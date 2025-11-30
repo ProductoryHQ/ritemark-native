@@ -2,9 +2,9 @@
 
 ## START HERE
 
-**Read the handover workplan first:**
-- `docs/handover/WEEK-1-WORKPLAN.md` - Current sprint tasks
-- `docs/handover/CONTEXT.md` - Project context and team structure
+**Current sprint:**
+- `docs/sprints/sprint-01-poc/sprint-plan.md` - Current sprint checklist
+- `docs/sprints/sprint-01-poc/research/` - Sprint research & context
 
 **Reference documentation (in ritemark repo):**
 - `/Users/jarmotuisk/Projects/ritemark/docs/research/vscode-native-app/README.md` - Master plan
@@ -16,7 +16,7 @@
 
 RiteMark Native is a VS Code OSS fork with RiteMark built-in as the native markdown editor. This is a standalone branded app, **not an extension**.
 
-**Target:** "RiteMark Desktop" - local-first markdown editing with offline support.
+**Target:** Local-first markdown editing with offline support.
 
 ---
 
@@ -41,7 +41,86 @@ ritemark-native/
 ├── branding/               # Icons, logos, product.json overrides
 ├── scripts/                # Development and release scripts
 └── docs/
-    └── handover/           # Sprint workplans and context
+    └── sprints/
+        └── sprint-XX-name/
+            ├── research/       # Context & research docs
+            ├── sprint-plan.md  # Checklist of deliverables
+            └── ...             # Other sprint docs
+```
+
+---
+
+## Development Environment (Jarmo's Mac)
+
+| Component | Version |
+|-----------|---------|
+| macOS | 15.5 (Sequoia) |
+| Architecture | arm64 (Apple Silicon) |
+| Node | v23.0.0 |
+| npm | 10.9.0 |
+| Python | 3.11.3 |
+| Xcode CLI | Installed |
+
+**Build target:** `darwin-arm64`
+
+---
+
+## Sprint Development Routine
+
+**Every sprint follows these phases. NO PHASE CAN BE SKIPPED.**
+
+### Phase 1: RESEARCH (Context)
+
+- Read existing documentation
+- Explore codebase / dependencies
+- Identify unknowns and risks
+- Document findings in `docs/sprints/sprint-XX/research/`
+
+### Phase 2: PLAN
+
+- Create `sprint-plan.md` with clear checklist
+- Define exit criteria
+- **⚠️ STOP: Wait for Jarmo's approval before proceeding**
+
+### Phase 3: DEVELOP
+
+- Implement checklist items
+- Commit frequently with clear messages
+- Update sprint-plan.md checkboxes as you go
+
+### Phase 4: TEST & VALIDATE
+
+- Verify all checklist items work
+- Jarmo tests on Mac (`darwin-arm64`)
+- Document any issues found
+
+### Phase 5: CLEANUP
+
+- Remove debug code / commented code
+- Ensure code quality
+- Update documentation
+- Address any tech debt created
+
+### Phase 6: CI/CD DEPLOY
+
+- Final commit with all changes
+- Push to GitHub
+- Tag release if applicable
+- Notify Jarmo: "Sprint XX complete, ready for review"
+
+---
+
+## Sprint Folder Structure
+
+Each sprint gets a dedicated folder:
+
+```
+docs/sprints/sprint-01-poc/
+├── research/
+│   ├── context.md          # Project context
+│   └── findings.md         # Research findings
+├── sprint-plan.md          # THE checklist (source of truth)
+└── notes.md                # Optional: implementation notes
 ```
 
 ---
@@ -64,29 +143,14 @@ cd vscode && ./scripts/code.sh
 
 ---
 
-## Working Protocol
-
-### Before Making Changes
-
-1. Check locked decisions above
-2. Read current workplan in `docs/handover/`
-3. If architectural decision needed → Ask Jarmo
-
-### Commit Style
+## Commit Style
 
 ```
-feat: add VS Code submodule (Task 1)
+feat: add VS Code submodule (Sprint 1, Task 1)
 fix: resolve extension loading issue
-docs: update workplan with progress
+docs: update sprint plan with progress
 chore: clean up build scripts
 ```
-
-### After Completing Tasks
-
-1. Commit with clear message
-2. Push to GitHub
-3. Update workplan with status
-4. Notify Jarmo for testing
 
 ---
 
