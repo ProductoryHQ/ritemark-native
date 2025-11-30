@@ -1,0 +1,34 @@
+{
+  "name": "ritemark",
+  "displayName": "RiteMark Editor",
+  "description": "WYSIWYG Markdown Editor",
+  "version": "0.1.0",
+  "publisher": "ritemark",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "ritemark.editor",
+        "displayName": "RiteMark",
+        "selector": [
+          { "filenamePattern": "*.md" },
+          { "filenamePattern": "*.markdown" }
+        ],
+        "priority": "default"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.94.0",
+    "typescript": "^5.0.0"
+  }
+}
