@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+webview/node_modules/
+
+# Build outputs (keep media/webview.js for distribution)
+out/
+*.js.map
+
+# TypeScript cache
+*.tsbuildinfo

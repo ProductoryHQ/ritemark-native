@@ -16,8 +16,12 @@
         "viewType": "ritemark.editor",
         "displayName": "RiteMark",
         "selector": [
-          { "filenamePattern": "*.md" },
-          { "filenamePattern": "*.markdown" }
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.markdown"
+          }
         ],
         "priority": "default"
       }
@@ -28,6 +32,7 @@
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
+    "@types/node": "^24.10.1",
     "@types/vscode": "^1.94.0",
     "typescript": "^5.0.0"
   }

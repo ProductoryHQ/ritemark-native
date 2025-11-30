@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
@@ -16,15 +18,50 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    webviewPanel.webview.options = { enableScripts: true };
-    webviewPanel.webview.html = this.getHtml(document.getText(), document.fileName);
+    // Get URI for the webview bundle
+    const scriptUri = webviewPanel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js')
+    );
+
+    // Get directory of the markdown file for local resource access
+    const docDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
+
+    webviewPanel.webview.options = {
+      enableScripts: true,
+      enableForms: true,  // Enable form inputs and file handling
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.context.extensionUri, 'media'),
+        docDir  // Allow loading images from document directory
+      ]
+    };
+
+    webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri);
+
+    // Track if we're currently updating to prevent feedback loops
+    let isUpdating = false;
 
     // Handle messages from the webview
     webviewPanel.webview.onDidReceiveMessage(
       message => {
         switch (message.type) {
-          case 'update':
-            this.updateDocument(document, message.content);
+          case 'ready':
+            // Webview is ready, send the document content
+            webviewPanel.webview.postMessage({
+              type: 'load',
+              content: document.getText()
+            });
+            return;
+
+          case 'contentChanged':
+            // Content changed in editor, update document
+            if (!isUpdating) {
+              this.updateDocument(document, message.content);
+            }
+            return;
+
+          case 'saveImage':
+            // Save image to ./images/ folder relative to markdown file
+            this.saveImage(document, message.dataUrl, message.filename, webviewPanel);
             return;
         }
       },
@@ -34,11 +71,14 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Update webview when document changes externally
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
-      if (e.document.uri.toString() === document.uri.toString()) {
+      if (e.document.uri.toString() === document.uri.toString() && !isUpdating) {
+        isUpdating = true;
         webviewPanel.webview.postMessage({
-          type: 'update',
+          type: 'load',
           content: document.getText()
         });
+        // Reset flag after a short delay
+        setTimeout(() => { isUpdating = false; }, 100);
       }
     });
 
@@ -57,13 +97,70 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     vscode.workspace.applyEdit(edit);
   }
 
-  private getHtml(content: string, fileName: string): string {
-    const name = fileName.split('/').pop() || 'Untitled';
+  private async saveImage(
+    document: vscode.TextDocument,
+    dataUrl: string,
+    filename: string,
+    webviewPanel: vscode.WebviewPanel
+  ): Promise<void> {
+    try {
+      // Get directory of the markdown file
+      const docDir = path.dirname(document.uri.fsPath);
+      const imagesDir = path.join(docDir, 'images');
+
+      // Create images folder if it doesn't exist
+      if (!fs.existsSync(imagesDir)) {
+        fs.mkdirSync(imagesDir, { recursive: true });
+      }
+
+      // Extract base64 data from data URL (format: data:image/png;base64,...)
+      const matches = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (!matches) {
+        throw new Error('Invalid image data URL');
+      }
+
+      const extension = matches[1];
+      const base64Data = matches[2];
+
+      // Ensure filename has correct extension
+      const baseName = path.basename(filename, path.extname(filename));
+      const finalFilename = `${baseName}.${extension}`;
+      const imagePath = path.join(imagesDir, finalFilename);
+
+      // Write image file
+      fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
+
+      // Return relative path for markdown and webview URI for display
+      const relativePath = `./images/${finalFilename}`;
+      const webviewUri = webviewPanel.webview.asWebviewUri(
+        vscode.Uri.file(imagePath)
+      ).toString();
+
+      // Send success response to webview with both paths
+      webviewPanel.webview.postMessage({
+        type: 'imageSaved',
+        path: relativePath,        // For markdown storage
+        displaySrc: webviewUri     // For editor display
+      });
+    } catch (error) {
+      console.error('Failed to save image:', error);
+      webviewPanel.webview.postMessage({
+        type: 'imageError',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  private getHtml(webview: vscode.Webview, scriptUri: vscode.Uri): string {
+    // Get nonce for Content Security Policy
+    const nonce = this.getNonce();
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:;">
   <title>RiteMark</title>
   <style>
     * {
@@ -71,92 +168,42 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       padding: 0;
       box-sizing: border-box;
     }
+    html, body, #root {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--vscode-editor-background, #1e1e1e);
-      color: var(--vscode-editor-foreground, #d4d4d4);
-      padding: 40px;
-      line-height: 1.6;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 32px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--vscode-panel-border, #3c3c3c);
-    }
-    .logo {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
-      border-radius: 6px;
-    }
-    h1 {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--vscode-foreground, #cccccc);
-    }
-    .badge {
-      font-size: 11px;
-      padding: 2px 8px;
-      background: var(--vscode-badge-background, #4d4d4d);
-      color: var(--vscode-badge-foreground, #ffffff);
-      border-radius: 10px;
-      margin-left: auto;
-    }
-    .file-name {
-      font-size: 14px;
-      color: var(--vscode-descriptionForeground, #8c8c8c);
-      margin-bottom: 24px;
-    }
-    .content {
-      background: var(--vscode-input-background, #252526);
-      padding: 24px;
-      border-radius: 8px;
-      border: 1px solid var(--vscode-input-border, #3c3c3c);
-      white-space: pre-wrap;
-      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-      font-size: 14px;
-      min-height: 200px;
-      max-height: 60vh;
-      overflow-y: auto;
-    }
-    .info {
-      margin-top: 24px;
-      padding: 16px;
-      background: var(--vscode-textBlockQuote-background, #2d2d2d);
-      border-left: 3px solid #4285f4;
-      border-radius: 0 4px 4px 0;
-      font-size: 13px;
-    }
-    .info strong {
-      color: #4285f4;
+      background: var(--vscode-editor-background, #ffffff);
+      color: var(--vscode-editor-foreground, #333333);
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo"></div>
-    <h1>RiteMark Editor</h1>
-    <span class="badge">POC v0.1</span>
-  </div>
-  <div class="file-name">${this.escapeHtml(name)}</div>
-  <div class="content">${this.escapeHtml(content)}</div>
-  <div class="info">
-    <strong>Prototype Mode</strong><br>
-    This is the RiteMark editor proof-of-concept. Full WYSIWYG editing coming in Sprint 2.
-  </div>
+  <div id="root"></div>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
+  <script nonce="${nonce}">
+    // Prevent VS Code from intercepting drops - let them through to our editor
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    document.addEventListener('drop', (e) => {
+      // Don't prevent default here - let the editor handle it
+      e.stopPropagation();
+    });
+  </script>
 </body>
 </html>`;
   }
 
-  private escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+  private getNonce(): string {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 32; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
   }
 }
