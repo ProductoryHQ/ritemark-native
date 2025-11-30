@@ -50,10 +50,10 @@
 - [x] Documentation updated
 - [x] Sprint plan updated
 
-### Phase 6: CI/CD DEPLOY ⏳
-- [ ] Final commit
-- [ ] Push to GitHub
-- [ ] Tag: `v0.1.0-poc`
+### Phase 6: CI/CD DEPLOY ✅
+- [x] Final commit
+- [x] Push to GitHub
+- [x] Tag: `v0.1.0-poc`
 
 ---
 
