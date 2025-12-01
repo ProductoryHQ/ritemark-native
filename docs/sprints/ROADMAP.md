@@ -14,9 +14,10 @@ This roadmap outlines all sprints needed to deliver RiteMark Native from POC to 
 | 01 | POC | ✅ Complete | Validate VS Code fork approach |
 | 02 | Full Editor | ✅ Complete | TipTap WYSIWYG editor working |
 | 03 | AI & Polish | ✅ Complete | AI assistant, offline mode, UX cleanup |
-| 04 | Multi-Platform | 📋 Planned | Windows, Linux builds + installers |
-| 05 | Release Prep | 📋 Planned | Auto-update, CI/CD, documentation |
-| 06+ | Post-MVP | 🔮 Future | Enhancements based on user feedback |
+| 04 | Core Polish | 📋 Next | VS Code chrome cleanup, branding, menus |
+| 05 | Multi-Platform | 📋 Planned | Windows, Linux builds + installers |
+| 06 | Release Prep | 📋 Planned | Auto-update, CI/CD, documentation |
+| 07+ | Post-MVP | 🔮 Future | Enhancements based on user feedback |
 
 ---
 
@@ -116,7 +117,70 @@ This roadmap outlines all sprints needed to deliver RiteMark Native from POC to 
 
 ---
 
-## 📋 Sprint 04: Multi-Platform Builds
+## 📋 Sprint 04: Core Polish
+
+**Goal:** Strip VS Code chrome to create a clean, focused RiteMark experience
+
+**Duration:** ~3-5 days estimated
+
+### Areas to Address
+
+**Activity Bar:**
+- [ ] Hide Accounts icon (or rebrand for RiteMark)
+- [ ] Hide Settings gear (move to menu only)
+- [ ] Ensure only Explorer, Search, SCM visible
+- [ ] Consider hiding activity bar entirely (sidebar-only mode)
+
+**Status Bar:**
+- [ ] Hide language mode selector (always Markdown)
+- [ ] Hide encoding selector
+- [ ] Hide line endings selector
+- [ ] Hide spaces/tabs indicator
+- [ ] Keep: Line/column, Git branch, RiteMark status
+- [ ] Custom RiteMark status items (word count?)
+
+**Panel Area (Terminal/Problems/Output):**
+- [ ] Decide: Hide entirely or keep minimal?
+- [ ] If keeping: disable Terminal, Problems tabs
+- [ ] Remove keyboard shortcuts for panels
+
+**Menus:**
+- [ ] Hide Debug menu entirely
+- [ ] Hide Terminal menu entirely
+- [ ] Simplify View menu (remove dev items)
+- [ ] Simplify Help menu (RiteMark-specific)
+- [ ] Review File menu (remove workspace items?)
+- [ ] Review Edit menu (keep standard items)
+
+**Title Bar:**
+- [ ] Show "RiteMark" not "Code - OSS"
+- [ ] Custom window title format
+- [ ] macOS: Native title bar styling
+
+**Welcome/Start:**
+- [ ] Disable VS Code welcome tab
+- [ ] RiteMark walkthrough as default
+- [ ] Empty state when no file open
+
+**Keyboard Shortcuts:**
+- [ ] Disable dev shortcuts (Cmd+Shift+P → hide dev commands)
+- [ ] Ensure RiteMark shortcuts work (Cmd+Shift+A, etc.)
+- [ ] Review conflicting shortcuts
+
+**Context Menus:**
+- [ ] Simplify editor context menu
+- [ ] Simplify explorer context menu
+- [ ] Add "Open with Text Editor" option
+
+### Exit Criteria
+- [ ] App feels like "RiteMark" not "VS Code"
+- [ ] No dev-focused UI elements visible
+- [ ] Clean, minimal interface
+- [ ] Jarmo: "This doesn't feel like VS Code anymore"
+
+---
+
+## 📋 Sprint 05: Multi-Platform Builds
 
 **Goal:** Windows and Linux builds with proper installers
 
@@ -156,7 +220,7 @@ This roadmap outlines all sprints needed to deliver RiteMark Native from POC to 
 
 ---
 
-## 📋 Sprint 05: Release Preparation
+## 📋 Sprint 06: Release Preparation
 
 **Goal:** CI/CD, auto-update, documentation for public release
 
@@ -197,7 +261,7 @@ This roadmap outlines all sprints needed to deliver RiteMark Native from POC to 
 
 ---
 
-## 🔮 Sprint 06+: Post-MVP (Future)
+## 🔮 Sprint 07+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
 
@@ -249,10 +313,11 @@ These items are **not committed** - prioritization depends on user needs.
 | Phase | Sprints | Est. Duration | Status |
 |-------|---------|---------------|--------|
 | Foundation | 01-02 | ~1 week | ✅ Done |
-| Polish | 03 | ~2 days | ✅ Done |
-| Platform | 04-05 | ~2 weeks | 📋 Next |
-| **MVP Total** | **01-05** | **~3-4 weeks** | **In Progress** |
-| Post-MVP | 06+ | Ongoing | 🔮 Future |
+| AI & UX | 03 | ~2 days | ✅ Done |
+| Core Polish | 04 | ~3-5 days | 📋 Next |
+| Platform | 05-06 | ~2 weeks | 📋 Planned |
+| **MVP Total** | **01-06** | **~4-5 weeks** | **In Progress** |
+| Post-MVP | 07+ | Ongoing | 🔮 Future |
 
 ---
 
@@ -273,8 +338,8 @@ Every sprint follows the same phases:
 ## Next Steps
 
 **To start Sprint 04:**
-1. Claude creates `docs/sprints/sprint-04-multi-platform/` folder
-2. Claude researches Windows/Linux build requirements
+1. Claude creates `docs/sprints/sprint-04-core-polish/` folder
+2. Claude researches VS Code core modification points
 3. Claude writes `sprint-plan.md` with detailed checklist
 4. Jarmo reviews and approves
 5. Development begins
