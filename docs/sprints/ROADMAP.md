@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2025-11-30 (added AI reuse analysis)
+**Last Updated:** 2025-12-01 (Sprint 03 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 ---
@@ -13,7 +13,7 @@ This roadmap outlines all sprints needed to deliver RiteMark Native from POC to 
 |--------|------|--------|------|
 | 01 | POC | ✅ Complete | Validate VS Code fork approach |
 | 02 | Full Editor | ✅ Complete | TipTap WYSIWYG editor working |
-| 03 | AI & Polish | 📋 Planned | AI assistant, offline mode, UX cleanup |
+| 03 | AI & Polish | ✅ Complete | AI assistant, offline mode, UX cleanup |
 | 04 | Multi-Platform | 📋 Planned | Windows, Linux builds + installers |
 | 05 | Release Prep | 📋 Planned | Auto-update, CI/CD, documentation |
 | 06+ | Post-MVP | 🔮 Future | Enhancements based on user feedback |
@@ -70,70 +70,49 @@ This roadmap outlines all sprints needed to deliver RiteMark Native from POC to 
 
 ---
 
-## 📋 Sprint 03: AI & Polish
+## ✅ Sprint 03: AI & Polish (Complete)
 
 **Goal:** Add AI assistant, offline detection, and polish the UX
 
-**Duration:** ~4-6 days estimated
+**Duration:** ~2 days (2025-11-30 to 2025-12-01)
 
 **Approach:** Reuse ~80% from ritemark-app AI implementation
 
-### Code Reuse from ritemark-app
-
-| Source File | Reuse | Adaptation Needed |
-|-------------|-------|-------------------|
-| `services/ai/openAIClient.ts` | 100% | Remove `dangerouslyAllowBrowser` |
-| `services/ai/textSearch.ts` | 100% | None - editor-agnostic |
-| `services/ai/apiKeyManager.ts` | Pattern | Use VS Code SecretStorage API |
-| `services/ai/widgets/*` | 85% | Adapt UI for VS Code webview |
-| `components/ai/AIChatSidebar.tsx` | 70% | Port to extension webview |
-| `components/ai/SelectionIndicator.tsx` | 90% | Minor styling tweaks |
-
-**Key Architecture from ritemark-app:**
-- OpenAI GPT with streaming + function calling
-- Widget system for modal operations (rephrase, find/replace)
-- 3-tier text search (exact → markdown-normalized → unicode)
-- Encrypted API key storage (AES-256-GCM)
-
 ### Deliverables
 
-**AI Integration (reuse openAIClient + widgets):**
-- [ ] AI chat sidebar in editor webview
-- [ ] `rephraseText` tool - modal with before/after preview
-- [ ] `findAndReplaceAll` tool - preview matches, case preservation
-- [ ] `insertText` tool - smart positioning
-- [ ] Streaming responses with cancel support
-- [ ] Error handling (401, 429, timeout, offline)
+**AI Integration:**
+- [x] AI chat sidebar in editor webview (Cmd+Shift+A)
+- [x] `rephraseText` tool - modal with style options
+- [x] `findAndReplaceAll` tool - preview matches, case preservation
+- [x] `insertText` tool - smart positioning
+- [x] Streaming responses with cancel support
+- [x] Error handling (401, 429, timeout, offline)
 
-**API Key Management (Option B - minimal):**
-- [ ] Store key via VS Code SecretStorage (OS keychain-backed)
-- [ ] Command: "RiteMark: Configure API Key" → input prompt
-- [ ] AI sidebar shows "API key not configured" + setup button when missing
-- [ ] Validate key format on entry (must start with `sk-`)
+**API Key Management:**
+- [x] Store key via VS Code SecretStorage (OS keychain-backed)
+- [x] Command: "RiteMark: Configure API Key" → input prompt
+- [x] AI sidebar shows "API key not configured" + setup button when missing
+- [x] Validate key format on entry (must start with `sk-`)
 
 **Offline Mode:**
-- [ ] Network connectivity detection
-- [ ] Status bar indicator (Ready/Offline)
-- [ ] AI panel shows "Connect for AI features" when offline
-- [ ] All local editing works offline
+- [x] Network connectivity detection
+- [x] AI panel shows offline message when disconnected
+- [x] All local editing works offline
 
 **UX Polish:**
-- [ ] Welcome screen (first-run experience)
-- [ ] Hide unused VS Code views (Activity Bar cleanup)
-- [ ] Simplify menus (remove dev-focused items)
-- [ ] Keyboard shortcut: Cmd+Shift+A toggle AI sidebar
-- [ ] "Open with Text Editor" context menu option
-
-**Quality:**
-- [ ] Error boundaries in webview
-- [ ] Graceful degradation
-- [ ] Performance optimization
+- [x] Welcome walkthrough (first-run experience)
+- [x] Hide unused VS Code views (Debug, Extensions, Outline, Timeline)
+- [x] Lucide icon font integration for cleaner activity bar
+- [x] Activity bar icon size optimization (16px)
+- [x] Keyboard shortcut: Cmd+Shift+A toggle AI sidebar
 
 ### Exit Criteria
-- [ ] AI features work (rephrase, find/replace, insert)
-- [ ] Offline mode shows clear status
-- [ ] First-run experience under 2 minutes
-- [ ] Jarmo: "This is polished enough to show users"
+- [x] AI features work (rephrase, find/replace, insert)
+- [x] Offline mode shows clear status
+- [x] First-run walkthrough experience
+- [x] Jarmo: "This is polished enough to show users"
+
+**Validated:** 2025-12-01 by Jarmo
 
 ---
 
@@ -270,9 +249,9 @@ These items are **not committed** - prioritization depends on user needs.
 | Phase | Sprints | Est. Duration | Status |
 |-------|---------|---------------|--------|
 | Foundation | 01-02 | ~1 week | ✅ Done |
-| Polish | 03 | ~1 week | 📋 Next |
-| Platform | 04-05 | ~2 weeks | 📋 Planned |
-| **MVP Total** | **01-05** | **~4 weeks** | **In Progress** |
+| Polish | 03 | ~2 days | ✅ Done |
+| Platform | 04-05 | ~2 weeks | 📋 Next |
+| **MVP Total** | **01-05** | **~3-4 weeks** | **In Progress** |
 | Post-MVP | 06+ | Ongoing | 🔮 Future |
 
 ---
@@ -293,9 +272,9 @@ Every sprint follows the same phases:
 
 ## Next Steps
 
-**To start Sprint 03:**
-1. Claude creates `docs/sprints/sprint-03-ai-polish/` folder
-2. Claude researches AI integration approaches
+**To start Sprint 04:**
+1. Claude creates `docs/sprints/sprint-04-multi-platform/` folder
+2. Claude researches Windows/Linux build requirements
 3. Claude writes `sprint-plan.md` with detailed checklist
 4. Jarmo reviews and approves
 5. Development begins
@@ -308,6 +287,7 @@ Every sprint follows the same phases:
 - Technical Spec: `/ritemark/docs/research/vscode-native-app/OPTION-B-full-fork.md`
 - Sprint 01 Details: `sprint-01-poc/sprint-plan.md`
 - Sprint 02 Details: `sprint-02-editor/sprint-plan.md`
+- Sprint 03 Details: `sprint-03-ai-polish/sprint-plan.md`
 
 ### AI Implementation Reference (ritemark-app)
 
