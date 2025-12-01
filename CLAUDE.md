@@ -3,8 +3,11 @@
 ## START HERE
 
 **Current sprint:**
-- `docs/sprints/sprint-01-poc/sprint-plan.md` - Current sprint checklist
-- `docs/sprints/sprint-01-poc/research/` - Sprint research & context
+- `docs/sprints/sprint-02-editor/sprint-plan.md` - Current sprint checklist
+- `docs/sprints/sprint-02-editor/research/` - Sprint research & context
+
+**Previous sprints:**
+- `docs/sprints/sprint-01-poc/` - ✅ Complete (POC validated)
 
 **Reference documentation (in ritemark repo):**
 - `/Users/jarmotuisk/Projects/ritemark/docs/research/vscode-native-app/README.md` - Master plan

@@ -1,14 +1,43 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import type { AIViewProvider } from './ai/AIViewProvider';
 
 export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
-  public static register(context: vscode.ExtensionContext): vscode.Disposable {
+  // Track all active webview panels for broadcasting tool execution
+  private static activeWebviews: Set<vscode.Webview> = new Set();
+  private static _aiViewProvider: AIViewProvider | null = null;
+
+  public static register(
+    context: vscode.ExtensionContext,
+    aiViewProvider: AIViewProvider
+  ): vscode.Disposable {
+    RiteMarkEditorProvider._aiViewProvider = aiViewProvider;
     return vscode.window.registerCustomEditorProvider(
       'ritemark.editor',
       new RiteMarkEditorProvider(context),
       { webviewOptions: { retainContextWhenHidden: true } }
     );
+  }
+
+  /**
+   * Execute AI tool in all active editor webviews
+   * Called from AI panel via command
+   */
+  public static executeAITool(data: {
+    toolName: string;
+    args: Record<string, unknown>;
+    selection: { text: string; isEmpty: boolean; from: number; to: number };
+  }) {
+    // Broadcast to all active webviews
+    for (const webview of RiteMarkEditorProvider.activeWebviews) {
+      webview.postMessage({
+        type: 'ai-widget',
+        toolName: data.toolName,
+        args: data.args,
+        selection: data.selection
+      });
+    }
   }
 
   constructor(private readonly context: vscode.ExtensionContext) {}
@@ -40,6 +69,9 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     // Track if we're currently updating to prevent feedback loops
     let isUpdating = false;
 
+    // Add this webview to active set for AI tool broadcasts
+    RiteMarkEditorProvider.activeWebviews.add(webviewPanel.webview);
+
     // Handle messages from the webview
     webviewPanel.webview.onDidReceiveMessage(
       message => {
@@ -63,6 +95,16 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             // Save image to ./images/ folder relative to markdown file
             this.saveImage(document, message.dataUrl, message.filename, webviewPanel);
             return;
+
+          case 'selectionChanged':
+            // Forward selection and document content to AI panel
+            if (RiteMarkEditorProvider._aiViewProvider) {
+              RiteMarkEditorProvider._aiViewProvider.sendSelection(
+                message.selection,
+                document.getText()
+              );
+            }
+            return;
         }
       },
       undefined,
@@ -83,6 +125,8 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     });
 
     webviewPanel.onDidDispose(() => {
+      // Remove from active set
+      RiteMarkEditorProvider.activeWebviews.delete(webviewPanel.webview);
       changeDocumentSubscription.dispose();
     });
   }
