@@ -9,7 +9,7 @@
   --muted: var(--vscode-input-background, #3c3c3c);
   --muted-foreground: var(--vscode-descriptionForeground, #8c8c8c);
   --border: var(--vscode-panel-border, #3c3c3c);
-  --primary: var(--vscode-button-background, #0078d4);
+  --primary: var(--vscode-button-background, #4338ca);
   --primary-foreground: var(--vscode-button-foreground, #ffffff);
 }
 

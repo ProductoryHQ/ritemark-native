@@ -94,15 +94,14 @@
       {
         "id": "ritemark.welcome",
         "title": "Get Started with RiteMark",
-        "description": "Your AI-powered markdown editor for focused writing",
+        "description": "A beautiful markdown editor with AI assistance",
         "steps": [
           {
             "id": "welcome",
             "title": "Welcome to RiteMark",
-            "description": "RiteMark is a distraction-free markdown editor with built-in AI assistance.\n\nWrite beautiful documents with a clean WYSIWYG interface while AI helps you improve your writing.",
+            "description": "Write in markdown with a clean, distraction-free interface. Your files stay on your computer.",
             "media": {
-              "altText": "RiteMark Editor",
-              "svg": "media/icon.svg"
+              "svg": "media/logo.svg"
             },
             "completionEvents": [
               "onStepSelected"
@@ -111,11 +110,7 @@
           {
             "id": "configureApiKey",
             "title": "Configure AI API Key",
-            "description": "To use AI features, you'll need an OpenAI API key.\n\nGet your key from [OpenAI](https://platform.openai.com/api-keys).\n\nYour key is stored securely in your system keychain.\n\n[Configure API Key](command:ritemark.configureApiKey)",
-            "media": {
-              "altText": "API Key Setup",
-              "svg": "media/icon.svg"
-            },
+            "description": "Optional: Add your OpenAI API key to enable AI writing assistance.\n\n[Configure API Key](command:ritemark.configureApiKey)",
             "completionEvents": [
               "onCommand:ritemark.configureApiKey"
             ]
@@ -123,23 +118,15 @@
           {
             "id": "openMarkdown",
             "title": "Open a Markdown File",
-            "description": "Open any `.md` or `.markdown` file to start editing with RiteMark's WYSIWYG editor.\n\n[Open File](command:workbench.action.files.openFile)\n\nOr create a new file and save it with a `.md` extension.",
-            "media": {
-              "altText": "Open Markdown",
-              "svg": "media/icon.svg"
-            },
+            "description": "Open any `.md` file to start writing.\n\n[Open File](command:workbench.action.files.openFileFolder)",
             "completionEvents": [
-              "onCommand:workbench.action.files.openFile"
+              "onCommand:workbench.action.files.openFileFolder"
             ]
           },
           {
             "id": "tryAI",
             "title": "Try AI Features",
-            "description": "Select some text in your document, then use the AI panel to:\n\n- **Rephrase** - Improve your writing style\n- **Find & Replace** - Smart text transformations\n- **Insert** - Add new content\n\n[Show AI Panel](command:ritemark.showAIPanel)",
-            "media": {
-              "altText": "AI Features",
-              "svg": "media/icon.svg"
-            },
+            "description": "Select text and use the AI panel to rephrase, expand, or improve your writing.\n\n[Show AI Panel](command:ritemark.showAIPanel)",
             "completionEvents": [
               "onCommand:ritemark.showAIPanel"
             ]

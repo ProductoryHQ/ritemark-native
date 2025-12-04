@@ -585,23 +585,23 @@ export function Editor({
         }
 
         .wysiwyg-editor .ProseMirror a.tiptap-link {
-          color: #2563eb !important;
+          color: #4338ca !important;
           text-decoration: underline !important;
           cursor: pointer !important;
         }
 
         .wysiwyg-editor .ProseMirror a.tiptap-link:hover {
-          color: #1d4ed8 !important;
+          color: #3730a3 !important;
         }
 
         /* Increased specificity to override Vite HMR styles in dev mode */
         div.wysiwyg-editor .ProseMirror.ProseMirror ::selection {
-          background: rgba(59, 130, 246, 0.15) !important;
+          background: rgba(67, 56, 202, 0.15) !important;
           border-radius: 2px !important;
         }
 
         div.wysiwyg-editor .ProseMirror.ProseMirror ::-moz-selection {
-          background: rgba(59, 130, 246, 0.15) !important;
+          background: rgba(67, 56, 202, 0.15) !important;
         }
 
         /* Code block styling with dark theme */
@@ -650,7 +650,7 @@ export function Editor({
         /* Enhanced mobile selection */
         @media (max-width: 768px) {
           div.wysiwyg-editor .ProseMirror.ProseMirror ::selection {
-            background: rgba(59, 130, 246, 0.2) !important;
+            background: rgba(67, 56, 202, 0.2) !important;
           }
         }
 
@@ -695,7 +695,7 @@ export function Editor({
         /* Row hover effect */
         .wysiwyg-editor .ProseMirror tr.tiptap-table-row:hover td,
         .wysiwyg-editor .ProseMirror tr.tiptap-table-row:hover th {
-          background-color: rgba(59, 130, 246, 0.05) !important;
+          background-color: rgba(67, 56, 202, 0.05) !important;
         }
 
         /* Selected cell */
@@ -707,7 +707,7 @@ export function Editor({
           right: 0 !important;
           top: 0 !important;
           bottom: 0 !important;
-          background: rgba(59, 130, 246, 0.1) !important;
+          background: rgba(67, 56, 202, 0.1) !important;
           pointer-events: none !important;
         }
 
@@ -718,7 +718,7 @@ export function Editor({
           top: 0 !important;
           bottom: 0 !important;
           width: 4px !important;
-          background-color: #3b82f6 !important;
+          background-color: #4338ca !important;
           cursor: col-resize !important;
           opacity: 0 !important;
           transition: opacity 0.2s !important;

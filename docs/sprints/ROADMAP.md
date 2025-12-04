@@ -306,6 +306,11 @@ These items are **not committed** - prioritization depends on user needs.
 - [ ] Simple git operations (commit, push)
 - [ ] Obsidian vault compatibility
 
+**Update System Enhancements:**
+- [ ] Cursor-style update notifications (polished UI with release notes preview)
+- [ ] Update notification customization (frequency, channels)
+- [ ] Silent background updates with user control
+
 ---
 
 ## Timeline Summary
