@@ -173,3 +173,9 @@ chore: clean up build scripts
 - **Claude** = Engineering (implementation, everything else)
 
 **When uncertain → Ask Jarmo**
+
+---
+
+## Troubleshooting
+
+For build issues, see `.claude/skills/vscode-development/TROUBLESHOOTING.md`
