@@ -105,6 +105,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
               );
             }
             return;
+
+          case 'ai-configure-key':
+            // Open settings to configure API key
+            vscode.commands.executeCommand('workbench.action.openSettings', 'ritemark.openaiApiKey');
+            return;
         }
       },
       undefined,

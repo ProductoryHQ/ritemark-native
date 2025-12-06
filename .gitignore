@@ -42,3 +42,16 @@ tmp/
 temp/
 
 .early.coverage
+
+# Build artifacts
+*.dmg
+*.app
+VSCode-darwin-arm64/
+
+# Claude Code local files
+.claude/settings.local.json
+.claude/agents/
+.claude/skills/knowledge-builder/
+
+# Backup files
+*_old.*

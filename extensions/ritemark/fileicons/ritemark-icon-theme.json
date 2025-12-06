@@ -1,0 +1,101 @@
+{
+  "iconDefinitions": {
+    "_file": {
+      "iconPath": "./icons/file.svg"
+    },
+    "_file_markdown": {
+      "iconPath": "./icons/file-text.svg"
+    },
+    "_file_code": {
+      "iconPath": "./icons/file-code.svg"
+    },
+    "_file_code_ts": {
+      "iconPath": "./icons/file-code-2.svg"
+    },
+    "_file_json": {
+      "iconPath": "./icons/braces.svg"
+    },
+    "_file_css": {
+      "iconPath": "./icons/paintbrush.svg"
+    },
+    "_file_image": {
+      "iconPath": "./icons/image.svg"
+    },
+    "_file_config": {
+      "iconPath": "./icons/settings.svg"
+    },
+    "_file_package": {
+      "iconPath": "./icons/package.svg"
+    },
+    "_file_readme": {
+      "iconPath": "./icons/book-open.svg"
+    },
+    "_folder": {
+      "iconPath": "./icons/folder.svg"
+    },
+    "_folder_open": {
+      "iconPath": "./icons/folder-open.svg"
+    }
+  },
+  "file": "_file",
+  "folder": "_folder",
+  "folderExpanded": "_folder_open",
+  "fileExtensions": {
+    "md": "_file_markdown",
+    "mdx": "_file_markdown",
+    "markdown": "_file_markdown",
+    "json": "_file_json",
+    "jsonc": "_file_json",
+    "json5": "_file_json",
+    "js": "_file_code",
+    "mjs": "_file_code",
+    "cjs": "_file_code",
+    "jsx": "_file_code",
+    "ts": "_file_code_ts",
+    "tsx": "_file_code_ts",
+    "mts": "_file_code_ts",
+    "cts": "_file_code_ts",
+    "html": "_file_code",
+    "htm": "_file_code",
+    "css": "_file_css",
+    "scss": "_file_css",
+    "sass": "_file_css",
+    "less": "_file_css",
+    "png": "_file_image",
+    "jpg": "_file_image",
+    "jpeg": "_file_image",
+    "gif": "_file_image",
+    "webp": "_file_image",
+    "svg": "_file_image",
+    "ico": "_file_image",
+    "bmp": "_file_image",
+    "yaml": "_file_config",
+    "yml": "_file_config",
+    "toml": "_file_config",
+    "ini": "_file_config",
+    "env": "_file_config"
+  },
+  "fileNames": {
+    "package.json": "_file_package",
+    "package-lock.json": "_file_package",
+    "readme.md": "_file_readme",
+    "readme": "_file_readme",
+    "changelog.md": "_file_readme",
+    "license": "_file_readme",
+    "license.md": "_file_readme"
+  },
+  "languageIds": {
+    "markdown": "_file_markdown",
+    "json": "_file_json",
+    "jsonc": "_file_json",
+    "javascript": "_file_code",
+    "javascriptreact": "_file_code",
+    "typescript": "_file_code_ts",
+    "typescriptreact": "_file_code_ts",
+    "html": "_file_code",
+    "css": "_file_css",
+    "scss": "_file_css",
+    "less": "_file_css",
+    "yaml": "_file_config"
+  }
+}
