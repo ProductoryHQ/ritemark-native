@@ -52,6 +52,7 @@ export class AIViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'ai-configure-key':
+          console.log('[AIViewProvider] Received ai-configure-key message');
           vscode.commands.executeCommand('ritemark.configureApiKey');
           break;
 
@@ -615,7 +616,7 @@ export class AIViewProvider implements vscode.WebviewViewProvider {
     </svg>
     <h3>OpenAI API Key Required</h3>
     <p>Add your API key to enable AI features</p>
-    <button class="btn" onclick="configureKey()">Configure API Key</button>
+    <button class="btn" id="configure-key-btn">Configure API Key</button>
   </div>
 
   <div id="offline-banner" class="offline-banner" style="display: none;">
@@ -975,6 +976,7 @@ export class AIViewProvider implements vscode.WebviewViewProvider {
     }
 
     function configureKey() {
+      console.log('[Webview] configureKey button clicked, posting message...');
       vscode.postMessage({ type: 'ai-configure-key' });
     }
 
@@ -1076,6 +1078,7 @@ export class AIViewProvider implements vscode.WebviewViewProvider {
     // Attach event listeners (CSP blocks inline onclick)
     document.getElementById('modal-cancel-btn').addEventListener('click', cancelWidget);
     document.getElementById('modal-execute-btn').addEventListener('click', executeWidget);
+    document.getElementById('configure-key-btn').addEventListener('click', configureKey);
 
     // Initialize
     vscode.postMessage({ type: 'ready' });
