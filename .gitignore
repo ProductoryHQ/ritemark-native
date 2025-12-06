@@ -48,10 +48,8 @@ temp/
 *.app
 VSCode-darwin-arm64/
 
-# Claude Code local files
+# Claude Code local files (keep settings local, commit agents for governance)
 .claude/settings.local.json
-.claude/agents/
-.claude/skills/knowledge-builder/
 
 # Backup files
 *_old.*
