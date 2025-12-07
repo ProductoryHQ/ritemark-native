@@ -75,7 +75,52 @@ npm run build
 ls -la ../media/webview.js  # Verify ~900KB
 ```
 
-### 3. TypeScript Compilation (CRITICAL)
+### 3. Webview Config Files (CRITICAL)
+
+**Check:** PostCSS and Tailwind config files exist and are not empty
+
+```bash
+# Validation commands
+[ -s extensions/ritemark/webview/postcss.config.js ] && echo "OK" || echo "EMPTY"
+[ -s extensions/ritemark/webview/tailwind.config.ts ] && echo "OK" || echo "EMPTY"
+```
+
+**If empty or missing:**
+```
+FAILED: Webview config files check
+
+Config files are empty (0 bytes) - Tailwind CSS will NOT be processed!
+This causes styles to be missing in production builds.
+
+FIX:
+cd extensions/ritemark/webview
+git checkout HEAD -- postcss.config.js tailwind.config.ts
+npm run build
+```
+
+### 4. CSS Processing Verification (CRITICAL)
+
+**Check:** Webview bundle contains processed CSS, not raw @tailwind directives
+
+```bash
+# Validation command
+! grep -q "@tailwind base" extensions/ritemark/media/webview.js && echo "OK" || echo "FAIL"
+```
+
+**If fails:**
+```
+FAILED: CSS processing check
+
+webview.js contains raw "@tailwind" directives instead of processed CSS.
+This means Tailwind CSS was NOT processed during build.
+
+FIX:
+1. Check postcss.config.js and tailwind.config.ts are not empty
+2. Rebuild: cd extensions/ritemark/webview && npm run build
+3. Verify: grep "@tailwind base" ../media/webview.js (should return nothing)
+```
+
+### 5. TypeScript Compilation (CRITICAL)
 
 **Check:** Extension compiles without errors
 
@@ -94,7 +139,7 @@ Errors found in extension code. Fix before committing.
 [Show actual errors from compile output]
 ```
 
-### 4. Debug Code Check (WARNING)
+### 6. Debug Code Check (WARNING)
 
 **Check:** No console.log or debugger statements in production code
 
@@ -113,7 +158,7 @@ Found console.log or debugger statements:
 Remove or mark with "// DEBUG" comment if intentional.
 ```
 
-### 5. Commit Message Format (WARNING)
+### 7. Commit Message Format (WARNING)
 
 **Check:** Follows conventional commit format
 
@@ -145,6 +190,8 @@ QA VALIDATION REPORT
 
 [PASS] Symlink integrity
 [PASS] Webview bundle size (923KB)
+[PASS] Webview config files
+[PASS] CSS processing verified
 [PASS] TypeScript compilation
 [WARN] Debug code (2 console.log found)
 [PASS] Commit format ready
@@ -197,20 +244,20 @@ Recommendation: Run qa-validator after fixing issues.
 
 For production releases, also check:
 
-### 6. Production App Exists
+### 8. Production App Exists
 
 ```bash
 ls -la "VSCode-darwin-arm64/RiteMark Native.app"
 ```
 
-### 7. Production App Launches
+### 9. Production App Launches
 
 ```bash
 open "VSCode-darwin-arm64/RiteMark Native.app"
 # Manual verification required
 ```
 
-### 8. Webview in Production
+### 10. Webview in Production
 
 ```bash
 ls -la "VSCode-darwin-arm64/RiteMark Native.app/Contents/Resources/app/extensions/ritemark/media/webview.js"
@@ -222,11 +269,11 @@ ls -la "VSCode-darwin-arm64/RiteMark Native.app/Contents/Resources/app/extension
 When invoked by sprint-manager for phase transitions:
 
 **Phase 4→5 (Test & Validate → Cleanup):**
-- Run checks 1-4
+- Run checks 1-6
 - Report to sprint-manager
 
 **Phase 6 (Deploy):**
-- Run all checks 1-8
+- Run all checks 1-10
 - Block release if any critical fails
 
 ## Quick Commands
@@ -236,8 +283,10 @@ When invoked by sprint-manager for phase transitions:
 ./scripts/qa-validate.sh  # (if exists)
 
 # Or manual:
-ls -la vscode/extensions/ritemark                    # Symlink
-ls -la extensions/ritemark/media/webview.js          # Bundle size
-cd extensions/ritemark && npm run compile            # TypeScript
-grep -r "console\.log" extensions/ritemark/src/      # Debug code
+ls -la vscode/extensions/ritemark                              # 1. Symlink
+ls -la extensions/ritemark/media/webview.js                    # 2. Bundle size
+[ -s extensions/ritemark/webview/postcss.config.js ] && echo OK  # 3. Config files
+grep -q "@tailwind base" extensions/ritemark/media/webview.js && echo FAIL || echo OK  # 4. CSS processed
+cd extensions/ritemark && npm run compile                      # 5. TypeScript
+grep -r "console\.log" extensions/ritemark/src/                # 6. Debug code
 ```

@@ -169,15 +169,19 @@ If the issue involves:
 ### Critical Invariants
 - Symlink: `vscode/extensions/ritemark` → `../../extensions/ritemark`
 - Build target: `darwin-arm64`
-- Node architecture: Must be arm64
+- Node architecture: Must be arm64 (NOT x64/Rosetta)
+- Node version: v20.x required
 
 ### Key Commands
 ```bash
 # Development mode
 cd vscode && ./scripts/code.sh
 
-# Production build (~25 min)
-cd vscode && yarn gulp vscode-darwin-arm64
+# Production build (RECOMMENDED - automated)
+./scripts/build-prod.sh
+
+# Production build (manual - ~25 min)
+cd vscode && npm run gulp vscode-darwin-arm64
 
 # Run production app
 open "VSCode-darwin-arm64/RiteMark Native.app"
@@ -185,3 +189,57 @@ open "VSCode-darwin-arm64/RiteMark Native.app"
 # Extension compile only
 cd extensions/ritemark && npm run compile
 ```
+
+## Pre-Build Checklist (MANDATORY)
+
+**ALWAYS run validation before ANY production build:**
+
+```bash
+./scripts/validate-build-env.sh
+```
+
+This checks in <30 seconds:
+1. Node version (v20.x required)
+2. Node architecture (arm64, not Rosetta)
+3. Symlink integrity
+4. Critical source files not corrupted
+5. Webview config files exist
+6. Icon files valid
+7. CSS properly processed
+
+**If any check fails → FIX BEFORE BUILDING**
+
+A failed 25-minute build wastes time. Validate first.
+
+### Post-Build Validation
+
+After build completes:
+```bash
+./scripts/validate-build-output.sh
+```
+
+Or use the automated script that does everything:
+```bash
+./scripts/build-prod.sh
+```
+
+### Common Build Issues
+
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| Wrong Node version | Build fails with module errors | `nvm use 20` |
+| x64 Node (Rosetta) | Native modules fail | Reinstall Node for arm64 |
+| Extension not in prod | Blank editor in .app | Run `./scripts/build-prod.sh` (copies extension) |
+| 0-byte files | Missing icons, JS errors | `git checkout HEAD -- <file>` |
+
+### Build Pipeline
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ validate-build- │────▶│   gulp build    │────▶│ validate-build- │
+│     env.sh      │     │   (~25 min)     │     │    output.sh    │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+         │                      │                       │
+         ▼                      ▼                       ▼
+    Fail fast if          Copy extension          Verify extension
+    env is wrong          to .app bundle          in production
