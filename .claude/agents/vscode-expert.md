@@ -1,9 +1,9 @@
 ---
 name: vscode-expert
 description: >
-  MANDATORY for VS Code builds and extension issues. Invoke IMMEDIATELY when user mentions:
+  MANDATORY for VS Code builds, extension issues, and patch management. Invoke IMMEDIATELY when user mentions:
   build, compile, error, fail, not working, extension not loading, yarn, npm install,
-  gulp, production build, dev mode, scripts/code.sh.
+  gulp, production build, dev mode, scripts/code.sh, patch, update vscode, upstream.
   NOT for webview/TipTap issues (use webview-expert) or sprint workflow (use sprint-manager).
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 model: sonnet
@@ -243,3 +243,85 @@ Or use the automated script that does everything:
          ▼                      ▼                       ▼
     Fail fast if          Copy extension          Verify extension
     env is wrong          to .app bundle          in production
+```
+
+---
+
+## VS Code Patch System
+
+We customize VS Code via **patch files** instead of direct submodule edits. This allows us to pull upstream updates without losing our customizations.
+
+### Patch Location
+
+```
+patches/
+└── vscode/
+    ├── 001-terminal-default-to-right-sidebar.patch
+    ├── 002-another-customization.patch
+    └── ...
+```
+
+### Patch Scripts
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| `./scripts/apply-patches.sh` | Apply all patches | After fresh clone or reset |
+| `./scripts/apply-patches.sh --dry-run` | Check patch status | Before builds, after updates |
+| `./scripts/apply-patches.sh --reverse` | Remove patches | Before updating VS Code |
+| `./scripts/create-patch.sh "name"` | Create new patch | After making a vscode/ change |
+| `./scripts/update-vscode.sh` | Update upstream | When new VS Code release needed |
+| `./scripts/update-vscode.sh --check` | Test update | Before committing to update |
+
+### Patch Workflow
+
+**Creating a new customization:**
+```bash
+# 1. Make changes in vscode/
+# 2. Save as patch
+./scripts/create-patch.sh "descriptive-name"
+# 3. Commit the patch file (not the vscode/ changes)
+git add patches/vscode/
+git commit -m "patch: add descriptive-name customization"
+```
+
+**After fresh clone:**
+```bash
+git submodule update --init
+./scripts/apply-patches.sh
+```
+
+**Updating VS Code upstream:**
+```bash
+# Test first
+./scripts/update-vscode.sh --check
+
+# If OK, do the update
+./scripts/update-vscode.sh
+```
+
+### Handling Patch Conflicts
+
+If `apply-patches.sh` fails after a VS Code update:
+
+1. **Identify the problem**: The script shows which patch failed
+2. **Manual resolution**:
+   - Read the patch file to understand the change
+   - Apply manually to the new code location
+   - Recreate the patch: `./scripts/create-patch.sh "same-name"`
+3. **Replace the old patch**: Delete old, commit new
+
+### Current Patches
+
+| Patch | Purpose | Risk |
+|-------|---------|------|
+| `001-terminal-default-to-right-sidebar` | Terminal opens in Secondary Sidebar by default | Low (cosmetic) |
+
+### Pre-Build Patch Check
+
+**ALWAYS verify patches before building:**
+
+```bash
+./scripts/apply-patches.sh --dry-run
+```
+
+All patches should show "Already applied". If any show "Can apply" or "CONFLICT", run `./scripts/apply-patches.sh` first.

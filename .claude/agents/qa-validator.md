@@ -139,7 +139,41 @@ Errors found in extension code. Fix before committing.
 [Show actual errors from compile output]
 ```
 
-### 6. Debug Code Check (WARNING)
+### 6. VS Code Patches Applied (CRITICAL)
+
+**Check:** All RiteMark patches are applied to the vscode submodule
+
+```bash
+# Validation command
+./scripts/apply-patches.sh --dry-run
+# All patches should show "Already applied"
+```
+
+**If patches not applied:**
+```
+FAILED: VS Code patches not applied
+
+Some patches show "Can apply" instead of "Already applied".
+This means the vscode submodule is missing RiteMark customizations.
+
+FIX:
+./scripts/apply-patches.sh
+```
+
+**If patch conflicts:**
+```
+FAILED: VS Code patch conflicts
+
+Some patches show "CONFLICT". This usually happens after updating VS Code upstream.
+
+FIX:
+1. Read the conflicting patch file in patches/vscode/
+2. Manually apply the change to the new code location
+3. Recreate the patch: ./scripts/create-patch.sh "same-name"
+4. Delete the old patch, commit the new one
+```
+
+### 7. Debug Code Check (WARNING)
 
 **Check:** No console.log or debugger statements in production code
 
@@ -158,7 +192,7 @@ Found console.log or debugger statements:
 Remove or mark with "// DEBUG" comment if intentional.
 ```
 
-### 7. Commit Message Format (WARNING)
+### 8. Commit Message Format (WARNING)
 
 **Check:** Follows conventional commit format
 
@@ -193,6 +227,7 @@ QA VALIDATION REPORT
 [PASS] Webview config files
 [PASS] CSS processing verified
 [PASS] TypeScript compilation
+[PASS] VS Code patches applied (1 patch)
 [WARN] Debug code (2 console.log found)
 [PASS] Commit format ready
 
@@ -244,20 +279,20 @@ Recommendation: Run qa-validator after fixing issues.
 
 For production releases, also check:
 
-### 8. Production App Exists
+### 9. Production App Exists
 
 ```bash
 ls -la "VSCode-darwin-arm64/RiteMark Native.app"
 ```
 
-### 9. Production App Launches
+### 10. Production App Launches
 
 ```bash
 open "VSCode-darwin-arm64/RiteMark Native.app"
 # Manual verification required
 ```
 
-### 10. Webview in Production
+### 11. Webview in Production
 
 ```bash
 ls -la "VSCode-darwin-arm64/RiteMark Native.app/Contents/Resources/app/extensions/ritemark/media/webview.js"
@@ -269,11 +304,11 @@ ls -la "VSCode-darwin-arm64/RiteMark Native.app/Contents/Resources/app/extension
 When invoked by sprint-manager for phase transitions:
 
 **Phase 4→5 (Test & Validate → Cleanup):**
-- Run checks 1-6
+- Run checks 1-7
 - Report to sprint-manager
 
 **Phase 6 (Deploy):**
-- Run all checks 1-10
+- Run all checks 1-11
 - Block release if any critical fails
 
 ## Quick Commands
@@ -288,5 +323,6 @@ ls -la extensions/ritemark/media/webview.js                    # 2. Bundle size
 [ -s extensions/ritemark/webview/postcss.config.js ] && echo OK  # 3. Config files
 grep -q "@tailwind base" extensions/ritemark/media/webview.js && echo FAIL || echo OK  # 4. CSS processed
 cd extensions/ritemark && npm run compile                      # 5. TypeScript
-grep -r "console\.log" extensions/ritemark/src/                # 6. Debug code
+./scripts/apply-patches.sh --dry-run                           # 6. Patches applied
+grep -r "console\.log" extensions/ritemark/src/                # 7. Debug code
 ```

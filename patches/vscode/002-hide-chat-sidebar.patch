@@ -1,0 +1,16 @@
+diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipantContributions.ts b/src/vs/workbench/contrib/chat/browser/chatParticipantContributions.ts
+index 05f89e7f972..537d372608f 100644
+--- a/src/vs/workbench/contrib/chat/browser/chatParticipantContributions.ts
++++ b/src/vs/workbench/contrib/chat/browser/chatParticipantContributions.ts
+@@ -173,8 +173,9 @@ export class ChatExtensionPointHandler implements IWorkbenchContribution {
+ 		@IChatAgentService private readonly _chatAgentService: IChatAgentService,
+ 		@ILogService private readonly logService: ILogService
+ 	) {
+-		this._viewContainer = this.registerViewContainer();
+-		this.registerDefaultParticipantView();
++		// RiteMark: Disable Chat sidebar - not needed without Copilot
++		// this._viewContainer = this.registerViewContainer();
++		// this.registerDefaultParticipantView();
+ 		this.handleAndRegisterChatExtensions();
+ 	}
+ 

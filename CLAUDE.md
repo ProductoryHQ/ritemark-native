@@ -24,13 +24,15 @@ RiteMark Native is a VS Code OSS fork with RiteMark built-in as the native markd
 
 ```
 ritemark-native/
-├── vscode/                      # VS Code OSS submodule (DO NOT EDIT directly)
+├── vscode/                      # VS Code OSS submodule (patches applied here)
 │   └── extensions/ritemark/     # SYMLINK → ../../extensions/ritemark
 ├── extensions/ritemark/         # RiteMark extension SOURCE (edit here!)
 │   ├── src/                     # TypeScript source
 │   ├── out/                     # Compiled JS
 │   ├── webview/                 # React webview (TipTap editor)
 │   └── media/                   # webview.js bundle (~900KB)
+├── patches/                     # RiteMark customizations to VS Code
+│   └── vscode/                  # Patch files (numbered, e.g., 001-*.patch)
 ├── branding/                    # Icons, logos, product.json overrides
 ├── scripts/                     # Development and release scripts
 ├── VSCode-darwin-arm64/         # Production build output
@@ -38,6 +40,35 @@ ritemark-native/
     ├── analysis/                # Technical analysis documents
     └── sprints/                 # Sprint documentation
 ```
+
+---
+
+## VS Code Patch System
+
+We customize VS Code via **patch files** (not direct submodule edits). This allows easy upstream updates.
+
+### Patch Workflow
+
+| Task | Command |
+|------|---------|
+| Apply all patches | `./scripts/apply-patches.sh` |
+| Check patch status | `./scripts/apply-patches.sh --dry-run` |
+| Create new patch | `./scripts/create-patch.sh "name"` |
+| Update VS Code | `./scripts/update-vscode.sh` |
+| Remove patches | `./scripts/apply-patches.sh --reverse` |
+
+### Rules
+
+1. **Never edit vscode/ directly** without creating a patch
+2. **All VS Code customizations** must be saved as patch files in `patches/vscode/`
+3. **After fresh clone**: Run `./scripts/apply-patches.sh`
+4. **Before updating VS Code**: Run `./scripts/update-vscode.sh --check` to test
+
+### Current Patches
+
+| Patch | Purpose |
+|-------|---------|
+| `001-terminal-default-to-right-sidebar.patch` | Terminal opens in right sidebar by default |
 
 ---
 
@@ -50,6 +81,7 @@ These MUST always be true. If broken, the project won't work:
 | Extension symlink | `ls -la vscode/extensions/ritemark` shows `→ ../../extensions/ritemark` | Invoke `vscode-expert` |
 | Webview bundle | `media/webview.js` is ~900KB (not 64KB) | Invoke `webview-expert` |
 | Node architecture | `node -p "process.arch"` shows `arm64` | Invoke `vscode-expert` |
+| Patches applied | `./scripts/apply-patches.sh --dry-run` shows all "Already applied" | Run `./scripts/apply-patches.sh` |
 
 ---
 
@@ -69,7 +101,7 @@ I MUST delegate to the appropriate expert agent.
 
 | Domain | Agent | Trigger Keywords |
 |--------|-------|------------------|
-| Builds, Extensions, Errors | `vscode-expert` | build, compile, error, fail, not working, extension |
+| Builds, Extensions, Errors, Patches | `vscode-expert` | build, compile, error, fail, not working, extension, patch, update vscode |
 | Sprint Workflow | `sprint-manager` | sprint, phase, plan, implement, feature |
 | Quality Gates | `qa-validator` | commit, push, done, ship, merge, PR, ready |
 | Webview/Editor | `webview-expert` | webview, tiptap, react, vite, bundle, editor |
@@ -123,6 +155,8 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 | Start new sprint | `sprint-manager` |
 | Commit changes | `qa-validator` |
 | Fix build error | `vscode-expert` |
+| Apply/create patches | `vscode-expert` |
+| Update VS Code upstream | `vscode-expert` |
 
 ---
 

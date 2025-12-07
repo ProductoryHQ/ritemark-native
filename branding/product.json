@@ -27,5 +27,6 @@
 	"urlProtocol": "ritemark",
 	"quality": "stable",
 	"extensionsGallery": null,
-	"enableTelemetry": false
+	"enableTelemetry": false,
+	"builtInExtensions": []
 }
