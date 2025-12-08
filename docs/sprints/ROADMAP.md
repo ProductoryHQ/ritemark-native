@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2025-12-07 (Sprint 07 complete)
+**Last Updated:** 2025-12-08 (Sprint 09 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 ---
@@ -18,9 +18,10 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | 05 | Polish Fixes | ✅ Complete | Production build fixes, light mode |
 | 06 | Icons UX | ✅ Complete | Custom Lucide file icon theme |
 | 07 | Governor Refactor | ✅ Complete | CLAUDE.md as CEO, expert agents |
-| 08 | Multi-Platform | 📋 Next | Windows, Linux builds + installers |
-| 09 | Release Prep | 📋 Planned | Auto-update, CI/CD, documentation |
-| 10+ | Post-MVP | 🔮 Future | Enhancements based on user feedback |
+| 08 | Build Stability | ✅ Complete | Validate builds, patch system |
+| 09 | Menu Audit | ✅ Complete | Remove code-focused menu items |
+| 10 | Installers | 📋 Planned | macOS DMG + Windows installer |
+| 11+ | Post-MVP | 🔮 Future | CI/CD, auto-update, enhancements |
 
 ---
 
@@ -136,64 +137,78 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 ---
 
-## 📋 Sprint 08: Multi-Platform Builds (Next)
+## ✅ Sprint 08: Build Stability (Complete)
 
-**Goal:** Windows and Linux builds with proper installers
+**Goal:** Validate builds work reliably, establish patch system
+
+**Deliverables:**
+- [x] Build validation workflow
+- [x] Patch system for VS Code customizations
+- [x] `scripts/apply-patches.sh` - Apply all patches
+- [x] `scripts/create-patch.sh` - Create new patches
+- [x] Documentation for patch workflow
+
+**Validated:** 2025-12-07 by Jarmo
+
+---
+
+## ✅ Sprint 09: Menu Audit & Cleanup (Complete)
+
+**Goal:** Remove code-focused menu items for a clean markdown editor experience
 
 **Deliverables:**
 
-**Windows Build:**
-- [ ] VS Code build for win32-x64
-- [ ] MSI installer
-- [ ] Code signing (optional for beta)
+**Edit Menu Cleanup:**
+- [x] Remove "Emmet: Expand Abbreviation"
+- [x] Remove "Toggle Line Comment"
+- [x] Remove "Toggle Block Comment"
+
+**Go Menu:**
+- [x] Removed entire Go menu (code navigation not needed)
+
+**View Menu Cleanup:**
+- [x] Remove Extensions panel
+- [x] Remove Appearance submenu
+- [x] Remove Editor Layout submenu
+
+**Patches Created:**
+- [x] `003-remove-edit-menu-code-items.patch`
+- [x] `004-hide-extensions-view-menu.patch`
+- [x] `005-remove-go-menu.patch`
+- [x] `006-cleanup-view-menu.patch`
+
+**Bonus:**
+- [x] `scripts/validate-patches.sh` - Pre-build validation (catches errors in 2 min vs 25 min)
+- [x] `docs/menu-customization.md` - Documentation
+
+**Validated:** 2025-12-08 by Jarmo
+
+---
+
+## 📋 Sprint 10: Installers (Planned)
+
+**Goal:** Professional installers for macOS and Windows
+
+**macOS Installer:**
+- [ ] DMG with drag-to-Applications UI
+- [ ] Custom volume icon and background
+- [ ] Unsigned for now (no Apple Developer account)
+- [ ] SHA256 checksum
+- [ ] Installation guide with Gatekeeper bypass instructions
+
+**Windows Installer:**
+- [ ] Research: MSI vs NSIS vs Electron Builder
+- [ ] Basic installer (unsigned for beta)
+- [ ] Desktop/Start menu shortcuts
 - [ ] Test on Windows machine
 
-**Linux Build:**
-- [ ] VS Code build for linux-x64
-- [ ] AppImage package
-- [ ] .deb package (optional)
-- [ ] Test on Linux (VM or hardware)
-
-**macOS Polish:**
-- [ ] Universal build (arm64 + x64)
-- [ ] DMG installer with custom background
-- [ ] Code signing with Developer ID
-- [ ] Notarization
-
-**Build Scripts:**
-- [ ] `scripts/build-windows.sh`
-- [ ] `scripts/build-linux.sh`
-- [ ] `scripts/build-mac.sh` (enhanced)
-- [ ] `scripts/package-all.sh`
+**Scripts:**
+- [ ] `scripts/create-dmg.sh`
+- [ ] `scripts/create-windows-installer.sh`
 
 ---
 
-## 📋 Sprint 09: Release Preparation (Planned)
-
-**Goal:** CI/CD, auto-update, documentation for public release
-
-**Deliverables:**
-
-**CI/CD Pipeline:**
-- [ ] GitHub Actions: build on push/PR
-- [ ] GitHub Actions: release on tag
-- [ ] Parallel platform builds
-- [ ] Artifact upload to releases
-
-**Auto-Update System:**
-- [ ] Update manifest endpoint
-- [ ] In-app update notification
-- [ ] Background download
-- [ ] Restart to apply
-
-**Documentation:**
-- [ ] README with installation instructions
-- [ ] Troubleshooting guide
-- [ ] Keyboard shortcuts reference
-
----
-
-## 🔮 Sprint 10+: Post-MVP (Future)
+## 🔮 Sprint 11+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
 
@@ -233,9 +248,11 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | AI & UX | 03 | ✅ Done |
 | Polish | 04-06 | ✅ Done |
 | Governance | 07 | ✅ Done |
-| Platform | 08-09 | 📋 Next |
-| **MVP Total** | **01-09** | **In Progress** |
-| Post-MVP | 10+ | 🔮 Future |
+| Build Stability | 08 | ✅ Done |
+| Menu Cleanup | 09 | ✅ Done |
+| Installers | 10 | 📋 Next |
+| **MVP Total** | **01-10** | **In Progress** |
+| Post-MVP | 11+ | 🔮 Future |
 
 ---
 
