@@ -1,6 +1,6 @@
 {
 	"nameShort": "RiteMark",
-	"nameLong": "RiteMark Native",
+	"nameLong": "RiteMark",
 	"applicationName": "ritemark",
 	"dataFolderName": ".ritemark",
 	"win32MutexName": "ritemarknative",
@@ -14,7 +14,7 @@
 	"serverDataFolderName": ".ritemark-server",
 	"tunnelApplicationName": "ritemark-tunnel",
 	"win32DirName": "RiteMark",
-	"win32NameVersion": "RiteMark Native",
+	"win32NameVersion": "RiteMark",
 	"win32RegValueName": "RiteMark",
 	"win32AppUserModelId": "Productory.RiteMark",
 	"win32ShellNameShort": "Rite&Mark",

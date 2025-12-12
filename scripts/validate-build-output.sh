@@ -18,7 +18,7 @@ echo "Post-Build Output Validation"
 echo "========================================"
 echo ""
 
-APP_PATH="VSCode-darwin-arm64/RiteMark Native.app"
+APP_PATH="VSCode-darwin-arm64/RiteMark.app"
 EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
 
 ERRORS=0
