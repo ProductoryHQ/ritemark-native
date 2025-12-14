@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { useEditor, useEditorState, EditorContent, type Editor as TipTapEditor } from '@tiptap/react'
+import React, { useEffect, useRef, useState } from 'react'
+import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor } from '@tiptap/react'
 import { sendToExtension, onMessage } from '../bridge'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -17,6 +17,7 @@ import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { TableOverlayControls } from './TableOverlayControls'
+import { PropertiesPanel, type DocumentProperties } from './properties'
 import type { EditorSelection } from '../types/editor'
 
 // Initialize Turndown for HTML to Markdown conversion
@@ -127,6 +128,9 @@ interface EditorProps {
   className?: string
   onEditorReady?: (editor: TipTapEditor) => void
   onSelectionChange?: (selection: EditorSelection) => void
+  properties?: DocumentProperties
+  hasProperties?: boolean
+  onPropertiesChange?: (properties: DocumentProperties) => void
 }
 
 export function Editor({
@@ -136,6 +140,9 @@ export function Editor({
   className = "",
   onEditorReady,
   onSelectionChange,
+  properties = {},
+  hasProperties = false,
+  onPropertiesChange,
 }: EditorProps) {
   const isInitialMount = useRef(true)
   const lastExternalValue = useRef(value)
@@ -450,6 +457,13 @@ export function Editor({
     const isExternalChange = value !== currentMarkdown && value !== lastOnChangeValue.current
 
     if (isExternalChange || currentMarkdown === '') {
+      // CURSOR JUMP BUG FIX: Don't update content if editor is focused
+      // This prevents cursor from jumping during autosave cycles
+      if (editor.isFocused) {
+        // Skip update - user is actively editing
+        return
+      }
+
       // Check if value is HTML (starts with common HTML tags)
       // Only check for actual HTML block tags, not random < > characters
       const isHTML = /^<(p|div|h[1-6]|ul|ol|li|blockquote|pre|table|strong|em|code)[\s>]/i.test(value.trim())
@@ -462,23 +476,59 @@ export function Editor({
             breaks: true,
             gfm: true
           }) as string
-          editor.commands.setContent(html)
+          editor.commands.setContent(html, false) // emitUpdate: false to prevent loops
         } catch (error) {
           console.error('Markdown conversion error:', error)
           // Fallback: treat as plain text
-          editor.commands.setContent(`<p>${value.replace(/\n/g, '</p><p>')}</p>`)
+          editor.commands.setContent(`<p>${value.replace(/\n/g, '</p><p>')}</p>`, false)
         }
       } else {
         // Already HTML or empty
-        editor.commands.setContent(value)
+        editor.commands.setContent(value, false) // emitUpdate: false to prevent loops
       }
 
       lastExternalValue.current = value
     }
   }, [editor, value])
 
+  // Calculate word count - simple approach using editor state
+  const [wordCount, setWordCount] = useState(0)
+
+  // Update word count when editor content changes and send to extension
+  useEffect(() => {
+    if (!editor) return
+
+    const updateWordCount = () => {
+      const text = editor.state.doc.textContent
+      const words = text.trim().split(/\s+/).filter(Boolean)
+      const count = words.length
+      setWordCount(count)
+      // Send word count to extension for status bar display
+      sendToExtension('wordCountChanged', { wordCount: count })
+    }
+
+    // Initial count
+    updateWordCount()
+
+    // Listen for updates
+    editor.on('update', updateWordCount)
+
+    return () => {
+      editor.off('update', updateWordCount)
+    }
+  }, [editor])
+
   return (
     <div className={`wysiwyg-editor h-full overflow-y-auto ${className}`}>
+      {/* Document Properties Panel */}
+      {onPropertiesChange && (
+        <PropertiesPanel
+          properties={properties}
+          hasProperties={hasProperties}
+          onChange={onPropertiesChange}
+        />
+      )}
+
       <EditorContent editor={editor} />
 
       {editor ? (
@@ -594,6 +644,22 @@ export function Editor({
           color: #3730a3 !important;
         }
 
+        /* Blockquote styling */
+        .wysiwyg-editor .ProseMirror blockquote {
+          border-left: 4px solid #4338ca !important;
+          padding-left: 1rem !important;
+          margin: 1em 0 !important;
+          color: #6b7280 !important;
+          font-style: italic !important;
+          background: #f9fafb !important;
+          padding: 0.75rem 1rem !important;
+          border-radius: 0 8px 8px 0 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror blockquote p {
+          margin: 0 !important;
+        }
+
         /* Increased specificity to override Vite HMR styles in dev mode */
         div.wysiwyg-editor .ProseMirror.ProseMirror ::selection {
           background: rgba(67, 56, 202, 0.15) !important;
@@ -613,7 +679,7 @@ export function Editor({
           margin: 1em 0 !important;
           overflow-x: auto !important;
           font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace !important;
-          font-size: 14px !important;
+          font-size: 16px !important;
           line-height: 1.5 !important;
           position: relative !important;
         }
@@ -739,7 +805,8 @@ export function Editor({
             padding: 0.4rem 0.6rem !important;
           }
         }
-      `}</style>
+
+        `}</style>
     </div>
   )
 }

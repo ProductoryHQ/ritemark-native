@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2025-12-13 (Sprint 11 complete)
+**Last Updated:** 2025-12-14 (Sprint 12 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 * * *
@@ -22,7 +22,8 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | 09 | Menu Audit | ✅ Complete | Remove code-focused menu items |
 | 10 | Installers | ✅ Complete | macOS DMG installer |
 | 11 | Quick Wins | ✅ Complete | Word count, CMD+B fix, autosave, H3, sticky AI header |
-| 12+ | Post-MVP | 🔮 Future | Document properties, enhancements |
+| 12 | Document Properties | ✅ Complete | YAML front-matter UI for metadata |
+| 13+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
 
 * * *
 
@@ -291,13 +292,29 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 * * *
 
-## 🔮 Sprint 12+: Post-MVP (Future)
+## ✅ Sprint 12: Document Properties (Complete)
+
+**Goal:** Visual interface for document metadata (YAML front-matter)
+
+**Deliverables:**
+
+-   Properties Panel component above editor
+-   YAML front-matter parsing with `gray-matter`
+-   Property types: Text, Date, Tags, Status
+-   Minimal empty state ("Add properties" button)
+-   Long text handling with auto-resize textarea
+-   Two-way sync: extension ↔ webview
+
+**Validated:** 2025-12-14 by Jarmo
+
+* * *
+
+## 🔮 Sprint 13+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
 
 **Potential Features:**
 
--   Document properties (front-matter UI)
 -   Blockquote styling
 -   Recent files list
 -   File templates
@@ -320,8 +337,9 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | Menu Cleanup | 09 | ✅ Done |
 | Installers | 10 | ✅ Done |
 | Quick Wins | 11 | ✅ Done |
-| **MVP Total** | **01-11** | **✅ Complete** |
-| Post-MVP | 12+ | 🔮 Future |
+| Document Properties | 12 | ✅ Done |
+| **MVP Total** | **01-12** | **✅ Complete** |
+| Post-MVP | 13+ | 🔮 Future |
 
 * * *
 

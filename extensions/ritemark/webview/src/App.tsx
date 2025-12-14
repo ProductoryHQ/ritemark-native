@@ -4,9 +4,12 @@ import { Editor } from './components/Editor'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
+import type { DocumentProperties } from './components/properties'
 
 function App() {
   const [content, setContent] = useState<string>('')
+  const [properties, setProperties] = useState<DocumentProperties>({})
+  const [hasProperties, setHasProperties] = useState(false)
   const [isReady, setIsReady] = useState(false)
 
   // Track selection for AI tool execution
@@ -21,6 +24,8 @@ function App() {
       switch (message.type) {
         case 'load':
           setContent(message.content as string)
+          setProperties((message.properties as DocumentProperties) || {})
+          setHasProperties(message.hasProperties as boolean || false)
           setIsReady(true)
           break
 
@@ -124,8 +129,14 @@ function App() {
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent)
-    sendToExtension('contentChanged', { content: newContent })
+    sendToExtension('contentChanged', { content: newContent, properties })
   }
+
+  const handlePropertiesChange = useCallback((newProperties: DocumentProperties) => {
+    setProperties(newProperties)
+    setHasProperties(Object.keys(newProperties).length > 0)
+    sendToExtension('propertiesChanged', { properties: newProperties })
+  }, [])
 
   const handleSelectionChange = useCallback((sel: EditorSelection) => {
     setSelection(sel)
@@ -154,6 +165,9 @@ function App() {
         onEditorReady={handleEditorReady}
         placeholder="Start writing..."
         className="h-full"
+        properties={properties}
+        hasProperties={hasProperties}
+        onPropertiesChange={handlePropertiesChange}
       />
     </div>
   )

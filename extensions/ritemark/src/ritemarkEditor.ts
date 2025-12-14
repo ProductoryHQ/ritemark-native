@@ -1,18 +1,36 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import matter from 'gray-matter';
 import type { AIViewProvider } from './ai/AIViewProvider';
+
+// Properties type for front-matter
+export interface DocumentProperties {
+  [key: string]: unknown;
+}
 
 export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
   // Track all active webview panels for broadcasting tool execution
   private static activeWebviews: Set<vscode.Webview> = new Set();
   private static _aiViewProvider: AIViewProvider | null = null;
+  private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
 
   public static register(
     context: vscode.ExtensionContext,
     aiViewProvider: AIViewProvider
   ): vscode.Disposable {
     RiteMarkEditorProvider._aiViewProvider = aiViewProvider;
+
+    // Create word count status bar item (to the left of AI status, priority 101)
+    RiteMarkEditorProvider._wordCountStatusBar = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      101 // Higher priority = more to the left
+    );
+    RiteMarkEditorProvider._wordCountStatusBar.name = 'RiteMark Word Count';
+    RiteMarkEditorProvider._wordCountStatusBar.text = '0 words';
+    RiteMarkEditorProvider._wordCountStatusBar.tooltip = 'Word count';
+    context.subscriptions.push(RiteMarkEditorProvider._wordCountStatusBar);
+
     return vscode.window.registerCustomEditorProvider(
       'ritemark.editor',
       new RiteMarkEditorProvider(context),
@@ -72,22 +90,44 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     // Add this webview to active set for AI tool broadcasts
     RiteMarkEditorProvider.activeWebviews.add(webviewPanel.webview);
 
+    // Show word count status bar when RiteMark editor is opened
+    RiteMarkEditorProvider._wordCountStatusBar?.show();
+
     // Handle messages from the webview
     webviewPanel.webview.onDidReceiveMessage(
       message => {
         switch (message.type) {
           case 'ready':
-            // Webview is ready, send the document content
+            // Webview is ready, send the document content with properties
+            const parsed = this.extractFrontMatter(document.getText());
             webviewPanel.webview.postMessage({
               type: 'load',
-              content: document.getText()
+              content: parsed.content,
+              properties: parsed.properties,
+              hasProperties: parsed.hasProperties
             });
             return;
 
           case 'contentChanged':
-            // Content changed in editor, update document
+            // Content changed in editor, update document with front-matter
             if (!isUpdating) {
-              this.updateDocument(document, message.content);
+              const fullContent = this.serializeFrontMatter(
+                message.properties as DocumentProperties | undefined,
+                message.content as string
+              );
+              this.updateDocument(document, fullContent);
+            }
+            return;
+
+          case 'propertiesChanged':
+            // Properties changed without content change, update document
+            if (!isUpdating) {
+              const currentParsed = this.extractFrontMatter(document.getText());
+              const newContent = this.serializeFrontMatter(
+                message.properties as DocumentProperties,
+                currentParsed.content
+              );
+              this.updateDocument(document, newContent);
             }
             return;
 
@@ -110,6 +150,14 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             // Open settings to configure API key
             vscode.commands.executeCommand('workbench.action.openSettings', 'ritemark.openaiApiKey');
             return;
+
+          case 'wordCountChanged':
+            // Update word count in status bar
+            if (RiteMarkEditorProvider._wordCountStatusBar) {
+              const count = message.wordCount || 0;
+              RiteMarkEditorProvider._wordCountStatusBar.text = `${count} ${count === 1 ? 'word' : 'words'}`;
+            }
+            return;
         }
       },
       undefined,
@@ -120,9 +168,12 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
       if (e.document.uri.toString() === document.uri.toString() && !isUpdating) {
         isUpdating = true;
+        const parsed = this.extractFrontMatter(document.getText());
         webviewPanel.webview.postMessage({
           type: 'load',
-          content: document.getText()
+          content: parsed.content,
+          properties: parsed.properties,
+          hasProperties: parsed.hasProperties
         });
         // Reset flag after a short delay
         setTimeout(() => { isUpdating = false; }, 100);
@@ -133,6 +184,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       // Remove from active set
       RiteMarkEditorProvider.activeWebviews.delete(webviewPanel.webview);
       changeDocumentSubscription.dispose();
+
+      // Hide word count if no more RiteMark editors are open
+      if (RiteMarkEditorProvider.activeWebviews.size === 0) {
+        RiteMarkEditorProvider._wordCountStatusBar?.hide();
+      }
     });
   }
 
@@ -144,6 +200,47 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       content
     );
     vscode.workspace.applyEdit(edit);
+  }
+
+  /**
+   * Extract front-matter (YAML) from markdown content
+   */
+  private extractFrontMatter(rawContent: string): {
+    content: string;
+    properties: DocumentProperties;
+    hasProperties: boolean;
+  } {
+    try {
+      const parsed = matter(rawContent);
+      return {
+        content: parsed.content,
+        properties: parsed.data as DocumentProperties,
+        hasProperties: Object.keys(parsed.data).length > 0
+      };
+    } catch {
+      // If parsing fails, return content as-is with empty properties
+      return {
+        content: rawContent,
+        properties: {},
+        hasProperties: false
+      };
+    }
+  }
+
+  /**
+   * Serialize properties and content back to markdown with front-matter
+   */
+  private serializeFrontMatter(
+    properties: DocumentProperties | undefined,
+    content: string
+  ): string {
+    // If no properties or empty properties, return content only
+    if (!properties || Object.keys(properties).length === 0) {
+      return content;
+    }
+
+    // Use gray-matter to stringify with YAML front-matter
+    return matter.stringify(content, properties);
   }
 
   private async saveImage(
