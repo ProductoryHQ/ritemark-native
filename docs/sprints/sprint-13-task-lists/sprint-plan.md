@@ -128,10 +128,15 @@ Enable GFM-style task lists with clickable checkboxes in the RiteMark editor, ac
 
 **Delivered:** 2025-12-15
 
-**DMG:** `dist/RiteMark-1.94.0-darwin-arm64.dmg` (128MB)
-**SHA256:** `7a515cff1b7c1d7303990701a7085ffed5303d1abaf6fb05426994621ff2d342`
+**DMG:** `dist/RiteMark-1.94.0-darwin-arm64.dmg` (160MB)
+**SHA256:** `63458388954c9e66248ba1dabb45175debbb51b4a666ba7443d3490a9fb4e5d0`
 
 **Approval Status:** ✅ APPROVED & VALIDATED - Jarmo confirmed working
+
+**Additional Fixes (post-validation):**
+- Fixed markdown roundtrip for task lists (save/load preserves checkbox state)
+- Added list buttons to bubble menu (bullet, ordered, task) with toggle behavior
+- Fixed bubble menu width constraint
 
 ## Risks & Considerations
 

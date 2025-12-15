@@ -310,7 +310,23 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 * * *
 
-## 🔮 Sprint 13+: Post-MVP (Future)
+## ✅ Sprint 13: Task Lists (Complete)
+
+**Goal:** GFM task list checkboxes with full roundtrip support
+
+**Deliverables:**
+
+-   TipTap TaskList/TaskItem extensions
+-   Slash command `/task` for creating task lists
+-   Markdown roundtrip: `- [ ]` / `- [x]` syntax preserved
+-   Bubble menu list buttons (bullet, ordered, task)
+-   Toggle behavior: click active list to convert to paragraph
+
+**Validated:** 2025-12-15 by Jarmo
+
+* * *
+
+## 🔮 Sprint 14+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
 
@@ -339,8 +355,9 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | Installers | 10 | ✅ Done |
 | Quick Wins | 11 | ✅ Done |
 | Document Properties | 12 | ✅ Done |
-| **MVP Total** | **01-12** | **✅ Complete** |
-| Post-MVP | 13+ | 🔮 Future |
+| Task Lists | 13 | ✅ Done |
+| **MVP Total** | **01-13** | **✅ Complete** |
+| Post-MVP | 14+ | 🔮 Future |
 
 * * *
 
