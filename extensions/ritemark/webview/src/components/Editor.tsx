@@ -36,6 +36,43 @@ turndownService.use(tables)
 turndownService.use(taskListItems)
 
 /**
+ * Preprocess HTML to convert GFM task lists to TipTap format
+ *
+ * marked generates: <ul><li><input type="checkbox" disabled> Task</li></ul>
+ * TipTap expects: <ul data-type="taskList"><li data-type="taskItem" data-checked="false">Task</li></ul>
+ */
+function preprocessTaskListHTML(html: string): string {
+  const temp = document.createElement('div')
+  temp.innerHTML = html
+
+  // Find all list items that contain a checkbox
+  temp.querySelectorAll('li').forEach(li => {
+    const checkbox = li.querySelector('input[type="checkbox"]')
+    if (checkbox) {
+      // Check if checkbox is at the start (first element child)
+      const firstElement = li.firstElementChild
+      if (firstElement === checkbox) {
+        // This is a task list item
+        const isChecked = checkbox.hasAttribute('checked')
+        li.setAttribute('data-type', 'taskItem')
+        li.setAttribute('data-checked', isChecked ? 'true' : 'false')
+
+        // Remove the checkbox - TipTap renders its own
+        checkbox.remove()
+
+        // Mark parent UL as task list
+        const parentUl = li.parentElement
+        if (parentUl && parentUl.tagName === 'UL') {
+          parentUl.setAttribute('data-type', 'taskList')
+        }
+      }
+    }
+  })
+
+  return temp.innerHTML
+}
+
+/**
  * Preprocess HTML to make TipTap tables compatible with turndown-plugin-gfm
  *
  * TipTap generates tables with:
@@ -67,6 +104,34 @@ function preprocessTableHTML(html: string): string {
 
   return temp.innerHTML
 }
+
+// Custom rule to convert TipTap task list items to GFM syntax
+// TipTap outputs: <li data-type="taskItem" data-checked="true">Task</li>
+// GFM expects: - [x] Task
+turndownService.addRule('tiptapTaskItem', {
+  filter: function (node) {
+    return node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem'
+  },
+  replacement: function (content, node) {
+    const element = node as HTMLElement
+    const isChecked = element.getAttribute('data-checked') === 'true'
+    const checkbox = isChecked ? '[x]' : '[ ]'
+    // Clean up content - remove leading/trailing whitespace and newlines
+    const cleanContent = content.replace(/^\s+|\s+$/g, '').replace(/\n+/g, ' ')
+    return `- ${checkbox} ${cleanContent}\n`
+  }
+})
+
+// Custom rule to handle TipTap task list UL (prevent default list handling)
+turndownService.addRule('tiptapTaskList', {
+  filter: function (node) {
+    return node.nodeName === 'UL' && node.getAttribute('data-type') === 'taskList'
+  },
+  replacement: function (content) {
+    // Content already formatted by taskItem rule, just return it
+    return '\n' + content + '\n'
+  }
+})
 
 // Override the tableCell rule to escape pipe characters in cell content
 // The turndown-plugin-gfm doesn't escape pipes by default, which breaks table structure
@@ -162,7 +227,9 @@ export function Editor({
     } else {
       // Convert markdown to HTML
       try {
-        return marked(value, { breaks: true, gfm: true }) as string
+        const html = marked(value, { breaks: true, gfm: true }) as string
+        // Convert GFM task list HTML to TipTap format
+        return preprocessTaskListHTML(html)
       } catch (error) {
         console.error('Markdown conversion error:', error)
         return `<p>${value.replace(/\n/g, '</p><p>')}</p>`
@@ -490,7 +557,9 @@ export function Editor({
             breaks: true,
             gfm: true
           }) as string
-          editor.commands.setContent(html, false) // emitUpdate: false to prevent loops
+          // Convert GFM task list HTML to TipTap format
+          const processedHtml = preprocessTaskListHTML(html)
+          editor.commands.setContent(processedHtml, false) // emitUpdate: false to prevent loops
         } catch (error) {
           console.error('Markdown conversion error:', error)
           // Fallback: treat as plain text

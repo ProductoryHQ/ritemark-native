@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2025-12-14 (Sprint 12 complete)
+**Last Updated:** 2025-12-15 (Sprint 13 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 * * *
@@ -23,7 +23,8 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | 10 | Installers | ✅ Complete | macOS DMG installer |
 | 11 | Quick Wins | ✅ Complete | Word count, CMD+B fix, autosave, H3, sticky AI header |
 | 12 | Document Properties | ✅ Complete | YAML front-matter UI for metadata |
-| 13+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
+| 13 | Task Lists | ✅ Complete | GFM task checkboxes (`- [ ]` / `- [x]`) |
+| 14+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
 
 * * *
 

@@ -1,6 +1,6 @@
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
 import { useState, useEffect, useRef } from 'react'
-import { Link2, Check, X, Table } from 'lucide-react'
+import { Link2, Check, X, Table, List, ListOrdered, ListChecks } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
 import { TablePicker } from './TablePicker'
@@ -9,7 +9,7 @@ import { TablePicker } from './TablePicker'
  * FormattingBubbleMenu Component
  *
  * Provides a context-sensitive formatting toolbar that appears when text is selected.
- * Features: Bold, Italic, Headings (H1, H2), and Link management with smart URL validation.
+ * Features: Bold, Italic, Headings (H1, H2, H3), and Link management with smart URL validation.
  *
  * @see /docs/components/FormattingBubbleMenu.md for full documentation
  */
@@ -170,6 +170,9 @@ export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps) {
       {/* Main formatting toolbar - appears on text selection */}
       <BubbleMenu
         editor={editor}
+        tippyOptions={{
+          maxWidth: 'none', // Remove default max-width constraint
+        }}
         shouldShow={({ editor, state }) => {
           const { selection } = state
           const { empty } = selection
@@ -232,7 +235,58 @@ export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps) {
             H2
           </button>
 
-          {/* Visual divider between headings and links */}
+          {/* Heading 3 Button - Small heading */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-gray-100 transition-colors ${
+              editor.isActive('heading', { level: 3 }) ? 'bg-gray-200' : ''
+            }`}
+            title="Heading 3"
+          >
+            H3
+          </button>
+
+          {/* Visual divider between headings and lists */}
+          <div className="w-px h-6 bg-gray-300 mx-1" />
+
+          {/* Bullet List Button - Toggle on/off */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
+              editor.isActive('bulletList') ? 'bg-gray-200' : ''
+            }`}
+            title="Bullet List"
+          >
+            <List size={16} />
+          </button>
+
+          {/* Ordered List Button - Toggle on/off */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
+              editor.isActive('orderedList') ? 'bg-gray-200' : ''
+            }`}
+            title="Numbered List"
+          >
+            <ListOrdered size={16} />
+          </button>
+
+          {/* Task List Button - Toggle on/off */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().toggleTaskList().run()}
+            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
+              editor.isActive('taskList') ? 'bg-gray-200' : ''
+            }`}
+            title="Task List"
+          >
+            <ListChecks size={16} />
+          </button>
+
+          {/* Visual divider between lists and links */}
           <div className="w-px h-6 bg-gray-300 mx-1" />
 
           {/* Link Button - Keyboard: Cmd+K / Ctrl+K */}
