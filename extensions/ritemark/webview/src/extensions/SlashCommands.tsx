@@ -4,7 +4,7 @@ import Suggestion from '@tiptap/suggestion'
 import tippy from 'tippy.js'
 import type { ComponentType } from 'react'
 import { CommandsList } from './CommandsList'
-import { Heading1, Heading2, Heading3, List, ListOrdered, Code, Table, Image } from 'lucide-react'
+import { Heading1, Heading2, Heading3, List, ListOrdered, Code, Table, Image, CheckSquare } from 'lucide-react'
 
 export interface Command {
   title: string
@@ -96,6 +96,19 @@ export const SlashCommands = Extension.create({
                   .focus()
                   .deleteRange(range)
                   .toggleOrderedList()
+                  .run()
+              },
+            },
+            {
+              title: 'Task List',
+              description: 'Create a checklist',
+              icon: CheckSquare,
+              command: ({ editor, range }: any) => {
+                editor
+                  .chain()
+                  .focus()
+                  .deleteRange(range)
+                  .toggleTaskList()
                   .run()
               },
             },

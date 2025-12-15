@@ -14,6 +14,60 @@ priority: high
 
 You are the VS Code OSS development expert for RiteMark Native. You handle builds, extension issues, and general VS Code troubleshooting.
 
+## ⚠️ MANDATORY PROACTIVE CHECKS (RUN FIRST!)
+
+**BEFORE doing ANYTHING else**, run these checks. These are the #1 causes of wasted time:
+
+### 1. Node Architecture Check
+```bash
+node -p "process.arch"
+```
+- **Must be `arm64`** - If it shows `x64`, you're running under Rosetta!
+- **Fix:** `arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20'`
+- This causes: `dlopen: incompatible architecture` errors, native module failures
+
+### 2. Extension Symlink Check
+```bash
+ls -la vscode/extensions/ritemark
+```
+- **Must show:** `ritemark -> ../../extensions/ritemark`
+- **If it's a directory (not symlink):** Extension changes won't be picked up!
+- **Fix:** `rm -rf vscode/extensions/ritemark && ln -s ../../extensions/ritemark vscode/extensions/ritemark`
+- This causes: Extension not activating, blank webview, stale code running
+
+### 3. Node Version Check
+```bash
+node -v
+```
+- **Must be v20.x** - If v22, v23, etc. - wrong version!
+- **Fix:** `nvm use 20`
+
+### 4. Electron Architecture Check (Dev Mode)
+```bash
+file vscode/.build/electron/*.app/Contents/MacOS/Electron
+```
+- **Must show:** `arm64`
+- **If x86_64:** Re-download with arm64 Node!
+- **Fix:**
+  ```bash
+  rm -rf vscode/.build/electron
+  arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && node build/lib/electron.js'
+  ```
+
+### 5. macOS Quarantine Attribute (SNEAKY!)
+```bash
+xattr -l vscode/.build/electron/*.app | grep quarantine
+```
+- **If shows `com.apple.quarantine`:** macOS forces Rosetta even on arm64!
+- **Symptoms:** "have arm64, need x86_64" error even when everything IS arm64
+- **Fix:**
+  ```bash
+  xattr -cr vscode/.build/electron/RiteMark.app
+  ```
+- This causes: Native modules fail with architecture mismatch despite correct architecture
+
+**DO NOT SKIP THESE CHECKS.** Every time the user reports a build/dev issue, run these FIRST.
+
 ## Scope Boundaries
 
 **YOUR domain:**

@@ -4,6 +4,63 @@ Quick solutions to common issues.
 
 ## RiteMark Native Specific Issues
 
+### Issue: Broken extension symlink (MOST COMMON!)
+
+**Symptoms:**
+- Extension not activating
+- Blank webview / editor
+- "Activating Extensions..." hangs forever
+- Changes to extension code not taking effect
+
+**Diagnosis:**
+```bash
+ls -la vscode/extensions/ritemark
+```
+- **Good:** `ritemark -> ../../extensions/ritemark` (symlink)
+- **Bad:** Shows directory contents (real folder, not symlink)
+
+**Root Cause:** Git operations, clean commands, or manual changes replaced the symlink with a real directory containing stale code.
+
+**Solution:**
+```bash
+# Remove the stale directory and recreate symlink
+rm -rf vscode/extensions/ritemark
+ln -s ../../extensions/ritemark vscode/extensions/ritemark
+
+# Verify
+ls -la vscode/extensions/ritemark  # Should show -> ../../extensions/ritemark
+
+# Restart dev mode
+cd vscode && ./scripts/code.sh
+```
+
+**Prevention:** After any git clean or submodule operation, always check the symlink.
+
+---
+
+### Issue: macOS Quarantine forces Rosetta (SNEAKY!)
+
+**Symptoms:**
+- `dlopen: mach-o file, but is an incompatible architecture (have 'arm64', need 'x86_64')`
+- Everything IS arm64 but still fails with architecture error
+- Error says modules "have arm64" but process "needs x86_64"
+
+**Root Cause:** macOS quarantine attribute on downloaded Electron forces Rosetta emulation even for arm64 binaries.
+
+**Diagnosis:**
+```bash
+xattr -l vscode/.build/electron/*.app | grep quarantine
+```
+
+**Solution:**
+```bash
+xattr -cr vscode/.build/electron/RiteMark.app
+```
+
+Then restart dev mode.
+
+---
+
 ### Issue: Architecture mismatch (x86_64 vs arm64)
 
 **Symptoms:**

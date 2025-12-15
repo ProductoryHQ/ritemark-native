@@ -6,6 +6,9 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Editor
 
+- Task list checkboxes (`- [ ]` / `- [x]`)
+  - Clickable checkboxes in rendered view
+  - Toggle state with click or keyboard
 - Action command palette
   - Show + button on hovered line (left side) to add blocks
   - Show drag handle with the +
@@ -74,4 +77,4 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ---
 
-*Last updated: 2025-12-13*
+*Last updated: 2025-12-15*

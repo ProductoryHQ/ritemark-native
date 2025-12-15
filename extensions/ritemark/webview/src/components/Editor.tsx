@@ -6,12 +6,14 @@ import Placeholder from '@tiptap/extension-placeholder'
 import BulletList from '@tiptap/extension-bullet-list'
 import OrderedList from '@tiptap/extension-ordered-list'
 import ListItem from '@tiptap/extension-list-item'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Link from '@tiptap/extension-link'
 import { createLowlight, common } from 'lowlight'
 import { marked } from 'marked'
 import TurndownService from 'turndown'
-import { tables } from 'turndown-plugin-gfm'
+import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
@@ -29,8 +31,9 @@ const turndownService = new TurndownService({
   strongDelimiter: '**'  // Use ** for bold (matches TipTap BubbleMenu input)
 })
 
-// Enable GFM tables plugin for turndown
+// Enable GFM plugins for turndown
 turndownService.use(tables)
+turndownService.use(taskListItems)
 
 /**
  * Preprocess HTML to make TipTap tables compatible with turndown-plugin-gfm
@@ -210,6 +213,17 @@ export function Editor({
         HTMLAttributes: {
           class: 'tiptap-list-item',
         },
+      }),
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'tiptap-task-list',
+        },
+      }),
+      TaskItem.configure({
+        HTMLAttributes: {
+          class: 'tiptap-task-item',
+        },
+        nested: true,
       }),
       Placeholder.configure({
         placeholder: placeholder,
@@ -622,6 +636,73 @@ export function Editor({
           margin: 0.25em 0 !important;
           line-height: 1.7 !important;
           display: list-item !important;
+        }
+
+        /* Task List (Checkbox) styling */
+        .wysiwyg-editor .ProseMirror ul.tiptap-task-list {
+          list-style-type: none !important;
+          padding-left: 0 !important;
+          margin: 0.5em 0 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror li.tiptap-task-item {
+          display: flex !important;
+          align-items: baseline !important;
+          margin: 0.25em 0 !important;
+          line-height: 1.7 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror li.tiptap-task-item > label {
+          display: flex !important;
+          align-items: center !important;
+          margin-right: 0.5rem !important;
+          user-select: none !important;
+        }
+
+        .wysiwyg-editor .ProseMirror li.tiptap-task-item > label > input[type="checkbox"] {
+          width: 1rem !important;
+          height: 1rem !important;
+          margin: 0 !important;
+          cursor: pointer !important;
+          border: 2px solid #9ca3af !important;
+          border-radius: 3px !important;
+          appearance: none !important;
+          -webkit-appearance: none !important;
+          background-color: white !important;
+          position: relative !important;
+          top: 1px !important;
+          flex-shrink: 0 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror li.tiptap-task-item > label > input[type="checkbox"]:checked {
+          background-color: #4338ca !important;
+          border-color: #4338ca !important;
+        }
+
+        .wysiwyg-editor .ProseMirror li.tiptap-task-item > label > input[type="checkbox"]:checked::after {
+          content: '✓' !important;
+          position: absolute !important;
+          top: 50% !important;
+          left: 50% !important;
+          transform: translate(-50%, -50%) !important;
+          color: white !important;
+          font-size: 11px !important;
+          font-weight: bold !important;
+          line-height: 1 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror li.tiptap-task-item > label > input[type="checkbox"]:hover {
+          border-color: #4338ca !important;
+        }
+
+        .wysiwyg-editor .ProseMirror li.tiptap-task-item > div {
+          flex: 1 !important;
+        }
+
+        /* Nested task lists */
+        .wysiwyg-editor .ProseMirror li.tiptap-task-item ul.tiptap-task-list {
+          margin-top: 0.5rem !important;
+          padding-left: 1.5rem !important;
         }
 
         .wysiwyg-editor .ProseMirror strong {
