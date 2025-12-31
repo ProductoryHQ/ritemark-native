@@ -60,16 +60,21 @@ A standalone desktop app for writing in Markdown, with AI built-in.
 
 ### Works With Your AI
 
-RiteMark Native doesn't lock you into one AI provider. The built-in terminal works with whatever you're already paying for:
+2025 is the year of **terminal-based AI agents**. Claude Code, Codex CLI, Gemini CLI, Aider—developers are leaving IDE sidebars and working directly in the terminal.
 
-| Your AI | CLI Tool | Works in RiteMark |
-|---------|----------|-------------------|
-| **Claude** (Anthropic) | Claude Code | ✅ |
-| **ChatGPT** (OpenAI) | Codex CLI | ✅ |
-| **Gemini** (Google) | Gemini CLI | ✅ |
-| **Local models** | Ollama, LMStudio | ✅ |
+RiteMark Native doesn't lock you into one provider. The built-in terminal works with whatever CLI agent you prefer:
+
+| Provider | CLI Agent | Notes |
+|----------|-----------|-------|
+| **Anthropic** | Claude Code | 27K+ stars, agentic codebase search |
+| **OpenAI** | Codex CLI | Open-source, GitHub Actions integration |
+| **Google** | Gemini CLI | Free tier, 1M token context window |
+| **Open Source** | Aider | Multi-model support, git integration |
+| **Local** | Ollama, LMStudio | Privacy-first, no API costs |
 
 **You already have an AI subscription. Now you have an editor that works nicely with it.**
+
+This is why **local-first + terminal** matters. RiteMark isn't an AI product that locks you in—it's an editor that works with the AI revolution happening in terminals.
 
 ### Core Capabilities
 
