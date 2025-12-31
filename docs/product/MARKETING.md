@@ -317,6 +317,7 @@ This is the high-level strategy. For detailed playbooks and guidelines, see:
 | [marketing/CONTENT-CALENDAR.md](./marketing/CONTENT-CALENDAR.md) | Content schedule Q1-Q2 2026 |
 | [marketing/LAUNCH-CHECKLIST.md](./marketing/LAUNCH-CHECKLIST.md) | Tactical launch checklist |
 | [marketing/CMO-REVIEW.md](./marketing/CMO-REVIEW.md) | CMO strategic review & decisions |
+| [marketing/DISTRIBUTION.md](./marketing/DISTRIBUTION.md) | Technical distribution (DMG, signing, updates) |
 
 ---
 
