@@ -18,26 +18,37 @@ The tools don't match:
 
 What I wanted was simple: **Claude Code, but for writing.**
 
-An editor that:
-1. Works locally (my files, my machine)
-2. Understands Markdown natively
-3. Has a terminal built-in for Claude Code
-4. Gets out of the way and lets me write
+Not code—text. Reports. Specs. Blog posts. Meeting notes.
+
+An editor where I can:
+1. Describe what a document should do, and have AI generate it
+2. Work locally (my files, my machine)
+3. Run Claude Code right in the terminal
+4. Write in Markdown without seeing the syntax
 
 ---
 
 ## The Insight
 
-**Markdown is the future of text.**
+**Companies need dual-use knowledge management.**
 
-Not because it's perfect, but because it's:
-- **Plain text** - Works everywhere, forever
-- **Human readable** - No proprietary format lock-in
-- **AI-native** - Every LLM speaks Markdown fluently
-- **Version control friendly** - Git just works
-- **Convertible** - Export to PDF, DOCX, HTML, anything
+A document must work for both humans AND AI. The same file needs to be readable by people and processable by agents. This is the new requirement that changes everything.
 
-When you write in Markdown, you're writing in the lingua franca of AI systems. Your documents become first-class citizens in the Claude Code workflow.
+The old formats fail this test:
+
+| Format | Human | AI | Problem |
+|--------|-------|-----|---------|
+| **DOCX** | OK | Bad | Complex, full of hidden formatting. "Half the info gets lost or distorted" when given to AI. |
+| **PDF** | OK | Terrible | Essentially a print format. Layout over structure. |
+| **Markdown** | Great | Great | Human-readable, machine-readable, version-control compatible. |
+
+**Markdown is the only dual-use text format.**
+
+It's been around for 20 years. Developers use it constantly. But it never broke through to "normal" users—until now.
+
+AI is the reason that changes. Not "markdown is better" as a technical preference, but "markdown is the only format that works with our new tools" as a practical necessity.
+
+> *"This is no longer a technical preference. It's a practical need."*
 
 ---
 
@@ -135,14 +146,36 @@ We maintain this as a **submodule with patches**, not a fork—so we can easily 
 
 ## The Bet
 
-Markdown will become the default format for AI-era documents.
+Two predictions for 2026:
 
-Not because anyone mandates it, but because:
-1. AI systems read and write it fluently
-2. It's the only format that works in terminals, browsers, and apps equally
-3. Plain text survives format wars
+### 1. Claude Code comes to the office
 
-RiteMark Native is the editor built for this future.
+Today you open Word, write text by hand. Tomorrow you describe to an agent what the document should do, and AI generates it. You don't create documents—you describe their purpose.
+
+This is a big shift in thinking. And it requires a new kind of tool: something between Claude Code (for developers) and Claude Artifacts (a demo). Something simple enough for a secretary, powerful enough that a developer doesn't feel limited.
+
+**RiteMark Native is that tool.**
+
+### 2. Markdown becomes the standard
+
+At least one Fortune 500 company will announce transition to markdown-based internal documentation in 2026.
+
+Why? Because consultants will drive it. When McKinsey delivers a report in Markdown because their AI processes it better, clients start using Markdown too. Consultants have always been carriers of "best practices"—this time it'll actually be useful.
+
+The spread mechanism:
+1. Tech companies adopt first
+2. Consultants pick it up
+3. Traditional enterprises follow
+
+---
+
+## Why This Matters
+
+RiteMark Native exists because the tools haven't caught up to the shift.
+
+Word, Notion, Confluence—they were built for humans writing alone. We need tools built for humans writing with AI.
+
+Markdown is the bridge. RiteMark Native is the editor.
 
 ---
 
