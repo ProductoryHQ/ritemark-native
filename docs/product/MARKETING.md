@@ -304,4 +304,20 @@ We're the only tool that combines:
 
 ---
 
+## Detailed Documentation
+
+This is the high-level strategy. For detailed playbooks and guidelines, see:
+
+| Document | Purpose |
+|----------|---------|
+| [marketing/FRAMEWORK.md](./marketing/FRAMEWORK.md) | Master marketing framework |
+| [marketing/COMPETITIVE.md](./marketing/COMPETITIVE.md) | Full competitive analysis (10 competitors) |
+| [marketing/PRODUCTHUNT.md](./marketing/PRODUCTHUNT.md) | ProductHunt launch playbook |
+| [marketing/BRAND.md](./marketing/BRAND.md) | Brand voice & messaging guidelines |
+| [marketing/CONTENT-CALENDAR.md](./marketing/CONTENT-CALENDAR.md) | Content schedule Q1-Q2 2026 |
+| [marketing/LAUNCH-CHECKLIST.md](./marketing/LAUNCH-CHECKLIST.md) | Tactical launch checklist |
+| [marketing/CMO-REVIEW.md](./marketing/CMO-REVIEW.md) | CMO strategic review & decisions |
+
+---
+
 *"The tools haven't caught up to the shift. We're building the one that will."*
