@@ -58,6 +58,19 @@ A standalone desktop app for writing in Markdown, with AI built-in.
 
 **Not a VS Code extension.** A complete, branded application built on VS Code's proven foundation—with everything code-focused stripped away.
 
+### Works With Your AI
+
+RiteMark Native doesn't lock you into one AI provider. The built-in terminal works with whatever you're already paying for:
+
+| Your AI | CLI Tool | Works in RiteMark |
+|---------|----------|-------------------|
+| **Claude** (Anthropic) | Claude Code | ✅ |
+| **ChatGPT** (OpenAI) | Codex CLI | ✅ |
+| **Gemini** (Google) | Gemini CLI | ✅ |
+| **Local models** | Ollama, LMStudio | ✅ |
+
+**You already have an AI subscription. Now you have an editor that works nicely with it.**
+
 ### Core Capabilities
 
 | Feature | What It Does |
