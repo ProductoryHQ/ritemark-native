@@ -197,4 +197,32 @@ Markdown is the bridge. RiteMark Native is the editor.
 
 ---
 
+## The Vision: Agentic Office Suite
+
+RiteMark Native is **product #1** in a larger vision.
+
+The traditional office suite (Word, Excel, PowerPoint) was built for humans working alone, clicking through menus, formatting by hand. That era is ending.
+
+The **agentic office suite** is built for humans working with AI agents:
+- You describe what you need
+- The agent generates, edits, formats
+- You review, refine, approve
+
+| Traditional | Agentic |
+|-------------|---------|
+| Word | **RiteMark** — Markdown + terminal agents |
+| Excel | RiteCalc? — Spreadsheets + agents |
+| PowerPoint | RiteDeck? — Slides + agents |
+| Visio | RiteDraw? — Diagrams + agents |
+
+**Common foundation:**
+- Local-first (your files, your machine)
+- Terminal-based agents (BYOA)
+- Plain-text formats (Markdown, CSV, SVG)
+- Dual-use (works for humans AND AI)
+
+RiteMark Native proves the thesis. If people need this, we build the suite.
+
+---
+
 *"Write in Markdown. Think with AI. Own your words."*
