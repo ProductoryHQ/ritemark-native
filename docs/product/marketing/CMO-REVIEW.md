@@ -61,35 +61,38 @@ The team didn't cherry-pick. Obsidian and Typora are acknowledged as excellent i
 
 ---
 
-### 2. Claude Dependency (MEDIUM)
+### 2. Claude Dependency (RESOLVED)
 
-**Problem:** "Claude Code, but for writing" ties brand to Anthropic. Risks:
-- Anthropic launches competing product
-- Claude Code pivots or sunsets
-- Brand confusion if Anthropic disapproves
+**Problem:** "Claude Code, but for writing" ties brand to Anthropic.
 
-**Recommendation:**
-- Have secondary tagline ready that doesn't mention Claude
-- "AI-native markdown editor" works for general audience
-- Consider reaching out to Anthropic for blessing/partnership
+**Resolution:** RiteMark is **AI-agnostic**. The terminal works with any CLI-based AI:
+- Claude Code (Anthropic)
+- Codex CLI (OpenAI/ChatGPT)
+- Gemini CLI (Google)
+- Local models (Ollama, LMStudio)
 
-**Decision needed:** Primary tagline for non-developer audiences?
+**New positioning:** "You already have an AI subscription. Now you have an editor that works nicely with it."
+
+This removes Anthropic dependency while keeping "Claude Code, but for writing" as one audience-specific tagline.
 
 ---
 
-### 3. Monetization Unclear (MEDIUM)
+### 3. Monetization (DEFERRED - CORRECT)
 
-**Problem:** "Free forever" isn't a business. Need to answer:
-- How does this make money?
-- When do we introduce pricing?
-- What's the pro/enterprise tier?
+**Status:** Too early. Validate hypothesis first.
 
-**Recommendation:**
-- Define "free" scope now (core features)
-- Plan premium tier (collaboration, cloud sync, enterprise)
-- Set trigger: "After 1,000 users, evaluate monetization"
+**Current approach:**
+- Free to use
+- Users bring their own AI subscription (Claude, ChatGPT, Gemini)
+- RiteMark is the editor, not the AI provider
 
-**Decision needed:** Is this a business or a side project?
+**Why this is right:**
+1. Removes friction for adoption
+2. No AI API costs for us
+3. Users already paying for AI elsewhere
+4. Validates "do people need this?" before "will they pay?"
+
+**Revisit when:** 1,000+ active users, clear retention signal, user requests for premium features.
 
 ---
 
