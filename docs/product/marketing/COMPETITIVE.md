@@ -1,4 +1,4 @@
-# RiteMark Native - Competitive Intelligence Report
+# Ritemark - Competitive Intelligence Report
 
 **Date:** 2025-12-31
 **Market:** AI-Enhanced Markdown Editors & Knowledge Management Tools
@@ -15,7 +15,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - Growing backlash against subscription lock-in
 - Apple-exclusive apps dominate premium segment, leaving Windows/Linux underserved
 
-**RiteMark's Opportunity:** Local-first, AI-enhanced markdown editor with offline capabilities addresses the largest unmet need.
+**Ritemark's Opportunity:** Local-first, AI-enhanced markdown editor with offline capabilities addresses the largest unmet need.
 
 ---
 
@@ -43,7 +43,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - Steep learning curve
 - Plugin quality varies
 
-**RiteMark Advantage:** Native AI terminal, no plugin setup required.
+**Ritemark Advantage:** Native AI terminal, no plugin setup required.
 
 ---
 
@@ -68,7 +68,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - Proprietary format = vendor lock-in
 - Poor markdown fidelity
 
-**RiteMark Advantage:** Local-first, true markdown, works offline.
+**Ritemark Advantage:** Local-first, true markdown, works offline.
 
 ---
 
@@ -93,7 +93,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - No cloud sync
 - No mobile apps
 
-**RiteMark Advantage:** Same WYSIWYG quality + AI terminal.
+**Ritemark Advantage:** Same WYSIWYG quality + AI terminal.
 
 ---
 
@@ -119,7 +119,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - No AI generation
 - Limited organization features
 
-**RiteMark Advantage:** Cross-platform, AI generation + editing.
+**Ritemark Advantage:** Cross-platform, AI generation + editing.
 
 ---
 
@@ -144,7 +144,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - No AI
 - Not for long-form
 
-**RiteMark Advantage:** Cross-platform, AI, better for serious writing.
+**Ritemark Advantage:** Cross-platform, AI, better for serious writing.
 
 ---
 
@@ -169,7 +169,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - Expensive subscription
 - Proprietary markdown flavor
 
-**RiteMark Advantage:** Cross-platform, real AI terminal, standard markdown.
+**Ritemark Advantage:** Cross-platform, real AI terminal, standard markdown.
 
 ---
 
@@ -195,7 +195,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - UI designed for code, not prose
 - Requires extension setup
 
-**RiteMark Advantage:** Pre-configured for writing, stripped-down UI.
+**Ritemark Advantage:** Pre-configured for writing, stripped-down UI.
 
 ---
 
@@ -220,7 +220,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - Expensive
 - AI requires cloud
 
-**RiteMark Advantage:** Writing-focused, markdown-optimized, simpler pricing.
+**Ritemark Advantage:** Writing-focused, markdown-optimized, simpler pricing.
 
 ---
 
@@ -245,7 +245,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - Privacy concerns (Google scans)
 - AI requires paid tier
 
-**RiteMark Advantage:** Real markdown, local-first, privacy.
+**Ritemark Advantage:** Real markdown, local-first, privacy.
 
 ---
 
@@ -270,7 +270,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 - Subscription fatigue
 - Bloated features
 
-**RiteMark Advantage:** Markdown-native, lean, local-first.
+**Ritemark Advantage:** Markdown-native, lean, local-first.
 
 ---
 
@@ -307,7 +307,7 @@ The markdown editor market is projected to reach **$3.44B by 2033** (12.3% CAGR)
 
 ## Competitive Positioning Matrix
 
-| Feature | RiteMark | Obsidian | Notion | Typora | iA Writer | Cursor |
+| Feature | Ritemark | Obsidian | Notion | Typora | iA Writer | Cursor |
 |---------|----------|----------|--------|--------|-----------|--------|
 | **Local-First** | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ |
 | **Native AI** | ✅ | ⚠️ | ✅ | ❌ | ⚠️ | ✅ |

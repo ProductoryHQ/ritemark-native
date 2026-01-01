@@ -1,4 +1,4 @@
-# RiteMark Native - Marketing Framework
+# Ritemark - Marketing Framework
 
 **Version:** 1.0
 **Date:** 2025-12-31
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-RiteMark Native enters a $3.44B markdown editor market at a unique inflection point. The convergence of three trends creates a once-in-a-decade opportunity:
+Ritemark enters a $3.44B markdown editor market at a unique inflection point. The convergence of three trends creates a once-in-a-decade opportunity:
 
 1. **AI is table stakes** — but all implementations require cloud APIs
 2. **Privacy concerns accelerating** — 72% prefer on-premise solutions
@@ -39,7 +39,7 @@ This is the shift. DOCX/PDF fail this test. Markdown passes. We built the editor
 
 ### Positioning Statement
 
-> For **knowledge workers and Claude Code users** who need to **write documents with AI assistance**, RiteMark Native is a **desktop markdown editor** that **combines WYSIWYG editing with built-in terminal for AI agents**. Unlike Word (AI bolted on) or Notion (cloud-only), we're **built from the ground up for dual-use documents**.
+> For **knowledge workers and Claude Code users** who need to **write documents with AI assistance**, Ritemark is a **desktop markdown editor** that **combines WYSIWYG editing with built-in terminal for AI agents**. Unlike Word (AI bolted on) or Notion (cloud-only), we're **built from the ground up for dual-use documents**.
 
 ---
 
@@ -87,7 +87,7 @@ This is the shift. DOCX/PDF fail this test. Markdown passes. We built the editor
 
 ### The Matrix
 
-| Feature | RiteMark | Obsidian | Notion | Typora | iA Writer | Cursor |
+| Feature | Ritemark | Obsidian | Notion | Typora | iA Writer | Cursor |
 |---------|----------|----------|--------|--------|-----------|--------|
 | WYSIWYG Markdown | ✅ | ❌ | ⚠️ | ✅ | ✅ | ⚠️ |
 | Native AI Terminal | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ |
@@ -187,7 +187,7 @@ The world is splitting into two eras:
 - **Before:** Documents for humans (Word, PDF, Docs)
 - **After:** Documents for humans AND AI (Markdown)
 
-RiteMark Native is built for the "After."
+Ritemark is built for the "After."
 
 ### Three Pillars
 
@@ -224,7 +224,7 @@ RiteMark Native is built for the "After."
 > "Markdown is the only format that works for both you and your AI. That's not opinion—it's architecture."
 
 **DON'T:**
-> "RiteMark is an amazing revolutionary tool that will change how you write forever!!!"
+> "Ritemark is an amazing revolutionary tool that will change how you write forever!!!"
 
 **DO:**
 > "Stop copying between ChatGPT and Word. There's a better way."
@@ -263,7 +263,7 @@ RiteMark Native is built for the "After."
 | "DOCX is Dead (For AI)" | Blog | LinkedIn | Provocative thought piece |
 | "The Consultant's Secret Weapon" | Blog | LinkedIn | PM/consultant audience |
 | Tutorial: Setup AI writing environment | Video | YouTube | SEO, education |
-| Comparison: RiteMark vs Obsidian vs Typora | Video | YouTube | Decision content |
+| Comparison: Ritemark vs Obsidian vs Typora | Video | YouTube | Decision content |
 | User case studies | Blog | Website | Social proof |
 
 ### Ongoing Content
@@ -392,7 +392,7 @@ RiteMark Native is built for the "After."
 ### Open Questions
 
 1. Should we rebrand away from "Claude Code" reference? (Anthropic risk)
-2. Is "RiteMark" memorable enough? Consider alternatives?
+2. Is "Ritemark" memorable enough? Consider alternatives?
 3. What's the monetization model? (Freemium? Pro tier? Donations?)
 4. Should we open source fully for credibility?
 

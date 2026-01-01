@@ -1,4 +1,4 @@
-# RiteMark Native - Brand Guidelines
+# Ritemark - Brand Guidelines
 
 **Version:** 1.0
 **Date:** 2025-12-31
@@ -96,7 +96,7 @@ This is the thesis. Everything supports it.
 
 **Subhead:** WYSIWYG that syncs with raw markdown. Built-in terminal. All local, all yours.
 
-**CTA:** Try RiteMark Native (free)
+**CTA:** Try Ritemark (free)
 
 ---
 
@@ -129,7 +129,7 @@ Local-first. Offline-capable. Your files, your machine.
 ```
 The text editor that speaks AI fluently.
 
-Documents must work for humans AND AI. RiteMark Native combines
+Documents must work for humans AND AI. Ritemark combines
 WYSIWYG markdown with built-in Claude Code terminal.
 
 [Download for macOS] [See How It Works]
@@ -145,7 +145,7 @@ Claude Code, but for writing. macOS now, more coming.
 ### LinkedIn Description
 
 ```
-RiteMark Native — Desktop markdown editor with AI built-in
+Ritemark — Desktop markdown editor with AI built-in
 
 Building the text editor for the AI era. WYSIWYG markdown + Claude Code terminal.
 Local-first, offline-capable, privacy-respecting.
@@ -157,7 +157,7 @@ Founded by Jarmo Tuisk (Productory AI, Estonia).
 
 **Launch:**
 1. "We're live: Claude Code, but for writing"
-2. "RiteMark Native is launching (markdown + AI terminal)"
+2. "Ritemark is launching (markdown + AI terminal)"
 3. "The text editor that speaks AI fluently (launching today)"
 
 **Newsletter:**
@@ -217,7 +217,7 @@ Founded by Jarmo Tuisk (Productory AI, Estonia).
 **Do:**
 - Feature table comparisons without hyperbole
 - "Different positioning from X"
-- Let features speak: "RiteMark has built-in terminal. Obsidian uses plugins."
+- Let features speak: "Ritemark has built-in terminal. Obsidian uses plugins."
 
 ---
 
@@ -261,7 +261,7 @@ Before publishing, verify:
 - Indigo primary (#4338ca)
 - Bold, technical, vibrant
 
-**RiteMark Adaptations:**
+**Ritemark Adaptations:**
 - Softer, writing-focused
 - More neutral tones (slate, white space)
 - Terminal aesthetic (monospace accents)

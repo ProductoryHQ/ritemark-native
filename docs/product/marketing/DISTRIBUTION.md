@@ -1,4 +1,4 @@
-# RiteMark Native - Distribution Strategy
+# Ritemark - Distribution Strategy
 
 **Platform:** macOS (darwin-arm64, Intel coming)
 **Format:** DMG installer
@@ -131,7 +131,7 @@ brew install --cask ritemark
 ```bash
 codesign --deep --force --verify --verbose \
   --sign "Developer ID Application: Your Name (TEAMID)" \
-  RiteMark.app
+  Ritemark.app
 ```
 
 ---
@@ -142,14 +142,14 @@ codesign --deep --force --verify --verbose \
 
 ```bash
 # Submit for notarization
-xcrun notarytool submit RiteMark.dmg \
+xcrun notarytool submit Ritemark.dmg \
   --apple-id "your@email.com" \
   --team-id "TEAMID" \
   --password "@keychain:AC_PASSWORD" \
   --wait
 
 # Staple ticket to DMG
-xcrun stapler staple RiteMark.dmg
+xcrun stapler staple Ritemark.dmg
 ```
 
 **Timeline:** Usually 5-15 minutes, occasionally hours.
@@ -167,9 +167,9 @@ xcrun stapler staple RiteMark.dmg
 # Build for both architectures
 # Combine with lipo
 lipo -create \
-  RiteMark-arm64 \
-  RiteMark-x86_64 \
-  -output RiteMark-universal
+  Ritemark-arm64 \
+  Ritemark-x86_64 \
+  -output Ritemark-universal
 ```
 
 **Recommendation:** Prioritize for v1.1. ~30% of Macs still Intel.
@@ -231,7 +231,7 @@ User downloads new version manually.
 ```
 ┌─────────────────────────────────────────────────┐
 │                                                 │
-│  RiteMark Native                                │
+│  Ritemark                                │
 │  The text editor that speaks AI fluently        │
 │                                                 │
 │  [Download for macOS]  ← Primary CTA            │
@@ -267,9 +267,9 @@ Include on download page:
 ```markdown
 ## Installation
 
-1. Download RiteMark-1.0.0.dmg
+1. Download Ritemark-1.0.0.dmg
 2. Open the DMG file
-3. Drag RiteMark to Applications folder
+3. Drag Ritemark to Applications folder
 4. Launch from Applications
 
 ### First Launch
