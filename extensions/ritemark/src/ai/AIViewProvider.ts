@@ -254,6 +254,10 @@ export class AIViewProvider implements vscode.WebviewViewProvider {
     .header {
       padding: 12px;
       border-bottom: 1px solid var(--vscode-panel-border);
+      position: sticky;
+      top: 0;
+      background: var(--vscode-sideBar-background);
+      z-index: 10;
     }
     .header h2 {
       font-size: 13px;

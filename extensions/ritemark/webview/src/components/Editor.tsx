@@ -8,8 +8,8 @@ import OrderedList from '@tiptap/extension-ordered-list'
 import ListItem from '@tiptap/extension-list-item'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import Link from '@tiptap/extension-link'
+import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExtension'
+import { CustomLink } from '../extensions/CustomLink'
 import { createLowlight, common } from 'lowlight'
 import { marked } from 'marked'
 import TurndownService from 'turndown'
@@ -17,9 +17,12 @@ import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
+import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
+import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { TableOverlayControls } from './TableOverlayControls'
 import { PropertiesPanel, type DocumentProperties } from './properties'
+import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
 
 // Initialize Turndown for HTML to Markdown conversion
@@ -216,6 +219,14 @@ export function Editor({
   const lastExternalValue = useRef(value)
   const lastOnChangeValue = useRef<string>('')
 
+  // State for external link editing (triggered by clicking links)
+  const [externalLinkEdit, setExternalLinkEdit] = useState<{ url: string } | null>(null)
+
+  // State for block menu (triggered by + button)
+  const [showBlockMenu, setShowBlockMenu] = useState(false)
+  const [blockMenuPosition, setBlockMenuPosition] = useState({ top: 0, left: 0 })
+  const [insertAtPos, setInsertAtPos] = useState<number | null>(null) // Document position to insert at
+
   // Convert initial markdown to HTML (only runs once on mount)
   const [initialContent] = useState(() => {
     if (!value || !value.trim()) return ''
@@ -259,7 +270,7 @@ export function Editor({
           },
         },
       }),
-      CodeBlockLowlight.configure({
+      CodeBlockWithCopyExtension.configure({
         lowlight,
         defaultLanguage: 'plaintext',
         HTMLAttributes: {
@@ -295,7 +306,7 @@ export function Editor({
       Placeholder.configure({
         placeholder: placeholder,
       }),
-      Link.configure({
+      CustomLink.configure({
         openOnClick: false,
         HTMLAttributes: {
           class: 'tiptap-link',
@@ -303,10 +314,20 @@ export function Editor({
         validate: (url) => {
           return url.startsWith('https://') || url.startsWith('http://')
         },
+        onLinkClick: (href) => {
+          setExternalLinkEdit({ url: href })
+        },
       }),
       ...tableExtensions,
       ImageExtension,
       SlashCommands,
+      GlobalDragHandle.configure({
+        dragHandleWidth: 24,
+        scrollTreshold: 100,
+      }),
+      AutoJoiner.configure({
+        elementsToJoin: ['bulletList', 'orderedList', 'taskList'],
+      }),
     ],
     content: initialContent,
     onCreate: ({ editor }) => {
@@ -601,6 +622,132 @@ export function Editor({
     }
   }, [editor])
 
+  // Create and manage the + button alongside the drag handle
+  useEffect(() => {
+    if (!editor) return
+
+    // Create the + button element
+    const plusButton = document.createElement('button')
+    plusButton.className = 'block-plus-btn'
+    plusButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`
+    plusButton.title = 'Add block'
+    plusButton.setAttribute('aria-label', 'Add block')
+
+    // Handle + button click
+    const handlePlusClick = (event: MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+
+      // Find the block at the drag handle's position
+      const dragHandle = document.querySelector('.drag-handle') as HTMLElement
+      if (dragHandle && editor) {
+        const handleRect = dragHandle.getBoundingClientRect()
+        // Get the center Y of the drag handle
+        const centerY = handleRect.top + handleRect.height / 2
+
+        // Find the ProseMirror position at this Y coordinate
+        // We need to look for a block element at this vertical position
+        const editorView = editor.view
+        const editorRect = editorView.dom.getBoundingClientRect()
+
+        // Use posAtCoords to find the document position
+        const coords = { left: editorRect.left + 50, top: centerY }
+        const posAtCoords = editorView.posAtCoords(coords)
+
+        if (posAtCoords) {
+          // Find which top-level block contains this position
+          const doc = editorView.state.doc
+          let blockStart = 0
+
+          doc.forEach((node, offset) => {
+            const nodeEnd = offset + node.nodeSize
+            // Check if the clicked position falls within this node
+            if (posAtCoords.pos >= offset && posAtCoords.pos < nodeEnd) {
+              blockStart = offset
+              return false // Stop iteration
+            }
+          })
+
+          setInsertAtPos(blockStart)
+        }
+      }
+
+      const rect = plusButton.getBoundingClientRect()
+      setBlockMenuPosition({ top: rect.bottom + 4, left: rect.left })
+      setShowBlockMenu(true)
+    }
+
+    plusButton.addEventListener('click', handlePlusClick)
+    plusButton.addEventListener('mousedown', (e) => e.preventDefault())
+
+    // Append to body (will be positioned via CSS relative to drag-handle)
+    document.body.appendChild(plusButton)
+
+    // Sync + button visibility and position with drag handle
+    const syncPlusButton = () => {
+      const dragHandle = document.querySelector('.drag-handle') as HTMLElement
+      if (dragHandle) {
+        const style = window.getComputedStyle(dragHandle)
+        const opacity = parseFloat(style.opacity)
+
+        if (opacity > 0) {
+          const rect = dragHandle.getBoundingClientRect()
+          plusButton.style.top = `${rect.top}px`
+          plusButton.style.left = `${rect.left - 28}px` // 24px width + 4px gap
+          plusButton.style.opacity = style.opacity
+          plusButton.style.display = 'flex'
+        } else {
+          plusButton.style.opacity = '0'
+        }
+      } else {
+        plusButton.style.opacity = '0'
+      }
+    }
+
+    // Use animation frame for smooth syncing
+    let animationId: number
+    const animate = () => {
+      syncPlusButton()
+      animationId = requestAnimationFrame(animate)
+    }
+    animationId = requestAnimationFrame(animate)
+
+    return () => {
+      cancelAnimationFrame(animationId)
+      plusButton.removeEventListener('click', handlePlusClick)
+      plusButton.remove()
+    }
+  }, [editor])
+
+  // Close block menu when clicking outside
+  useEffect(() => {
+    if (!showBlockMenu) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const menu = document.querySelector('.block-menu-container')
+      const plusBtn = document.querySelector('.block-plus-btn')
+      if (
+        menu && !menu.contains(event.target as Node) &&
+        plusBtn && !plusBtn.contains(event.target as Node)
+      ) {
+        setShowBlockMenu(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowBlockMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showBlockMenu])
+
   return (
     <div className={`wysiwyg-editor h-full overflow-y-auto ${className}`}>
       {/* Document Properties Panel */}
@@ -616,8 +763,26 @@ export function Editor({
 
       {editor ? (
         <>
-          <FormattingBubbleMenu editor={editor} />
+          <FormattingBubbleMenu
+            editor={editor}
+            externalLinkEdit={externalLinkEdit}
+            onExternalLinkEditDone={() => setExternalLinkEdit(null)}
+          />
           <TableOverlayControls editor={editor} />
+          {/* Block insertion menu (triggered by + button) */}
+          {showBlockMenu && (
+            <div
+              className="block-menu-container"
+              style={{
+                position: 'fixed',
+                top: blockMenuPosition.top,
+                left: blockMenuPosition.left,
+                zIndex: 100,
+              }}
+            >
+              <BlockMenu editor={editor} onClose={() => setShowBlockMenu(false)} insertAtPos={insertAtPos} />
+            </div>
+          )}
         </>
       ) : (
         <div style={{ display: 'none' }}>Editor not ready</div>
@@ -637,7 +802,7 @@ export function Editor({
           max-width: 100% !important;
           max-width: 900px !important;
           margin: 0 auto !important;
-          padding: 2rem 2rem 0 2rem !important;
+          padding: 2rem 2rem 0 4rem !important; /* Extra left padding for drag handle */
         }
 
         .wysiwyg-editor .ProseMirror p {
@@ -863,6 +1028,46 @@ export function Editor({
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-class { color: #e5c07b !important; }
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-id { color: #61afef !important; }
 
+        /* Code block copy button */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn {
+          position: absolute !important;
+          top: 8px !important;
+          right: 8px !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 4px !important;
+          padding: 4px 8px !important;
+          background: rgba(255, 255, 255, 0.1) !important;
+          border: 1px solid rgba(255, 255, 255, 0.2) !important;
+          border-radius: 4px !important;
+          color: #9ca3af !important;
+          font-size: 12px !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+          cursor: pointer !important;
+          opacity: 0 !important;
+          transition: opacity 0.2s, background 0.2s, color 0.2s !important;
+          z-index: 10 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block:hover .code-copy-btn {
+          opacity: 1 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:hover {
+          background: rgba(255, 255, 255, 0.2) !important;
+          color: #f9fafb !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:active {
+          background: rgba(255, 255, 255, 0.3) !important;
+        }
+
+        /* Copied state - green feedback */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn.copied {
+          color: #4ade80 !important;
+          opacity: 1 !important;
+        }
+
         /* Enhanced mobile selection */
         @media (max-width: 768px) {
           div.wysiwyg-editor .ProseMirror.ProseMirror ::selection {
@@ -953,6 +1158,130 @@ export function Editor({
           .wysiwyg-editor .ProseMirror td.tiptap-table-cell,
           .wysiwyg-editor .ProseMirror th.tiptap-table-header {
             padding: 0.4rem 0.6rem !important;
+          }
+        }
+
+        /* Drag handle styling - subtle ghost style */
+        .drag-handle {
+          position: fixed;
+          opacity: 1 !important;
+          transition: background-color 0.15s ease;
+          border-radius: 4px;
+          background-color: transparent;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='5' r='1.5'/%3E%3Ccircle cx='9' cy='12' r='1.5'/%3E%3Ccircle cx='9' cy='19' r='1.5'/%3E%3Ccircle cx='15' cy='5' r='1.5'/%3E%3Ccircle cx='15' cy='12' r='1.5'/%3E%3Ccircle cx='15' cy='19' r='1.5'/%3E%3C/svg%3E");
+          background-size: 16px;
+          background-repeat: no-repeat;
+          background-position: center;
+          width: 24px;
+          height: 28px;
+          z-index: 50;
+          cursor: grab;
+          border: none;
+          transform: translateX(-8px) !important; /* 8px gap from text */
+        }
+
+        .drag-handle:hover {
+          background-color: rgba(0, 0, 0, 0.06);
+        }
+
+        .drag-handle:active {
+          background-color: rgba(0, 0, 0, 0.1);
+          cursor: grabbing;
+        }
+
+        .drag-handle.hide {
+          opacity: 0 !important;
+          pointer-events: none;
+        }
+
+
+        /* + button styling - subtle ghost style */
+        .block-plus-btn {
+          position: fixed;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 28px;
+          border: none;
+          border-radius: 4px;
+          background-color: transparent;
+          color: #9ca3af;
+          cursor: pointer;
+          opacity: 1 !important;
+          transition: background-color 0.15s ease;
+          z-index: 50;
+        }
+
+        .block-plus-btn:hover {
+          background-color: rgba(0, 0, 0, 0.06);
+        }
+
+        .block-plus-btn:active {
+          background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        /* Block menu styling */
+        .block-menu {
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          padding: 4px;
+          min-width: 200px;
+          max-height: 300px;
+          overflow-y: auto;
+        }
+
+        .block-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          padding: 8px 12px;
+          border: none;
+          border-radius: 4px;
+          background: transparent;
+          cursor: pointer;
+          text-align: left;
+          transition: background-color 0.15s ease;
+        }
+
+        .block-menu-item:hover {
+          background-color: #f3f4f6;
+        }
+
+        .block-menu-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          color: #6b7280;
+        }
+
+        .block-menu-text {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .block-menu-title {
+          font-size: 14px;
+          font-weight: 500;
+          color: #111827;
+        }
+
+        .block-menu-description {
+          font-size: 12px;
+          color: #9ca3af;
+        }
+
+        /* Hide drag handle and + button on mobile */
+        @media (max-width: 768px) {
+          .drag-handle,
+          .block-plus-btn {
+            display: none !important;
+            pointer-events: none;
           }
         }
 

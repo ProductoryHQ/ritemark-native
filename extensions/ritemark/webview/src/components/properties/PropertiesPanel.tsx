@@ -84,8 +84,8 @@ export function PropertiesPanel({ properties, hasProperties, onChange }: Propert
   // Minimal empty state - just a small button
   if (propertyCount === 0) {
     return (
-      <div className="px-4 py-2">
-        <div className="relative inline-block">
+      <div className="px-4 py-2 flex justify-end">
+        <div className="relative">
           <button
             onClick={() => setShowAddMenu(!showAddMenu)}
             className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"

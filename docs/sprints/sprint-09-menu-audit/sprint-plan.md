@@ -172,11 +172,11 @@ RiteMark Native currently shows all default VS Code menu items, including many t
 **Patches created:**
 
 -   ✅ `003-remove-edit-menu-code-items.patch` - Remove Emmet, comment actions from Edit menu
-
+    
 -   ✅ `004-hide-extensions-view-menu.patch` - Hide Extensions from View menu
-
+    
 -   ✅ `005-remove-go-menu.patch` - Remove entire Go menu from menubar
-
+    
 -   ✅ `006-cleanup-view-menu.patch` - Remove Appearance and Editor Layout submenus
     
 
@@ -234,42 +234,61 @@ RiteMark Native currently shows all default VS Code menu items, including many t
 ### Phase 2: Create Patches ✅ COMPLETE
 
 -   ✅ Create `003-remove-edit-menu-code-items.patch`
+    
     -   Removed Emmet: Expand Abbreviation menu registration
+        
     -   Removed Toggle Line Comment menu registration (keyboard shortcut kept)
+        
     -   Removed Toggle Block Comment menu registration
+        
     -   Fixed unused MenuId imports
-
+        
 -   ✅ Create `004-hide-extensions-view-menu.patch`
+    
     -   Hide Extensions panel from View menu
+        
     -   Fixed unused KeyMod/KeyCode imports
-
+        
 -   ✅ Create `005-remove-go-menu.patch`
+    
     -   Removed entire Go menu from menubar
-
+        
 -   ✅ Create `006-cleanup-view-menu.patch`
+    
     -   Removed Appearance submenu from View menu
+        
     -   Removed Editor Layout submenu from View menu
-
+        
 -   ✅ Test each patch with `./scripts/apply-patches.sh`
+    
 -   ✅ All patches validated with `./scripts/validate-patches.sh`
     
 
 ### Phase 3: Test & Validate ✅ COMPLETE
 
 -   ✅ Apply all patches to VS Code submodule
+    
 -   ✅ Verify patches apply without conflicts
+    
 -   ✅ TypeScript type check passes for all patched files
+    
 -   ✅ Build development version for testing
+    
 -   ✅ Test all remaining menu items work
+    
 -   ✅ Keyboard shortcuts still work (Cmd+/ for comments)
+    
 -   ⏳ Build production version (optional - dev testing sufficient)
+    
 -   ⏳ Screenshot all menus (optional)
     
 
 ### Phase 4: Documentation ✅ COMPLETE
 
 -   ✅ Create `docs/menu-customization.md`
+    
 -   ✅ Sprint plan updated with implementation details
+    
 -   ✅ Validation script documented
     
 
@@ -453,8 +472,11 @@ Complexity: Medium (patch-based approach proven with `002-hide-chat-sidebar.patc
 ### Tools Required
 
 -   Git (for patch creation) ✅
+    
 -   VS Code source (submodule) ✅
+    
 -   Patch scripts ✅ (`./scripts/apply-patches.sh`, `./scripts/create-patch.sh`)
+    
 -   **NEW:** Validation script ✅ (`./scripts/validate-patches.sh`) - Created in this sprint to catch TypeScript errors in ~2 min instead of 25 min build
     
 

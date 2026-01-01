@@ -7,14 +7,14 @@ A collection of ideas for future development. No commitment, no order - just a p
 ## Editor
 
 - Action command palette
-  - Show + button on hovered line (left side) to add blocks
-  - Show drag handle with the +
-- Copy code button in code blocks
+  - Show + button on hovered line (left side) to add blocks → **Sprint 14** (stretch)
+  - Show drag handle with the + → **Sprint 14**
+- Copy code button in code blocks → **Sprint 14**
 - Quotation styles
 - HTML paste improvements
-  - Convert tables to markdown format
-  - Convert inline PNGs to local files (or smart placeholders)
-- Clicking on link opens link editing dialog
+  - Convert tables to markdown format → **Sprint 15**
+  - Convert inline PNGs to local files (or smart placeholders) → **Sprint 15** (optional)
+- Clicking on link opens link editing dialog → **Sprint 14**
 
 ## File Management
 
@@ -34,6 +34,9 @@ A collection of ideas for future development. No commitment, no order - just a p
 - AI image generation via command palette
   - Opens dialog to configure Google API key
   - Uses Gemini API to generate images
+- On left sidebar - possbility to edit Agents and Skills/Tools ... of Claude Code
+
+
 
 ## Export
 
@@ -75,4 +78,4 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ---
 
-*Last updated: 2025-12-15*
+*Last updated: 2025-12-19*

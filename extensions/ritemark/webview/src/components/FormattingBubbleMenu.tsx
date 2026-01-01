@@ -1,6 +1,6 @@
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
 import { useState, useEffect, useRef } from 'react'
-import { Link2, Check, X, Table, List, ListOrdered, ListChecks } from 'lucide-react'
+import { Link2, Check, X, Table, List, ListOrdered, ListChecks, ExternalLink } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
 import { TablePicker } from './TablePicker'
@@ -17,6 +17,10 @@ import { TablePicker } from './TablePicker'
 interface FormattingBubbleMenuProps {
   /** The TipTap editor instance (required). Must have Bold, Italic, Heading, and Link extensions. */
   editor: TipTapEditor | null
+  /** External link edit trigger - when set, opens dialog with this URL */
+  externalLinkEdit?: { url: string } | null
+  /** Callback when external link edit is handled (to clear the trigger) */
+  onExternalLinkEditDone?: () => void
 }
 
 /**
@@ -66,7 +70,11 @@ function isValidUrl(url: string): boolean {
   }
 }
 
-export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps) {
+export function FormattingBubbleMenu({
+  editor,
+  externalLinkEdit,
+  onExternalLinkEditDone
+}: FormattingBubbleMenuProps) {
   // Link dialog state management
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
@@ -75,6 +83,16 @@ export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps) {
 
   // Table dialog state management
   const [showTableDialog, setShowTableDialog] = useState(false)
+
+  // Handle external link edit trigger (from clicking a link in the editor)
+  useEffect(() => {
+    if (externalLinkEdit) {
+      setLinkUrl(externalLinkEdit.url)
+      setUrlError('')
+      setShowLinkDialog(true)
+      onExternalLinkEditDone?.()
+    }
+  }, [externalLinkEdit, onExternalLinkEditDone])
 
   // Auto-focus link input when dialog opens (with small delay for animation)
   useEffect(() => {
@@ -329,23 +347,39 @@ export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps) {
             </Dialog.Title>
             <div className="space-y-4">
               <div>
-                <input
-                  ref={linkInputRef}
-                  type="url"
-                  value={linkUrl}
-                  onChange={(e) => {
-                    setLinkUrl(e.target.value)
-                    setUrlError('') // Clear validation error while user types
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleSetLink() // Submit on Enter key
-                    }
-                  }}
-                  placeholder="example.com or https://example.com"
-                  className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="flex gap-2">
+                  <input
+                    ref={linkInputRef}
+                    type="url"
+                    value={linkUrl}
+                    onChange={(e) => {
+                      setLinkUrl(e.target.value)
+                      setUrlError('') // Clear validation error while user types
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSetLink() // Submit on Enter key
+                      }
+                    }}
+                    placeholder="example.com or https://example.com"
+                    className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {/* Open in browser button - only shown when URL exists */}
+                  {linkUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
+                        window.open(url, '_blank', 'noopener,noreferrer')
+                      }}
+                      className="px-3 py-2 border rounded text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                      title="Open in browser (Cmd+click also works)"
+                    >
+                      <ExternalLink size={16} />
+                    </button>
+                  )}
+                </div>
                 {/* Inline validation error message */}
                 {urlError && (
                   <p className="text-sm text-red-500 mt-1">{urlError}</p>
