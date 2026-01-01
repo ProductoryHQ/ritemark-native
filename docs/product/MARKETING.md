@@ -1,4 +1,4 @@
-# RiteMark Native - Marketing Strategy
+# Ritemark - Marketing Strategy
 
 **Status:** Draft v1
 **Date:** 2025-12-31
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-RiteMark Native enters the market at a unique inflection point: AI is becoming a writing collaborator, but the tools haven't caught up. We position as **the first editor built for the AI-native workflow**—not AI bolted onto Word, but a ground-up rethinking of how humans and AI create documents together.
+Ritemark enters the market at a unique inflection point: AI is becoming a writing collaborator, but the tools haven't caught up. We position as **the first editor built for the AI-native workflow**—not AI bolted onto Word, but a ground-up rethinking of how humans and AI create documents together.
 
 ---
 
@@ -28,7 +28,7 @@ No tool exists that combines:
 - Local-first, privacy-respecting
 - Clean, focused writing environment
 
-**RiteMark Native fills this gap.**
+**Ritemark fills this gap.**
 
 ---
 
@@ -84,11 +84,11 @@ No tool exists that combines:
 
 ### Elevator Pitch (30 seconds)
 
-> RiteMark Native is a desktop app for writing in Markdown with AI built-in. It's Claude Code, but for text—not code. Write in rich text, save as Markdown, run Claude Code right in the terminal. Local-first, offline-capable, no cloud lock-in. For knowledge workers who want the AI-native workflow without giving up control of their files.
+> Ritemark is a desktop app for writing in Markdown with AI built-in. It's Claude Code, but for text—not code. Write in rich text, save as Markdown, run Claude Code right in the terminal. Local-first, offline-capable, no cloud lock-in. For knowledge workers who want the AI-native workflow without giving up control of their files.
 
 ### Positioning Statement
 
-> For **knowledge workers and Claude Code users** who need to **write documents with AI assistance**, RiteMark Native is a **desktop markdown editor** that **combines WYSIWYG editing with built-in terminal for AI agents**. Unlike Word (AI bolted on) or Notion (cloud-only), RiteMark Native is **built from the ground up for the dual-use future** where documents work for both humans and AI.
+> For **knowledge workers and Claude Code users** who need to **write documents with AI assistance**, Ritemark is a **desktop markdown editor** that **combines WYSIWYG editing with built-in terminal for AI agents**. Unlike Word (AI bolted on) or Notion (cloud-only), Ritemark is **built from the ground up for the dual-use future** where documents work for both humans and AI.
 
 ---
 
@@ -100,7 +100,7 @@ No tool exists that combines:
 - **Before:** Documents for humans (Word, PDF, Docs)
 - **After:** Documents for humans AND AI (Markdown)
 
-RiteMark Native is built for the "After."
+Ritemark is built for the "After."
 
 ### Message Pillars
 
@@ -117,8 +117,8 @@ RiteMark Native is built for the "After."
 |-----------|----------|
 | "I already use Notion/Docs" | Those are online-only and lock in your data. Do you trust them with your private notes? |
 | "Why Markdown?" | It's the only format AI can read and write fluently. DOCX loses half the info. |
-| "I can just use VS Code" | You could—but it's designed for code. RiteMark removes the clutter so you can focus on writing. |
-| "What about Obsidian?" | Great tool! RiteMark adds native AI terminal integration and WYSIWYG that syncs with raw markdown. |
+| "I can just use VS Code" | You could—but it's designed for code. Ritemark removes the clutter so you can focus on writing. |
+| "What about Obsidian?" | Great tool! Ritemark adds native AI terminal integration and WYSIWYG that syncs with raw markdown. |
 
 ---
 
@@ -133,7 +133,7 @@ RiteMark Native is built for the "After."
 - [ ] Post on Hacker News (Show HN)
 - [ ] Share in Claude/Anthropic communities (Discord, X)
 - [ ] Write founding story blog post ("Why I built Claude Code for writing")
-- [ ] Create demo video (2 min) showing Claude Code + RiteMark workflow
+- [ ] Create demo video (2 min) showing Claude Code + Ritemark workflow
 
 **Metrics:** 1,000 downloads, 100 active weekly users
 
@@ -183,10 +183,10 @@ RiteMark Native is built for the "After."
 
 | Type | Topic | Platform |
 |------|-------|----------|
-| Demo | "RiteMark + Claude Code workflow" | YouTube, X |
+| Demo | "Ritemark + Claude Code workflow" | YouTube, X |
 | Tutorial | "Set up your AI writing environment" | YouTube |
 | Short | "Write a blog post in 5 minutes with AI" | X, LinkedIn |
-| Comparison | "RiteMark vs Notion vs Obsidian" | YouTube |
+| Comparison | "Ritemark vs Notion vs Obsidian" | YouTube |
 
 ### Social Presence
 
@@ -235,7 +235,7 @@ We're the only tool that combines:
 > "Markdown is the only format that works for both you and your AI. That's not opinion—it's architecture."
 
 ❌ **Don't:**
-> "RiteMark is an amazing revolutionary tool that will change how you write forever!!!"
+> "Ritemark is an amazing revolutionary tool that will change how you write forever!!!"
 
 ✅ **Do:**
 > "Stop copying between ChatGPT and Word. There's a better way."

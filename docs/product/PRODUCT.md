@@ -1,4 +1,4 @@
-# RiteMark Native - Product Overview
+# Ritemark - Product Overview
 
 **Tagline:** The text editor that speaks AI fluently.
 
@@ -52,7 +52,7 @@ AI is the reason that changes. Not "markdown is better" as a technical preferenc
 
 ---
 
-## What RiteMark Native Is
+## What Ritemark Is
 
 A standalone desktop app for writing in Markdown, with AI built-in.
 
@@ -62,7 +62,7 @@ A standalone desktop app for writing in Markdown, with AI built-in.
 
 2025 is the year of **terminal-based AI agents**. Claude Code, Codex CLI, Gemini CLI, Aider—developers are leaving IDE sidebars and working directly in the terminal.
 
-RiteMark Native doesn't lock you into one provider. The built-in terminal works with whatever CLI agent you prefer:
+Ritemark doesn't lock you into one provider. The built-in terminal works with whatever CLI agent you prefer:
 
 | Provider | CLI Agent | Notes |
 |----------|-----------|-------|
@@ -74,7 +74,7 @@ RiteMark Native doesn't lock you into one provider. The built-in terminal works 
 
 **You already have an AI subscription. Now you have an editor that works nicely with it.**
 
-This is why **local-first + terminal** matters. RiteMark isn't an AI product that locks you in—it's an editor that works with the AI revolution happening in terminals.
+This is why **local-first + terminal** matters. Ritemark isn't an AI product that locks you in—it's an editor that works with the AI revolution happening in terminals.
 
 ### Core Capabilities
 
@@ -172,7 +172,7 @@ Today you open Word, write text by hand. Tomorrow you describe to an agent what 
 
 This is a big shift in thinking. And it requires a new kind of tool: something between Claude Code (for developers) and Claude Artifacts (a demo). Something simple enough for a secretary, powerful enough that a developer doesn't feel limited.
 
-**RiteMark Native is that tool.**
+**Ritemark is that tool.**
 
 ### 2. Markdown becomes the standard
 
@@ -189,17 +189,17 @@ The spread mechanism:
 
 ## Why This Matters
 
-RiteMark Native exists because the tools haven't caught up to the shift.
+Ritemark exists because the tools haven't caught up to the shift.
 
 Word, Notion, Confluence—they were built for humans writing alone. We need tools built for humans writing with AI.
 
-Markdown is the bridge. RiteMark Native is the editor.
+Markdown is the bridge. Ritemark is the editor.
 
 ---
 
 ## The Vision: Agentic Office Suite
 
-RiteMark Native is **product #1** in a larger vision.
+Ritemark is **product #1** in a larger vision.
 
 The traditional office suite (Word, Excel, PowerPoint) was built for humans working alone, clicking through menus, formatting by hand. That era is ending.
 
@@ -210,7 +210,7 @@ The **agentic office suite** is built for humans working with AI agents:
 
 | Traditional | Agentic |
 |-------------|---------|
-| Word | **RiteMark** — Markdown + terminal agents |
+| Word | **Ritemark** — Markdown + terminal agents |
 | Excel | RiteCalc? — Spreadsheets + agents |
 | PowerPoint | RiteDeck? — Slides + agents |
 | Visio | RiteDraw? — Diagrams + agents |
@@ -221,7 +221,7 @@ The **agentic office suite** is built for humans working with AI agents:
 - Plain-text formats (Markdown, CSV, SVG)
 - Dual-use (works for humans AND AI)
 
-RiteMark Native proves the thesis. If people need this, we build the suite.
+Ritemark proves the thesis. If people need this, we build the suite.
 
 ---
 

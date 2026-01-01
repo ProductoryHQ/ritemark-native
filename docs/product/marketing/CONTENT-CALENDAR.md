@@ -1,4 +1,4 @@
-# RiteMark Native - Content Calendar
+# Ritemark - Content Calendar
 
 **Period:** Q1-Q2 2026
 **Goal:** Build awareness, drive downloads, establish thought leadership
@@ -31,7 +31,7 @@
 | Day | Channel | Content | Goal |
 |-----|---------|---------|------|
 | Mon | X/Twitter | Thread: "Markdown is the future. Here's why." | Thesis expansion |
-| Wed | YouTube | Demo video: "RiteMark Native in 2 minutes" | Visual proof |
+| Wed | YouTube | Demo video: "Ritemark in 2 minutes" | Visual proof |
 | Fri | Blog | "Documents Must Work for Humans AND AI" | Core thesis piece |
 
 ### Week -2
@@ -50,7 +50,7 @@
 | Mon | X/Twitter | Feature highlight: WYSIWYG + Markdown | Feature education |
 | Tue | X/Twitter | Feature highlight: Terminal integration | Feature education |
 | Wed | X/Twitter | Feature highlight: Local-first/offline | Feature education |
-| Thu | Email | "Tomorrow: RiteMark Native launches" | List activation |
+| Thu | Email | "Tomorrow: Ritemark launches" | List activation |
 | Fri | ALL | ProductHunt launch | 🚀 LAUNCH DAY |
 
 ---
@@ -63,7 +63,7 @@
 |------|---------|---------|
 | 12:01 AM PST | ProductHunt | Listing live + first comment |
 | 12:15 AM | X/Twitter | "We're live on ProductHunt!" + link |
-| 6:00 AM | LinkedIn | "Launching RiteMark Native today" (professional post) |
+| 6:00 AM | LinkedIn | "Launching Ritemark today" (professional post) |
 | 9:00 AM | X/Twitter | Progress update: "Top X so far!" |
 | 12:00 PM | X/Twitter | Tip: "Use Cmd+` to summon Claude" |
 | 3:00 PM | X/Twitter | User feedback highlight |
@@ -84,7 +84,7 @@
 | Sun | X/Twitter | "Weekend tip: How to set up your writing workflow" |
 | Mon | Blog | "ProductHunt Launch: What We Learned" |
 | Tue | X/Twitter | User workflow spotlight |
-| Wed | LinkedIn | "Week 1 reflections on launching RiteMark Native" |
+| Wed | LinkedIn | "Week 1 reflections on launching Ritemark" |
 | Thu | X/Twitter | Roadmap sneak peek |
 | Fri | Email | "Pro tips from power users" |
 
@@ -97,7 +97,7 @@
 | Day | Channel | Type | Example |
 |-----|---------|------|---------|
 | **Monday** | Blog | Long-form | Feature deep-dive, thesis piece |
-| **Tuesday** | X/Twitter | Tips | "Did you know? RiteMark can..." |
+| **Tuesday** | X/Twitter | Tips | "Did you know? Ritemark can..." |
 | **Wednesday** | LinkedIn | Thought leadership | "Why enterprises will adopt markdown" |
 | **Thursday** | X/Twitter | Community | User story, feedback response |
 | **Friday** | X/Twitter | Engagement | Question, poll, discussion |
@@ -119,7 +119,7 @@
 | Week | Title | Length |
 |------|-------|--------|
 | 2 | "Setup: Your AI Writing Environment" | 5 min |
-| 4 | "RiteMark vs Obsidian vs Typora" | 8 min |
+| 4 | "Ritemark vs Obsidian vs Typora" | 8 min |
 | 6 | "Advanced: Claude Code Workflows" | 10 min |
 | 8 | "What's Coming in v1.2" | 3 min |
 
@@ -272,7 +272,7 @@
 
 | Month | Theme | Focus |
 |-------|-------|-------|
-| **April** | Use Cases | How different personas use RiteMark |
+| **April** | Use Cases | How different personas use Ritemark |
 | **May** | Comparisons | vs. competitors, honest takes |
 | **June** | Community | User stories, feature requests shipped |
 
@@ -293,7 +293,7 @@
 - "From Outline to Published"
 
 ### Technical
-- "How We Built RiteMark on VS Code"
+- "How We Built Ritemark on VS Code"
 - "The Patch System Explained"
 - "Why TipTap for the Editor"
 - "Local-First Architecture Deep Dive"

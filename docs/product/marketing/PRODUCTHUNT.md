@@ -1,4 +1,4 @@
-# RiteMark Native - ProductHunt Launch Playbook
+# Ritemark - ProductHunt Launch Playbook
 
 **Target Launch:** Q1 2026
 **Goal:** Top 5 Product of the Day
@@ -22,7 +22,7 @@
 - [ ] Build waiting list (email capture)
 
 **Asset Preparation**
-- [ ] Thumbnail (240x240px) — RiteMark logo
+- [ ] Thumbnail (240x240px) — Ritemark logo
 - [ ] Gallery images (5-7, 1280x960px):
   1. Hero: Split screen markdown + terminal
   2. Before/After: Fragmented workflow → unified
@@ -108,7 +108,7 @@
 ```
 Hey ProductHunt! 👋
 
-I'm Jarmo, maker of RiteMark Native.
+I'm Jarmo, maker of Ritemark.
 
 **The Origin Story:**
 
@@ -123,7 +123,7 @@ I thought: "Why are these separate apps?"
 
 **What We Built:**
 
-RiteMark Native = Notion's editor + VS Code's terminal in one window.
+Ritemark = Notion's editor + VS Code's terminal in one window.
 
 ✅ WYSIWYG Markdown (tables, task lists, GFM)
 ✅ Claude Code terminal (Cmd+` to summon)
@@ -217,7 +217,7 @@ Modern writing tools ignore AI workflows. You're forced to:
 ```
 Great question! [Competitor] is excellent for [their strength].
 
-RiteMark Native's unique combo:
+Ritemark's unique combo:
 1. Claude Code terminal built-in (not a plugin)
 2. WYSIWYG + Markdown source (switch anytime)
 3. 100% local-first (your files, your disk)

@@ -1,4 +1,4 @@
-# CMO Review: RiteMark Native Marketing Strategy
+# CMO Review: Ritemark Marketing Strategy
 
 **Reviewer:** Acting CMO
 **Date:** 2025-12-31
@@ -65,7 +65,7 @@ The team didn't cherry-pick. Obsidian and Typora are acknowledged as excellent i
 
 **Problem:** "Claude Code, but for writing" ties brand to Anthropic.
 
-**Resolution:** RiteMark is **AI-agnostic**. The terminal works with any CLI-based AI:
+**Resolution:** Ritemark is **AI-agnostic**. The terminal works with any CLI-based AI:
 - Claude Code (Anthropic)
 - Codex CLI (OpenAI/ChatGPT)
 - Gemini CLI (Google)
@@ -84,7 +84,7 @@ This removes Anthropic dependency while keeping "Claude Code, but for writing" a
 **Current approach:**
 - Free to use
 - Users bring their own AI subscription (Claude, ChatGPT, Gemini)
-- RiteMark is the editor, not the AI provider
+- Ritemark is the editor, not the AI provider
 
 **Why this is right:**
 1. Removes friction for adoption

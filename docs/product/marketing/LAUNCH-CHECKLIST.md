@@ -1,4 +1,4 @@
-# RiteMark Native - Launch Checklist
+# Ritemark - Launch Checklist
 
 **Status:** Pre-Launch
 **Target:** Q1 2026

@@ -1,4 +1,4 @@
-# RiteMark Native - Minimum Viable Launch
+# Ritemark - Minimum Viable Launch
 
 **Goal:** Find 10 real users. Learn if this matters.
 
@@ -17,7 +17,7 @@
 
 **The breakthrough:** Terminal-based agents (Claude Code, Codex CLI, Gemini CLI, Aider) don't suggest—they edit. They can read your file, change it, save it.
 
-**What RiteMark solves:** A clean writing environment with a built-in terminal. Your AI agent can actually work on your documents. Not suggestions in a sidebar. Direct edits you approve.
+**What Ritemark solves:** A clean writing environment with a built-in terminal. Your AI agent can actually work on your documents. Not suggestions in a sidebar. Direct edits you approve.
 
 ---
 
@@ -27,7 +27,7 @@
 > "Write with AI that can actually edit your files."
 
 **Elevator:**
-> Most AI tools give you suggestions to copy-paste. Terminal-based agents can edit directly. RiteMark gives you a writing app with a built-in terminal—so your AI works right in your documents. Local files. Any agent. One window.
+> Most AI tools give you suggestions to copy-paste. Terminal-based agents can edit directly. Ritemark gives you a writing app with a built-in terminal—so your AI works right in your documents. Local files. Any agent. One window.
 
 **The key difference:**
 
@@ -35,7 +35,7 @@
 |----------|--------------|
 | ChatGPT/Claude web | AI suggests → you copy-paste → repeat forever |
 | Notion AI / Copilot | AI suggests → cloud-only → vendor lock-in |
-| **RiteMark + any agent** | AI edits your file directly → you review → done |
+| **Ritemark + any agent** | AI edits your file directly → you review → done |
 
 ---
 
@@ -46,7 +46,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                                                             │
-│  RiteMark Native                                            │
+│  Ritemark                                            │
 │                                                             │
 │  Write with AI that can actually edit your files.           │
 │                                                             │
@@ -58,7 +58,7 @@
 │                                                             │
 │  Stop copying between ChatGPT and your documents.           │
 │                                                             │
-│  RiteMark has a built-in terminal. Your AI agent            │
+│  Ritemark has a built-in terminal. Your AI agent            │
 │  can read, edit, and save your files directly.              │
 │                                                             │
 │  Works with Claude Code, Codex CLI, Gemini CLI, Aider.      │
@@ -85,7 +85,7 @@
 **Visual:** Screen recording, no talking head, just action.
 
 ```
-[0-2s] Document open in RiteMark
+[0-2s] Document open in Ritemark
        Text overlay: "Stop copying to ChatGPT"
 
 [2-4s] Open terminal (Cmd+`)
@@ -115,7 +115,7 @@
 ```markdown
 ## Get Started
 
-1. Download RiteMark Native
+1. Download Ritemark
 2. Install your preferred AI agent:
    - Claude Code: npm install -g @anthropic-ai/claude-code
    - Codex CLI: npm install -g @openai/codex
