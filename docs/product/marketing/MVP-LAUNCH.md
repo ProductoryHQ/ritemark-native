@@ -4,6 +4,41 @@
 
 ---
 
+## The Problem We Solve
+
+**The copy-paste hell:**
+1. Write in Word/Docs/Notion
+2. Copy text to ChatGPT/Claude
+3. Get suggestions
+4. Copy back to document
+5. Repeat 50 times a day
+
+**The deeper problem:** AI chat interfaces can *suggest* text, but they can't *edit* your files directly.
+
+**The breakthrough:** Terminal-based agents (Claude Code, Codex CLI, Gemini CLI, Aider) don't suggest—they edit. They can read your file, change it, save it.
+
+**What RiteMark solves:** A clean writing environment with a built-in terminal. Your AI agent can actually work on your documents. Not suggestions in a sidebar. Direct edits you approve.
+
+---
+
+## The Pitch (Problem-Focused)
+
+**One-liner:**
+> "Write with AI that can actually edit your files."
+
+**Elevator:**
+> Most AI tools give you suggestions to copy-paste. Terminal-based agents can edit directly. RiteMark gives you a writing app with a built-in terminal—so your AI works right in your documents. Local files. Any agent. One window.
+
+**The key difference:**
+
+| Approach | What Happens |
+|----------|--------------|
+| ChatGPT/Claude web | AI suggests → you copy-paste → repeat forever |
+| Notion AI / Copilot | AI suggests → cloud-only → vendor lock-in |
+| **RiteMark + any agent** | AI edits your file directly → you review → done |
+
+---
+
 ## What We Need
 
 ### 1. Landing Page (1 hour to build)
@@ -13,19 +48,21 @@
 │                                                             │
 │  RiteMark Native                                            │
 │                                                             │
-│  The markdown editor for AI agents.                         │
-│  Works with Codex CLI, Claude Code, Gemini CLI, and more.   │
+│  Write with AI that can actually edit your files.           │
 │                                                             │
 │  [Download for macOS] ← Big button                          │
 │                                                             │
-│  ▶ Watch: Get started in 10 seconds                         │
+│  ▶ Watch: See it work (10 sec)                              │
 │                                                             │
 │  ─────────────────────────────────────────────────────────  │
 │                                                             │
-│  You already have ChatGPT? Great.                           │
-│  Install Codex CLI. Open RiteMark. Start writing.           │
+│  Stop copying between ChatGPT and your documents.           │
 │                                                             │
-│  Your AI subscription + our editor = magic.                 │
+│  RiteMark has a built-in terminal. Your AI agent            │
+│  can read, edit, and save your files directly.              │
+│                                                             │
+│  Works with Claude Code, Codex CLI, Gemini CLI, Aider.      │
+│  Local files. Any agent. One window.                        │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -48,47 +85,50 @@
 **Visual:** Screen recording, no talking head, just action.
 
 ```
-[0-2s] Open RiteMark Native
-       Text overlay: "RiteMark Native"
+[0-2s] Document open in RiteMark
+       Text overlay: "Stop copying to ChatGPT"
 
-[2-5s] Open terminal (Cmd+`)
+[2-4s] Open terminal (Cmd+`)
        Text overlay: "Built-in terminal"
 
-[5-8s] Type: codex "add a conclusion to this doc"
-       Text overlay: "Works with Codex CLI"
+[4-7s] Type command, AI starts editing
+       Text overlay: "AI edits your file directly"
 
-[8-10s] Watch AI edit the document
-        Text overlay: "Your AI. Your editor. Your files."
+[7-10s] Document updates, user reviews
+        Text overlay: "Local files. Any agent. One window."
 ```
+
+**The point:** Show the PROBLEM being solved (no more copy-paste), not which tool.
 
 **Music:** None or subtle click sounds
 **Format:** MP4, 1080p, can be GIF for Twitter
-
 **Tools:** QuickTime screen record → trim in iMovie/ScreenFlow
 
 ---
 
 ### 3. Getting Started Flow
 
-**Why Codex CLI first:**
-- Everyone has ChatGPT (200M+ users)
-- Codex CLI is free if you have ChatGPT subscription
-- Simpler than Claude Code setup
-- Open source, trusted
+**Principle:** Show that it works with ANY terminal-based agent. User picks their preferred one.
 
 **Installation (for landing page):**
 
 ```markdown
 ## Get Started
 
-1. Download RiteMark Native [button]
-2. Install Codex CLI: `npm install -g @openai/codex`
+1. Download RiteMark Native
+2. Install your preferred AI agent:
+   - Claude Code: npm install -g @anthropic-ai/claude-code
+   - Codex CLI: npm install -g @openai/codex
+   - Gemini CLI: npm install -g @google/gemini-cli
+   - Aider: pip install aider-chat
 3. Open any .md file
 4. Press Cmd+` to open terminal
-5. Type: codex "help me write"
+5. Ask your AI to edit the document
 
-That's it. You're writing with AI.
+That's it. AI edits directly. You review.
 ```
+
+**For the video:** Pick whichever agent you have installed. The demo works the same regardless.
 
 ---
 
@@ -212,23 +252,27 @@ Interested? Takes 5 min to set up.
 
 ---
 
-### 9. One More Thing: Lead with ChatGPT
+### 9. The Positioning That Works
 
-**Old pitch:** "Claude Code, but for writing"
-**New pitch:** "You have ChatGPT? Now you have an editor for it."
+**Lead with the problem, not the tool.**
 
-ChatGPT is the gateway:
-- 200M+ users
-- Codex CLI is free with subscription
-- Everyone knows ChatGPT
-- Nobody needs to learn what Claude Code is
+**Bad pitches (tool-focused):**
+- "Claude Code, but for writing" ← assumes Claude familiarity
+- "You have ChatGPT? Now you have an editor for it" ← focuses on tool
 
-The conversation:
-> "Do you use ChatGPT?"
-> "Yes"
-> "Did you know there's a terminal version that can edit your files?"
-> "No"
-> "Here's an editor built for exactly that."
+**Good pitch (problem-focused):**
+- "Write with AI that can actually edit your files"
+- "Stop copying between ChatGPT and your documents"
+- "One window for writing and AI editing"
+
+**The conversation:**
+> "Do you use AI to help with writing?"
+> "Yes, but I spend half my time copying back and forth"
+> "What if AI could edit your document directly?"
+> "How?"
+> "Terminal-based agents can. Here's an editor built for that."
+
+**Why this works:** You're solving a pain they already have, not selling a tool they need to learn about.
 
 ---
 
