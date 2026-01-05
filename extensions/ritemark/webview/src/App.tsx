@@ -11,6 +11,7 @@ function App() {
   const [properties, setProperties] = useState<DocumentProperties>({})
   const [hasProperties, setHasProperties] = useState(false)
   const [isReady, setIsReady] = useState(false)
+  const [imageMappings, setImageMappings] = useState<Record<string, string>>({})
 
   // Track selection for AI tool execution
   const [selection, setSelection] = useState<EditorSelection | null>(null)
@@ -26,6 +27,7 @@ function App() {
           setContent(message.content as string)
           setProperties((message.properties as DocumentProperties) || {})
           setHasProperties(message.hasProperties as boolean || false)
+          setImageMappings((message.imageMappings as Record<string, string>) || {})
           setIsReady(true)
           break
 
@@ -168,6 +170,7 @@ function App() {
         properties={properties}
         hasProperties={hasProperties}
         onPropertiesChange={handlePropertiesChange}
+        imageMappings={imageMappings}
       />
     </div>
   )

@@ -2,16 +2,18 @@
 
 ## Goal
 
-Integrate real RiteMark WYSIWYG editor into the VS Code webview.
+Integrate real RiteMarcok WYSIWYG editor into the VS Code webview.
 
----
+![](./images/002A821E-268B-4764-BDA8-6B867AC618EA.jpeg)
+
+* * *
 
 ## RiteMark Web Editor Analysis
 
 ### Editor Stack
 
 | Component | Technology |
-|-----------|------------|
+| --- | --- |
 | Editor framework | TipTap v3.4+ (React wrapper for ProseMirror) |
 | Markdown conversion | Turndown (HTML→MD) + Marked (MD→HTML) |
 | UI components | Radix UI + Lucide icons |
@@ -23,20 +25,30 @@ Integrate real RiteMark WYSIWYG editor into the VS Code webview.
 
 ### Key Features
 
-- Bold, Italic, Underline, Strikethrough
-- Headings (H1-H6)
-- Lists (bullet, ordered, nested)
-- Code blocks with syntax highlighting
-- Tables with resize, header rows
-- Images with resize
-- Blockquotes, horizontal rules
-- Slash commands (`/Heading1`, `/Table`, etc.)
-- Formatting bubble menu
-- Selection tracking
+-   Bold, Italic, Underline, Strikethrough
+    
+-   Headings (H1-H6)
+    
+-   Lists (bullet, ordered, nested)
+    
+-   Code blocks with syntax highlighting
+    
+-   Tables with resize, header rows
+    
+-   Images with resize
+    
+-   Blockquotes, horizontal rules
+    
+-   Slash commands (`/Heading1`, `/Table`, etc.)
+    
+-   Formatting bubble menu
+    
+-   Selection tracking
+    
 
 ### Files to Extract
 
-```
+```plaintext
 ritemark-app/src/
 ├── components/
 │   ├── Editor.tsx                    # Main editor (756 lines)
@@ -52,20 +64,24 @@ ritemark-app/src/
     └── editor.ts                     # TypeScript types
 ```
 
----
+* * *
 
 ## VS Code Webview Integration Approach
 
 ### How It Works
 
-1. VS Code webview = embedded Chromium browser
-2. Can run full React + TipTap stack
-3. Communication via `postMessage` API
-4. File I/O through extension host
+1.  VS Code webview = embedded Chromium browser
+    
+2.  Can run full React + TipTap stack
+    
+3.  Communication via `postMessage` API
+    
+4.  File I/O through extension host
+    
 
 ### Architecture
 
-```
+```plaintext
 ┌─────────────────────────────────────────┐
 │  VS Code Extension Host (Node.js)       │
 │  - File read/write                      │
@@ -83,7 +99,7 @@ ritemark-app/src/
 
 ### Message Flow
 
-```
+```plaintext
 1. User opens .md file
 2. Extension reads file from disk
 3. Extension sends content to webview via postMessage
@@ -93,52 +109,70 @@ ritemark-app/src/
 7. Extension writes to disk
 ```
 
----
+* * *
 
 ## Sprint 02 Approach Options
 
 ### Option A: Embed Full Web App Bundle (Recommended)
 
-- Build ritemark-app as standalone bundle
-- Load bundle in VS Code webview
-- Fastest path to working editor
-- Reuses existing tested code
+-   Build ritemark-app as standalone bundle
+    
+-   Load bundle in VS Code webview
+    
+-   Fastest path to working editor
+    
+-   Reuses existing tested code
+    
 
 ### Option B: Extract @ritemark/core Package
 
-- Create shared package from web app
-- More work upfront
-- Better long-term maintainability
-- Enables web + native to share code
+-   Create shared package from web app
+    
+-   More work upfront
+    
+-   Better long-term maintainability
+    
+-   Enables web + native to share code
+    
 
 ### Recommendation
 
 **Start with Option A** for Sprint 02 (get it working), then refactor to Option B in Sprint 03 (shared packages).
 
----
+* * *
 
 ## Technical Considerations
 
 ### Webview Limitations
 
-- No direct filesystem access (must go through extension)
-- CSP restrictions (can be configured)
-- No Node.js APIs (pure browser environment)
+-   No direct filesystem access (must go through extension)
+    
+-   CSP restrictions (can be configured)
+    
+-   No Node.js APIs (pure browser environment)
+    
 
 ### What Works in Webview
 
-- React, TipTap, ProseMirror ✅
-- All CSS/styling ✅
-- Local state management ✅
-- postMessage communication ✅
+-   React, TipTap, ProseMirror ✅
+    
+-   All CSS/styling ✅
+    
+-   Local state management ✅
+    
+-   postMessage communication ✅
+    
 
 ### What Needs Adaptation
 
-- File I/O → Extension bridge
-- Google Drive → Remove for native (local files only)
-- Image upload → Local file handling
+-   File I/O → Extension bridge
+    
+-   Google Drive → Remove for native (local files only)
+    
+-   Image upload → Local file handling
+    
 
----
+* * *
 
 ## Dependencies to Include in Webview
 
@@ -157,7 +191,7 @@ ritemark-app/src/
 }
 ```
 
----
+* * *
 
 ## Success Criteria for Sprint 02
 

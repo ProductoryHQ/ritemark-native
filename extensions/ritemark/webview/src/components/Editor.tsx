@@ -175,6 +175,30 @@ turndownService.addRule('imageWithRelativePath', {
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common)
 
+/**
+ * Apply image mappings to HTML content
+ * Converts relative image paths to webview URIs for display,
+ * while storing the original relative path in the title attribute for turndown
+ */
+function applyImageMappings(html: string, imageMappings: Record<string, string>): string {
+  if (!imageMappings || Object.keys(imageMappings).length === 0) {
+    return html
+  }
+
+  // Process each mapping
+  let result = html
+  for (const [relativePath, webviewUri] of Object.entries(imageMappings)) {
+    // Escape special regex characters in the path
+    const escapedPath = relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // Replace src="relativePath" with src="webviewUri" title="relativePath"
+    // This preserves the relative path for turndown to use when saving
+    const srcRegex = new RegExp(`src="${escapedPath}"`, 'g')
+    result = result.replace(srcRegex, `src="${webviewUri}" title="${relativePath}"`)
+  }
+
+  return result
+}
+
 // Helper to read a File as base64 data URL
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -202,6 +226,7 @@ interface EditorProps {
   properties?: DocumentProperties
   hasProperties?: boolean
   onPropertiesChange?: (properties: DocumentProperties) => void
+  imageMappings?: Record<string, string>
 }
 
 export function Editor({
@@ -214,10 +239,12 @@ export function Editor({
   properties = {},
   hasProperties = false,
   onPropertiesChange,
+  imageMappings = {},
 }: EditorProps) {
   const isInitialMount = useRef(true)
   const lastExternalValue = useRef(value)
   const lastOnChangeValue = useRef<string>('')
+  const lastImageMappingsRef = useRef<Record<string, string>>({})
 
   // State for external link editing (triggered by clicking links)
   const [externalLinkEdit, setExternalLinkEdit] = useState<{ url: string } | null>(null)
@@ -558,7 +585,13 @@ export function Editor({
     // This prevents the editor from updating during typing/formatting
     const isExternalChange = value !== currentMarkdown && value !== lastOnChangeValue.current
 
-    if (isExternalChange || currentMarkdown === '') {
+    // Check if imageMappings changed - need to re-apply them
+    const imageMappingsChanged = Object.keys(imageMappings).length > 0 &&
+      Object.keys(imageMappings).length !== Object.keys(lastImageMappingsRef.current).length
+
+    if (isExternalChange || currentMarkdown === '' || imageMappingsChanged) {
+      // Update the ref
+      lastImageMappingsRef.current = imageMappings
       // CURSOR JUMP BUG FIX: Don't update content if editor is focused
       // This prevents cursor from jumping during autosave cycles
       if (editor.isFocused) {
@@ -579,7 +612,9 @@ export function Editor({
             gfm: true
           }) as string
           // Convert GFM task list HTML to TipTap format
-          const processedHtml = preprocessTaskListHTML(html)
+          let processedHtml = preprocessTaskListHTML(html)
+          // Apply image mappings to convert relative paths to webview URIs
+          processedHtml = applyImageMappings(processedHtml, imageMappings)
           editor.commands.setContent(processedHtml, false) // emitUpdate: false to prevent loops
         } catch (error) {
           console.error('Markdown conversion error:', error)
@@ -587,13 +622,14 @@ export function Editor({
           editor.commands.setContent(`<p>${value.replace(/\n/g, '</p><p>')}</p>`, false)
         }
       } else {
-        // Already HTML or empty
-        editor.commands.setContent(value, false) // emitUpdate: false to prevent loops
+        // Already HTML or empty - still apply image mappings
+        const processedValue = applyImageMappings(value, imageMappings)
+        editor.commands.setContent(processedValue, false) // emitUpdate: false to prevent loops
       }
 
       lastExternalValue.current = value
     }
-  }, [editor, value])
+  }, [editor, value, imageMappings])
 
   // Calculate word count - simple approach using editor state
   const [wordCount, setWordCount] = useState(0)
