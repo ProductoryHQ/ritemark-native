@@ -60,6 +60,52 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
+  /**
+   * Transform relative image paths in markdown to webview URIs
+   * Returns both the original content and a mapping of relative paths to webview URIs
+   */
+  private transformImagePaths(
+    markdown: string,
+    documentUri: vscode.Uri,
+    webview: vscode.Webview
+  ): Record<string, string> {
+    const imageMappings: Record<string, string> = {};
+    const docDir = path.dirname(documentUri.fsPath);
+
+    // Match markdown images: ![alt](path)
+    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    let match;
+
+    while ((match = imageRegex.exec(markdown)) !== null) {
+      const imagePath = match[2];
+
+      // Only process relative paths (starting with ./ or ../)
+      if (!imagePath.startsWith('./') && !imagePath.startsWith('../')) {
+        continue;
+      }
+
+      // Skip if already mapped
+      if (imageMappings[imagePath]) {
+        continue;
+      }
+
+      // Resolve relative path to absolute
+      const absolutePath = path.resolve(docDir, imagePath);
+
+      // Check if file exists
+      if (fs.existsSync(absolutePath)) {
+        // Convert to webview URI
+        const webviewUri = webview.asWebviewUri(
+          vscode.Uri.file(absolutePath)
+        ).toString();
+
+        imageMappings[imagePath] = webviewUri;
+      }
+    }
+
+    return imageMappings;
+  }
+
   async resolveCustomTextEditor(
     document: vscode.TextDocument,
     webviewPanel: vscode.WebviewPanel,
@@ -100,11 +146,18 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'ready':
             // Webview is ready, send the document content with properties
             const parsed = this.extractFrontMatter(document.getText());
+            // Transform image paths to webview URIs for display
+            const imageMappings = this.transformImagePaths(
+              parsed.content,
+              document.uri,
+              webviewPanel.webview
+            );
             webviewPanel.webview.postMessage({
               type: 'load',
               content: parsed.content,
               properties: parsed.properties,
-              hasProperties: parsed.hasProperties
+              hasProperties: parsed.hasProperties,
+              imageMappings: imageMappings
             });
             return;
 
@@ -169,11 +222,18 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       if (e.document.uri.toString() === document.uri.toString() && !isUpdating) {
         isUpdating = true;
         const parsed = this.extractFrontMatter(document.getText());
+        // Transform image paths to webview URIs for display
+        const mappings = this.transformImagePaths(
+          parsed.content,
+          document.uri,
+          webviewPanel.webview
+        );
         webviewPanel.webview.postMessage({
           type: 'load',
           content: parsed.content,
           properties: parsed.properties,
-          hasProperties: parsed.hasProperties
+          hasProperties: parsed.hasProperties,
+          imageMappings: mappings
         });
         // Reset flag after a short delay
         setTimeout(() => { isUpdating = false; }, 100);
