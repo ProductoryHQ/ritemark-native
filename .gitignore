@@ -47,6 +47,11 @@ temp/
 *.dmg
 *.app
 VSCode-darwin-arm64/
+VSCode-darwin-x64/
+VSCode-linux-arm64/
+VSCode-linux-x64/
+VSCode-win32-arm64/
+VSCode-win32-x64/
 
 # Claude Code local files (keep settings local, commit agents for governance)
 .claude/settings.local.json
