@@ -6,7 +6,7 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Editor
 
-- [ ] Action command palette - [ ] \- \[x\] Show + button on hovered line (left side) to add blocks → **Sprint 14** - \[x\] Show drag handle with the + → **Sprint 14** - \[ \] Add images from command palette - \[ \] Add Youtube (any other streaming) videos from command palette
+- [ ] Action command palette - \[x\] Show + button on hovered line (left side) to add blocks → **Sprint 14** - \[x\] Show drag handle with the + → **Sprint 14** - \[ \] Add images from command palette - \[ \] Add Youtube (any other streaming) videos from command palette
 - [x] Copy code button in code blocks → **Sprint 14**
 - [ ] Quotation styles
 - [ ] Paste inline images (screenshots, data URLs) → save as local files
@@ -55,8 +55,9 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Bugs
 
-- [ ] Cursor randomly jumps to bottom of page
+- [x] Cursor randomly jumps to bottom of page
 - [ ] When deleting table column, it leaves a "ghost" column
+- [ ] Nested checklist is broken after edits
 
 * * *
 

@@ -111,6 +111,9 @@ function preprocessTableHTML(html: string): string {
 // Custom rule to convert TipTap task list items to GFM syntax
 // TipTap outputs: <li data-type="taskItem" data-checked="true">Task</li>
 // GFM expects: - [x] Task
+//
+// BUG FIX: Handle nested task lists by preserving line breaks and indentation
+// Previously, nested items were flattened to a single line with escaped brackets
 turndownService.addRule('tiptapTaskItem', {
   filter: function (node) {
     return node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem'
@@ -119,7 +122,22 @@ turndownService.addRule('tiptapTaskItem', {
     const element = node as HTMLElement
     const isChecked = element.getAttribute('data-checked') === 'true'
     const checkbox = isChecked ? '[x]' : '[ ]'
-    // Clean up content - remove leading/trailing whitespace and newlines
+
+    // Split content into lines
+    const lines = content.split('\n').filter(line => line.trim())
+
+    // Check if we have nested task list items (lines starting with "- [")
+    // These are already converted by turndown processing child nodes first
+    const hasNestedTasks = lines.some((line, idx) => idx > 0 && line.match(/^- \[[ x]\]/))
+
+    if (hasNestedTasks && lines.length > 1) {
+      // First line is direct content, rest are nested items
+      const firstLine = lines[0].trim()
+      const nestedLines = lines.slice(1).map(line => '  ' + line).join('\n')
+      return `- ${checkbox} ${firstLine}\n${nestedLines}\n`
+    }
+
+    // No nested items - single line (clean up whitespace and newlines)
     const cleanContent = content.replace(/^\s+|\s+$/g, '').replace(/\n+/g, ' ')
     return `- ${checkbox} ${cleanContent}\n`
   }
@@ -131,8 +149,11 @@ turndownService.addRule('tiptapTaskList', {
     return node.nodeName === 'UL' && node.getAttribute('data-type') === 'taskList'
   },
   replacement: function (content) {
-    // Content already formatted by taskItem rule, just return it
-    return '\n' + content + '\n'
+    // Content already formatted by taskItem rule
+    // For nested lists, don't add extra newlines - let parent control formatting
+    const parent = (node as HTMLElement).parentElement
+    const isNested = parent && parent.getAttribute('data-type') === 'taskItem'
+    return isNested ? content : '\n' + content + '\n'
   }
 })
 
