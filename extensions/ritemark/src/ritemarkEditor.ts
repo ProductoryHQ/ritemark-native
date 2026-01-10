@@ -133,15 +133,26 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     // Track if we're currently updating to prevent feedback loops
     let isUpdating = false;
 
+    // Track if webview is disposed to prevent accessing disposed webview
+    let isDisposed = false;
+
+    // Store reference to webview before it might get disposed
+    const webview = webviewPanel.webview;
+
     // Add this webview to active set for AI tool broadcasts
-    RiteMarkEditorProvider.activeWebviews.add(webviewPanel.webview);
+    RiteMarkEditorProvider.activeWebviews.add(webview);
 
     // Show word count status bar when RiteMark editor is opened
     RiteMarkEditorProvider._wordCountStatusBar?.show();
 
     // Handle messages from the webview
-    webviewPanel.webview.onDidReceiveMessage(
+    webview.onDidReceiveMessage(
       message => {
+        // Don't process messages if webview is disposed
+        if (isDisposed) {
+          return;
+        }
+
         switch (message.type) {
           case 'ready':
             // Webview is ready, send the document content with properties
@@ -150,9 +161,9 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             const imageMappings = this.transformImagePaths(
               parsed.content,
               document.uri,
-              webviewPanel.webview
+              webview
             );
-            webviewPanel.webview.postMessage({
+            webview.postMessage({
               type: 'load',
               content: parsed.content,
               properties: parsed.properties,
@@ -186,7 +197,7 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'saveImage':
             // Save image to ./images/ folder relative to markdown file
-            this.saveImage(document, message.dataUrl, message.filename, webviewPanel);
+            this.saveImage(document, message.dataUrl, message.filename, webview);
             return;
 
           case 'selectionChanged':
@@ -221,14 +232,19 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
       if (e.document.uri.toString() === document.uri.toString() && !isUpdating) {
         isUpdating = true;
+        // Skip if disposed
+        if (isDisposed) {
+          return;
+        }
+
         const parsed = this.extractFrontMatter(document.getText());
         // Transform image paths to webview URIs for display
         const mappings = this.transformImagePaths(
           parsed.content,
           document.uri,
-          webviewPanel.webview
+          webview
         );
-        webviewPanel.webview.postMessage({
+        webview.postMessage({
           type: 'load',
           content: parsed.content,
           properties: parsed.properties,
@@ -241,8 +257,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     });
 
     webviewPanel.onDidDispose(() => {
-      // Remove from active set
-      RiteMarkEditorProvider.activeWebviews.delete(webviewPanel.webview);
+      // Mark as disposed FIRST to prevent any message handlers from running
+      isDisposed = true;
+
+      // Remove from active set using stored reference
+      RiteMarkEditorProvider.activeWebviews.delete(webview);
       changeDocumentSubscription.dispose();
 
       // Hide word count if no more RiteMark editors are open
@@ -307,7 +326,7 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     document: vscode.TextDocument,
     dataUrl: string,
     filename: string,
-    webviewPanel: vscode.WebviewPanel
+    webview: vscode.Webview
   ): Promise<void> {
     try {
       // Get directory of the markdown file
@@ -338,19 +357,19 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
       // Return relative path for markdown and webview URI for display
       const relativePath = `./images/${finalFilename}`;
-      const webviewUri = webviewPanel.webview.asWebviewUri(
+      const webviewUri = webview.asWebviewUri(
         vscode.Uri.file(imagePath)
       ).toString();
 
       // Send success response to webview with both paths
-      webviewPanel.webview.postMessage({
+      webview.postMessage({
         type: 'imageSaved',
         path: relativePath,        // For markdown storage
         displaySrc: webviewUri     // For editor display
       });
     } catch (error) {
       console.error('Failed to save image:', error);
-      webviewPanel.webview.postMessage({
+      webview.postMessage({
         type: 'imageError',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
