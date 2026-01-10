@@ -4,6 +4,7 @@ import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { AIViewProvider } from './ai/AIViewProvider';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
+import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
 
 // Export AI view provider for editor access
 export let aiViewProvider: AIViewProvider;
@@ -14,6 +15,13 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize connectivity monitoring (status bar + online detection)
   initConnectivity(context);
+
+  // Initialize update service
+  const updateStorage = new UpdateStorage(context.globalState);
+  const updateService = new UpdateService(updateStorage);
+
+  // Schedule startup update check (10 second delay)
+  scheduleStartupCheck(updateService, updateStorage);
 
   // Register AI View Provider (Secondary Side Bar / right)
   aiViewProvider = new AIViewProvider(context.extensionUri);

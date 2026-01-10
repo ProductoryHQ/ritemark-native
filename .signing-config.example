@@ -1,0 +1,33 @@
+# RiteMark Code Signing Configuration
+# Copy this file to .signing-config and fill in your values
+#
+# IMPORTANT: Never commit .signing-config to git!
+#            It contains sensitive credentials.
+
+# =============================================================================
+# Required: Apple Team ID
+# =============================================================================
+# Find this at: https://developer.apple.com/account
+# Or run: security find-identity -v -p codesigning
+# It's the alphanumeric string in parentheses, e.g., "ABC123XYZ"
+
+APPLE_TEAM_ID="YOUR_TEAM_ID_HERE"
+
+# =============================================================================
+# Notarization Credentials (choose ONE method)
+# =============================================================================
+
+# --- Option 1: App Store Connect API Key (RECOMMENDED) ---
+# Create at: https://appstoreconnect.apple.com/access/api
+# More secure, doesn't require 2FA prompts
+
+# NOTARIZE_KEY_ID="YOUR_KEY_ID"
+# NOTARIZE_KEY_ISSUER="YOUR_ISSUER_ID"
+# NOTARIZE_KEY_PATH="/path/to/AuthKey_XXXXXX.p8"
+
+# --- Option 2: Apple ID + App-Specific Password ---
+# Create app-specific password at: https://appleid.apple.com
+# Under "Sign-In and Security" → "App-Specific Passwords"
+
+# APPLE_ID="your.apple.id@email.com"
+# APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"

@@ -1,0 +1,25 @@
+# RiteMark Patch: About Dialog Version Display
+#
+# Purpose: Show ritemarkVersion (our version) instead of VS Code version
+#          in the About dialog.
+#
+# Why: Users see RiteMark version (1.0.0) instead of VS Code version (1.94.0)
+#      This prevents confusion when reporting bugs or checking for updates.
+#
+# File: src/vs/workbench/electron-sandbox/parts/dialogs/dialogHandler.ts
+# Risk: Low - only affects About dialog display, no functionality changes
+#
+diff --git a/src/vs/workbench/electron-sandbox/parts/dialogs/dialogHandler.ts b/src/vs/workbench/electron-sandbox/parts/dialogs/dialogHandler.ts
+index 6c61a590324..21191ba120f 100644
+--- a/src/vs/workbench/electron-sandbox/parts/dialogs/dialogHandler.ts
++++ b/src/vs/workbench/electron-sandbox/parts/dialogs/dialogHandler.ts
+@@ -70,7 +70,8 @@ export class NativeDialogHandler extends AbstractDialogHandler {
+ 	}
+
+ 	async about(): Promise<void> {
+-		let version = this.productService.version;
++		// RiteMark: Use ritemarkVersion if available, otherwise fall back to VS Code version
++		let version = (this.productService as any).ritemarkVersion || this.productService.version;
+ 		if (this.productService.target) {
+ 			version = `${version} (${this.productService.target} setup)`;
+ 		} else if (this.productService.darwinUniversalAssetId) {

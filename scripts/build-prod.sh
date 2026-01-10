@@ -115,6 +115,28 @@ cp -R extensions/ritemark "$EXT_DEST"
 echo -e "${GREEN}Extension copied successfully${NC}"
 echo ""
 
+# Add ritemarkVersion field to product.json from branding
+# NOTE: We keep VS Code's "version" field intact (1.94.0) for internal compatibility
+# RiteMark uses "ritemarkVersion" for update checking
+PRODUCT_JSON="$APP_PATH/Contents/Resources/app/product.json"
+RITEMARK_VERSION=$(grep '"ritemarkVersion"' branding/product.json | sed 's/.*"ritemarkVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+echo "Adding RiteMark version: $RITEMARK_VERSION"
+
+# Add ritemarkVersion field after the version field
+if [[ "$(uname)" == "Darwin" ]]; then
+  sed -i '' "s/\"version\":[[:space:]]*\"[^\"]*\"/\"version\": \"1.94.0\",\n\t\"ritemarkVersion\": \"$RITEMARK_VERSION\"/" "$PRODUCT_JSON"
+else
+  sed -i "s/\"version\":[[:space:]]*\"[^\"]*\"/\"version\": \"1.94.0\",\n\t\"ritemarkVersion\": \"$RITEMARK_VERSION\"/" "$PRODUCT_JSON"
+fi
+
+# Verify the ritemarkVersion was added
+if grep -q "ritemarkVersion" "$PRODUCT_JSON"; then
+  echo -e "${GREEN}RiteMark version $RITEMARK_VERSION added to product.json${NC}"
+else
+  echo -e "${RED}WARNING: ritemarkVersion field may not have been added${NC}"
+fi
+echo ""
+
 # =============================================================================
 # Step 4: Verify Extension Copy (GUARDRAIL)
 # =============================================================================
@@ -187,9 +209,22 @@ fi
 echo ""
 
 # =============================================================================
-# Step 6: Success
+# Step 6: Fix Timestamps
 # =============================================================================
-echo -e "${BLUE}Step 6/6: Build Complete${NC}"
+echo -e "${BLUE}Step 6/7: Fixing Timestamps${NC}"
+echo "----------------------------------------"
+
+# VS Code build sets dates to 1980 - fix them to current time
+echo "Setting app bundle timestamps to current time..."
+find "$APP_PATH" -exec touch {} \; 2>/dev/null || true
+touch "$APP_PATH"
+echo -e "${GREEN}Timestamps updated${NC}"
+echo ""
+
+# =============================================================================
+# Step 7: Success
+# =============================================================================
+echo -e "${BLUE}Step 7/7: Build Complete${NC}"
 echo "----------------------------------------"
 echo ""
 echo -e "${GREEN}========================================${NC}"

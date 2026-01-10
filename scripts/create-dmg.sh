@@ -55,15 +55,15 @@ if [ ! -f "$ICON_PATH" ]; then
 fi
 echo "  ✓ Icon found"
 
-# Extract version from package.json
+# Extract ritemarkVersion from branding/product.json (RiteMark version, not VS Code)
 echo
 echo "[2/5] Extracting version..."
-VERSION=$(node -p "require('$PROJECT_ROOT/vscode/package.json').version")
+VERSION=$(grep '"ritemarkVersion"' "$PROJECT_ROOT/branding/product.json" | sed 's/.*"ritemarkVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 if [ -z "$VERSION" ]; then
-    echo -e "${RED}ERROR: Could not extract version${NC}"
+    echo -e "${RED}ERROR: Could not extract ritemarkVersion from branding/product.json${NC}"
     exit 1
 fi
-echo "  Version: $VERSION"
+echo "  Version: $VERSION (from branding/product.json ritemarkVersion)"
 
 # Create output directory
 echo
@@ -101,6 +101,28 @@ create-dmg \
 if [ ! -f "$DMG_PATH" ]; then
     echo -e "${RED}ERROR: DMG creation failed${NC}"
     exit 1
+fi
+
+# Sign the DMG if credentials available
+CONFIG_FILE="$PROJECT_ROOT/.signing-config"
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+fi
+
+if [ -n "$APPLE_TEAM_ID" ]; then
+    echo
+    echo "[4b/5] Signing DMG..."
+    SIGNING_IDENTITY="Developer ID Application: Jarmo Tuisk ($APPLE_TEAM_ID)"
+
+    if security find-identity -v -p codesigning | grep -q "$APPLE_TEAM_ID"; then
+        codesign --force --sign "$SIGNING_IDENTITY" "$DMG_PATH"
+        echo -e "  ${GREEN}✓ DMG signed${NC}"
+    else
+        echo -e "  ${YELLOW}⚠ Certificate not found, skipping DMG signing${NC}"
+    fi
+else
+    echo
+    echo -e "  ${YELLOW}⚠ No APPLE_TEAM_ID, skipping DMG signing${NC}"
 fi
 
 # Generate SHA256 checksum

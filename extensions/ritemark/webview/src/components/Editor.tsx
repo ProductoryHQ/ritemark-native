@@ -148,7 +148,7 @@ turndownService.addRule('tiptapTaskList', {
   filter: function (node) {
     return node.nodeName === 'UL' && node.getAttribute('data-type') === 'taskList'
   },
-  replacement: function (content) {
+  replacement: function (content, node) {
     // Content already formatted by taskItem rule
     // For nested lists, don't add extra newlines - let parent control formatting
     const parent = (node as HTMLElement).parentElement
@@ -416,7 +416,12 @@ export function Editor({
         return false
       },
       handlePaste: (_view, event) => {
-        // Handle image paste from clipboard
+        // If clipboard has HTML/text content (e.g., from Word), let TipTap handle it
+        if (event.clipboardData?.types?.includes('text/html')) {
+          return false
+        }
+
+        // Only handle as image if there's no HTML (pure image paste, e.g., screenshot)
         if (event.clipboardData && event.clipboardData.files && event.clipboardData.files.length > 0) {
           const file = event.clipboardData.files[0]
           if (file.type.startsWith('image/')) {
