@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2026-01-11 (Sprint 17 complete)
+**Last Updated:** 2026-01-11 (Sprint 18 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 * * *
@@ -28,7 +28,8 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | 15 | Paste Enhancements | ✅ Complete | Smart paste from web, Word, etc. |
 | 16 | Auto-Update | ✅ Complete | Update notifications via GitHub Releases |
 | 17 | File Preview | ✅ Complete | CSV preview with inline editing |
-| 18+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
+| 18 | Header & Export | ✅ Complete | Document header, PDF/Word export |
+| 19+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
 
 * * *
 
@@ -393,7 +394,23 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 * * *
 
-## 🔮 Sprint 18+: Post-MVP (Future)
+## ✅ Sprint 18: Header & Export (Complete)
+
+**Goal:** Document header with properties access and export functionality
+
+**Deliverables:**
+
+-   Sticky document header (Properties + Export buttons)
+-   Properties modal (improved from Sprint 12)
+-   PDF export with pdfkit (Arial/Helvetica font)
+-   Word export with docx library (Arial font)
+-   Export dropdown menu with format selection
+
+**Validated:** 2026-01-11 by Jarmo
+
+* * *
+
+## 🔮 Sprint 19+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
 
@@ -402,9 +419,8 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 -   Blockquote styling
 -   Recent files list
 -   File templates
--   Export to PDF/DOCX
 -   AI image generation (Gemini)
--   Excel file preview (Sprint 19 planned)
+-   Excel file preview (read-only)
     
 
 * * *
@@ -427,8 +443,9 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | Paste Enhancements | 15 | ✅ Done |
 | Auto-Update | 16 | ✅ Done |
 | File Preview | 17 | ✅ Done |
-| **MVP Total** | **01-17** | **✅ Complete** |
-| Post-MVP | 18+ | 🔮 Future |
+| Header & Export | 18 | ✅ Done |
+| **MVP Total** | **01-18** | **✅ Complete** |
+| Post-MVP | 19+ | 🔮 Future |
 
 * * *
 
