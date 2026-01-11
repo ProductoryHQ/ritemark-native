@@ -15,12 +15,17 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Onboarding / Welcome Screen
 
-- [ ] Redesign Welcome screen for total newbies - \[ \] Clear "Getting Started" section with step-by-step guides - \[ \] How to open/create your first document - \[ \] How to install AI coding assistants from terminal: - \[ \] Claude Code - \[ \] Codex CLI - \[ \] Gemini CLI - \[ \] Visual tutorials / article links - \[ \] Make it obvious what to do first
+Redesign Welcome screen for total newbies
+
+- [ ] Clear "Getting Started" section with step-by-step guides
+- [ ] How to open/create your first document
+- [ ] How to install AI coding assistants from terminal: Claude Code Codex CLI Gemini CLI
+- [ ] Visual tutorials / article links
+- [ ] Make it obvious what to do first
 
 ## File Management
 
-- [ ] Recent files list on welcome page
-- [ ] File templates (blog post, meeting notes, etc.)
+- [ ] Recent files list on welcome page - [ ] File templates (blog post, meeting notes, etc.)
 - [ ] Markdown front-matter support (visual UI, not raw YAML)
 - [ ] Quick switcher improvements
 - [ ] Pre-installed viewers: Word, PDF, Excel, PowerPoint
@@ -58,6 +63,7 @@ A collection of ideas for future development. No commitment, no order - just a p
 - [x] Cursor randomly jumps to bottom of page
 - [ ] When deleting table column, it leaves a "ghost" column
 - [ ] Nested checklist is broken after edits
+- [ ] Copy-paste screenshot on Mac creates double image (needs investigation)
 
 * * *
 

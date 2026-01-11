@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2025-12-15 (Sprint 13 complete)
+**Last Updated:** 2026-01-11 (Sprint 16 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 * * *
@@ -24,7 +24,10 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | 11 | Quick Wins | ✅ Complete | Word count, CMD+B fix, autosave, H3, sticky AI header |
 | 12 | Document Properties | ✅ Complete | YAML front-matter UI for metadata |
 | 13 | Task Lists | ✅ Complete | GFM task checkboxes (`- [ ]` / `- [x]`) |
-| 14+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
+| 14 | Block Interactions | ✅ Complete | Block hover/drag/delete interactions |
+| 15 | Paste Enhancements | ✅ Complete | Smart paste from web, Word, etc. |
+| 16 | Auto-Update | ✅ Complete | Update notifications via GitHub Releases |
+| 17+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
 
 * * *
 
@@ -326,7 +329,52 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 * * *
 
-## 🔮 Sprint 14+: Post-MVP (Future)
+## ✅ Sprint 14: Block Interactions (Complete)
+
+**Goal:** Improve block-level editing with hover controls and drag/drop
+
+**Deliverables:**
+
+-   Block hover menu with delete button
+-   Drag handle for reordering blocks
+-   Visual feedback during drag operations
+
+**Validated:** 2026-01-08 by Jarmo
+
+* * *
+
+## ✅ Sprint 15: Paste Enhancements (Complete)
+
+**Goal:** Smart paste handling from various sources
+
+**Deliverables:**
+
+-   Intelligent paste from web pages
+-   Word/Google Docs paste support
+-   Clean HTML-to-Markdown conversion
+
+**Validated:** 2026-01-09 by Jarmo
+
+* * *
+
+## ✅ Sprint 16: Auto-Update (Complete)
+
+**Goal:** In-app update notifications via GitHub Releases
+
+**Deliverables:**
+
+-   Update module (8 TypeScript files)
+-   GitHub Releases API integration
+-   Version comparison (semantic versioning)
+-   Notification UI with Install/Later/Don't Show buttons
+-   User preference persistence
+-   Startup scheduler (10s delay)
+
+**Validated:** 2026-01-11 by Jarmo
+
+* * *
+
+## 🔮 Sprint 17+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
 
@@ -356,8 +404,11 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | Quick Wins | 11 | ✅ Done |
 | Document Properties | 12 | ✅ Done |
 | Task Lists | 13 | ✅ Done |
-| **MVP Total** | **01-13** | **✅ Complete** |
-| Post-MVP | 14+ | 🔮 Future |
+| Block Interactions | 14 | ✅ Done |
+| Paste Enhancements | 15 | ✅ Done |
+| Auto-Update | 16 | ✅ Done |
+| **MVP Total** | **01-16** | **✅ Complete** |
+| Post-MVP | 17+ | 🔮 Future |
 
 * * *
 
