@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { FileText, FileType } from 'lucide-react'
 
 interface ExportMenuProps {
@@ -65,7 +65,7 @@ export function ExportMenu({
   }, [isOpen, onClose, anchorElement])
 
   // Calculate position relative to anchor
-  const [position, setPosition] = React.useState({ top: 0, left: 0 })
+  const [position, setPosition] = useState({ top: 0, left: 0 })
 
   useEffect(() => {
     if (!isOpen || !anchorElement) return

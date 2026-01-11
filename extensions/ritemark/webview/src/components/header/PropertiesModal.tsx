@@ -119,7 +119,7 @@ export function PropertiesModal({
           z-index: 1000;
           display: flex;
           flex-direction: column;
-          overflow: hidden;
+          overflow: visible;
           animation: modal-scale-in 150ms ease-out;
         }
 
@@ -173,11 +173,12 @@ export function PropertiesModal({
           background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
         }
 
-        /* Modal content - scrollable */
+        /* Modal content - allow dropdowns to overflow */
         .properties-modal-content {
           flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
+          overflow: visible;
+          min-height: 300px;
+          padding-bottom: 16px;
         }
 
         /* Responsive adjustments */

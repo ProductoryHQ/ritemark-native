@@ -7,28 +7,14 @@ import {
   Paragraph,
   TextRun,
   HeadingLevel,
-  AlignmentType,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  BorderStyle,
   ExternalHyperlink,
+  NumberFormat,
+  LevelFormat,
 } from 'docx';
 import type { DocumentProperties } from '../ritemarkEditor';
 
 /**
  * Export markdown content to Word (.docx)
- *
- * Converts markdown to docx format using the 'docx' library.
- * Supports:
- * - Headings (H1-H6)
- * - Paragraphs
- * - Bold, italic
- * - Lists (bullet, ordered)
- * - Links
- * - Code blocks (monospace)
- * - Tables
  */
 export async function exportToWord(
   markdown: string,
@@ -52,15 +38,60 @@ export async function exportToWord(
     });
 
     if (!saveUri) {
-      // User cancelled
-      return;
+      return; // User cancelled
     }
 
     // Parse markdown to structured content
-    const paragraphs = parseMarkdownToDocx(markdown);
+    const paragraphs = parseMarkdownToDocx(markdown, properties);
 
-    // Create docx document
+    // Create docx document with numbering definitions and default font
     const doc = new Document({
+      styles: {
+        default: {
+          document: {
+            run: {
+              font: 'Arial',
+              size: 24, // 12pt
+            },
+          },
+          heading1: {
+            run: {
+              font: 'Arial',
+              size: 48, // 24pt
+              bold: true,
+            },
+          },
+          heading2: {
+            run: {
+              font: 'Arial',
+              size: 36, // 18pt
+              bold: true,
+            },
+          },
+          heading3: {
+            run: {
+              font: 'Arial',
+              size: 28, // 14pt
+              bold: true,
+            },
+          },
+        },
+      },
+      numbering: {
+        config: [
+          {
+            reference: 'ordered-list',
+            levels: [
+              {
+                level: 0,
+                format: LevelFormat.DECIMAL,
+                text: '%1.',
+                alignment: 'start' as const,
+              },
+            ],
+          },
+        ],
+      },
       sections: [
         {
           properties: {},
@@ -90,11 +121,42 @@ export async function exportToWord(
 /**
  * Parse markdown to docx paragraphs
  */
-function parseMarkdownToDocx(markdown: string): Paragraph[] {
+function parseMarkdownToDocx(markdown: string, properties: DocumentProperties): Paragraph[] {
   const paragraphs: Paragraph[] = [];
-  const lines = markdown.split('\n');
 
+  // Add title from properties if available
+  const title = properties.title as string;
+  if (title) {
+    paragraphs.push(
+      new Paragraph({
+        text: cleanText(title),
+        heading: HeadingLevel.TITLE
+      })
+    );
+  }
+
+  // Add author and date
+  const author = properties.author as string;
+  const date = properties.date as string;
+  if (author || date) {
+    const metaText = [author, date].filter(Boolean).join(' • ');
+    paragraphs.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: metaText,
+            color: '666666',
+            size: 22 // 11pt
+          })
+        ]
+      })
+    );
+    paragraphs.push(new Paragraph({ text: '' })); // Spacer
+  }
+
+  const lines = markdown.split('\n');
   let i = 0;
+
   while (i < lines.length) {
     const line = lines[i];
 
@@ -109,7 +171,7 @@ function parseMarkdownToDocx(markdown: string): Paragraph[] {
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {
       const level = headingMatch[1].length;
-      const text = headingMatch[2];
+      const text = cleanText(headingMatch[2]);
       const headingLevels = [
         HeadingLevel.HEADING_1,
         HeadingLevel.HEADING_2,
@@ -147,65 +209,17 @@ function parseMarkdownToDocx(markdown: string): Paragraph[] {
               font: 'Courier New',
               size: 20 // 10pt
             })
-          ],
-          shading: {
-            fill: 'F5F5F5'
-          }
+          ]
         })
       );
       continue;
     }
 
-    // Bullet lists
-    if (line.match(/^[-*+]\s+/)) {
-      const listItems = [];
-      while (i < lines.length && lines[i].match(/^[-*+]\s+/)) {
-        const itemText = lines[i].replace(/^[-*+]\s+/, '');
-        listItems.push(itemText);
-        i++;
-      }
-
-      for (const item of listItems) {
-        paragraphs.push(
-          new Paragraph({
-            text: item,
-            bullet: {
-              level: 0
-            }
-          })
-        );
-      }
-      continue;
-    }
-
-    // Ordered lists
-    if (line.match(/^\d+\.\s+/)) {
-      const listItems = [];
-      while (i < lines.length && lines[i].match(/^\d+\.\s+/)) {
-        const itemText = lines[i].replace(/^\d+\.\s+/, '');
-        listItems.push(itemText);
-        i++;
-      }
-
-      for (const item of listItems) {
-        paragraphs.push(
-          new Paragraph({
-            text: item,
-            numbering: {
-              reference: 'default-numbering',
-              level: 0
-            }
-          })
-        );
-      }
-      continue;
-    }
-
-    // Task lists (checkboxes)
-    const taskMatch = line.match(/^-\s+\[([ x])\]\s+(.+)$/);
+    // Task lists (checkboxes) - check before bullet lists
+    const taskMatch = line.match(/^[-*]\s+\[([ xX])\]\s+(.+)$/);
     if (taskMatch) {
-      const isChecked = taskMatch[1] === 'x';
-      const taskText = taskMatch[2];
+      const isChecked = taskMatch[1].toLowerCase() === 'x';
+      const taskText = cleanText(taskMatch[2]);
       paragraphs.push(
         new Paragraph({
           children: [
@@ -222,8 +236,73 @@ function parseMarkdownToDocx(markdown: string): Paragraph[] {
       continue;
     }
 
+    // Bullet lists
+    if (line.match(/^[-*+]\s+/)) {
+      const itemText = cleanText(line.replace(/^[-*+]\s+/, ''));
+      paragraphs.push(
+        new Paragraph({
+          text: '• ' + itemText
+        })
+      );
+      i++;
+      continue;
+    }
+
+    // Ordered lists
+    if (line.match(/^\d+\.\s+/)) {
+      const itemText = cleanText(line.replace(/^\d+\.\s+/, ''));
+      paragraphs.push(
+        new Paragraph({
+          text: itemText,
+          numbering: {
+            reference: 'ordered-list',
+            level: 0
+          }
+        })
+      );
+      i++;
+      continue;
+    }
+
+    // Blockquotes
+    if (line.startsWith('>')) {
+      const quoteText = cleanText(line.replace(/^>\s*/, ''));
+      paragraphs.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: quoteText,
+              italics: true,
+              color: '666666'
+            })
+          ],
+          indent: {
+            left: 720 // 0.5 inch
+          }
+        })
+      );
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (line.match(/^(-{3,}|\*{3,}|_{3,})$/)) {
+      paragraphs.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: '────────────────────────────────────────',
+              color: 'CCCCCC'
+            })
+          ]
+        })
+      );
+      i++;
+      continue;
+    }
+
     // Regular paragraph with inline formatting
-    const runs = parseInlineFormatting(line);
+    const runs = parseInlineFormatting(cleanText(line));
     paragraphs.push(
       new Paragraph({
         children: runs
@@ -236,13 +315,17 @@ function parseMarkdownToDocx(markdown: string): Paragraph[] {
 }
 
 /**
+ * Clean text: remove backslash escapes
+ */
+function cleanText(text: string): string {
+  return text.replace(/\\([.!#\-*_\[\](){}])/g, '$1');
+}
+
+/**
  * Parse inline formatting (bold, italic, code, links)
  */
 function parseInlineFormatting(text: string): (TextRun | ExternalHyperlink)[] {
   const runs: (TextRun | ExternalHyperlink)[] = [];
-
-  // Simple regex-based parser
-  // This is a basic implementation - a full parser would use a proper markdown AST
 
   let remaining = text;
   const patterns = [
@@ -287,7 +370,8 @@ function parseInlineFormatting(text: string): (TextRun | ExternalHyperlink)[] {
               children: [
                 new TextRun({
                   text: earliestMatch.content,
-                  style: 'Hyperlink'
+                  color: '0066CC',
+                  underline: {}
                 })
               ],
               link: earliestMatch.url!
@@ -304,8 +388,7 @@ function parseInlineFormatting(text: string): (TextRun | ExternalHyperlink)[] {
           runs.push(
             new TextRun({
               text: earliestMatch.content,
-              font: 'Courier New',
-              shading: { fill: 'F5F5F5' }
+              font: 'Courier New' // Keep monospace for code
             })
           );
           break;
