@@ -1,13 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { onMessage, sendToExtension } from './bridge'
 import { Editor } from './components/Editor'
+import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { DocumentProperties } from './components/properties'
 
+type FileType = 'markdown' | 'csv' | 'xlsx'
+
 function App() {
   const [content, setContent] = useState<string>('')
+  const [fileType, setFileType] = useState<FileType>('markdown')
+  const [filename, setFilename] = useState<string>('')
+  const [encoding, setEncoding] = useState<string | undefined>()
+  const [sizeBytes, setSizeBytes] = useState<number | undefined>()
   const [properties, setProperties] = useState<DocumentProperties>({})
   const [hasProperties, setHasProperties] = useState(false)
   const [isReady, setIsReady] = useState(false)
@@ -25,6 +32,10 @@ function App() {
       switch (message.type) {
         case 'load':
           setContent(message.content as string)
+          setFileType((message.fileType as FileType) || 'markdown')
+          setFilename((message.filename as string) || '')
+          setEncoding(message.encoding as string | undefined)
+          setSizeBytes(message.sizeBytes as number | undefined)
           setProperties((message.properties as DocumentProperties) || {})
           setHasProperties(message.hasProperties as boolean || false)
           setImageMappings((message.imageMappings as Record<string, string>) || {})
@@ -150,14 +161,35 @@ function App() {
     editorRef.current = editor
   }, [])
 
+  // Handle CSV content changes (must be before any early returns!)
+  const handleCSVChange = useCallback((newContent: string) => {
+    setContent(newContent)
+    sendToExtension('contentChanged', { content: newContent })
+  }, [])
+
   if (!isReady) {
     return (
       <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
-        <div className="text-[var(--vscode-foreground)]">Loading editor...</div>
+        <div className="text-[var(--vscode-foreground)]">Loading...</div>
       </div>
     )
   }
 
+  // Route to SpreadsheetViewer for CSV/Excel files
+  if (fileType === 'csv' || fileType === 'xlsx') {
+    return (
+      <SpreadsheetViewer
+        content={content}
+        filename={filename}
+        fileType={fileType}
+        encoding={encoding}
+        sizeBytes={sizeBytes}
+        onChange={fileType === 'csv' ? handleCSVChange : undefined}
+      />
+    )
+  }
+
+  // Default: Markdown editor
   return (
     <div className="h-screen bg-[var(--vscode-editor-background)]">
       <Editor

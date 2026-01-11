@@ -59,3 +59,4 @@ VSCode-win32-x64/
 # Backup files
 *_old.*
 .signing-config
+test-files/
