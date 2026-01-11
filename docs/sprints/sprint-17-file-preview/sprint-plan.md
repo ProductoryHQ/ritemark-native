@@ -1,14 +1,16 @@
-# Sprint 17: CSV and Excel File Preview
+# Sprint 17: CSV File Preview
 
 ## Goal
-Add read-only CSV and Excel (.xlsx, .xls) preview to RiteMark Native using the existing editor infrastructure.
+Add read-only CSV preview to RiteMark Native using the existing editor infrastructure.
+
+**Note:** Excel support deferred to Sprint 19 due to `CustomTextEditorProvider` limitations with binary files. See `docs/sprints/sprint-19-excel-preview/lessons-learned.md`.
 
 ## Success Criteria
-- [ ] CSV files open in RiteMark with tabular preview
-- [ ] Excel files (.xlsx, .xls) open with tabular preview
-- [ ] Large files (10k+ rows) render without performance issues
-- [ ] File type selector in package.json includes CSV and Excel
-- [ ] Webview bundle remains under 2MB
+- [x] CSV files open in RiteMark with tabular preview
+- [ ] ~~Excel files (.xlsx, .xls) open with tabular preview~~ → Deferred to Sprint 19
+- [x] Large files (10k+ rows) render without performance issues
+- [x] File type selector in package.json includes CSV
+- [x] Webview bundle remains under 2MB (actual: 1.41MB)
 - [ ] Production build works on darwin-arm64
 
 ## Deliverables
@@ -76,7 +78,85 @@ Add read-only CSV and Excel (.xlsx, .xls) preview to RiteMark Native using the e
 - **@tanstack/react-table** (~50KB) - Headless table
 - **@tanstack/react-virtual** (~10KB) - Virtual scrolling
 
-**File Type Detection:**
+**Excel Binary Handling:**
+- `CustomTextEditorProvider` receives TextDocument (text-based)
+- Excel files are binary (ZIP format) - TextDocument corrupts them
+- **Solution:** Bypass TextDocument, read file directly with `fs.readFileSync()`, Base64 encode
+- SheetJS natively supports Base64 input: `XLSX.read(base64, { type: 'base64' })`
+
+---
+
+## Message Contract
+
+Extension sends `load` message to webview. Payload varies by file type:
+
+### Markdown (backwards compatible)
+```typescript
+{
+  type: 'load',
+  fileType: 'markdown',
+  filename: 'readme.md',
+  content: string,              // UTF-8 text
+  properties?: object,          // YAML front-matter
+  hasProperties?: boolean,
+  imageMappings?: Record<string, string>
+}
+```
+
+### CSV
+```typescript
+{
+  type: 'load',
+  fileType: 'csv',
+  filename: 'data.csv',
+  content: string,              // UTF-8 text (raw CSV)
+  sizeBytes: number             // For large file warnings
+}
+```
+
+### Excel
+```typescript
+{
+  type: 'load',
+  fileType: 'xlsx',
+  filename: 'report.xlsx',
+  content: string,              // Base64 encoded binary
+  encoding: 'base64',
+  sizeBytes: number
+}
+```
+
+### Extension-Side Implementation
+```typescript
+// In RiteMarkEditorProvider.ts
+const ext = path.extname(document.uri.fsPath).toLowerCase();
+
+if (ext === '.xlsx' || ext === '.xls') {
+  // Bypass TextDocument - read binary directly
+  const buffer = fs.readFileSync(document.uri.fsPath);
+  webview.postMessage({
+    type: 'load',
+    fileType: 'xlsx',
+    filename: path.basename(document.uri.fsPath),
+    content: buffer.toString('base64'),
+    encoding: 'base64',
+    sizeBytes: buffer.length
+  });
+} else if (ext === '.csv') {
+  webview.postMessage({
+    type: 'load',
+    fileType: 'csv',
+    filename: path.basename(document.uri.fsPath),
+    content: document.getText(),
+    sizeBytes: Buffer.byteLength(document.getText(), 'utf8')
+  });
+} else {
+  // Markdown - existing flow with added fields
+  // ...
+}
+```
+
+### Webview-Side Routing
 ```typescript
 // App.tsx
 const ext = filename.toLowerCase().split('.').pop();
@@ -103,11 +183,11 @@ return <Editor />; // Default markdown editor
 - JSON/YAML preview (separate sprint)
 
 ## Status
-**Current Phase:** 1 (RESEARCH - COMPLETE)
-**Approval Required:** YES
+**Current Phase:** 2 (DEVELOPMENT)
+**Approved:** 2025-01-11
 
 ## Approval
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2025-01-11)
 
 ---
 

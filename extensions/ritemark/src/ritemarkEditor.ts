@@ -61,6 +61,70 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   /**
+   * Determine file type from extension
+   */
+  private getFileType(filePath: string): 'markdown' | 'csv' | 'xlsx' {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.csv') return 'csv';
+    if (ext === '.xlsx' || ext === '.xls') return 'xlsx';
+    return 'markdown';
+  }
+
+  /**
+   * Build load message payload based on file type
+   */
+  private buildLoadMessage(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Record<string, unknown> {
+    const filePath = document.uri.fsPath;
+    const fileType = this.getFileType(filePath);
+    const filename = path.basename(filePath);
+
+    if (fileType === 'xlsx') {
+      // Excel: bypass TextDocument, read binary directly and Base64 encode
+      const buffer = fs.readFileSync(filePath);
+      return {
+        type: 'load',
+        fileType: 'xlsx',
+        filename,
+        content: buffer.toString('base64'),
+        encoding: 'base64',
+        sizeBytes: buffer.length
+      };
+    }
+
+    if (fileType === 'csv') {
+      // CSV: use TextDocument content (UTF-8 text)
+      const content = document.getText();
+      return {
+        type: 'load',
+        fileType: 'csv',
+        filename,
+        content,
+        sizeBytes: Buffer.byteLength(content, 'utf8')
+      };
+    }
+
+    // Markdown: existing flow with added fields
+    const parsed = this.extractFrontMatter(document.getText());
+    const imageMappings = this.transformImagePaths(
+      parsed.content,
+      document.uri,
+      webview
+    );
+    return {
+      type: 'load',
+      fileType: 'markdown',
+      filename,
+      content: parsed.content,
+      properties: parsed.properties,
+      hasProperties: parsed.hasProperties,
+      imageMappings
+    };
+  }
+
+  /**
    * Transform relative image paths in markdown to webview URIs
    * Returns both the original content and a mapping of relative paths to webview URIs
    */
@@ -142,8 +206,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     // Add this webview to active set for AI tool broadcasts
     RiteMarkEditorProvider.activeWebviews.add(webview);
 
-    // Show word count status bar when RiteMark editor is opened
-    RiteMarkEditorProvider._wordCountStatusBar?.show();
+    // Show word count status bar only for markdown files
+    const fileType = this.getFileType(document.uri.fsPath);
+    if (fileType === 'markdown') {
+      RiteMarkEditorProvider._wordCountStatusBar?.show();
+    }
 
     // Handle messages from the webview
     webview.onDidReceiveMessage(
@@ -155,26 +222,13 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
         switch (message.type) {
           case 'ready':
-            // Webview is ready, send the document content with properties
-            const parsed = this.extractFrontMatter(document.getText());
-            // Transform image paths to webview URIs for display
-            const imageMappings = this.transformImagePaths(
-              parsed.content,
-              document.uri,
-              webview
-            );
-            webview.postMessage({
-              type: 'load',
-              content: parsed.content,
-              properties: parsed.properties,
-              hasProperties: parsed.hasProperties,
-              imageMappings: imageMappings
-            });
+            // Webview is ready, send the document content
+            webview.postMessage(this.buildLoadMessage(document, webview));
             return;
 
           case 'contentChanged':
-            // Content changed in editor, update document with front-matter
-            if (!isUpdating) {
+            // Content changed in editor, update document with front-matter (markdown only)
+            if (!isUpdating && this.getFileType(document.uri.fsPath) === 'markdown') {
               const fullContent = this.serializeFrontMatter(
                 message.properties as DocumentProperties | undefined,
                 message.content as string
@@ -184,8 +238,8 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             return;
 
           case 'propertiesChanged':
-            // Properties changed without content change, update document
-            if (!isUpdating) {
+            // Properties changed without content change, update document (markdown only)
+            if (!isUpdating && this.getFileType(document.uri.fsPath) === 'markdown') {
               const currentParsed = this.extractFrontMatter(document.getText());
               const newContent = this.serializeFrontMatter(
                 message.properties as DocumentProperties,
@@ -228,29 +282,22 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       this.context.subscriptions
     );
 
-    // Update webview when document changes externally
+    // Update webview when document changes externally (only for markdown - CSV/Excel are read-only)
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
       if (e.document.uri.toString() === document.uri.toString() && !isUpdating) {
+        // Only reload for markdown files (CSV/Excel are read-only)
+        const fileType = this.getFileType(document.uri.fsPath);
+        if (fileType !== 'markdown') {
+          return;
+        }
+
         isUpdating = true;
         // Skip if disposed
         if (isDisposed) {
           return;
         }
 
-        const parsed = this.extractFrontMatter(document.getText());
-        // Transform image paths to webview URIs for display
-        const mappings = this.transformImagePaths(
-          parsed.content,
-          document.uri,
-          webview
-        );
-        webview.postMessage({
-          type: 'load',
-          content: parsed.content,
-          properties: parsed.properties,
-          hasProperties: parsed.hasProperties,
-          imageMappings: mappings
-        });
+        webview.postMessage(this.buildLoadMessage(document, webview));
         // Reset flag after a short delay
         setTimeout(() => { isUpdating = false; }, 100);
       }
