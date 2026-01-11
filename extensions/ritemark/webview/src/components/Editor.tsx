@@ -21,7 +21,6 @@ import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { TableOverlayControls } from './TableOverlayControls'
-import { PropertiesPanel, type DocumentProperties } from './properties'
 import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
 
@@ -244,9 +243,6 @@ interface EditorProps {
   className?: string
   onEditorReady?: (editor: TipTapEditor) => void
   onSelectionChange?: (selection: EditorSelection) => void
-  properties?: DocumentProperties
-  hasProperties?: boolean
-  onPropertiesChange?: (properties: DocumentProperties) => void
   imageMappings?: Record<string, string>
 }
 
@@ -257,9 +253,6 @@ export function Editor({
   className = "",
   onEditorReady,
   onSelectionChange,
-  properties = {},
-  hasProperties = false,
-  onPropertiesChange,
   imageMappings = {},
 }: EditorProps) {
   const isInitialMount = useRef(true)
@@ -812,15 +805,6 @@ export function Editor({
 
   return (
     <div className={`wysiwyg-editor h-full overflow-y-auto ${className}`}>
-      {/* Document Properties Panel */}
-      {onPropertiesChange && (
-        <PropertiesPanel
-          properties={properties}
-          hasProperties={hasProperties}
-          onChange={onPropertiesChange}
-        />
-      )}
-
       <EditorContent editor={editor} />
 
       {editor ? (
