@@ -195,6 +195,279 @@ interface ExportWordMessage {
 // Extension → Webview (reuse existing notification system)
 ```
 
+## UI Design Specification
+
+### 1. Document Header
+
+**Asukoht:** Editori ülaosas, sticky (jääb paigale scrollimisel)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [📋 Properties]                                    [⬇ Export] │
+└─────────────────────────────────────────────────────────────────┘
+  ↑                                                        ↑
+  Vasak serv, 16px padding                    Parem serv, 16px padding
+```
+
+**Mõõtmed:**
+- Kõrgus: 40px
+- Padding: 16px vasakul/paremal
+- Border-bottom: 1px solid `var(--vscode-panel-border)`
+
+**Stiil:**
+- Background: `var(--vscode-editor-background)` (sama mis editor)
+- Nupud: Ghost style (transparent bg, hover'il nähtav)
+
+**Nupud:**
+
+| Nupp | Ikoon | Tekst | Hover |
+|------|-------|-------|-------|
+| Properties | `FileText` (lucide) | "Properties" | Light gray background |
+| Export | `Download` (lucide) | "Export" | Light gray background |
+
+```css
+/* Nupu stiil */
+.header-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.header-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+```
+
+### 2. Properties Modal
+
+**Trigger:** Click "Properties" nupul
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                    ┌─────────────────────────┐                  │
+│                    │ Properties          [✕] │ ← Header         │
+│                    ├─────────────────────────┤                  │
+│                    │                         │                  │
+│                    │  Title: [............]  │                  │
+│                    │                         │                  │
+│                    │  Tags:  [work] [q1] [+] │ ← Olemasolev     │
+│                    │                         │    PropertiesPanel│
+│                    │  Status: [Draft    ▾]   │                  │
+│                    │                         │                  │
+│                    │  [+ Add property]       │                  │
+│                    │                         │                  │
+│                    └─────────────────────────┘                  │
+│                                                                 │
+│  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ ← Backdrop
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Mõõtmed:**
+- Modal laius: 400px
+- Max-height: 80vh
+- Border-radius: 12px
+
+**Backdrop:**
+- Background: `rgba(0, 0, 0, 0.4)`
+- Click = sulgeb modali
+
+**Sulgemisviisid:**
+- ✕ nupp üleval paremal
+- ESC klahv
+- Click backdrop'il
+
+**Animatsioon:**
+- Fade in: 150ms ease-out
+- Fade out: 100ms ease-in
+
+```css
+/* Modal stiil */
+.properties-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  max-height: 80vh;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+}
+```
+
+### 3. Export Menu (Dropdown)
+
+**Trigger:** Click "Export" nupul
+
+```
+                                              ┌─────────────────┐
+                                              │  [⬇ Export]     │ ← Nupp
+                                              └────────┬────────┘
+                                                       │
+                                              ┌────────▼────────┐
+                                              │ 📄 Export PDF   │
+                                              │ 📝 Export Word  │
+                                              └─────────────────┘
+```
+
+**Mõõtmed:**
+- Laius: 160px
+- Item height: 36px
+
+**Positsioneering:**
+- Dropdown avaneb nupu all
+- Joondatud paremale (nupu paremast servast)
+
+**Sulgemine:**
+- Click menüü itemil
+- Click väljaspool menüüd
+- ESC klahv
+
+```css
+/* Dropdown stiil */
+.export-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 160px;
+  background: var(--vscode-menu-background);
+  border: 1px solid var(--vscode-menu-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--vscode-menu-foreground);
+  cursor: pointer;
+}
+
+.export-menu-item:hover {
+  background: var(--vscode-menu-selectionBackground);
+}
+```
+
+### 4. Export Flow (UX)
+
+**PDF Export:**
+```
+1. User clicks "Export PDF"
+2. Menu closes
+3. VS Code "Save As" dialog opens
+   - Default filename: [document-name].pdf
+   - Default location: same folder as .md file
+4. User confirms save
+5. Notification: "✓ Exported to meeting-notes.pdf"
+   OR
+   Error notification: "✗ Export failed: [reason]"
+```
+
+**Word Export:**
+```
+1. User clicks "Export Word"
+2. Menu closes
+3. VS Code "Save As" dialog opens
+   - Default filename: [document-name].docx
+   - Default location: same folder as .md file
+4. User confirms save
+5. Notification: "✓ Exported to meeting-notes.docx"
+   OR
+   Error notification: "✗ Export failed: [reason]"
+```
+
+### 5. Full Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [📋 Properties]                                    [⬇ Export] │ ← HEADER (sticky)
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│                                                                 │
+│     # Meeting Notes                                             │
+│                                                                 │
+│     Today we discussed the following topics...                  │
+│                                                                 │
+│     ## Action Items                                             │
+│                                                                 │
+│     - [ ] Send follow-up email                                  │
+│     - [ ] Schedule next meeting                                 │
+│                                                                 │
+│                                                                 │ ← EDITOR (scrolls)
+│                                                                 │
+│                                                                 │
+│                                                                 │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+│                 VS Code Status Bar (word count etc)             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6. Z-index Hierarchy
+
+| Element | Z-index |
+|---------|---------|
+| Editor content | 1 |
+| Drag handle, + button | 50 |
+| Document Header | 60 |
+| Export dropdown | 100 |
+| Bubble menu | 200 |
+| Modal backdrop | 999 |
+| Properties Modal | 1000 |
+
+### 7. Responsive Behavior
+
+**Kui webview on kitsas (<500px):**
+- Nupud näitavad ainult ikoone (ilma tekstita)
+- Modal võtab 90% laiusest
+
+```
+┌─────────────────────────────┐
+│ [📋]               [⬇]     │  ← Ainult ikoonid
+├─────────────────────────────┤
+│                             │
+│        Editor               │
+│                             │
+└─────────────────────────────┘
+```
+
+### 8. Dark/Light Mode
+
+Kasutame VS Code CSS muutujaid, nii et automaatselt töötab mõlemas:
+
+| Element | Light | Dark |
+|---------|-------|------|
+| Header bg | `#ffffff` | `#1e1e1e` |
+| Button hover | `#e8e8e8` | `#2d2d2d` |
+| Modal bg | `#ffffff` | `#252526` |
+| Backdrop | `rgba(0,0,0,0.4)` | `rgba(0,0,0,0.6)` |
+
+---
+
 ## Risks & Mitigations
 
 | Risk | Impact | Mitigation |
