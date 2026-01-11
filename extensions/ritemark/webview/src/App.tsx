@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { onMessage, sendToExtension } from './bridge'
 import { Editor } from './components/Editor'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
-import { DocumentHeader } from './components/header'
+import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
@@ -30,6 +30,7 @@ function App() {
   // UI state
   const [showPropertiesModal, setShowPropertiesModal] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportButtonRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     // Listen for messages from VS Code extension
@@ -177,9 +178,33 @@ function App() {
     setShowPropertiesModal(true)
   }, [])
 
-  const handleExportClick = useCallback(() => {
+  const handleExportClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    exportButtonRef.current = event.currentTarget
     setShowExportMenu(prev => !prev)
   }, [])
+
+  const handleClosePropertiesModal = useCallback(() => {
+    setShowPropertiesModal(false)
+  }, [])
+
+  const handleCloseExportMenu = useCallback(() => {
+    setShowExportMenu(false)
+  }, [])
+
+  // Export handlers
+  const handleExportPDF = useCallback(() => {
+    sendToExtension('exportPDF', {
+      content,
+      properties,
+    })
+  }, [content, properties])
+
+  const handleExportWord = useCallback(() => {
+    sendToExtension('exportWord', {
+      markdown: content,
+      properties,
+    })
+  }, [content, properties])
 
   if (!isReady) {
     return (
@@ -221,15 +246,26 @@ function App() {
           onEditorReady={handleEditorReady}
           placeholder="Start writing..."
           className="h-full"
-          properties={properties}
-          hasProperties={hasProperties}
-          onPropertiesChange={handlePropertiesChange}
           imageMappings={imageMappings}
         />
       </div>
 
-      {/* TODO: Properties Modal - Phase 3 */}
-      {/* TODO: Export Menu - Phase 4 */}
+      {/* Properties Modal */}
+      <PropertiesModal
+        isOpen={showPropertiesModal}
+        onClose={handleClosePropertiesModal}
+        properties={properties}
+        onPropertiesChange={handlePropertiesChange}
+      />
+
+      {/* Export Menu */}
+      <ExportMenu
+        isOpen={showExportMenu}
+        onClose={handleCloseExportMenu}
+        onExportPDF={handleExportPDF}
+        onExportWord={handleExportWord}
+        anchorElement={exportButtonRef.current}
+      />
     </div>
   )
 }

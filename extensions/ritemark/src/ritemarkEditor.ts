@@ -3,6 +3,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import matter from 'gray-matter';
 import type { AIViewProvider } from './ai/AIViewProvider';
+import { exportToPDF } from './export/pdfExporter';
+import { exportToWord } from './export/wordExporter';
 
 // Properties type for front-matter
 export interface DocumentProperties {
@@ -275,6 +277,24 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
               const count = message.wordCount || 0;
               RiteMarkEditorProvider._wordCountStatusBar.text = `${count} ${count === 1 ? 'word' : 'words'}`;
             }
+            return;
+
+          case 'exportPDF':
+            // Export document to PDF
+            exportToPDF(
+              message.content as string,
+              message.properties as DocumentProperties,
+              document.uri
+            );
+            return;
+
+          case 'exportWord':
+            // Export document to Word
+            exportToWord(
+              message.markdown as string,
+              message.properties as DocumentProperties,
+              document.uri
+            );
             return;
         }
       },
