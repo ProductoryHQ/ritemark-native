@@ -2,7 +2,7 @@
 	"nameShort": "RiteMark",
 	"nameLong": "RiteMark",
 	"applicationName": "ritemark",
-	"ritemarkVersion": "1.0.0",
+	"ritemarkVersion": "1.0.1",
 	"dataFolderName": ".ritemark",
 	"win32MutexName": "ritemarknative",
 	"licenseName": "MIT",
