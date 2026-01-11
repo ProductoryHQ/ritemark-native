@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { onMessage, sendToExtension } from './bridge'
 import { Editor } from './components/Editor'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
+import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
@@ -25,6 +26,11 @@ function App() {
 
   // Editor ref for tool execution
   const editorRef = useRef<TipTapEditor | null>(null)
+
+  // UI state
+  const [showPropertiesModal, setShowPropertiesModal] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportButtonRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     // Listen for messages from VS Code extension
@@ -167,6 +173,39 @@ function App() {
     sendToExtension('contentChanged', { content: newContent })
   }, [])
 
+  // Header button handlers
+  const handlePropertiesClick = useCallback(() => {
+    setShowPropertiesModal(true)
+  }, [])
+
+  const handleExportClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    exportButtonRef.current = event.currentTarget
+    setShowExportMenu(prev => !prev)
+  }, [])
+
+  const handleClosePropertiesModal = useCallback(() => {
+    setShowPropertiesModal(false)
+  }, [])
+
+  const handleCloseExportMenu = useCallback(() => {
+    setShowExportMenu(false)
+  }, [])
+
+  // Export handlers
+  const handleExportPDF = useCallback(() => {
+    sendToExtension('exportPDF', {
+      content,
+      properties,
+    })
+  }, [content, properties])
+
+  const handleExportWord = useCallback(() => {
+    sendToExtension('exportWord', {
+      markdown: content,
+      properties,
+    })
+  }, [content, properties])
+
   if (!isReady) {
     return (
       <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
@@ -191,18 +230,41 @@ function App() {
 
   // Default: Markdown editor
   return (
-    <div className="h-screen bg-[var(--vscode-editor-background)]">
-      <Editor
-        value={content}
-        onChange={handleContentChange}
-        onSelectionChange={handleSelectionChange}
-        onEditorReady={handleEditorReady}
-        placeholder="Start writing..."
-        className="h-full"
+    <div className="h-screen bg-[var(--vscode-editor-background)] flex flex-col">
+      {/* Document Header - Sticky with Properties and Export buttons */}
+      <DocumentHeader
+        onPropertiesClick={handlePropertiesClick}
+        onExportClick={handleExportClick}
+      />
+
+      {/* Editor - Takes remaining space */}
+      <div className="flex-1 overflow-y-auto">
+        <Editor
+          value={content}
+          onChange={handleContentChange}
+          onSelectionChange={handleSelectionChange}
+          onEditorReady={handleEditorReady}
+          placeholder="Start writing..."
+          className="h-full"
+          imageMappings={imageMappings}
+        />
+      </div>
+
+      {/* Properties Modal */}
+      <PropertiesModal
+        isOpen={showPropertiesModal}
+        onClose={handleClosePropertiesModal}
         properties={properties}
-        hasProperties={hasProperties}
         onPropertiesChange={handlePropertiesChange}
-        imageMappings={imageMappings}
+      />
+
+      {/* Export Menu */}
+      <ExportMenu
+        isOpen={showExportMenu}
+        onClose={handleCloseExportMenu}
+        onExportPDF={handleExportPDF}
+        onExportWord={handleExportWord}
+        anchorElement={exportButtonRef.current}
       />
     </div>
   )
