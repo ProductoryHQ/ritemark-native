@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2026-01-11 (Sprint 16 complete)
+**Last Updated:** 2026-01-11 (Sprint 17 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 * * *
@@ -27,7 +27,8 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | 14 | Block Interactions | ✅ Complete | Block hover/drag/delete interactions |
 | 15 | Paste Enhancements | ✅ Complete | Smart paste from web, Word, etc. |
 | 16 | Auto-Update | ✅ Complete | Update notifications via GitHub Releases |
-| 17+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
+| 17 | File Preview | ✅ Complete | CSV preview with inline editing |
+| 18+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
 
 * * *
 
@@ -374,7 +375,25 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 * * *
 
-## 🔮 Sprint 17+: Post-MVP (Future)
+## ✅ Sprint 17: File Preview (Complete)
+
+**Goal:** CSV file preview with inline editing
+
+**Deliverables:**
+
+-   CSV files open in tabular view
+-   Inline cell editing with auto-save
+-   Row numbers column (Excel-style)
+-   Virtual scrolling for large files (up to 10k rows)
+-   Large file warning (>5MB)
+-   TanStack Table + Virtual integration
+-   Excel support deferred to Sprint 19 (requires CustomEditorProvider)
+
+**Validated:** 2026-01-11 by Jarmo
+
+* * *
+
+## 🔮 Sprint 18+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
 
@@ -385,7 +404,7 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 -   File templates
 -   Export to PDF/DOCX
 -   AI image generation (Gemini)
--   In-app update notifications
+-   Excel file preview (Sprint 19 planned)
     
 
 * * *
@@ -407,8 +426,9 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | Block Interactions | 14 | ✅ Done |
 | Paste Enhancements | 15 | ✅ Done |
 | Auto-Update | 16 | ✅ Done |
-| **MVP Total** | **01-16** | **✅ Complete** |
-| Post-MVP | 17+ | 🔮 Future |
+| File Preview | 17 | ✅ Done |
+| **MVP Total** | **01-17** | **✅ Complete** |
+| Post-MVP | 18+ | 🔮 Future |
 
 * * *
 
