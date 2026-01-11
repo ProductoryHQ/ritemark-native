@@ -45,64 +45,64 @@ Add a minimal sticky header with Properties toggle and Export menu, enabling PDF
 - [ ] Verify no z-index conflicts with menus
 
 ### Phase 3: Properties Modal
-- [ ] Create `PropertiesModal.tsx` component
-  - [ ] Modal overlay with backdrop
-  - [ ] Close handlers (ESC, click outside, X button)
-  - [ ] Center positioning
-  - [ ] Reuse existing PropertiesPanel content
-- [ ] Wire up modal state in App.tsx
+- [x] Create `PropertiesModal.tsx` component
+  - [x] Modal overlay with backdrop
+  - [x] Close handlers (ESC, click outside, X button)
+  - [x] Center positioning
+  - [x] Reuse existing PropertiesPanel content
+- [x] Wire up modal state in App.tsx
 - [ ] Test modal open/close behavior
 - [ ] Test properties data flow (no regressions)
-- [ ] Remove inline PropertiesPanel from Editor.tsx
+- [x] Remove inline PropertiesPanel from Editor.tsx
 
 ### Phase 4: Export Menu UI
-- [ ] Create `ExportMenu.tsx` dropdown component
-  - [ ] Menu items: Export PDF, Export Word
-  - [ ] VS Code styling
-  - [ ] Click outside to close
-  - [ ] Proper positioning below button
-- [ ] Wire up menu to Export button
+- [x] Create `ExportMenu.tsx` dropdown component
+  - [x] Menu items: Export PDF, Export Word
+  - [x] VS Code styling
+  - [x] Click outside to close
+  - [x] Proper positioning below button
+- [x] Wire up menu to Export button
 - [ ] Test menu interactions
 - [ ] Add loading states for exports
 
 ### Phase 5: PDF Export Backend
-- [ ] Add `exportPDF` message type to bridge.ts
-- [ ] Create `export/pdfExporter.ts` in extension
-  - [ ] Check Electron API availability
-  - [ ] Implement printToPDF workflow
-  - [ ] Show VS Code save dialog
-  - [ ] Handle file save errors
+- [x] Add `exportPDF` message type to bridge.ts
+- [x] Create `export/pdfExporter.ts` in extension
+  - [x] Check Electron API availability
+  - [x] Implement printToPDF workflow (HTML fallback for now)
+  - [x] Show VS Code save dialog
+  - [x] Handle file save errors
 - [ ] Test PDF generation with various documents
   - [ ] Headings, paragraphs, lists
   - [ ] Tables
   - [ ] Code blocks
   - [ ] Images (if supported)
-- [ ] Add success/error notifications
+- [x] Add success/error notifications
 
 ### Phase 6: Word Export Backend
-- [ ] Install `docx` package (`npm install docx` in extensions/ritemark)
-- [ ] Add `exportWord` message type to bridge.ts
-- [ ] Create `export/wordExporter.ts` in extension
-  - [ ] Parse markdown to structure
-  - [ ] Convert to docx format
-    - [ ] Headings (H1-H6)
-    - [ ] Paragraphs
-    - [ ] Bold/italic
-    - [ ] Lists (bullet, ordered, task)
+- [x] Install `docx` package (`npm install docx` in extensions/ritemark)
+- [x] Add `exportWord` message type to bridge.ts
+- [x] Create `export/wordExporter.ts` in extension
+  - [x] Parse markdown to structure
+  - [x] Convert to docx format
+    - [x] Headings (H1-H6)
+    - [x] Paragraphs
+    - [x] Bold/italic
+    - [x] Lists (bullet, ordered, task)
     - [ ] Tables
-    - [ ] Code blocks (monospace)
-    - [ ] Links
+    - [x] Code blocks (monospace)
+    - [x] Links
     - [ ] Images (embed or reference)
-  - [ ] Show VS Code save dialog
-  - [ ] Save .docx file
-  - [ ] Handle errors
+  - [x] Show VS Code save dialog
+  - [x] Save .docx file
+  - [x] Handle errors
 - [ ] Test Word export with various documents
   - [ ] Simple formatting
   - [ ] Complex nested lists
   - [ ] Tables with many columns
   - [ ] Code blocks
   - [ ] Mixed content
-- [ ] Add success/error notifications
+- [x] Add success/error notifications
 
 ### Phase 7: Testing & Validation
 - [ ] Test header with empty document
@@ -502,9 +502,9 @@ If critical issues found:
 - VS Code API (file dialogs, notifications)
 
 ## Status
-**Current Phase:** 3 (Development - Phase 2: Header Infrastructure)
-**Last Completed:** Phase 1 (Research), Phase 2 checklist items (Header component created)
-**Next:** Test header, then proceed to Phase 3 checklist (Properties Modal)
+**Current Phase:** 7 (Testing & Validation)
+**Last Completed:** Phase 1-6 (Research through Word Export Backend)
+**Next:** Test all features, validate export functionality
 **Approval Required:** No (Jarmo approved on 2026-01-11)
 
 ## Approval

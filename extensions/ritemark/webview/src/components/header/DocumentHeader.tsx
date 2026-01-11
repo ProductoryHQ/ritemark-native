@@ -2,7 +2,7 @@ import { FileText, Download } from 'lucide-react'
 
 interface DocumentHeaderProps {
   onPropertiesClick: () => void
-  onExportClick: () => void
+  onExportClick: (event: React.MouseEvent<HTMLButtonElement>) => void
 }
 
 /**
@@ -33,7 +33,7 @@ export function DocumentHeader({ onPropertiesClick, onExportClick }: DocumentHea
         {/* Export button */}
         <button
           className="header-btn"
-          onClick={onExportClick}
+          onClick={(e) => onExportClick(e)}
           aria-label="Export document"
           title="Export"
         >
