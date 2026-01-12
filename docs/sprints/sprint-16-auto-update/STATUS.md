@@ -152,3 +152,39 @@ Based on implementation (testing required to verify):
 **Status:** ✅ SPRINT COMPLETE
 
 **Delivered:** Auto-update infrastructure for checking GitHub releases and notifying users
+
+---
+
+# Post-Sprint: Code Signing & Notarization (v1.0.1)
+
+**Date:** 2026-01-12
+
+## Context
+
+After releasing v1.0.0, users downloading the DMG from GitHub encountered:
+> "RiteMark.app is damaged and can't be opened"
+
+This is macOS Gatekeeper blocking unsigned apps downloaded from the internet.
+
+## Solution Implemented
+
+1. **Apple Developer Account** - Enrolled ($99/year)
+   - Team ID: `JKBSC3ZDT5`
+   - Developer ID Application certificate installed
+
+2. **Code Signing Scripts Created**
+   - `scripts/codesign-app.sh` - Signs all app components with Developer ID
+   - `scripts/notarize-app.sh` - Submits to Apple for notarization
+   - `.signing-config` - Credentials (not in git)
+   - `branding/entitlements.plist` - Hardened runtime entitlements
+
+3. **Signing Challenges Resolved**
+   - Fixed nested binary signing (*.node, *.dylib, frameworks, helpers)
+   - Fixed paths with spaces in helper app names
+   - Added hardened runtime entitlements for JIT, unsigned memory, network
+
+## Current Status: WAITING FOR APPLE NOTARIZATION
+
+Build v1.0.1 is signed and submitted. Apple notarization is taking longer than usual (known issue affecting new developer accounts in January 2026).
+
+**See: `HANDOVER.md` for continuation instructions**

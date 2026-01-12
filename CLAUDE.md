@@ -103,7 +103,8 @@ I MUST delegate to the appropriate expert agent.
 |--------|-------|------------------|
 | Builds, Extensions, Errors, Patches | `vscode-expert` | build, compile, error, fail, not working, extension, patch, update vscode |
 | Sprint Workflow | `sprint-manager` | sprint, phase, plan, implement, feature |
-| Quality Gates | `qa-validator` | commit, push, done, ship, merge, PR, ready |
+| Quality Gates | `qa-validator` | commit, push, done, merge, PR |
+| Releases & Distribution | `release-manager` | release, publish, ship, deploy, dmg, notarization, github release |
 | Webview/Editor | `webview-expert` | webview, tiptap, react, vite, bundle, editor |
 
 ### Invocation Rule
@@ -120,7 +121,7 @@ Responding without invoking the required agent is a **VIOLATION** of project gov
 |------|-----------|----------------|
 | Sprint Phase 2→3 | Cannot write implementation code | "approved", "Jarmo approved", "proceed" |
 | Any commit | qa-validator must pass all checks | All checks green |
-| Production release | Full QA + explicit sign-off | "ship it", "release approved" |
+| Production release | release-manager Gate 1 (technical) + Gate 2 (Jarmo tested) | "tested locally", "approved for release" |
 
 **These gates cannot be bypassed.** If blocked, wait for approval or fix issues.
 
@@ -157,6 +158,9 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 | Fix build error | `vscode-expert` |
 | Apply/create patches | `vscode-expert` |
 | Update VS Code upstream | `vscode-expert` |
+| Release to GitHub | `release-manager` |
+| Check notarization | `release-manager` |
+| Create DMG | `release-manager` |
 
 ---
 
@@ -168,6 +172,7 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 │   ├── vscode-expert.md      # Builds, extensions, debugging
 │   ├── sprint-manager.md     # Sprint workflow, approval gates
 │   ├── qa-validator.md       # Quality checks, commit validation
+│   ├── release-manager.md    # Release process, notarization, DMG
 │   ├── webview-expert.md     # TipTap, Vite, React, webview
 │   └── knowledge-builder.md  # Meta: creating new agents
 └── skills/
