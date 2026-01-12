@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2026-01-11 (Sprint 18 complete)
+**Last Updated:** 2026-01-12 (Sprint 19 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 * * *
@@ -29,7 +29,8 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | 16 | Auto-Update | ✅ Complete | Update notifications via GitHub Releases |
 | 17 | File Preview | ✅ Complete | CSV preview with inline editing |
 | 18 | Header & Export | ✅ Complete | Document header, PDF/Word export |
-| 19+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
+| 19 | Excel Preview | ✅ Complete | Read-only Excel preview with multi-sheet |
+| 20+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
 
 * * *
 
@@ -410,7 +411,25 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 * * *
 
-## 🔮 Sprint 19+: Post-MVP (Future)
+## ✅ Sprint 19: Excel Preview (Complete)
+
+**Goal:** Read-only Excel file preview with multi-sheet support
+
+**Deliverables:**
+
+-   Excel files (.xlsx, .xls) open in tabular view
+-   Multi-sheet workbooks with tab-based sheet selector
+-   Client-side caching (parse once, instant sheet switching)
+-   Click-to-expand rows for viewing long cell content
+-   Fixed virtualization for stable scrolling
+-   Async file I/O (fs.promises) for better performance
+-   CustomReadonlyEditorProvider pattern
+
+**Validated:** 2026-01-12 by Jarmo
+
+* * *
+
+## 🔮 Sprint 20+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
 
@@ -420,7 +439,7 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 -   Recent files list
 -   File templates
 -   AI image generation (Gemini)
--   Excel file preview (read-only)
+-   Excel editing (if needed based on feedback)
     
 
 * * *
@@ -444,8 +463,9 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | Auto-Update | 16 | ✅ Done |
 | File Preview | 17 | ✅ Done |
 | Header & Export | 18 | ✅ Done |
-| **MVP Total** | **01-18** | **✅ Complete** |
-| Post-MVP | 19+ | 🔮 Future |
+| Excel Preview | 19 | ✅ Done |
+| **MVP Total** | **01-19** | **✅ Complete** |
+| Post-MVP | 20+ | 🔮 Future |
 
 * * *
 
