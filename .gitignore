@@ -60,3 +60,9 @@ VSCode-win32-x64/
 *_old.*
 .signing-config
 test-files/
+
+# Apple certificates (public, downloadable from Apple)
+*.cer
+
+# Source maps (large, not needed in repo)
+extensions/ritemark/media/*.map

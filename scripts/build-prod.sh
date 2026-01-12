@@ -112,6 +112,11 @@ rm -rf "$EXT_DEST"
 echo "Copying extension from source..."
 cp -R extensions/ritemark "$EXT_DEST"
 
+# Remove dev dependencies that shouldn't be in production
+echo "Removing webview dev dependencies..."
+rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
+rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
+
 echo -e "${GREEN}Extension copied successfully${NC}"
 echo ""
 
