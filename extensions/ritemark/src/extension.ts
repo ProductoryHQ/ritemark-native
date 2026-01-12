@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { RiteMarkEditorProvider } from './ritemarkEditor';
+import { ExcelEditorProvider } from './excelEditorProvider';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { AIViewProvider } from './ai/AIViewProvider';
@@ -75,9 +76,14 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register custom editor
+  // Register markdown/CSV custom editor
   context.subscriptions.push(
     RiteMarkEditorProvider.register(context, aiViewProvider)
+  );
+
+  // Register Excel viewer (read-only)
+  context.subscriptions.push(
+    ExcelEditorProvider.register(context)
   );
 }
 
