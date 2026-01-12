@@ -10,6 +10,7 @@ export interface SpreadsheetViewerProps {
   encoding?: string
   sizeBytes?: number
   onChange?: (content: string) => void
+  // Multi-sheet support: handled via client-side caching of workbook
 }
 
 interface ParsedData {
@@ -33,6 +34,8 @@ export function SpreadsheetViewer({
   const [isLoading, setIsLoading] = useState(true)
   const [showSizeWarning, setShowSizeWarning] = useState(false)
   const [proceedWithLargeFile, setProceedWithLargeFile] = useState(false)
+  const [selectedSheet, setSelectedSheet] = useState<string>('')
+  const [cachedWorkbook, setCachedWorkbook] = useState<XLSX.WorkBook | null>(null)
 
   // CSV is editable, Excel is read-only
   const isEditable = fileType === 'csv' && !!onChange
@@ -59,7 +62,7 @@ export function SpreadsheetViewer({
       if (fileType === 'csv') {
         parseCSV(content)
       } else if (fileType === 'xlsx') {
-        parseExcel(content, encoding)
+        parseExcel(content, encoding, selectedSheet)
       }
     } catch (error) {
       console.error('Parse error:', error)
@@ -70,7 +73,7 @@ export function SpreadsheetViewer({
       })
       setIsLoading(false)
     }
-  }, [content, fileType, encoding, showSizeWarning, proceedWithLargeFile])
+  }, [content, fileType, encoding, showSizeWarning, proceedWithLargeFile, selectedSheet])
 
   const parseCSV = (csvContent: string) => {
     Papa.parse(csvContent, {
@@ -100,26 +103,35 @@ export function SpreadsheetViewer({
     })
   }
 
-  const parseExcel = (base64Content: string, enc?: string) => {
+  const parseExcel = (base64Content: string, enc?: string, sheetName?: string) => {
     try {
-      // SheetJS reads Base64 directly
-      const workbook = XLSX.read(base64Content, {
-        type: enc === 'base64' ? 'base64' : 'string',
-      })
+      // CLIENT-SIDE CACHING: Parse workbook ONCE and cache it
+      let workbook = cachedWorkbook
+      if (!workbook) {
+        workbook = XLSX.read(base64Content, {
+          type: enc === 'base64' ? 'base64' : 'string',
+        })
+        setCachedWorkbook(workbook)
 
-      // Get first sheet
-      const firstSheetName = workbook.SheetNames[0]
-      if (!firstSheetName) {
+        // Set default selected sheet if not already set
+        if (!selectedSheet && workbook.SheetNames.length > 0) {
+          setSelectedSheet(workbook.SheetNames[0])
+        }
+      }
+
+      // Determine which sheet to display
+      const targetSheet = sheetName || selectedSheet || workbook.SheetNames[0]
+      if (!targetSheet || !workbook.Sheets[targetSheet]) {
         setParsedData({
           columns: [],
           rows: [],
-          error: 'Workbook has no sheets',
+          error: 'Sheet not found in workbook',
         })
         setIsLoading(false)
         return
       }
 
-      const worksheet = workbook.Sheets[firstSheetName]
+      const worksheet = workbook.Sheets[targetSheet]
 
       // Convert to JSON with header row
       let rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet)
@@ -168,6 +180,12 @@ export function SpreadsheetViewer({
     })
     onChange(csvString)
   }, [parsedData, onChange])
+
+  // Handle sheet switching (Excel only)
+  const handleSheetChange = useCallback((sheetName: string) => {
+    setSelectedSheet(sheetName)
+    // Re-parse will happen automatically via useEffect dependency
+  }, [])
 
   // Status bar info
   const statusInfo = useMemo(() => {
@@ -254,6 +272,25 @@ export function SpreadsheetViewer({
           )}
         </span>
       </div>
+
+      {/* Sheet selector (Excel only, if multiple sheets) */}
+      {fileType === 'xlsx' && cachedWorkbook && cachedWorkbook.SheetNames.length > 1 && (
+        <div className="flex gap-1 px-2 py-1 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] overflow-x-auto">
+          {cachedWorkbook.SheetNames.map(sheetName => (
+            <button
+              key={sheetName}
+              onClick={() => handleSheetChange(sheetName)}
+              className={`px-3 py-1 text-xs rounded transition-colors ${
+                sheetName === selectedSheet
+                  ? 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] font-medium'
+                  : 'bg-transparent text-[var(--vscode-foreground)] hover:bg-[var(--vscode-list-hoverBackground)]'
+              }`}
+            >
+              {sheetName}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
       <div className="flex-1 overflow-hidden">

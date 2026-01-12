@@ -81,6 +81,19 @@ function EditableCell({ value, rowIndex, columnId, onCellChange }: EditableCellP
 
 export function DataTable({ data, columns, editable = false, onCellChange }: DataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+
+  const toggleRowExpanded = useCallback((rowIndex: number) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev)
+      if (next.has(rowIndex)) {
+        next.delete(rowIndex)
+      } else {
+        next.add(rowIndex)
+      }
+      return next
+    })
+  }, [])
 
   // Create column definitions from column names
   const columnHelper = createColumnHelper<Record<string, unknown>>()
@@ -119,23 +132,25 @@ export function DataTable({ data, columns, editable = false, onCellChange }: Dat
 
   const { rows } = table.getRowModel()
 
+  const ROW_HEIGHT = 37 // Fixed row height (py-2 = 16px + text ~20px + border 1px)
+
   // Virtual scrolling for performance with large datasets
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 35, // Estimated row height
-    overscan: 10, // Number of rows to render outside visible area
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 15,
   })
 
   const virtualRows = rowVirtualizer.getVirtualItems()
   const totalSize = rowVirtualizer.getTotalSize()
 
-  // Calculate padding to position rows correctly
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start || 0 : 0
-  const paddingBottom =
-    virtualRows.length > 0
-      ? totalSize - (virtualRows[virtualRows.length - 1]?.end || 0)
-      : 0
+  // Calculate padding to position rows correctly with safe bounds
+  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0
+  const lastRow = virtualRows[virtualRows.length - 1]
+  const paddingBottom = virtualRows.length > 0 && lastRow
+    ? Math.max(0, totalSize - (lastRow.end ?? totalSize))
+    : 0
 
   if (data.length === 0) {
     return (
@@ -149,7 +164,6 @@ export function DataTable({ data, columns, editable = false, onCellChange }: Dat
     <div
       ref={parentRef}
       className="h-full overflow-auto"
-      style={{ contain: 'strict' }}
     >
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-[var(--vscode-editor-background)]">
@@ -185,24 +199,27 @@ export function DataTable({ data, columns, editable = false, onCellChange }: Dat
           )}
           {virtualRows.map((virtualRow) => {
             const row = rows[virtualRow.index]
+            const isExpanded = expandedRows.has(virtualRow.index)
             return (
               <tr
                 key={row.id}
                 data-index={virtualRow.index}
-                ref={(node) => rowVirtualizer.measureElement(node)}
-                className="hover:bg-[var(--vscode-list-hoverBackground)]"
+                onClick={() => toggleRowExpanded(virtualRow.index)}
+                className={`hover:bg-[var(--vscode-list-hoverBackground)] cursor-pointer ${isExpanded ? 'bg-[var(--vscode-list-activeSelectionBackground)]' : ''}`}
+                style={{ height: isExpanded ? 'auto' : ROW_HEIGHT, minHeight: ROW_HEIGHT }}
               >
                 {/* Row number */}
                 <td
-                  className="px-2 py-2 text-center text-xs border-b border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-descriptionForeground)]"
-                  style={{ minWidth: 50, width: 50 }}
+                  className={`px-2 py-2 text-center text-xs border-b border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-descriptionForeground)] ${isExpanded ? '' : 'overflow-hidden whitespace-nowrap'}`}
+                  style={{ minWidth: 50, width: 50, verticalAlign: 'top' }}
                 >
                   {virtualRow.index + 1}
                 </td>
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className="px-3 py-2 border-b border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)]"
+                    className={`px-3 py-2 border-b border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] ${isExpanded ? 'whitespace-pre-wrap break-words' : 'overflow-hidden whitespace-nowrap text-ellipsis'}`}
+                    style={{ maxWidth: isExpanded ? 'none' : 300, verticalAlign: 'top' }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
