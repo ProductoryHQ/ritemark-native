@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { DataTable } from './DataTable'
+import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
+import { sendToExtension, onMessage } from '../bridge'
 
 export interface SpreadsheetViewerProps {
   content: string
@@ -36,9 +38,25 @@ export function SpreadsheetViewer({
   const [proceedWithLargeFile, setProceedWithLargeFile] = useState(false)
   const [selectedSheet, setSelectedSheet] = useState<string>('')
   const [cachedWorkbook, setCachedWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [hasExcel, setHasExcel] = useState(false)
 
   // CSV is editable, Excel is read-only
   const isEditable = fileType === 'csv' && !!onChange
+
+  // Check if Excel is installed on mount
+  useEffect(() => {
+    sendToExtension('checkExcel', {})
+
+    const handleMessage = onMessage((message) => {
+      if (message.type === 'excelStatus') {
+        setHasExcel(message.hasExcel as boolean)
+      }
+    })
+
+    return () => {
+      // Cleanup if needed (onMessage doesn't return cleanup function)
+    }
+  }, [])
 
   // Check file size before parsing
   useEffect(() => {
@@ -187,6 +205,15 @@ export function SpreadsheetViewer({
     // Re-parse will happen automatically via useEffect dependency
   }, [])
 
+  // Handle opening in external apps
+  const handleOpenInExcel = useCallback(() => {
+    sendToExtension('openInExternalApp', { app: 'excel' })
+  }, [])
+
+  const handleOpenInNumbers = useCallback(() => {
+    sendToExtension('openInExternalApp', { app: 'numbers' })
+  }, [])
+
   // Status bar info
   const statusInfo = useMemo(() => {
     if (!parsedData) return null
@@ -253,12 +280,19 @@ export function SpreadsheetViewer({
 
   return (
     <div className="flex flex-col h-screen bg-[var(--vscode-editor-background)]">
+      {/* Toolbar with external app actions */}
+      <SpreadsheetToolbar
+        filename={filename}
+        onOpenInExcel={hasExcel ? handleOpenInExcel : undefined}
+        onOpenInNumbers={handleOpenInNumbers}
+        hasExcel={hasExcel}
+      />
+
       {/* Status bar */}
       <div className="flex items-center justify-between px-3 py-1 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-xs text-[var(--vscode-descriptionForeground)]">
         <span>
-          {filename}
           {isEditable && (
-            <span className="ml-2 text-[var(--vscode-textLink-foreground)]">
+            <span className="text-[var(--vscode-textLink-foreground)]">
               (click cell to edit)
             </span>
           )}

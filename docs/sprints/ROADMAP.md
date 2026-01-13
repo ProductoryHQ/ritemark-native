@@ -1,6 +1,6 @@
 # RiteMark Native - Sprint Roadmap
 
-**Last Updated:** 2026-01-12 (Sprint 19 complete)
+**Last Updated:** 2026-01-13 (Sprint 19.5 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
 
 * * *
@@ -30,6 +30,7 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | 17 | File Preview | ✅ Complete | CSV preview with inline editing |
 | 18 | Header & Export | ✅ Complete | Document header, PDF/Word export |
 | 19 | Excel Preview | ✅ Complete | Read-only Excel preview with multi-sheet |
+| 19.5 | Spreadsheet Toolbar | ✅ Complete | Open in Excel/Numbers from preview |
 | 20+ | Post-MVP | 🔮 Future | Enhancements based on feedback |
 
 * * *
@@ -429,6 +430,23 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 * * *
 
+## ✅ Sprint 19.5: Spreadsheet Toolbar (Complete)
+
+**Goal:** Add toolbar to Excel/CSV preview for opening files in external apps
+
+**Deliverables:**
+
+-   SpreadsheetToolbar component with split button design
+-   "Open in Excel" primary action (when Excel installed)
+-   "Open in Numbers" dropdown option (always available on macOS)
+-   Excel auto-detection via macOS `open` command
+-   Ghost button styling matching DocumentHeader
+-   Responsive design (hides text on narrow screens)
+
+**Validated:** 2026-01-13 by Jarmo
+
+* * *
+
 ## 🔮 Sprint 20+: Post-MVP (Future)
 
 **Goal:** Enhancements based on user feedback
@@ -464,7 +482,8 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 | File Preview | 17 | ✅ Done |
 | Header & Export | 18 | ✅ Done |
 | Excel Preview | 19 | ✅ Done |
-| **MVP Total** | **01-19** | **✅ Complete** |
+| Spreadsheet Toolbar | 19.5 | ✅ Done |
+| **MVP Total** | **01-19.5** | **✅ Complete** |
 | Post-MVP | 20+ | 🔮 Future |
 
 * * *
