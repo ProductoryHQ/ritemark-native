@@ -1,10 +1,14 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import matter from 'gray-matter';
 import type { AIViewProvider } from './ai/AIViewProvider';
 import { exportToPDF } from './export/pdfExporter';
 import { exportToWord } from './export/wordExporter';
+
+const execAsync = promisify(exec);
 
 // Properties type for front-matter
 export interface DocumentProperties {
@@ -296,6 +300,24 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
               document.uri
             );
             return;
+
+          case 'checkExcel':
+            // Check if Excel is installed
+            this.checkExcelInstalled().then(hasExcel => {
+              if (!isDisposed) {
+                webview.postMessage({
+                  type: 'excelStatus',
+                  hasExcel
+                });
+              }
+            });
+            return;
+
+          case 'openInExternalApp':
+            // Open file in external app (Excel or Numbers)
+            const app = message.app as string;
+            this.openInExternalApp(document.uri.fsPath, app);
+            return;
         }
       },
       undefined,
@@ -497,5 +519,39 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
+  }
+
+  /**
+   * Check if Microsoft Excel is installed
+   * Returns true if Excel is found, false otherwise
+   */
+  private async checkExcelInstalled(): Promise<boolean> {
+    try {
+      // macOS: Use 'open -Ra' to check if app exists without launching it
+      await execAsync('open -Ra "Microsoft Excel"');
+      return true;
+    } catch (error) {
+      // Excel not found
+      return false;
+    }
+  }
+
+  /**
+   * Open file in external application
+   * @param filePath Absolute path to the file
+   * @param app App identifier ('excel' or 'numbers')
+   */
+  private async openInExternalApp(filePath: string, app: string): Promise<void> {
+    try {
+      const appName = app === 'excel' ? 'Microsoft Excel' : 'Numbers';
+
+      // macOS: Use 'open -a' to open file with specific app
+      await execAsync(`open -a "${appName}" "${filePath}"`);
+
+      vscode.window.showInformationMessage(`Opening in ${appName}...`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Failed to open in ${app}: ${errorMessage}`);
+    }
   }
 }

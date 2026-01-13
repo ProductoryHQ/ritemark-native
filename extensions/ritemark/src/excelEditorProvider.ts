@@ -1,7 +1,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { ExcelDocument } from './excelDocument';
+
+const execAsync = promisify(exec);
 
 /**
  * Custom editor provider for Excel files (.xlsx, .xls)
@@ -68,12 +72,27 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
 
     // Handle messages from webview
     webviewPanel.webview.onDidReceiveMessage(
-      message => {
+      async message => {
         switch (message.type) {
           case 'ready':
             // Webview is ready, send Excel data ONCE
             // Client-side caching: webview will parse and cache all sheets
             this.sendExcelData(webviewPanel.webview, document);
+            break;
+
+          case 'checkExcel':
+            // Check if Excel is installed
+            const hasExcel = await this.checkExcelInstalled();
+            webviewPanel.webview.postMessage({
+              type: 'excelStatus',
+              hasExcel
+            });
+            break;
+
+          case 'openInExternalApp':
+            // Open file in external app (Excel or Numbers)
+            const app = message.app as string;
+            await this.openInExternalApp(document.uri.fsPath, app);
             break;
 
           case 'error':
@@ -142,5 +161,39 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
+  }
+
+  /**
+   * Check if Microsoft Excel is installed
+   * Returns true if Excel is found, false otherwise
+   */
+  private async checkExcelInstalled(): Promise<boolean> {
+    try {
+      // macOS: Use 'open -Ra' to check if app exists without launching it
+      await execAsync('open -Ra "Microsoft Excel"');
+      return true;
+    } catch (error) {
+      // Excel not found
+      return false;
+    }
+  }
+
+  /**
+   * Open file in external application
+   * @param filePath Absolute path to the file
+   * @param app App identifier ('excel' or 'numbers')
+   */
+  private async openInExternalApp(filePath: string, app: string): Promise<void> {
+    try {
+      const appName = app === 'excel' ? 'Microsoft Excel' : 'Numbers';
+
+      // macOS: Use 'open -a' to open file with specific app
+      await execAsync(`open -a "${appName}" "${filePath}"`);
+
+      vscode.window.showInformationMessage(`Opening in ${appName}...`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Failed to open in ${app}: ${errorMessage}`);
+    }
   }
 }
