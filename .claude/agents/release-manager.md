@@ -189,3 +189,58 @@ Did you change files outside extensions/ritemark/?
         ├─ YES → Full App Release (DMG)
         └─ NO → Extension-Only Release
 ```
+
+---
+
+## Post-Release: Marketing Handoff
+
+**MANDATORY:** After Gate 2 passes and GitHub release is complete, invoke `product-marketer` agent.
+
+### Handoff Information
+
+Provide the following to product-marketer:
+
+```
+version: "[released version, e.g., 1.5.0 or 1.5.0-ext.1]"
+release_type: "[major|minor|patch|extension]"
+features: ["List of new features from sprint"]
+fixes: ["List of bug fixes"]
+sprint_ref: "[sprint folder name, e.g., sprint-20]"
+github_release_url: "[full URL to the GitHub release]"
+release_date: "[YYYY-MM-DD]"
+```
+
+### Example Invocation
+
+After uploading release to GitHub:
+
+```
+Release v1.5.0 uploaded successfully.
+
+Now invoking product-marketer for marketing updates:
+- version: "1.5.0"
+- release_type: "minor"
+- features: ["Excel preview with multi-sheet support", "Spreadsheet toolbar"]
+- fixes: ["Fixed blank editor on first launch"]
+- sprint_ref: "sprint-19"
+- github_release_url: "https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.5.0"
+- release_date: "2026-01-14"
+```
+
+### What product-marketer Does
+
+1. Updates `/docs/CHANGELOG.md`
+2. Creates `/docs/releases/vX.X.X.md`
+3. Proposes blog post (if warranted)
+4. Updates landing page features (scoped edits)
+5. Flags any screenshots needed
+
+**Note:** Website changes require Jarmo's approval before being written.
+
+### Skip Conditions
+
+You may skip marketing handoff ONLY if:
+- This is a hotfix with no user-facing changes
+- Jarmo explicitly says "skip marketing"
+
+Otherwise, always invoke product-marketer after successful release.
