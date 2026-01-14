@@ -106,6 +106,7 @@ I MUST delegate to the appropriate expert agent.
 | Quality Gates | `qa-validator` | commit, push, done, merge, PR |
 | Releases & Distribution | `release-manager` | release, publish, ship, deploy, dmg, notarization, github release |
 | Webview/Editor | `webview-expert` | webview, tiptap, react, vite, bundle, editor |
+| Marketing & Content | `product-marketer` | changelog, release notes, blog post, landing page, marketing |
 
 ### Invocation Rule
 
@@ -161,6 +162,9 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 | Release to GitHub | `release-manager` |
 | Check notarization | `release-manager` |
 | Create DMG | `release-manager` |
+| Update changelog | `product-marketer` |
+| Write release notes | `product-marketer` |
+| Update landing page | `product-marketer` |
 
 ---
 
@@ -174,6 +178,7 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 │   ├── qa-validator.md       # Quality checks, commit validation
 │   ├── release-manager.md    # Release process, notarization, DMG
 │   ├── webview-expert.md     # TipTap, Vite, React, webview
+│   ├── product-marketer.md   # Changelog, release notes, landing page
 │   └── knowledge-builder.md  # Meta: creating new agents
 └── skills/
     └── vscode-development/   # Knowledge base for vscode-expert
