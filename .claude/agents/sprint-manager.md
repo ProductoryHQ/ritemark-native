@@ -150,6 +150,18 @@ Gate: [Clear / Blocked - reason]
 - **qa-validator**: Invoke at Phase 4→5 and Phase 6
 - **vscode-expert**: Delegate build/extension issues during Phase 3
 - **webview-expert**: Delegate webview issues during Phase 3
+- **release-manager**: Invoke at Phase 6 for release decisions
+
+## Release Type Determination
+
+At sprint completion, determine release type:
+
+| Sprint Changes | Release Type |
+|----------------|--------------|
+| Only `extensions/ritemark/` | Extension-only (`X.Y.Z-ext.N`) |
+| VS Code core, patches, branding | Full app (`X.Y.Z`) |
+
+See `release-manager` agent for release workflow details.
 
 ## HARD GATE Enforcement
 
