@@ -115,20 +115,38 @@ Four main categories that all content maps to:
 
 ## 4. Topic Backlog (Initial Ideas)
 
-### Evergreen Content (Write Once, Value Forever)
+### Phase 1: Foundational Posts (Start Here)
 
-| # | Title (EN) | Title (ET) | Pillar | Priority |
-|---|------------|------------|--------|----------|
-| 1 | Why Local-First Matters for Writers | Miks kohalik-esmalt loeb kirjutajatele | Philosophy | High |
-| 2 | Markdown for Beginners: Everything You Need to Know | Markdown algajatele: koik, mida pead teadma | Tutorial | High |
-| 3 | RiteMark vs Google Docs: A Honest Comparison | RiteMark vs Google Docs: aus vordlus | Philosophy | High |
-| 4 | The Hidden Cost of "Free" Cloud Writing Tools | "Tasuta" pilvekirjutustoodete varjatud hind | Philosophy | Medium |
-| 5 | How to Build a Personal Knowledge Base with Markdown | Kuidas ehitada isiklik teadmusbaas Markdowniga | Tutorial | Medium |
-| 6 | Exporting Your Work: PDF, Word, and Beyond | Too eksportimine: PDF, Word ja muud | Tutorial | High |
-| 7 | Writing Without Distractions: A Minimalist Approach | Kirjutamine ilma segatuseta: minimalistlik lahenemine | Writing | Medium |
-| 8 | Why Writers Should Own Their Files | Miks kirjanikud peaksid oma faile omama | Philosophy | Medium |
-| 9 | Keyboard Shortcuts That Will Speed Up Your Writing | Klaviatuurikaed, mis kiirendavad su kirjutamist | Tutorial | Low |
-| 10 | From Idea to Published: A Complete Writing Workflow | Ideest avaldamiseni: terve kirjutamise toovoogi | Writing | Medium |
+These posts establish what RiteMark is and why it exists. **Must publish before other content.**
+
+| # | Title | Angle | Priority |
+|---|-------|-------|----------|
+| 1 | Why We Built RiteMark | Origin story - what problem we're solving, the journey | **FIRST** |
+| 2 | Why Local-First Matters for AI Writing | Why cloud editors fail with AI agents, local files + AI = power | **SECOND** |
+| 3 | What is RiteMark? | Product explainer - VS Code foundation, markdown native, local-first | **THIRD** |
+
+### Phase 2: Differentiation Posts
+
+Why RiteMark over alternatives? Position against competitors.
+
+| # | Title | Pillar | Priority |
+|---|-------|--------|----------|
+| 4 | RiteMark vs Google Docs: An Honest Comparison | Philosophy | High |
+| 5 | RiteMark vs Notion: When Local Beats Cloud | Philosophy | High |
+| 6 | Why Not Just Use VS Code? | Philosophy | Medium |
+| 7 | The Hidden Cost of "Free" Cloud Writing Tools | Philosophy | Medium |
+
+### Phase 3: Evergreen Content
+
+| # | Title | Pillar | Priority |
+|---|-------|--------|----------|
+| 8 | Markdown for Beginners: Everything You Need to Know | Tutorial | High |
+| 9 | Exporting Your Work: PDF, Word, and Beyond | Tutorial | High |
+| 10 | How to Build a Personal Knowledge Base with Markdown | Tutorial | Medium |
+| 11 | Writing Without Distractions: A Minimalist Approach | Writing | Medium |
+| 12 | Why Writers Should Own Their Files | Philosophy | Medium |
+| 13 | Keyboard Shortcuts That Will Speed Up Your Writing | Tutorial | Low |
+| 14 | From Idea to Published: A Complete Writing Workflow | Writing | Medium |
 
 ### Release-Triggered Content
 
@@ -212,38 +230,42 @@ productory-2026 agent publishes:
 
 ---
 
-## 7. Bilingual Approach (ET/EN)
+## 7. Content Workflow
 
-### Strategy: Estonian First, English Second
-
-1. **Write Estonian version first** - natural voice, not translated
-2. **Create English version** - same information, natural English
-3. **Same structure** - headings, sections, images match
-
-### Language-Specific Considerations
-
-| Aspect | Estonian | English |
-|--------|----------|---------|
-| Tone | Familiar, direct | Professional but warm |
-| Examples | Estonian context when relevant | International context |
-| SEO | Estonian keywords | English keywords |
-| Length | May be shorter (Estonian is efficient) | Can be slightly longer |
-
-### What Gets Translated
-
-| Content | Translate? |
-|---------|------------|
-| Evergreen posts | Yes, both languages |
-| Release posts | Yes, both languages |
-| Technical tutorials | Yes, both languages |
-| Very local content | Maybe ET only |
-
-### URL Structure (for productory-2026)
+### Strategy: English in This Repo → Copywriter Imports
 
 ```
-productory.ee/ritemark/blog/et/[slug]
-productory.ee/ritemark/blog/en/[slug]
+product-marketer (this repo)
+      |
+      v
+Writes blog post in English
+  → docs/marketing/content-marketing/blog/posts/[slug].md
+      |
+      v
+Jarmo reviews and approves
+      |
+      v
+copywriter agent (productory-2026)
+      |
+      v
+Imports content to RiteMark site
+  - Creates Estonian version if needed
+  - Publishes to ritemark.ee/blog/
 ```
+
+### What We Write Here
+
+| Content | Language | Location |
+|---------|----------|----------|
+| All blog posts | English | `blog/posts/[slug].md` |
+| Release posts | English | `releases/vX.X.X/blog.md` |
+
+### What productory-2026 Does
+
+- Imports English content from this repo
+- Creates Estonian translations (via copywriter agent)
+- Publishes to website
+- Handles SEO, images, formatting for web
 
 ---
 
@@ -296,9 +318,8 @@ productory.ee/ritemark/blog/en/[slug]
 
 1. **Frequency:** Is 2 posts/month realistic given other priorities?
 2. **Voice:** Should posts be "Jarmo writing" or "RiteMark team"?
-3. **Estonian priority:** Focus more on ET or equal split?
-4. **Guest content:** Open to guest posts in the future?
-5. **Newsletter:** Should blog tie into email newsletter later?
+3. **Guest content:** Open to guest posts in the future?
+4. **Newsletter:** Should blog tie into email newsletter later?
 
 ---
 
@@ -312,6 +333,6 @@ This strategy document outlines the proposed approach for RiteMark's blog.
 - [ ] Posting frequency acceptable
 - [ ] Content pillars make sense
 - [ ] Topic backlog looks good
-- [ ] Bilingual approach is correct
+- [x] Workflow clarified (English here → copywriter imports to site)
 
 **Awaiting:** Jarmo's approval before any blog post writing begins.
