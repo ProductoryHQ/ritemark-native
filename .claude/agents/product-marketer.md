@@ -256,8 +256,10 @@ tags: ['ritemark', 'release']
 
 version: 1.5.0
 release_date: 2025-01-14
-download_url: https://github.com/jarmo-productory/ritemark-public/releases/latest
+download_url: https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg
 ```
+
+**Note:** Always use the stable `RiteMark.dmg` filename - this URL never changes between releases.
 
 ### landing-page/features.md
 
