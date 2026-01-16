@@ -101,11 +101,11 @@ I MUST delegate to the appropriate expert agent.
 
 | Domain | Agent | Trigger Keywords |
 |--------|-------|------------------|
-| Builds, Extensions, Errors, Patches | `vscode-expert` | build, compile, error, fail, not working, extension, patch, update vscode |
+| Builds, Extensions, Errors, Patches | `vscode-expert` | build, compile, error, fail, not working, extension, patch, update vscode, **prod, production, gulp, run dev, start dev, launch, npm run, yarn** |
 | Sprint Workflow | `sprint-manager` | sprint, phase, plan, implement, feature |
 | Quality Gates | `qa-validator` | commit, push, done, merge, PR |
 | Releases & Distribution | `release-manager` | release, publish, ship, deploy, dmg, notarization, github release |
-| Webview/Editor | `webview-expert` | webview, tiptap, react, vite, bundle, editor |
+| Webview/Editor | `webview-expert` | webview, tiptap, react, vite, bundle, editor blank, editor not loading |
 | Marketing & Content | `product-marketer` | changelog, release notes, blog post, landing page, marketing |
 
 ### Invocation Rule
@@ -113,6 +113,16 @@ I MUST delegate to the appropriate expert agent.
 When user input contains trigger keywords → **INVOKE agent BEFORE responding.**
 
 Responding without invoking the required agent is a **VIOLATION** of project governance.
+
+### ⚠️ CRITICAL: Production Build Rule
+
+**BEFORE any production build command**, I MUST invoke `vscode-expert` to:
+1. Validate source files are not corrupted (no 0-byte .ts files)
+2. Verify correct Node version (arm64 v20, NOT v23, NOT Rosetta)
+3. Ensure extension compiles successfully
+4. Check webview bundle exists and has correct size
+
+**NEVER run `gulp vscode-darwin-arm64` or production builds directly.** Always delegate to vscode-expert first.
 
 ---
 

@@ -38,6 +38,171 @@ RiteMark supports TWO release types:
 
 ---
 
+## Pre-Release Audit (MANDATORY)
+
+**BEFORE discussing ANY release, you MUST perform this audit and report ALL findings.**
+
+### Step 1: Build State Verification
+
+Run these checks and report findings:
+
+```bash
+# 1. When was the last production build created?
+ls -la VSCode-darwin-arm64/RiteMark.app/Contents/Info.plist
+stat -f "%Sm" VSCode-darwin-arm64/RiteMark.app/Contents/Info.plist
+
+# 2. What version is in the current build?
+grep -E '"version"|"ritemarkVersion"' VSCode-darwin-arm64/RiteMark.app/Contents/Resources/app/product.json
+
+# 3. Is the build properly code-signed (NOT adhoc)?
+codesign -dv VSCode-darwin-arm64/RiteMark.app 2>&1 | grep -E "Signature|Authority|TeamIdentifier"
+# MUST show: TeamIdentifier=JKBSC3ZDT5, NOT "adhoc" or "not set"
+
+# 4. Does a DMG exist and when was it created?
+ls -la dist/RiteMark-*.dmg
+
+# 5. Is the DMG properly signed (mount and check)?
+hdiutil attach dist/RiteMark-X.Y.Z-darwin-arm64.dmg -nobrowse -quiet
+codesign -dv "/Volumes/RiteMark/RiteMark.app" 2>&1 | grep -E "Signature|Authority|TeamIdentifier"
+hdiutil detach "/Volumes/RiteMark" -quiet
+# MUST show Developer ID, NOT adhoc
+```
+
+### Step 2: Check for Red Flags
+
+**You MUST check and report on ALL of these:**
+
+#### HARD BLOCKERS (Release IMPOSSIBLE if any fail)
+
+| Red Flag | How to Check | Command |
+|----------|--------------|---------|
+| Extension missing | Check ritemark folder exists in DMG | `ls "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark"` |
+| Extension corrupt | webview.js must be >500KB | `stat -f%z "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/media/webview.js"` |
+| **node_modules missing** | Runtime deps must exist (100+ packages) | `ls ".../extensions/ritemark/node_modules" \| wc -l` must be >100 |
+| DMG has adhoc signature | TeamIdentifier must be set | `codesign -dv` must show TeamIdentifier, NOT "adhoc" |
+| App missing ritemarkVersion | Must have ritemarkVersion field | `grep ritemarkVersion product.json` |
+| Timestamps show 1980 | Created/Modified must be recent | `stat -f "%Sm" RiteMark.app` - must NOT be 1980 |
+| Info.plist version wrong | CFBundleShortVersionString must match | Check Info.plist shows correct version |
+
+#### SOFT WARNINGS (Can proceed but flag to Jarmo)
+
+| Red Flag | How to Check | Blocker? |
+|----------|--------------|----------|
+| DMG older than app build | Compare timestamps | WARN |
+| Uncommitted changes | `git status` | WARN |
+| Open/incomplete sprints | Check `docs/sprints/` for WIP | WARN |
+| Notarization pending | Check notarytool status | WARN (for beta: note it) |
+| Release notes missing | Check `docs/releases/vX.Y.Z.md` exists | WARN |
+| Release notes outdated | Compare features in release notes vs actual build | WARN |
+
+### Step 2a: DMG Content Verification (MANDATORY)
+
+**Mount the DMG and verify these BEFORE any release discussion:**
+
+```bash
+# Mount DMG
+hdiutil attach dist/RiteMark-X.Y.Z-darwin-arm64.dmg -nobrowse -quiet
+
+# HARD CHECK 1: Extension exists
+ls -la "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark"
+# MUST show: out/, media/, package.json, etc.
+
+# HARD CHECK 2: webview.js is valid (>500KB)
+stat -f%z "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/media/webview.js"
+# MUST be > 500000 bytes
+
+# HARD CHECK 3: extension.js exists and valid (>1KB)
+stat -f%z "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/out/extension.js"
+# MUST be > 1000 bytes
+
+# HARD CHECK 4: Timestamps are NOT 1980
+stat -f "%Sm" "/Volumes/RiteMark/RiteMark.app"
+# MUST show current date, NOT "Jan 1 1980"
+
+# HARD CHECK 5: ritemarkVersion present
+grep "ritemarkVersion" "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/product.json"
+# MUST show the target version
+
+# HARD CHECK 6: Proper code signature
+codesign -dv "/Volumes/RiteMark/RiteMark.app" 2>&1 | grep TeamIdentifier
+# MUST show TeamIdentifier=JKBSC3ZDT5, NOT "not set"
+
+# HARD CHECK 7: node_modules exists (CRITICAL - runtime dependencies!)
+ls "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/node_modules" | wc -l
+# MUST show 100+ packages. If missing, TipTap editor won't load!
+
+# Unmount
+hdiutil detach "/Volumes/RiteMark" -quiet
+```
+
+**If ANY hard check fails, the DMG is BROKEN. Do NOT proceed.**
+
+### Step 2b: Release Notes Verification
+
+**ALWAYS check `docs/releases/` folder:**
+
+```bash
+# List existing release notes
+ls -la docs/releases/
+
+# Read the target version's release notes
+cat docs/releases/vX.Y.Z.md
+
+# Verify features listed match what's actually in the build
+```
+
+Compare the release notes against:
+- What sprints are mentioned
+- What features are listed
+- Whether the build actually contains those features
+
+### Step 3: Mandatory Question
+
+**ALWAYS ask Jarmo before proceeding:**
+
+> "Have you installed and actually tested the latest DMG (`dist/RiteMark-X.Y.Z-darwin-arm64.dmg`) on your machine?"
+
+Do NOT proceed with release until Jarmo confirms testing.
+
+### Step 4: Red Flag Report
+
+Output a clear report:
+
+```
+========================================
+PRE-RELEASE AUDIT REPORT
+========================================
+Target Version: X.Y.Z
+Audit Date: YYYY-MM-DD
+
+BUILD STATE:
+  App build date: [date]
+  App version: [version]
+  App signed: [YES with Developer ID / NO / adhoc]
+  DMG exists: [YES/NO]
+  DMG date: [date]
+  DMG signed: [YES with Developer ID / NO / adhoc]
+  DMG version matches app: [YES/NO]
+
+RED FLAGS:
+  [ ] DMG is adhoc-signed (BLOCKER)
+  [ ] DMG older than current build (BLOCKER)
+  [ ] Version mismatch (BLOCKER)
+  [ ] Missing ritemarkVersion (BLOCKER)
+  [ ] Uncommitted changes (WARNING)
+  [ ] Open sprints (WARNING)
+
+BLOCKERS FOUND: [count]
+WARNINGS FOUND: [count]
+
+VERDICT: [READY FOR RELEASE / NOT READY - FIX REQUIRED]
+========================================
+```
+
+**If ANY blockers exist, you MUST refuse to proceed with release.**
+
+---
+
 ## Full App Release (DMG)
 
 ### Gate 1: Technical Checks
@@ -59,13 +224,39 @@ RiteMark supports TWO release types:
 4. Create DMG: `./scripts/create-dmg.sh`
 5. Declare Gate 1 PASS
 6. Wait for Jarmo to test and confirm (Gate 2)
-7. Upload to GitHub:
+7. Create stable DMG filename: `cp dist/RiteMark-X.Y.Z-darwin-arm64.dmg dist/RiteMark.dmg`
+8. Upload to GitHub with **stable filename only** (no versioned filename):
 
 ```bash
 gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
   --title "RiteMark vX.Y.Z" \
   --notes-file docs/releases/vX.Y.Z.md \
-  RiteMark-X.Y.Z-darwin-arm64.dmg
+  dist/RiteMark.dmg
+```
+
+### GitHub Release Notes Format
+
+**ALWAYS** include a prominent download link at the TOP of release notes:
+
+```markdown
+## [DOWNLOAD RITEMARK](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg)
+
+---
+
+[rest of release notes...]
+```
+
+### DMG Naming Rules
+
+| Rule | Reason |
+|------|--------|
+| Upload **only** `RiteMark.dmg` | Stable URL for website links |
+| **Never** upload versioned filename | Confuses users with multiple options |
+| Version is in release tag | `v1.0.2` tag identifies the version |
+
+The stable download URL that **never changes**:
+```
+https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg
 ```
 
 ---
@@ -229,13 +420,16 @@ Now invoking product-marketer for marketing updates:
 
 ### What product-marketer Does
 
-1. Updates `/docs/CHANGELOG.md`
-2. Creates `/docs/releases/vX.X.X.md`
-3. Proposes blog post (if warranted)
-4. Updates landing page features (scoped edits)
-5. Flags any screenshots needed
+Product-marketer creates content in `docs/marketing/` (this repo only):
 
-**Note:** Website changes require Jarmo's approval before being written.
+1. Creates `/docs/marketing/releases/vX.X.X/changelog.md`
+2. Creates `/docs/marketing/releases/vX.X.X/release-notes.md`
+3. Creates social media copy if warranted
+4. Creates blog post content if warranted
+5. Updates `/docs/marketing/landing-page/` content
+6. Flags any screenshots needed
+
+**Note:** Product-marketer does NOT edit productory-2026. A separate agent in that repo consumes the content created here.
 
 ### Skip Conditions
 
@@ -244,3 +438,114 @@ You may skip marketing handoff ONLY if:
 - Jarmo explicitly says "skip marketing"
 
 Otherwise, always invoke product-marketer after successful release.
+
+---
+
+## Troubleshooting & Lessons Learned
+
+### Incident: v1.0.1 Release Failure (2026-01-14)
+
+**Symptoms:**
+- DMG built successfully but app showed plain text editor instead of TipTap webview
+- Finder showed "Version: 1.94.0" instead of "1.0.1"
+- Timestamps showed "January 1, 1980"
+
+**Root Causes Found:**
+
+#### 1. Missing node_modules in DMG
+
+**Problem:** The extension's runtime dependencies (docx, pdfkit, openai, xlsx, etc.) were stripped during "cleanup" when copying the extension to the app bundle.
+
+**How to detect:** Compare working DMG (v1.0.0) with broken DMG:
+```bash
+# Mount both and compare
+ls /Volumes/v100/RiteMark.app/.../extensions/ritemark/
+ls /Volumes/v101/RiteMark.app/.../extensions/ritemark/
+# v1.0.0 had node_modules, v1.0.1 didn't
+```
+
+**Fix:** Do NOT remove `extensions/ritemark/node_modules` when copying. Only remove:
+- `webview/node_modules` (dev dependencies)
+- `webview/src` (source files)
+
+**Correct copy command:**
+```bash
+cp -R extensions/ritemark "$EXT_DEST"
+rm -rf "$EXT_DEST/webview/node_modules" "$EXT_DEST/webview/src"
+# DO NOT remove $EXT_DEST/node_modules - those are runtime dependencies!
+```
+
+#### 2. Info.plist Version Not Updated
+
+**Problem:** Finder shows `CFBundleShortVersionString` from Info.plist, not `ritemarkVersion` from product.json.
+
+**How to detect:**
+```bash
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" RiteMark.app/Contents/Info.plist
+# Shows 1.94.0 (VS Code version) instead of 1.0.1
+```
+
+**Fix:** Update Info.plist after build:
+```bash
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.1" RiteMark.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 1.0.1" RiteMark.app/Contents/Info.plist
+```
+
+#### 3. File Corruption (0-byte files)
+
+**Problem:** Source files randomly became 0 bytes - TypeScript, SVGs, config files, even node_modules type definitions.
+
+**Symptoms:**
+- `npm run compile` shows "file is not a module" errors
+- `stat -f%z` shows 0 bytes for source files
+- `find . -type f -size 0` shows many corrupted files
+
+**How to detect:**
+```bash
+find extensions/ritemark/src -name "*.ts" -size 0 -type f
+find extensions/ritemark/webview/src -name "*.tsx" -size 0 -type f
+```
+
+**Fix:**
+1. Restore from git: `git checkout HEAD -- extensions/ritemark/`
+2. Reinstall node_modules: `rm -rf node_modules && npm install`
+3. Rebuild webview: `cd webview && npm install && npm run build`
+
+**Root cause:** Unknown - possibly disk issue, sync tool, or system process. Worth investigating if recurring.
+
+### HARD CHECK: node_modules Verification
+
+**Add to DMG verification checklist:**
+
+```bash
+# HARD CHECK 7: node_modules exists (runtime dependencies)
+ls "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/node_modules" | wc -l
+# MUST show 100+ packages
+```
+
+### Quick Comparison Test
+
+When TipTap editor doesn't load, compare with known working version:
+
+```bash
+# Mount working v1.0.0
+hdiutil attach dist/RiteMark-1.0.0-darwin-arm64.dmg -mountpoint /tmp/v100
+
+# Mount broken build
+hdiutil attach dist/RiteMark-1.0.1-darwin-arm64.dmg -mountpoint /tmp/v101
+
+# Compare extension folders
+diff <(ls /tmp/v100/RiteMark.app/.../extensions/ritemark/) \
+     <(ls /tmp/v101/RiteMark.app/.../extensions/ritemark/)
+
+# Unmount
+hdiutil detach /tmp/v100; hdiutil detach /tmp/v101
+```
+
+### Key Lessons
+
+1. **Never strip node_modules from extension** - they're runtime dependencies, not dev-only
+2. **Always update Info.plist version** - that's what Finder displays
+3. **Compare with working build** when debugging - diff reveals missing pieces
+4. **Watch for 0-byte files** - sign of corruption, restore from git
+5. **Test the actual DMG** - not just the source app bundle
