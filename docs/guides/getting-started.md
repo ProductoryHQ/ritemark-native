@@ -9,9 +9,8 @@ This guide walks you through installing RiteMark and creating your first documen
 ## 1. Download
 
 Get RiteMark from GitHub:
-1. Go to [RiteMark Releases](https://github.com/jarmo-productory/ritemark-public/releases)
-2. Download the latest `.dmg` file
-3. Open the downloaded file
+1. Download [RiteMark.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg)
+2. Open the downloaded file
 
 ---
 
