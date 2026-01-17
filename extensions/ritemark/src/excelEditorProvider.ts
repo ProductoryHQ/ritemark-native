@@ -12,6 +12,9 @@ const execAsync = promisify(exec);
  * Provides read-only preview with multi-sheet support
  */
 export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<ExcelDocument> {
+  // File watchers and debounce timers
+  private fileWatchers = new Map<string, vscode.FileSystemWatcher>();
+  private fileChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     return vscode.window.registerCustomEditorProvider(
@@ -70,6 +73,9 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
 
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri);
 
+    // Create file watcher for external changes
+    this.createFileWatcher(document, webviewPanel.webview);
+
     // Handle messages from webview
     webviewPanel.webview.onDidReceiveMessage(
       async message => {
@@ -78,6 +84,11 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
             // Webview is ready, send Excel data ONCE
             // Client-side caching: webview will parse and cache all sheets
             this.sendExcelData(webviewPanel.webview, document);
+            break;
+
+          case 'refresh':
+            // Refresh: re-read file and send fresh content
+            await this.handleRefresh(webviewPanel.webview, document);
             break;
 
           case 'checkExcel':
@@ -104,6 +115,42 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
       undefined,
       this.context.subscriptions
     );
+
+    // Clean up file watcher when webview is disposed
+    webviewPanel.onDidDispose(() => {
+      this.disposeFileWatcher(document.uri.fsPath);
+    });
+  }
+
+  /**
+   * Handle refresh: re-read file from disk and send fresh content
+   */
+  private async handleRefresh(
+    webview: vscode.Webview,
+    document: ExcelDocument
+  ): Promise<void> {
+    try {
+      // Re-read file from disk
+      const buffer = await fs.readFile(document.uri.fsPath);
+      const filename = path.basename(document.uri.fsPath);
+      const ext = path.extname(document.uri.fsPath).toLowerCase();
+
+      // Send fresh content to webview
+      webview.postMessage({
+        type: 'load',
+        fileType: ext === '.xlsx' || ext === '.xls' ? 'xlsx' : 'xlsx',
+        content: buffer.toString('base64'),
+        encoding: 'base64',
+        filename: filename,
+        sizeBytes: buffer.length
+      });
+
+      // Show success notification
+      vscode.window.showInformationMessage(`Refreshed ${filename}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Failed to refresh: ${message}`);
+    }
   }
 
   /**
@@ -194,6 +241,91 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       vscode.window.showErrorMessage(`Failed to open in ${app}: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Create file watcher to detect external changes
+   */
+  private createFileWatcher(
+    document: ExcelDocument,
+    webview: vscode.Webview
+  ): void {
+    const filePath = document.uri.fsPath;
+
+    // Don't create duplicate watchers
+    if (this.fileWatchers.has(filePath)) {
+      return;
+    }
+
+    // Create watcher for this specific file
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(path.dirname(filePath), path.basename(filePath))
+    );
+
+    // Listen for file changes
+    watcher.onDidChange(() => {
+      this.handleFileChange(document, webview);
+    });
+
+    // Listen for file deletion
+    watcher.onDidDelete(() => {
+      webview.postMessage({
+        type: 'fileDeleted',
+        filename: path.basename(filePath)
+      });
+    });
+
+    this.fileWatchers.set(filePath, watcher);
+  }
+
+  /**
+   * Handle file change event (debounced)
+   */
+  private handleFileChange(
+    document: ExcelDocument,
+    webview: vscode.Webview
+  ): void {
+    const filePath = document.uri.fsPath;
+
+    // Clear existing debounce timer
+    const existingTimer = this.fileChangeDebounceTimers.get(filePath);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    // Debounce changes (500ms) to avoid spam
+    const timer = setTimeout(() => {
+      const filename = path.basename(filePath);
+
+      // Excel is read-only, so never dirty
+      webview.postMessage({
+        type: 'fileChanged',
+        filename,
+        isDirty: false
+      });
+
+      this.fileChangeDebounceTimers.delete(filePath);
+    }, 500);
+
+    this.fileChangeDebounceTimers.set(filePath, timer);
+  }
+
+  /**
+   * Dispose file watcher for a specific file
+   */
+  private disposeFileWatcher(filePath: string): void {
+    const watcher = this.fileWatchers.get(filePath);
+    if (watcher) {
+      watcher.dispose();
+      this.fileWatchers.delete(filePath);
+    }
+
+    // Clear any pending debounce timer
+    const timer = this.fileChangeDebounceTimers.get(filePath);
+    if (timer) {
+      clearTimeout(timer);
+      this.fileChangeDebounceTimers.delete(filePath);
     }
   }
 }

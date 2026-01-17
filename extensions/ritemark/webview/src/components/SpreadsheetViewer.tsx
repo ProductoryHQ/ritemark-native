@@ -3,6 +3,7 @@ import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { DataTable } from './DataTable'
 import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
+import { ConflictDialog } from './dialogs/ConflictDialog'
 import { sendToExtension, onMessage } from '../bridge'
 
 export interface SpreadsheetViewerProps {
@@ -40,16 +41,38 @@ export function SpreadsheetViewer({
   const [cachedWorkbook, setCachedWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [hasExcel, setHasExcel] = useState(false)
 
+  // Conflict detection state
+  const [showConflictDialog, setShowConflictDialog] = useState(false)
+  const [showDiscardWarning, setShowDiscardWarning] = useState(false)
+  const [isDiskConflict, setIsDiskConflict] = useState(false)
+
+  // File change indicator (badge on refresh button)
+  const [hasFileChanged, setHasFileChanged] = useState(false)
+
   // CSV is editable, Excel is read-only
   const isEditable = fileType === 'csv' && !!onChange
 
-  // Check if Excel is installed on mount
+  // Check if Excel is installed on mount and listen for messages
   useEffect(() => {
     sendToExtension('checkExcel', {})
 
     const handleMessage = onMessage((message) => {
       if (message.type === 'excelStatus') {
         setHasExcel(message.hasExcel as boolean)
+      } else if (message.type === 'showConflictDialog') {
+        // True conflict: local edits + disk changes
+        setIsDiskConflict(true)
+        setShowConflictDialog(true)
+      } else if (message.type === 'confirmDiscard') {
+        // Simple discard: local edits only
+        setIsDiskConflict(false)
+        setShowDiscardWarning(true)
+      } else if (message.type === 'fileChanged') {
+        // File changed externally - show badge on refresh button
+        setHasFileChanged(true)
+      } else if (message.type === 'fileDeleted') {
+        // File was deleted externally
+        alert(`File ${message.filename} was deleted on disk.`)
       }
     })
 
@@ -75,6 +98,9 @@ export function SpreadsheetViewer({
     }
 
     setIsLoading(true)
+
+    // Clear cached workbook when content changes (forces re-parse on refresh)
+    setCachedWorkbook(null)
 
     try {
       if (fileType === 'csv') {
@@ -199,10 +225,29 @@ export function SpreadsheetViewer({
     onChange(csvString)
   }, [parsedData, onChange])
 
+  // Handle conflict dialog actions
+  const handleConfirmDiscard = useCallback(() => {
+    sendToExtension('confirmRefresh', {})
+    setShowConflictDialog(false)
+    setShowDiscardWarning(false)
+  }, [])
+
+  const handleCancelRefresh = useCallback(() => {
+    sendToExtension('cancelRefresh', {})
+    setShowConflictDialog(false)
+    setShowDiscardWarning(false)
+  }, [])
+
   // Handle sheet switching (Excel only)
   const handleSheetChange = useCallback((sheetName: string) => {
     setSelectedSheet(sheetName)
     // Re-parse will happen automatically via useEffect dependency
+  }, [])
+
+  // Handle refresh from disk
+  const handleRefresh = useCallback(() => {
+    setHasFileChanged(false) // Clear badge when refresh clicked
+    sendToExtension('refresh', {})
   }, [])
 
   // Handle opening in external apps
@@ -279,14 +324,34 @@ export function SpreadsheetViewer({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--vscode-editor-background)]">
-      {/* Toolbar with external app actions */}
-      <SpreadsheetToolbar
+    <>
+      {/* Conflict dialogs */}
+      <ConflictDialog
+        isOpen={showConflictDialog}
         filename={filename}
-        onOpenInExcel={hasExcel ? handleOpenInExcel : undefined}
-        onOpenInNumbers={handleOpenInNumbers}
-        hasExcel={hasExcel}
+        onDiscard={handleConfirmDiscard}
+        onCancel={handleCancelRefresh}
+        isDiskConflict={isDiskConflict}
       />
+
+      <ConflictDialog
+        isOpen={showDiscardWarning}
+        filename={filename}
+        onDiscard={handleConfirmDiscard}
+        onCancel={handleCancelRefresh}
+        isDiskConflict={false}
+      />
+
+      <div className="flex flex-col h-screen bg-[var(--vscode-editor-background)]">
+        {/* Toolbar with external app actions */}
+        <SpreadsheetToolbar
+          filename={filename}
+          onRefresh={handleRefresh}
+          onOpenInExcel={hasExcel ? handleOpenInExcel : undefined}
+          onOpenInNumbers={handleOpenInNumbers}
+          hasExcel={hasExcel}
+          hasFileChanged={hasFileChanged}
+        />
 
       {/* Status bar */}
       <div className="flex items-center justify-between px-3 py-1 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-xs text-[var(--vscode-descriptionForeground)]">
@@ -336,5 +401,6 @@ export function SpreadsheetViewer({
         />
       </div>
     </div>
+    </>
   )
 }
