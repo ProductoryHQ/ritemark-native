@@ -21,6 +21,12 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
   private static _aiViewProvider: AIViewProvider | null = null;
   private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
 
+  // File metadata tracking for conflict detection
+  private fileLoadTimes = new Map<string, number>();
+  private fileWatchers = new Map<string, vscode.FileSystemWatcher>();
+  private fileChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
+  private pendingSaves = new Set<string>(); // Track our own saves to ignore in file watcher
+
   public static register(
     context: vscode.ExtensionContext,
     aiViewProvider: AIViewProvider
@@ -218,6 +224,19 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       RiteMarkEditorProvider._wordCountStatusBar?.show();
     }
 
+    // Create file watcher for CSV and Excel files (not markdown - handled by VS Code)
+    if (fileType === 'csv' || fileType === 'xlsx') {
+      this.createFileWatcher(document, webview);
+
+      // Listen for saves to ignore our own saves in the file watcher
+      const saveListener = vscode.workspace.onWillSaveTextDocument(e => {
+        if (e.document.uri.fsPath === document.uri.fsPath) {
+          this.pendingSaves.add(document.uri.fsPath);
+        }
+      });
+      webviewPanel.onDidDispose(() => saveListener.dispose());
+    }
+
     // Handle messages from the webview
     webview.onDidReceiveMessage(
       message => {
@@ -229,17 +248,27 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
         switch (message.type) {
           case 'ready':
             // Webview is ready, send the document content
+            // Store file load time for conflict detection
+            this.updateFileLoadTime(document.uri.fsPath);
             webview.postMessage(this.buildLoadMessage(document, webview));
             return;
 
           case 'contentChanged':
-            // Content changed in editor, update document with front-matter (markdown only)
-            if (!isUpdating && this.getFileType(document.uri.fsPath) === 'markdown') {
-              const fullContent = this.serializeFrontMatter(
-                message.properties as DocumentProperties | undefined,
-                message.content as string
-              );
-              this.updateDocument(document, fullContent);
+            // Content changed in editor, update document
+            if (!isUpdating) {
+              const fileType = this.getFileType(document.uri.fsPath);
+
+              if (fileType === 'markdown') {
+                // Markdown: serialize with front-matter
+                const fullContent = this.serializeFrontMatter(
+                  message.properties as DocumentProperties | undefined,
+                  message.content as string
+                );
+                this.updateDocument(document, fullContent);
+              } else if (fileType === 'csv') {
+                // CSV: direct content update (no front-matter)
+                this.updateDocument(document, message.content as string);
+              }
             }
             return;
 
@@ -318,6 +347,20 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             const app = message.app as string;
             this.openInExternalApp(document.uri.fsPath, app);
             return;
+
+          case 'refresh':
+            // Handle refresh request from webview
+            this.handleRefresh(document, webview);
+            return;
+
+          case 'confirmRefresh':
+            // User confirmed refresh, discard local changes
+            this.reloadFile(document, webview);
+            return;
+
+          case 'cancelRefresh':
+            // User cancelled refresh, do nothing
+            return;
         }
       },
       undefined,
@@ -352,6 +395,9 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       // Remove from active set using stored reference
       RiteMarkEditorProvider.activeWebviews.delete(webview);
       changeDocumentSubscription.dispose();
+
+      // Dispose file watcher
+      this.disposeFileWatcher(document.uri.fsPath);
 
       // Hide word count if no more RiteMark editors are open
       if (RiteMarkEditorProvider.activeWebviews.size === 0) {
@@ -462,6 +508,211 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
         type: 'imageError',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  }
+
+  /**
+   * Update file load time for conflict detection
+   */
+  private updateFileLoadTime(filePath: string): void {
+    try {
+      const stats = fs.statSync(filePath);
+      this.fileLoadTimes.set(filePath, stats.mtimeMs);
+    } catch (error) {
+      console.error('Failed to get file stats:', error);
+    }
+  }
+
+  /**
+   * Handle refresh request: check for conflicts and prompt if needed
+   */
+  private async handleRefresh(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    const fileType = this.getFileType(document.uri.fsPath);
+
+    // Excel files: simple reload (no conflict detection, read-only)
+    if (fileType === 'xlsx') {
+      // Excel refresh is handled by excelEditorProvider, not here
+      return;
+    }
+
+    // CSV files: check for conflicts
+    if (fileType === 'csv') {
+      const isDirty = document.isDirty;
+      const hasFileChanged = this.hasFileChangedOnDisk(document.uri.fsPath);
+
+      if (isDirty && hasFileChanged) {
+        // True conflict: local edits + disk changes
+        webview.postMessage({
+          type: 'showConflictDialog',
+          filename: path.basename(document.uri.fsPath)
+        });
+      } else if (isDirty) {
+        // Local changes only, file unchanged on disk
+        webview.postMessage({
+          type: 'confirmDiscard'
+        });
+      } else {
+        // No local changes, reload immediately
+        this.reloadFile(document, webview);
+      }
+    }
+
+    // Markdown files: simple reload (handled by existing change detection)
+    if (fileType === 'markdown') {
+      this.reloadFile(document, webview);
+    }
+  }
+
+  /**
+   * Check if file has changed on disk since last load
+   */
+  private hasFileChangedOnDisk(filePath: string): boolean {
+    try {
+      const stats = fs.statSync(filePath);
+      const lastLoadTime = this.fileLoadTimes.get(filePath);
+      if (!lastLoadTime) {
+        return false;
+      }
+      return stats.mtimeMs > lastLoadTime;
+    } catch (error) {
+      console.error('Failed to check file stats:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reload file from disk and update webview
+   */
+  private async reloadFile(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    try {
+      // Re-read file from disk
+      const filePath = document.uri.fsPath;
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+
+      // Update the document
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(
+        document.uri,
+        new vscode.Range(0, 0, document.lineCount, 0),
+        fileContent
+      );
+      await vscode.workspace.applyEdit(edit);
+
+      // Update load time
+      this.updateFileLoadTime(filePath);
+
+      // Send fresh content to webview
+      webview.postMessage(this.buildLoadMessage(document, webview));
+
+      // Show success notification
+      const filename = path.basename(filePath);
+      vscode.window.showInformationMessage(`Refreshed ${filename}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Failed to refresh: ${message}`);
+    }
+  }
+
+  /**
+   * Create file watcher to detect external changes
+   */
+  private createFileWatcher(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): void {
+    const filePath = document.uri.fsPath;
+
+    // Don't create duplicate watchers
+    if (this.fileWatchers.has(filePath)) {
+      return;
+    }
+
+    // Create watcher for this specific file
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(path.dirname(filePath), path.basename(filePath))
+    );
+
+    // Listen for file changes
+    watcher.onDidChange(() => {
+      this.handleFileChange(document, webview);
+    });
+
+    // Listen for file deletion
+    watcher.onDidDelete(() => {
+      webview.postMessage({
+        type: 'fileDeleted',
+        filename: path.basename(filePath)
+      });
+    });
+
+    this.fileWatchers.set(filePath, watcher);
+  }
+
+  /**
+   * Handle file change event (debounced)
+   */
+  private handleFileChange(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): void {
+    const filePath = document.uri.fsPath;
+
+    // Clear existing debounce timer
+    const existingTimer = this.fileChangeDebounceTimers.get(filePath);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    // Debounce changes (500ms) to avoid spam
+    const timer = setTimeout(() => {
+      // Ignore our own saves - check and clear the flag
+      if (this.pendingSaves.has(filePath)) {
+        this.pendingSaves.delete(filePath);
+        this.fileChangeDebounceTimers.delete(filePath);
+        return;
+      }
+
+      // Update file load time
+      this.updateFileLoadTime(filePath);
+
+      // Check if document has unsaved changes
+      const isDirty = document.isDirty;
+      const filename = path.basename(filePath);
+
+      // Send notification to webview
+      webview.postMessage({
+        type: 'fileChanged',
+        filename,
+        isDirty
+      });
+
+      this.fileChangeDebounceTimers.delete(filePath);
+    }, 500);
+
+    this.fileChangeDebounceTimers.set(filePath, timer);
+  }
+
+  /**
+   * Dispose file watcher for a specific file
+   */
+  private disposeFileWatcher(filePath: string): void {
+    const watcher = this.fileWatchers.get(filePath);
+    if (watcher) {
+      watcher.dispose();
+      this.fileWatchers.delete(filePath);
+    }
+
+    // Clear any pending debounce timer
+    const timer = this.fileChangeDebounceTimers.get(filePath);
+    if (timer) {
+      clearTimeout(timer);
+      this.fileChangeDebounceTimers.delete(filePath);
     }
   }
 

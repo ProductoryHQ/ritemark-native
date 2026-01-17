@@ -1,11 +1,14 @@
 import React from 'react'
-import { ArrowUpRight, ChevronDown, Table2, Grid3X3 } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Table2, Grid3X3, RotateCw } from 'lucide-react'
 
 interface SpreadsheetToolbarProps {
   filename: string
   onOpenInExcel?: () => void
   onOpenInNumbers?: () => void
   hasExcel: boolean
+  onRefresh?: () => void
+  refreshDisabled?: boolean
+  hasFileChanged?: boolean // Show badge when file changed externally
 }
 
 /**
@@ -23,6 +26,9 @@ export function SpreadsheetToolbar({
   onOpenInExcel,
   onOpenInNumbers,
   hasExcel,
+  onRefresh,
+  refreshDisabled = false,
+  hasFileChanged = false,
 }: SpreadsheetToolbarProps) {
   const [showDropdown, setShowDropdown] = React.useState(false)
   const dropdownRef = React.useRef<HTMLDivElement>(null)
@@ -56,6 +62,20 @@ export function SpreadsheetToolbar({
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Refresh button (if provided) */}
+        {onRefresh && (
+          <button
+            className={`refresh-button ${hasFileChanged ? 'has-changes' : ''}`}
+            onClick={onRefresh}
+            disabled={refreshDisabled}
+            aria-label={hasFileChanged ? 'File changed on disk - click to refresh' : 'Refresh from disk'}
+            title={hasFileChanged ? 'File changed on disk' : 'Refresh from disk'}
+          >
+            <RotateCw size={16} />
+            {hasFileChanged && <span className="refresh-badge" />}
+          </button>
+        )}
 
         {/* Right side: Split button */}
         <div className="split-button-container" ref={dropdownRef}>
@@ -241,6 +261,52 @@ export function SpreadsheetToolbar({
         .dropdown-item:hover {
           background: var(--vscode-menu-selectionBackground);
           color: var(--vscode-menu-selectionForeground);
+        }
+
+        /* Refresh button */
+        .refresh-button {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          border: none;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--vscode-foreground);
+          cursor: pointer;
+          transition: background-color 0.15s ease;
+        }
+
+        .refresh-button:hover:not(:disabled) {
+          background: var(--vscode-toolbar-hoverBackground);
+        }
+
+        .refresh-button:active:not(:disabled) {
+          background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
+        }
+
+        .refresh-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        /* Badge indicator when file changed on disk */
+        .refresh-badge {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          width: 8px;
+          height: 8px;
+          background: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+          border-radius: 50%;
+          border: 2px solid var(--vscode-editor-background);
+        }
+
+        /* Subtle glow effect when file changed */
+        .refresh-button.has-changes {
+          color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
         }
       `}</style>
     </header>
