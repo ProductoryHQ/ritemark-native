@@ -25,23 +25,25 @@ Small badge near the download button.
 
 ---
 
-## 3. Spreadsheet Feature Card ✓ REVISED
+## 3. Spreadsheet Feature Card ✓ REVISED (v1.0.2-ext.1)
 
-New feature card for CSV/Excel capabilities.
+New feature card for CSV/Excel capabilities. Updated to include refresh feature.
 
 ### Estonian (ET)
 
 **Title:** Andmefailide eelvaade
 
-**Description:** Vaata CSV ja Excel faile otse RiteMarkis. Ühe klikiga avad faili Excelis või Numbersis. Sinu AI agent saab CSV failidega otse töötada.
+**Description:** Vaata CSV ja Excel faile otse RiteMarkis. Värskenda faile automaatselt, kui need muutuvad. Sinu AI agent saab CSV failidega otse töötada.
 
 ### English (EN)
 
 **Title:** Data File Preview
 
-**Description:** Preview CSV and Excel files right inside RiteMark. One click opens the file in Excel or Numbers. Your AI agent can work with CSV files directly.
+**Description:** Preview CSV and Excel files right inside RiteMark. Refresh files automatically when they change. Your AI agent can work with CSV files directly.
 
 **Icon:** Table2 (Lucide)
+
+**New in v1.0.2-ext.1:** Refresh button, file watching, blue badge indicator for external changes.
 
 ---
 
