@@ -61,9 +61,9 @@ Redesign Welcome screen for total newbies
 ## Bugs
 
 - [x] Cursor randomly jumps to bottom of page
-- [ ] When deleting table column, it leaves a "ghost" column
-- [ ] Nested checklist is broken after edits
-- [ ] Copy-paste screenshot on Mac creates double image (needs investigation)
+- [x] When deleting table column, it leaves a "ghost" column
+- [x] Nested checklist is broken after edits
+- [x] Copy-paste screenshot on Mac creates double image (needs investigation)
 
 * * *
 
@@ -80,4 +80,4 @@ Redesign Welcome screen for total newbies
 
 * * *
 
-*Last updated: 2025-01-06*
+*Last updated: 2025-01-18*
