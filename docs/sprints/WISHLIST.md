@@ -8,8 +8,8 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 - [ ] Action command palette - \[x\] Show + button on hovered line (left side) to add blocks → **Sprint 14** - \[x\] Show drag handle with the + → **Sprint 14** - \[ \] Add images from command palette - \[ \] Add Youtube (any other streaming) videos from command palette
 - [x] Copy code button in code blocks → **Sprint 14**
-- [ ] Quotation styles
-- [ ] Paste inline images (screenshots, data URLs) → save as local files
+- [x] Quotation styles
+- [x] Paste inline images (screenshots, data URLs) → save as local files
 - [x] Clicking on link opens link editing dialog → **Sprint 14**
 - [x] Display images with relative paths in editor
 
@@ -40,8 +40,8 @@ Redesign Welcome screen for total newbies
 
 ## Export
 
-- [ ] Save as PDF
-- [ ] Save as DOCX
+- [x] Save as PDF
+- [x] Save as DOCX
 - [ ] Batch export folder as .zip of DOCX
 
 ## Collaboration
@@ -54,7 +54,7 @@ Redesign Welcome screen for total newbies
 
 ## Updates
 
-- [ ] In-app update notifications (like Cursor) - \[ \] Show banner when new version available - \[ \] "Later" / "Install Now" buttons
+- [x] In-app update notifications (like Cursor) - \[x\] Show banner when new version available - \[x\] "Later" / "Install Now" buttons
 
 * * *
 
