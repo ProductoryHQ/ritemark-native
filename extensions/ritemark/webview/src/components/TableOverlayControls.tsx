@@ -232,12 +232,20 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
                         const cellElement = cell as HTMLElement
                         const pos = editor.view.posAtDOM(cellElement, 0)
 
-
-                        editor.chain()
-                          .focus()
-                          .setTextSelection(pos)
-                          .deleteRow()
-                          .run()
+                        // If this is the last row, delete the entire table
+                        if (tableInfo.rowRects.length <= 1) {
+                          editor.chain()
+                            .focus()
+                            .setTextSelection(pos)
+                            .deleteTable()
+                            .run()
+                        } else {
+                          editor.chain()
+                            .focus()
+                            .setTextSelection(pos)
+                            .deleteRow()
+                            .run()
+                        }
                       }
                     }}
                     title="Delete row"
@@ -306,12 +314,20 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
                         const cellElement = cell as HTMLElement
                         const pos = editor.view.posAtDOM(cellElement, 0)
 
-
-                        editor.chain()
-                          .focus()
-                          .setTextSelection(pos)
-                          .deleteColumn()
-                          .run()
+                        // If this is the last column, delete the entire table
+                        if (tableInfo.colRects.length <= 1) {
+                          editor.chain()
+                            .focus()
+                            .setTextSelection(pos)
+                            .deleteTable()
+                            .run()
+                        } else {
+                          editor.chain()
+                            .focus()
+                            .setTextSelection(pos)
+                            .deleteColumn()
+                            .run()
+                        }
                       }
                     }}
                     title="Delete column"
