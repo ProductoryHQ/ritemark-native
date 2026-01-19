@@ -4,6 +4,7 @@ import { Link2, Check, X, Table, List, ListOrdered, ListChecks, ExternalLink } f
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
 import { TablePicker } from './TablePicker'
+import { openExternalUrl } from '../bridge'
 
 /**
  * FormattingBubbleMenu Component
@@ -371,7 +372,7 @@ export function FormattingBubbleMenu({
                       type="button"
                       onClick={() => {
                         const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
-                        window.open(url, '_blank', 'noopener,noreferrer')
+                        openExternalUrl(url)
                       }}
                       className="px-3 py-2 border rounded text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
                       title="Open in browser (Cmd+click also works)"
