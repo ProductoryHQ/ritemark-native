@@ -1,11 +1,12 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { FileText, FileType } from 'lucide-react'
+import { FileText, FileType, Clipboard, Check } from 'lucide-react'
 
 interface ExportMenuProps {
   isOpen: boolean
   onClose: () => void
   onExportPDF: () => void
   onExportWord: () => void
+  onCopyAsMarkdown: () => void
   anchorElement: HTMLElement | null
 }
 
@@ -25,9 +26,11 @@ export function ExportMenu({
   onClose,
   onExportPDF,
   onExportWord,
+  onCopyAsMarkdown,
   anchorElement,
 }: ExportMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
 
   // Handle ESC key
   useEffect(() => {
@@ -100,6 +103,13 @@ export function ExportMenu({
     onClose()
   }, [onExportWord, onClose])
 
+  const handleCopyAsMarkdown = useCallback(async () => {
+    await onCopyAsMarkdown()
+    setCopied(true)
+    // Reset copied state after 2 seconds
+    setTimeout(() => setCopied(false), 2000)
+  }, [onCopyAsMarkdown])
+
   if (!isOpen) return null
 
   return (
@@ -118,6 +128,24 @@ export function ExportMenu({
         <button className="export-menu-item" onClick={handleExportPDF}>
           <FileText size={16} className="export-menu-icon" />
           <span>Export PDF</span>
+        </button>
+
+        {/* Copy as Markdown */}
+        <button
+          className={`export-menu-item ${copied ? 'export-menu-item-success' : ''}`}
+          onClick={handleCopyAsMarkdown}
+        >
+          {copied ? (
+            <>
+              <Check size={16} className="export-menu-icon" />
+              <span>Copied!</span>
+            </>
+          ) : (
+            <>
+              <Clipboard size={16} className="export-menu-icon" />
+              <span>Copy as Markdown</span>
+            </>
+          )}
         </button>
 
         {/* Export Word */}
@@ -175,6 +203,15 @@ export function ExportMenu({
 
         .export-menu-item:active {
           opacity: 0.8;
+        }
+
+        /* Success state for copy feedback */
+        .export-menu-item-success {
+          color: #4ade80 !important;
+        }
+
+        .export-menu-item-success:hover {
+          color: #4ade80 !important;
         }
 
         .export-menu-icon {

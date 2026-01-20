@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor } from '@tiptap/react'
+import { DOMSerializer } from '@tiptap/pm/model'
 import { sendToExtension, onMessage } from '../bridge'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -25,7 +26,7 @@ import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
 
 // Initialize Turndown for HTML to Markdown conversion
-const turndownService = new TurndownService({
+export const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',
   bulletListMarker: '-',
@@ -83,7 +84,7 @@ function preprocessTaskListHTML(html: string): string {
  *
  * This function cleans the HTML in the DOM before Turndown processes it
  */
-function preprocessTableHTML(html: string): string {
+export function preprocessTableHTML(html: string): string {
   // Create a temporary DOM element to parse and manipulate HTML
   const temp = document.createElement('div')
   temp.innerHTML = html
@@ -1334,4 +1335,30 @@ export function Editor({
         `}</style>
     </div>
   )
+}
+
+/**
+ * Extract HTML from editor selection or full document
+ *
+ * @param editor - TipTap editor instance
+ * @returns HTML string of selected content (or full document if no selection)
+ */
+export function getSelectionHTML(editor: TipTapEditor): string {
+  const { from, to, empty } = editor.state.selection
+
+  // No selection - return full document HTML
+  if (empty) {
+    return editor.getHTML()
+  }
+
+  // Extract selected fragment using ProseMirror DOMSerializer
+  const fragment = editor.state.doc.slice(from, to).content
+  const schema = editor.schema
+  const serializer = DOMSerializer.fromSchema(schema)
+  const dom = serializer.serializeFragment(fragment)
+
+  // Convert DOM fragment to HTML string
+  const div = document.createElement('div')
+  div.appendChild(dom)
+  return div.innerHTML
 }
