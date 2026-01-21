@@ -10,6 +10,7 @@
 
 import Link from '@tiptap/extension-link'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { openExternalUrl } from '../bridge'
 
 export interface CustomLinkOptions {
   /**
@@ -51,7 +52,7 @@ export const CustomLink = Link.extend<CustomLinkOptions>({
 
             // Cmd+click (Mac) or Ctrl+click (Windows/Linux) opens in browser
             if (event.metaKey || event.ctrlKey) {
-              window.open(href, '_blank', 'noopener,noreferrer')
+              openExternalUrl(href)
               return true
             }
 
