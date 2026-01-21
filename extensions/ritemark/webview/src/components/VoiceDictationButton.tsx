@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Mic, Mic2, Loader2, AlertTriangle, ChevronDown } from 'lucide-react'
 import { useVoiceDictation, type DictationState } from '../hooks/useVoiceDictation'
-import { LanguagePickerModal, type Language, WHISPER_LANGUAGES } from './LanguagePickerModal'
+import { LanguagePickerModal, WHISPER_LANGUAGES } from './LanguagePickerModal'
 import { DictationSettingsModal } from './DictationSettingsModal'
 
 // Local storage keys
@@ -366,12 +366,12 @@ export function VoiceDictationButton() {
       <LanguagePickerModal
         isOpen={showFullPicker}
         onClose={() => setShowFullPicker(false)}
-        onSelect={(language: Language) => {
-          saveRecentLanguage(language.code)
-          setLastLanguage(language.code)
+        onSelect={(code: string) => {
+          saveRecentLanguage(code)
+          setLastLanguage(code)
           setRecentLanguages(getRecentLanguages())
           setShowFullPicker(false)
-          startDictation(language.code)
+          startDictation(code)
         }}
         recentLanguages={recentLanguages}
       />
