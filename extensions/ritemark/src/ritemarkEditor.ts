@@ -404,6 +404,16 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'cancelRefresh':
             // User cancelled refresh, do nothing
             return;
+
+          case 'openExternal':
+            // Open URL in external browser
+            if (message.url) {
+              const url = message.url as string;
+              // Ensure URL has protocol
+              const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+              vscode.env.openExternal(vscode.Uri.parse(fullUrl));
+            }
+            return;
         }
       },
       undefined,
