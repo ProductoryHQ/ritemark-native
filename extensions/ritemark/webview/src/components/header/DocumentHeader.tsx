@@ -1,5 +1,6 @@
 import React from 'react'
 import { FileText, Download } from 'lucide-react'
+import { VoiceDictationButton } from '../VoiceDictationButton'
 
 interface DocumentHeaderProps {
   onPropertiesClick: () => void
@@ -7,7 +8,7 @@ interface DocumentHeaderProps {
 }
 
 /**
- * Sticky header at the top of the editor with Properties and Export buttons
+ * Sticky header at the top of the editor with Properties, Voice Dictation, and Export buttons
  *
  * Positioning: Sticky at top, z-index 60 (below bubble menus, above editor content)
  * Theme: Integrated with VS Code theme using CSS variables
@@ -28,8 +29,11 @@ export function DocumentHeader({ onPropertiesClick, onExportClick }: DocumentHea
           <span className="header-btn-text">Properties</span>
         </button>
 
-        {/* Spacer to push Export to the right */}
+        {/* Spacer to push Voice Dictation and Export to the right */}
         <div className="flex-1" />
+
+        {/* Voice Dictation button */}
+        <VoiceDictationButton />
 
         {/* Export button */}
         <button
