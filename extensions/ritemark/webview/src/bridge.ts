@@ -125,3 +125,11 @@ export function onInternalEvent(
     internalEventListeners.push(eventTypeOrCallback)
   }
 }
+
+/**
+ * Open external URL in the default browser
+ * Uses VS Code's env.openExternal API via the extension host
+ */
+export function openExternalUrl(url: string) {
+  sendToExtension('openExternal', { url })
+}
