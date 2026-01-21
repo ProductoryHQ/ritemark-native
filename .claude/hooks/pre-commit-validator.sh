@@ -42,7 +42,28 @@ if grep -q "@tailwind base" "extensions/ritemark/media/webview.js" 2>/dev/null; 
   ERRORS=$((ERRORS + 1))
 fi
 
-# Check 5: Extension compiles
+# Check 5: Webview bundle freshness (source vs bundle)
+# If webview source files are staged, bundle must also be staged
+STAGED_WEBVIEW_SRC=$(git diff --cached --name-only -- "extensions/ritemark/webview/src" 2>/dev/null || true)
+if [[ -n "$STAGED_WEBVIEW_SRC" ]]; then
+  STAGED_BUNDLE=$(git diff --cached --name-only -- "extensions/ritemark/media/webview.js" 2>/dev/null || true)
+  if [[ -z "$STAGED_BUNDLE" ]]; then
+    echo "ERROR: Webview source files changed but webview.js not updated!"
+    echo "  Changed: $(echo "$STAGED_WEBVIEW_SRC" | wc -l | tr -d ' ') source file(s)"
+    echo "  Fix: cd extensions/ritemark/webview && npm run build"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
+# Check 6: Webview bundle contains key components
+if [[ -f "extensions/ritemark/media/webview.js" ]]; then
+  if ! grep -q "document-header" "extensions/ritemark/media/webview.js"; then
+    echo "ERROR: webview.js missing document-header component"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
+# Check 7: Extension compiles
 if ! cd extensions/ritemark && npm run compile --silent 2>/dev/null; then
   echo "ERROR: Extension TypeScript compilation failed"
   ERRORS=$((ERRORS + 1))
