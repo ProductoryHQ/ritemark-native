@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { onMessage, sendToExtension } from './bridge'
-import { Editor } from './components/Editor'
+import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from './components/Editor'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
 import { marked } from 'marked'
@@ -206,6 +206,26 @@ function App() {
     })
   }, [content, properties])
 
+  const handleCopyAsMarkdown = useCallback(async () => {
+    if (!editorRef.current) return
+
+    try {
+      // Get HTML from selection or full document
+      const html = getSelectionHTML(editorRef.current)
+
+      // Clean HTML for proper markdown conversion (removes colgroup, unwraps <p> in cells)
+      const cleanedHTML = preprocessTableHTML(html)
+
+      // Convert to markdown
+      const markdown = turndownService.turndown(cleanedHTML)
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(markdown)
+    } catch (error) {
+      console.error('Failed to copy markdown:', error)
+    }
+  }, [])
+
   if (!isReady) {
     return (
       <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
@@ -264,6 +284,7 @@ function App() {
         onClose={handleCloseExportMenu}
         onExportPDF={handleExportPDF}
         onExportWord={handleExportWord}
+        onCopyAsMarkdown={handleCopyAsMarkdown}
         anchorElement={exportButtonRef.current}
       />
     </div>
