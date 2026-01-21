@@ -25,7 +25,7 @@ Redesign Welcome screen for total newbies
 
 ## File Management
 
-- [ ] Recent files list on welcome page - [ ] File templates (blog post, meeting notes, etc.)
+- [ ] Recent files list on welcome page - \[ \] File templates (blog post, meeting notes, etc.)
 - [ ] Markdown front-matter support (visual UI, not raw YAML)
 - [ ] Quick switcher improvements
 - [ ] Pre-installed viewers: Word, PDF, Excel, PowerPoint
