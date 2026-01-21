@@ -7,6 +7,7 @@ import matter from 'gray-matter';
 import type { AIViewProvider } from './ai/AIViewProvider';
 import { exportToPDF } from './export/pdfExporter';
 import { exportToWord } from './export/wordExporter';
+import { DictationController } from './voiceDictation/controller';
 
 const execAsync = promisify(exec);
 
@@ -26,6 +27,9 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
   private fileWatchers = new Map<string, vscode.FileSystemWatcher>();
   private fileChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
   private pendingSaves = new Set<string>(); // Track our own saves to ignore in file watcher
+
+  // Voice dictation controller
+  private dictationController: DictationController | null = null;
 
   public static register(
     context: vscode.ExtensionContext,
@@ -298,6 +302,45 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
               );
             }
             return;
+
+          // ===== Voice Dictation Handlers =====
+          case 'dictation:prepare':
+            // Check if model is downloaded, show download dialog if not
+            this.handlePrepareDictation(webview, message.language as string);
+            return;
+
+          case 'dictation:start':
+            // Start voice dictation
+            if (!this.dictationController) {
+              this.dictationController = new DictationController(webview, this.context);
+            }
+            this.dictationController.startDictation(message.language as string || 'en');
+            return;
+
+          case 'dictation:audioChunk':
+            // Handle incoming audio chunk (base64 WAV)
+            if (this.dictationController) {
+              this.dictationController.handleAudioChunk(message.audio as string);
+            }
+            return;
+
+          case 'dictation:stop':
+            // Stop voice dictation and get transcription
+            if (this.dictationController) {
+              this.dictationController.stopDictation();
+            }
+            return;
+
+          case 'dictation:getModelStatus':
+            // Get model download status
+            this.getModelStatus(webview);
+            return;
+
+          case 'dictation:removeModel':
+            // Remove downloaded model
+            this.removeModel(webview);
+            return;
+          // ===== End Voice Dictation =====
 
           case 'ai-configure-key':
             // Open settings to configure API key
@@ -783,6 +826,40 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
+   * Handle dictation preparation - check model and download if needed
+   */
+  private async handlePrepareDictation(webview: vscode.Webview, language: string): Promise<void> {
+    try {
+      const { isModelDownloaded, ensureModelDownloaded } = await import('./voiceDictation/modelManager');
+
+      // Check if model needs download
+      const wasAlreadyDownloaded = isModelDownloaded();
+
+      // This will show download dialog if needed
+      const result = await ensureModelDownloaded();
+
+      if (result.success) {
+        if (wasAlreadyDownloaded) {
+          // Model was already there, ready to go
+          webview.postMessage({ type: 'dictation:ready' });
+        } else {
+          // Model was just downloaded - reset to idle, user should click again
+          webview.postMessage({ type: 'dictation:cancelled' });
+        }
+      } else {
+        // User cancelled or download failed
+        webview.postMessage({ type: 'dictation:cancelled' });
+      }
+    } catch (error) {
+      console.error('[RiteMark] Dictation prepare error:', error);
+      webview.postMessage({
+        type: 'dictation:error',
+        error: 'Failed to prepare voice dictation'
+      });
+    }
+  }
+
+  /**
    * Check if Microsoft Excel is installed
    * Returns true if Excel is found, false otherwise
    */
@@ -813,6 +890,94 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       vscode.window.showErrorMessage(`Failed to open in ${app}: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Get model download status and send to webview
+   */
+  private async getModelStatus(webview: vscode.Webview): Promise<void> {
+    try {
+      const { isModelDownloaded, getModelPath, AVAILABLE_MODELS } = await import('./voiceDictation/modelManager');
+      const modelPath = getModelPath();
+      const downloaded = isModelDownloaded();
+
+      // Get model filename from path
+      const modelFilename = path.basename(modelPath);
+      const modelInfo = AVAILABLE_MODELS[modelFilename];
+
+      let sizeBytes = 0;
+      if (downloaded) {
+        try {
+          const stats = fs.statSync(modelPath);
+          sizeBytes = stats.size;
+        } catch {
+          // Ignore errors getting size
+        }
+      }
+
+      // Check if dictation is currently active
+      const isDictationActive = this.dictationController?.isActive() ?? false;
+
+      webview.postMessage({
+        type: 'dictation:modelStatus',
+        status: {
+          downloaded,
+          sizeBytes,
+          path: modelPath,
+          modelName: modelInfo?.name || modelFilename.replace('ggml-', '').replace('.bin', ''),
+          modelSizeDisplay: modelInfo?.sizeDisplay || '',
+          isDictationActive
+        }
+      });
+    } catch (error) {
+      console.error('[RiteMark] Failed to get model status:', error);
+      webview.postMessage({
+        type: 'dictation:modelStatus',
+        status: {
+          downloaded: false,
+          sizeBytes: 0,
+          path: '',
+          modelName: 'unknown',
+          modelSizeDisplay: '',
+          isDictationActive: false
+        }
+      });
+    }
+  }
+
+  /**
+   * Remove downloaded model and notify webview
+   */
+  private async removeModel(webview: vscode.Webview): Promise<void> {
+    try {
+      const { getModelPath } = await import('./voiceDictation/modelManager');
+      const modelPath = getModelPath();
+
+      if (fs.existsSync(modelPath)) {
+        fs.unlinkSync(modelPath);
+        vscode.window.showInformationMessage('Voice model removed successfully.');
+      }
+
+      // Also remove partial download if exists
+      const partialPath = modelPath + '.partial';
+      if (fs.existsSync(partialPath)) {
+        fs.unlinkSync(partialPath);
+      }
+
+      webview.postMessage({
+        type: 'dictation:modelRemoved',
+        success: true
+      });
+    } catch (error) {
+      console.error('[RiteMark] Failed to remove model:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Failed to remove model: ${errorMessage}`);
+      webview.postMessage({
+        type: 'dictation:modelRemoved',
+        success: false,
+        error: errorMessage
+      });
     }
   }
 }

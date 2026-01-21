@@ -265,6 +265,29 @@ This checks in <30 seconds:
 
 A failed 25-minute build wastes time. Validate first.
 
+### ⚠️ CRITICAL: Webview Bundle Freshness
+
+**BEFORE production build, ALWAYS ensure webview.js is up-to-date:**
+
+```bash
+# Check if source is newer than bundle
+NEWEST_SRC=$(find extensions/ritemark/webview/src -name "*.tsx" -o -name "*.ts" | xargs stat -f "%m" 2>/dev/null | sort -rn | head -1)
+BUNDLE_TIME=$(stat -f "%m" extensions/ritemark/media/webview.js 2>/dev/null || echo 0)
+if [[ $NEWEST_SRC -gt $BUNDLE_TIME ]]; then
+  echo "⚠️ Webview source is NEWER than bundle - REBUILD REQUIRED"
+fi
+```
+
+**If source is newer → REBUILD before production build:**
+```bash
+cd extensions/ritemark/webview && npm run build
+```
+
+**Why this matters:**
+- Production build copies `extensions/ritemark/media/webview.js` as-is
+- If webview.js is stale, production app will have old/missing UI components
+- This caused the missing VoiceDictationButton bug (2025-01-21)
+
 ### Post-Build Validation
 
 After build completes:
