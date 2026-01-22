@@ -93,6 +93,12 @@ docs/sprints/sprint-XX-short-name/
 ## Goal
 [One sentence describing the sprint objective]
 
+## Feature Flag Check
+- [ ] Does this sprint need a feature flag?
+  - Platform-specific? Experimental? Large download? Premium? Kill-switch?
+  - If YES: Define flag in deliverables
+  - If NO: Document why (bug fix, refactoring, small change, etc.)
+
 ## Success Criteria
 - [ ] Criterion 1
 - [ ] Criterion 2
@@ -101,11 +107,17 @@ docs/sprints/sprint-XX-short-name/
 | Deliverable | Description |
 |-------------|-------------|
 | Item 1 | What it does |
+| Feature flag (if needed) | Flag ID, status, platforms |
 
 ## Implementation Checklist
 ### Phase 1: [Section]
 - [ ] Task 1
 - [ ] Task 2
+
+### Phase 2: Feature Flag (if applicable)
+- [ ] Define flag in `src/features/flags.ts`
+- [ ] Add setting to `package.json` (if experimental)
+- [ ] Gate feature code with `isEnabled(flagId)`
 
 ## Status
 **Current Phase:** X (NAME)
