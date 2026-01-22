@@ -259,18 +259,32 @@ Left sidebar, own Activity Bar icon (book/search icon). Uses VS Code's `WebviewV
 3. **Documents Tab** - List of indexed files, index status, re-index button
 4. **Status** - Index progress, chunk count, last update time
 
-### Chat Backend Options
+### Chat Backend: Existing OpenAI Integration (REUSE)
 
-For the chat functionality, several approaches:
+RiteMark already has a **production-ready AI assistant** on OpenAI API (gpt-4o-mini). The RAG chat should reuse this infrastructure:
 
-| Option | Pros | Cons |
-|--------|------|------|
-| Local LLM (Ollama) | Fully offline, privacy | Needs GPU, slower |
-| Claude API (user key) | High quality | Needs API key, costs |
-| VS Code LM API | Leverages Copilot subscription | Requires Copilot |
-| Configurable | User chooses | More complex UI |
+| Existing Component | File | Reuse for RAG |
+|-------------------|------|---------------|
+| OpenAI streaming client | `src/ai/openAIClient.ts` | Send RAG-augmented prompts |
+| API key management | `src/ai/apiKeyManager.ts` | Same key, no new config |
+| Connectivity monitor | `src/ai/connectivity.ts` | Same health checks |
+| Chat UI patterns | `webview/src/components/ai/AIChatSidebar.tsx` | Similar React component |
+| WebviewViewProvider | `src/ai/AIViewProvider.ts` | Pattern for left sidebar |
 
-**Recommendation:** Start with **configurable** - support Ollama (local) and Claude API (cloud). Let user choose in settings.
+**Architecture:**
+```
+User Query (RAG Sidebar)
+    ↓
+ChromaDB semantic search → Top-K chunks
+    ↓
+System prompt + chunks + query → openAIClient.ts (gpt-4o-mini)
+    ↓
+Streaming response with [source citations]
+```
+
+**Cost:** gpt-4o-mini at ~$0.15/1M input tokens. A typical RAG query with 5 chunks (~2K tokens context) costs ~$0.0003 per query.
+
+**No new LLM dependencies needed.** Same API key, same client, same streaming pattern.
 
 ---
 
@@ -293,12 +307,13 @@ For the chat functionality, several approaches:
 - Search UI (React component)
 - Document list view
 
-### Phase 3: Chat UI
+### Phase 3: Chat UI (Reuse Existing OpenAI Client)
 
-- Add chat interface to sidebar
-- Integrate with Ollama / Claude API
-- RAG-powered responses (retrieve + generate)
-- Citation links (click to open source document)
+- Add chat interface to RAG sidebar (pattern from AIChatSidebar.tsx)
+- Create RAG-specific system prompt with retrieved chunks as context
+- Reuse `openAIClient.ts` streaming logic for gpt-4o-mini
+- Reuse `apiKeyManager.ts` - same API key as existing AI assistant
+- Citation links (click to open source document at specific page/section)
 
 ### Phase 4: Advanced Features
 
@@ -368,8 +383,10 @@ RiteMark RAG would be unique in combining:
 3. **First-run experience** - Models download on first use (~500MB). Show progress? Pre-bundle?
 4. **Chunk size strategy** - 512 tokens works for search. But for chat context, bigger chunks (1024) might be better.
 5. **Image handling** - OCR everything, or use ColPali for visual retrieval? ColPali needs GPU.
-6. **Chat LLM** - Default to Ollama? Require Claude API key? Support both?
+6. ~~**Chat LLM**~~ - **RESOLVED:** Reuse existing OpenAI gpt-4o-mini integration (same API key, same client).
 7. **Auto-start MCP** - Should RiteMark auto-register as MCP server in Claude Code config?
+8. **Sidebar placement** - Existing AI assistant is in right sidebar (auxiliarybar). RAG in left sidebar (primary)? Or same panel with tabs?
+9. **Embedding via OpenAI?** - Instead of local all-MiniLM, use `text-embedding-3-small` via same API key? Simpler (no ONNX/Python for embeddings) but needs network.
 
 ---
 
