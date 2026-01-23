@@ -46,25 +46,29 @@ A **local-first** multi-modal RAG system built into RiteMark that:
 ritemark-native/
 ├── extensions/ritemark/
 │   ├── src/
-│   │   ├── rag/
-│   │   │   ├── indexer.ts          # File watcher + indexing orchestrator
-│   │   │   ├── docProcessor.ts     # Calls Docling/parser for each file type
-│   │   │   ├── embeddings.ts       # Local embedding generation (ONNX)
-│   │   │   ├── vectorStore.ts      # ChromaDB/SQLite-vec interface
-│   │   │   ├── search.ts           # Semantic search + reranking
-│   │   │   └── mcpServer.ts        # FastMCP server (stdio transport)
+│   │   ├── ai/                      # EXISTING (keep + extend)
+│   │   │   ├── openAIClient.ts      # Add embedding calls here
+│   │   │   ├── apiKeyManager.ts     # Same key for chat + embeddings
+│   │   │   └── connectivity.ts      # Same connectivity checks
+│   │   ├── rag/                     # NEW
+│   │   │   ├── indexer.ts           # File watcher + indexing orchestrator
+│   │   │   ├── embeddings.ts        # OpenAI text-embedding-3-small calls
+│   │   │   ├── vectorStore.ts       # ChromaDB/SQLite-vec interface
+│   │   │   ├── search.ts            # Semantic search + reranking
+│   │   │   └── mcpServer.ts         # MCP server (stdio transport)
 │   │   └── views/
-│   │       └── ragSidebar.ts       # WebviewViewProvider for sidebar
+│   │       └── UnifiedViewProvider.ts  # REPLACES AIViewProvider.ts
 │   └── webview/
-│       └── rag/                    # React sidebar UI
-│           ├── SearchView.tsx
-│           ├── ChatView.tsx
-│           └── DocumentList.tsx
-└── rag-server/                     # Python MCP server (separate process)
-    ├── server.py                   # FastMCP entry point
-    ├── indexer.py                  # Document processing pipeline
-    ├── embeddings.py               # Embedding model management
-    └── requirements.txt
+│       └── unified/                 # REPLACES ai/ folder
+│           ├── UnifiedChat.tsx       # Single chat component
+│           ├── MessageBubble.tsx     # Chat message with citations
+│           ├── SelectionCard.tsx     # Shows selected text context
+│           ├── ActionButtons.tsx     # [Apply] [Discard] for edits
+│           └── IndexStatus.tsx       # Footer: doc count, re-index
+└── rag-server/                      # Python - ONLY for doc parsing
+    ├── server.py                    # FastMCP entry point + MCP tools
+    ├── parser.py                    # Docling document parser
+    └── requirements.txt             # docling, fastmcp (NO embeddings)
 ```
 
 ### Component Choices
@@ -72,11 +76,12 @@ ritemark-native/
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
 | Document Parser | **Docling** (IBM, MIT license) | Handles PDF, DOCX, PPTX, XLSX, HTML, images. Table extraction, OCR, layout analysis. 15k+ GitHub stars. |
-| Embedding Model | **all-MiniLM-L6-v2** (ONNX) | 22M params, 384-dim vectors, runs on CPU. 256 token limit per chunk. |
-| Vector Store | **ChromaDB** (local) or **sqlite-vec** | Local-first, no cloud dependency. ChromaDB is proven with RAG. sqlite-vec is lighter. |
-| MCP Server | **FastMCP** (Python) | Official MCP SDK integration. Simple decorator-based API. |
-| Visual Retrieval | **ColPali** (optional, advanced) | For image-heavy docs: embeds page screenshots directly. No OCR needed. ICLR 2025. |
-| Sidebar UI | **WebviewView** (React) | Consistent with existing RiteMark webview approach. |
+| Embeddings | **OpenAI text-embedding-3-small** | 1536-dim, $0.02/1M tokens. Same API key. No local model download needed. |
+| Vector Store | **ChromaDB** (local) or **sqlite-vec** | Local-first, no cloud dependency. ChromaDB is proven with RAG. sqlite-vec is lighter (no Python). |
+| Chat LLM | **OpenAI gpt-4o-mini** (existing) | Already integrated, streaming works, tools defined. |
+| MCP Server | **FastMCP** (Python) | Official MCP SDK. Same process as Docling parser. |
+| Visual Retrieval | **ColPali** (V2, optional) | For image-heavy docs: embeds page screenshots directly. No OCR needed. |
+| Sidebar UI | **WebviewView** (React) | Unified chat, replaces current AI assistant. Left sidebar. |
 
 ---
 
@@ -87,29 +92,44 @@ File Change Detected (FileSystemWatcher)
     │
     ▼
 ┌─────────────────────┐
-│  Document Parser     │  Docling: PDF, DOCX, PPTX, images
-│  (Docling)           │  Output: structured text + metadata
+│  Document Parser     │  Docling (Python subprocess): PDF, DOCX, PPTX
+│  (Docling)           │  Output: structured text + metadata (JSON)
 └─────────┬───────────┘
           │
           ▼
 ┌─────────────────────┐
-│  Chunking            │  LangChain RecursiveCharacterTextSplitter
-│  (512 tokens,        │  Overlap: 50 tokens
+│  Chunking            │  TypeScript (extension side)
+│  (512 tokens,        │  Simple recursive text splitter
 │   50 overlap)        │  Preserves section headers as metadata
 └─────────┬───────────┘
           │
           ▼
 ┌─────────────────────┐
-│  Embedding           │  all-MiniLM-L6-v2 (ONNX Runtime)
-│  (Local, CPU)        │  384-dimensional vectors
+│  Embedding           │  OpenAI text-embedding-3-small (HTTP API)
+│  (OpenAI API)        │  1536-dimensional vectors, batched
 └─────────┬───────────┘
           │
           ▼
 ┌─────────────────────┐
-│  Vector Store        │  ChromaDB (persistent, local)
-│  (ChromaDB)          │  Collection per workspace
+│  Vector Store        │  ChromaDB (persistent, local) or sqlite-vec
+│  (Local)             │  Collection per workspace
 └─────────────────────┘
 ```
+
+### Simplified Dependency Chain
+
+```
+Python (only for parsing):          TypeScript (extension, everything else):
+┌────────────────────┐              ┌─────────────────────────────┐
+│ docling             │──JSON──→    │ chunking (simple splitter)   │
+│ fastmcp (MCP tools) │              │ embeddings (OpenAI HTTP)     │
+└────────────────────┘              │ vector store (ChromaDB/sqlite)│
+                                    │ chat (OpenAI streaming)      │
+                                    │ sidebar UI (React)           │
+                                    └─────────────────────────────┘
+```
+
+This means: Python is ONLY a document parser. All intelligence (embeddings, search, chat) stays in TypeScript.
 
 ### Supported File Types
 
@@ -206,153 +226,218 @@ Or RiteMark could auto-generate this config when RAG is enabled.
 
 ---
 
-## 6. Sidebar UI Design
+## 6. Unified Sidebar UI Design
+
+### Key Decision: Merge AI Assistant + RAG into One Chat
+
+The existing AI assistant (right sidebar, `auxiliarybar`) becomes redundant as Claude Code handles code/text editing better. Instead of two separate chat panels, we merge everything into **one unified chat** in the **left sidebar**.
+
+| Before (current) | After (unified) |
+|-------------------|-----------------|
+| Right sidebar: AI assistant (rephrase, edit) | **Removed** |
+| Left sidebar: (empty) | **Unified chat** (RAG + editing) |
+| Two API keys to think about | One OpenAI key does all |
 
 ### Location
 
-Left sidebar, own Activity Bar icon (book/search icon). Uses VS Code's `WebviewViewProvider` API.
+Left sidebar (Primary Sidebar), own Activity Bar icon. Replaces current AI assistant entirely.
 
-### Views
+### Unified Chat Wireframe
 
 ```
 ┌──────────────────────────┐
-│ 🔍 RiteMark RAG          │  ← Activity Bar tab
+│ ✦ RiteMark AI            │  ← Activity Bar tab (left)
 ├──────────────────────────┤
+│                          │
+│ 💬 Mis on Q4 raporti     │
+│    peamine järeldus?     │
+│                          │
+│ 🤖 Raporti (report.pdf  │
+│    lk 3-4) põhjal on    │
+│    peamine järeldus...   │
+│    ──────────────────    │
+│    📎 report.pdf p.3     │  ← Citation (clickable)
+│                          │
+│ ─────────────────────── │
+│                          │
+│ 💬 Tee see lõik lühemaks │  ← Text editing (selection)
+│    ┌──────────────────┐  │
+│    │ "Selected text..." │  │  ← Shows selected text
+│    └──────────────────┘  │
+│                          │
+│ 🤖 [Preview]             │
+│    "Shorter version..."  │
+│    [Apply] [Discard]     │  ← Inline actions
+│                          │
+│ ─────────────────────── │
+│                          │
 │ ┌──────────────────────┐ │
-│ │ Search documents...  │ │  ← Search input
+│ │ Ask anything...       │ │  ← Input (always at bottom)
 │ └──────────────────────┘ │
-│                          │
-│ Results:                 │
-│ ┌──────────────────────┐ │
-│ │ 📄 report.pdf p.3    │ │  ← Click to preview
-│ │ "...revenue grew by  │ │
-│ │  23% in Q4..."       │ │
-│ ├──────────────────────┤ │
-│ │ 📝 notes.docx §2    │ │
-│ │ "...meeting decided  │ │
-│ │  to postpone..."     │ │
-│ └──────────────────────┘ │
-│                          │
-│ ─── Chat ─────────────── │
-│ ┌──────────────────────┐ │
-│ │ Ask about your docs  │ │  ← Chat input
-│ └──────────────────────┘ │
-│                          │
-│ 💬 What does the Q4     │
-│    report say about     │
-│    revenue targets?     │
-│                          │
-│ 🤖 Based on report.pdf │
-│    (p.3-4), revenue     │
-│    targets were...      │
 │                          │
 ├──────────────────────────┤
-│ Indexed: 12 docs, 847   │  ← Status bar
-│ chunks | Last: 2min ago │
+│ 📚 12 docs | 847 chunks │  ← Index status footer
+│ ⟳ Re-index              │
 └──────────────────────────┘
 ```
 
-### UI Components
+### Smart Context Detection
 
-1. **Search Tab** - Semantic search with file type filters, preview snippets
-2. **Chat Tab** - RAG-powered Q&A about workspace documents
-3. **Documents Tab** - List of indexed files, index status, re-index button
-4. **Status** - Index progress, chunk count, last update time
+The chat is context-aware - it detects what the user needs based on input + state:
 
-### Chat Backend: Existing OpenAI Integration (REUSE)
+| Context | Behavior | Example |
+|---------|----------|---------|
+| No selection, question | RAG search → answer with citations | "What did the contract say about deadlines?" |
+| Text selected, instruction | Edit text (rephrase/shorten/etc.) | "Make this more formal" |
+| No selection, instruction | Search + apply to document | "Find all mentions of budget" |
+| File reference | Get content from indexed file | "Summarize report.pdf" |
 
-RiteMark already has a **production-ready AI assistant** on OpenAI API (gpt-4o-mini). The RAG chat should reuse this infrastructure:
+### System Prompt Strategy
 
-| Existing Component | File | Reuse for RAG |
-|-------------------|------|---------------|
-| OpenAI streaming client | `src/ai/openAIClient.ts` | Send RAG-augmented prompts |
-| API key management | `src/ai/apiKeyManager.ts` | Same key, no new config |
-| Connectivity monitor | `src/ai/connectivity.ts` | Same health checks |
-| Chat UI patterns | `webview/src/components/ai/AIChatSidebar.tsx` | Similar React component |
-| WebviewViewProvider | `src/ai/AIViewProvider.ts` | Pattern for left sidebar |
+```
+You are RiteMark AI, a document assistant.
+
+CAPABILITIES:
+1. Answer questions using indexed workspace documents (RAG)
+2. Edit selected text (rephrase, shorten, expand, translate)
+3. Search across all workspace documents (PDF, Word, etc.)
+
+CONTEXT PROVIDED:
+- Selected text (if any): {selection}
+- Current document: {activeFile}
+- Retrieved chunks: {ragResults}
+
+RULES:
+- Always cite sources with [filename, page/section]
+- For text edits, show the result and wait for [Apply] confirmation
+- For questions, search indexed documents first
+```
+
+### UI Components (Simplified)
+
+1. **Chat messages** - Conversation history with markdown rendering
+2. **Selection indicator** - Shows currently selected text (when applicable)
+3. **Citation chips** - Clickable source references (open file at location)
+4. **Action buttons** - [Apply] / [Discard] for text edit suggestions
+5. **Index status footer** - Document count, chunk count, re-index button
+
+### What Gets Removed
+
+The current AI assistant (`AIViewProvider.ts`, right sidebar) gets **replaced** entirely:
+- `ritemark.aiView` → replaced by `ritemark.ragView` (left sidebar)
+- Widget modal preview → inline in chat with [Apply] button
+- Separate connectivity status → merged into footer
+- Right sidebar panel → removed
+
+### Migration Path
+
+1. Keep existing `openAIClient.ts`, `apiKeyManager.ts`, `connectivity.ts` (backend logic)
+2. Replace `AIViewProvider.ts` with new `UnifiedViewProvider.ts` (left sidebar)
+3. Replace `AIChatSidebar.tsx` with new unified React component
+4. Add RAG context injection before API calls
+5. Remove right sidebar registration from `package.json`
+
+### Backend: Unified OpenAI Integration
+
+Everything runs on the **same OpenAI API key** the user already has configured:
+
+| Function | Model | Cost |
+|----------|-------|------|
+| Chat / RAG answers | `gpt-4o-mini` | ~$0.15/1M input tokens |
+| Text editing (rephrase etc.) | `gpt-4o-mini` | Same |
+| Document embeddings | `text-embedding-3-small` | ~$0.02/1M tokens |
 
 **Architecture:**
 ```
-User Query (RAG Sidebar)
+User Query (Unified Sidebar)
     ↓
-ChromaDB semantic search → Top-K chunks
+Context detection: RAG query? Text edit? Search?
     ↓
-System prompt + chunks + query → openAIClient.ts (gpt-4o-mini)
+[If RAG] → ChromaDB semantic search → Top-K chunks
     ↓
-Streaming response with [source citations]
+System prompt + context + query → openAIClient.ts (gpt-4o-mini)
+    ↓
+Streaming response with [citations] or [Apply/Discard]
 ```
 
-**Cost:** gpt-4o-mini at ~$0.15/1M input tokens. A typical RAG query with 5 chunks (~2K tokens context) costs ~$0.0003 per query.
+**Cost per RAG query:** ~$0.0003 (5 chunks, ~2K tokens context)
+**Cost to embed 100-page PDF:** ~$0.001 (50K tokens)
 
-**No new LLM dependencies needed.** Same API key, same client, same streaming pattern.
+**No Python needed for embeddings.** OpenAI `text-embedding-3-small` via HTTP eliminates ONNX/sentence-transformers dependency entirely. Python only needed for Docling (document parsing).
 
 ---
 
 ## 7. Implementation Strategy
 
-### Phase 1: Core RAG Pipeline (Python backend)
+### Phase 1: Document Parser + Embeddings
 
-- Set up Python project with FastMCP + Docling + ChromaDB
-- Implement document processing pipeline (PDF, DOCX first)
-- Implement embedding with all-MiniLM-L6-v2 (ONNX)
-- Implement semantic search
-- Expose as MCP server (stdio transport)
-- Test with Claude Code manually
+- Set up Python project: Docling only (no embedding models)
+- Implement parse endpoint: file path → structured JSON (text + metadata)
+- Add OpenAI embedding calls to extension (`src/rag/embeddings.ts`)
+- Implement text chunker in TypeScript (simple recursive splitter)
+- Set up ChromaDB or sqlite-vec for vector storage
+- End-to-end test: drop a PDF → get chunks → embed → store → search
 
-### Phase 2: VS Code Integration
+### Phase 2: Unified Sidebar (Replace AI Assistant)
 
-- FileSystemWatcher for auto-indexing on file changes
-- Extension spawns Python MCP server as subprocess
-- WebviewViewProvider for sidebar
-- Search UI (React component)
-- Document list view
+- Create `UnifiedViewProvider.ts` (left sidebar, replaces `AIViewProvider.ts`)
+- Build `UnifiedChat.tsx` React component (merge search + chat + edit)
+- Implement smart context detection (selection → edit mode, question → RAG mode)
+- Wire up existing `openAIClient.ts` with RAG context injection
+- Add citation chips (clickable → open source document)
+- Add [Apply] / [Discard] for text edit suggestions (replace widget modal)
+- Remove old right sidebar AI panel from `package.json`
+- Add index status footer
 
-### Phase 3: Chat UI (Reuse Existing OpenAI Client)
+### Phase 3: MCP Server + Auto-Indexing
 
-- Add chat interface to RAG sidebar (pattern from AIChatSidebar.tsx)
-- Create RAG-specific system prompt with retrieved chunks as context
-- Reuse `openAIClient.ts` streaming logic for gpt-4o-mini
-- Reuse `apiKeyManager.ts` - same API key as existing AI assistant
-- Citation links (click to open source document at specific page/section)
+- Add FastMCP server to Python process (same as Docling)
+- Expose `search_documents`, `get_document_content`, `list_indexed_documents`
+- Add FileSystemWatcher for auto-indexing on file changes
+- Auto-generate `.claude/settings.json` MCP config (optional)
+- Test with Claude Code: "What does the contract say about..."
 
-### Phase 4: Advanced Features
+### Phase 4: Polish + Advanced
 
-- ColPali visual retrieval for image-heavy documents
-- Incremental indexing (only changed files)
+- Incremental indexing (hash-based, only changed files)
+- ColPali visual retrieval for image-heavy documents (optional, GPU)
+- Batch embedding with progress indicator
 - Cross-workspace search
-- Export search results to markdown
-- Auto-generated MCP config for Claude Code
+- Export search results to markdown note
 
 ---
 
 ## 8. Dependencies
 
-### Python (rag-server/)
+### Python (rag-server/) - MINIMAL
 
 ```
-fastmcp>=2.0
-docling>=2.0
-chromadb>=0.5
-sentence-transformers>=3.0
-onnxruntime>=1.17
-langchain-text-splitters>=0.2
+fastmcp>=2.0          # MCP server
+docling>=2.0          # Document parsing (PDF, DOCX, PPTX, images)
 ```
+
+No embedding models, no ONNX, no sentence-transformers. Python only parses documents.
 
 ### Node.js (extension)
 
 ```
 # Already in extension dependencies:
+openai@^4.73.0        # Chat + embeddings (text-embedding-3-small)
 vscode (webview API)
 
-# New:
-# (Python server managed as subprocess, no Node RAG deps needed)
+# New (if using ChromaDB from TypeScript):
+chromadb              # Vector store client
+# OR
+better-sqlite3        # If using sqlite-vec instead
 ```
 
 ### System Requirements
 
-- Python 3.11+ (for Docling)
-- ~500MB disk for embedding model + Docling models (first run download)
-- ~50MB RAM per 1000 document chunks in ChromaDB
+- Python 3.11+ (for Docling document parser)
+- OpenAI API key (same one already configured for AI assistant)
+- ~200MB disk for Docling models (first run download, no embedding models needed)
+- ~50MB RAM per 1000 document chunks in vector store
+- Network connection for OpenAI API (embeddings + chat)
 
 ---
 
@@ -378,15 +463,22 @@ RiteMark RAG would be unique in combining:
 
 ## 10. Open Questions
 
-1. **Embedding model size vs quality** - all-MiniLM (22M, fast) vs BGE-small (33M, better) vs nomic-embed (137M, best)?
-2. **Python dependency management** - Bundle Python? Use system Python? Use `uv` for isolated env?
-3. **First-run experience** - Models download on first use (~500MB). Show progress? Pre-bundle?
-4. **Chunk size strategy** - 512 tokens works for search. But for chat context, bigger chunks (1024) might be better.
-5. **Image handling** - OCR everything, or use ColPali for visual retrieval? ColPali needs GPU.
-6. ~~**Chat LLM**~~ - **RESOLVED:** Reuse existing OpenAI gpt-4o-mini integration (same API key, same client).
-7. **Auto-start MCP** - Should RiteMark auto-register as MCP server in Claude Code config?
-8. **Sidebar placement** - Existing AI assistant is in right sidebar (auxiliarybar). RAG in left sidebar (primary)? Or same panel with tabs?
-9. **Embedding via OpenAI?** - Instead of local all-MiniLM, use `text-embedding-3-small` via same API key? Simpler (no ONNX/Python for embeddings) but needs network.
+### Resolved
+
+1. ~~**Chat LLM**~~ → Reuse existing OpenAI gpt-4o-mini (same API key, same client)
+2. ~~**Embeddings**~~ → OpenAI `text-embedding-3-small` (same API key, no local models)
+3. ~~**Sidebar placement**~~ → Unified left sidebar, replaces current right-side AI assistant
+4. ~~**Embedding model size**~~ → Not applicable, using OpenAI API
+
+### Still Open
+
+1. **Python dependency management** - Bundle Python? Use system Python? Use `uv` for isolated env?
+2. **First-run experience** - No large model downloads needed anymore (OpenAI API). But Docling still needs Python + its deps.
+3. **Chunk size strategy** - 512 tokens for search vs 1024 for chat context?
+4. **Image handling** - OCR via Docling, or ColPali for visual retrieval? ColPali needs GPU.
+5. **Auto-start MCP** - Should RiteMark auto-generate `.claude/settings.json` MCP config?
+6. **Vector store choice** - ChromaDB (Python, proven) vs sqlite-vec (TypeScript-native, lighter)?
+7. **Offline fallback** - OpenAI embeddings need network. Cache embeddings locally? What if offline during indexing?
 
 ---
 
