@@ -4,11 +4,17 @@ import { ExcelEditorProvider } from './excelEditorProvider';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
+import { DocumentIndexer } from './rag/indexer';
+import { MCPServerManager } from './rag/mcpServer';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
 
 // Export unified view provider for editor access
 export let unifiedViewProvider: UnifiedViewProvider;
+
+// RAG infrastructure
+let documentIndexer: DocumentIndexer | null = null;
+let mcpServer: MCPServerManager | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
   // Initialize API key manager (must be first)
@@ -84,6 +90,72 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     ExcelEditorProvider.register(context)
   );
+
+  // Initialize RAG indexer and MCP server (if workspace available)
+  if (workspacePath) {
+    documentIndexer = new DocumentIndexer({ workspacePath });
+    mcpServer = new MCPServerManager({ workspacePath });
+
+    // Start file watcher for auto-indexing
+    documentIndexer.startWatching();
+
+    // Update sidebar when index changes
+    documentIndexer.onProgress(() => {
+      unifiedViewProvider.updateIndexStatus();
+    });
+
+    // Register reindex command
+    context.subscriptions.push(
+      vscode.commands.registerCommand('ritemark.reindexDocuments', async () => {
+        if (!documentIndexer) { return; }
+        vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Indexing documents...' },
+          async (progress) => {
+            const listener = documentIndexer!.onProgress((p) => {
+              progress.report({
+                message: `${p.processed}/${p.total}: ${p.current}`,
+                increment: (1 / Math.max(p.total, 1)) * 100,
+              });
+            });
+            try {
+              const result = await documentIndexer!.indexAll();
+              if (result.errors.length > 0) {
+                vscode.window.showWarningMessage(
+                  `Indexed ${result.processed} docs with ${result.errors.length} errors`
+                );
+              } else {
+                vscode.window.showInformationMessage(
+                  `Indexed ${result.processed} documents (${documentIndexer!.getStats().totalChunks} chunks)`
+                );
+              }
+              unifiedViewProvider.updateIndexStatus();
+            } finally {
+              listener.dispose();
+            }
+          }
+        );
+      })
+    );
+
+    // Register MCP config generation command
+    context.subscriptions.push(
+      vscode.commands.registerCommand('ritemark.generateMCPConfig', () => {
+        mcpServer?.generateClaudeConfig();
+      })
+    );
+
+    // Auto-index on first activation (with delay to not block startup)
+    setTimeout(() => {
+      documentIndexer?.indexAll().then(() => {
+        unifiedViewProvider.updateIndexStatus();
+      }).catch((err) => {
+        console.log('[RAG] Initial indexing skipped:', err.message);
+      });
+    }, 5000);
+  }
 }
 
-export function deactivate() {}
+export function deactivate() {
+  documentIndexer?.dispose();
+  mcpServer?.dispose();
+}
