@@ -9,3 +9,4 @@ export { embedText, embedTexts, getEmbeddingDimensions } from './embeddings';
 export { VectorStore, SearchResult, getDefaultDbPath } from './vectorStore';
 export { DocumentIndexer, IndexerOptions, IndexProgress } from './indexer';
 export { searchDocuments, buildRAGContext, RAGSearchResult, RAGSearchOptions } from './search';
+export { MCPServerManager, MCPServerOptions } from './mcpServer';

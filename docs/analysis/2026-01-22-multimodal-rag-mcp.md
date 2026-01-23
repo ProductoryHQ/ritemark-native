@@ -389,6 +389,7 @@ Streaming response with [citations] or [Apply/Discard]
 - Add [Apply] / [Discard] for text edit suggestions (replace widget modal)
 - Remove old right sidebar AI panel from `package.json`
 - Add index status footer
+- **Cleanup:** Delete `AIViewProvider.ts` and `AIChatSidebar.tsx` (replaced by UnifiedViewProvider)
 
 ### Phase 3: MCP Server + Auto-Indexing
 
