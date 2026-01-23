@@ -271,6 +271,9 @@ export function useVoiceDictation(): VoiceDictationHook {
    * Stop microphone capture and cleanup
    */
   const stopDictation = useCallback(() => {
+    // Guard: only do work if we have active audio resources
+    const hasActiveResources = streamRef.current || audioContextRef.current || sendIntervalRef.current
+
     // Stop send interval
     if (sendIntervalRef.current) {
       clearInterval(sendIntervalRef.current)
@@ -317,11 +320,13 @@ export function useVoiceDictation(): VoiceDictationHook {
       streamRef.current = null
     }
 
-    // Notify extension
-    sendToExtension('dictation:stop', {})
+    // Only notify extension and emit events if we had active resources
+    if (hasActiveResources) {
+      sendToExtension('dictation:stop', {})
+      emitInternalEvent('dictation:listening-stopped')
+    }
 
     setState('idle')
-    emitInternalEvent('dictation:listening-stopped')
     setError(null)
   }, [])
 
@@ -368,7 +373,8 @@ export function useVoiceDictation(): VoiceDictationHook {
       }
     }
 
-    onMessage(handleMessage)
+    const unsubscribe = onMessage(handleMessage)
+    return unsubscribe
   }, [stopDictation, startMicCapture])
 
   /**

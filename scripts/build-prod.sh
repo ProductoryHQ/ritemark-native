@@ -219,11 +219,18 @@ echo ""
 echo -e "${BLUE}Step 6/7: Fixing Timestamps${NC}"
 echo "----------------------------------------"
 
-# VS Code build sets dates to 1980 - fix them to current time
+# VS Code build sets creation dates to 1980 (ZIP epoch) - fix to current time
 echo "Setting app bundle timestamps to current time..."
-find "$APP_PATH" -exec touch {} \; 2>/dev/null || true
 touch "$APP_PATH"
-echo -e "${GREEN}Timestamps updated${NC}"
+# SetFile -d sets the creation date (touch only sets modification/access times)
+if command -v SetFile &>/dev/null; then
+  CURRENT_DATE=$(date '+%m/%d/%Y %H:%M:%S')
+  SetFile -d "$CURRENT_DATE" "$APP_PATH"
+  echo -e "${GREEN}Timestamps updated (including creation date)${NC}"
+else
+  echo -e "${YELLOW}WARNING: SetFile not found - creation date may show 1980${NC}"
+  echo "Install Xcode Command Line Tools to fix: xcode-select --install"
+fi
 echo ""
 
 # =============================================================================
