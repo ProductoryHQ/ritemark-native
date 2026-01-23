@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import matter from 'gray-matter';
-import type { AIViewProvider } from './ai/AIViewProvider';
+import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDF } from './export/pdfExporter';
 import { exportToWord } from './export/wordExporter';
 import { DictationController } from './voiceDictation/controller';
@@ -20,7 +20,7 @@ export interface DocumentProperties {
 export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
   // Track all active webview panels for broadcasting tool execution
   private static activeWebviews: Set<vscode.Webview> = new Set();
-  private static _aiViewProvider: AIViewProvider | null = null;
+  private static _unifiedViewProvider: UnifiedViewProvider | null = null;
   private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
 
   // File metadata tracking for conflict detection
@@ -34,9 +34,9 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
   public static register(
     context: vscode.ExtensionContext,
-    aiViewProvider: AIViewProvider
+    unifiedViewProvider: UnifiedViewProvider
   ): vscode.Disposable {
-    RiteMarkEditorProvider._aiViewProvider = aiViewProvider;
+    RiteMarkEditorProvider._unifiedViewProvider = unifiedViewProvider;
 
     // Create word count status bar item (to the left of AI status, priority 101)
     RiteMarkEditorProvider._wordCountStatusBar = vscode.window.createStatusBarItem(
@@ -310,8 +310,8 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'selectionChanged':
             // Forward selection and document content to AI panel
-            if (RiteMarkEditorProvider._aiViewProvider) {
-              RiteMarkEditorProvider._aiViewProvider.sendSelection(
+            if (RiteMarkEditorProvider._unifiedViewProvider) {
+              RiteMarkEditorProvider._unifiedViewProvider.sendSelection(
                 message.selection,
                 document.getText()
               );
