@@ -3,12 +3,12 @@ import { RiteMarkEditorProvider } from './ritemarkEditor';
 import { ExcelEditorProvider } from './excelEditorProvider';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
-import { AIViewProvider } from './ai/AIViewProvider';
+import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
 
-// Export AI view provider for editor access
-export let aiViewProvider: AIViewProvider;
+// Export unified view provider for editor access
+export let unifiedViewProvider: UnifiedViewProvider;
 
 export function activate(context: vscode.ExtensionContext) {
   // Initialize API key manager (must be first)
@@ -24,22 +24,22 @@ export function activate(context: vscode.ExtensionContext) {
   // Schedule startup update check (10 second delay)
   scheduleStartupCheck(updateService, updateStorage);
 
-  // Register AI View Provider (Secondary Side Bar / right)
-  aiViewProvider = new AIViewProvider(context.extensionUri);
+  // Register Unified View Provider (Primary Sidebar / left)
+  const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(AIViewProvider.viewType, aiViewProvider, {
+    vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );
 
-  // Auto-show AI panel on startup
+  // Auto-show unified panel on startup
   setTimeout(async () => {
     try {
-      // Open AI view in auxiliary bar
       await vscode.commands.executeCommand('workbench.view.extension.ritemark-ai');
     } catch (e) {
-      console.log('Failed to open AI view:', e);
-      await vscode.commands.executeCommand('ritemark.aiView.focus');
+      console.log('Failed to open unified view:', e);
+      await vscode.commands.executeCommand('ritemark.unifiedView.focus');
     }
   }, 1500);
 
@@ -52,8 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Register show AI panel command
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.showAIPanel', () => {
-      // Focus the AI view
-      vscode.commands.executeCommand('ritemark.aiView.focus');
+      vscode.commands.executeCommand('ritemark.unifiedView.focus');
     })
   );
 
@@ -78,7 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register markdown/CSV custom editor
   context.subscriptions.push(
-    RiteMarkEditorProvider.register(context, aiViewProvider)
+    RiteMarkEditorProvider.register(context, unifiedViewProvider)
   );
 
   // Register Excel viewer (read-only)
