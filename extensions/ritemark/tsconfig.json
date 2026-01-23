@@ -1,1 +1,1 @@
-{"compilerOptions":{"module":"commonjs","target":"ES2020","outDir":"out","lib":["ES2020","DOM"],"types":["node"],"sourceMap":true,"rootDir":"src","strict":true,"esModuleInterop":true,"skipLibCheck":true},"exclude":["node_modules","out","webview","media"]}
+{"compilerOptions":{"module":"commonjs","target":"ES2020","outDir":"out","lib":["ES2020","DOM"],"types":["node"],"sourceMap":true,"rootDir":"src","strict":true,"esModuleInterop":true,"skipLibCheck":true},"exclude":["node_modules","out","webview","media","src/**/*.test.ts"]}
