@@ -53,7 +53,7 @@ ritemark-native/
 │   │   ├── rag/                     # NEW
 │   │   │   ├── indexer.ts           # File watcher + indexing orchestrator
 │   │   │   ├── embeddings.ts        # OpenAI text-embedding-3-small calls
-│   │   │   ├── vectorStore.ts       # ChromaDB/SQLite-vec interface
+│   │   │   ├── vectorStore.ts       # sqlite-vec interface
 │   │   │   ├── search.ts            # Semantic search + reranking
 │   │   │   └── mcpServer.ts         # MCP server (stdio transport)
 │   │   └── views/
@@ -77,7 +77,7 @@ ritemark-native/
 |-----------|--------|-----------|
 | Document Parser | **Docling** (IBM, MIT license) | Handles PDF, DOCX, PPTX, XLSX, HTML, images. Table extraction, OCR, layout analysis. 15k+ GitHub stars. |
 | Embeddings | **OpenAI text-embedding-3-small** | 1536-dim, $0.02/1M tokens. Same API key. No local model download needed. |
-| Vector Store | **ChromaDB** (local) or **sqlite-vec** | Local-first, no cloud dependency. ChromaDB is proven with RAG. sqlite-vec is lighter (no Python). |
+| Vector Store | **sqlite-vec** (SQLite extension) | Pure C, SIMD-accelerated, works with better-sqlite3, no Python, single file DB. |
 | Chat LLM | **OpenAI gpt-4o-mini** (existing) | Already integrated, streaming works, tools defined. |
 | MCP Server | **FastMCP** (Python) | Official MCP SDK. Same process as Docling parser. |
 | Visual Retrieval | **ColPali** (V2, optional) | For image-heavy docs: embeds page screenshots directly. No OCR needed. |
@@ -111,7 +111,7 @@ File Change Detected (FileSystemWatcher)
           │
           ▼
 ┌─────────────────────┐
-│  Vector Store        │  ChromaDB (persistent, local) or sqlite-vec
+│  Vector Store        │  sqlite-vec (persistent, local SQLite file)
 │  (Local)             │  Collection per workspace
 └─────────────────────┘
 ```
@@ -123,7 +123,7 @@ Python (only for parsing):          TypeScript (extension, everything else):
 ┌────────────────────┐              ┌─────────────────────────────┐
 │ docling             │──JSON──→    │ chunking (simple splitter)   │
 │ fastmcp (MCP tools) │              │ embeddings (OpenAI HTTP)     │
-└────────────────────┘              │ vector store (ChromaDB/sqlite)│
+└────────────────────┘              │ vector store (sqlite-vec)      │
                                     │ chat (OpenAI streaming)      │
                                     │ sidebar UI (React)           │
                                     └─────────────────────────────┘
@@ -353,7 +353,7 @@ User Query (Unified Sidebar)
     ↓
 Context detection: RAG query? Text edit? Search?
     ↓
-[If RAG] → ChromaDB semantic search → Top-K chunks
+[If RAG] → sqlite-vec semantic search → Top-K chunks
     ↓
 System prompt + context + query → openAIClient.ts (gpt-4o-mini)
     ↓
@@ -369,14 +369,15 @@ Streaming response with [citations] or [Apply/Discard]
 
 ## 7. Implementation Strategy
 
-### Phase 1: Document Parser + Embeddings
+### Phase 1: Document Parser + Embeddings + Vector Store
 
-- Set up Python project: Docling only (no embedding models)
-- Implement parse endpoint: file path → structured JSON (text + metadata)
-- Add OpenAI embedding calls to extension (`src/rag/embeddings.ts`)
-- Implement text chunker in TypeScript (simple recursive splitter)
-- Set up ChromaDB or sqlite-vec for vector storage
-- End-to-end test: drop a PDF → get chunks → embed → store → search
+- Set up `rag-server/` Python project with `pyproject.toml` (Docling + FastMCP)
+- Implement Docling parser: file path → structured JSON (text + metadata)
+- Extension spawns parser via `uv run` (auto-installs deps on first run)
+- Implement text chunker in TypeScript (`src/rag/chunker.ts`)
+- Add OpenAI embedding calls (`src/rag/embeddings.ts`)
+- Set up **sqlite-vec** vector store (`src/rag/vectorStore.ts`) via better-sqlite3
+- End-to-end test: drop a PDF → parse → chunk → embed → store → search
 
 ### Phase 2: Unified Sidebar (Replace AI Assistant)
 
@@ -425,10 +426,9 @@ No embedding models, no ONNX, no sentence-transformers. Python only parses docum
 openai@^4.73.0        # Chat + embeddings (text-embedding-3-small)
 vscode (webview API)
 
-# New (if using ChromaDB from TypeScript):
-chromadb              # Vector store client
-# OR
-better-sqlite3        # If using sqlite-vec instead
+# New:
+better-sqlite3        # SQLite driver (native, fast)
+sqlite-vec            # Vector search extension for SQLite
 ```
 
 ### System Requirements
@@ -469,16 +469,11 @@ RiteMark RAG would be unique in combining:
 2. ~~**Embeddings**~~ → OpenAI `text-embedding-3-small` (same API key, no local models)
 3. ~~**Sidebar placement**~~ → Unified left sidebar, replaces current right-side AI assistant
 4. ~~**Embedding model size**~~ → Not applicable, using OpenAI API
+5. ~~**Vector store**~~ → **sqlite-vec** (pure C SQLite extension, works with better-sqlite3 in Node.js, no Python needed, local file, SIMD-accelerated)
+6. ~~**Python dependency management**~~ → **uv** (single Rust binary, auto-creates venv, installs deps on first `uv run`, isolated from system Python)
+7. ~~**Offline fallback**~~ → Cache parsed text + embeddings in SQLite. Queue un-embedded files, embed when online.
 
-### Still Open
-
-1. **Python dependency management** - Bundle Python? Use system Python? Use `uv` for isolated env?
-2. **First-run experience** - No large model downloads needed anymore (OpenAI API). But Docling still needs Python + its deps.
-3. **Chunk size strategy** - 512 tokens for search vs 1024 for chat context?
-4. **Image handling** - OCR via Docling, or ColPali for visual retrieval? ColPali needs GPU.
-5. **Auto-start MCP** - Should RiteMark auto-generate `.claude/settings.json` MCP config?
-6. **Vector store choice** - ChromaDB (Python, proven) vs sqlite-vec (TypeScript-native, lighter)?
-7. **Offline fallback** - OpenAI embeddings need network. Cache embeddings locally? What if offline during indexing?
+### All Questions Resolved - Ready for Implementation
 
 ---
 
