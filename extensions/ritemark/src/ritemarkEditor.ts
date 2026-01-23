@@ -8,6 +8,7 @@ import type { AIViewProvider } from './ai/AIViewProvider';
 import { exportToPDF } from './export/pdfExporter';
 import { exportToWord } from './export/wordExporter';
 import { DictationController } from './voiceDictation/controller';
+import { isEnabled } from './features';
 
 const execAsync = promisify(exec);
 
@@ -136,7 +137,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       content: parsed.content,
       properties: parsed.properties,
       hasProperties: parsed.hasProperties,
-      imageMappings
+      imageMappings,
+      features: {
+        voiceDictation: isEnabled('voice-dictation'),
+        markdownExport: isEnabled('markdown-export')
+      }
     };
   }
 
@@ -249,6 +254,12 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         }
 
+        // Gate all dictation messages with a single check
+        if (message.type.startsWith('dictation:') && !isEnabled('voice-dictation')) {
+          webview.postMessage({ type: 'dictation:error', error: 'Voice dictation is not available' });
+          return;
+        }
+
         switch (message.type) {
           case 'ready':
             // Webview is ready, send the document content
@@ -332,12 +343,10 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             return;
 
           case 'dictation:getModelStatus':
-            // Get model download status
             this.getModelStatus(webview);
             return;
 
           case 'dictation:removeModel':
-            // Remove downloaded model
             this.removeModel(webview);
             return;
           // ===== End Voice Dictation =====
