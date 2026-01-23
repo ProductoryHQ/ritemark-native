@@ -85,32 +85,19 @@ fi
 echo "  ✓ Certificate found in Keychain"
 
 # =============================================================================
-# Step 2: Create/verify entitlements
+# Step 2: Verify entitlements
 # =============================================================================
 echo ""
-echo "[2/7] Preparing entitlements..."
+echo "[2/7] Checking entitlements..."
 
-mkdir -p "$(dirname "$ENTITLEMENTS_PATH")"
-cat > "$ENTITLEMENTS_PATH" << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>com.apple.security.cs.allow-jit</key>
-    <true/>
-    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-    <true/>
-    <key>com.apple.security.cs.disable-library-validation</key>
-    <true/>
-    <key>com.apple.security.network.client</key>
-    <true/>
-    <key>com.apple.security.files.user-selected.read-write</key>
-    <true/>
-</dict>
-</plist>
-EOF
-echo "  ✓ Entitlements file ready"
-
+if [ ! -f "$ENTITLEMENTS_PATH" ]; then
+    echo -e "${RED}ERROR: Entitlements file not found at $ENTITLEMENTS_PATH${NC}"
+    echo "  Create branding/entitlements.plist with required entitlements."
+    exit 1
+fi
+echo "  ✓ Entitlements file found: $ENTITLEMENTS_PATH"
+echo "  Entitlements:"
+grep "<key>" "$ENTITLEMENTS_PATH" | sed 's/.*<key>/    - /; s/<\/key>//'
 # =============================================================================
 # Step 3: Clean up unnecessary files (webview node_modules, etc.)
 # =============================================================================

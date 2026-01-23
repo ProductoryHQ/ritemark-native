@@ -42,6 +42,21 @@ RiteMark supports TWO release types:
 
 **BEFORE discussing ANY release, you MUST perform this audit and report ALL findings.**
 
+### Step 0: Existing Releases Check (ALWAYS FIRST)
+
+**BEFORE anything else, check what is already released publicly:**
+
+```bash
+# Check existing releases on GitHub
+gh release list --repo jarmo-productory/ritemark-public --limit 10
+```
+
+Report the latest version and determine the NEXT valid version number:
+- If latest full release is `v1.0.2` → next full release is `v1.0.3`
+- If latest extension release is `v1.0.2-ext.1` → next extension release is `v1.0.2-ext.2` (or `v1.0.3-ext.1` if base version changes)
+
+**NEVER suggest a version that already exists.** Include the release list in your audit report.
+
 ### Step 1: Build State Verification
 
 Run these checks and report findings:
@@ -175,6 +190,11 @@ PRE-RELEASE AUDIT REPORT
 Target Version: X.Y.Z
 Audit Date: YYYY-MM-DD
 
+EXISTING RELEASES (from GitHub):
+  Latest full: [version] ([date])
+  Latest ext:  [version] ([date])
+  Next valid:  [version]
+
 BUILD STATE:
   App build date: [date]
   App version: [version]
@@ -185,6 +205,7 @@ BUILD STATE:
   DMG version matches app: [YES/NO]
 
 RED FLAGS:
+  [ ] Version already exists on GitHub (BLOCKER)
   [ ] DMG is adhoc-signed (BLOCKER)
   [ ] DMG older than current build (BLOCKER)
   [ ] Version mismatch (BLOCKER)

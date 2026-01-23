@@ -256,6 +256,10 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
         // Gate all dictation messages with a single check
         if (message.type.startsWith('dictation:') && !isEnabled('voice-dictation')) {
+          // Don't respond to stop/cancel with error - prevents infinite loop
+          if (message.type === 'dictation:stop') {
+            return;
+          }
           webview.postMessage({ type: 'dictation:error', error: 'Voice dictation is not available' });
           return;
         }
@@ -350,6 +354,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             this.removeModel(webview);
             return;
           // ===== End Voice Dictation =====
+
+          case 'system:openMicSettings':
+            // Open macOS System Settings → Privacy → Microphone
+            require('child_process').exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"');
+            return;
 
           case 'ai-configure-key':
             // Open settings to configure API key

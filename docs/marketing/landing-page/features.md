@@ -4,6 +4,23 @@ Features listed here should appear in the features grid.
 
 ## Current Features
 
+### Voice Dictation
+- **Icon:** Mic (from lucide-react)
+- **Title ET:** Haaledikteerimine
+- **Title EN:** Voice Dictation
+- **Description ET:** Dikteeri teksti otse redaktorisse. Tootab taielikult lokaalset - sinu haal ei lahku kunagi masinast. Eesti keel + 50 keelt.
+- **Description EN:** Dictate text directly into the editor. Runs entirely locally - your voice never leaves your machine. Estonian + 50 languages.
+- **Screenshot:** none (needs screenshot showing mic button active in toolbar with streaming text)
+- **Badge:** NEW
+
+### Copy as Markdown
+- **Icon:** Copy (from lucide-react)
+- **Title ET:** Kopeeri Markdownina
+- **Title EN:** Copy as Markdown
+- **Description ET:** Ekspordi dokument voi valik puhta markdowni tekstina. Ideaalne GitHubi, e-kirjade ja teiste tooriistate jaoks.
+- **Description EN:** Export document or selection as clean markdown text. Ideal for GitHub, email, and other tools.
+- **Screenshot:** none
+
 ### Data File Preview
 - **Icon:** Table2 (from lucide-react)
 - **Title ET:** Andmefailide eelvaade
@@ -38,4 +55,6 @@ Features listed here should appear in the features grid.
 
 ## Screenshot Needs
 
+- [ ] Voice Dictation - show mic button active in toolbar with streaming text appearing in editor
+- [ ] Copy as Markdown - show Export menu with "Copy as Markdown" option highlighted
 - [ ] Spreadsheet refresh feature - show refresh button with blue badge indicator

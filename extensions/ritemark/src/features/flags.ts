@@ -30,8 +30,8 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   'voice-dictation': {
     id: 'voice-dictation',
     label: 'Voice Dictation',
-    description: 'Speech-to-text using Whisper (experimental, macOS only)',
-    status: 'experimental',
+    description: 'Speech-to-text using Whisper (macOS only)',
+    status: 'stable',
     platforms: ['darwin'],
   },
   'markdown-export': {

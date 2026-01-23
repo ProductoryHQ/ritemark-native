@@ -3,6 +3,7 @@ import { Mic, Mic2, Loader2, AlertTriangle, ChevronDown } from 'lucide-react'
 import { useVoiceDictation, type DictationState } from '../hooks/useVoiceDictation'
 import { LanguagePickerModal, WHISPER_LANGUAGES } from './LanguagePickerModal'
 import { DictationSettingsModal } from './DictationSettingsModal'
+import { sendToExtension } from '../bridge'
 
 // Local storage keys
 const RECENT_LANGUAGES_KEY = 'ritemark-dictation-recent-languages'
@@ -62,6 +63,7 @@ export function VoiceDictationButton() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showFullPicker, setShowFullPicker] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showMicPermission, setShowMicPermission] = useState(false)
   const [recentLanguages, setRecentLanguages] = useState<string[]>(['et', 'en'])
   const [lastLanguage, setLastLanguage] = useState<string>('et')
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -71,6 +73,13 @@ export function VoiceDictationButton() {
     setRecentLanguages(getRecentLanguages())
     setLastLanguage(getLastLanguage())
   }, [])
+
+  // Show mic permission modal when mic access is denied
+  useEffect(() => {
+    if (error && error.includes('Microphone access denied')) {
+      setShowMicPermission(true)
+    }
+  }, [error])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -381,6 +390,135 @@ export function VoiceDictationButton() {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
       />
+
+      {/* Microphone permission modal */}
+      {showMicPermission && (
+        <>
+          <div className="mic-permission-backdrop" onClick={() => setShowMicPermission(false)}>
+            <div className="mic-permission-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="mic-permission-icon">
+                <Mic size={24} />
+              </div>
+              <h3 className="mic-permission-title">Microphone Access Required</h3>
+              <p className="mic-permission-text">
+                RiteMark needs microphone access for voice dictation.
+              </p>
+              <div className="mic-permission-steps">
+                <p><strong>To enable:</strong></p>
+                <p>System Settings → Privacy & Security → Microphone → Enable <strong>RiteMark</strong></p>
+              </div>
+              <div className="mic-permission-buttons">
+                <button
+                  className="mic-permission-btn-primary"
+                  onClick={() => {
+                    sendToExtension('system:openMicSettings', {})
+                    setShowMicPermission(false)
+                  }}
+                >
+                  Open System Settings
+                </button>
+                <button
+                  className="mic-permission-btn-secondary"
+                  onClick={() => setShowMicPermission(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+          <style>{`
+            .mic-permission-backdrop {
+              position: fixed;
+              inset: 0;
+              background: rgba(0, 0, 0, 0.4);
+              z-index: 9999;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              animation: modal-fade-in 150ms ease-out;
+            }
+            .mic-permission-modal {
+              width: 340px;
+              max-width: 90vw;
+              background: var(--vscode-editor-background);
+              border: 1px solid var(--vscode-panel-border);
+              border-radius: 12px;
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+              padding: 24px;
+              text-align: center;
+            }
+            .mic-permission-icon {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 48px;
+              height: 48px;
+              border-radius: 50%;
+              background: var(--vscode-toolbar-hoverBackground);
+              color: var(--vscode-foreground);
+              margin-bottom: 12px;
+            }
+            .mic-permission-title {
+              font-size: 16px;
+              font-weight: 600;
+              color: var(--vscode-foreground);
+              margin: 0 0 8px;
+            }
+            .mic-permission-text {
+              font-size: 13px;
+              color: var(--vscode-descriptionForeground);
+              margin: 0 0 16px;
+            }
+            .mic-permission-steps {
+              text-align: left;
+              background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.1));
+              border-radius: 8px;
+              padding: 12px 16px;
+              margin-bottom: 20px;
+              font-size: 13px;
+              color: var(--vscode-foreground);
+            }
+            .mic-permission-steps p {
+              margin: 0 0 4px;
+            }
+            .mic-permission-steps p:last-child {
+              margin: 0;
+            }
+            .mic-permission-buttons {
+              display: flex;
+              gap: 8px;
+              justify-content: center;
+            }
+            .mic-permission-btn-primary {
+              padding: 8px 16px;
+              border: none;
+              border-radius: 6px;
+              background: var(--vscode-button-background);
+              color: var(--vscode-button-foreground);
+              font-size: 13px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: opacity 0.15s ease;
+            }
+            .mic-permission-btn-primary:hover {
+              opacity: 0.9;
+            }
+            .mic-permission-btn-secondary {
+              padding: 8px 16px;
+              border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-widget-border));
+              border-radius: 6px;
+              background: transparent;
+              color: var(--vscode-foreground);
+              font-size: 13px;
+              cursor: pointer;
+              transition: background-color 0.15s ease;
+            }
+            .mic-permission-btn-secondary:hover {
+              background: var(--vscode-toolbar-hoverBackground);
+            }
+          `}</style>
+        </>
+      )}
     </div>
   )
 }
