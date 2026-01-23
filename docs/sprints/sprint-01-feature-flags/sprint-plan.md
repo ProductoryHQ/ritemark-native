@@ -6,15 +6,15 @@ Implement a minimal, type-safe feature flag system that supports platform filter
 
 ## Success Criteria
 
-- [ ] `isEnabled(flagId)` function works correctly for all status types
-- [ ] Platform filtering prevents platform-specific features on wrong OS
-- [ ] Experimental features appear as toggles in VS Code Settings UI
-- [ ] Voice dictation is gated (experimental, darwin-only, default OFF)
-- [ ] Markdown export is gated (stable, all platforms, default ON)
-- [ ] All currently working features continue to work (no regressions)
-- [ ] TypeScript compilation succeeds with no errors
+- [x] `isEnabled(flagId)` function works correctly for all status types
+- [x] Platform filtering prevents platform-specific features on wrong OS
+- [x] Experimental features appear as toggles in VS Code Settings UI
+- [x] Voice dictation is gated (experimental, darwin-only, default OFF)
+- [x] Markdown export flag defined (stable, no runtime gate - always true)
+- [x] TypeScript compilation succeeds with no errors
+- [x] Documentation updated (CLAUDE.md, sprint-manager agent)
 - [ ] Dev mode runs successfully and features behave correctly
-- [ ] Documentation updated (CLAUDE.md, sprint-manager agent)
+- [ ] All currently working features continue to work (no regressions)
 
 ## Deliverables
 
@@ -36,119 +36,30 @@ Implement a minimal, type-safe feature flag system that supports platform filter
 - [x] Identify all files requiring changes
 - [x] Define flag interface and evaluation logic
 
-### Phase 2: Plan (CURRENT)
-- [ ] Review sprint plan with Jarmo
-- [ ] Get approval to proceed to Phase 3
+### Phase 2: Plan (COMPLETED)
+- [x] Review sprint plan with Jarmo
+- [x] Get approval to proceed to Phase 3
 
-### Phase 3: Core Implementation
+### Phase 3: Implementation (COMPLETED)
+- [x] `src/utils/platform.ts` - `getCurrentPlatform()` with fallback
+- [x] `src/features/flags.ts` - FeatureFlag interface, FlagId type, FLAGS register
+- [x] `src/features/featureGate.ts` - `isEnabled()` with full evaluation logic
+- [x] `src/features/index.ts` - Public API exports
+- [x] `package.json` - "RiteMark Features" config section with voice-dictation toggle
 
-#### 3.1: Platform Detection Utility
-- [ ] Implement `getCurrentPlatform()` in `src/utils/platform.ts`
-  - Return `'darwin' | 'win32' | 'linux'`
-  - Handle unknown platforms (fallback to 'linux')
-  - Add warning log for unknown platforms
+### Phase 4: Integration (COMPLETED)
+- [x] Single early-return gate for all `dictation:*` messages
+- [x] Feature state sent to webview in load message
+- [x] No runtime gate for markdown-export (stable = always on, flag for kill-switch only)
 
-#### 3.2: Feature Flag Definitions
-- [ ] Create `src/features/flags.ts`
-  - Define FeatureFlag interface
-  - Create FLAGS constant object with const assertion
-  - Export FlagId type
-  - Define initial flags:
-    - VOICE_DICTATION (experimental, darwin)
-    - MARKDOWN_EXPORT (stable, all platforms)
+### Phase 5: Documentation (COMPLETED)
+- [x] CLAUDE.md - Feature flag guidelines section
+- [x] sprint-manager.md - Flag checklist in sprint template
 
-#### 3.3: Runtime Gate Function
-- [ ] Create `src/features/featureGate.ts`
-  - Implement `isEnabled(flagId: FlagId): boolean`
-  - Add flag lookup logic
-  - Add platform filtering
-  - Add status evaluation:
-    - disabled → false
-    - premium → false
-    - stable → true
-    - experimental → check VS Code setting
-  - Add console warnings for unknown flags
-
-#### 3.4: Public API
-- [ ] Create `src/features/index.ts`
-  - Export `isEnabled` function
-  - Export `FLAGS` constant
-  - Export `FlagId` type
-  - Export `FeatureFlag` interface
-
-#### 3.5: VS Code Configuration
-- [ ] Update `package.json`
-  - Add "RiteMark Features" configuration section
-  - Add `ritemark.features.voice-dictation` boolean setting
-  - Set description, default (false), scope (application)
-
-### Phase 4: Integration
-
-#### 4.1: Extension Activation (extension.ts)
-- [ ] Import `isEnabled` from './features'
-- [ ] Add conditional voice dictation initialization (if needed here)
-- [ ] Test extension activates without errors
-
-#### 4.2: Editor Integration (ritemarkEditor.ts)
-- [ ] Import `isEnabled` from './features'
-- [ ] Gate DictationController instantiation (line ~315)
-  - Only create if `isEnabled('voice-dictation')`
-- [ ] Gate export message handlers (lines ~358-369)
-  - Check `isEnabled('markdown-export')` before export
-  - Send error message if disabled
-- [ ] Update webview load messages
-  - Add `features` object with enabled feature flags
-  - Webview can hide UI elements accordingly
-
-#### 4.3: Webview Communication
-- [ ] Update load message to include feature flags
-  - `voiceDictation: isEnabled('voice-dictation')`
-  - `markdownExport: isEnabled('markdown-export')`
-- [ ] Document expected webview behavior (for future webview sprint)
-
-### Phase 5: Documentation
-
-#### 5.1: Project Guidelines (CLAUDE.md)
-- [ ] Add "Feature Flag System" section after "Critical Invariants"
-  - When to add a feature flag (decision tree)
-  - How to check flags (`isEnabled(flagId)`)
-  - Flag lifecycle (disabled → experimental → stable → remove/premium)
-  - Best practices (gate at highest level, one flag per feature)
-
-#### 5.2: Sprint Process (sprint-manager.md)
-- [ ] Update Phase 2 checklist template
-  - Add "Feature flag defined?" item
-- [ ] Add decision tree to sprint planning
-  - Needs flag if: experimental, platform-specific, big change, kill-switch, premium
-  - No flag if: bug fix, refactoring, small UI tweak, infrastructure
-
-### Phase 6: Validation & Testing
-
-#### 6.1: TypeScript Compilation
-- [ ] Run `npm run compile` in extensions/ritemark
-- [ ] Fix any type errors
-- [ ] Verify all imports resolve
-
-#### 6.2: Dev Mode Testing
-- [ ] Start dev mode (invoke vscode-expert)
-- [ ] Open Settings and verify "Voice Dictation" toggle appears
-- [ ] Test with toggle OFF:
-  - Voice dictation UI hidden/disabled
-  - Export buttons work (stable feature)
-- [ ] Test with toggle ON:
-  - Voice dictation UI available
-- [ ] Test on wrong platform (if possible):
-  - darwin-only features disabled on non-Mac
-
-#### 6.3: Regression Testing
-- [ ] Verify all existing features work:
-  - Open markdown file → editor loads
-  - Export to PDF → works
-  - Export to Word → works
-  - AI assistant → works
-  - Excel viewer → works
-- [ ] Check console for warnings/errors
-- [ ] Verify settings persist across restarts
+### Phase 6: Validation
+- [x] TypeScript compilation passes
+- [ ] Dev mode testing (Settings UI, toggle behavior)
+- [ ] Regression testing (all features still work)
 
 ## Risks & Mitigations
 

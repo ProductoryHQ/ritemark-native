@@ -254,6 +254,12 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         }
 
+        // Gate all dictation messages with a single check
+        if (message.type.startsWith('dictation:') && !isEnabled('voice-dictation')) {
+          webview.postMessage({ type: 'dictation:error', error: 'Voice dictation is not available' });
+          return;
+        }
+
         switch (message.type) {
           case 'ready':
             // Webview is ready, send the document content
@@ -310,27 +316,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           // ===== Voice Dictation Handlers =====
           case 'dictation:prepare':
-            // Check feature flag before handling
-            if (!isEnabled('voice-dictation')) {
-              webview.postMessage({
-                type: 'dictation:error',
-                error: 'Voice dictation is not available on this platform or is disabled'
-              });
-              return;
-            }
             // Check if model is downloaded, show download dialog if not
             this.handlePrepareDictation(webview, message.language as string);
             return;
 
           case 'dictation:start':
-            // Check feature flag before starting
-            if (!isEnabled('voice-dictation')) {
-              webview.postMessage({
-                type: 'dictation:error',
-                error: 'Voice dictation is not available'
-              });
-              return;
-            }
             // Start voice dictation
             if (!this.dictationController) {
               this.dictationController = new DictationController(webview, this.context);
@@ -340,42 +330,23 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'dictation:audioChunk':
             // Handle incoming audio chunk (base64 WAV)
-            if (this.dictationController && isEnabled('voice-dictation')) {
+            if (this.dictationController) {
               this.dictationController.handleAudioChunk(message.audio as string);
             }
             return;
 
           case 'dictation:stop':
             // Stop voice dictation and get transcription
-            if (this.dictationController && isEnabled('voice-dictation')) {
+            if (this.dictationController) {
               this.dictationController.stopDictation();
             }
             return;
 
           case 'dictation:getModelStatus':
-            // Get model download status
-            if (!isEnabled('voice-dictation')) {
-              webview.postMessage({
-                type: 'dictation:modelStatus',
-                status: {
-                  downloaded: false,
-                  sizeBytes: 0,
-                  path: '',
-                  modelName: 'unavailable',
-                  modelSizeDisplay: '',
-                  isDictationActive: false
-                }
-              });
-              return;
-            }
             this.getModelStatus(webview);
             return;
 
           case 'dictation:removeModel':
-            // Remove downloaded model
-            if (!isEnabled('voice-dictation')) {
-              return;
-            }
             this.removeModel(webview);
             return;
           // ===== End Voice Dictation =====
@@ -394,11 +365,6 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             return;
 
           case 'exportPDF':
-            // Check feature flag before exporting
-            if (!isEnabled('markdown-export')) {
-              vscode.window.showErrorMessage('Export feature is not available');
-              return;
-            }
             // Export document to PDF
             exportToPDF(
               message.content as string,
@@ -408,11 +374,6 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             return;
 
           case 'exportWord':
-            // Check feature flag before exporting
-            if (!isEnabled('markdown-export')) {
-              vscode.window.showErrorMessage('Export feature is not available');
-              return;
-            }
             // Export document to Word
             exportToWord(
               message.markdown as string,
