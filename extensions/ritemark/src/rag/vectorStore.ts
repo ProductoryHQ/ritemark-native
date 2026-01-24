@@ -58,10 +58,9 @@ export class VectorStore {
 			CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(file_hash);
 		`);
 
-		// Create virtual table for vector search
+		// Create virtual table for vector search (rowid maps to chunks.id)
 		this.db.exec(`
 			CREATE VIRTUAL TABLE IF NOT EXISTS chunk_embeddings USING vec0(
-				chunk_id INTEGER PRIMARY KEY,
 				embedding float[${this.dimensions}]
 			);
 		`);
@@ -87,7 +86,7 @@ export class VectorStore {
 		`);
 
 		const insertEmbedding = this.db.prepare(`
-			INSERT INTO chunk_embeddings (chunk_id, embedding)
+			INSERT INTO chunk_embeddings (rowid, embedding)
 			VALUES (?, ?)
 		`);
 
@@ -100,10 +99,10 @@ export class VectorStore {
 			metadata.fileHash ?? null
 		);
 
-		const chunkId = result.lastInsertRowid as number;
+		const chunkId = BigInt(result.lastInsertRowid);
 		insertEmbedding.run(chunkId, embeddingToBuffer(embedding));
 
-		return chunkId;
+		return Number(chunkId);
 	}
 
 	/**
@@ -128,7 +127,7 @@ export class VectorStore {
 		`);
 
 		const insertEmbedding = this.db.prepare(`
-			INSERT INTO chunk_embeddings (chunk_id, embedding)
+			INSERT INTO chunk_embeddings (rowid, embedding)
 			VALUES (?, ?)
 		`);
 
@@ -142,9 +141,9 @@ export class VectorStore {
 					chunk.chunkIndex,
 					chunk.fileHash ?? null
 				);
-				const chunkId = result.lastInsertRowid as number;
+				const chunkId = BigInt(result.lastInsertRowid);
 				insertEmbedding.run(chunkId, embeddingToBuffer(chunk.embedding));
-				ids.push(chunkId);
+				ids.push(Number(chunkId));
 			}
 		});
 
@@ -163,7 +162,7 @@ export class VectorStore {
 			query = `
 				SELECT c.content, c.source, c.page, c.section, ce.distance
 				FROM chunk_embeddings ce
-				JOIN chunks c ON c.id = ce.chunk_id
+				JOIN chunks c ON c.id = ce.rowid
 				WHERE ce.embedding MATCH ?
 				AND c.source LIKE ?
 				ORDER BY ce.distance
@@ -174,7 +173,7 @@ export class VectorStore {
 			query = `
 				SELECT c.content, c.source, c.page, c.section, ce.distance
 				FROM chunk_embeddings ce
-				JOIN chunks c ON c.id = ce.chunk_id
+				JOIN chunks c ON c.id = ce.rowid
 				WHERE ce.embedding MATCH ?
 				ORDER BY ce.distance
 				LIMIT ?
@@ -214,7 +213,7 @@ export class VectorStore {
 		const chunkIds = chunks.map(c => c.id);
 		const placeholders = chunkIds.map(() => '?').join(',');
 
-		this.db.prepare(`DELETE FROM chunk_embeddings WHERE chunk_id IN (${placeholders})`).run(...chunkIds);
+		this.db.prepare(`DELETE FROM chunk_embeddings WHERE rowid IN (${placeholders})`).run(...chunkIds);
 		const result = this.db.prepare('DELETE FROM chunks WHERE source = ?').run(source);
 
 		return result.changes;

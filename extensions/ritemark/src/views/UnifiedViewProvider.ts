@@ -100,6 +100,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           vscode.commands.executeCommand('ritemark.reindexDocuments');
           break;
 
+        case 'cancelIndex':
+          vscode.commands.executeCommand('ritemark.cancelIndexing');
+          break;
+
         case 'open-source':
           // Open source document at specific location
           this._openSourceDocument(message.filePath, message.page);
@@ -131,6 +135,26 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Update index status in the UI (called by indexer when docs change)
    */
   public updateIndexStatus() {
+    this._sendIndexStatus();
+  }
+
+  /**
+   * Send indexing progress to webview (called during indexing)
+   */
+  public sendIndexProgress(processed: number, total: number, current: string) {
+    this._view?.webview.postMessage({
+      type: 'index-progress',
+      processed,
+      total,
+      current,
+    });
+  }
+
+  /**
+   * Signal indexing completed to webview
+   */
+  public sendIndexDone() {
+    this._view?.webview.postMessage({ type: 'index-done' });
     this._sendIndexStatus();
   }
 
@@ -314,16 +338,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       flex-direction: column;
       padding: 0 !important;
     }
-    .header {
-      padding: 12px;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      position: sticky;
-      top: 0;
-      background: var(--vscode-sideBar-background);
-      z-index: 10;
-    }
-    .header h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
-    .header p { font-size: 11px; color: var(--vscode-descriptionForeground); }
     .no-key {
       flex: 1;
       display: flex;
@@ -531,10 +545,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   </style>
 </head>
 <body style="padding: 0 !important;">
-  <div class="header">
-    <h2>RiteMark AI</h2>
-    <p id="subtitle">Search docs & edit text</p>
-  </div>
 
   <div id="no-key" class="no-key" style="display: none;">
     <h3>OpenAI API Key Required</h3>
@@ -584,6 +594,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   <div id="index-footer" class="index-footer">
     <span id="index-stats">No documents indexed</span>
     <button id="reindex-btn">Re-index</button>
+    <button id="cancel-index-btn" style="display:none; color: var(--vscode-errorForeground);">Cancel</button>
   </div>
 
   <script nonce="${nonce}">
@@ -597,6 +608,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     let currentSelection = { text: '', isEmpty: true, from: 0, to: 0 };
     let streamingContent = '';
     let indexStatus = { totalDocs: 0, totalChunks: 0 };
+    let indexingInProgress = false;
     let activeWidget = null;
     let ragResults = [];
 
@@ -609,7 +621,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const stopBtn = document.getElementById('stop-btn');
     const selectionInfo = document.getElementById('selection-info');
     const selectionText = document.getElementById('selection-text');
-    const subtitle = document.getElementById('subtitle');
     const indexStats = document.getElementById('index-stats');
 
     function render() {
@@ -617,19 +628,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         noKeyEl.style.display = 'flex';
         offlineBanner.style.display = 'none';
         chatContainer.style.display = 'none';
-        subtitle.textContent = 'API key required';
       } else if (!online) {
         noKeyEl.style.display = 'none';
         offlineBanner.style.display = 'block';
         chatContainer.style.display = 'flex';
-        subtitle.textContent = 'Offline';
         inputEl.disabled = true;
         sendBtn.disabled = true;
       } else {
         noKeyEl.style.display = 'none';
         offlineBanner.style.display = 'none';
         chatContainer.style.display = 'flex';
-        subtitle.textContent = 'Search docs & edit text';
         inputEl.disabled = false;
         sendBtn.disabled = false;
       }
@@ -643,11 +651,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         selectionInfo.style.display = 'none';
       }
 
-      // Index status
-      if (indexStatus.totalDocs > 0) {
-        indexStats.textContent = indexStatus.totalDocs + ' docs | ' + indexStatus.totalChunks + ' chunks';
+      // Index status and buttons
+      const reindexBtn = document.getElementById('reindex-btn');
+      const cancelBtn = document.getElementById('cancel-index-btn');
+      if (indexingInProgress) {
+        reindexBtn.style.display = 'none';
+        cancelBtn.style.display = 'inline';
       } else {
-        indexStats.textContent = 'No documents indexed';
+        reindexBtn.style.display = 'inline';
+        cancelBtn.style.display = 'none';
+        if (indexStatus.totalDocs > 0) {
+          indexStats.textContent = indexStatus.totalDocs + ' docs | ' + indexStatus.totalChunks + ' chunks';
+        } else {
+          indexStats.textContent = 'No documents indexed';
+        }
       }
 
       // Messages
@@ -767,6 +784,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     document.getElementById('reindex-btn').addEventListener('click', () => {
       vscode.postMessage({ type: 'reindex' });
     });
+    document.getElementById('cancel-index-btn').addEventListener('click', () => {
+      vscode.postMessage({ type: 'cancelIndex' });
+    });
 
     // Handle clicks on citations and widget actions
     messagesEl.addEventListener('click', (e) => {
@@ -875,6 +895,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'index-status':
           indexStatus = { totalDocs: message.totalDocs, totalChunks: message.totalChunks };
+          indexingInProgress = false;
+          render();
+          break;
+
+        case 'index-progress':
+          indexingInProgress = true;
+          indexStats.textContent = 'Indexing ' + message.processed + '/' + message.total + ': ' + message.current;
+          render();
+          break;
+
+        case 'index-done':
+          indexingInProgress = false;
           render();
           break;
       }

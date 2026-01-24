@@ -1,7 +1,7 @@
 # Sprint 24: Multi-Modal RAG + MCP Integration
 
-**Status:** Phase 3 Complete (Implementation)
-**Branch:** `claude/ritemark-multimodal-rag-Kq8lp`
+**Status:** Phase 4 In Progress (Integration & Testing)
+**Branch:** `claude/ritemark-multimodal-rag-Kq8lp` (rebased onto main v1.0.3)
 
 ---
 
@@ -157,7 +157,7 @@ docling>=2.0        # Document parsing
 fastmcp>=2.0        # MCP server
 ```
 
-### Node.js (needed, not yet in package.json)
+### Node.js
 ```
 better-sqlite3      # SQLite driver
 sqlite-vec          # Vector search extension
@@ -165,16 +165,27 @@ sqlite-vec          # Vector search extension
 
 ---
 
-## Phase 4 (Future / Polish)
+## Phase 4: Integration & Polish (rebased onto main v1.0.3)
 
-- [ ] Add `better-sqlite3` + `sqlite-vec` to extension package.json dependencies
+### Completed
+- [x] Rebase onto main (v1.0.3 with voice dictation + feature flags)
+- [x] Add `better-sqlite3` + `sqlite-vec` to extension package.json
+- [x] Add `@types/better-sqlite3` to devDependencies
+- [x] Update package.json: commands, views, activation events for unified sidebar
+- [x] Fix `getKey()` → `getAPIKey()` in embeddings.ts (API changed on main)
+
+### Remaining Tasks
+- [ ] Install `uv` and test document parsing (Python MCP server)
+- [ ] Test full RAG pipeline: index → embed → search → chat
+- [ ] Verify unified sidebar renders correctly in dev mode
+- [ ] Test MCP config generation for Claude Code
 - [ ] Batch embedding progress indicator in sidebar
 - [ ] Incremental indexing (hash-based skip - logic exists but untested)
+- [ ] Error handling for missing `uv` binary
+- [ ] First-run UX: prompt to install uv if not found
 - [ ] ColPali visual retrieval for image-heavy documents (GPU optional)
 - [ ] Cross-workspace search
 - [ ] Export search results to markdown note
-- [ ] Error handling for missing `uv` binary
-- [ ] First-run UX: prompt to install uv if not found
 
 ---
 
