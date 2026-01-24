@@ -20,7 +20,7 @@ export interface EmbeddingResult {
  */
 async function getClient(): Promise<OpenAI> {
 	const keyManager = getAPIKeyManager();
-	const apiKey = await keyManager.getKey();
+	const apiKey = await keyManager.getAPIKey();
 
 	if (!apiKey) {
 		throw new Error('OpenAI API key not configured. Use "RiteMark: Configure API Key" command.');

@@ -15,7 +15,7 @@ import { embedTexts } from './embeddings';
 import { VectorStore, getDefaultDbPath } from './vectorStore';
 
 /** Supported file extensions for indexing */
-const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.xlsx', '.html', '.htm', '.png', '.jpg', '.jpeg'];
+const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.xlsx', '.html', '.htm', '.md', '.markdown', '.png', '.jpg', '.jpeg'];
 
 /** Parsed document structure from Python parser */
 interface ParsedDocument {
@@ -60,6 +60,7 @@ export class DocumentIndexer {
 	private ragServerPath: string;
 	private watcher: vscode.FileSystemWatcher | null = null;
 	private indexing = false;
+	private cancelRequested = false;
 
 	private _onProgress = new vscode.EventEmitter<IndexProgress>();
 	public readonly onProgress = this._onProgress.event;
@@ -104,6 +105,16 @@ export class DocumentIndexer {
 	}
 
 	/**
+	 * Cancel indexing in progress.
+	 */
+	cancelIndexing(): void {
+		if (this.indexing) {
+			this.cancelRequested = true;
+			console.log('[RAG] Cancellation requested');
+		}
+	}
+
+	/**
 	 * Index all supported files in the workspace.
 	 */
 	async indexAll(): Promise<IndexProgress> {
@@ -112,7 +123,11 @@ export class DocumentIndexer {
 		}
 
 		this.indexing = true;
+		this.cancelRequested = false;
 		const files = this.findSupportedFiles();
+		console.log(`[RAG] Found ${files.length} files to index`);
+		files.forEach(f => console.log(`[RAG]   - ${path.relative(this.workspacePath, f)}`));
+
 		const progress: IndexProgress = {
 			total: files.length,
 			processed: 0,
@@ -122,19 +137,28 @@ export class DocumentIndexer {
 
 		try {
 			for (const file of files) {
+				if (this.cancelRequested) {
+					console.log(`[RAG] Indexing cancelled at ${progress.processed}/${progress.total}`);
+					break;
+				}
+
 				progress.current = path.basename(file);
 				this._onProgress.fire({ ...progress });
 
 				try {
 					const hash = this.getFileHash(file);
 					if (this.store.isFileIndexed(hash)) {
+						console.log(`[RAG] Skip (cached): ${path.basename(file)}`);
 						progress.processed++;
 						continue;
 					}
 
+					console.log(`[RAG] Indexing: ${path.relative(this.workspacePath, file)}`);
 					await this.indexFile(file);
+					console.log(`[RAG] Done: ${path.basename(file)}`);
 				} catch (err) {
 					const msg = err instanceof Error ? err.message : String(err);
+					console.log(`[RAG] Error: ${path.basename(file)} - ${msg}`);
 					progress.errors.push(`${path.basename(file)}: ${msg}`);
 				}
 
@@ -143,6 +167,7 @@ export class DocumentIndexer {
 			}
 		} finally {
 			this.indexing = false;
+			this.cancelRequested = false;
 			progress.current = '';
 			this._onProgress.fire({ ...progress });
 		}
@@ -159,8 +184,21 @@ export class DocumentIndexer {
 			return;
 		}
 
-		// Parse document via Python/Docling
-		const parsed = await this.parseDocument(filePath);
+		// Parse document - markdown directly, binary via Python/Docling
+		let parsed: ParsedDocument;
+		if (ext === '.md' || ext === '.markdown') {
+			const content = fs.readFileSync(filePath, 'utf-8');
+			parsed = {
+				source: filePath,
+				format: 'markdown',
+				full_text: content,
+				sections: [],
+				tables: [],
+				metadata: { title: path.basename(filePath, ext), page_count: 1 },
+			};
+		} else {
+			parsed = await this.parseDocument(filePath);
+		}
 
 		// Chunk the text
 		let chunks: TextChunk[];
