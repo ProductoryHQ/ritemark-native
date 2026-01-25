@@ -39,15 +39,8 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Auto-show unified panel on startup
-  setTimeout(async () => {
-    try {
-      await vscode.commands.executeCommand('workbench.view.extension.ritemark-ai');
-    } catch (e) {
-      console.log('Failed to open unified view:', e);
-      await vscode.commands.executeCommand('ritemark.unifiedView.focus');
-    }
-  }, 1500);
+  // AI panel opens via activity bar click, not auto-shown on startup
+  // User requested Explorer (folder view) to be default
 
   // Auto-open terminal in right sidebar (auxiliary bar) on startup
   setTimeout(async () => {
@@ -78,6 +71,20 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.openSearch', () => {
       vscode.commands.executeCommand('workbench.view.search');
+    })
+  );
+
+  // Register new chat command (clears conversation)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.newChat', () => {
+      unifiedViewProvider.clearChat();
+    })
+  );
+
+  // Register AI settings command (opens API key configuration)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.aiSettings', () => {
+      vscode.commands.executeCommand('ritemark.configureApiKey');
     })
   );
 
@@ -113,6 +120,7 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
         documentIndexer = new DocumentIndexer({ workspacePath: wp });
+        await documentIndexer.init();
         documentIndexer.onProgress((p) => {
           unifiedViewProvider.sendIndexProgress(p.processed, p.total, p.current);
         });
@@ -125,8 +133,9 @@ export function activate(context: vscode.ExtensionContext) {
             `Indexed ${result.processed} docs with ${result.errors.length} errors`
           );
         } else {
+          const stats = await documentIndexer!.getStats();
           vscode.window.showInformationMessage(
-            `Indexed ${result.processed} documents (${documentIndexer!.getStats().totalChunks} chunks)`
+            `Indexed ${result.processed} documents (${stats.totalChunks} chunks)`
           );
         }
       } catch (err) {
@@ -163,6 +172,11 @@ export function activate(context: vscode.ExtensionContext) {
   if (workspacePath) {
     documentIndexer = new DocumentIndexer({ workspacePath });
     mcpServer = new MCPServerManager({ workspacePath });
+
+    // Initialize vector store asynchronously
+    documentIndexer.init().catch(() => {
+      // Vector store init failed - RAG features won't work
+    });
 
     // Send progress to sidebar during indexing
     documentIndexer.onProgress((p) => {

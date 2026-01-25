@@ -1,21 +1,58 @@
 /**
- * Vector store using sqlite-vec for local semantic search.
- * Uses better-sqlite3 as the SQLite driver with sqlite-vec extension.
+ * Vector store using Orama for local semantic search.
+ * Pure TypeScript, zero native dependencies.
  */
 
 import * as path from 'path';
-import Database from 'better-sqlite3';
-import * as sqliteVec from 'sqlite-vec';
-import { getEmbeddingDimensions, embeddingToBuffer, bufferToEmbedding } from './embeddings';
+import * as fs from 'fs';
+import {
+	create,
+	insert,
+	remove,
+	search,
+	count,
+	save,
+	load,
+} from '@orama/orama';
+import type { Orama, Results } from '@orama/orama';
+import { getEmbeddingDimensions } from './embeddings';
+
+// Schema definition for Orama
+const SCHEMA = {
+	id: 'string',
+	content: 'string',
+	source: 'string',
+	page: 'number',
+	section: 'string',
+	chunkIndex: 'number',
+	fileHash: 'string',
+	createdAt: 'string',
+	embedding: 'vector[1536]', // OpenAI text-embedding-3-small dimensions
+} as const;
+
+type OramaDB = Orama<typeof SCHEMA>;
+
+// Document type matching schema
+interface ChunkDocument {
+	id: string;
+	content: string;
+	source: string;
+	page: number;
+	section: string;
+	chunkIndex: number;
+	fileHash: string;
+	createdAt: string;
+	embedding: number[];
+}
 
 export interface StoredChunk {
-	id: number;
+	id: string;
 	content: string;
 	source: string;
 	page: number | null;
 	section: string | null;
 	chunkIndex: number;
-	embedding: Float32Array;
+	embedding: number[];
 	createdAt: string;
 }
 
@@ -28,213 +65,271 @@ export interface SearchResult {
 }
 
 export class VectorStore {
-	private db: Database.Database;
+	private db: OramaDB | null = null;
+	private dbPath: string;
 	private dimensions: number;
+	private idCounter: number = 0;
+	private dirty: boolean = false;
 
 	constructor(dbPath: string) {
 		this.dimensions = getEmbeddingDimensions();
-		this.db = new Database(dbPath);
-
-		// Load sqlite-vec extension
-		sqliteVec.load(this.db);
-
-		this.initSchema();
+		this.dbPath = dbPath;
 	}
 
-	private initSchema(): void {
-		this.db.exec(`
-			CREATE TABLE IF NOT EXISTS chunks (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				content TEXT NOT NULL,
-				source TEXT NOT NULL,
-				page INTEGER,
-				section TEXT,
-				chunk_index INTEGER NOT NULL,
-				file_hash TEXT,
-				created_at TEXT DEFAULT (datetime('now'))
-			);
+	/**
+	 * Initialize the database (async - must be called before use).
+	 */
+	async init(): Promise<void> {
+		// Ensure directory exists
+		const dir = path.dirname(this.dbPath);
+		if (!fs.existsSync(dir)) {
+			fs.mkdirSync(dir, { recursive: true });
+		}
 
-			CREATE INDEX IF NOT EXISTS idx_chunks_source ON chunks(source);
-			CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(file_hash);
-		`);
+		// Try to load existing index
+		if (fs.existsSync(this.dbPath)) {
+			try {
+				const data = fs.readFileSync(this.dbPath, 'utf-8');
+				const snapshot = JSON.parse(data);
+				this.db = await create({ schema: SCHEMA });
+				await load(this.db, snapshot);
 
-		// Create virtual table for vector search (rowid maps to chunks.id)
-		this.db.exec(`
-			CREATE VIRTUAL TABLE IF NOT EXISTS chunk_embeddings USING vec0(
-				embedding float[${this.dimensions}]
-			);
-		`);
+				await count(this.db); // Verify loaded successfully
+			} catch (err) {
+				console.warn('[VectorStore] Failed to load existing index, creating new:', err);
+				await this.createNewDb();
+			}
+		} else {
+			await this.createNewDb();
+		}
+	}
+
+	private async createNewDb(): Promise<void> {
+		this.db = await create({
+			schema: SCHEMA,
+		});
+	}
+
+	private ensureInit(): OramaDB {
+		if (!this.db) {
+			throw new Error('VectorStore not initialized. Call init() first.');
+		}
+		return this.db;
+	}
+
+	private generateId(): string {
+		return `chunk_${Date.now()}_${++this.idCounter}`;
 	}
 
 	/**
 	 * Insert a chunk with its embedding into the store.
 	 */
-	insertChunk(
+	async insertChunk(
 		content: string,
 		source: string,
-		embedding: Float32Array,
+		embedding: Float32Array | number[],
 		metadata: {
 			page?: number | null;
 			section?: string | null;
 			chunkIndex: number;
 			fileHash?: string;
 		}
-	): number {
-		const insertChunk = this.db.prepare(`
-			INSERT INTO chunks (content, source, page, section, chunk_index, file_hash)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`);
+	): Promise<string> {
+		const db = this.ensureInit();
+		const id = this.generateId();
 
-		const insertEmbedding = this.db.prepare(`
-			INSERT INTO chunk_embeddings (rowid, embedding)
-			VALUES (?, ?)
-		`);
-
-		const result = insertChunk.run(
+		await insert(db, {
+			id,
 			content,
 			source,
-			metadata.page ?? null,
-			metadata.section ?? null,
-			metadata.chunkIndex,
-			metadata.fileHash ?? null
-		);
+			page: metadata.page ?? 0,
+			section: metadata.section ?? '',
+			chunkIndex: metadata.chunkIndex,
+			fileHash: metadata.fileHash ?? '',
+			createdAt: new Date().toISOString(),
+			embedding: Array.from(embedding),
+		});
 
-		const chunkId = BigInt(result.lastInsertRowid);
-		insertEmbedding.run(chunkId, embeddingToBuffer(embedding));
-
-		return Number(chunkId);
+		this.dirty = true;
+		return id;
 	}
 
 	/**
-	 * Insert multiple chunks in a transaction (much faster).
+	 * Insert multiple chunks (faster than individual inserts).
 	 */
-	insertChunks(
+	async insertChunks(
 		chunks: Array<{
 			content: string;
 			source: string;
-			embedding: Float32Array;
+			embedding: Float32Array | number[];
 			page?: number | null;
 			section?: string | null;
 			chunkIndex: number;
 			fileHash?: string;
 		}>
-	): number[] {
-		const ids: number[] = [];
+	): Promise<string[]> {
+		const db = this.ensureInit();
+		const ids: string[] = [];
 
-		const insertChunk = this.db.prepare(`
-			INSERT INTO chunks (content, source, page, section, chunk_index, file_hash)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`);
+		for (const chunk of chunks) {
+			const id = this.generateId();
+			await insert(db, {
+				id,
+				content: chunk.content,
+				source: chunk.source,
+				page: chunk.page ?? 0,
+				section: chunk.section ?? '',
+				chunkIndex: chunk.chunkIndex,
+				fileHash: chunk.fileHash ?? '',
+				createdAt: new Date().toISOString(),
+				embedding: Array.from(chunk.embedding),
+			});
+			ids.push(id);
+		}
 
-		const insertEmbedding = this.db.prepare(`
-			INSERT INTO chunk_embeddings (rowid, embedding)
-			VALUES (?, ?)
-		`);
-
-		const transaction = this.db.transaction(() => {
-			for (const chunk of chunks) {
-				const result = insertChunk.run(
-					chunk.content,
-					chunk.source,
-					chunk.page ?? null,
-					chunk.section ?? null,
-					chunk.chunkIndex,
-					chunk.fileHash ?? null
-				);
-				const chunkId = BigInt(result.lastInsertRowid);
-				insertEmbedding.run(chunkId, embeddingToBuffer(chunk.embedding));
-				ids.push(Number(chunkId));
-			}
-		});
-
-		transaction();
+		this.dirty = true;
 		return ids;
 	}
 
 	/**
-	 * Semantic search: find top-K most similar chunks to query embedding.
+	 * Vector similarity search.
 	 */
-	search(queryEmbedding: Float32Array, topK: number = 5, sourceFilter?: string): SearchResult[] {
-		let query: string;
-		let params: any[];
+	async search(
+		queryEmbedding: Float32Array | number[],
+		topK: number = 5,
+		_sourceFilter?: string,
+		_queryText?: string
+	): Promise<SearchResult[]> {
+		const db = this.ensureInit();
 
-		if (sourceFilter) {
-			query = `
-				SELECT c.content, c.source, c.page, c.section, ce.distance
-				FROM chunk_embeddings ce
-				JOIN chunks c ON c.id = ce.rowid
-				WHERE ce.embedding MATCH ?
-				AND c.source LIKE ?
-				ORDER BY ce.distance
-				LIMIT ?
-			`;
-			params = [embeddingToBuffer(queryEmbedding), `%${sourceFilter}%`, topK];
-		} else {
-			query = `
-				SELECT c.content, c.source, c.page, c.section, ce.distance
-				FROM chunk_embeddings ce
-				JOIN chunks c ON c.id = ce.rowid
-				WHERE ce.embedding MATCH ?
-				ORDER BY ce.distance
-				LIMIT ?
-			`;
-			params = [embeddingToBuffer(queryEmbedding), topK];
-		}
+		// Vector search
+		const results = await search(db, {
+			mode: 'vector',
+			vector: {
+				value: Array.from(queryEmbedding),
+				property: 'embedding',
+			},
+			similarity: 0.3, // Minimum similarity threshold
+			limit: topK,
+		}) as Results<ChunkDocument>;
 
-		const stmt = this.db.prepare(query);
-		const rows = stmt.all(...params) as Array<{
-			content: string;
-			source: string;
-			page: number | null;
-			section: string | null;
-			distance: number;
-		}>;
+		return results.hits.map((hit) => ({
+			content: hit.document.content,
+			source: hit.document.source,
+			page: hit.document.page === 0 ? null : hit.document.page,
+			section: hit.document.section === '' ? null : hit.document.section,
+			score: hit.score,
+		}));
+	}
 
-		return rows.map(row => ({
-			content: row.content,
-			source: row.source,
-			page: row.page,
-			section: row.section,
-			// Convert distance to similarity score (1 - normalized_distance)
-			score: 1 - row.distance,
+	/**
+	 * Full-text search only.
+	 */
+	async searchText(
+		queryText: string,
+		topK: number = 5,
+		_sourceFilter?: string
+	): Promise<SearchResult[]> {
+		const db = this.ensureInit();
+
+		const results = await search(db, {
+			term: queryText,
+			limit: topK,
+		}) as Results<ChunkDocument>;
+
+		return results.hits.map((hit) => ({
+			content: hit.document.content,
+			source: hit.document.source,
+			page: hit.document.page === 0 ? null : hit.document.page,
+			section: hit.document.section === '' ? null : hit.document.section,
+			score: hit.score,
 		}));
 	}
 
 	/**
 	 * Remove all chunks for a specific source file.
 	 */
-	removeBySource(source: string): number {
-		const chunks = this.db.prepare('SELECT id FROM chunks WHERE source = ?').all(source) as Array<{ id: number }>;
+	async removeBySource(source: string): Promise<number> {
+		const db = this.ensureInit();
 
-		if (chunks.length === 0) {
-			return 0;
+		// Find all documents with this source using fulltext search on source
+		const results = await search(db, {
+			term: '',
+			limit: 10000,
+		}) as Results<ChunkDocument>;
+
+		// Filter to matching source and remove
+		let removed = 0;
+		for (const hit of results.hits) {
+			if (hit.document.source === source) {
+				await remove(db, hit.id);
+				removed++;
+			}
 		}
 
-		const chunkIds = chunks.map(c => c.id);
-		const placeholders = chunkIds.map(() => '?').join(',');
-
-		this.db.prepare(`DELETE FROM chunk_embeddings WHERE rowid IN (${placeholders})`).run(...chunkIds);
-		const result = this.db.prepare('DELETE FROM chunks WHERE source = ?').run(source);
-
-		return result.changes;
+		if (removed > 0) {
+			this.dirty = true;
+		}
+		return removed;
 	}
 
 	/**
 	 * Check if a file is already indexed (by hash).
 	 */
-	isFileIndexed(fileHash: string): boolean {
-		const row = this.db.prepare('SELECT 1 FROM chunks WHERE file_hash = ? LIMIT 1').get(fileHash) as any;
-		return !!row;
+	async isFileIndexed(fileHash: string): Promise<boolean> {
+		const db = this.ensureInit();
+
+		// Search for any document with this hash
+		const results = await search(db, {
+			term: '',
+			limit: 10000,
+		}) as Results<ChunkDocument>;
+
+		return results.hits.some(hit => hit.document.fileHash === fileHash);
+	}
+
+	/**
+	 * Check if a file is indexed by source path.
+	 */
+	async isSourceIndexed(source: string): Promise<boolean> {
+		const db = this.ensureInit();
+
+		const results = await search(db, {
+			term: '',
+			limit: 10000,
+		}) as Results<ChunkDocument>;
+
+		return results.hits.some(hit => hit.document.source === source);
 	}
 
 	/**
 	 * Get statistics about the vector store.
 	 */
-	getStats(): { totalChunks: number; totalSources: number; sources: Array<{ source: string; chunks: number }> } {
-		const totalChunks = (this.db.prepare('SELECT COUNT(*) as count FROM chunks').get() as any).count;
-		const sources = this.db.prepare(
-			'SELECT source, COUNT(*) as chunks FROM chunks GROUP BY source ORDER BY chunks DESC'
-		).all() as Array<{ source: string; chunks: number }>;
+	async getStats(): Promise<{
+		totalChunks: number;
+		totalSources: number;
+		sources: Array<{ source: string; chunks: number }>;
+	}> {
+		const db = this.ensureInit();
+
+		const totalChunks = await count(db);
+
+		// Get all documents to count by source
+		const results = await search(db, {
+			term: '',
+			limit: 100000,
+		}) as Results<ChunkDocument>;
+
+		// Group by source
+		const sourceMap = new Map<string, number>();
+		for (const hit of results.hits) {
+			const source = hit.document.source;
+			sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+		}
+
+		const sources = Array.from(sourceMap.entries())
+			.map(([source, chunks]) => ({ source, chunks }))
+			.sort((a, b) => b.chunks - a.chunks);
 
 		return {
 			totalChunks,
@@ -244,10 +339,25 @@ export class VectorStore {
 	}
 
 	/**
-	 * Close the database connection.
+	 * Persist the index to disk.
 	 */
-	close(): void {
-		this.db.close();
+	async save(): Promise<void> {
+		if (!this.dirty) {
+			return;
+		}
+
+		const db = this.ensureInit();
+		const snapshot = await save(db);
+		fs.writeFileSync(this.dbPath, JSON.stringify(snapshot));
+		this.dirty = false;
+	}
+
+	/**
+	 * Close the database (saves to disk).
+	 */
+	async close(): Promise<void> {
+		await this.save();
+		this.db = null;
 	}
 }
 
@@ -255,5 +365,5 @@ export class VectorStore {
  * Get the default database path for a workspace.
  */
 export function getDefaultDbPath(workspacePath: string): string {
-	return path.join(workspacePath, '.ritemark', 'rag.db');
+	return path.join(workspacePath, '.ritemark', 'rag-index.json');
 }

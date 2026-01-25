@@ -84,10 +84,6 @@ export function findTextInDocument(
     return { from: textOffset, to: textOffset + searchText.length };
   }
 
-  console.log('[textSearch] Text not found after 3 strategies');
-  console.log('[textSearch] Searched for:', searchText);
-  console.log('[textSearch] In document:', plainText.substring(0, 200) + '...');
-
   return null; // Text not found
 }
 

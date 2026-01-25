@@ -37,12 +37,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   ) {
     // Initialize vector store if workspace is available
     if (_workspacePath) {
-      try {
-        const dbPath = getDefaultDbPath(_workspacePath);
-        this._vectorStore = new VectorStore(dbPath);
-      } catch {
-        // Vector store not available yet (first run, no indexed docs)
-      }
+      this._initVectorStore(_workspacePath);
+    }
+  }
+
+  private async _initVectorStore(workspacePath: string): Promise<void> {
+    try {
+      const dbPath = getDefaultDbPath(workspacePath);
+      this._vectorStore = new VectorStore(dbPath);
+      await this._vectorStore.init();
+    } catch (err) {
+      console.warn('[UnifiedViewProvider] Vector store init failed:', err);
+      this._vectorStore = null;
     }
   }
 
@@ -164,6 +170,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /**
+   * Clear chat history and start fresh conversation
+   */
+  public clearChat() {
+    this._view?.webview.postMessage({ type: 'clear-chat' });
+  }
+
   public dispose() {
     this._vectorStore?.close();
   }
@@ -182,7 +195,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'connectivity-status', isOnline: isOnline() });
   }
 
-  private _sendIndexStatus() {
+  private async _sendIndexStatus() {
     if (!this._vectorStore) {
       this._view?.webview.postMessage({
         type: 'index-status',
@@ -194,7 +207,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const stats = this._vectorStore.getStats();
+      const stats = await this._vectorStore.getStats();
       this._view?.webview.postMessage({
         type: 'index-status',
         totalDocs: stats.totalSources,
@@ -337,6 +350,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       display: flex;
       flex-direction: column;
       padding: 0 !important;
+      overflow: hidden;
     }
     .no-key {
       flex: 1;
@@ -556,7 +570,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     <strong>Offline</strong> - AI features require internet connection
   </div>
 
-  <div id="chat-container" style="display: none; flex: 1; display: flex; flex-direction: column;">
+  <div id="chat-container" style="display: none; flex: 1; flex-direction: column; overflow: hidden;">
     <div id="selection-info" class="selection-info" style="display: none;">
       <span class="label">Selected:</span>
       <span class="text" id="selection-text"></span>
@@ -829,6 +843,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       switch (message.type) {
         case 'ai-key-status':
           hasApiKey = message.hasKey;
+          render();
+          break;
+
+        case 'clear-chat':
+          messages = [];
+          conversationHistory = [];
+          streamingContent = '';
+          ragResults = [];
+          activeWidget = null;
           render();
           break;
 

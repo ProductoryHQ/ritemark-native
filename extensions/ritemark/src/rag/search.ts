@@ -34,8 +34,8 @@ export async function searchDocuments(
 	// Embed the query
 	const { embedding } = await embedText(query);
 
-	// Search vector store
-	const results = store.search(embedding, topK, options?.sourceFilter);
+	// Search vector store (hybrid: vector + full-text)
+	const results = await store.search(embedding, topK, options?.sourceFilter, query);
 
 	// Filter by minimum score and format
 	return results

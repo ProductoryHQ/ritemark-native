@@ -2,7 +2,7 @@
  * Document indexer - orchestrates the RAG pipeline.
  *
  * Watches workspace for supported files, parses them via Docling (Python subprocess),
- * chunks the text, generates embeddings via OpenAI, and stores in sqlite-vec.
+ * chunks the text, generates embeddings via OpenAI, and stores in Orama.
  */
 
 import * as vscode from 'vscode';
@@ -61,6 +61,7 @@ export class DocumentIndexer {
 	private watcher: vscode.FileSystemWatcher | null = null;
 	private indexing = false;
 	private cancelRequested = false;
+	private initialized = false;
 
 	private _onProgress = new vscode.EventEmitter<IndexProgress>();
 	public readonly onProgress = this._onProgress.event;
@@ -83,6 +84,23 @@ export class DocumentIndexer {
 	}
 
 	/**
+	 * Initialize the indexer (must be called before use).
+	 */
+	async init(): Promise<void> {
+		if (this.initialized) {
+			return;
+		}
+		await this.store.init();
+		this.initialized = true;
+	}
+
+	private ensureInit(): void {
+		if (!this.initialized) {
+			throw new Error('DocumentIndexer not initialized. Call init() first.');
+		}
+	}
+
+	/**
 	 * Start watching for file changes in the workspace.
 	 */
 	startWatching(): void {
@@ -91,9 +109,9 @@ export class DocumentIndexer {
 			new vscode.RelativePattern(this.workspacePath, pattern)
 		);
 
-		this.watcher.onDidCreate(uri => this.indexFile(uri.fsPath));
-		this.watcher.onDidChange(uri => this.reindexFile(uri.fsPath));
-		this.watcher.onDidDelete(uri => this.removeFile(uri.fsPath));
+		this.watcher.onDidCreate(uri => this.indexFile(uri.fsPath).catch(console.error));
+		this.watcher.onDidChange(uri => this.reindexFile(uri.fsPath).catch(console.error));
+		this.watcher.onDidDelete(uri => this.removeFile(uri.fsPath).catch(console.error));
 	}
 
 	/**
@@ -110,7 +128,6 @@ export class DocumentIndexer {
 	cancelIndexing(): void {
 		if (this.indexing) {
 			this.cancelRequested = true;
-			console.log('[RAG] Cancellation requested');
 		}
 	}
 
@@ -118,6 +135,8 @@ export class DocumentIndexer {
 	 * Index all supported files in the workspace.
 	 */
 	async indexAll(): Promise<IndexProgress> {
+		this.ensureInit();
+
 		if (this.indexing) {
 			throw new Error('Indexing already in progress');
 		}
@@ -125,8 +144,6 @@ export class DocumentIndexer {
 		this.indexing = true;
 		this.cancelRequested = false;
 		const files = this.findSupportedFiles();
-		console.log(`[RAG] Found ${files.length} files to index`);
-		files.forEach(f => console.log(`[RAG]   - ${path.relative(this.workspacePath, f)}`));
 
 		const progress: IndexProgress = {
 			total: files.length,
@@ -138,7 +155,6 @@ export class DocumentIndexer {
 		try {
 			for (const file of files) {
 				if (this.cancelRequested) {
-					console.log(`[RAG] Indexing cancelled at ${progress.processed}/${progress.total}`);
 					break;
 				}
 
@@ -147,24 +163,23 @@ export class DocumentIndexer {
 
 				try {
 					const hash = this.getFileHash(file);
-					if (this.store.isFileIndexed(hash)) {
-						console.log(`[RAG] Skip (cached): ${path.basename(file)}`);
+					if (await this.store.isFileIndexed(hash)) {
 						progress.processed++;
 						continue;
 					}
 
-					console.log(`[RAG] Indexing: ${path.relative(this.workspacePath, file)}`);
 					await this.indexFile(file);
-					console.log(`[RAG] Done: ${path.basename(file)}`);
 				} catch (err) {
 					const msg = err instanceof Error ? err.message : String(err);
-					console.log(`[RAG] Error: ${path.basename(file)} - ${msg}`);
 					progress.errors.push(`${path.basename(file)}: ${msg}`);
 				}
 
 				progress.processed++;
 				this._onProgress.fire({ ...progress });
 			}
+
+			// Save index to disk after indexing
+			await this.store.save();
 		} finally {
 			this.indexing = false;
 			this.cancelRequested = false;
@@ -228,22 +243,24 @@ export class DocumentIndexer {
 			fileHash,
 		}));
 
-		this.store.insertChunks(storeChunks);
+		await this.store.insertChunks(storeChunks);
 	}
 
 	/**
 	 * Re-index a file (remove old chunks, then index fresh).
 	 */
 	async reindexFile(filePath: string): Promise<void> {
-		this.store.removeBySource(filePath);
+		await this.store.removeBySource(filePath);
 		await this.indexFile(filePath);
+		await this.store.save();
 	}
 
 	/**
 	 * Remove a file from the index.
 	 */
-	removeFile(filePath: string): void {
-		this.store.removeBySource(filePath);
+	async removeFile(filePath: string): Promise<void> {
+		await this.store.removeBySource(filePath);
+		await this.store.save();
 	}
 
 	/**
@@ -256,7 +273,7 @@ export class DocumentIndexer {
 	/**
 	 * Get indexing statistics.
 	 */
-	getStats() {
+	async getStats() {
 		return this.store.getStats();
 	}
 
@@ -348,9 +365,9 @@ export class DocumentIndexer {
 	/**
 	 * Dispose all resources.
 	 */
-	dispose(): void {
+	async dispose(): Promise<void> {
 		this.stopWatching();
-		this.store.close();
+		await this.store.close();
 		this._onProgress.dispose();
 	}
 }

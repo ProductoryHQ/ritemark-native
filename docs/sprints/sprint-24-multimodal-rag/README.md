@@ -206,3 +206,73 @@ sqlite-vec          # Vector search extension
 | Index 100-page PDF | text-embedding-3-small | ~$0.001 |
 | Single RAG query | text-embedding-3-small + gpt-4o-mini | ~$0.0005 |
 | 1000 queries/day | Both | ~$0.50/day |
+
+---
+
+## PIVOT: sqlite-vec → Orama (2026-01-25)
+
+### Blocker
+
+The `vec0 INSERT` fails with "Only integers are allowed for primary key values" error. After extensive debugging (Number(), BigInt(), schema changes), the root cause is **native dependency hell**:
+
+1. **Version mismatch** - sqlite-vec `0.1.0` wrapper vs `0.1.6` darwin binary
+2. **Electron ABI** - better-sqlite3 needs to match VS Code's Electron version
+3. **Production bug** - [electron-builder #8824](https://github.com/electron-userland/electron-builder/issues/8824) documents `.dylib.dylib` path bug
+4. **Alpha status** - npm package neglected (last publish: over a year ago)
+
+**Analysis:** [../../analysis/2026-01-25-vector-store-comparison.md](../../analysis/2026-01-25-vector-store-comparison.md)
+
+### Decision: Orama
+
+| Property | sqlite-vec | Orama |
+|----------|-----------|-------|
+| Native deps | 3 layers (C bindings) | **Zero** |
+| Bundle size | ~5MB + dylib | **<2KB** |
+| Search | Vector only | **Hybrid** (vector + full-text) |
+| VS Code compat | Buggy | **No issues** |
+| Scale | Millions | ~100K (sufficient) |
+
+Orama's hybrid search combines keyword matching with semantic similarity - exactly what workspace RAG needs.
+
+### What Changes
+
+| Phase | Original | After Pivot |
+|-------|----------|-------------|
+| Phase 1-3 | ✅ Done (parser, embeddings, MCP) | ✅ Keep as-is |
+| Phase 4 | sqlite-vec integration | 🔄 **Orama migration** |
+| Phase 5-6 | Polish, testing | ✅ Same scope |
+
+### New Phase 4: Orama Migration
+
+**Remove:**
+```json
+- "better-sqlite3": "^11.0.0"
+- "sqlite-vec": "^0.1.0"
+- "sqlite-vec-darwin-arm64": "^0.1.6"
+- "@types/better-sqlite3": "^7.6.0"
+```
+
+**Add:**
+```json
++ "@orama/orama": "^3.0.0"
+```
+
+**Rewrite:**
+- `extensions/ritemark/src/rag/vectorStore.ts` - same API, Orama backend
+
+**API stays the same:**
+- `insertChunks(chunks: Chunk[])`
+- `search(query: string, embedding: number[], limit?: number)`
+- `removeBySource(sourcePath: string)`
+- `getStats()`
+- `isFileIndexed(sourcePath: string, hash: string)`
+
+### Tasks
+
+- [ ] Remove sqlite-vec dependencies from package.json
+- [ ] Add @orama/orama dependency
+- [ ] Rewrite vectorStore.ts with Orama backend
+- [ ] Implement hybrid search (vector + BM25)
+- [ ] JSON file persistence (~/.ritemark/rag-index.json)
+- [ ] Test full pipeline: index → embed → search → chat
+- [ ] Verify sidebar renders search results correctly

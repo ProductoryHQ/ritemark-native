@@ -280,8 +280,6 @@ ${plainText}
         { role: 'user', content: prompt }
       ];
 
-      console.log('[OpenAI] Starting streaming request...');
-
       const stream = await openai.chat.completions.create(
         {
           model: 'gpt-4o-mini', // Using gpt-4o-mini for cost efficiency
