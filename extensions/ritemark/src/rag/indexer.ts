@@ -1,49 +1,23 @@
 /**
  * Document indexer - orchestrates the RAG pipeline.
  *
- * Watches workspace for supported files, parses them via Docling (Python subprocess),
- * chunks the text, generates embeddings via OpenAI, and stores in Orama.
+ * Watches workspace for markdown files, chunks the text,
+ * generates embeddings via OpenAI, and stores in Orama.
  */
 
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import { spawn } from 'child_process';
-import { chunkSections, chunkText, TextChunk } from './chunker';
+import { chunkText, TextChunk } from './chunker';
 import { embedTexts } from './embeddings';
 import { VectorStore, getDefaultDbPath } from './vectorStore';
 
-/** Supported file extensions for indexing */
-const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.xlsx', '.html', '.htm', '.md', '.markdown', '.png', '.jpg', '.jpeg'];
-
-/** Parsed document structure from Python parser */
-interface ParsedDocument {
-	source: string;
-	format: string;
-	full_text: string;
-	sections: Array<{
-		content: string;
-		page?: number | null;
-		title?: string | null;
-		level?: number | null;
-	}>;
-	tables: Array<{
-		content: string;
-		page?: number | null;
-	}>;
-	metadata: {
-		title: string;
-		page_count: number;
-	};
-}
+/** Supported file extensions for indexing (markdown only) */
+const SUPPORTED_EXTENSIONS = ['.md', '.markdown'];
 
 export interface IndexerOptions {
 	workspacePath: string;
-	/** Path to uv binary (defaults to 'uv' in PATH) */
-	uvPath?: string;
-	/** Max concurrent file processing */
-	concurrency?: number;
 }
 
 export interface IndexProgress {
@@ -56,8 +30,6 @@ export interface IndexProgress {
 export class DocumentIndexer {
 	private store: VectorStore;
 	private workspacePath: string;
-	private uvPath: string;
-	private ragServerPath: string;
 	private watcher: vscode.FileSystemWatcher | null = null;
 	private indexing = false;
 	private cancelRequested = false;
@@ -68,10 +40,6 @@ export class DocumentIndexer {
 
 	constructor(options: IndexerOptions) {
 		this.workspacePath = options.workspacePath;
-		this.uvPath = options.uvPath || 'uv';
-
-		// rag-server is at repo root level
-		this.ragServerPath = path.resolve(__dirname, '..', '..', '..', '..', 'rag-server');
 
 		// Ensure .ritemark directory exists
 		const ritemarkDir = path.join(this.workspacePath, '.ritemark');
@@ -191,7 +159,7 @@ export class DocumentIndexer {
 	}
 
 	/**
-	 * Index a single file.
+	 * Index a single markdown file.
 	 */
 	async indexFile(filePath: string): Promise<void> {
 		const ext = path.extname(filePath).toLowerCase();
@@ -199,29 +167,14 @@ export class DocumentIndexer {
 			return;
 		}
 
-		// Parse document - markdown directly, binary via Python/Docling
-		let parsed: ParsedDocument;
-		if (ext === '.md' || ext === '.markdown') {
-			const content = fs.readFileSync(filePath, 'utf-8');
-			parsed = {
-				source: filePath,
-				format: 'markdown',
-				full_text: content,
-				sections: [],
-				tables: [],
-				metadata: { title: path.basename(filePath, ext), page_count: 1 },
-			};
-		} else {
-			parsed = await this.parseDocument(filePath);
+		// Read markdown content
+		const content = fs.readFileSync(filePath, 'utf-8');
+		if (!content.trim()) {
+			return;
 		}
 
 		// Chunk the text
-		let chunks: TextChunk[];
-		if (parsed.sections.length > 0) {
-			chunks = chunkSections(parsed.sections, filePath);
-		} else {
-			chunks = chunkText(parsed.full_text, filePath);
-		}
+		const chunks: TextChunk[] = chunkText(content, filePath);
 
 		if (chunks.length === 0) {
 			return;
@@ -275,51 +228,6 @@ export class DocumentIndexer {
 	 */
 	async getStats() {
 		return this.store.getStats();
-	}
-
-	/**
-	 * Parse a document using the Python Docling parser via uv.
-	 */
-	private parseDocument(filePath: string): Promise<ParsedDocument> {
-		return new Promise((resolve, reject) => {
-			const proc = spawn(this.uvPath, [
-				'run',
-				'--project', this.ragServerPath,
-				'python', '-m', 'ritemark_rag.parser', filePath
-			], {
-				cwd: this.ragServerPath,
-				env: { ...process.env },
-			});
-
-			let stdout = '';
-			let stderr = '';
-
-			proc.stdout.on('data', (data: Buffer) => {
-				stdout += data.toString();
-			});
-
-			proc.stderr.on('data', (data: Buffer) => {
-				stderr += data.toString();
-			});
-
-			proc.on('close', (code) => {
-				if (code !== 0) {
-					reject(new Error(`Parser failed (exit ${code}): ${stderr}`));
-					return;
-				}
-
-				try {
-					const parsed = JSON.parse(stdout) as ParsedDocument;
-					resolve(parsed);
-				} catch (e) {
-					reject(new Error(`Failed to parse output: ${e}`));
-				}
-			});
-
-			proc.on('error', (err) => {
-				reject(new Error(`Failed to spawn parser: ${err.message}. Is 'uv' installed?`));
-			});
-		});
 	}
 
 	/**

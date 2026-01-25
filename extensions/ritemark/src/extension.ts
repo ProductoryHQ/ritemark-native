@@ -5,7 +5,6 @@ import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { DocumentIndexer } from './rag/indexer';
-import { MCPServerManager } from './rag/mcpServer';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
 
@@ -14,7 +13,6 @@ export let unifiedViewProvider: UnifiedViewProvider;
 
 // RAG infrastructure
 let documentIndexer: DocumentIndexer | null = null;
-let mcpServer: MCPServerManager | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
   // Initialize API key manager (must be first)
@@ -153,25 +151,9 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register MCP config generation command (initializes on-demand if needed)
-  context.subscriptions.push(
-    vscode.commands.registerCommand('ritemark.generateMCPConfig', () => {
-      if (!mcpServer) {
-        const wp = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!wp) {
-          vscode.window.showWarningMessage('Open a folder first to generate MCP config.');
-          return;
-        }
-        mcpServer = new MCPServerManager({ workspacePath: wp });
-      }
-      mcpServer.generateClaudeConfig();
-    })
-  );
-
-  // Initialize RAG indexer and MCP server (if workspace available)
+  // Initialize RAG indexer (if workspace available)
   if (workspacePath) {
     documentIndexer = new DocumentIndexer({ workspacePath });
-    mcpServer = new MCPServerManager({ workspacePath });
 
     // Initialize vector store asynchronously
     documentIndexer.init().catch(() => {
@@ -192,5 +174,4 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
   documentIndexer?.dispose();
-  mcpServer?.dispose();
 }
