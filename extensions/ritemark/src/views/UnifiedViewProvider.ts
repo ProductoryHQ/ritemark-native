@@ -606,7 +606,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   </div>
 
   <div id="index-footer" class="index-footer">
-    <span id="index-stats">No documents indexed</span>
+    <span id="index-stats"></span>
     <button id="reindex-btn">Re-index</button>
     <button id="cancel-index-btn" style="display:none; color: var(--vscode-errorForeground);">Cancel</button>
   </div>
@@ -675,9 +675,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         reindexBtn.style.display = 'inline';
         cancelBtn.style.display = 'none';
         if (indexStatus.totalDocs > 0) {
-          indexStats.textContent = indexStatus.totalDocs + ' docs | ' + indexStatus.totalChunks + ' chunks';
+          indexStats.textContent = indexStatus.totalDocs + ' docs';
         } else {
-          indexStats.textContent = 'No documents indexed';
+          indexStats.textContent = '';
         }
       }
 
