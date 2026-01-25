@@ -1,8 +1,10 @@
-# Sprint 24 - Status Report (2026-01-24)
+# Sprint 24 - Status Report (2026-01-25)
 
 **Branch:** `claude/ritemark-multimodal-rag-Kq8lp`
-**Phase:** 4 - Integration & Testing
+**Phase:** 4 - Integration & Testing → **PIVOT to Orama**
 **Base:** main v1.0.3 (rebased)
+
+> ⚠️ **PIVOT:** sqlite-vec native dependency issues are blocking. Migrating to Orama (pure TypeScript, zero native deps, hybrid search). See [README.md](README.md#pivot-sqlite-vec--orama-2026-01-25) for details.
 
 ---
 
@@ -27,14 +29,37 @@
 
 ---
 
-## Broken / In Progress
+## Broken → Pivoting
 
-| Issue | Root Cause | Status |
-|-------|-----------|--------|
-| vec0 INSERT fails | "Only integers are allowed for primary key values" | **Investigating** - tried Number(), BigInt(), schema change. vec0 still rejects the rowid value when inserting embeddings. |
-| vec0 search query | "LIMIT or k=? required" | Fixed (using LIMIT) but untested since INSERT fails |
-| xlsx/pdf parsing | Requires Python Docling via `uv run` | Not tested yet (blocked by vec0 INSERT) |
-| MCP server | Python FastMCP subprocess | Not tested yet |
+| Issue | Root Cause | Resolution |
+|-------|-----------|------------|
+| vec0 INSERT fails | Native dependency hell (sqlite-vec + better-sqlite3 + Electron ABI) | **PIVOT to Orama** |
+| vec0 search query | Same | **PIVOT to Orama** |
+
+See [vector store comparison analysis](../../analysis/2026-01-25-vector-store-comparison.md) for full details.
+
+---
+
+## Pivot Tasks (Orama Migration)
+
+| Task | Status |
+|------|--------|
+| Remove sqlite-vec dependencies | ✅ Done |
+| Add @orama/orama | ✅ Done |
+| Rewrite vectorStore.ts | ✅ Done |
+| Implement hybrid search | ⏸️ Vector-only for now (hybrid needs more work) |
+| JSON persistence | ✅ Done |
+| Test full pipeline | ⬜ Pending |
+| Test sidebar rendering | ⬜ Pending |
+
+---
+
+## Unaffected (still to test after pivot)
+
+| Feature | Status |
+|---------|--------|
+| xlsx/pdf parsing | Requires Python Docling via `uv run` - test after Orama works |
+| MCP server | Python FastMCP subprocess - test after Orama works |
 
 ---
 
@@ -88,11 +113,11 @@
 
 ## Next Steps
 
-1. **Fix vec0 INSERT** - The core blocker. Need to understand why BigInt rowid values are rejected by sqlite-vec. May need to check sqlite-vec version compatibility with better-sqlite3, or try a different binding approach.
-2. **Test with markdown-only** - Skip binary files, verify the full pipeline works for .md (chunk -> embed -> store -> search).
-3. **Test Docling parsing** - Ensure `uv run python -m ritemark_rag.parser <file>` works for PDF/DOCX.
-4. **Test search** - Once INSERT works, verify KNN search returns correct results.
-5. **MCP server** - Test `ritemark.generateMCPConfig` and Python subprocess.
+1. **Orama migration** - Rewrite vectorStore.ts with pure TypeScript backend
+2. **Test with markdown** - Verify full pipeline: chunk → embed → store → search
+3. **Test hybrid search** - Verify BM25 + vector combination works
+4. **Test Docling parsing** - Ensure `uv run python -m ritemark_rag.parser <file>` works
+5. **MCP server** - Test `ritemark.generateMCPConfig` and Python subprocess
 
 ---
 
