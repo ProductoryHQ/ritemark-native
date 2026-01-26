@@ -168,10 +168,14 @@ export class DocumentIndexer {
 		}
 
 		// Read markdown content
-		const content = fs.readFileSync(filePath, 'utf-8');
+		let content = fs.readFileSync(filePath, 'utf-8');
 		if (!content.trim()) {
 			return;
 		}
+
+		// Remove base64 embedded images (they break chunking and aren't useful for search)
+		// Matches: ![alt](data:image/...;base64,...) and ![](data:image/...;base64,...)
+		content = content.replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '[image]');
 
 		// Chunk the text
 		const chunks: TextChunk[] = chunkText(content, filePath);
