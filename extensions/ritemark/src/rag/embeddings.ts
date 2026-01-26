@@ -8,7 +8,9 @@ import { getAPIKeyManager } from '../ai/apiKeyManager';
 
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMENSIONS = 1536;
-const MAX_BATCH_SIZE = 100; // OpenAI allows up to 2048, but 100 is practical
+// Process one chunk at a time to avoid token limit issues
+// (8192 token limit, but actual tokens vary by language/content)
+const MAX_BATCH_SIZE = 1;
 
 export interface EmbeddingResult {
 	embedding: Float32Array;

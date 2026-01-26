@@ -127,9 +127,16 @@ export function activate(context: vscode.ExtensionContext) {
         const result = await documentIndexer!.indexAll();
         unifiedViewProvider.sendIndexDone();
         if (result.errors.length > 0) {
-          vscode.window.showWarningMessage(
-            `Indexed ${result.processed} docs with ${result.errors.length} errors`
+          // Show first error, offer to see all
+          const firstError = result.errors[0];
+          const action = await vscode.window.showWarningMessage(
+            `Indexed ${result.processed} docs with ${result.errors.length} error(s). First: ${firstError}`,
+            'Show All Errors'
           );
+          if (action === 'Show All Errors') {
+            const errorList = result.errors.map((e, i) => `${i + 1}. ${e}`).join('\n');
+            vscode.window.showInformationMessage(errorList, { modal: true });
+          }
         } else {
           const stats = await documentIndexer!.getStats();
           vscode.window.showInformationMessage(

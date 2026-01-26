@@ -25,8 +25,10 @@ export interface ChunkOptions {
 }
 
 const DEFAULT_OPTIONS: Required<ChunkOptions> = {
-	maxTokens: 512,
-	overlapTokens: 50,
+	// Conservative: 256 tokens (~1000 chars) to handle non-English text
+	// that may have worse char-to-token ratios than English
+	maxTokens: 256,
+	overlapTokens: 25,
 	separators: ['\n\n', '\n', '. ', ' '],
 };
 

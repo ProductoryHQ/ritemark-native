@@ -21,7 +21,7 @@ export interface FeatureFlag {
 /**
  * All known flag IDs
  */
-export type FlagId = 'voice-dictation' | 'markdown-export';
+export type FlagId = 'voice-dictation' | 'markdown-export' | 'document-search';
 
 /**
  * Feature flag registry
@@ -38,6 +38,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'markdown-export',
     label: 'Markdown Export',
     description: 'Export documents as PDF and Word files',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  'document-search': {
+    id: 'document-search',
+    label: 'Document Search (RAG)',
+    description: 'Search your markdown documents with AI-powered semantic search',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },

@@ -159,8 +159,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /**
    * Signal indexing completed to webview
    */
-  public sendIndexDone() {
+  public async sendIndexDone() {
     this._view?.webview.postMessage({ type: 'index-done' });
+    // Reload vector store from disk to get fresh stats
+    if (this._vectorStore) {
+      await this._vectorStore.init();
+    }
     this._sendIndexStatus();
   }
 
