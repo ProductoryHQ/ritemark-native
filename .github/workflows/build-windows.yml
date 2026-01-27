@@ -82,7 +82,19 @@ jobs:
       - name: Install VS Code dependencies
         shell: bash
         working-directory: r/vscode
-        run: npm install
+        env:
+          npm_config_disturl: https://electronjs.org/headers
+          npm_config_target: 30.5.1
+          npm_config_runtime: electron
+          npm_config_build_from_source: true
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+        run: |
+          # Retry npm install up to 3 times (Electron header downloads can timeout)
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            npm install && break || echo "Attempt $i failed, retrying..."
+            sleep 10
+          done
         
       # =========================================================================
       # Step 6: Install RiteMark extension dependencies
