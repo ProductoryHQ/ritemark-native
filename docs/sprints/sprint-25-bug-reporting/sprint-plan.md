@@ -1,4 +1,4 @@
-# Sprint 20: Bug Reporting Sidebar
+# Sprint 25: Bug Reporting Sidebar
 
 ## Goal
 Add an easy-to-use bug reporting feature that allows customers to submit GitHub issues directly from RiteMark's AI sidebar with auto-collected system information.

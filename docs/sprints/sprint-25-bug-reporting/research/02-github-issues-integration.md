@@ -1,6 +1,6 @@
 # GitHub Issues Integration Research
 
-**Sprint:** 20
+**Sprint:** 25
 **Date:** 2026-01-27
 **Phase:** 1 (Research)
 
