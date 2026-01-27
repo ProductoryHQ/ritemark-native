@@ -1,0 +1,214 @@
+name: Build Windows (PoC)
+
+# Sprint 25: Proof-of-concept to answer "Can GitHub Actions build Windows RiteMark?"
+# Manual trigger only for testing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      # =========================================================================
+      # Step 1: Checkout with short path + VS Code submodule
+      # =========================================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: r  # Short path to avoid Windows MAX_PATH issues (Codex #7)
+          submodules: true  # VS Code submodule
+          
+      - name: Enable Git long paths
+        shell: bash
+        run: git config --global core.longpaths true
+        
+      # =========================================================================
+      # Step 2: Setup toolchain
+      # =========================================================================
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      # =========================================================================
+      # Step 3: Validate MSVC toolchain (Codex #6)
+      # =========================================================================
+      - name: Validate MSVC toolchain
+        shell: cmd
+        run: |
+          where cl.exe || echo "WARNING: MSVC cl.exe not found in PATH"
+          
+      # =========================================================================
+      # Step 4: Handle extension symlink → COPY (Windows has no symlinks, Codex #3)
+      # =========================================================================
+      - name: Copy extension (replace symlink)
+        shell: bash
+        working-directory: r
+        run: |
+          # Remove symlink if it exists (will fail on Windows anyway)
+          rm -rf vscode/extensions/ritemark 2>/dev/null || true
+          
+          # COPY extension instead of symlink
+          cp -R extensions/ritemark vscode/extensions/ritemark
+          
+          echo "Extension copied to vscode/extensions/ritemark"
+          
+      # =========================================================================
+      # Step 5: Install VS Code dependencies
+      # =========================================================================
+      - name: Install VS Code dependencies
+        shell: bash
+        working-directory: r/vscode
+        run: npm install
+        
+      # =========================================================================
+      # Step 6: Install RiteMark extension dependencies
+      # =========================================================================
+      - name: Install extension dependencies
+        shell: bash
+        working-directory: r/extensions/ritemark
+        run: npm install
+        
+      # =========================================================================
+      # Step 7: Apply patches (branding + customizations)
+      # =========================================================================
+      - name: Apply patches
+        shell: bash
+        working-directory: r
+        run: ./scripts/apply-patches.sh
+        
+      # =========================================================================
+      # Step 8: Compile RiteMark extension
+      # =========================================================================
+      - name: Compile extension
+        shell: bash
+        working-directory: r/extensions/ritemark
+        run: npm run compile
+        
+      # =========================================================================
+      # Step 9: Build VS Code for Windows (x64)
+      # =========================================================================
+      - name: Build VS Code (vscode-win32-x64-min)
+        shell: bash
+        working-directory: r/vscode
+        run: |
+          echo "Starting Windows build at $(date)"
+          npm run gulp vscode-win32-x64-min
+          echo "Build completed at $(date)"
+          
+      # =========================================================================
+      # Step 10: Copy RiteMark extension to build output
+      # =========================================================================
+      - name: Copy extension to build output
+        shell: bash
+        working-directory: r
+        run: |
+          BUILD_DIR="VSCode-win32-x64"
+          EXT_DEST="$BUILD_DIR/resources/app/extensions/ritemark"
+          
+          if [ ! -d "$BUILD_DIR" ]; then
+            echo "ERROR: Build output not found at $BUILD_DIR"
+            exit 1
+          fi
+          
+          echo "Copying extension to build output..."
+          rm -rf "$EXT_DEST" || true
+          cp -R extensions/ritemark "$EXT_DEST"
+          
+          # Remove dev dependencies
+          rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
+          rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
+          
+          echo "Extension copied successfully"
+          
+      # =========================================================================
+      # Step 11: Validate build output
+      # =========================================================================
+      - name: Validate extension in build
+        shell: bash
+        working-directory: r
+        run: |
+          BUILD_DIR="VSCode-win32-x64"
+          EXT_PATH="$BUILD_DIR/resources/app/extensions/ritemark"
+          
+          echo "Validating extension files..."
+          
+          ERRORS=0
+          
+          # Check webview.js (must be >500KB)
+          if [ -f "$EXT_PATH/media/webview.js" ]; then
+            WEBVIEW_SIZE=$(stat -c%s "$EXT_PATH/media/webview.js" 2>/dev/null || stat -f%z "$EXT_PATH/media/webview.js" 2>/dev/null || echo 0)
+            if [ "$WEBVIEW_SIZE" -lt 500000 ]; then
+              echo "FAIL: webview.js too small ($WEBVIEW_SIZE bytes)"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: webview.js ($WEBVIEW_SIZE bytes)"
+            fi
+          else
+            echo "FAIL: webview.js not found"
+            ERRORS=$((ERRORS + 1))
+          fi
+          
+          # Check extension.js (must be >1KB)
+          if [ -f "$EXT_PATH/out/extension.js" ]; then
+            EXTENSION_SIZE=$(stat -c%s "$EXT_PATH/out/extension.js" 2>/dev/null || stat -f%z "$EXT_PATH/out/extension.js" 2>/dev/null || echo 0)
+            if [ "$EXTENSION_SIZE" -lt 1000 ]; then
+              echo "FAIL: extension.js too small ($EXTENSION_SIZE bytes)"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: extension.js ($EXTENSION_SIZE bytes)"
+            fi
+          else
+            echo "FAIL: extension.js not found"
+            ERRORS=$((ERRORS + 1))
+          fi
+          
+          if [ $ERRORS -gt 0 ]; then
+            echo "Validation FAILED with $ERRORS error(s)"
+            exit 1
+          fi
+          
+          echo "Validation PASSED"
+          
+      # =========================================================================
+      # Step 12: Upload build artifact
+      # =========================================================================
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ritemark-windows-x64
+          path: r/VSCode-win32-x64/
+          retention-days: 30
+          
+      # =========================================================================
+      # Step 13: Build summary
+      # =========================================================================
+      - name: Build summary
+        shell: bash
+        working-directory: r
+        run: |
+          echo "========================================" 
+          echo "Windows Build Complete"
+          echo "========================================"
+          echo ""
+          echo "Build output: VSCode-win32-x64/"
+          echo ""
+          
+          # Show directory structure
+          echo "Build contents:"
+          ls -lh VSCode-win32-x64/ | head -20
+          
+          echo ""
+          echo "Extension files:"
+          ls -lh VSCode-win32-x64/resources/app/extensions/ritemark/ | head -10
+          
+          echo ""
+          echo "Artifact uploaded as: ritemark-windows-x64"
+          echo "Retention: 30 days"
