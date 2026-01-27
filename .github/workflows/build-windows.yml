@@ -16,18 +16,22 @@ jobs:
     
     steps:
       # =========================================================================
-      # Step 1: Checkout with short path + VS Code submodule
+      # Step 1: Checkout RiteMark + clone VS Code source
       # =========================================================================
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          path: r  # Short path to avoid Windows MAX_PATH issues (Codex #7)
-          submodules: recursive
-          fetch-depth: 0  # Full clone needed — submodule points to specific VS Code commit
-          
       - name: Enable Git long paths
         shell: bash
         run: git config --global core.longpaths true
+
+      - name: Checkout RiteMark
+        uses: actions/checkout@v4
+        with:
+          path: r  # Short path to avoid Windows MAX_PATH issues (Codex #7)
+
+      - name: Clone VS Code OSS (1.94.0)
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 1.94.0 https://github.com/microsoft/vscode.git r/vscode
+          echo "VS Code 1.94.0 cloned"
         
       # =========================================================================
       # Step 2: Setup toolchain
