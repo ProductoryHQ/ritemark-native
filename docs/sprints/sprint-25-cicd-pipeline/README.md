@@ -91,12 +91,15 @@ See `research/04-delivery-architecture.md` for the complete flow diagram.
 
 ## Approval Gate
 
-**Current Phase:** 1 (RESEARCH) - Updating with review findings
+**Current Phase:** 0 (PROOF OF CONCEPT)
 
-This sprint follows the 6-phase workflow enforced by `sprint-manager` agent:
-1. 🔄 **RESEARCH** - Incorporating Codex review (9 findings)
-2. ⏸️ **PLAN** - Pending (needs re-approval with fixes)
-3. ⏸️ **DEVELOP** - Pending
+**Core question:** Can GitHub Actions produce a working Windows RiteMark build?
+
+This sprint follows a modified workflow — Phase 0 gates everything else:
+0. 🔄 **PROOF OF CONCEPT** - Single Windows build on GitHub Actions
+1. ✅ **RESEARCH** - Complete (+ Codex review incorporated)
+2. ⏸️ **PLAN** - Pending (needs re-approval after Phase 0 results)
+3. ⏸️ **DEVELOP** - Blocked until Phase 0 proves feasibility
 4. ⏸️ **TEST & VALIDATE** - Pending
 5. ⏸️ **CLEANUP** - Pending
 6. ⏸️ **DEPLOY** - Pending
