@@ -41,6 +41,42 @@ Implement automated GitHub Actions workflows to build, validate, and release Rit
 
 ## Implementation Checklist
 
+### Phase 0: Proof of Concept — Can GitHub Actions build Windows RiteMark?
+
+**Goal:** Answer one question: does a GitHub Actions Windows runner produce a working RiteMark .exe?
+
+**Why this comes first:** All other phases (CI validation, release orchestration, update service, agent updates) are premature until we prove the core premise works. macOS pipeline already works locally — Windows is the unknown.
+
+**Success criteria:** A user can download the Windows build artifact, extract it, launch RiteMark, and open a .md file in the RiteMark editor.
+
+**Deliverable:** Single file: `.github/workflows/build-windows.yml`
+
+- [ ] Create minimal `build-windows.yml` with `workflow_dispatch` (manual trigger only)
+  - Setup: Node 20, Python 3.11 on `windows-latest`
+  - **[Codex #7]** Short checkout path (`path: r`) + `core.longpaths true`
+  - **[Codex #6]** Validate MSVC toolchain is available
+  - **[Codex #3]** Handle symlink: copy extension instead of symlink (Windows has no symlinks)
+  - Checkout VS Code submodule
+  - Install VS Code dependencies (`npm install` / `yarn`)
+  - Install RiteMark extension dependencies
+  - Apply patches
+  - Compile RiteMark extension (`npm run compile`)
+  - Build VS Code with `gulp vscode-win32-x64-min`
+  - Copy RiteMark extension to build output
+  - Validate: webview.js > 500KB, extension.js > 1KB
+  - Upload build as artifact (30-day retention)
+- [ ] Push workflow to GitHub
+- [ ] Trigger workflow manually from Actions tab
+- [ ] Download artifact
+- [ ] Test on Windows: extract, launch, open .md file
+- [ ] **GATE: Does it work? Y/N**
+  - **YES →** Proceed to Phase 3 (automate the rest)
+  - **NO →** Debug, fix, re-test until it works or document why it's infeasible
+
+**Estimated time:** Build ~35 min on GitHub runner. Testing requires Windows machine (VM or real).
+
+---
+
 ### Phase 1: Research (COMPLETED)
 - [x] Analyze current build scripts and gaps
 - [x] Review VSCodium CI architecture
