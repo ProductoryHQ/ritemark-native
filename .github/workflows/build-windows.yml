@@ -22,7 +22,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: r  # Short path to avoid Windows MAX_PATH issues (Codex #7)
-          submodules: true  # VS Code submodule
+          submodules: recursive
+          fetch-depth: 0  # Full clone needed — submodule points to specific VS Code commit
           
       - name: Enable Git long paths
         shell: bash
