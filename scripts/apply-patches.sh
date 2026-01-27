@@ -78,43 +78,43 @@ for patch in "${PATCHES[@]}"; do
         echo -n "Checking $PATCH_NAME... "
         if git apply --check "$patch" 2>/dev/null; then
             echo -e "${GREEN}OK (can apply)${NC}"
-            ((APPLIED++))
+            APPLIED=$((APPLIED + 1))
         elif git apply --check --reverse "$patch" 2>/dev/null; then
             echo -e "${YELLOW}Already applied${NC}"
-            ((SKIPPED++))
+            SKIPPED=$((SKIPPED + 1))
         else
             echo -e "${RED}CONFLICT${NC}"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     elif [ "$REVERSE" = true ]; then
         echo -n "Removing $PATCH_NAME... "
         if git apply --reverse "$patch" 2>/dev/null; then
             echo -e "${GREEN}Done${NC}"
-            ((APPLIED++))
+            APPLIED=$((APPLIED + 1))
         elif git apply --check "$patch" 2>/dev/null; then
             echo -e "${YELLOW}Not applied (skipping)${NC}"
-            ((SKIPPED++))
+            SKIPPED=$((SKIPPED + 1))
         else
             echo -e "${RED}Failed${NC}"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     else
         echo -n "Applying $PATCH_NAME... "
         if git apply --check --reverse "$patch" 2>/dev/null; then
             echo -e "${YELLOW}Already applied (skipping)${NC}"
-            ((SKIPPED++))
+            SKIPPED=$((SKIPPED + 1))
         elif git apply "$patch" 2>/dev/null; then
             echo -e "${GREEN}Done${NC}"
-            ((APPLIED++))
+            APPLIED=$((APPLIED + 1))
         else
             echo -e "${RED}Failed${NC}"
             echo "  Attempting with 3-way merge..."
             if git apply --3way "$patch"; then
                 echo -e "  ${GREEN}Applied with merge${NC}"
-                ((APPLIED++))
+                APPLIED=$((APPLIED + 1))
             else
                 echo -e "  ${RED}Could not apply. Manual intervention needed.${NC}"
-                ((FAILED++))
+                FAILED=$((FAILED + 1))
             fi
         fi
     fi
