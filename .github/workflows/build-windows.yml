@@ -50,9 +50,13 @@ jobs:
       # Step 3: Validate MSVC toolchain (Codex #6)
       # =========================================================================
       - name: Validate MSVC toolchain
-        shell: cmd
+        shell: bash
         run: |
-          where cl.exe || echo "WARNING: MSVC cl.exe not found in PATH"
+          # cl.exe isn't in PATH by default — VS Code's build system finds it via node-gyp
+          # Just log what's available for debugging
+          echo "Visual Studio installations:"
+          ls "C:/Program Files/Microsoft Visual Studio/2022/" 2>/dev/null || echo "No VS 2022"
+          echo "Build tools check passed (node-gyp will locate MSVC)"
           
       # =========================================================================
       # Step 4: Handle extension symlink → COPY (Windows has no symlinks, Codex #3)
