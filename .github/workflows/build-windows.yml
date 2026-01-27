@@ -5,6 +5,10 @@ name: Build Windows (PoC)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-windows.yml'
 
 jobs:
   build:
