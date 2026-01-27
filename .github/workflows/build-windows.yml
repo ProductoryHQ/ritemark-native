@@ -67,11 +67,11 @@ jobs:
         run: |
           # Remove symlink if it exists (will fail on Windows anyway)
           rm -rf vscode/extensions/ritemark 2>/dev/null || true
-          
-          # COPY extension instead of symlink
-          cp -R extensions/ritemark vscode/extensions/ritemark
-          
-          echo "Extension copied to vscode/extensions/ritemark"
+
+          # COPY extension, excluding macOS-only binaries (contain symlinks Windows can't handle)
+          rsync -a --exclude='binaries/darwin-arm64' extensions/ritemark/ vscode/extensions/ritemark/
+
+          echo "Extension copied to vscode/extensions/ritemark (excluding darwin binaries)"
           
       # =========================================================================
       # Step 5: Install VS Code dependencies
