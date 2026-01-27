@@ -1,7 +1,7 @@
-# Sprint 24: Cross-Platform CI/CD Pipeline
+# Sprint 25: Cross-Platform CI/CD Pipeline
 
-**Status:** Phase 3 (DEVELOP) - Approved ✅
-**Started:** 2026-01-25
+**Status:** Phase 1 (RESEARCH) - Incorporating review findings
+**Started:** 2026-01-27
 **Goal:** Achieve Level 1 ("Works") CI/CD maturity
 
 ---
@@ -33,7 +33,7 @@ This sprint implements automated GitHub Actions workflows to build RiteMark Nati
 ## Sprint Structure
 
 ```
-docs/sprints/sprint-24-cicd-pipeline/
+docs/sprints/sprint-25-cicd-pipeline/
 ├── README.md                           # This file
 ├── sprint-plan.md                      # Detailed plan with checklist
 ├── research/
@@ -91,18 +91,38 @@ See `research/04-delivery-architecture.md` for the complete flow diagram.
 
 ## Approval Gate
 
-**Current Phase:** 3 (DEVELOP) ✅
-**Gate:** PASSED - Jarmo approved on 2026-01-25
+**Current Phase:** 1 (RESEARCH) - Updating with review findings
 
 This sprint follows the 6-phase workflow enforced by `sprint-manager` agent:
-1. ✅ **RESEARCH** - Complete
-2. ✅ **PLAN** - Approved
-3. 🔄 **DEVELOP** - In Progress
+1. 🔄 **RESEARCH** - Incorporating Codex review (9 findings)
+2. ⏸️ **PLAN** - Pending (needs re-approval with fixes)
+3. ⏸️ **DEVELOP** - Pending
 4. ⏸️ **TEST & VALIDATE** - Pending
 5. ⏸️ **CLEANUP** - Pending
 6. ⏸️ **DEPLOY** - Pending
 
+**History:** Originally Sprint 24 (pivoted to RAG). Research preserved, now Sprint 25.
 **Scope addition:** release-manager agent update included per Jarmo's request.
+
+---
+
+## Codex Review (2026-01-27)
+
+External code review identified 9 gaps. All accepted. See `review-findings-and-suggestions.md` for full details.
+
+**Must fix before development:**
+
+| # | Finding | Fix |
+|---|---------|-----|
+| 1 | `release.yml` calls build workflows without `workflow_call` | Add `on: workflow_call` to build workflows |
+| 2 | PR validation scope conflict (Level 1 vs Level 2) | Resolve: PR validation IS Level 1 |
+| 3 | Windows symlink fix missing from Phase 3 checklist | Add junction/copy step to Windows workflow |
+| 4 | Version consistency gate missing | Add tag↔package.json↔product.json check in CI |
+| 5 | Electron/Node ABI risk | Pin Node to VS Code's version, log Electron/Node versions |
+| 6 | Windows MSVC toolchain not enforced | Add explicit MSVC setup/validation step |
+| 7 | Windows long-path risk | Use short checkout path (`path: r`) + enable long paths |
+| 8 | Artifact naming not validated | Add assertion step in release.yml before publishing |
+| 9 | Update service lacks test plan | Add manual test checklist for Windows update flow |
 
 ---
 
@@ -153,4 +173,4 @@ This sprint follows the 6-phase workflow enforced by `sprint-manager` agent:
 
 ---
 
-**Last Updated:** 2026-01-25 (Phase 2 - added delivery architecture research)
+**Last Updated:** 2026-01-27 (Renamed to Sprint 25, incorporated Codex review findings)

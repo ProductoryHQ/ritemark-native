@@ -1,4 +1,4 @@
-# Sprint 24: Cross-Platform CI/CD Pipeline
+# Sprint 25: Cross-Platform CI/CD Pipeline
 
 ## Goal
 
@@ -58,13 +58,18 @@ Implement automated GitHub Actions workflows to build, validate, and release Rit
 - [x] Add release-manager agent update to scope
 
 ### Phase 3: Development - Workflows
-- [ ] Create `.github/workflows/ci.yml` (PR validation)
+- [ ] Create `.github/workflows/ci.yml` (PR validation — Level 1)
   - Fast TypeScript compilation checks
   - Webview bundle integrity check
   - File icon count validation
   - Git status check (no uncommitted changes)
+  - **[Codex #2]** PR validation is confirmed Level 1 scope
 - [ ] Create `.github/workflows/build-windows.yml`
   - Setup: Node 20, Python 3.11, Git Bash
+  - **[Codex #6]** Explicit MSVC toolchain setup/validation
+  - **[Codex #7]** Short checkout path (`path: r`) + `core.longpaths true`
+  - **[Codex #3]** Windows symlink fix: recreate junction or copy extension
+  - **[Codex #5]** Pin Node to VS Code's version, log Electron/Node versions
   - Apply patches
   - Install dependencies (VS Code + RiteMark extension)
   - Backup extension before build (corruption guardrail)
@@ -74,14 +79,19 @@ Implement automated GitHub Actions workflows to build, validate, and release Rit
   - Validate build output (webview.js, extension.js sizes)
   - Create ZIP artifact
   - Upload artifact with 30-day retention
+  - **[Codex #1]** Add `on: workflow_call` trigger for reuse by release.yml
 - [ ] Create `.github/workflows/build-macos.yml`
   - Setup: Node 20, macOS runner
+  - **[Codex #5]** Log Electron/Node versions
   - Run `./scripts/build-prod.sh` (reuse existing)
   - Run `./scripts/create-dmg.sh` (skip signing/notarization)
   - Upload DMG artifact
+  - **[Codex #1]** Add `on: workflow_call` trigger for reuse by release.yml
 - [ ] Create `.github/workflows/release.yml`
-  - Wait for Windows + macOS builds
+  - Call build workflows via `workflow_call`
   - Download both artifacts
+  - **[Codex #8]** Assert expected artifact filenames exist before proceeding
+  - **[Codex #4]** Version consistency gate: tag ↔ package.json ↔ product.json
   - Generate SHA256 checksums
   - Create draft GitHub Release
   - Upload artifacts + checksums
@@ -114,7 +124,12 @@ Implement automated GitHub Actions workflows to build, validate, and release Rit
   - Handle ZIP extraction on Windows
   - Keep DMG handling for macOS
   - Add error handling for unsupported platforms
-- [ ] Test update flow manually (future release will validate)
+- [ ] **[Codex #9]** Manual update service test checklist:
+  - [ ] Download Windows ZIP, extract, launch app
+  - [ ] Verify platform detection returns 'win32'
+  - [ ] Verify asset pattern matches `.zip` file
+  - [ ] Verify macOS still detects `.dmg` correctly
+  - [ ] Document any issues for Level 2 automation
 
 ### Phase 5b: Development - release-manager Agent Update
 - [ ] Update `.claude/agents/release-manager.md`
@@ -175,14 +190,14 @@ Implement automated GitHub Actions workflows to build, validate, and release Rit
 
 ## Out of Scope (Explicit Non-Goals)
 
-These are explicitly NOT included in Sprint 24:
+These are explicitly NOT included in Sprint 25:
 
 | Item | Rationale | Future Sprint? |
 |------|-----------|----------------|
 | Linux builds | No user demand yet | Maybe (if requested) |
 | Windows ARM builds | Market share < 5% | Maybe (if requested) |
 | Intel Mac builds | Rosetta works well | Maybe (if issues reported) |
-| Code signing in CI | Complex setup, not MVP | Yes (Level 2, Sprint 25+) |
+| Code signing in CI | Complex setup, not MVP | Yes (Level 2, Sprint 26+) |
 | Full smoke tests | Requires GUI automation | Yes (Level 2) |
 | Auto-publish releases | Risky without smoke tests | Yes (Level 3) |
 | Update flow testing in CI | Requires 2+ releases | Yes (Level 3) |
@@ -277,17 +292,17 @@ Uses GitHub Actions and existing tools:
 
 ## Status
 
-**Current Phase:** 3 (DEVELOP) ✅
+**Current Phase:** 1 (RESEARCH) - Incorporating Codex review findings
 
-**Approval:** Granted by Jarmo on 2026-01-25
-
-**Gate:** PASSED - Implementation authorized
+**Previous approval (Sprint 24):** Granted by Jarmo on 2026-01-25
+**Re-approval needed:** Yes — plan updated with 9 Codex review fixes
 
 ## Approval
 
-- [x] Jarmo approved this sprint plan (2026-01-25)
+- [x] Jarmo approved original plan (2026-01-25, as Sprint 24)
+- [ ] Jarmo re-approves updated plan (Sprint 25, with Codex fixes)
 
-**Approval context:** "jah ja siis approved!" - includes release-manager agent update in scope
+**Approval context:** Original: "jah ja siis approved!" — Plan now updated with Codex code review findings (9 gaps addressed).
 
 ---
 
