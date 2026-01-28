@@ -89,81 +89,13 @@ These MUST always be true. If broken, the project won't work:
 
 * * *
 
-## Feature Flag System
+## Feature Flags
 
-RiteMark uses feature flags to control feature availability based on platform, stability, and user preferences.
+Project uses feature flags for platform-specific, experimental, and premium features.
 
-### When to Use Feature Flags
+**Implementation details:** `.claude/skills/feature-flags/SKILL.md`
 
-Use a feature flag if the feature is:
-
-| Scenario | Flag Status | Example |
-| --- | --- | --- |
-| Platform-specific (e.g., macOS-only) | `experimental` or `stable` | Voice dictation (darwin only) |
-| Experimental/unstable | `experimental` | New AI features in beta |
-| Requires large download | `experimental` | Whisper model (~75MB) |
-| Premium/paid feature | `premium` | Future: Pro features |
-| Needs kill-switch | `stable` or `experimental` | Features that might break |
-| Large UI change | `experimental` | Major editor redesigns |
-
-**Do NOT use flags for:**
-- Bug fixes
-- Internal refactoring
-- Small UI tweaks
-- Core infrastructure
-
-### How to Check Flags
-
-```typescript
-import { isEnabled } from './features';
-
-// Gate feature initialization
-if (isEnabled('voice-dictation')) {
-  this.dictationController = new DictationController(webview, context);
-}
-
-// Gate message handlers
-case 'dictation:start':
-  if (!isEnabled('voice-dictation')) {
-    return; // or show error
-  }
-  // ... handle dictation
-```
-
-### Flag Lifecycle
-
-1. **New feature** → Add as `experimental` (default OFF, requires user opt-in)
-2. **Testing phase** → Users enable via Settings UI
-3. **Stable** → Change status to `stable` (default ON)
-4. **Mature** → Remove flag entirely (feature is permanent)
-5. **Deprecation** → Set to `disabled` (prevent usage)
-
-### Flag Evaluation Logic
-
-```
-1. Flag exists? → No: false (+ warning)
-2. Status = 'disabled'? → Yes: false
-3. Status = 'premium'? → Yes: false (future: check license)
-4. Platform supported? → No: false
-5. Status = 'stable'? → Yes: true
-6. Status = 'experimental'? → Check user setting (default: false)
-```
-
-### Adding a New Flag
-
-1. Define in `extensions/ritemark/src/features/flags.ts`
-2. Add setting to `package.json` (if experimental)
-3. Gate feature code with `isEnabled(flagId)`
-4. Send feature state to webview (if UI needs it)
-5. Update sprint documentation
-
-### Best Practices
-
-- **Gate at the highest level** (activation, not every function call)
-- **One flag per feature** (don't combine unrelated features)
-- **Default experimental features to OFF** (opt-in for safety)
-- **Send feature state to webview** (so UI can hide disabled features)
-- **Provide helpful error messages** (when feature is disabled)
+**When to consider flags:** New features that need gating, platform restrictions, or kill-switch capability. Sprint-manager will prompt when relevant.
 
 * * *
 
@@ -300,6 +232,8 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 │   ├── product-marketer.md   # Changelog, release notes, landing page
 │   └── knowledge-builder.md  # Meta: creating new agents
 └── skills/
+    ├── feature-flags/        # When to use and how to implement feature flags
+    │   └── SKILL.md
     └── vscode-development/   # Knowledge base for vscode-expert
         ├── SKILL.md
         └── TROUBLESHOOTING.md

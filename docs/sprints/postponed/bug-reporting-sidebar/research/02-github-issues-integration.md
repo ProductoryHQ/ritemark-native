@@ -113,7 +113,7 @@ function generateBugReportUrl(userInput: {
   steps?: string;
   expected?: string;
 }): string {
-  const repoUrl = 'https://github.com/AICurator/ritemark-public';
+  const repoUrl = 'https://github.com/jarmo-productory/ritemark-public';
 
   // Collect system info
   const systemInfo = {

@@ -113,7 +113,7 @@ Add an easy-to-use bug reporting feature that allows customers to submit GitHub 
 - [ ] Test with VS Code theme (light mode)
 
 ### Phase 7: GitHub Repository Setup
-- [ ] Verify `bug` label exists in `AICurator/ritemark-public` repo
+- [ ] Verify `bug` label exists in `jarmo-productory/ritemark-public` repo
 - [ ] Create `user-reported` label:
   - Color: `#0075ca` (blue)
   - Description: "Reported via in-app bug reporter"
@@ -149,7 +149,7 @@ Follow existing webview patterns:
 
 ### URL Format Example
 ```
-https://github.com/AICurator/ritemark-public/issues/new?
+https://github.com/jarmo-productory/ritemark-public/issues/new?
   title=[Bug]%20Editor%20crashed%20when%20pasting
   &body=<ENCODED_BODY>
   &labels=bug,user-reported
