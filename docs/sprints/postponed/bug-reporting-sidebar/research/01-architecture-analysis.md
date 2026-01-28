@@ -103,7 +103,7 @@ This is the standard VS Code API for opening URLs in the default browser.
 **Method:** Generate URL with query parameters
 **Example:**
 ```
-https://github.com/AICurator/ritemark-public/issues/new?
+https://github.com/jarmo-productory/ritemark-public/issues/new?
   title=[Bug]%20...
   &body=...
   &labels=bug,user-reported
