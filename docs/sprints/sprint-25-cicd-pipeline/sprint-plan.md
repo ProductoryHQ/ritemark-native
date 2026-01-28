@@ -2,374 +2,119 @@
 
 ## Goal
 
-Implement automated GitHub Actions workflows to build, validate, and release RiteMark Native for Windows (x64) and macOS (arm64), achieving Level 1 ("Works") maturity with draft releases and quality gates.
+Automated GitHub Actions pipeline that builds, validates, and releases RiteMark Native for Windows (x64) and macOS (arm64). Level 1 maturity: unsigned builds, draft releases, quality gates.
 
-## Feature Flag Check
+## Feature Flag
 
-- [x] Does this sprint need a feature flag?
-  - **NO** - This is infrastructure/DevOps work (CI/CD pipelines)
-  - Not a user-facing feature
-  - No runtime behavior changes
-  - No platform-specific logic (except build outputs)
+No. Infrastructure work, no runtime behavior changes.
 
 ## Success Criteria
 
-- [x] `.github/workflows/ci.yml` runs fast PR validation (TypeScript, lint) in < 10 min
-- [x] `.github/workflows/build-windows.yml` produces working Windows x64 ZIP artifact
-- [x] `.github/workflows/build-macos.yml` produces working macOS arm64 DMG artifact
-- [x] `.github/workflows/release.yml` creates draft GitHub Release with both artifacts
-- [x] Windows build validates webview.js (> 500KB), extension.js (> 1KB)
-- [x] macOS build validates same (reuses existing build-prod.sh validation)
-- [x] SHA256 checksums generated for all artifacts
-- [x] Update service (`githubClient.ts`, `updateService.ts`) detects platform correctly
-- [x] Build time < 45 min per platform
-- [x] All workflows tested with manual triggers before enabling on tags
+- [ ] `build-windows.yml` produces a working Windows build with RiteMark icon and clean UI
+- [ ] `build-macos.yml` produces a working macOS arm64 DMG
+- [ ] `release.yml` creates draft GitHub Release with both platform artifacts + checksums
+- [ ] `ci.yml` runs fast PR validation (TypeScript, webview integrity)
+- [ ] Update service detects platform and downloads correct artifact (`.dmg` / `.zip`)
+- [ ] Jarmo tests both artifacts locally before first real release
 
-## Deliverables
+## What's Done
 
-| Deliverable | Description | Location |
-|-------------|-------------|----------|
-| PR validation workflow | Fast checks (TypeScript, lint) on Linux runner | `.github/workflows/ci.yml` |
-| Windows build workflow | Native Windows x64 build with artifact upload | `.github/workflows/build-windows.yml` |
-| macOS build workflow | macOS arm64 build with DMG creation | `.github/workflows/build-macos.yml` |
-| Release orchestration | Multi-platform release with checksums | `.github/workflows/release.yml` |
-| Windows build script | PowerShell script for local Windows builds | `scripts/build-windows.ps1` |
-| QA check script | Minimal validation checks for CI | `scripts/qa-check.sh` |
-| Update service fixes | Platform-aware asset detection | `extensions/ritemark/src/update/` |
-| **release-manager update** | Support CI artifacts + Windows verification | `.claude/agents/release-manager.md` |
-| Documentation | CI/CD usage guide | `docs/sprints/sprint-24-cicd-pipeline/notes/ci-usage.md` |
+- [x] **Phase 0: Windows PoC** (2026-01-28) — `build-windows.yml` exists, builds successfully, app launches and opens .md files. Run #21445463668, artifact ~168MB ZIP.
+- [x] **Research** — VSCodium CI analysis, Windows build requirements, cost estimates, Codex review (9 gaps), delivery architecture design. See `research/` folder.
+- [x] **Plan** — Original approved by Jarmo 2026-01-25 (as Sprint 24). Rewritten 2026-01-28 after Phase 0 results.
+
+### Known Issues from Phase 0 Testing
+
+| Issue | Root Cause | Fix |
+| --- | --- | --- |
+| RiteMark icon missing | CI doesn't copy `branding/icons/icon.ico` to `vscode/resources/win32/code.ico` | Add `cp` step before gulp build |
+| Sidebar shows Run/Debug, Extensions, Accounts, Manage | CI clones fresh VS Code — submodule-only UI customizations are lost (no patches for them) | Create missing patches (010, 011, update 004) |
+| No installer | ZIP only, no Inno Setup | Add `installer/ritemark.iss` + Inno Setup CI step |
+
+See README.md "Phase 0 Results" for detailed research on each fix.
+
+* * *
 
 ## Implementation Checklist
 
-### Phase 0: Proof of Concept — Can GitHub Actions build Windows RiteMark?
+### Phase 3: Harden Windows Build
 
-**Goal:** Answer one question: does a GitHub Actions Windows runner produce a working RiteMark .exe?
+Fix the three issues found during Phase 0 testing:
 
-**Why this comes first:** All other phases (CI validation, release orchestration, update service, agent updates) are premature until we prove the core premise works. macOS pipeline already works locally — Windows is the unknown.
+- [ ] Add branding icon step to `build-windows.yml` (`cp branding/icons/icon.ico vscode/resources/win32/code.ico`)
+- [ ] Create `010-hide-accounts-manage-gear.patch` (target: `globalCompositeBar.ts`)
+- [ ] Create `011-hide-run-debug-sidebar.patch` (target: `debug.contribution.ts` — `hideIfEmpty: true`, WelcomeView `when: never-show`)
+- [ ] Update `004-hide-extensions-view-menu.patch` to include `hideIfEmpty: true`
+- [ ] Create `installer/ritemark.iss` (Inno Setup script, .md-focused)
+- [ ] Add Inno Setup steps to `build-windows.yml` (`choco install innosetup --version=6.4.3`)
+- [ ] Add `on: workflow_call` trigger to `build-windows.yml` (for reuse by `release.yml`)
+- [ ] Test: trigger build, download, verify icon + clean sidebar + installer works
 
-**Success criteria:** A user can download the Windows build artifact, extract it, launch RiteMark, and open a .md file in the RiteMark editor.
+### Phase 4: Remaining Workflows
 
-**Deliverable:** Single file: `.github/workflows/build-windows.yml`
+- [ ] Create `build-macos.yml` -   Wraps existing `build-prod.sh` + `create-dmg.sh`      -   Upload DMG artifact      -   Add `on: workflow_call` trigger
+- [ ] Create `ci.yml` (PR validation) -   TypeScript compilation check      -   Webview bundle integrity (> 500KB)      -   File icon count (> 10)      -   Runs on Linux (fast, cheap)
+- [ ] Create `release.yml` -   Triggered by tag push (`v*`) + manual      -   Calls `build-windows.yml` and `build-macos.yml` via `workflow_call`      -   Version consistency gate: tag matches package.json      -   SHA256 checksums for all artifacts      -   Creates draft GitHub Release with artifacts attached
 
-- [ ] Create minimal `build-windows.yml` with `workflow_dispatch` (manual trigger only)
-  - Setup: Node 20, Python 3.11 on `windows-latest`
-  - **[Codex #7]** Short checkout path (`path: r`) + `core.longpaths true`
-  - **[Codex #6]** Validate MSVC toolchain is available
-  - **[Codex #3]** Handle symlink: copy extension instead of symlink (Windows has no symlinks)
-  - Checkout VS Code submodule
-  - Install VS Code dependencies (`npm install` / `yarn`)
-  - Install RiteMark extension dependencies
-  - Apply patches
-  - Compile RiteMark extension (`npm run compile`)
-  - Build VS Code with `gulp vscode-win32-x64-min`
-  - Copy RiteMark extension to build output
-  - Validate: webview.js > 500KB, extension.js > 1KB
-  - Upload build as artifact (30-day retention)
-- [ ] Push workflow to GitHub
-- [ ] Trigger workflow manually from Actions tab
-- [ ] Download artifact
-- [ ] Test on Windows: extract, launch, open .md file
-- [ ] **GATE: Does it work? Y/N**
-  - **YES →** Proceed to Phase 3 (automate the rest)
-  - **NO →** Debug, fix, re-test until it works or document why it's infeasible
+### Phase 5: Update Service
 
-**Estimated time:** Build ~35 min on GitHub runner. Testing requires Windows machine (VM or real).
+Make the existing update service work cross-platform:
 
----
+- [ ] Fix `githubClient.ts` — detect platform, match correct asset pattern (`.dmg` for darwin, `.zip` for win32)
+- [ ] Fix `updateService.ts` — platform-aware download, ZIP extraction on Windows, keep DMG for macOS
+- [ ] Manual test: verify macOS still works, verify Windows detects `.zip`
 
-### Phase 1: Research (COMPLETED)
-- [x] Analyze current build scripts and gaps
-- [x] Review VSCodium CI architecture
-- [x] Document Windows build requirements
-- [x] Design 3-level maturity model (Level 0→1→2→3)
-- [x] Create decision log for platform support
-- [x] Analyze costs and GitHub Actions free tier limits
-- [x] Document risks and mitigation strategies
+### Phase 6: Test, Clean Up, Deploy
 
-### Phase 2: Plan (COMPLETED)
-- [x] Review sprint plan with Jarmo
-- [x] Confirm platform decisions (Windows x64 only, macOS arm64 only)
-- [x] Confirm Level 1 scope (unsigned builds, draft releases)
-- [x] Get approval to proceed to Phase 3
-- [x] Add release-manager agent update to scope
-
-### Phase 3: Development - Workflows
-- [ ] Create `.github/workflows/ci.yml` (PR validation — Level 1)
-  - Fast TypeScript compilation checks
-  - Webview bundle integrity check
-  - File icon count validation
-  - Git status check (no uncommitted changes)
-  - **[Codex #2]** PR validation is confirmed Level 1 scope
-- [ ] Create `.github/workflows/build-windows.yml`
-  - Setup: Node 20, Python 3.11, Git Bash
-  - **[Codex #6]** Explicit MSVC toolchain setup/validation
-  - **[Codex #7]** Short checkout path (`path: r`) + `core.longpaths true`
-  - **[Codex #3]** Windows symlink fix: recreate junction or copy extension
-  - **[Codex #5]** Pin Node to VS Code's version, log Electron/Node versions
-  - Apply patches
-  - Install dependencies (VS Code + RiteMark extension)
-  - Backup extension before build (corruption guardrail)
-  - Build VS Code with `gulp vscode-win32-x64-min`
-  - Verify + restore extension if corrupted
-  - Copy RiteMark extension to production app
-  - Validate build output (webview.js, extension.js sizes)
-  - Create ZIP artifact
-  - Upload artifact with 30-day retention
-  - **[Codex #1]** Add `on: workflow_call` trigger for reuse by release.yml
-- [ ] Create `.github/workflows/build-macos.yml`
-  - Setup: Node 20, macOS runner
-  - **[Codex #5]** Log Electron/Node versions
-  - Run `./scripts/build-prod.sh` (reuse existing)
-  - Run `./scripts/create-dmg.sh` (skip signing/notarization)
-  - Upload DMG artifact
-  - **[Codex #1]** Add `on: workflow_call` trigger for reuse by release.yml
-- [ ] Create `.github/workflows/release.yml`
-  - Call build workflows via `workflow_call`
-  - Download both artifacts
-  - **[Codex #8]** Assert expected artifact filenames exist before proceeding
-  - **[Codex #4]** Version consistency gate: tag ↔ package.json ↔ product.json
-  - Generate SHA256 checksums
-  - Create draft GitHub Release
-  - Upload artifacts + checksums
-  - Auto-generate release notes
-
-### Phase 4: Development - Scripts
-- [ ] Create `scripts/build-windows.ps1` (native Windows build script)
-  - Pre-flight checks (Node, Python, VS Code dir)
-  - Apply patches
-  - Install dependencies
-  - Build VS Code
-  - Copy extension
-  - Validate output
-  - Create ZIP
-  - Generate checksum
-- [ ] Create `scripts/qa-check.sh` (minimal CI validation)
-  - TypeScript compilation (VS Code)
-  - TypeScript compilation (RiteMark extension)
-  - Webview bundle size check (> 500KB)
-  - File icon count check (> 10)
-  - Git status check (no uncommitted changes)
-
-### Phase 5: Development - Update Service Fixes
-- [ ] Fix `extensions/ritemark/src/update/githubClient.ts`
-  - Detect current platform (darwin, win32, linux)
-  - Platform-specific asset pattern (`.dmg` for darwin, `.zip` for win32)
-  - Handle multiple architecture suffixes (arm64, x64)
-- [ ] Fix `extensions/ritemark/src/update/updateService.ts`
-  - Platform-aware download path
-  - Handle ZIP extraction on Windows
-  - Keep DMG handling for macOS
-  - Add error handling for unsupported platforms
-- [ ] **[Codex #9]** Manual update service test checklist:
-  - [ ] Download Windows ZIP, extract, launch app
-  - [ ] Verify platform detection returns 'win32'
-  - [ ] Verify asset pattern matches `.zip` file
-  - [ ] Verify macOS still detects `.dmg` correctly
-  - [ ] Document any issues for Level 2 automation
-
-### Phase 5b: Development - release-manager Agent Update
-- [ ] Update `.claude/agents/release-manager.md`
-  - Add dual-mode support (CI artifacts vs local builds)
-  - Add `gh release download` commands for CI artifacts
-  - Add Windows ZIP verification checks
-  - Add Windows-specific checklist (no signing, SmartScreen docs)
-  - Update Pre-Release Audit to detect artifact source
-  - Add SHA256 checksum verification for CI artifacts
-  - Document SmartScreen workaround text for release notes
-
-### Phase 6: Testing & Validation
-- [ ] Test `ci.yml` with manual trigger on PR branch
-- [ ] Test `build-windows.yml` with manual trigger
-  - Verify artifact uploaded
-  - Download and test locally on Windows
-  - Verify .md files open in RiteMark editor
-- [ ] Test `build-macos.yml` with manual trigger
-  - Verify DMG uploaded
-  - Download and test locally on macOS
-  - Verify .md files open in RiteMark editor
-- [ ] Test `release.yml` with test tag (e.g., `v0.0.1-test`)
-  - Verify draft release created
-  - Verify both artifacts present
-  - Verify checksums correct
-  - Delete test release after validation
-- [ ] Invoke `qa-validator` agent for final checks
-
-### Phase 7: Cleanup
-- [ ] Remove test artifacts and releases
-- [ ] Add comments to workflows explaining key steps
-- [ ] Update `CLAUDE.md` with CI/CD workflow info
+- [ ] Test all 4 workflows with manual triggers
+- [ ] Jarmo tests Windows installer + macOS DMG locally
+- [ ] Create test release tag (e.g. `v0.0.1-test`), verify draft release, delete after
 - [ ] Document SmartScreen workaround for unsigned Windows builds
-- [ ] Clean up any debug code or temporary files
+- [ ] Create real release tag when ready
 
-### Phase 8: Deploy
-- [ ] Final commit with all workflows
-- [ ] Push to GitHub
-- [ ] Verify workflows appear in Actions tab
-- [ ] Create real release tag (e.g., `v1.0.4`)
-- [ ] Monitor build progress
-- [ ] Verify draft release created
-- [ ] Test both artifacts locally
-- [ ] Jarmo publishes release
-- [ ] Invoke `qa-validator` for final production check
+* * *
 
-## Risks & Mitigations
+## Out of Scope
 
-| Risk | Impact | Probability | Mitigation |
-|------|--------|-------------|------------|
-| VS Code missing `win32ContextMenu` fix | Windows build fails | Medium | Check commit history, create patch if needed |
-| Extension symlink corruption during build | App can't open .md files | High | Backup/restore pattern, post-build validation |
-| Native module compilation failure (Windows) | Build fails | Medium | Use windows-latest (has MSVC), setup Python 3.11 |
-| Runner time exceeds free tier | Can't build releases | Low | Optimize caching, monitor usage, upgrade if needed |
-| Update service breaks on Windows | Auto-update fails | High | Must fix before release (in scope) |
-| Artifact upload fails | Build succeeds but artifact lost | Low | Use latest action version, 30-day retention |
-| SmartScreen warnings scare users | Low adoption | High | Document workaround clearly in release notes |
+| Item | Rationale |
+| --- | --- |
+| Linux builds | No user demand |
+| Windows ARM | < 5% market share |
+| Code signing in CI | Level 2 (future sprint) |
+| Auto-publish releases | Risky without smoke tests |
+| `scripts/build-windows.ps1` | Nobody builds Windows locally — CI does it |
+| `scripts/qa-check.sh` | Inline checks in CI workflow, don't need separate script |
+| release-manager agent update | Documentation work, not blocking pipeline |
 
-## Out of Scope (Explicit Non-Goals)
+## Key Decisions
 
-These are explicitly NOT included in Sprint 25:
+1.  Windows x64 only, macOS arm64 only, no Linux
+    
+2.  Draft releases only (manual publish)
+    
+3.  No code signing in CI (Level 1)
+    
+4.  Node 20 hardcoded in workflows
+    
+5.  Inno Setup 6.4.3 (last free version) for Windows installer
+    
+6.  Artifact retention: 30 days
+    
+7.  Triggers: tag push (`v*`) + `workflow_dispatch`
+    
 
-| Item | Rationale | Future Sprint? |
-|------|-----------|----------------|
-| Linux builds | No user demand yet | Maybe (if requested) |
-| Windows ARM builds | Market share < 5% | Maybe (if requested) |
-| Intel Mac builds | Rosetta works well | Maybe (if issues reported) |
-| Code signing in CI | Complex setup, not MVP | Yes (Level 2, Sprint 26+) |
-| Full smoke tests | Requires GUI automation | Yes (Level 2) |
-| Auto-publish releases | Risky without smoke tests | Yes (Level 3) |
-| Update flow testing in CI | Requires 2+ releases | Yes (Level 3) |
-| Matrix builds (multiple architectures) | Not needed for MVP | Yes (Level 2) |
-| Self-hosted runners | Within free tier limits | Maybe (if costs too high) |
-| Cross-compilation | Proven infeasible | No (never) |
+## Risks
 
-## Technical Notes
+| Risk | Mitigation |
+| --- | --- |
+| Patches fail on Windows | Test patches on fresh VS Code 1.94.0 clone locally first |
+| SmartScreen warns users | Document workaround in release notes |
+| macOS runner costs (10x multiplier) | Monitor usage, stay under 2000 min/month free tier |
+| Update service breaks macOS while adding Windows | Test both platforms before release |
 
-### Platform Support Matrix (Level 1)
-
-| Platform | Architecture | Build Method | Artifact | Signed? |
-|----------|--------------|--------------|----------|---------|
-| macOS | arm64 | GitHub Actions (macos-latest-xlarge) | DMG | No (manual post-build) |
-| Windows | x64 | GitHub Actions (windows-latest) | ZIP | No (unsigned) |
-| Linux | - | Not supported | - | - |
-
-### Runner Cost Estimate (Per Month)
-
-| Workflow | Runs | Duration | Platform | Multiplier | Total Minutes |
-|----------|------|----------|----------|------------|---------------|
-| CI (PRs) | 20 | 5 min | Linux | 1× | 100 min |
-| Windows builds | 4 | 35 min | Windows | 2× | 280 min |
-| macOS builds | 4 | 30 min | macOS | 10× | 1200 min |
-| **TOTAL** | | | | | **1580 min** |
-
-**Free Tier Limit:** 2000 min/month (safe margin: 420 min)
-
-### File Changes Summary
-
-```
-New files (6):
-- .github/workflows/ci.yml (~60 lines)
-- .github/workflows/build-windows.yml (~120 lines)
-- .github/workflows/build-macos.yml (~50 lines)
-- .github/workflows/release.yml (~70 lines)
-- scripts/build-windows.ps1 (~150 lines)
-- scripts/qa-check.sh (~80 lines)
-
-Modified files (3):
-- extensions/ritemark/src/update/githubClient.ts (~30 lines changed)
-- extensions/ritemark/src/update/updateService.ts (~50 lines changed)
-- CLAUDE.md (~30 lines added for CI/CD section)
-
-Total new code: ~530 lines
-Total changes: ~610 lines
-```
-
-### Dependencies
-
-**No new npm packages required.**
-
-Uses GitHub Actions and existing tools:
-- `actions/checkout@v4`
-- `actions/setup-node@v4`
-- `actions/setup-python@v5`
-- `actions/upload-artifact@v4`
-- `actions/download-artifact@v4`
-- `softprops/action-gh-release@v1`
-
-### Performance Impact
-
-**Build Times (Projected):**
-- PR validation: 5-8 min (Linux, fast checks only)
-- Windows build: 30-40 min (native compilation)
-- macOS build: 25-35 min (existing script)
-- Release orchestration: 1-2 min (download + upload)
-
-**Total Release Pipeline:** ~60-80 min (parallel builds)
-
-## Testing Checklist
-
-### Manual Tests (Before Phase 8)
-- [ ] `ci.yml` passes on clean PR
-- [ ] `ci.yml` fails on broken TypeScript
-- [ ] `ci.yml` fails on missing webview bundle
-- [ ] Windows build completes without errors
-- [ ] Windows ZIP extracts correctly
-- [ ] Windows app launches and opens .md files
-- [ ] macOS build completes without errors
-- [ ] macOS DMG mounts and installs
-- [ ] macOS app launches and opens .md files
-- [ ] Release workflow creates draft
-- [ ] Checksums are correct (manual verification)
-
-### Integration Tests
-- [ ] Update service detects platform correctly
-- [ ] Update service finds correct asset (darwin → .dmg, win32 → .zip)
-- [ ] Update service handles missing assets gracefully
-- [ ] All existing features work on Windows build
-- [ ] All existing features work on macOS build
-
-## Status
-
-**Current Phase:** 1 (RESEARCH) - Incorporating Codex review findings
-
-**Previous approval (Sprint 24):** Granted by Jarmo on 2026-01-25
-**Re-approval needed:** Yes — plan updated with 9 Codex review fixes
+* * *
 
 ## Approval
 
-- [x] Jarmo approved original plan (2026-01-25, as Sprint 24)
-- [ ] Jarmo re-approves updated plan (Sprint 25, with Codex fixes)
-
-**Approval context:** Original: "jah ja siis approved!" — Plan now updated with Codex code review findings (9 gaps addressed).
-
----
-
-## Key Decisions Summary
-
-The following decisions were made during research and are reflected in this plan:
-
-1. **Windows:** x64 only (ARM out of scope)
-2. **macOS:** arm64 only (Intel via Rosetta)
-3. **Linux:** Out of scope (no demand)
-4. **PR Validation:** Fast checks on Linux only (no full platform builds)
-5. **Build Triggers:** Tags (`v*`) + manual (`workflow_dispatch`)
-6. **Release Strategy:** Draft releases (manual publish for safety)
-7. **Code Signing:** Skip in CI (Level 1), add in Level 2
-8. **Smoke Tests:** Skip in Level 1, add in Level 2
-9. **Node Version:** Hardcode `20` in workflows
-10. **Caching:** Use built-in `cache: 'npm'` only
-11. **Artifact Retention:** 30 days
-12. **QA Checks:** Minimal script (not full qa-validator agent)
-
-All decisions are **reversible** and can be upgraded in future sprints (Level 2/3).
-
----
-
-## Post-Approval: Implementation Notes
-
-This section will be filled during Phase 3+ (Development) with:
-- Actual workflow YAML snippets
-- Edge cases encountered
-- Adjustments made to the plan
-- Useful patterns discovered
-- Build logs and debugging notes
-
-(To be completed after approval)
+- [x] Jarmo approved original plan (2026-01-25)
+- [x] Jarmo approves rewritten plan (2026-01-28, post-Phase 0)

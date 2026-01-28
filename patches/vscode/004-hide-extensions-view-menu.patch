@@ -1,17 +1,17 @@
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-index 01999f16d61..cdacf03b899 100644
+index f4d62c70da1..cdacf03b899 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
 +++ b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
 @@ -4,7 +4,7 @@
   *--------------------------------------------------------------------------------------------*/
- 
+
  import { localize, localize2 } from '../../../../nls.js';
 -import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
 +// RiteMark: KeyMod, KeyCode removed - unused after hiding Extensions menu item
  import { Registry } from '../../../../platform/registry/common/platform.js';
  import { MenuRegistry, MenuId, registerAction2, Action2, IMenuItem, IAction2Options } from '../../../../platform/actions/common/actions.js';
  import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
-@@ -106,12 +106,13 @@ Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegis
+@@ -106,17 +106,19 @@ Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegis
  	{
  		id: VIEWLET_ID,
  		title: localize2('extensions', "Extensions"),
@@ -31,3 +31,9 @@ index 01999f16d61..cdacf03b899 100644
  		ctorDescriptor: new SyncDescriptor(ExtensionsViewPaneContainer),
  		icon: extensionsViewIcon,
  		order: 4,
+ 		rejectAddedViews: true,
+ 		alwaysUseContainerInfo: true,
++		hideIfEmpty: true, // RiteMark: Hide when no extensions gallery
+ 	}, ViewContainerLocation.Sidebar);
+
+ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration)
