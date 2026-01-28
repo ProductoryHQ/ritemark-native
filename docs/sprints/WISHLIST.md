@@ -50,6 +50,7 @@ Redesign Welcome screen for total newbies
 - [ ] Customization (CLAUDE.md, Agents.md support)
 - [ ] AI image generation via command palette - \[ \] Opens dialog to configure Google API key - \[ \] Uses Gemini API to generate images
 - [ ] On left sidebar - possibility to edit Agents and Skills/Tools of Claude Code
+- [ ] RAG to support pdf, word, ppt etc (finishing sprint-24 ideas, but we need to solve local-first dilemma)
 
 ## Export
 
