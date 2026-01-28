@@ -1,32 +1,51 @@
 # Sprint 25: Cross-Platform CI/CD Pipeline
 
-**Status:** Phase 1 (RESEARCH) - Incorporating review findings
+**Status:** Phase 0 COMPLETE. Awaiting approval for Phase 3.
 **Started:** 2026-01-27
-**Goal:** Achieve Level 1 ("Works") CI/CD maturity
+**Goal:** Level 1 CI/CD — automated builds for Windows x64 + macOS arm64, draft GitHub Releases.
 
 ---
 
-## Quick Summary
+## Current State
 
-This sprint implements automated GitHub Actions workflows to build RiteMark Native for Windows (x64) and macOS (arm64). We're moving from Level 0 ("Hope" - manual builds only) to Level 1 ("Works" - automated builds with quality gates).
+**Phase 0 (PoC) passed.** Windows build works on GitHub Actions. Jarmo tested 2026-01-28 — app launches, .md files open.
 
-### What We're Building
+Three issues found during testing (icon, sidebar, installer) are scoped into Phase 3.
 
-1. **`.github/workflows/ci.yml`** - Fast PR validation (TypeScript, lint)
-2. **`.github/workflows/build-windows.yml`** - Windows x64 production build
-3. **`.github/workflows/build-macos.yml`** - macOS arm64 production build
-4. **`.github/workflows/release.yml`** - Multi-platform GitHub Release
-5. **Update service fixes** - Platform-aware asset detection
-6. **Build scripts** - Windows PowerShell + QA check script
+### Remaining Phases
 
-### Key Decisions
+| Phase | What | Status |
+|-------|------|--------|
+| 3 | Harden Windows build (icon, patches, installer) | Pending approval |
+| 4 | Create remaining workflows (build-macos, ci, release) | Pending |
+| 5 | Update service cross-platform support | Pending |
+| 6 | Test, clean up, deploy | Pending |
 
-- **Windows:** x64 only (no ARM)
-- **macOS:** arm64 only (Intel via Rosetta)
-- **Linux:** Out of scope
-- **Signing:** Not in CI (manual post-build)
-- **Release:** Draft only (manual publish)
-- **Scope:** Level 1 ("Works") - basic automation
+See `sprint-plan.md` for the full checklist.
+
+---
+
+## Phase 0 Results (2026-01-28)
+
+**Windows PoC Build: SUCCESS** — GitHub Actions run #21445463668
+
+### What Worked
+- VS Code compiles on `windows-latest` runner
+- Extension copied correctly (not symlinked)
+- Patches applied (with fallback)
+- Webview bundle + extension.js validated
+- Artifact uploaded (~168MB ZIP)
+- App launches and opens .md files
+
+### Known Issues
+
+| Issue | Fix (Phase 3) |
+|-------|--------------|
+| RiteMark icon missing | `cp branding/icons/icon.ico vscode/resources/win32/code.ico` before build |
+| Sidebar: Run/Debug, Extensions, Accounts, Manage visible | Create patches 010, 011; update patch 004 |
+| No installer (ZIP only) | Add `installer/ritemark.iss` + Inno Setup 6.4.3 in CI |
+
+Detailed research on each fix is in `sprint-plan.md` and the `research/` folder.
 
 ---
 
@@ -35,145 +54,16 @@ This sprint implements automated GitHub Actions workflows to build RiteMark Nati
 ```
 docs/sprints/sprint-25-cicd-pipeline/
 ├── README.md                           # This file
-├── sprint-plan.md                      # Detailed plan with checklist
-├── research/
-│   ├── 01-current-state.md            # Analysis of existing build system
-│   ├── 02-cicd-architecture.md        # Workflow design and best practices
-│   ├── 03-technical-decisions.md      # Decision log and risk analysis
-│   ├── 04-delivery-architecture.md    # CI/CD + Agent integration
-│   └── 05-pre-mortem.md               # What could go wrong? (NEW)
-└── notes/                              # Implementation notes (Phase 3+)
-    └── .gitkeep
+├── sprint-plan.md                      # Implementation checklist
+├── review-findings-and-suggestions.md  # Codex code review (9 findings)
+└── research/
+    ├── 01-current-state.md
+    ├── 02-cicd-architecture.md
+    ├── 03-technical-decisions.md
+    ├── 04-delivery-architecture.md
+    └── 05-pre-mortem.md
 ```
 
 ---
 
-## Research Highlights
-
-### Delivery Architecture (Key Insight)
-
-**CI/CD automates the BUILD, not the RELEASE.**
-
-```
-CI/CD (automated) ──► Draft Release ──► release-manager ──► product-marketer
-       │                    │                  │                    │
-       │                    │                  │                    └── Content
-       │                    │                  └── Quality gates + publish
-       │                    └── Artifacts ready for testing
-       └── Builds both platforms in parallel
-```
-
-The existing agents (release-manager, product-marketer) remain essential:
-- **release-manager**: Gate 1 (technical) + Gate 2 (Jarmo tests) + publish
-- **product-marketer**: Release notes, changelog, social copy
-
-CI removes the manual build burden but preserves human-in-the-loop safety.
-
-See `research/04-delivery-architecture.md` for the complete flow diagram.
-
-### Current State (Level 0)
-- ❌ No `.github/workflows/` directory
-- ❌ No automated builds
-- ❌ No PR validation
-- ✅ Manual macOS builds work (`build-prod.sh`)
-- ❌ Windows builds broken (assumes cross-compilation)
-
-### Target State (Level 1)
-- ✅ Automated builds on tag push
-- ✅ Windows x64 ZIP artifact
-- ✅ macOS arm64 DMG artifact
-- ✅ Draft GitHub Releases
-- ✅ Quality gates (webview validation, TypeScript checks)
-- ❌ Not signed (manual signing post-build)
-- ❌ No smoke tests (add in Level 2)
-
----
-
-## Approval Gate
-
-**Current Phase:** 0 (PROOF OF CONCEPT)
-
-**Core question:** Can GitHub Actions produce a working Windows RiteMark build?
-
-This sprint follows a modified workflow — Phase 0 gates everything else:
-0. 🔄 **PROOF OF CONCEPT** - Single Windows build on GitHub Actions
-1. ✅ **RESEARCH** - Complete (+ Codex review incorporated)
-2. ⏸️ **PLAN** - Pending (needs re-approval after Phase 0 results)
-3. ⏸️ **DEVELOP** - Blocked until Phase 0 proves feasibility
-4. ⏸️ **TEST & VALIDATE** - Pending
-5. ⏸️ **CLEANUP** - Pending
-6. ⏸️ **DEPLOY** - Pending
-
-**History:** Originally Sprint 24 (pivoted to RAG). Research preserved, now Sprint 25.
-**Scope addition:** release-manager agent update included per Jarmo's request.
-
----
-
-## Codex Review (2026-01-27)
-
-External code review identified 9 gaps. All accepted. See `review-findings-and-suggestions.md` for full details.
-
-**Must fix before development:**
-
-| # | Finding | Fix |
-|---|---------|-----|
-| 1 | `release.yml` calls build workflows without `workflow_call` | Add `on: workflow_call` to build workflows |
-| 2 | PR validation scope conflict (Level 1 vs Level 2) | Resolve: PR validation IS Level 1 |
-| 3 | Windows symlink fix missing from Phase 3 checklist | Add junction/copy step to Windows workflow |
-| 4 | Version consistency gate missing | Add tag↔package.json↔product.json check in CI |
-| 5 | Electron/Node ABI risk | Pin Node to VS Code's version, log Electron/Node versions |
-| 6 | Windows MSVC toolchain not enforced | Add explicit MSVC setup/validation step |
-| 7 | Windows long-path risk | Use short checkout path (`path: r`) + enable long paths |
-| 8 | Artifact naming not validated | Add assertion step in release.yml before publishing |
-| 9 | Update service lacks test plan | Add manual test checklist for Windows update flow |
-
----
-
-## Next Steps (After Approval)
-
-1. Create `.github/workflows/` directory
-2. Implement 4 workflow files (ci, build-windows, build-macos, release)
-3. Create `scripts/build-windows.ps1` and `scripts/qa-check.sh`
-4. Fix update service platform detection
-5. Test all workflows with manual triggers
-6. Create test release (e.g., `v0.0.1-test`)
-7. Validate artifacts locally
-8. Clean up and document
-9. Enable for production releases
-
----
-
-## Success Criteria
-
-### Must Have (Blocking)
-- [ ] Windows build produces working ZIP
-- [ ] macOS build produces working DMG
-- [ ] Both builds validate webview.js integrity
-- [ ] Draft GitHub Release with both artifacts
-- [ ] Checksums generated
-- [ ] Update service detects platform correctly
-
-### Should Have (Quality)
-- [ ] PR validation catches TypeScript errors
-- [ ] Build time < 45 min per platform
-- [ ] Within GitHub free tier (< 2000 min/month)
-
----
-
-## References
-
-### Internal
-- **Windows Build Audit:** `docs/analysis/windows-build-audit.md`
-- **Current macOS Build:** `scripts/build-prod.sh`
-- **Release Manager Agent:** `.claude/agents/release-manager.md`
-- **Product Marketer Agent:** `.claude/agents/product-marketer.md`
-- **Sprint Manager Agent:** `.claude/agents/sprint-manager.md`
-
-### External
-- **VSCodium Windows CI:** https://github.com/VSCodium/vscodium/blob/master/.github/workflows/stable-windows.yml
-- **VS Code Build Prerequisites:** https://github.com/microsoft/vscode/wiki/How-to-Contribute
-- **Electron Forge CI Patterns:** https://www.electronforge.io/guides/code-signing
-
----
-
-**Last Updated:** 2026-01-27 (Renamed to Sprint 25, incorporated Codex review findings)
+**Last Updated:** 2026-01-28

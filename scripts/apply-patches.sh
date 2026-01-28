@@ -147,10 +147,18 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     BRANDING_DIR="$ROOT_DIR/branding"
 
-    # Copy icon if it exists
+    # Copy macOS icon if it exists
     if [ -f "$BRANDING_DIR/icons/icon.icns" ]; then
         echo -n "Copying macOS icon... "
         cp "$BRANDING_DIR/icons/icon.icns" "$VSCODE_DIR/resources/darwin/code.icns"
+        echo -e "${GREEN}Done${NC}"
+    fi
+
+    # Copy Windows icon if it exists
+    if [ -f "$BRANDING_DIR/icons/icon.ico" ]; then
+        echo -n "Copying Windows icon... "
+        mkdir -p "$VSCODE_DIR/resources/win32"
+        cp "$BRANDING_DIR/icons/icon.ico" "$VSCODE_DIR/resources/win32/code.ico"
         echo -e "${GREEN}Done${NC}"
     fi
 

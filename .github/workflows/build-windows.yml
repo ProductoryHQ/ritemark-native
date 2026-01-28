@@ -1,10 +1,8 @@
-name: Build Windows (PoC)
-
-# Sprint 25: Proof-of-concept to answer "Can GitHub Actions build Windows RiteMark?"
-# Manual trigger only for testing
+name: Build Windows (x64)
 
 on:
   workflow_dispatch:
+  workflow_call:
   push:
     branches: [main]
     paths:
@@ -13,10 +11,10 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    
+
     steps:
       # =========================================================================
-      # Step 1: Checkout RiteMark + clone VS Code source
+      # Step 1: Checkout + clone VS Code
       # =========================================================================
       - name: Enable Git long paths
         shell: bash
@@ -25,14 +23,14 @@ jobs:
       - name: Checkout RiteMark
         uses: actions/checkout@v4
         with:
-          path: r  # Short path to avoid Windows MAX_PATH issues (Codex #7)
+          path: r
 
       - name: Clone VS Code OSS (1.94.0)
         shell: bash
         run: |
           git clone --depth 1 --branch 1.94.0 https://github.com/microsoft/vscode.git r/vscode
           echo "VS Code 1.94.0 cloned"
-        
+
       # =========================================================================
       # Step 2: Setup toolchain
       # =========================================================================
@@ -40,44 +38,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          
+
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
+
       # =========================================================================
-      # Step 3: Validate MSVC toolchain (Codex #6)
-      # =========================================================================
-      - name: Validate MSVC toolchain
-        shell: bash
-        run: |
-          # cl.exe isn't in PATH by default — VS Code's build system finds it via node-gyp
-          # Just log what's available for debugging
-          echo "Visual Studio installations:"
-          ls "C:/Program Files/Microsoft Visual Studio/2022/" 2>/dev/null || echo "No VS 2022"
-          echo "Build tools check passed (node-gyp will locate MSVC)"
-          
-      # =========================================================================
-      # Step 4: Handle extension symlink → COPY (Windows has no symlinks, Codex #3)
+      # Step 3: Handle extension symlink (Windows has no symlinks)
       # =========================================================================
       - name: Copy extension (replace symlink)
         shell: bash
         working-directory: r
         run: |
-          # Remove symlink if it exists (will fail on Windows anyway)
           rm -rf vscode/extensions/ritemark 2>/dev/null || true
-
-          # Remove macOS-only binaries first (contain symlinks Windows can't handle)
           rm -rf extensions/ritemark/binaries/darwin-arm64 2>/dev/null || true
-
-          # COPY extension
           cp -R extensions/ritemark vscode/extensions/ritemark
+          echo "Extension copied to vscode/extensions/ritemark"
 
-          echo "Extension copied to vscode/extensions/ritemark (darwin binaries excluded)"
-          
       # =========================================================================
-      # Step 5: Install VS Code dependencies
+      # Step 4: Install dependencies
       # =========================================================================
       - name: Install VS Code dependencies
         shell: bash
@@ -89,52 +69,46 @@ jobs:
           npm_config_build_from_source: true
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
         run: |
-          # Retry npm install up to 3 times (Electron header downloads can timeout)
           for i in 1 2 3; do
             echo "Attempt $i..."
             npm install && break || echo "Attempt $i failed, retrying..."
             sleep 10
           done
-        
-      # =========================================================================
-      # Step 6: Install RiteMark extension dependencies
-      # =========================================================================
+
       - name: Install extension dependencies
         shell: bash
         working-directory: r/vscode/extensions/ritemark
         run: npm install
-        
+
       # =========================================================================
-      # Step 7: Apply patches (branding + customizations)
+      # Step 5: Apply patches + branding
       # =========================================================================
       - name: Apply patches
         shell: bash
         working-directory: r
-        run: |
-          # Allow partial patch failures for PoC — some patches are macOS-specific
-          ./scripts/apply-patches.sh || echo "WARNING: Some patches failed (non-blocking for PoC)"
-        
+        run: ./scripts/apply-patches.sh
+
       # =========================================================================
-      # Step 8: Compile RiteMark extension
+      # Step 6: Compile extension
       # =========================================================================
       - name: Compile extension
         shell: bash
         working-directory: r/vscode/extensions/ritemark
         run: npm run compile
-        
+
       # =========================================================================
-      # Step 9: Build VS Code for Windows (x64)
+      # Step 7: Build VS Code for Windows x64
       # =========================================================================
-      - name: Build VS Code (vscode-win32-x64-min)
+      - name: Build VS Code (win32-x64-min)
         shell: bash
         working-directory: r/vscode
         run: |
           echo "Starting Windows build at $(date)"
           npm run gulp vscode-win32-x64-min
           echo "Build completed at $(date)"
-          
+
       # =========================================================================
-      # Step 10: Copy RiteMark extension to build output
+      # Step 8: Copy extension to build output
       # =========================================================================
       - name: Copy extension to build output
         shell: bash
@@ -142,53 +116,31 @@ jobs:
         run: |
           BUILD_DIR="VSCode-win32-x64"
           EXT_DEST="$BUILD_DIR/resources/app/extensions/ritemark"
-          
+
           if [ ! -d "$BUILD_DIR" ]; then
             echo "ERROR: Build output not found at $BUILD_DIR"
             exit 1
           fi
-          
-          echo "Copying extension to build output..."
+
           rm -rf "$EXT_DEST" || true
-          # Copy from vscode/extensions/ritemark (where we compiled) not extensions/ritemark (source)
           cp -R vscode/extensions/ritemark "$EXT_DEST"
-          
-          # Remove dev dependencies
           rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
           rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
-          
           echo "Extension copied successfully"
-          
+
       # =========================================================================
-      # Step 11: Validate build output
+      # Step 9: Validate build
       # =========================================================================
-      - name: Validate extension in build
+      - name: Validate build
         shell: bash
         working-directory: r
         run: |
           BUILD_DIR="VSCode-win32-x64"
           EXT_PATH="$BUILD_DIR/resources/app/extensions/ritemark"
-
-          echo "Validating extension files..."
-          echo "Working directory: $(pwd)"
-          echo "Looking for build at: $BUILD_DIR"
-          echo "Extension path: $EXT_PATH"
-
-          # Debug: show what exists
-          if [ -d "$BUILD_DIR" ]; then
-            echo "Build directory exists"
-            ls -la "$BUILD_DIR/" | head -5
-          else
-            echo "ERROR: Build directory not found!"
-            echo "Available directories:"
-            ls -la | grep -E "^d"
-          fi
-
           ERRORS=0
-          
+
           # Check webview.js (must be >500KB)
           if [ -f "$EXT_PATH/media/webview.js" ]; then
-            # Use wc -c for portable file size (works on Windows Git Bash)
             WEBVIEW_SIZE=$(wc -c < "$EXT_PATH/media/webview.js" | tr -d ' ')
             if [ "$WEBVIEW_SIZE" -lt 500000 ]; then
               echo "FAIL: webview.js too small ($WEBVIEW_SIZE bytes)"
@@ -197,9 +149,7 @@ jobs:
               echo "OK: webview.js ($WEBVIEW_SIZE bytes)"
             fi
           else
-            echo "FAIL: webview.js not found at $EXT_PATH/media/webview.js"
-            echo "Checking what exists:"
-            ls -la "$EXT_PATH/media/" 2>/dev/null || echo "media/ dir not found"
+            echo "FAIL: webview.js not found"
             ERRORS=$((ERRORS + 1))
           fi
 
@@ -213,51 +163,66 @@ jobs:
               echo "OK: extension.js ($EXTENSION_SIZE bytes)"
             fi
           else
-            echo "FAIL: extension.js not found at $EXT_PATH/out/extension.js"
-            echo "Checking what exists:"
-            ls -la "$EXT_PATH/out/" 2>/dev/null || echo "out/ dir not found"
+            echo "FAIL: extension.js not found"
             ERRORS=$((ERRORS + 1))
           fi
-          
+
           if [ $ERRORS -gt 0 ]; then
             echo "Validation FAILED with $ERRORS error(s)"
             exit 1
           fi
-          
           echo "Validation PASSED"
-          
+
       # =========================================================================
-      # Step 12: Upload build artifact
+      # Step 10: Build Windows installer (Inno Setup)
       # =========================================================================
-      - name: Upload build artifact
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.4.3 -y --no-progress
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build installer
+        shell: pwsh
+        working-directory: r
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\windows\ritemark.iss"
+
+      # =========================================================================
+      # Step 11: Upload artifacts
+      # =========================================================================
+      - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: ritemark-windows-x64
           path: r/VSCode-win32-x64/
           retention-days: 30
-          
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ritemark-windows-x64-installer
+          path: r/installer-output/*.exe
+          retention-days: 30
+
       # =========================================================================
-      # Step 13: Build summary
+      # Step 12: Build summary
       # =========================================================================
       - name: Build summary
         shell: bash
         working-directory: r
         run: |
-          echo "========================================" 
+          echo "========================================"
           echo "Windows Build Complete"
           echo "========================================"
           echo ""
-          echo "Build output: VSCode-win32-x64/"
-          echo ""
-          
-          # Show directory structure
           echo "Build contents:"
-          ls -lh VSCode-win32-x64/ | head -20
-          
+          ls -lh VSCode-win32-x64/ | head -10
           echo ""
-          echo "Extension files:"
+          echo "Extension:"
           ls -lh VSCode-win32-x64/resources/app/extensions/ritemark/ | head -10
-          
           echo ""
-          echo "Artifact uploaded as: ritemark-windows-x64"
-          echo "Retention: 30 days"
+          echo "Installer:"
+          ls -lh installer-output/ 2>/dev/null || echo "No installer output"
+          echo ""
+          echo "Artifacts: ritemark-windows-x64, ritemark-windows-x64-installer"

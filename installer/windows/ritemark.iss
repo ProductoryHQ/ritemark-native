@@ -23,15 +23,13 @@ AppUpdatesURL={#AppURL}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
-; Output settings - will be overridden by command line
-OutputDir=..\..\dist
+OutputDir=..\..\installer-output
 OutputBaseFilename=RiteMark-{#AppVersion}-win32-x64-setup
 Compression=lzma2
 SolidCompression=yes
 ; Use modern wizard style
 WizardStyle=modern
-; Setup icon (if available)
-; SetupIconFile=..\..\branding\icons\icon.ico
+SetupIconFile=..\..\branding\icons\icon.ico
 ; Uninstall icon
 UninstallDisplayIcon={app}\{#AppExeName}
 ; Windows 10+ only
