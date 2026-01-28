@@ -167,14 +167,28 @@ jobs:
         run: |
           BUILD_DIR="VSCode-win32-x64"
           EXT_PATH="$BUILD_DIR/resources/app/extensions/ritemark"
-          
+
           echo "Validating extension files..."
-          
+          echo "Working directory: $(pwd)"
+          echo "Looking for build at: $BUILD_DIR"
+          echo "Extension path: $EXT_PATH"
+
+          # Debug: show what exists
+          if [ -d "$BUILD_DIR" ]; then
+            echo "Build directory exists"
+            ls -la "$BUILD_DIR/" | head -5
+          else
+            echo "ERROR: Build directory not found!"
+            echo "Available directories:"
+            ls -la | grep -E "^d"
+          fi
+
           ERRORS=0
           
           # Check webview.js (must be >500KB)
           if [ -f "$EXT_PATH/media/webview.js" ]; then
-            WEBVIEW_SIZE=$(stat -c%s "$EXT_PATH/media/webview.js" 2>/dev/null || stat -f%z "$EXT_PATH/media/webview.js" 2>/dev/null || echo 0)
+            # Use wc -c for portable file size (works on Windows Git Bash)
+            WEBVIEW_SIZE=$(wc -c < "$EXT_PATH/media/webview.js" | tr -d ' ')
             if [ "$WEBVIEW_SIZE" -lt 500000 ]; then
               echo "FAIL: webview.js too small ($WEBVIEW_SIZE bytes)"
               ERRORS=$((ERRORS + 1))
@@ -182,13 +196,15 @@ jobs:
               echo "OK: webview.js ($WEBVIEW_SIZE bytes)"
             fi
           else
-            echo "FAIL: webview.js not found"
+            echo "FAIL: webview.js not found at $EXT_PATH/media/webview.js"
+            echo "Checking what exists:"
+            ls -la "$EXT_PATH/media/" 2>/dev/null || echo "media/ dir not found"
             ERRORS=$((ERRORS + 1))
           fi
-          
+
           # Check extension.js (must be >1KB)
           if [ -f "$EXT_PATH/out/extension.js" ]; then
-            EXTENSION_SIZE=$(stat -c%s "$EXT_PATH/out/extension.js" 2>/dev/null || stat -f%z "$EXT_PATH/out/extension.js" 2>/dev/null || echo 0)
+            EXTENSION_SIZE=$(wc -c < "$EXT_PATH/out/extension.js" | tr -d ' ')
             if [ "$EXTENSION_SIZE" -lt 1000 ]; then
               echo "FAIL: extension.js too small ($EXTENSION_SIZE bytes)"
               ERRORS=$((ERRORS + 1))
@@ -196,7 +212,9 @@ jobs:
               echo "OK: extension.js ($EXTENSION_SIZE bytes)"
             fi
           else
-            echo "FAIL: extension.js not found"
+            echo "FAIL: extension.js not found at $EXT_PATH/out/extension.js"
+            echo "Checking what exists:"
+            ls -la "$EXT_PATH/out/" 2>/dev/null || echo "out/ dir not found"
             ERRORS=$((ERRORS + 1))
           fi
           
