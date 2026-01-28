@@ -4,14 +4,25 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 * * *
 
-## Editor
+## Text Editor
 
-- [ ] Action command palette - \[x\] Show + button on hovered line (left side) to add blocks → **Sprint 14** - \[x\] Show drag handle with the + → **Sprint 14** - \[ \] Add images from command palette - \[ \] Add Youtube (any other streaming) videos from command palette
-- [x] Copy code button in code blocks → **Sprint 14**
-- [x] Quotation styles
-- [x] Paste inline images (screenshots, data URLs) → save as local files
-- [x] Clicking on link opens link editing dialog → **Sprint 14**
-- [x] Display images with relative paths in editor
+- [ ] Add images from command palette (it means user can select a file from their computer, the file is uploaded to /images folder.
+- [ ] Remove Table from bubble menu (it is not related to formatting)
+- [ ] Add quote style to bubble (formatting) menu ![](./images/image-1769619933029.png)
+- [ ] Add Youtube (any other streaming) videos from / command palette
+- [ ] Image selected state (user can click on image and it shows that it is selected, also investigate whether it is possible to "resize" the image)
+- [ ] PDF preview (read-only viewer)
+- [ ] Word (.docx) preview (read-only viewer)
+- [ ] Text-editor should display if the webviewer state becomes stale and needs refreshing (like Data editor does)
+
+## Data Editor
+
+CSV editing, Excel/spreadsheet preview
+
+- [ ] Rebrand current Excel viewer as "Data Editor"
+- [ ] CSV full editing improvements (sort, filter, column operations)
+- [ ] Excel (.xlsx) editing (currently preview-only)
+- [ ] PowerPoint (.pptx) preview
 
 ## Onboarding / Welcome Screen
 
@@ -23,12 +34,14 @@ Redesign Welcome screen for total newbies
 - [ ] Visual tutorials / article links
 - [ ] Make it obvious what to do first
 
+## Dictate
+
+- [ ] When launched first time easy to digest checklist whether the dependencies are installed in computer (first-launch wizard)
+
 ## File Management
 
 - [ ] Recent files list on welcome page - \[ \] File templates (blog post, meeting notes, etc.)
-- [ ] Markdown front-matter support (visual UI, not raw YAML)
 - [ ] Quick switcher improvements
-- [ ] Pre-installed viewers: Word, PDF, Excel, PowerPoint
 
 ## AI Assistant
 
@@ -40,8 +53,6 @@ Redesign Welcome screen for total newbies
 
 ## Export
 
-- [x] Save as PDF
-- [x] Save as DOCX
 - [ ] Batch export folder as .zip of DOCX
 
 ## Collaboration
@@ -52,23 +63,19 @@ Redesign Welcome screen for total newbies
 
 - [ ] Sync to cloud (Google Drive, SharePoint)
 
-## Updates
-
-- [x] In-app update notifications (like Cursor) - \[x\] Show banner when new version available - \[x\] "Later" / "Install Now" buttons
-
-* * *
-
-## Bugs
-
-- [x] Cursor randomly jumps to bottom of page
-- [x] When deleting table column, it leaves a "ghost" column
-- [x] Nested checklist is broken after edits
-- [x] Copy-paste screenshot on Mac creates double image (needs investigation)
-
 * * *
 
 ## Completed
 
+- [x] In-app update notifications (like Cursor) - \[x\] Show banner when new version available - \[x\] "Later" / "Install Now" buttons
+- [x] Save as PDF
+- [x] Save as DOCX
+- [x] Copy code button in code blocks → **Sprint 14**
+- [x] Quotation styles
+- [x] Paste inline images (screenshots, data URLs) → save as local files
+- [x] Clicking on link opens link editing dialog → **Sprint 14**
+- [x] Display images with relative paths in editor
+- [x] Markdown front-matter support (visual UI via properties dialog)
 - [x] HTML table paste from web (Google Docs, Wikipedia) - Sprint 15
 - [x] Task list checkboxes (`- [ ]` / `- [x]`) - Sprint 13
 - [x] Word count / reading time in status bar
@@ -77,7 +84,13 @@ Redesign Welcome screen for total newbies
 - [x] H3 button in formatting palette
 - [x] Autosave enabled by default (1 second delay)
 - [x] AI panel header made sticky
+- [x] Show + button on hovered line (left side) to add blocks → **Sprint 14**
+- [x] Show drag handle with the + → **Sprint 14**
+- [x] Cursor randomly jumps to bottom of page
+- [x] When deleting table column, it leaves a "ghost" column
+- [x] Nested checklist is broken after edits
+- [x] Copy-paste screenshot on Mac creates double image (needs investigation)
 
 * * *
 
-*Last updated: 2025-01-18*
+*Last updated: 2026-01-28*
