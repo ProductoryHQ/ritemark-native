@@ -101,7 +101,7 @@ jobs:
       # =========================================================================
       - name: Install extension dependencies
         shell: bash
-        working-directory: r/extensions/ritemark
+        working-directory: r/vscode/extensions/ritemark
         run: npm install
         
       # =========================================================================
@@ -119,7 +119,7 @@ jobs:
       # =========================================================================
       - name: Compile extension
         shell: bash
-        working-directory: r/extensions/ritemark
+        working-directory: r/vscode/extensions/ritemark
         run: npm run compile
         
       # =========================================================================
