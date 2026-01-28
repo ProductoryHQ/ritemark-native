@@ -8,20 +8,22 @@ Ask questions about your documents and get AI-powered answers with source citati
 
 **Document Search** lets the RiteMark AI assistant search your markdown documents and provide answers based on what you've actually written. Instead of generic AI responses, you get answers grounded in your own notes.
 
+![](./images/image-1769421231992.png)
+
 **Example:** Ask "What did I write about the Q3 budget?" and get an answer that references your actual meeting notes.
 
 ## How to Use
 
 1.  Open a workspace containing markdown files
-
-2.  Click the **RiteMark AI** icon in the left sidebar
+    
+2.  Click the **RiteMark AI** icon in the left sidebar  
     ![RiteMark AI icon in sidebar](./images/image-1769410779205.png)
-
-3.  Click **Re-index** in the footer
+    
+3.  Click **Re-index** in the footer  
     ![Re-index button in footer](./images/image-1769410790440.png)
-
+    
 4.  Wait for indexing to complete (you'll see "X docs" in the footer)
-
+    
 5.  Ask questions in natural language:
     
     -   "What did I write about X?"
