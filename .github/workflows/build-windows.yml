@@ -150,7 +150,8 @@ jobs:
           
           echo "Copying extension to build output..."
           rm -rf "$EXT_DEST" || true
-          cp -R extensions/ritemark "$EXT_DEST"
+          # Copy from vscode/extensions/ritemark (where we compiled) not extensions/ritemark (source)
+          cp -R vscode/extensions/ritemark "$EXT_DEST"
           
           # Remove dev dependencies
           rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
