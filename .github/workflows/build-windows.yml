@@ -16,9 +16,11 @@ jobs:
       # =========================================================================
       # Step 1: Checkout + clone VS Code
       # =========================================================================
-      - name: Enable Git long paths
+      - name: Configure Git for Windows
         shell: bash
-        run: git config --global core.longpaths true
+        run: |
+          git config --global core.longpaths true
+          git config --global core.autocrlf false
 
       - name: Checkout RiteMark
         uses: actions/checkout@v4

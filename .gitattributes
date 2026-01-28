@@ -1,0 +1,2 @@
+# Patch files must stay LF — CRLF corrupts unified diff format
+*.patch text eol=lf
