@@ -80,17 +80,20 @@ body {
   font-weight: 600;
 }
 
-/* Image styles */
+/* Image styles - base styles for all images */
 .ProseMirror img {
   max-width: 100%;
   height: auto;
   display: block;
-  margin: 1em 0;
   border-radius: 4px;
 }
 
-/* Image selection state - blue border like VS Code */
-.ProseMirror img.ProseMirror-selectednode {
-  outline: 2px solid var(--vscode-focusBorder, #007acc);
-  outline-offset: 2px;
+/* Margin only for images NOT in ResizableImage NodeView */
+.ProseMirror > p > img {
+  margin: 1em 0;
+}
+
+/* Images in ResizableImage NodeView - container handles spacing */
+.resizable-image-container img {
+  margin: 0 !important;
 }

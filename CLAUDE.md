@@ -99,6 +99,28 @@ Project uses feature flags for platform-specific, experimental, and premium feat
 
 * * *
 
+## UI Components
+
+Webview uses **Tailwind CSS** with custom components. Future migration to **shadcn/ui** is planned.
+
+### Current Shared Components
+
+| Component | Location | Usage |
+| --- | --- | --- |
+| Dialog | `webview/src/components/Dialog.tsx` | All modal dialogs (Dictation Settings, Resize confirm) |
+
+### Future: shadcn/ui
+
+When doing UI refactoring, use **shadcn/ui** components:
+- Tailwind-based (already in use)
+- Copy-paste pattern (code is ours, not dependency)
+- Radix UI primitives (accessible)
+- See WISHLIST.md for full migration plan
+
+**Invoke `ux-expert` when designing new UI components.**
+
+* * *
+
 ## Team
 
 -   **Jarmo** = Product Owner (decisions, testing, approval)
@@ -123,6 +145,7 @@ I MUST delegate to the appropriate expert agent.
 | Releases & Distribution | `release-manager` | release, publish, ship, deploy, dmg, notarization, github release |
 | Webview/Editor | `webview-expert` | webview, tiptap, react, vite, bundle, editor blank, editor not loading |
 | Marketing & Content | `product-marketer` | changelog, release notes, blog post, landing page, marketing |
+| UX/UI Design | `ux-expert` | dialog, modal, button, UI, UX, component, design, user experience |
 
 ### Invocation Rule
 
@@ -216,6 +239,8 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 | Update changelog | `product-marketer` |
 | Write release notes | `product-marketer` |
 | Update landing page | `product-marketer` |
+| Design new UI | `ux-expert` |
+| Create dialog/modal | `ux-expert` |
 
 * * *
 
@@ -230,6 +255,7 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 │   ├── release-manager.md    # Release process, notarization, DMG
 │   ├── webview-expert.md     # TipTap, Vite, React, webview
 │   ├── product-marketer.md   # Changelog, release notes, landing page
+│   ├── ux-expert.md          # UX/UI design, shadcn/ui patterns
 │   └── knowledge-builder.md  # Meta: creating new agents
 └── skills/
     ├── feature-flags/        # When to use and how to implement feature flags

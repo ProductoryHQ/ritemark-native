@@ -136,9 +136,34 @@ As a [user type], I want to [action] so that [benefit].
 | Typora | WYSIWYG markdown | Inline metadata |
 | iA Writer | Minimalism | Focus mode |
 
+## Component Library: shadcn/ui (Future)
+
+When UI refactoring happens, RiteMark will migrate to **shadcn/ui** for consistent components.
+
+### Why shadcn/ui?
+- Tailwind-based (already in use)
+- Copy-paste components (not npm dependency)
+- Radix UI primitives (accessible)
+- Highly customizable
+
+### Components to Use
+| Component | Use Case |
+|-----------|----------|
+| Dialog | Modals (Settings, Confirm, Properties) |
+| Button | All buttons (primary, secondary, ghost) |
+| DropdownMenu | Export menu, context menus |
+| Popover | Tooltips, bubble menus |
+| Input | Form fields |
+| Select | Dropdowns |
+
+### Current Shared Components
+- `Dialog.tsx` - Shared dialog component (already implemented)
+- More to be added during UI refactor sprint
+
 ## Guidelines
 
 1. **When in doubt, simplify**: Remove rather than add
 2. **Test with words**: If you can't explain it simply, it's too complex
 3. **Follow platform conventions**: macOS users expect certain behaviors
 4. **Maintain writing focus**: Features shouldn't distract from writing
+5. **Use shared components**: Prefer Dialog, Button from components/ over inline styles

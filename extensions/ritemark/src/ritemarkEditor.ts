@@ -311,6 +311,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
             this.selectImageFile(document, webview);
             return;
 
+          case 'resizeImage':
+            // Resize image file (user confirmed resize in webview)
+            this.resizeImage(document, message.relativePath, message.dataUrl);
+            return;
+
           case 'selectionChanged':
             // Forward selection and document content to AI panel
             if (RiteMarkEditorProvider._unifiedViewProvider) {
@@ -595,6 +600,45 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
         type: 'imageError',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  }
+
+  /**
+   * Resize an image file (called after user confirms resize in webview)
+   * The webview has already resized the image using Canvas, we just save it
+   */
+  private async resizeImage(
+    document: vscode.TextDocument,
+    relativePath: string,
+    dataUrl: string
+  ): Promise<void> {
+    try {
+      // Get full path from relative path
+      const docDir = path.dirname(document.uri.fsPath);
+      const imagePath = path.join(docDir, relativePath);
+
+      // Verify the file exists
+      if (!fs.existsSync(imagePath)) {
+        throw new Error(`Image file not found: ${relativePath}`);
+      }
+
+      // Extract base64 data from data URL (format: data:image/png;base64,...)
+      const matches = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (!matches) {
+        throw new Error('Invalid image data URL');
+      }
+
+      const base64Data = matches[2];
+
+      // Overwrite the original file with resized image
+      fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
+
+      console.log(`[RiteMark] Resized image: ${relativePath}`);
+    } catch (error) {
+      console.error('Failed to resize image:', error);
+      vscode.window.showErrorMessage(
+        `Failed to resize image: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
