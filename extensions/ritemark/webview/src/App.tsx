@@ -119,7 +119,6 @@ function App() {
           // Insert transcribed text at cursor position
           const transcribedText = message.text as string
           if (transcribedText && editorRef.current) {
-            console.log('[App] Inserting transcription:', transcribedText)
             // Remove any placeholder, then insert text
             removeDictationPlaceholder(editorRef.current)
             editorRef.current.chain()
@@ -149,7 +148,6 @@ function App() {
         case 'dictation:listening-started':
           // Show "Listening..." placeholder when recording starts
           if (editorRef.current) {
-            console.log('[App] Dictation started - showing listening placeholder')
             insertDictationPlaceholder(editorRef.current, LISTENING_PLACEHOLDER)
           }
           break
@@ -157,7 +155,6 @@ function App() {
         case 'dictation:processing':
           // Change to "Processing..." when audio chunk is sent for transcription
           if (editorRef.current) {
-            console.log('[App] Processing audio - showing processing placeholder')
             insertDictationPlaceholder(editorRef.current, PROCESSING_PLACEHOLDER)
           }
           break
@@ -165,7 +162,6 @@ function App() {
         case 'dictation:listening-stopped':
           // Remove placeholder when dictation ends
           if (editorRef.current) {
-            console.log('[App] Dictation stopped - removing placeholder')
             removeDictationPlaceholder(editorRef.current)
           }
           break

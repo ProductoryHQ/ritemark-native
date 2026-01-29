@@ -632,8 +632,6 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
       // Overwrite the original file with resized image
       fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
-
-      console.log(`[RiteMark] Resized image: ${relativePath}`);
     } catch (error) {
       console.error('Failed to resize image:', error);
       vscode.window.showErrorMessage(
