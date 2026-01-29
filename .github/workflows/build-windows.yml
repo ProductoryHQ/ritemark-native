@@ -178,11 +178,11 @@ jobs:
       # =========================================================================
       # Step 10: Build Windows installer (Inno Setup)
       # =========================================================================
-      - name: Install Inno Setup
-        shell: pwsh
+      - name: Verify Inno Setup
+        shell: bash
         run: |
-          choco install innosetup --version=6.4.3 -y --no-progress
-          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Inno Setup is pre-installed on windows-latest
+          ls -la "/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
 
       - name: Build installer
         shell: pwsh
