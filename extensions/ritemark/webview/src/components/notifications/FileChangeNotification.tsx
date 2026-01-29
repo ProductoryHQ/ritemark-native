@@ -77,13 +77,10 @@ export function FileChangeNotification({
       </div>
 
       <style>{`
-        /* Banner container - sticky at top */
+        /* Banner container - flex item at top of layout */
         .file-change-banner {
-          position: sticky;
-          top: 0;
-          left: 0;
-          right: 0;
           display: flex;
+          flex-shrink: 0;
           align-items: center;
           justify-content: space-between;
           padding: 12px 16px;

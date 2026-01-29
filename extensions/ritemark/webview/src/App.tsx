@@ -87,6 +87,10 @@ function App() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportButtonRef = useRef<HTMLElement | null>(null)
 
+  // File change notification state
+  const [showFileChangeNotification, setShowFileChangeNotification] = useState(false)
+  const [fileChangeData, setFileChangeData] = useState({ filename: '', isDirty: false })
+
   useEffect(() => {
     // Listen for messages from VS Code extension
     onMessage((message) => {
@@ -125,6 +129,15 @@ function App() {
             // If still listening, show placeholder again for next chunk
             // (This will be handled by the next dictation:listening-started event)
           }
+          break
+
+        case 'fileChanged':
+          // File changed externally - show notification banner
+          setFileChangeData({
+            filename: (message.filename as string) || '',
+            isDirty: (message.isDirty as boolean) || false
+          })
+          setShowFileChangeNotification(true)
           break
       }
     })
@@ -356,6 +369,11 @@ function App() {
       <DocumentHeader
         onPropertiesClick={handlePropertiesClick}
         onExportClick={handleExportClick}
+        hasFileChanged={showFileChangeNotification}
+        onRefresh={() => {
+          setShowFileChangeNotification(false)
+          sendToExtension('refresh')
+        }}
       />
 
       {/* Editor - Takes remaining space */}

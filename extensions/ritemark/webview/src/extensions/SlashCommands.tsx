@@ -5,6 +5,7 @@ import tippy from 'tippy.js'
 import type { ComponentType } from 'react'
 import { CommandsList } from './CommandsList'
 import { Heading1, Heading2, Heading3, List, ListOrdered, Code, Table, Image, CheckSquare } from 'lucide-react'
+import { sendToExtension } from '../bridge'
 
 export interface Command {
   title: string
@@ -140,13 +141,14 @@ export const SlashCommands = Extension.create({
             },
             {
               title: 'Image',
-              description: 'Insert an image (coming soon)',
+              description: 'Insert an image from file',
               icon: Image,
               command: ({ editor, range }: any) => {
+                // Delete the /image text first
                 editor.chain().focus().deleteRange(range).run()
-                // TODO: Implement local image handling for VS Code (future sprint)
-                console.log('Image insertion not yet supported in VS Code extension')
-                // Future: Send to VS Code extension for local file selection
+                // Request file selection from VS Code extension
+                // Extension will handle file picker and save flow
+                sendToExtension('selectImageFile')
               },
             },
           ]
