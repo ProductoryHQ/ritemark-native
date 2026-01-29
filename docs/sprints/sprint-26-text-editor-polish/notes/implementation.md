@@ -56,7 +56,23 @@
 
 **Pattern:** TipTap automatically adds `ProseMirror-selectednode` class to selected nodes. CSS provides visual feedback.
 
-**Resize Investigation:** Deferred to future sprint. Basic selection state is sufficient for this sprint. Full resize with drag handles would require custom NodeView component (significant complexity).
+**Resize Investigation:**
+
+**Key Insight (Jarmo):** Instead of storing dimensions in markdown (like `![](image.png){width=400}`), resize the **actual image file**. This keeps markdown clean and portable.
+
+**Implementation Approach:**
+1. Custom NodeView with resize handles (corner drag)
+2. On resize drag end → show confirmation dialog: "This will resize the image file permanently. Continue?"
+3. If confirmed:
+   - Use Canvas API to resize image
+   - Overwrite original file (or save as new file with suffix?)
+   - Update image in editor (new dimensions reflected automatically)
+4. Benefits:
+   - Markdown stays clean: `![](./images/photo.jpg)`
+   - Image file is actually smaller (saves disk space)
+   - Works everywhere (GitHub, other editors)
+
+**Status:** Implementing in Sprint 26 (extended)
 
 ### 5. Text Editor Stale State Indicator ✅
 **Files Changed:**

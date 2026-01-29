@@ -6,14 +6,15 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Text Editor
 
-- [ ] Add images from command palette (it means user can select a file from their computer, the file is uploaded to /images folder.
-- [ ] Remove Table from bubble menu (it is not related to formatting)
-- [ ] Add quote style to bubble (formatting) menu ![](./images/image-1769619933029.png)
+- [x] Add images from command palette (`/image` slash command) → **Sprint 26**
+- [x] Remove Table from bubble menu → **Sprint 26**
+- [x] Add quote style to bubble (formatting) menu → **Sprint 26**
 - [ ] Add Youtube (any other streaming) videos from / command palette
-- [ ] Image selected state (user can click on image and it shows that it is selected, also investigate whether it is possible to "resize" the image)
+- [x] Image selected state (click shows selection, resize handles for local images) → **Sprint 26**
+- [ ] Image resize - resize actual file when user drags handles (confirmation dialog implemented, needs Canvas resize)
 - [ ] PDF preview (read-only viewer)
 - [ ] Word (.docx) preview (read-only viewer)
-- [ ] Text-editor should display if the webviewer state becomes stale and needs refreshing (like Data editor does)
+- [x] Text-editor should display if the webviewer state becomes stale and needs refreshing → **Sprint 26**
 
 ## Data Editor
 
@@ -56,6 +57,31 @@ Redesign Welcome screen for total newbies
 
 - [ ] Batch export folder as .zip of DOCX
 
+## Export V2 (Major Refactor)
+
+Current PDF/Word export has limitations. V2 should be production-quality.
+
+- [ ] **Table support** - Tables not exported correctly to PDF/Word (critical)
+- [ ] **Better styling** - Professional document styling, proper fonts
+- [ ] **Images** - Embedded images in exports (not broken links)
+- [ ] **Headers/footers** - Page numbers, document title
+- [ ] **Code blocks** - Syntax highlighting in exports
+- [ ] **Front-matter** - Include document properties (title, author, date)
+- [ ] **Template system** - User can choose export templates
+- [ ] **Error handling** - Clear error messages, graceful fallbacks
+
+## UI/UX Refactoring (shadcn/ui)
+
+Consolidate UI components using shadcn/ui for consistency.
+
+- [ ] **Install shadcn/ui** - Setup with existing Tailwind config
+- [ ] **Dialog component** - Replace all custom dialogs (Dictation Settings, Resize confirm, Properties, etc.)
+- [ ] **Button component** - Consistent button styles across app
+- [ ] **Text Editor refactor** - Migrate FormattingBubbleMenu, BlockMenu, SlashCommands
+- [ ] **Data Editor refactor** - Migrate SpreadsheetViewer components
+- [ ] **Update CLAUDE.md** - Add shadcn/ui guidelines for agents
+- [ ] **Create ux-expert agent** - Agent specialized in shadcn/ui patterns
+
 ## Collaboration
 
 - [ ] Sharing (online, cloud sharing, view permissions)
@@ -94,4 +120,4 @@ Redesign Welcome screen for total newbies
 
 * * *
 
-*Last updated: 2026-01-28*
+*Last updated: 2026-01-29*

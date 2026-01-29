@@ -76,6 +76,38 @@ function preprocessTaskListHTML(html: string): string {
 }
 
 /**
+ * Preprocess HTML to unwrap standalone images from paragraph tags
+ *
+ * marked generates: <p><img src="..." alt=""></p>
+ * TipTap with inline:false images expects: <img src="..." alt="">
+ *
+ * Without this, TipTap creates both an empty paragraph AND an image node,
+ * causing extra spacing above images when reopening files.
+ */
+function preprocessImageHTML(html: string): string {
+  const temp = document.createElement('div')
+  temp.innerHTML = html
+
+  // Find all paragraphs that contain only an image (and maybe whitespace)
+  temp.querySelectorAll('p').forEach(p => {
+    const img = p.querySelector('img')
+    if (img) {
+      // Check if paragraph only contains the image (no text content besides whitespace)
+      const textContent = p.textContent?.trim() || ''
+      const imgAlt = img.getAttribute('alt') || ''
+
+      // If the only text content is the img alt text (or empty), unwrap the image
+      if (textContent === '' || textContent === imgAlt) {
+        // Replace paragraph with just the image
+        p.replaceWith(img)
+      }
+    }
+  })
+
+  return temp.innerHTML
+}
+
+/**
  * Preprocess HTML to make TipTap tables compatible with turndown-plugin-gfm
  *
  * TipTap generates tables with:
@@ -281,8 +313,10 @@ export function Editor({
       // Convert markdown to HTML
       try {
         const html = marked(value, { breaks: true, gfm: true }) as string
-        // Convert GFM task list HTML to TipTap format
-        return preprocessTaskListHTML(html)
+        // Preprocess: task lists and unwrap standalone images from paragraphs
+        let processed = preprocessTaskListHTML(html)
+        processed = preprocessImageHTML(processed)
+        return processed
       } catch (error) {
         console.error('Markdown conversion error:', error)
         return `<p>${value.replace(/\n/g, '</p><p>')}</p>`
@@ -563,13 +597,34 @@ export function Editor({
 
     const handleMessage = (message: { type: string; path?: string; displaySrc?: string; error?: string; filename?: string; isDirty?: boolean }) => {
       if (message.type === 'imageSaved' && message.displaySrc && message.path) {
-        // Insert image at current cursor position
-        // Use displaySrc for rendering, store relative path in data attribute
-        editor.chain().focus().setImage({
-          src: message.displaySrc,
-          alt: '',
-          title: message.path  // Store relative path in title for turndown conversion
-        }).run()
+        // Check if current paragraph is empty - if so, delete it first
+        // This prevents empty lines when inserting images via /image command
+        const { $from } = editor.state.selection
+        const currentNode = $from.parent
+        const isEmptyParagraph = currentNode.type.name === 'paragraph' && currentNode.content.size === 0
+
+        if (isEmptyParagraph) {
+          // Delete empty paragraph, then insert image
+          editor.chain()
+            .focus()
+            .deleteNode('paragraph')
+            .setImage({
+              src: message.displaySrc,
+              alt: '',
+              title: message.path
+            })
+            .run()
+        } else {
+          // Just insert image at cursor
+          editor.chain()
+            .focus()
+            .setImage({
+              src: message.displaySrc,
+              alt: '',
+              title: message.path
+            })
+            .run()
+        }
       } else if (message.type === 'imageError' && message.error) {
         console.error('Failed to save image:', message.error)
       }
@@ -634,6 +689,8 @@ export function Editor({
           }) as string
           // Convert GFM task list HTML to TipTap format
           let processedHtml = preprocessTaskListHTML(html)
+          // Unwrap standalone images from paragraphs
+          processedHtml = preprocessImageHTML(processedHtml)
           // Apply image mappings to convert relative paths to webview URIs
           processedHtml = applyImageMappings(processedHtml, imageMappings)
           editor.commands.setContent(processedHtml, false) // emitUpdate: false to prevent loops
