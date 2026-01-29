@@ -29,7 +29,8 @@ Compression=lzma2
 SolidCompression=yes
 ; Use modern wizard style
 WizardStyle=modern
-SetupIconFile=..\..\branding\icons\icon.ico
+; SetupIconFile - disabled until path issue is resolved
+; SetupIconFile=..\..\branding\icons\icon.ico
 ; Uninstall icon
 UninstallDisplayIcon={app}\{#AppExeName}
 ; Windows 10+ only
