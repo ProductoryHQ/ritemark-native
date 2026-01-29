@@ -38,6 +38,8 @@ MinVersion=10.0
 ; 64-bit only
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+; Handle long paths (node_modules has deeply nested paths >260 chars)
+UseLongPathNames=yes
 ; Mutex to prevent running during install
 AppMutex={#AppMutex}
 ; Don't require admin by default (user install)
