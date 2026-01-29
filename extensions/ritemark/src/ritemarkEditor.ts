@@ -233,18 +233,16 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       RiteMarkEditorProvider._wordCountStatusBar?.show();
     }
 
-    // Create file watcher for CSV and Excel files (not markdown - handled by VS Code)
-    if (fileType === 'csv' || fileType === 'xlsx') {
-      this.createFileWatcher(document, webview);
+    // Create file watcher for all file types
+    this.createFileWatcher(document, webview);
 
-      // Listen for saves to ignore our own saves in the file watcher
-      const saveListener = vscode.workspace.onWillSaveTextDocument(e => {
-        if (e.document.uri.fsPath === document.uri.fsPath) {
-          this.pendingSaves.add(document.uri.fsPath);
-        }
-      });
-      webviewPanel.onDidDispose(() => saveListener.dispose());
-    }
+    // Listen for saves to ignore our own saves in the file watcher
+    const saveListener = vscode.workspace.onWillSaveTextDocument(e => {
+      if (e.document.uri.fsPath === document.uri.fsPath) {
+        this.pendingSaves.add(document.uri.fsPath);
+      }
+    });
+    webviewPanel.onDidDispose(() => saveListener.dispose());
 
     // Handle messages from the webview
     webview.onDidReceiveMessage(
@@ -306,6 +304,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'saveImage':
             // Save image to ./images/ folder relative to markdown file
             this.saveImage(document, message.dataUrl, message.filename, webview);
+            return;
+
+          case 'selectImageFile':
+            // Open file picker for image selection
+            this.selectImageFile(document, webview);
             return;
 
           case 'selectionChanged':
@@ -371,6 +374,11 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
               const count = message.wordCount || 0;
               RiteMarkEditorProvider._wordCountStatusBar.text = `${count} ${count === 1 ? 'word' : 'words'}`;
             }
+            return;
+
+          case 'refresh':
+            // Refresh content from disk after external change
+            this.handleRefresh(document, webview);
             return;
 
           case 'exportPDF':
@@ -553,9 +561,17 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       const extension = matches[1];
       const base64Data = matches[2];
 
-      // Ensure filename has correct extension
-      const baseName = path.basename(filename, path.extname(filename));
-      const finalFilename = `${baseName}.${extension}`;
+      // Sanitize filename - remove special characters that cause issues
+      const rawBaseName = path.basename(filename, path.extname(filename));
+      // Replace special chars with dash, remove consecutive dashes, trim dashes from ends
+      const sanitizedBaseName = rawBaseName
+        .normalize('NFD')                          // Decompose accented chars
+        .replace(/[\u0300-\u036f]/g, '')           // Remove diacritics
+        .replace(/[^a-zA-Z0-9_-]/g, '-')           // Replace special chars with dash
+        .replace(/-+/g, '-')                       // Remove consecutive dashes
+        .replace(/^-|-$/g, '');                    // Trim dashes from ends
+
+      const finalFilename = `${sanitizedBaseName || 'image'}.${extension}`;
       const imagePath = path.join(imagesDir, finalFilename);
 
       // Write image file
@@ -578,6 +594,63 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       webview.postMessage({
         type: 'imageError',
         error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Select an image file from the file system and send it to the webview
+   */
+  private async selectImageFile(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    try {
+      const result = await vscode.window.showOpenDialog({
+        canSelectFiles: true,
+        canSelectFolders: false,
+        canSelectMany: false,
+        filters: {
+          'Images': ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
+        },
+        title: 'Select Image'
+      });
+
+      if (!result || result.length === 0) {
+        // User cancelled - send cancellation message
+        webview.postMessage({ type: 'imageSelectionCancelled' });
+        return;
+      }
+
+      const selectedFile = result[0];
+
+      // Read file as base64
+      const fileBuffer = fs.readFileSync(selectedFile.fsPath);
+      const base64Data = fileBuffer.toString('base64');
+
+      // Determine MIME type from extension
+      const ext = path.extname(selectedFile.fsPath).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml'
+      };
+      const mimeType = mimeTypes[ext] || 'image/png';
+
+      // Create data URL
+      const dataUrl = `data:${mimeType};base64,${base64Data}`;
+      const filename = path.basename(selectedFile.fsPath);
+
+      // Use existing saveImage flow
+      await this.saveImage(document, dataUrl, filename, webview);
+    } catch (error) {
+      console.error('Failed to select image:', error);
+      webview.postMessage({
+        type: 'imageError',
+        error: error instanceof Error ? error.message : 'Failed to select image'
       });
     }
   }

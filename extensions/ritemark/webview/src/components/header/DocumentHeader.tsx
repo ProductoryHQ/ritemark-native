@@ -1,10 +1,12 @@
 import React from 'react'
-import { FileText, Download } from 'lucide-react'
+import { FileText, Download, RotateCw } from 'lucide-react'
 import { VoiceDictationButton } from '../VoiceDictationButton'
 
 interface DocumentHeaderProps {
   onPropertiesClick: () => void
   onExportClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  hasFileChanged?: boolean
+  onRefresh?: () => void
 }
 
 /**
@@ -14,7 +16,12 @@ interface DocumentHeaderProps {
  * Theme: Integrated with VS Code theme using CSS variables
  * Style: Ghost buttons (transparent, hover shows background)
  */
-export function DocumentHeader({ onPropertiesClick, onExportClick }: DocumentHeaderProps) {
+export function DocumentHeader({
+  onPropertiesClick,
+  onExportClick,
+  hasFileChanged = false,
+  onRefresh
+}: DocumentHeaderProps) {
   return (
     <header className="document-header">
       <div className="header-content">
@@ -34,6 +41,20 @@ export function DocumentHeader({ onPropertiesClick, onExportClick }: DocumentHea
 
         {/* Voice Dictation button */}
         <VoiceDictationButton />
+
+        {/* Refresh button - only shows when file changed externally */}
+        {hasFileChanged && onRefresh && (
+          <button
+            className="header-btn refresh-btn has-changes"
+            onClick={onRefresh}
+            aria-label="File changed on disk - click to refresh"
+            title="File changed on disk - click to reload"
+          >
+            <RotateCw size={16} />
+            <span className="header-btn-text">Refresh</span>
+            <span className="refresh-badge" />
+          </button>
+        )}
 
         {/* Export button */}
         <button
@@ -101,6 +122,31 @@ export function DocumentHeader({ onPropertiesClick, onExportClick }: DocumentHea
           .header-btn-text {
             display: none;
           }
+        }
+
+        /* Refresh button with badge */
+        .refresh-btn {
+          position: relative;
+        }
+
+        .refresh-btn.has-changes {
+          color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+        }
+
+        .refresh-badge {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          width: 8px;
+          height: 8px;
+          background: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+          border-radius: 50%;
+          animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
       `}</style>
     </header>

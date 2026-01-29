@@ -1,9 +1,8 @@
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
 import { useState, useEffect, useRef } from 'react'
-import { Link2, Check, X, Table, List, ListOrdered, ListChecks, ExternalLink } from 'lucide-react'
+import { Link2, Check, X, List, ListOrdered, ListChecks, ExternalLink, Quote } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
-import { TablePicker } from './TablePicker'
 import { openExternalUrl } from '../bridge'
 
 /**
@@ -81,9 +80,6 @@ export function FormattingBubbleMenu({
   const [linkUrl, setLinkUrl] = useState('')
   const [urlError, setUrlError] = useState('')
   const linkInputRef = useRef<HTMLInputElement>(null)
-
-  // Table dialog state management
-  const [showTableDialog, setShowTableDialog] = useState(false)
 
   // Handle external link edit trigger (from clicking a link in the editor)
   useEffect(() => {
@@ -305,8 +301,20 @@ export function FormattingBubbleMenu({
             <ListChecks size={16} />
           </button>
 
-          {/* Visual divider between lists and links */}
+          {/* Visual divider before blockquote and link */}
           <div className="w-px h-6 bg-gray-300 mx-1" />
+
+          {/* Blockquote Button - Toggle on/off */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
+              editor.isActive('blockquote') ? 'bg-gray-200' : ''
+            }`}
+            title="Blockquote"
+          >
+            <Quote size={16} />
+          </button>
 
           {/* Link Button - Keyboard: Cmd+K / Ctrl+K */}
           <button
@@ -318,19 +326,6 @@ export function FormattingBubbleMenu({
             title="Add/Edit Link (Cmd+K)"
           >
             <Link2 size={16} />
-          </button>
-
-          {/* Visual divider between links and tables */}
-          <div className="w-px h-6 bg-gray-300 mx-1" />
-
-          {/* Table Button - Opens Dialog */}
-          <button
-            onClick={() => setShowTableDialog(true)}
-            onMouseDown={(e) => e.preventDefault()}
-            className="px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center"
-            title="Insert Table"
-          >
-            <Table size={16} />
           </button>
         </div>
       </BubbleMenu>
@@ -413,26 +408,6 @@ export function FormattingBubbleMenu({
                 </Button>
               </div>
             </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      {/*
-        Table Dialog - Separate modal for table insertion
-        Uses Radix Dialog for consistent UX with Link dialog
-      */}
-      <Dialog.Root open={showTableDialog} onOpenChange={setShowTableDialog}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl p-6 z-50">
-            <Dialog.Title className="text-lg font-semibold mb-4">
-              Insert Table
-            </Dialog.Title>
-
-            <TablePicker
-              editor={editor}
-              onClose={() => setShowTableDialog(false)}
-            />
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

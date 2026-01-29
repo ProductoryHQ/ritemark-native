@@ -557,11 +557,11 @@ export function Editor({
     }
   }, [editorSelection, onSelectionChange])
 
-  // Listen for image saved response from extension
+  // Listen for messages from extension (image upload, file changes)
   useEffect(() => {
     if (!editor) return
 
-    const handleMessage = (message: { type: string; path?: string; displaySrc?: string; error?: string }) => {
+    const handleMessage = (message: { type: string; path?: string; displaySrc?: string; error?: string; filename?: string; isDirty?: boolean }) => {
       if (message.type === 'imageSaved' && message.displaySrc && message.path) {
         // Insert image at current cursor position
         // Use displaySrc for rendering, store relative path in data attribute
@@ -573,6 +573,7 @@ export function Editor({
       } else if (message.type === 'imageError' && message.error) {
         console.error('Failed to save image:', message.error)
       }
+      // Note: fileChanged is handled at App level, not here
     }
 
     onMessage(handleMessage)
