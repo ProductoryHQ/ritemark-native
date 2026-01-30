@@ -178,14 +178,13 @@ jobs:
       # =========================================================================
       # Step 10: Build Windows installer (Inno Setup 6.7+)
       # =========================================================================
-      - name: Install Inno Setup 6.7
+      - name: Ensure Inno Setup 6.7+
         shell: pwsh
         run: |
-          # Install latest IS6 via Chocolatey (6.7+ supports UseLongPathNames)
-          # windows-latest has older IS6 pre-installed that doesn't support it
-          choco install innosetup -y --no-progress
-          # Verify installation
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /? | Select-String "Inno Setup"
+          # windows-latest now has Inno Setup 6.7.0 pre-installed
+          # Just upgrade if needed (idempotent, won't fail if already current)
+          choco upgrade innosetup -y --no-progress
+          # Note: Don't use ISCC.exe /? to verify - it returns exit code 1
 
       - name: Build installer
         shell: pwsh
