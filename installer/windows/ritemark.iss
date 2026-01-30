@@ -39,7 +39,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Handle long paths (node_modules has deeply nested paths >260 chars)
-UseLongPathNames=yes
+; UseLongPathNames=yes  ; Requires Inno Setup 7, windows-latest has IS6
 ; Mutex to prevent running during install
 AppMutex={#AppMutex}
 ; Don't require admin by default (user install)
