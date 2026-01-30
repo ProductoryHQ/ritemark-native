@@ -6,15 +6,9 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Text Editor
 
-- [x] Add images from command palette (`/image` slash command) → **Sprint 26**
-- [x] Remove Table from bubble menu → **Sprint 26**
-- [x] Add quote style to bubble (formatting) menu → **Sprint 26**
 - [ ] Add Youtube (any other streaming) videos from / command palette
-- [x] Image selected state (click shows selection, resize handles for local images) → **Sprint 26**
-- [ ] Image resize - resize actual file when user drags handles (confirmation dialog implemented, needs Canvas resize)
 - [ ] PDF preview (read-only viewer)
 - [ ] Word (.docx) preview (read-only viewer)
-- [x] Text-editor should display if the webviewer state becomes stale and needs refreshing → **Sprint 26**
 
 ## Data Editor
 
@@ -76,6 +70,7 @@ Consolidate UI components using shadcn/ui for consistency.
 
 - [ ] **Install shadcn/ui** - Setup with existing Tailwind config
 - [ ] **Dialog component** - Replace all custom dialogs (Dictation Settings, Resize confirm, Properties, etc.)
+- [ ] **Resize dialog design** - Current resize confirmation dialog needs visual polish
 - [ ] **Button component** - Consistent button styles across app
 - [ ] **Text Editor refactor** - Migrate FormattingBubbleMenu, BlockMenu, SlashCommands
 - [ ] **Data Editor refactor** - Migrate SpreadsheetViewer components
@@ -94,6 +89,12 @@ Consolidate UI components using shadcn/ui for consistency.
 
 ## Completed
 
+- [x] Add images from command palette (`/image` slash command) → **Sprint 26**
+- [x] Remove Table from bubble menu → **Sprint 26**
+- [x] Add quote style to bubble (formatting) menu → **Sprint 26**
+- [x] Image selected state (click shows selection, resize handles for local images) → **Sprint 26**
+- [x] Image resize - resize actual file when user drags handles → **Sprint 26**
+- [x] Stale file indicator (Refresh button when file changes externally) → **Sprint 26**
 - [x] In-app update notifications (like Cursor) - \[x\] Show banner when new version available - \[x\] "Later" / "Install Now" buttons
 - [x] Save as PDF
 - [x] Save as DOCX
@@ -120,4 +121,4 @@ Consolidate UI components using shadcn/ui for consistency.
 
 * * *
 
-*Last updated: 2026-01-29*
+*Last updated: 2026-01-30*
