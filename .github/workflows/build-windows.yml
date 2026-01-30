@@ -176,22 +176,16 @@ jobs:
           echo "Validation PASSED"
 
       # =========================================================================
-      # Step 10: Build Windows installer (Inno Setup)
+      # Step 10: Build Windows installer (Inno Setup 6.7+)
       # =========================================================================
-      - name: Enable Windows long paths
+      - name: Install Inno Setup 6.7
         shell: pwsh
         run: |
-          # Enable long path support (>260 chars) for Inno Setup
-          # Required for node_modules with deep nesting
-          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
-            -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
-          Write-Host "Long paths enabled"
-
-      - name: Verify Inno Setup
-        shell: bash
-        run: |
-          # Inno Setup is pre-installed on windows-latest
-          ls -la "/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          # Install latest IS6 via Chocolatey (6.7+ supports UseLongPathNames)
+          # windows-latest has older IS6 pre-installed that doesn't support it
+          choco install innosetup -y --no-progress
+          # Verify installation
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /? | Select-String "Inno Setup"
 
       - name: Build installer
         shell: pwsh
