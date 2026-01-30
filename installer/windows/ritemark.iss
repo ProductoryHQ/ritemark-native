@@ -1,5 +1,5 @@
 ; RiteMark Windows Installer Script
-; Built with Inno Setup 6
+; Built with Inno Setup 6.3+ (for UseLongPathNames support)
 ;
 ; Usage (via Docker from macOS):
 ;   docker run --rm -v "$PWD:/work" amake/innosetup installer/windows/ritemark.iss
@@ -39,7 +39,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Handle long paths (node_modules has deeply nested paths >260 chars)
-; UseLongPathNames=yes  ; Requires Inno Setup 7, windows-latest has IS6
+UseLongPathNames=yes
 ; Mutex to prevent running during install
 AppMutex={#AppMutex}
 ; Don't require admin by default (user install)
@@ -55,8 +55,9 @@ Name: "associatewithfiles"; Description: "Associate with .md files"; GroupDescri
 Name: "addtopath"; Description: "Add to PATH"; GroupDescription: "Other:"
 
 [Files]
-; Copy everything from the built app
-Source: "..\..\VSCode-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Copy everything from the built app, excluding paths that exceed MAX_PATH (260 chars)
+; The docx/build folder has deeply nested paths but isn't needed at runtime
+Source: "..\..\VSCode-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*\node_modules\docx\build\*,*\node_modules\*\node_modules\*\node_modules\*"
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
