@@ -53,8 +53,18 @@ Features listed here should appear in the features grid.
 - **Description EN:** Files stay on your computer. No account needed. Full control over your data.
 - **Screenshot:** none
 
+### Image Handling
+- **Icon:** Image (from lucide-react)
+- **Title ET:** Pildihaldus
+- **Title EN:** Image Handling
+- **Description ET:** Lisa pilte /image kaasuga. Muuda suurust lohistades - RiteMark muudab tegelikku faili, mitte ainult vaadet.
+- **Description EN:** Insert images with /image command. Resize by dragging - RiteMark resizes the actual file, not just the display.
+- **Screenshot:** none (needs screenshot showing image with resize handles)
+- **Badge:** NEW
+
 ## Screenshot Needs
 
 - [ ] Voice Dictation - show mic button active in toolbar with streaming text appearing in editor
 - [ ] Copy as Markdown - show Export menu with "Copy as Markdown" option highlighted
 - [ ] Spreadsheet refresh feature - show refresh button with blue badge indicator
+- [ ] Image Handling - show image with resize handles visible
