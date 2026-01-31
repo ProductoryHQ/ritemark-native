@@ -8,10 +8,12 @@
  * - API key from VS Code SecretStorage
  */
 
+import * as vscode from 'vscode';
 import OpenAI from 'openai';
 import TurndownService from 'turndown';
 import { tables } from 'turndown-plugin-gfm';
 import { getAPIKeyManager } from './apiKeyManager';
+import { DEFAULT_MODELS, usesResponsesAPI, getReasoningEffort } from './modelConfig';
 
 /**
  * Initialize TurndownService for HTML to Markdown conversion
@@ -209,6 +211,14 @@ async function createOpenAIClient(): Promise<OpenAI | null> {
 }
 
 /**
+ * Get configured AI model from VS Code settings
+ */
+function getConfiguredModel(): string {
+  const config = vscode.workspace.getConfiguration('ritemark');
+  return config.get('ai.model', DEFAULT_MODELS.assistant);
+}
+
+/**
  * Execute a user command using OpenAI function calling
  *
  * @param prompt - User's natural language command
@@ -280,9 +290,18 @@ ${plainText}
         { role: 'user', content: prompt }
       ];
 
+      // Get model from settings
+      const model = getConfiguredModel();
+      const useResponses = usesResponsesAPI(model);
+
+      console.log(`[OpenAI] Using model: ${model}, API: ${useResponses ? 'Responses' : 'Chat Completions'}`);
+
+      // For tool calling, we need Chat Completions API
+      // Responses API doesn't support function calling in the same way
+      // GPT-5 models also work with Chat Completions API
       const stream = await openai.chat.completions.create(
         {
-          model: 'gpt-4o-mini', // Using gpt-4o-mini for cost efficiency
+          model,
           messages,
           tools: [rephraseTextTool, findAndReplaceAllTool, insertTextTool],
           tool_choice: 'auto',
@@ -386,14 +405,15 @@ export async function testConnection(): Promise<AICommandResult> {
   }
 
   try {
+    const model = getConfiguredModel();
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model,
       messages: [{ role: 'user', content: 'Hello' }],
       max_tokens: 5
     });
 
     if (response.choices[0]?.message?.content) {
-      return { success: true, message: 'OpenAI connection successful' };
+      return { success: true, message: `Connected with ${model}` };
     }
 
     return { success: false, error: 'Unexpected response from OpenAI' };

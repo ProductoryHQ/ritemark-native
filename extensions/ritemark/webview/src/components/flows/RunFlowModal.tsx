@@ -11,13 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Progress } from '../ui/progress';
-import type { Flow, FlowsMessage, FlowsCommand } from './types';
-
-declare const acquireVsCodeApi: () => {
-  postMessage: (message: FlowsCommand) => void;
-};
-
-const vscode = acquireVsCodeApi();
+import type { Flow, FlowsMessage } from './types';
+import { vscode } from '../../lib/vscode';
 
 interface RunFlowModalProps {
   flow: Flow;

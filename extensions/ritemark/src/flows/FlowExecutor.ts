@@ -13,6 +13,8 @@ import type {
   ExecutionProgress,
 } from './types';
 import { executeLLMNode } from './nodes/LLMNodeExecutor';
+import { executeImageNode } from './nodes/ImageNodeExecutor';
+import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 
 /**
  * Progress callback
@@ -80,18 +82,18 @@ async function executeNode(
   context: ExecutionContext
 ): Promise<unknown> {
   switch (node.type) {
-    case 'input':
-      // Input nodes don't execute - their values come from context.inputs
-      return null;
+    case 'trigger':
+      // Trigger node provides inputs to the flow
+      return context.inputs;
 
     case 'llm-prompt':
       return await executeLLMNode(node, context);
 
     case 'image-prompt':
-      throw new Error('Image nodes not yet implemented (Phase 2)');
+      return await executeImageNode(node, context);
 
     case 'save-file':
-      throw new Error('Save file nodes not yet implemented (Phase 2)');
+      return await executeSaveFileNode(node, context);
 
     default:
       throw new Error(`Unknown node type: ${(node as FlowNode).type}`);
@@ -121,11 +123,35 @@ export async function executeFlow(
     }
   }
 
+  // Build input labels map (label -> value)
+  const inputLabels = new Map<string, string>();
+  const triggerNode = flow.nodes.find(n => n.type === 'trigger');
+  if (triggerNode) {
+    const triggerInputs = (triggerNode.data as { inputs?: Array<{ id: string; label: string }> }).inputs || [];
+    for (const input of triggerInputs) {
+      const value = inputs[input.label] ?? inputs[input.id];
+      if (value !== undefined) {
+        inputLabels.set(input.label, String(value));
+      }
+    }
+  }
+
+  // Build node labels map (label -> nodeId)
+  const nodeLabels = new Map<string, string>();
+  for (const node of flow.nodes) {
+    const label = (node.data as { label?: string }).label;
+    if (label) {
+      nodeLabels.set(label, node.id);
+    }
+  }
+
   // Build execution context
   const context: ExecutionContext = {
     inputs,
     outputs: new Map(),
     workspacePath,
+    inputLabels,
+    nodeLabels,
   };
 
   try {

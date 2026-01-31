@@ -14,8 +14,29 @@ declare function acquireVsCodeApi(): {
   setState(state: unknown): void
 }
 
+// Use window-level singleton to ensure only one call per webview
+declare global {
+  interface Window {
+    __vscodeApi?: ReturnType<typeof acquireVsCodeApi>;
+  }
+}
+
 // Get VS Code API (only available in webview context)
-const vscode = typeof acquireVsCodeApi !== 'undefined' ? acquireVsCodeApi() : null
+function getOrCreateVsCodeApi() {
+  if (typeof window !== 'undefined' && window.__vscodeApi) {
+    return window.__vscodeApi;
+  }
+  if (typeof acquireVsCodeApi !== 'undefined') {
+    const api = acquireVsCodeApi();
+    if (typeof window !== 'undefined') {
+      window.__vscodeApi = api;
+    }
+    return api;
+  }
+  return null;
+}
+
+const vscode = getOrCreateVsCodeApi()
 
 export interface Message {
   type: string

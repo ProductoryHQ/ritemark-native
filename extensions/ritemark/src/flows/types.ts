@@ -35,7 +35,7 @@ export interface FlowInput {
  */
 export interface FlowNode {
   id: string;
-  type: 'input' | 'llm-prompt' | 'image-prompt' | 'save-file';
+  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file';
   position: { x: number; y: number };
   data: Record<string, unknown>;
 }
@@ -56,6 +56,10 @@ export interface ExecutionContext {
   inputs: Record<string, unknown>;
   outputs: Map<string, unknown>;
   workspacePath: string;
+  /** Map of input label -> input value (for {Label} syntax) */
+  inputLabels: Map<string, string>;
+  /** Map of node label -> node ID (for {Label} syntax) */
+  nodeLabels: Map<string, string>;
 }
 
 /**
