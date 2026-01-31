@@ -1,0 +1,13 @@
+diff --git a/src/vs/workbench/services/themes/common/themeConfiguration.ts b/src/vs/workbench/services/themes/common/themeConfiguration.ts
+index 60e2174d..31321f8d 100644
+--- a/src/vs/workbench/services/themes/common/themeConfiguration.ts
++++ b/src/vs/workbench/services/themes/common/themeConfiguration.ts
+@@ -34,7 +34,7 @@ export const COLOR_THEME_CONFIGURATION_SETTINGS_TAG = 'colorThemeConfiguration';
+ const colorThemeSettingSchema: IConfigurationPropertySchema = {
+ 	type: 'string',
+ 	markdownDescription: nls.localize({ key: 'colorTheme', comment: ['{0} will become a link to another setting.'] }, "Specifies the color theme used in the workbench when {0} is not enabled.", formatSettingAsLink(ThemeSettings.DETECT_COLOR_SCHEME)),
+-	default: isWeb ? ThemeSettingDefaults.COLOR_THEME_LIGHT : ThemeSettingDefaults.COLOR_THEME_DARK,
++	default: ThemeSettingDefaults.COLOR_THEME_LIGHT, // RiteMark: Always default to light theme
+ 	tags: [COLOR_THEME_CONFIGURATION_SETTINGS_TAG],
+ 	enum: colorThemeSettingEnum,
+ 	enumDescriptions: colorThemeSettingEnumDescriptions,

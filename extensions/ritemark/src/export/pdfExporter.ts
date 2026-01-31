@@ -67,7 +67,7 @@ export async function exportToPDF(
     doc.pipe(writeStream);
 
     // Render content
-    renderMarkdownToPDF(doc, markdown, properties);
+    renderMarkdownToPDF(doc, markdown, properties, documentUri);
 
     // Finalize PDF
     doc.end();
@@ -89,12 +89,62 @@ export async function exportToPDF(
 }
 
 /**
+ * Try to load image from path (relative to document or absolute)
+ * Returns buffer on success, null if image cannot be loaded
+ */
+function tryLoadImage(imagePath: string, documentUri?: vscode.Uri): Buffer | null {
+  try {
+    // Handle vscode-file:// scheme
+    if (imagePath.startsWith('vscode-file://')) {
+      imagePath = imagePath.replace('vscode-file://', '');
+    }
+
+    // Handle file:// scheme
+    if (imagePath.startsWith('file://')) {
+      imagePath = imagePath.replace('file://', '');
+    }
+
+    // Skip remote URLs (http://, https://)
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      console.log(`Skipping remote image: ${imagePath}`);
+      return null;
+    }
+
+    // Resolve relative paths
+    let absolutePath: string;
+    if (path.isAbsolute(imagePath)) {
+      absolutePath = imagePath;
+    } else if (documentUri) {
+      // Resolve relative to document directory
+      const docDir = path.dirname(documentUri.fsPath);
+      absolutePath = path.resolve(docDir, imagePath);
+    } else {
+      // No document URI, can't resolve relative path
+      return null;
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(absolutePath)) {
+      console.log(`Image not found: ${absolutePath}`);
+      return null;
+    }
+
+    // Read image file
+    return fs.readFileSync(absolutePath);
+  } catch (error) {
+    console.error(`Failed to load image: ${imagePath}`, error);
+    return null;
+  }
+}
+
+/**
  * Render markdown content to PDF document
  */
 function renderMarkdownToPDF(
   doc: PDFKit.PDFDocument,
   markdown: string,
-  properties: DocumentProperties
+  properties: DocumentProperties,
+  documentUri?: vscode.Uri
 ): void {
   // Font sizes
   const FONT_SIZES = {
@@ -244,7 +294,8 @@ function renderMarkdownToPDF(
     if (taskMatch) {
       const checked = taskMatch[2].toLowerCase() === 'x';
       const content = taskMatch[3];
-      const checkbox = checked ? '☑' : '☐';
+      // Use ASCII fallback instead of unicode (☑ ☐) which may not render in Helvetica
+      const checkbox = checked ? '[x]' : '[ ]';
 
       doc.fontSize(FONT_SIZES.body)
          .font(FONT_REGULAR)
@@ -274,6 +325,54 @@ function renderMarkdownToPDF(
          .stroke();
       doc.strokeColor('#000000');
       doc.moveDown(0.5);
+      continue;
+    }
+
+    // Images - Parse and embed if possible
+    const imageMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imageMatch) {
+      const altText = imageMatch[1];
+      const imagePath = imageMatch[2];
+
+      const imageBuffer = tryLoadImage(imagePath, documentUri);
+      if (imageBuffer) {
+        try {
+          // Calculate max width (page width - margins)
+          const maxWidth = doc.page.width - 144; // 72px margins on each side
+          const maxHeight = 400; // Max height in pixels
+
+          // Add some spacing before image
+          doc.moveDown(0.5);
+
+          // Embed image with fit constraint
+          doc.image(imageBuffer, {
+            fit: [maxWidth, maxHeight],
+            align: 'center'
+          });
+
+          // Add alt text as caption if provided
+          if (altText) {
+            doc.fontSize(9)
+               .font(FONT_ITALIC)
+               .fillColor('#666666')
+               .text(altText, { align: 'center' });
+            doc.fillColor('#000000');
+          }
+
+          doc.moveDown(0.5);
+          continue;
+        } catch (error) {
+          console.error(`Failed to embed image: ${imagePath}`, error);
+          // Fall through to show [Image] text
+        }
+      }
+
+      // If image loading failed, show placeholder
+      doc.fontSize(FONT_SIZES.body)
+         .font(FONT_ITALIC)
+         .fillColor('#999999')
+         .text(`[Image: ${altText || imagePath}]`, { align: 'left' });
+      doc.fillColor('#000000');
       continue;
     }
 
@@ -325,6 +424,9 @@ function renderCodeBlock(
 /**
  * Clean inline markdown formatting (bold, italic, links, etc.)
  * Returns plain text for PDF
+ *
+ * Note: Images are handled separately in the main rendering loop,
+ * so we don't strip them here anymore.
  */
 function cleanInlineFormatting(text: string): string {
   return text
@@ -340,8 +442,6 @@ function cleanInlineFormatting(text: string): string {
     .replace(/`(.+?)`/g, '$1')
     // Remove links, keep text
     .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-    // Remove images
-    .replace(/!\[.*?\]\(.+?\)/g, '[Image]')
     // Remove strikethrough
     .replace(/~~(.+?)~~/g, '$1');
 }

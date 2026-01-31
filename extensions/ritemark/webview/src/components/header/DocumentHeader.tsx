@@ -2,11 +2,17 @@ import React from 'react'
 import { FileText, Download, RotateCw } from 'lucide-react'
 import { VoiceDictationButton } from '../VoiceDictationButton'
 
+interface Features {
+  voiceDictation: boolean
+  markdownExport: boolean
+}
+
 interface DocumentHeaderProps {
   onPropertiesClick: () => void
   onExportClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   hasFileChanged?: boolean
   onRefresh?: () => void
+  features: Features
 }
 
 /**
@@ -20,7 +26,8 @@ export function DocumentHeader({
   onPropertiesClick,
   onExportClick,
   hasFileChanged = false,
-  onRefresh
+  onRefresh,
+  features
 }: DocumentHeaderProps) {
   return (
     <header className="document-header">
@@ -39,8 +46,8 @@ export function DocumentHeader({
         {/* Spacer to push Voice Dictation and Export to the right */}
         <div className="flex-1" />
 
-        {/* Voice Dictation button */}
-        <VoiceDictationButton />
+        {/* Voice Dictation button - only show if feature is enabled (macOS only) */}
+        {features.voiceDictation && <VoiceDictationButton />}
 
         {/* Refresh button - only shows when file changed externally */}
         {hasFileChanged && onRefresh && (
