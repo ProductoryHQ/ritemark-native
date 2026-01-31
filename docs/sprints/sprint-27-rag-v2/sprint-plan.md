@@ -602,32 +602,33 @@ For users who enable `rag-docling` flag (requires Python 3.11+):
 
 ## Status Tracking
 
-**Current Phase:** 2 (PLAN)
+**Current Phase:** 3a (DEVELOP) ✅
 
-**Approval Required:** YES - Jarmo must approve before Phase 3
+**Approval:** Jarmo approved on 2026-01-31
+
+**Decisions:**
+- ✅ Include Docling (Step 0b) behind `rag-docling` feature flag
+- ✅ Migration: Re-index required for new features (no migration script)
+- ✅ No side-by-side comparison UI needed
 
 **Blockers:**
 1. ~~Sprint 24 Phase 4 not complete~~ ✅ Sprint 24 released (v1.1.x)
-2. Jarmo approval pending
+2. ~~Jarmo approval pending~~ ✅ Approved
 
 **Next Actions:**
-1. Jarmo reviews this sprint plan
-2. Jarmo approves with "approved" or "proceed"
-3. Create branch from main
-4. Begin Phase 3a development (Step 0a: JS parsers)
+1. Create branch from main
+2. Begin Step 0a: JS Document Parsers (pdf-parse, mammoth)
 
 ---
 
 ## Approval
 
-- [ ] **Jarmo approved this sprint plan**
+- [x] **Jarmo approved this sprint plan** ✅ (2026-01-31)
 
-**Approval Phrase Required:**
-- "approved"
-- "Jarmo approved"
-- "@approved"
-- "proceed"
-- "go ahead"
+**Approval notes:**
+- Include Docling behind feature flag
+- Re-index required for migration
+- No comparison UI needed
 
 ---
 

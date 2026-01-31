@@ -640,8 +640,9 @@ Before proceeding to Phase 3 (DEVELOP), confirm:
 
 ---
 
-**Status:** Awaiting Jarmo's approval
-**Next Step:** Review sprint plan → Approve → Proceed to Phase 3
+**Status:** ✅ APPROVED - Phase 3 (DEVELOP)
+**Approved:** 2026-01-31 by Jarmo
+**Decisions:** Include Docling (behind flag), re-index for migration, no comparison UI
 
 ---
 
