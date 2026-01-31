@@ -1,4 +1,4 @@
-# RiteMark Native Branding
+# Ritemark Native Branding
 
 ## Files
 
@@ -12,7 +12,7 @@ These files override VS Code's default branding during build.
 
 ## Placeholder Icons
 
-Current icons are blue placeholder squares. Replace with final RiteMark icons when ready.
+Current icons are blue placeholder squares. Replace with final Ritemark icons when ready.
 
 To regenerate .icns from a new icon.png:
 

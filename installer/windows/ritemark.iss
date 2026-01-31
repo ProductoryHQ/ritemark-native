@@ -1,4 +1,4 @@
-; RiteMark Windows Installer Script
+; Ritemark Windows Installer Script
 ; Built with Inno Setup 6.x
 ;
 ; Usage:
@@ -11,12 +11,12 @@
   #define SourcePath "..\..\VSCode-win32-x64"
 #endif
 
-#define AppName "RiteMark"
+#define AppName "Ritemark"
 ; Keep in sync with extensions/ritemark/package.json version
 #define AppVersion "1.1.1"
 #define AppPublisher "Productory"
 #define AppURL "https://ritemark.app"
-#define AppExeName "RiteMark.exe"
+#define AppExeName "Ritemark.exe"
 #define AppMutex "ritemarknative"
 
 [Setup]
@@ -32,7 +32,7 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
 OutputDir=..\..\installer-output
-OutputBaseFilename=RiteMark-{#AppVersion}-win32-x64-setup
+OutputBaseFilename=Ritemark-{#AppVersion}-win32-x64-setup
 Compression=lzma2
 SolidCompression=yes
 ; Use modern wizard style
@@ -74,14 +74,14 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
-; Associate .md files with RiteMark
-Root: HKCU; Subkey: "Software\Classes\.md"; ValueType: string; ValueName: ""; ValueData: "RiteMark.md"; Flags: uninsdeletevalue; Tasks: associatewithfiles
-Root: HKCU; Subkey: "Software\Classes\RiteMark.md"; ValueType: string; ValueName: ""; ValueData: "Markdown File"; Flags: uninsdeletekey; Tasks: associatewithfiles
-Root: HKCU; Subkey: "Software\Classes\RiteMark.md\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"; Tasks: associatewithfiles
-Root: HKCU; Subkey: "Software\Classes\RiteMark.md\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""; Tasks: associatewithfiles
+; Associate .md files with Ritemark
+Root: HKCU; Subkey: "Software\Classes\.md"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\Ritemark.md"; ValueType: string; ValueName: ""; ValueData: "Markdown File"; Flags: uninsdeletekey; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\Ritemark.md\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\Ritemark.md\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""; Tasks: associatewithfiles
 
 ; Also associate .markdown files
-Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "RiteMark.md"; Flags: uninsdeletevalue; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue; Tasks: associatewithfiles
 
 ; Add to PATH
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\bin"; Tasks: addtopath; Check: NeedsAddPath('{app}\bin')
