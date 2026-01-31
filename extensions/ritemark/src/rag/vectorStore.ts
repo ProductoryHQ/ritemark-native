@@ -1,6 +1,11 @@
 /**
  * Vector store using Orama for local semantic search.
  * Pure TypeScript, zero native dependencies.
+ *
+ * Supports:
+ * - Vector search (semantic similarity)
+ * - Full-text search (BM25 keyword matching)
+ * - Hybrid search (combines both with RRF - when rag-v2-enhancements flag enabled)
  */
 
 import * as path from 'path';
@@ -16,6 +21,7 @@ import {
 } from '@orama/orama';
 import type { Orama, Results } from '@orama/orama';
 import { getEmbeddingDimensions } from './embeddings';
+import { isEnabled } from '../features';
 
 // Schema definition for Orama
 const SCHEMA = {
@@ -64,6 +70,10 @@ export interface SearchResult {
 	page: number | null;
 	section: string | null;
 	score: number;
+	/** Document type for re-ranking (pdf, markdown, docx) */
+	sourceType?: string;
+	/** Index timestamp for recency scoring */
+	createdAt?: string;
 }
 
 export class VectorStore {
@@ -198,24 +208,84 @@ export class VectorStore {
 	}
 
 	/**
-	 * Vector similarity search.
+	 * Search for documents using vector similarity.
+	 * When rag-v2-enhancements flag is enabled, uses hybrid search (vector + BM25).
+	 *
+	 * @param queryEmbedding - The query embedding vector
+	 * @param topK - Maximum number of results to return
+	 * @param _sourceFilter - Optional filter by source path (not yet implemented)
+	 * @param queryText - The original query text (required for hybrid search)
 	 */
 	async search(
 		queryEmbedding: Float32Array | number[],
 		topK: number = 5,
 		_sourceFilter?: string,
-		_queryText?: string
+		queryText?: string
+	): Promise<SearchResult[]> {
+		const db = this.ensureInit();
+		const useHybrid = isEnabled('rag-v2-enhancements') && queryText;
+
+		let results: Results<ChunkDocument>;
+
+		if (useHybrid) {
+			// Hybrid search: combines vector + BM25 with RRF (Reciprocal Rank Fusion)
+			results = await search(db, {
+				mode: 'hybrid',
+				term: queryText,
+				vector: {
+					value: Array.from(queryEmbedding),
+					property: 'embedding',
+				},
+				similarity: 0.3,
+				limit: topK,
+			}) as Results<ChunkDocument>;
+		} else {
+			// Vector-only search (Sprint 24 behavior)
+			results = await search(db, {
+				mode: 'vector',
+				vector: {
+					value: Array.from(queryEmbedding),
+					property: 'embedding',
+				},
+				similarity: 0.3,
+				limit: topK,
+			}) as Results<ChunkDocument>;
+		}
+
+		return results.hits.map((hit) => ({
+			content: hit.document.content,
+			source: hit.document.source,
+			page: hit.document.page === 0 ? null : hit.document.page,
+			section: hit.document.section === '' ? null : hit.document.section,
+			score: hit.score,
+			sourceType: hit.document.sourceType,
+			createdAt: hit.document.createdAt,
+		}));
+	}
+
+	/**
+	 * Hybrid search combining vector similarity and BM25 keyword matching.
+	 * Uses Reciprocal Rank Fusion (RRF) to combine results.
+	 *
+	 * @param queryEmbedding - The query embedding vector
+	 * @param queryText - The query text for keyword matching
+	 * @param topK - Maximum number of results to return
+	 */
+	async searchHybrid(
+		queryEmbedding: Float32Array | number[],
+		queryText: string,
+		topK: number = 10
 	): Promise<SearchResult[]> {
 		const db = this.ensureInit();
 
-		// Vector search
 		const results = await search(db, {
-			mode: 'vector',
+			mode: 'hybrid',
+			term: queryText,
 			vector: {
 				value: Array.from(queryEmbedding),
 				property: 'embedding',
 			},
-			similarity: 0.3, // Minimum similarity threshold
+			similarity: 0.3,
 			limit: topK,
 		}) as Results<ChunkDocument>;
 
@@ -225,11 +295,13 @@ export class VectorStore {
 			page: hit.document.page === 0 ? null : hit.document.page,
 			section: hit.document.section === '' ? null : hit.document.section,
 			score: hit.score,
+			sourceType: hit.document.sourceType,
+			createdAt: hit.document.createdAt,
 		}));
 	}
 
 	/**
-	 * Full-text search only.
+	 * Full-text search only (BM25 keyword matching).
 	 */
 	async searchText(
 		queryText: string,
@@ -249,6 +321,8 @@ export class VectorStore {
 			page: hit.document.page === 0 ? null : hit.document.page,
 			section: hit.document.section === '' ? null : hit.document.section,
 			score: hit.score,
+			sourceType: hit.document.sourceType,
+			createdAt: hit.document.createdAt,
 		}));
 	}
 
