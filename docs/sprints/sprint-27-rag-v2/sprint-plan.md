@@ -1,7 +1,9 @@
 # Sprint 27: RAG v2 - Enhanced Retrieval Pipeline
 
 ## Goal
-Enhance Sprint 24's RAG system with Docify's pipeline improvements: hybrid search, multi-factor re-ranking, citation verification, and anti-hallucination prompts to improve retrieval quality and reduce LLM hallucinations.
+Enhance Sprint 24's RAG system with:
+1. **Document parsing** - PDF/Word support via JS libraries (default) + optional Docling for power users
+2. **Pipeline improvements** - Hybrid search, re-ranking, citation verification (from Docify research)
 
 ---
 
@@ -31,12 +33,15 @@ Enhance Sprint 24's RAG system with Docify's pipeline improvements: hybrid searc
 
 | Deliverable | Description |
 |-------------|-------------|
+| **JS document parsers** | PDF + Word parsing via pdf-parse and mammoth (default, no Python) |
+| **Docling bridge** | Optional Python parser for OCR, tables, PPT (requires Python 3.11+) |
+| **Parser router** | Route files to correct parser based on extension + feature flag |
 | Hybrid search config | Enable Orama's built-in BM25 + vector search with RRF |
 | Re-ranking service | 5-factor post-retrieval scoring (quality, recency, specificity, etc.) |
 | Citation verifier | Post-process LLM responses to verify `[Source N]` citations |
 | Anti-hallucination prompts | Strict system prompts requiring citations, admitting unknowns |
 | Context assembler | 60/30/10 token budget allocation (primary/supporting/metadata) |
-| Feature flag | `rag-v2-enhancements` in flags.ts, gates all new features |
+| Feature flags | `rag-docling` + `rag-v2-enhancements` in flags.ts |
 | Updated sidebar | Display citation verification scores in UI |
 | Unit tests | Test coverage for all new components |
 | Documentation | Update Sprint 24 README with v2 enhancements |
@@ -79,8 +84,81 @@ Enhance Sprint 24's RAG system with Docify's pipeline improvements: hybrid searc
 
 **Prerequisites:**
 - [ ] Jarmo approval received
-- [ ] Sprint 24 Phase 4 complete (Orama migration tested)
-- [ ] Branch created from Sprint 24's branch
+- [x] Sprint 24 complete and released (v1.1.x) ✅
+- [ ] Branch created from main
+
+---
+
+#### Step 0a: JS Document Parsers (3-4 hours) ⭐ PRIORITY
+Default parsing that works for everyone - no Python required:
+
+- [ ] Add npm dependencies to `package.json`:
+  ```json
+  "pdf-parse": "^1.1.1",
+  "mammoth": "^1.6.0"
+  ```
+- [ ] Create `src/rag/parsers/pdfParser.ts`:
+  - [ ] Use `pdf-parse` (wrapper around Mozilla pdf.js)
+  - [ ] Extract text, page count, metadata
+  - [ ] Return: `{ text, metadata: { pages, title, author } }`
+  - [ ] Handle errors gracefully (corrupted PDFs, password protected)
+- [ ] Create `src/rag/parsers/wordParser.ts`:
+  - [ ] Use `mammoth` for DOCX parsing
+  - [ ] Extract text with structure (headers, paragraphs)
+  - [ ] Return: `{ text, metadata: { title } }`
+- [ ] Create `src/rag/parsers/index.ts` (router):
+  - [ ] Route by extension: `.pdf` → pdfParser, `.docx` → wordParser, `.md` → direct
+  - [ ] Check feature flag for Docling override (Step 0b)
+  - [ ] Return consistent `ParseResult` interface
+- [ ] Update `src/rag/indexer.ts`:
+  - [ ] Extend `SUPPORTED_EXTENSIONS` to include `.pdf`, `.docx`
+  - [ ] Route through parser router instead of direct text read
+  - [ ] Add `source_type` metadata to chunks (pdf, docx, markdown)
+- [ ] Test: index a PDF and Word doc, verify searchable
+- [ ] Commit: `feat(rag): add PDF and Word parsing via JS libraries`
+
+**Expected changes:**
+- `extensions/ritemark/package.json` (~2 lines)
+- `extensions/ritemark/src/rag/parsers/pdfParser.ts` (new, ~60 lines)
+- `extensions/ritemark/src/rag/parsers/wordParser.ts` (new, ~50 lines)
+- `extensions/ritemark/src/rag/parsers/index.ts` (new, ~40 lines)
+- `extensions/ritemark/src/rag/indexer.ts` (~30 lines modified)
+
+---
+
+#### Step 0b: Docling Integration (3-4 hours) - OPTIONAL
+For users who enable `rag-docling` flag (requires Python 3.11+):
+
+- [ ] Create `rag-server/pyproject.toml`:
+  ```toml
+  [project]
+  name = "rag-server"
+  requires-python = ">=3.11"
+  dependencies = ["docling>=2.0"]
+  ```
+- [ ] Create `rag-server/parser.py`:
+  - [ ] Input: file path as CLI argument
+  - [ ] Output: JSON to stdout `{ text, metadata, pages[] }`
+  - [ ] Support: PDF, DOCX, PPTX, images (OCR)
+- [ ] Create `src/rag/parsers/doclingParser.ts`:
+  - [ ] Check if Python available (`which python3`)
+  - [ ] If not found: show instructions, fallback to JS parser
+  - [ ] Spawn via `uv run python -m rag_server.parser <file>`
+  - [ ] Parse JSON output, handle errors
+  - [ ] Show progress for Docling model download (~200MB first run)
+- [ ] Define `rag-docling` feature flag in `src/features/flags.ts`
+- [ ] Update parser router to prefer Docling when flag enabled
+- [ ] Add `.pptx`, `.png`, `.jpg` to supported extensions (Docling only)
+- [ ] Test: index a scanned PDF with OCR
+- [ ] Commit: `feat(rag): add optional Docling parser for advanced documents`
+
+**Expected changes:**
+- `rag-server/pyproject.toml` (new, ~10 lines)
+- `rag-server/parser.py` (new, ~80 lines)
+- `extensions/ritemark/src/rag/parsers/doclingParser.ts` (new, ~100 lines)
+- `extensions/ritemark/src/features/flags.ts` (~10 lines)
+
+---
 
 #### 3.1: Feature Flag Setup (30 min)
 - [ ] Define `rag-v2-enhancements` flag in `src/features/flags.ts`:
@@ -418,7 +496,10 @@ Enhance Sprint 24's RAG system with Docify's pipeline improvements: hybrid searc
 **Expected changes:**
 - `extensions/ritemark/src/views/UnifiedViewProvider.ts` (~40 lines)
 
-**Total Phase 3a estimated time:** 18-25 hours
+**Total Phase 3a estimated time:** 24-33 hours
+- Step 0a (JS parsers): 3-4 hours ⭐ Must have
+- Step 0b (Docling): 3-4 hours (optional, can defer)
+- Steps 3.1-3.9 (pipeline): 18-25 hours
 
 ---
 
@@ -526,15 +607,14 @@ Enhance Sprint 24's RAG system with Docify's pipeline improvements: hybrid searc
 **Approval Required:** YES - Jarmo must approve before Phase 3
 
 **Blockers:**
-1. Sprint 24 Phase 4 not complete (Orama migration needs testing)
+1. ~~Sprint 24 Phase 4 not complete~~ ✅ Sprint 24 released (v1.1.x)
 2. Jarmo approval pending
 
 **Next Actions:**
 1. Jarmo reviews this sprint plan
-2. Jarmo confirms Sprint 24 Phase 4 completion
-3. Jarmo approves with "approved" or "proceed"
-4. Create branch from Sprint 24
-5. Begin Phase 3a development
+2. Jarmo approves with "approved" or "proceed"
+3. Create branch from main
+4. Begin Phase 3a development (Step 0a: JS parsers)
 
 ---
 
