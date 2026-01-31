@@ -26,10 +26,10 @@ Sprint 24 built RiteMark's RAG foundation: **markdown-only** parsing, embeddings
 2. **Basic search** - Pure vector search misses exact keywords, no citation verification
 
 **Solution:** Two-part enhancement:
-1. **Docling integration** - Parse PDF, DOCX, PPTX, images via Python subprocess
+1. **Document parsing** - PDF/Word support via JS libraries (default) + optional Docling for power users
 2. **Pipeline improvements** - Hybrid search, re-ranking, citation verification (from Docify)
 
-**Solution:** Layer Docify's 5-stage enhancement pipeline on top of Sprint 24's architecture:
+**Architecture:** Layer improvements on Sprint 24's foundation:
 
 ```
 Query → [Hybrid Search] → [Re-ranking] → [Context Assembly] → [LLM + Prompts] → [Citation Verify] → Response
@@ -40,32 +40,61 @@ Query → [Hybrid Search] → [Re-ranking] → [Context Assembly] → [LLM + Pro
 
 ## Key Enhancements
 
-### 0. Docling Integration (PDF/Word/PPT Support) ⭐ NEW
+### 0. Document Parsing (PDF/Word Support) ⭐ NEW
 **Current:** Markdown files only (`.md`, `.markdown`)
-**Enhanced:** Full document support via Docling:
+**Enhanced:** Two-tier document parsing system:
+
+#### Tier 1: JS Parsers (Default - No Dependencies)
+Works out of the box for everyone:
+
+| Format | Library | Quality | Notes |
+|--------|---------|---------|-------|
+| PDF | `pdf-parse` | Good | Text-based PDFs, no OCR |
+| Word (.docx) | `mammoth` | Good | Preserves structure, headers |
+| Markdown | Direct | Excellent | Already working |
+
+#### Tier 2: Docling (Optional - Requires Python)
+For power users who need advanced features:
 
 | Format | Parser | Notes |
 |--------|--------|-------|
 | PDF | Docling | Tables, figures, OCR, multi-column |
-| Word (.docx) | Docling | Formatting, headers, tables |
+| Word (.docx) | Docling | Better table extraction |
 | PowerPoint (.pptx) | Docling | Slides as sections |
 | Images (PNG, JPEG) | Docling OCR | Text extraction from images |
-| Markdown | Direct (no Python) | Already working |
 
 **Architecture:**
 ```
 File detected → Extension check
+    │
     ├─ .md/.markdown → Direct TypeScript parsing (existing)
-    └─ .pdf/.docx/.pptx/.png/.jpg → Python subprocess (Docling via uv)
-        └─ Returns: JSON { text, metadata, pages[] }
+    │
+    └─ .pdf/.docx → Check feature flag
+        │
+        ├─ rag-docling DISABLED (default)
+        │   └─ JS parsers (pdf-parse, mammoth)
+        │       └─ Works for 80% of use cases
+        │
+        └─ rag-docling ENABLED (user opted in)
+            └─ Python subprocess (Docling via uv)
+                └─ Best quality, OCR, tables, images
 ```
 
-**Why:** This is the #1 missing feature. Users have PDFs and Word docs in their workspace that are invisible to RAG.
+**Why this approach:**
+- **Works out of the box** - No Python required for basic PDF/Word
+- **Progressive enhancement** - Power users can enable Docling
+- **Matches RiteMark philosophy** - Local-first, minimal dependencies
 
-**Dependencies:**
-- Python 3.11+ (user's system)
-- `uv` package manager (auto-install on first use)
-- Docling (~200MB models, downloaded on first use)
+**Tier 1 Dependencies (npm - ships with extension):**
+```json
+"pdf-parse": "^1.1.1",   // ~500KB, Mozilla pdf.js wrapper
+"mammoth": "^1.6.0"      // ~200KB, Word to text
+```
+
+**Tier 2 Dependencies (optional, user's system):**
+- Python 3.11+
+- `uv` package manager
+- Docling (~200MB models)
 
 ---
 
@@ -205,9 +234,10 @@ Response + verification metadata
 
 | Deliverable | Description | File(s) |
 |-------------|-------------|---------|
-| **Docling parser** | Python subprocess for PDF/Word/PPT | `rag-server/parser.py` (new) |
-| **Document parser bridge** | TypeScript ↔ Python interface | `src/rag/documentParser.ts` (new) |
-| **Extended indexer** | Support all file types | `src/rag/indexer.ts` (update) |
+| **JS document parsers** | PDF + Word parsing (default) | `src/rag/parsers/pdfParser.ts`, `src/rag/parsers/wordParser.ts` (new) |
+| **Docling bridge** | Python subprocess (optional) | `rag-server/parser.py`, `src/rag/parsers/doclingParser.ts` (new) |
+| **Parser router** | Route files to correct parser | `src/rag/parsers/index.ts` (new) |
+| **Extended indexer** | Support PDF, DOCX, PPTX | `src/rag/indexer.ts` (update) |
 | Hybrid search config | Enable Orama BM25 + vector | `src/rag/vectorStore.ts` |
 | Re-ranking service | 5-factor scoring logic | `src/rag/reranking.ts` (new) |
 | Citation verifier | Post-process LLM responses | `src/rag/citationVerifier.ts` (new) |
@@ -234,36 +264,66 @@ Response + verification metadata
 ### Phase 3a: DEVELOP - Core Enhancements
 **Prerequisites:** Jarmo approval (Sprint 24 Orama migration is complete and released ✅)
 
-#### Step 0: Docling Integration (4-6 hours) ⭐ PRIORITY
+#### Step 0a: JS Document Parsers (3-4 hours) ⭐ PRIORITY
+Default parsing that works for everyone:
+
+- [ ] Add npm dependencies: `pdf-parse`, `mammoth`
+- [ ] Create `src/rag/parsers/pdfParser.ts`:
+  - Use `pdf-parse` (wrapper around Mozilla pdf.js)
+  - Extract text, page count, metadata
+  - Return: `{ text, metadata: { pages, title, author } }`
+- [ ] Create `src/rag/parsers/wordParser.ts`:
+  - Use `mammoth` for DOCX parsing
+  - Extract text with structure (headers, paragraphs)
+  - Return: `{ text, metadata: { title } }`
+- [ ] Create `src/rag/parsers/index.ts` (router):
+  - Route by extension: `.pdf` → pdfParser, `.docx` → wordParser
+  - Check feature flag for Docling override
+- [ ] Update `src/rag/indexer.ts`:
+  - Extend `SUPPORTED_EXTENSIONS` to include `.pdf`, `.docx`
+  - Route through parser router
+- [ ] Add `source_type` metadata to chunks (pdf, docx, markdown)
+- [ ] Test: index a PDF and Word doc, verify searchable
+- [ ] Commit: `feat(rag): add PDF and Word parsing via JS libraries`
+
+**npm Dependencies:**
+```json
+"pdf-parse": "^1.1.1",
+"mammoth": "^1.6.0"
+```
+
+---
+
+#### Step 0b: Docling Integration (3-4 hours) - OPTIONAL
+For users who enable `rag-docling` flag:
+
 - [ ] Create `rag-server/` Python project with `pyproject.toml`
 - [ ] Implement `parser.py` using Docling:
   - Input: file path
   - Output: JSON `{ text, metadata, pages[] }`
   - Support: PDF, DOCX, PPTX, images (OCR)
-- [ ] Create `src/rag/documentParser.ts` bridge:
-  - Spawn Python via `uv run python -m rag_server.parser <file>`
-  - Parse JSON output
-  - Handle errors gracefully
-- [ ] Update `src/rag/indexer.ts`:
-  - Extend `SUPPORTED_EXTENSIONS` to include `.pdf`, `.docx`, `.pptx`, `.png`, `.jpg`
-  - Route non-markdown files through Docling
-  - Preserve markdown direct parsing (no Python needed)
-- [ ] Add `source_type` metadata to chunks (pdf, docx, markdown, etc.)
-- [ ] Test: index a PDF, verify chunks are searchable
-- [ ] Commit: `feat(rag): add Docling for PDF/Word/PPT parsing`
+- [ ] Create `src/rag/parsers/doclingParser.ts` bridge:
+  - Check if Python available, show instructions if not
+  - Spawn via `uv run python -m rag_server.parser <file>`
+  - Parse JSON output, handle errors
+- [ ] Update parser router to prefer Docling when flag enabled
+- [ ] Add `.pptx`, `.png`, `.jpg` to supported extensions (Docling only)
+- [ ] Test: index a scanned PDF with OCR
+- [ ] Commit: `feat(rag): add optional Docling parser for advanced documents`
 
 **Python Dependencies (rag-server/pyproject.toml):**
 ```toml
 [project]
 name = "rag-server"
+requires-python = ">=3.11"
 dependencies = ["docling>=2.0"]
 ```
 
-**First-run UX:**
-- User clicks "Re-index" with PDFs in workspace
-- Extension detects Python not ready, shows: "Installing document parser (one-time, ~200MB)..."
-- `uv` auto-creates venv and installs Docling
-- Progress shown in footer
+**First-run UX (when Docling enabled):**
+- User enables `rag-docling` in settings
+- User clicks "Re-index" with PDFs
+- If Python not found: "Docling requires Python 3.11+. [Install Python] [Use basic parser instead]"
+- If Python found: "Installing Docling (one-time, ~200MB)..." with progress
 
 ---
 
@@ -322,7 +382,10 @@ dependencies = ["docling>=2.0"]
 - [ ] Test: verify context stays within limits
 - [ ] Commit: `feat(rag): add token budget management`
 
-**Total Phase 3a:** ~18-26 hours of focused development (including Docling)
+**Total Phase 3a:** ~18-24 hours of focused development
+- Step 0a (JS parsers): 3-4 hours ⭐ Must have
+- Step 0b (Docling): 3-4 hours (optional, can defer)
+- Steps 1-5 (pipeline): 12-16 hours
 
 ### Phase 3b: DEVELOP - Optional Enhancements (Future)
 - [ ] Query expansion service
@@ -402,13 +465,13 @@ This is a **post-retrieval** step, layered on top of Orama's initial ranking.
 
 **Flag Definitions:**
 ```typescript
-// Docling document parsing (PDF/Word/PPT)
+// Advanced document parsing via Docling (optional, requires Python)
 {
   id: 'rag-docling',
-  name: 'Document Parsing (PDF, Word, PowerPoint)',
+  name: 'Advanced Document Parsing (Docling)',
   status: 'experimental',
   platforms: ['darwin', 'win32', 'linux'],
-  description: 'Parse PDF, DOCX, PPTX via Docling. Requires Python 3.11+.',
+  description: 'Use Docling for OCR, tables, and PowerPoint. Requires Python 3.11+. Default: JS parsers.',
   enabledByDefault: false,
 }
 
@@ -423,12 +486,22 @@ This is a **post-retrieval** step, layered on top of Orama's initial ranking.
 }
 ```
 
+**Feature Matrix:**
+
+| Flags | PDF/Word | PPT/Images | Search | Re-ranking |
+|-------|----------|------------|--------|------------|
+| None (default) | ✅ JS parsers | ❌ | Vector only | ❌ |
+| `rag-v2-enhancements` | ✅ JS parsers | ❌ | Hybrid + BM25 | ✅ |
+| `rag-docling` | ✅ Docling | ✅ Docling | Vector only | ❌ |
+| Both flags | ✅ Docling | ✅ Docling | Hybrid + BM25 | ✅ |
+
 **Implementation:**
 - [ ] Define both flags in `src/features/flags.ts`
 - [ ] Add settings to `package.json` (experimental features section)
+- [ ] JS parsers always available (no flag needed)
 - [ ] Gate Docling with `isEnabled('rag-docling')`
 - [ ] Gate pipeline enhancements with `isEnabled('rag-v2-enhancements')`
-- [ ] Fallback: markdown-only + basic vector search if disabled
+- [ ] Fallback: JS parsers + basic vector search
 
 ---
 
@@ -436,15 +509,22 @@ This is a **post-retrieval** step, layered on top of Orama's initial ranking.
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| **Python not installed** | High | Detect on startup, show install instructions, graceful fallback to markdown-only |
-| **Docling model download fails** | High | Retry logic, progress indicator, allow offline mode with cached models |
-| **Docling parsing slow** | Medium | Parse async in background, show progress, cache results |
-| **uv not working on Windows** | Medium | Test on all platforms, fallback to pip if needed |
+| **pdf-parse fails on complex PDF** | Medium | Show warning, suggest enabling Docling for better results |
+| **mammoth misses Word formatting** | Low | Acceptable for RAG (we need text, not styling) |
 | Re-ranking slows down search | Medium | Add performance benchmarks, optimize scoring |
 | Citation verification false positives | Medium | Tune overlap threshold, allow user override |
 | Orama hybrid search config breaks | Medium | Test thoroughly, keep fallback to vector-only |
 | Context assembly truncates important info | Low | Smart truncation (preserve first/last sentences) |
 | Token budget too restrictive | Low | Make budget configurable (2K-6K tokens) |
+
+**Docling-specific risks (only if user enables flag):**
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Python not installed | Low | Clear instructions, user chose to enable flag |
+| Docling model download fails | Medium | Retry logic, progress indicator, offline cache |
+| Docling parsing slow | Medium | Parse async, show progress, cache results |
+| uv not working on Windows | Medium | Test on all platforms, fallback to pip |
 
 ---
 
@@ -458,10 +538,14 @@ This is a **post-retrieval** step, layered on top of Orama's initial ranking.
 
 **Status:** Sprint 24 core is released. Docling was designed but not implemented.
 
-### New npm Packages
-None! TypeScript enhancements use existing dependencies.
+### New npm Packages (Tier 1 - ships with extension)
+```json
+"pdf-parse": "^1.1.1",   // ~500KB, PDF text extraction (pdf.js)
+"mammoth": "^1.6.0"      // ~200KB, Word to text/HTML
+```
 
-### New Python Package (rag-server/)
+### New Python Package (Tier 2 - optional, rag-server/)
+Only needed if user enables `rag-docling` flag:
 ```toml
 [project]
 name = "rag-server"
@@ -470,10 +554,15 @@ dependencies = ["docling>=2.0"]
 ```
 
 ### System Requirements
-- **Python 3.11+** (user's system - for Docling)
-- **uv** (auto-installed if missing via curl/powershell)
+
+**For everyone (Tier 1):**
 - **OpenAI API key** (existing, for embeddings + chat)
-- **~200MB disk** for Docling models (first-run download)
+- No additional dependencies!
+
+**For Docling users (Tier 2, optional):**
+- **Python 3.11+** (user's system)
+- **uv** (auto-installed if missing)
+- **~200MB disk** for Docling models
 
 ---
 
