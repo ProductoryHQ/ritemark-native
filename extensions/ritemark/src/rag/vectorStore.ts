@@ -22,6 +22,7 @@ const SCHEMA = {
 	id: 'string',
 	content: 'string',
 	source: 'string',
+	sourceType: 'string', // Document type: 'markdown', 'pdf', 'docx'
 	page: 'number',
 	section: 'string',
 	chunkIndex: 'number',
@@ -37,6 +38,7 @@ interface ChunkDocument {
 	id: string;
 	content: string;
 	source: string;
+	sourceType: string;
 	page: number;
 	section: string;
 	chunkIndex: number;
@@ -133,6 +135,7 @@ export class VectorStore {
 			section?: string | null;
 			chunkIndex: number;
 			fileHash?: string;
+			sourceType?: string;
 		}
 	): Promise<string> {
 		const db = this.ensureInit();
@@ -142,6 +145,7 @@ export class VectorStore {
 			id,
 			content,
 			source,
+			sourceType: metadata.sourceType ?? 'markdown',
 			page: metadata.page ?? 0,
 			section: metadata.section ?? '',
 			chunkIndex: metadata.chunkIndex,
@@ -166,6 +170,7 @@ export class VectorStore {
 			section?: string | null;
 			chunkIndex: number;
 			fileHash?: string;
+			sourceType?: string;
 		}>
 	): Promise<string[]> {
 		const db = this.ensureInit();
@@ -177,6 +182,7 @@ export class VectorStore {
 				id,
 				content: chunk.content,
 				source: chunk.source,
+				sourceType: chunk.sourceType ?? 'markdown',
 				page: chunk.page ?? 0,
 				section: chunk.section ?? '',
 				chunkIndex: chunk.chunkIndex,

@@ -1,8 +1,9 @@
 /**
  * Document indexer - orchestrates the RAG pipeline.
  *
- * Watches workspace for markdown files, chunks the text,
- * generates embeddings via OpenAI, and stores in Orama.
+ * Watches workspace for supported files (markdown, PDF, Word),
+ * parses content, chunks the text, generates embeddings via OpenAI,
+ * and stores in Orama.
  */
 
 import * as vscode from 'vscode';
@@ -12,9 +13,10 @@ import * as crypto from 'crypto';
 import { chunkText, TextChunk } from './chunker';
 import { embedTexts } from './embeddings';
 import { VectorStore, getDefaultDbPath } from './vectorStore';
+import { parseDocument, isParseableExtension, getDocumentType } from './parsers';
 
-/** Supported file extensions for indexing (markdown only) */
-const SUPPORTED_EXTENSIONS = ['.md', '.markdown'];
+/** Supported file extensions for indexing */
+const SUPPORTED_EXTENSIONS = ['.md', '.markdown', '.pdf', '.docx'];
 
 export interface IndexerOptions {
 	workspacePath: string;
@@ -159,7 +161,7 @@ export class DocumentIndexer {
 	}
 
 	/**
-	 * Index a single markdown file.
+	 * Index a single document file (markdown, PDF, or Word).
 	 */
 	async indexFile(filePath: string): Promise<void> {
 		const ext = path.extname(filePath).toLowerCase();
@@ -167,15 +169,33 @@ export class DocumentIndexer {
 			return;
 		}
 
-		// Read markdown content
-		let content = fs.readFileSync(filePath, 'utf-8');
+		let content: string;
+		let sourceType: string;
+
+		// Parse document based on type
+		if (ext === '.md' || ext === '.markdown') {
+			// Markdown: direct read (fast path)
+			content = fs.readFileSync(filePath, 'utf-8');
+			sourceType = 'markdown';
+
+			// Remove base64 embedded images (they break chunking and aren't useful for search)
+			content = content.replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '[image]');
+		} else {
+			// PDF, DOCX: use document parser
+			try {
+				const result = await parseDocument(filePath);
+				content = result.text;
+				sourceType = result.metadata.type;
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				console.error(`[Indexer] Failed to parse ${filePath}: ${msg}`);
+				throw err;
+			}
+		}
+
 		if (!content.trim()) {
 			return;
 		}
-
-		// Remove base64 embedded images (they break chunking and aren't useful for search)
-		// Matches: ![alt](data:image/...;base64,...) and ![](data:image/...;base64,...)
-		content = content.replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '[image]');
 
 		// Chunk the text
 		const chunks: TextChunk[] = chunkText(content, filePath);
@@ -188,7 +208,7 @@ export class DocumentIndexer {
 		const texts = chunks.map(c => c.content);
 		const embeddings = await embedTexts(texts);
 
-		// Store in vector DB
+		// Store in vector DB with source_type metadata
 		const fileHash = this.getFileHash(filePath);
 		const storeChunks = chunks.map((chunk, i) => ({
 			content: chunk.content,
@@ -198,6 +218,7 @@ export class DocumentIndexer {
 			section: chunk.metadata.section,
 			chunkIndex: chunk.metadata.chunkIndex,
 			fileHash,
+			sourceType,
 		}));
 
 		await this.store.insertChunks(storeChunks);
