@@ -198,7 +198,7 @@ Response + verification metadata
 - [ ] **Jarmo approval required to proceed**
 
 ### Phase 3a: DEVELOP - Core Enhancements
-**Prerequisites:** Jarmo approval + Sprint 24 Orama migration tested
+**Prerequisites:** Jarmo approval (Sprint 24 Orama migration is complete and released ✅)
 
 #### Step 1: Hybrid Search (2-3 hours)
 - [ ] Enable Orama hybrid search mode in vectorStore.ts
@@ -362,19 +362,18 @@ This is a **post-retrieval** step, layered on top of Orama's initial ranking.
 | Orama hybrid search config breaks | High | Test thoroughly, keep fallback to vector-only |
 | Context assembly truncates important info | Medium | Smart truncation (preserve first/last sentences) |
 | Token budget too restrictive | Low | Make budget configurable (2K-6K tokens) |
-| Sprint 24 not tested yet | High | BLOCKER - must complete Sprint 24 Phase 4 first |
 
 ---
 
 ## Dependencies
 
 ### On Sprint 24
-- [ ] Orama migration tested and working
-- [ ] Basic RAG pipeline functional (index → embed → search → chat)
-- [ ] Unified sidebar renders correctly
-- [ ] Document parsing (Docling) works
+- [x] Orama migration tested and working ✅
+- [x] Basic RAG pipeline functional (index → embed → search → chat) ✅
+- [x] Unified sidebar renders correctly ✅
+- [x] Document parsing (Docling) works ✅
 
-**Status:** Sprint 24 is in Phase 4 (Orama migration complete but not fully tested). Sprint 27 cannot start development until Sprint 24 passes Phase 4 validation.
+**Status:** Sprint 24 is complete and released. Sprint 27 can proceed immediately upon Jarmo's approval.
 
 ### New npm Packages
 None! All enhancements use existing dependencies:
@@ -456,7 +455,7 @@ These are deferred to future sprints.
 
 Before proceeding to Phase 3 (DEVELOP), confirm:
 
-- [ ] Sprint 24 Phase 4 is complete and tested
+- [x] Sprint 24 is complete and released ✅
 - [ ] Jarmo approves this sprint plan
 - [ ] Feature flag approach is agreed
 - [ ] Scope is clear (Phase 3a core, 3b optional)
@@ -464,7 +463,7 @@ Before proceeding to Phase 3 (DEVELOP), confirm:
 
 ---
 
-**Status:** BLOCKED - Awaiting Jarmo's approval
+**Status:** Awaiting Jarmo's approval
 **Next Step:** Review sprint plan → Approve → Proceed to Phase 3
 
 ---
