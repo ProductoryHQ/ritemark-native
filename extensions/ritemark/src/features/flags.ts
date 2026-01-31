@@ -21,7 +21,7 @@ export interface FeatureFlag {
 /**
  * All known flag IDs
  */
-export type FlagId = 'voice-dictation' | 'markdown-export' | 'document-search';
+export type FlagId = 'voice-dictation' | 'markdown-export' | 'document-search' | 'ritemark-flows';
 
 /**
  * Feature flag registry
@@ -46,6 +46,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     label: 'Document Search (RAG)',
     description: 'Search your markdown documents with AI-powered semantic search',
     status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  'ritemark-flows': {
+    id: 'ritemark-flows',
+    label: 'RiteMark Flows',
+    description: 'Visual automation workflows with AI and file operations',
+    status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },
 };

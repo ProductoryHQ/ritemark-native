@@ -4,12 +4,17 @@ import { ExcelEditorProvider } from './excelEditorProvider';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
+import { FlowsViewProvider } from './flows/FlowsViewProvider';
 import { DocumentIndexer } from './rag/indexer';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
+// Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
 export let unifiedViewProvider: UnifiedViewProvider;
+
+// Flows view provider
+let flowsViewProvider: FlowsViewProvider | null = null;
 
 // RAG infrastructure
 let documentIndexer: DocumentIndexer | null = null;
@@ -36,6 +41,16 @@ export function activate(context: vscode.ExtensionContext) {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );
+
+  // Register Flows View Provider (always register - visibility controlled by when clause in package.json)
+  if (workspacePath) {
+    flowsViewProvider = new FlowsViewProvider(context.extensionUri, workspacePath);
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, flowsViewProvider, {
+        webviewOptions: { retainContextWhenHidden: true }
+      })
+    );
+  }
 
   // AI panel opens via activity bar click, not auto-shown on startup
   // User requested Explorer (folder view) to be default
@@ -83,6 +98,19 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.aiSettings', () => {
       vscode.commands.executeCommand('ritemark.configureApiKey');
+    })
+  );
+
+  // Register Flows commands (always register - menu visibility controlled by when clauses in package.json)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.flows.new', () => {
+      vscode.window.showInformationMessage('Flow editor coming in Phase 2!');
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.flows.refresh', async () => {
+      await flowsViewProvider?.refresh();
     })
   );
 
