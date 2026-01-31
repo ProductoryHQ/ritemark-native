@@ -12,7 +12,8 @@
 #endif
 
 #define AppName "RiteMark"
-#define AppVersion "1.96.0"
+; Keep in sync with extensions/ritemark/package.json version
+#define AppVersion "1.1.1"
 #define AppPublisher "Productory"
 #define AppURL "https://ritemark.app"
 #define AppExeName "RiteMark.exe"
