@@ -67,3 +67,7 @@ test-files/
 
 # Source maps (large, not needed in repo)
 extensions/ritemark/media/*.map
+
+# RiteMark Flows - generated artifacts (keep flows themselves)
+.flows/test-outputs/
+.flows/images/

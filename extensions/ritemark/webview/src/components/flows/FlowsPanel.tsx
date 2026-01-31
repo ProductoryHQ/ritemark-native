@@ -9,15 +9,8 @@ import { Play, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription } from '../ui/alert';
 import { RunFlowModal } from './RunFlowModal';
-import type { Flow, FlowsMessage, FlowsCommand } from './types';
-
-declare const acquireVsCodeApi: () => {
-  postMessage: (message: FlowsCommand) => void;
-  setState: (state: unknown) => void;
-  getState: () => unknown;
-};
-
-const vscode = acquireVsCodeApi();
+import type { Flow, FlowsMessage } from './types';
+import { vscode } from '../../lib/vscode';
 
 export function FlowsPanel() {
   const [flows, setFlows] = useState<Flow[]>([]);

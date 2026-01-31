@@ -1,0 +1,89 @@
+{
+  "id": "test-save-file",
+  "name": "Test: Save File Node",
+  "description": "Tests saving LLM output to a markdown file",
+  "version": 1,
+  "created": "",
+  "modified": "",
+  "inputs": [
+    {
+      "id": "input-topic",
+      "type": "text",
+      "label": "Topic",
+      "required": true,
+      "defaultValue": "productivity tips"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "position": { "x": 250, "y": 50 },
+      "data": {
+        "label": "Trigger",
+        "inputs": [
+          {
+            "id": "input-topic",
+            "type": "text",
+            "label": "Topic",
+            "required": true,
+            "defaultValue": "productivity tips"
+          }
+        ]
+      }
+    },
+    {
+      "id": "writer-node",
+      "type": "llm-prompt",
+      "position": { "x": 250, "y": 200 },
+      "data": {
+        "label": "Content Writer",
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "systemPrompt": "Write a short markdown document with a title and 3 bullet points.",
+        "userPrompt": "Write about: {Topic}",
+        "temperature": 0.7,
+        "maxTokens": 300
+      }
+    },
+    {
+      "id": "save-node",
+      "type": "save-file",
+      "position": { "x": 250, "y": 400 },
+      "data": {
+        "label": "Save Output",
+        "filename": "test-output-{timestamp}.md",
+        "folder": ".flows/test-outputs",
+        "content": "{Content Writer}"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "trigger",
+      "target": "writer-node"
+    },
+    {
+      "id": "edge-2",
+      "source": "writer-node",
+      "target": "save-node"
+    }
+  ],
+  "_test": {
+    "inputs": {
+      "Topic": "testing best practices"
+    },
+    "expectations": {
+      "writer-node": {
+        "type": "string",
+        "minLength": 50
+      },
+      "save-node": {
+        "type": "object",
+        "hasProperty": "path"
+      }
+    },
+    "tags": ["file-io"]
+  }
+}

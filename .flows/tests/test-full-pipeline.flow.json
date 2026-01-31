@@ -1,0 +1,111 @@
+{
+  "id": "test-full-pipeline",
+  "name": "Test: Full Pipeline (LLM → Image → Save)",
+  "description": "Tests complete workflow: generate description, create image, save both",
+  "version": 1,
+  "created": "",
+  "modified": "",
+  "inputs": [
+    {
+      "id": "input-concept",
+      "type": "text",
+      "label": "Concept",
+      "required": true,
+      "defaultValue": "peaceful garden"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "position": { "x": 250, "y": 50 },
+      "data": {
+        "label": "Trigger",
+        "inputs": [
+          {
+            "id": "input-concept",
+            "type": "text",
+            "label": "Concept",
+            "required": true,
+            "defaultValue": "peaceful garden"
+          }
+        ]
+      }
+    },
+    {
+      "id": "prompt-generator",
+      "type": "llm-prompt",
+      "position": { "x": 250, "y": 200 },
+      "data": {
+        "label": "Prompt Generator",
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "systemPrompt": "Generate a detailed image prompt for DALL-E. Output only the prompt, no explanation. Keep under 100 words.",
+        "userPrompt": "Create an image prompt for: {Concept}",
+        "temperature": 0.8,
+        "maxTokens": 150
+      }
+    },
+    {
+      "id": "image-generator",
+      "type": "image-prompt",
+      "position": { "x": 250, "y": 400 },
+      "data": {
+        "label": "Image Creator",
+        "provider": "openai",
+        "model": "gpt-image-1.5",
+        "prompt": "{Prompt Generator}",
+        "size": "1024x1024",
+        "quality": "standard"
+      }
+    },
+    {
+      "id": "save-result",
+      "type": "save-file",
+      "position": { "x": 250, "y": 600 },
+      "data": {
+        "label": "Save Report",
+        "filename": "pipeline-result-{timestamp}.md",
+        "folder": ".flows/test-outputs",
+        "content": "# Generated Content\n\n## Concept\n{Concept}\n\n## Generated Prompt\n{Prompt Generator}\n\n## Image\n![Generated Image]({Image Creator})"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "trigger",
+      "target": "prompt-generator"
+    },
+    {
+      "id": "edge-2",
+      "source": "prompt-generator",
+      "target": "image-generator"
+    },
+    {
+      "id": "edge-3",
+      "source": "image-generator",
+      "target": "save-result"
+    }
+  ],
+  "_test": {
+    "inputs": {
+      "Concept": "a cozy reading nook"
+    },
+    "expectations": {
+      "prompt-generator": {
+        "type": "string",
+        "minLength": 20
+      },
+      "image-generator": {
+        "type": "object",
+        "hasProperty": "localPath"
+      },
+      "save-result": {
+        "type": "object",
+        "hasProperty": "path"
+      }
+    },
+    "tags": ["expensive", "slow", "full-pipeline"]
+  }
+}

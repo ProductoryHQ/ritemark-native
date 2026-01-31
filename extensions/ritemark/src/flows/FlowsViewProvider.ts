@@ -220,13 +220,14 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Open flow JSON file in editor
+   * Open flow in visual editor
    */
   private async _handleEditFlow(id: string): Promise<void> {
     try {
       const flowPath = this._storage.getFlowPath(id);
       const uri = vscode.Uri.file(flowPath);
-      await vscode.commands.executeCommand('vscode.open', uri);
+      // Open with the visual flow editor, not the default text editor
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'ritemark.flowEditor');
     } catch (err) {
       console.error('[FlowsViewProvider] Failed to open flow for editing:', err);
       vscode.window.showErrorMessage(`Failed to open flow: ${err instanceof Error ? err.message : String(err)}`);
