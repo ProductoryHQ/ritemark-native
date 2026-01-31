@@ -1,12 +1,23 @@
 /**
  * Document Parser Router
- * Routes files to the appropriate parser based on extension
+ * Routes files to the appropriate parser based on extension and feature flags.
+ *
+ * Two-tier architecture:
+ * - Tier 1: JS parsers (pdf-parse, mammoth) - always available, no Python required
+ * - Tier 2: Docling parser - optional, requires Python 3.11+, enables OCR/tables/PPT
  */
 
 import * as path from 'path';
 import * as fs from 'fs';
 import { parsePdf } from './pdfParser';
 import { parseWord } from './wordParser';
+import {
+	parseWithDocling,
+	isPythonAvailable,
+	requiresDocling,
+	DOCLING_EXTENSIONS,
+} from './doclingParser';
+import { isEnabled } from '../../features';
 
 /**
  * Result from parsing a document
@@ -38,30 +49,58 @@ export interface ParseResult {
 }
 
 /**
- * Supported file extensions for document parsing
+ * Tier 1: JS parsers (always available, no Python required)
  */
-export const PARSEABLE_EXTENSIONS = {
-	// Tier 1: JS parsers (always available)
+export const JS_PARSEABLE_EXTENSIONS = {
 	pdf: 'pdf',
 	docx: 'docx',
-	// Markdown handled directly by indexer
 	md: 'markdown',
 	markdown: 'markdown',
-	// Tier 2: Docling-only (when rag-docling flag enabled)
-	// pptx: 'pptx',
-	// png: 'image',
-	// jpg: 'image',
-	// jpeg: 'image',
+} as const;
+
+/**
+ * Tier 2: Docling-only extensions (requires rag-docling flag + Python)
+ */
+export const DOCLING_ONLY_EXTENSIONS = {
+	pptx: 'pptx',
+	png: 'image',
+	jpg: 'image',
+	jpeg: 'image',
+	tiff: 'image',
+	bmp: 'image',
+} as const;
+
+/**
+ * All supported extensions for document parsing
+ */
+export const PARSEABLE_EXTENSIONS = {
+	...JS_PARSEABLE_EXTENSIONS,
+	...DOCLING_ONLY_EXTENSIONS,
 } as const;
 
 export type ParseableExtension = keyof typeof PARSEABLE_EXTENSIONS;
+export type JSParseableExtension = keyof typeof JS_PARSEABLE_EXTENSIONS;
 
 /**
  * Check if a file extension is supported for parsing
+ *
+ * @param ext - File extension (with or without leading dot)
+ * @param checkDocling - If true, also checks Docling-only extensions when flag enabled
  */
-export function isParseableExtension(ext: string): ext is ParseableExtension {
+export function isParseableExtension(ext: string, checkDocling = true): boolean {
 	const normalized = ext.toLowerCase().replace('.', '');
-	return normalized in PARSEABLE_EXTENSIONS;
+
+	// Always allow Tier 1 extensions
+	if (normalized in JS_PARSEABLE_EXTENSIONS) {
+		return true;
+	}
+
+	// Check Tier 2 extensions only if Docling flag is enabled
+	if (checkDocling && normalized in DOCLING_ONLY_EXTENSIONS) {
+		return isEnabled('rag-docling') && isPythonAvailable();
+	}
+
+	return false;
 }
 
 /**
@@ -73,7 +112,39 @@ export function getDocumentType(ext: string): string | undefined {
 }
 
 /**
+ * Check if Docling should be used for parsing
+ */
+function shouldUseDocling(ext: string): boolean {
+	if (!isEnabled('rag-docling')) {
+		return false;
+	}
+
+	if (!isPythonAvailable()) {
+		return false;
+	}
+
+	const normalized = ext.toLowerCase().replace('.', '');
+
+	// Docling-only extensions always use Docling
+	if (normalized in DOCLING_ONLY_EXTENSIONS) {
+		return true;
+	}
+
+	// For PDF/DOCX, Docling offers better OCR/table extraction
+	// Use Docling when flag is enabled
+	if (normalized === 'pdf' || normalized === 'docx') {
+		return true;
+	}
+
+	return false;
+}
+
+/**
  * Parse a document file and extract text content
+ *
+ * Uses two-tier parsing:
+ * - Tier 1: JS parsers (default, no Python required)
+ * - Tier 2: Docling (optional, for OCR/tables/PPT when rag-docling flag enabled)
  *
  * @param filePath - Absolute path to the document
  * @returns ParseResult with text and metadata
@@ -87,7 +158,21 @@ export async function parseDocument(filePath: string): Promise<ParseResult> {
 		throw new Error(`File not found: ${filePath}`);
 	}
 
-	// Route to appropriate parser
+	// Check if we should use Docling
+	if (shouldUseDocling(ext)) {
+		try {
+			return await parseWithDocling(filePath);
+		} catch (err) {
+			// For Docling-only extensions, rethrow
+			if (ext in DOCLING_ONLY_EXTENSIONS) {
+				throw err;
+			}
+			// For PDF/DOCX, fall back to JS parser
+			console.warn(`[Parser] Docling failed, falling back to JS parser:`, err);
+		}
+	}
+
+	// Route to appropriate JS parser (Tier 1)
 	switch (ext) {
 		case 'pdf':
 			return parsePdf(filePath);
@@ -101,6 +186,13 @@ export async function parseDocument(filePath: string): Promise<ParseResult> {
 			return parseMarkdown(filePath);
 
 		default:
+			// Check if this is a Docling-only extension
+			if (ext in DOCLING_ONLY_EXTENSIONS) {
+				throw new Error(
+					`File type .${ext} requires Docling parser.\n` +
+						'Enable the "rag-docling" feature flag and ensure Python 3.11+ is installed.'
+				);
+			}
 			throw new Error(`Unsupported file type: .${ext}`);
 	}
 }
@@ -129,7 +221,16 @@ async function parseMarkdown(filePath: string): Promise<ParseResult> {
 
 /**
  * Get list of all parseable extensions (for file filtering)
+ *
+ * @param includeDocling - Include Docling-only extensions if flag enabled
  */
-export function getAllParseableExtensions(): string[] {
-	return Object.keys(PARSEABLE_EXTENSIONS).map(ext => `.${ext}`);
+export function getAllParseableExtensions(includeDocling = true): string[] {
+	const jsExts = Object.keys(JS_PARSEABLE_EXTENSIONS).map(ext => `.${ext}`);
+
+	if (includeDocling && isEnabled('rag-docling') && isPythonAvailable()) {
+		const doclingExts = Object.keys(DOCLING_ONLY_EXTENSIONS).map(ext => `.${ext}`);
+		return [...jsExts, ...doclingExts];
+	}
+
+	return jsExts;
 }
