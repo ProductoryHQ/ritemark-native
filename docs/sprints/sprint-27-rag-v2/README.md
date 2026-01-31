@@ -19,13 +19,15 @@
 
 ## Executive Summary
 
-Sprint 24 built RiteMark's RAG foundation: document parsing (Docling), embeddings (OpenAI), vector storage (Orama), and a unified sidebar. Sprint 27 enhances this pipeline with Docify's proven techniques to improve retrieval quality, reduce hallucinations, and provide better user trust.
+Sprint 24 built RiteMark's RAG foundation: **markdown-only** parsing, embeddings (OpenAI), vector storage (Orama), and a unified sidebar. Sprint 27 completes the vision by adding **Docling for PDF/Word/PPT support** plus Docify's proven pipeline techniques.
 
-**Problem:** Current RAG (Sprint 24) uses pure vector search. This misses:
-- Exact keyword matches (e.g., "API key" vs semantically similar "authentication token")
-- Citation verification (LLMs can hallucinate sources)
-- Source quality ranking (research papers vs random notes)
-- Conflicting information detection
+**Problem:** Current RAG (v1.1.x) has two major gaps:
+1. **Markdown only** - Can't index PDF, Word, PowerPoint, images
+2. **Basic search** - Pure vector search misses exact keywords, no citation verification
+
+**Solution:** Two-part enhancement:
+1. **Docling integration** - Parse PDF, DOCX, PPTX, images via Python subprocess
+2. **Pipeline improvements** - Hybrid search, re-ranking, citation verification (from Docify)
 
 **Solution:** Layer Docify's 5-stage enhancement pipeline on top of Sprint 24's architecture:
 
@@ -37,6 +39,35 @@ Query → [Hybrid Search] → [Re-ranking] → [Context Assembly] → [LLM + Pro
 ---
 
 ## Key Enhancements
+
+### 0. Docling Integration (PDF/Word/PPT Support) ⭐ NEW
+**Current:** Markdown files only (`.md`, `.markdown`)
+**Enhanced:** Full document support via Docling:
+
+| Format | Parser | Notes |
+|--------|--------|-------|
+| PDF | Docling | Tables, figures, OCR, multi-column |
+| Word (.docx) | Docling | Formatting, headers, tables |
+| PowerPoint (.pptx) | Docling | Slides as sections |
+| Images (PNG, JPEG) | Docling OCR | Text extraction from images |
+| Markdown | Direct (no Python) | Already working |
+
+**Architecture:**
+```
+File detected → Extension check
+    ├─ .md/.markdown → Direct TypeScript parsing (existing)
+    └─ .pdf/.docx/.pptx/.png/.jpg → Python subprocess (Docling via uv)
+        └─ Returns: JSON { text, metadata, pages[] }
+```
+
+**Why:** This is the #1 missing feature. Users have PDFs and Word docs in their workspace that are invisible to RAG.
+
+**Dependencies:**
+- Python 3.11+ (user's system)
+- `uv` package manager (auto-install on first use)
+- Docling (~200MB models, downloaded on first use)
+
+---
 
 ### 1. Hybrid Search (Vector + BM25)
 **Current:** Pure semantic vector search
@@ -174,6 +205,9 @@ Response + verification metadata
 
 | Deliverable | Description | File(s) |
 |-------------|-------------|---------|
+| **Docling parser** | Python subprocess for PDF/Word/PPT | `rag-server/parser.py` (new) |
+| **Document parser bridge** | TypeScript ↔ Python interface | `src/rag/documentParser.ts` (new) |
+| **Extended indexer** | Support all file types | `src/rag/indexer.ts` (update) |
 | Hybrid search config | Enable Orama BM25 + vector | `src/rag/vectorStore.ts` |
 | Re-ranking service | 5-factor scoring logic | `src/rag/reranking.ts` (new) |
 | Citation verifier | Post-process LLM responses | `src/rag/citationVerifier.ts` (new) |
@@ -199,6 +233,39 @@ Response + verification metadata
 
 ### Phase 3a: DEVELOP - Core Enhancements
 **Prerequisites:** Jarmo approval (Sprint 24 Orama migration is complete and released ✅)
+
+#### Step 0: Docling Integration (4-6 hours) ⭐ PRIORITY
+- [ ] Create `rag-server/` Python project with `pyproject.toml`
+- [ ] Implement `parser.py` using Docling:
+  - Input: file path
+  - Output: JSON `{ text, metadata, pages[] }`
+  - Support: PDF, DOCX, PPTX, images (OCR)
+- [ ] Create `src/rag/documentParser.ts` bridge:
+  - Spawn Python via `uv run python -m rag_server.parser <file>`
+  - Parse JSON output
+  - Handle errors gracefully
+- [ ] Update `src/rag/indexer.ts`:
+  - Extend `SUPPORTED_EXTENSIONS` to include `.pdf`, `.docx`, `.pptx`, `.png`, `.jpg`
+  - Route non-markdown files through Docling
+  - Preserve markdown direct parsing (no Python needed)
+- [ ] Add `source_type` metadata to chunks (pdf, docx, markdown, etc.)
+- [ ] Test: index a PDF, verify chunks are searchable
+- [ ] Commit: `feat(rag): add Docling for PDF/Word/PPT parsing`
+
+**Python Dependencies (rag-server/pyproject.toml):**
+```toml
+[project]
+name = "rag-server"
+dependencies = ["docling>=2.0"]
+```
+
+**First-run UX:**
+- User clicks "Re-index" with PDFs in workspace
+- Extension detects Python not ready, shows: "Installing document parser (one-time, ~200MB)..."
+- `uv` auto-creates venv and installs Docling
+- Progress shown in footer
+
+---
 
 #### Step 1: Hybrid Search (2-3 hours)
 - [ ] Enable Orama hybrid search mode in vectorStore.ts
@@ -255,7 +322,7 @@ Response + verification metadata
 - [ ] Test: verify context stays within limits
 - [ ] Commit: `feat(rag): add token budget management`
 
-**Total Phase 3a:** ~12-18 hours of focused development
+**Total Phase 3a:** ~18-26 hours of focused development (including Docling)
 
 ### Phase 3b: DEVELOP - Optional Enhancements (Future)
 - [ ] Query expansion service
@@ -325,31 +392,43 @@ This is a **post-retrieval** step, layered on top of Orama's initial ranking.
 ## Feature Flag Check
 
 **Does this sprint need a feature flag?**
-- [ ] Platform-specific? No (works everywhere)
-- [ ] Experimental? Yes (new pipeline enhancements)
-- [ ] Large download? No
+- [ ] Platform-specific? No (works everywhere with Python)
+- [ ] Experimental? Yes (new pipeline enhancements + Docling)
+- [ ] Large download? **YES** - Docling models ~200MB on first use
 - [ ] Premium feature? No
-- [ ] Kill-switch needed? Yes (in case re-ranking breaks search)
+- [ ] Kill-switch needed? Yes (in case Docling/re-ranking breaks)
 
-**Decision:** YES - add feature flag
+**Decision:** YES - add feature flag for Docling (separate from pipeline enhancements)
 
-**Flag Definition:**
+**Flag Definitions:**
 ```typescript
+// Docling document parsing (PDF/Word/PPT)
+{
+  id: 'rag-docling',
+  name: 'Document Parsing (PDF, Word, PowerPoint)',
+  status: 'experimental',
+  platforms: ['darwin', 'win32', 'linux'],
+  description: 'Parse PDF, DOCX, PPTX via Docling. Requires Python 3.11+.',
+  enabledByDefault: false,
+}
+
+// Pipeline enhancements (hybrid search, re-ranking, etc.)
 {
   id: 'rag-v2-enhancements',
   name: 'RAG v2 Pipeline Enhancements',
   status: 'experimental',
   platforms: ['darwin', 'win32', 'linux'],
   description: 'Hybrid search, re-ranking, citation verification',
-  enabledByDefault: false, // Start disabled, enable after testing
+  enabledByDefault: false,
 }
 ```
 
 **Implementation:**
-- [ ] Define flag in `src/features/flags.ts`
-- [ ] Add setting to `package.json` (experimental features section)
-- [ ] Gate re-ranking and citation verification with `isEnabled('rag-v2-enhancements')`
-- [ ] Fallback: use Sprint 24's basic vector search if disabled
+- [ ] Define both flags in `src/features/flags.ts`
+- [ ] Add settings to `package.json` (experimental features section)
+- [ ] Gate Docling with `isEnabled('rag-docling')`
+- [ ] Gate pipeline enhancements with `isEnabled('rag-v2-enhancements')`
+- [ ] Fallback: markdown-only + basic vector search if disabled
 
 ---
 
@@ -357,35 +436,44 @@ This is a **post-retrieval** step, layered on top of Orama's initial ranking.
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Re-ranking slows down search | High | Add performance benchmarks, optimize scoring |
+| **Python not installed** | High | Detect on startup, show install instructions, graceful fallback to markdown-only |
+| **Docling model download fails** | High | Retry logic, progress indicator, allow offline mode with cached models |
+| **Docling parsing slow** | Medium | Parse async in background, show progress, cache results |
+| **uv not working on Windows** | Medium | Test on all platforms, fallback to pip if needed |
+| Re-ranking slows down search | Medium | Add performance benchmarks, optimize scoring |
 | Citation verification false positives | Medium | Tune overlap threshold, allow user override |
-| Orama hybrid search config breaks | High | Test thoroughly, keep fallback to vector-only |
-| Context assembly truncates important info | Medium | Smart truncation (preserve first/last sentences) |
+| Orama hybrid search config breaks | Medium | Test thoroughly, keep fallback to vector-only |
+| Context assembly truncates important info | Low | Smart truncation (preserve first/last sentences) |
 | Token budget too restrictive | Low | Make budget configurable (2K-6K tokens) |
 
 ---
 
 ## Dependencies
 
-### On Sprint 24
+### On Sprint 24 (v1.1.x)
 - [x] Orama migration tested and working ✅
-- [x] Basic RAG pipeline functional (index → embed → search → chat) ✅
+- [x] Basic RAG pipeline functional (markdown → embed → search → chat) ✅
 - [x] Unified sidebar renders correctly ✅
-- [x] Document parsing (Docling) works ✅
+- [ ] ~~Document parsing (Docling)~~ **NOT DONE** - Only markdown supported currently
 
-**Status:** Sprint 24 is complete and released. Sprint 27 can proceed immediately upon Jarmo's approval.
+**Status:** Sprint 24 core is released. Docling was designed but not implemented.
 
 ### New npm Packages
-None! All enhancements use existing dependencies:
-- Orama (already in Sprint 24)
-- OpenAI SDK (already in Sprint 24)
-- VS Code APIs (already in Sprint 24)
+None! TypeScript enhancements use existing dependencies.
+
+### New Python Package (rag-server/)
+```toml
+[project]
+name = "rag-server"
+requires-python = ">=3.11"
+dependencies = ["docling>=2.0"]
+```
 
 ### System Requirements
-Same as Sprint 24:
-- Python 3.11+ (for Docling)
-- OpenAI API key
-- uv (Python package manager)
+- **Python 3.11+** (user's system - for Docling)
+- **uv** (auto-installed if missing via curl/powershell)
+- **OpenAI API key** (existing, for embeddings + chat)
+- **~200MB disk** for Docling models (first-run download)
 
 ---
 
