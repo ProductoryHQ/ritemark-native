@@ -1,8 +1,15 @@
 ; RiteMark Windows Installer Script
 ; Built with Inno Setup 6.x
 ;
-; Usage (via Docker from macOS):
-;   docker run --rm -v "$PWD:/work" amake/innosetup installer/windows/ritemark.iss
+; Usage:
+;   ISCC.exe /DSourcePath="C:\path\to\VSCode-win32-x64" ritemark.iss
+;
+; See docs/BUILD-WINDOWS-INSTALLER.md for full instructions.
+
+; Allow SourcePath to be passed from command line
+#ifndef SourcePath
+  #define SourcePath "..\..\VSCode-win32-x64"
+#endif
 
 #define AppName "RiteMark"
 #define AppVersion "1.96.0"
@@ -55,7 +62,7 @@ Name: "addtopath"; Description: "Add to PATH"; GroupDescription: "Other:"
 [Files]
 ; Copy everything from the built app, excluding paths that exceed MAX_PATH (260 chars)
 ; The docx/build folder has deeply nested paths but isn't needed at runtime
-Source: "..\..\VSCode-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*\node_modules\docx\build\*,*\node_modules\*\node_modules\*\node_modules\*"
+Source: "{#SourcePath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*\node_modules\docx\build\*,*\node_modules\*\node_modules\*\node_modules\*"
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"

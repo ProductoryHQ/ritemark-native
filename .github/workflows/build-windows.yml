@@ -176,25 +176,10 @@ jobs:
           echo "Validation PASSED"
 
       # =========================================================================
-      # Step 10: Build Windows installer (Inno Setup 6.7+)
+      # Step 10: Upload ZIP artifact
       # =========================================================================
-      - name: Ensure Inno Setup 6.7+
-        shell: pwsh
-        run: |
-          # windows-latest now has Inno Setup 6.7.0 pre-installed
-          # Just upgrade if needed (idempotent, won't fail if already current)
-          choco upgrade innosetup -y --no-progress
-          # Note: Don't use ISCC.exe /? to verify - it returns exit code 1
-
-      - name: Build installer
-        shell: pwsh
-        working-directory: r
-        run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\windows\ritemark.iss"
-
-      # =========================================================================
-      # Step 11: Upload artifacts
-      # =========================================================================
+      # NOTE: Installer is built locally on Windows machine
+      # See: docs/BUILD-WINDOWS-INSTALLER.md
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
@@ -202,15 +187,8 @@ jobs:
           path: r/VSCode-win32-x64/
           retention-days: 30
 
-      - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ritemark-windows-x64-installer
-          path: r/installer-output/*.exe
-          retention-days: 30
-
       # =========================================================================
-      # Step 12: Build summary
+      # Step 11: Build summary
       # =========================================================================
       - name: Build summary
         shell: bash
@@ -226,7 +204,5 @@ jobs:
           echo "Extension:"
           ls -lh VSCode-win32-x64/resources/app/extensions/ritemark/ | head -10
           echo ""
-          echo "Installer:"
-          ls -lh installer-output/ 2>/dev/null || echo "No installer output"
-          echo ""
-          echo "Artifacts: ritemark-windows-x64, ritemark-windows-x64-installer"
+          echo "Artifact: ritemark-windows-x64"
+          echo "NOTE: Build installer locally - see docs/BUILD-WINDOWS-INSTALLER.md"
