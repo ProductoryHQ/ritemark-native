@@ -1,5 +1,5 @@
 ; RiteMark Windows Installer Script
-; Built with Inno Setup 6.3+ (for UseLongPathNames support)
+; Built with Inno Setup 6.x
 ;
 ; Usage (via Docker from macOS):
 ;   docker run --rm -v "$PWD:/work" amake/innosetup installer/windows/ritemark.iss
@@ -38,8 +38,6 @@ MinVersion=10.0
 ; 64-bit only
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-; Handle long paths (node_modules has deeply nested paths >260 chars)
-UseLongPathNames=yes
 ; Mutex to prevent running during install
 AppMutex={#AppMutex}
 ; Don't require admin by default (user install)
