@@ -1,0 +1,10 @@
+{
+  "productName": "Ritemark",
+  "productNameLower": "ritemark",
+  "publisher": "Productory",
+  "version": "1.1.1",
+  "website": "https://ritemark.app",
+  "bundleIdentifier": "ai.productory.ritemark",
+  "win32AppId": "B8F5E4A2-7C3D-4E9F-A1B6-8D2E5F3C9A7B",
+  "description": "A beautiful markdown editor with AI assistance"
+}
