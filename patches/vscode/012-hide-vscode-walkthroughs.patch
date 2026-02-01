@@ -1,23 +1,22 @@
 diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
-index 60f47c9a..00055ffd 100644
 --- a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
 +++ b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
-@@ -248,12 +248,13 @@ function createCopilotSetupStep(id: string, button: string, when: string, includ
- 	};
- }
- 
+@@ -208,12 +208,13 @@ type GettingStartedWalkthroughContent = GettingStartedWalkthrough[];
+
+ const Button = (title: string, href: string) => `[${title}](${href})`;
+
 +// RiteMark: Hide VS Code default walkthroughs - only show extension walkthroughs
  export const walkthroughs: GettingStartedWalkthroughContent = [
  	{
  		id: 'Setup',
- 		title: localize('gettingStarted.setup.title', "Get started with VS Code"),
+ 		title: localize('gettingStarted.setup.title', "Get Started with VS Code"),
  		description: localize('gettingStarted.setup.description', "Customize your editor, learn the basics, and start coding"),
 -		isFeatured: true,
 +		isFeatured: false, // RiteMark: changed from true
  		icon: setupIcon,
  		when: '!isWeb',
- 		walkthroughPageTitle: localize('gettingStarted.setup.walkthroughPageTitle', 'Setup VS Code'),
-@@ -289,7 +290,7 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
+ 		next: 'Beginner',
+@@ -313,7 +314,7 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
  		id: 'SetupWeb',
  		title: localize('gettingStarted.setupWeb.title', "Get Started with VS Code for the Web"),
  		description: localize('gettingStarted.setupWeb.description', "Customize your editor, learn the basics, and start coding"),
@@ -26,7 +25,7 @@ index 60f47c9a..00055ffd 100644
  		icon: setupIcon,
  		when: 'isWeb',
  		next: 'Beginner',
-@@ -375,7 +376,7 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
+@@ -398,7 +399,7 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
  		id: 'SetupAccessibility',
  		title: localize('gettingStarted.setupAccessibility.title', "Get Started with Accessibility Features"),
  		description: localize('gettingStarted.setupAccessibility.description', "Learn the tools and shortcuts that make VS Code accessible. Note that some actions are not actionable from within the context of the walkthrough."),
