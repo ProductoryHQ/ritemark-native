@@ -53,10 +53,10 @@ Visual flow editor with drag-drop canvas, node configuration, and execution.
 ```
 extensions/ritemark/src/flows/
 ├── types.ts                    # Flow, FlowNode, FlowInput interfaces
-├── FlowStorage.ts              # CRUD for .flows/*.flow.json
+├── FlowStorage.ts              # CRUD for .ritemark/flows/*.flow.json
 ├── FlowExecutor.ts             # Topological sort + sequential execution
 ├── FlowEditorProvider.ts       # Custom editor for visual canvas
-├── FlowsViewProvider.ts        # Sidebar panel
+├── FlowsViewProvider.ts        # Sidebar panel (own Activity Bar tab)
 └── nodes/
     ├── LLMNodeExecutor.ts      # OpenAI chat completion
     ├── ImageNodeExecutor.ts    # GPT Image 1.5 (auto-download)
@@ -98,9 +98,13 @@ webview/src/components/flows/
 ## Data Flow
 
 ### 1. Flow JSON Structure
+
+**Storage:** `.ritemark/flows/<sanitized-name>-<shortId>.flow.json`
+**Example:** `.ritemark/flows/blog-post-outline-x4k9.flow.json`
+
 ```json
 {
-  "id": "flow-1234",
+  "id": "blog-post-outline-x4k9",
   "name": "Blog Post Outline",
   "description": "Generate outline from topic",
   "version": 1,
@@ -192,21 +196,41 @@ webview/src/components/flows/
 
 ---
 
+## Key Implementation Details
+
+### File Naming
+- **Format:** `<sanitized-name>-<shortId>.flow.json`
+- **Example:** `my-blog-post-x4k9.flow.json`
+- **Sanitization:** lowercase, alphanumeric + hyphens, max 30 chars
+- **Short ID:** 4 random alphanumeric chars for uniqueness
+- **Rename on save:** If flow name changes, file is renamed using `WorkspaceEdit.renameFile()` (flicker-free)
+
+### Sidebar Integration
+- **Own Activity Bar tab:** Flows has dedicated icon (`media/flows-icon.svg`)
+- **Lucide workflow icon:** Matches design language
+- **Header actions:** New Flow (+), Refresh (↻), Settings (⚙)
+- **Delete confirmation:** Uses VS Code native dialog (not browser `confirm()`)
+
+### Save File Node
+- **Field order:** Label → Source → Format → Folder → Filename (input-first UX)
+- **Folder picker:** VS Code folder dialog, returns relative path
+- **Variable picker:** `/` button shows `{{inputs.*}}`, `{{timestamp}}`, `{{date}}`
+
+---
+
 ## Known Limitations
 
-1. **No file picker** for file inputs (Phase 3)
-2. **No variable interpolation preview** in prompts
-3. **Image providers** only OpenAI implemented (Gemini needs Google AI API key)
-4. **No flow templates** yet
-5. **No export/import** of flows
+1. **No variable interpolation preview** in prompts (shows raw `{Topic}` instead of value)
+2. **Image providers** only OpenAI implemented (Gemini needs Google AI API key)
+3. **No flow templates** yet
+4. **No export/import** of flows
 
 ---
 
 ## Next Steps (Phase 3+)
 
-- [ ] File picker for file inputs
-- [ ] Variable interpolation (`{{inputs.topic}}`, `{{nodeId}}`)
-- [ ] More image providers
+- [ ] Variable interpolation preview in prompts
+- [ ] More image providers (Gemini)
 - [ ] Starter templates
 - [ ] Flow export/import
 - [ ] Conditional branching nodes

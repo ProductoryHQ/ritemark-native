@@ -68,11 +68,9 @@ async function resolveFileContent(value: string): Promise<string> {
 
   try {
     const content = await fs.readFile(value, 'utf-8');
-    console.log('[LLMNodeExecutor] Read file:', value, `(${content.length} chars)`);
     return content;
-  } catch (err) {
+  } catch {
     // File doesn't exist or can't be read - return original value
-    console.warn('[LLMNodeExecutor] Could not read file:', value, err);
     return value;
   }
 }
@@ -205,9 +203,6 @@ async function executeWithOpenAI(
     ? `${systemPrompt}\n\n${userPrompt}`
     : userPrompt;
 
-  console.log('[LLMNodeExecutor] Model:', model);
-  console.log('[LLMNodeExecutor] Input:', input.slice(0, 200));
-
   // Check model config to determine which API to use
   const useResponses = usesResponsesAPI(model);
 
@@ -215,8 +210,6 @@ async function executeWithOpenAI(
 
   if (!useResponses) {
     // Use Chat Completions API for GPT-4 models
-    console.log('[LLMNodeExecutor] Using Chat Completions API');
-
     const messages: OpenAI.ChatCompletionMessageParam[] = [];
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
@@ -233,8 +226,6 @@ async function executeWithOpenAI(
     outputText = completion.choices[0]?.message?.content || '';
   } else {
     // Use Responses API for GPT-5+ models
-    console.log('[LLMNodeExecutor] Using Responses API (GPT-5+)');
-
     const reasoningEffort = getReasoningEffort(model);
 
     const response = await openai.responses.create({
@@ -248,7 +239,6 @@ async function executeWithOpenAI(
       }),
     });
 
-    console.log('[LLMNodeExecutor] Response:', JSON.stringify(response, null, 2).slice(0, 500));
     outputText = response.output_text;
   }
 
@@ -346,11 +336,6 @@ export async function executeLLMNode(
 
   const provider = data.provider || 'openai';
 
-  console.log('[LLMNodeExecutor] Executing with provider:', provider);
-  console.log('[LLMNodeExecutor] Model:', data.model);
-  console.log('[LLMNodeExecutor] System prompt:', systemPrompt.slice(0, 100));
-  console.log('[LLMNodeExecutor] User prompt:', userPrompt.slice(0, 100));
-
   try {
     let response: string;
 
@@ -360,7 +345,6 @@ export async function executeLLMNode(
       response = await executeWithOpenAI(data, systemPrompt, userPrompt);
     }
 
-    console.log('[LLMNodeExecutor] Response length:', response.length, 'chars');
     return response;
   } catch (err) {
     if (err instanceof Error) {

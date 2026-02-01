@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, X } from 'lucide-react';
+import { Trash2, Plus, X, FolderOpen } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
@@ -872,6 +872,56 @@ interface SaveFileNodeConfigProps {
 function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
   const nodes = useFlowEditorStore((state) => state.nodes);
   const otherNodes = nodes.filter((n) => n.type !== 'saveFileNode');
+  const triggerNode = nodes.find((n) => n.type === 'triggerNode');
+  const [showVarPicker, setShowVarPicker] = useState(false);
+
+  // Get available variables for filename
+  const availableVars = React.useMemo(() => {
+    const vars: Array<{ label: string; value: string; type: string }> = [];
+
+    // Built-in variables
+    vars.push({ label: 'timestamp', value: '{timestamp}', type: 'Built-in' });
+    vars.push({ label: 'date', value: '{date}', type: 'Built-in' });
+
+    // Input variables from trigger
+    if (triggerNode) {
+      const triggerData = triggerNode.data as TriggerNodeData;
+      for (const input of triggerData.inputs || []) {
+        vars.push({ label: input.label, value: `{${input.label}}`, type: 'Input' });
+      }
+    }
+
+    // Node output variables
+    for (const node of otherNodes) {
+      if (node.type !== 'triggerNode') {
+        const label = (node.data as { label?: string }).label;
+        if (label) {
+          vars.push({ label, value: `{${label}}`, type: 'Node' });
+        }
+      }
+    }
+
+    return vars;
+  }, [nodes, triggerNode, otherNodes]);
+
+  // Listen for folder picker response
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+      if (message.type === 'flow:folderPicked' && message.field === 'folder') {
+        onUpdate({ folder: message.folderPath });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onUpdate]);
+
+  const insertVariable = (varValue: string) => {
+    const currentFilename = data.filename || '';
+    onUpdate({ filename: currentFilename + varValue });
+    setShowVarPicker(false);
+  };
 
   return (
     <>
@@ -883,15 +933,23 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
         />
       </Field>
 
-      <Field
-        label="Filename"
-        description="Use {{inputs.name}} or {{nodeId}} for dynamic names"
-      >
-        <Input
-          value={data.filename || ''}
-          onChange={(e) => onUpdate({ filename: e.target.value })}
-          placeholder="output.md"
-        />
+      {/* Input first: what to save */}
+      <Field label="Save output from">
+        <Select
+          value={data.sourceNodeId || ''}
+          onValueChange={(value) => onUpdate({ sourceNodeId: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select source..." />
+          </SelectTrigger>
+          <SelectContent>
+            {otherNodes.map((node) => (
+              <SelectItem key={node.id} value={node.id}>
+                {(node.data as { label?: string }).label || node.id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Field>
 
       <Field label="Format">
@@ -912,22 +970,74 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
         </Select>
       </Field>
 
-      <Field label="Source Node" description="Node whose output to save">
-        <Select
-          value={data.sourceNodeId || ''}
-          onValueChange={(value) => onUpdate({ sourceNodeId: value })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select source..." />
-          </SelectTrigger>
-          <SelectContent>
-            {otherNodes.map((node) => (
-              <SelectItem key={node.id} value={node.id}>
-                {(node.data as { label?: string }).label || node.id}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Output: where to save */}
+      <Field label="Folder" description="Relative to workspace root">
+        <div className="flex gap-2">
+          <Input
+            value={data.folder || ''}
+            onChange={(e) => onUpdate({ folder: e.target.value })}
+            placeholder="output/"
+            className="flex-1"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => vscode.postMessage({ type: 'flow:pickFolder', field: 'folder' })}
+            title="Browse folders"
+          >
+            <FolderOpen className="w-4 h-4" />
+          </Button>
+        </div>
+      </Field>
+
+      <Field label="Filename" description="Type / to insert variables">
+        <div className="relative">
+          <div className="flex gap-2">
+            <Input
+              value={data.filename || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                onUpdate({ filename: value });
+                // Show picker when user types /
+                if (value.endsWith('/')) {
+                  setShowVarPicker(true);
+                }
+              }}
+              placeholder="output.md"
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowVarPicker(!showVarPicker)}
+              title="Insert variable"
+            >
+              <span className="text-xs font-mono">/</span>
+            </Button>
+          </div>
+
+          {/* Variable picker dropdown */}
+          {showVarPicker && (
+            <div className="absolute z-50 mt-1 w-full bg-[var(--vscode-dropdown-background)] border border-[var(--vscode-dropdown-border)] rounded shadow-lg max-h-48 overflow-y-auto">
+              {availableVars.map((v, i) => (
+                <button
+                  key={i}
+                  onClick={() => insertVariable(v.value)}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--vscode-list-hoverBackground)] flex justify-between items-center"
+                >
+                  <span className="text-[var(--vscode-foreground)]">{v.label}</span>
+                  <span className="text-xs text-[var(--vscode-descriptionForeground)]">{v.type}</span>
+                </button>
+              ))}
+              <button
+                onClick={() => setShowVarPicker(false)}
+                className="w-full px-3 py-1 text-left text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-list-hoverBackground)] border-t border-[var(--vscode-dropdown-border)]"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </Field>
     </>
   );

@@ -2,29 +2,46 @@
  * Flow Storage Service
  *
  * CRUD operations for .flow.json files in the workspace.
- * Flows are stored in .flows/ directory at workspace root.
+ * Flows are stored in .ritemark/flows/ directory at workspace root.
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Flow } from './types';
 
+/**
+ * Sanitize a string for use in a filename
+ */
+function sanitizeForFilename(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
+    .replace(/^-+|-+$/g, '')     // Remove leading/trailing hyphens
+    .slice(0, 30);               // Limit length
+}
+
+/**
+ * Generate a short random suffix for uniqueness
+ */
+function shortId(): string {
+  return Math.random().toString(36).slice(2, 6);
+}
+
 export class FlowStorage {
   private flowsDir: string;
 
   constructor(workspacePath: string) {
-    this.flowsDir = path.join(workspacePath, '.flows');
+    this.flowsDir = path.join(workspacePath, '.ritemark', 'flows');
   }
 
   /**
-   * Ensure .flows directory exists
+   * Ensure .ritemark/flows directory exists
    */
   async ensureFlowsDirectory(): Promise<void> {
     try {
       await fs.access(this.flowsDir);
     } catch {
       await fs.mkdir(this.flowsDir, { recursive: true });
-      console.log('[FlowStorage] Created .flows directory:', this.flowsDir);
     }
   }
 
@@ -93,7 +110,6 @@ export class FlowStorage {
 
     try {
       await fs.writeFile(flowPath, JSON.stringify(flow, null, 2), 'utf-8');
-      console.log('[FlowStorage] Saved flow:', flow.id);
     } catch (err) {
       throw new Error(`Failed to save flow: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -107,7 +123,6 @@ export class FlowStorage {
 
     try {
       await fs.unlink(flowPath);
-      console.log('[FlowStorage] Deleted flow:', id);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new Error(`Flow not found: ${id}`);
@@ -138,10 +153,12 @@ export class FlowStorage {
 
   /**
    * Create a new flow with defaults
+   * ID format: sanitized-name-xxxx (e.g., my-blog-post-x4k9)
    */
   createNewFlow(name: string, description: string = ''): Flow {
     const now = new Date().toISOString();
-    const id = `flow-${Date.now()}`;
+    const sanitizedName = sanitizeForFilename(name) || 'flow';
+    const id = `${sanitizedName}-${shortId()}`;
 
     return {
       id,
@@ -154,5 +171,13 @@ export class FlowStorage {
       nodes: [],
       edges: [],
     };
+  }
+
+  /**
+   * Generate a flow ID from a name
+   */
+  static generateFlowId(name: string): string {
+    const sanitizedName = sanitizeForFilename(name) || 'flow';
+    return `${sanitizedName}-${shortId()}`;
   }
 }

@@ -14,6 +14,26 @@ import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { getAPIKeyManager } from '../ai/apiKeyManager';
 
+/**
+ * Sanitize a string for use in a filename
+ */
+function sanitizeForFilename(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 30);
+}
+
+/**
+ * Extract short ID from flow filename (e.g., "my-flow-x4k9.flow.json" -> "x4k9")
+ */
+function extractShortId(filename: string): string | null {
+  const base = path.basename(filename, '.flow.json');
+  const match = base.match(/-([a-z0-9]{4})$/);
+  return match ? match[1] : null;
+}
+
 export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'ritemark.flowEditor';
 
@@ -78,9 +98,11 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
             if (!isUpdating) {
               isUpdating = true;
               try {
-                await this.updateDocument(document, message.flow);
+                await this.updateDocument(document, message.flow, webview);
                 // Signal save complete so webview marks clean
                 webview.postMessage({ type: 'flow:saved' });
+                // Refresh flows list in sidebar
+                vscode.commands.executeCommand('ritemark.flows.refresh');
               } finally {
                 isUpdating = false;
               }
@@ -124,6 +146,11 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           case 'flow:pickFile':
             // Show file picker dialog
             this.showFilePicker(message.inputId, message.label, workspacePath, webview);
+            return;
+
+          case 'flow:pickFolder':
+            // Show folder picker dialog for Save File node
+            this.showFolderPicker(message.field, workspacePath, webview);
             return;
         }
       },
@@ -176,22 +203,61 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
   /**
    * Update document with new flow content
+   * If flow name changed, rename the file to match
    */
   private async updateDocument(
     document: vscode.TextDocument,
-    flow: Flow
+    flow: Flow,
+    webview?: vscode.Webview
   ): Promise<void> {
     // Update modified timestamp
     flow.modified = new Date().toISOString();
 
-    const content = JSON.stringify(flow, null, 2);
-    const edit = new vscode.WorkspaceEdit();
-    edit.replace(
-      document.uri,
-      new vscode.Range(0, 0, document.lineCount, 0),
-      content
-    );
-    await vscode.workspace.applyEdit(edit);
+    // Check if we need to rename the file based on flow name change
+    const currentFilename = path.basename(document.uri.fsPath, '.flow.json');
+    const shortId = extractShortId(document.uri.fsPath);
+    const sanitizedName = sanitizeForFilename(flow.name) || 'flow';
+    const expectedFilename = shortId ? `${sanitizedName}-${shortId}` : sanitizedName;
+
+    if (shortId && currentFilename !== expectedFilename) {
+      // Name changed - rename file using WorkspaceEdit (smoother than close/reopen)
+      const dir = path.dirname(document.uri.fsPath);
+      const newPath = path.join(dir, `${expectedFilename}.flow.json`);
+      const newUri = vscode.Uri.file(newPath);
+
+      // Update flow ID to match new filename
+      flow.id = expectedFilename;
+
+      // First update the content
+      const content = JSON.stringify(flow, null, 2);
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(
+        document.uri,
+        new vscode.Range(0, 0, document.lineCount, 0),
+        content
+      );
+      await vscode.workspace.applyEdit(edit);
+
+      // Then rename the file (VS Code handles editor update)
+      const renameEdit = new vscode.WorkspaceEdit();
+      renameEdit.renameFile(document.uri, newUri);
+      await vscode.workspace.applyEdit(renameEdit);
+
+      // Notify webview of the rename (new ID)
+      if (webview) {
+        webview.postMessage({ type: 'flow:renamed', newId: flow.id });
+      }
+    } else {
+      // No rename needed - just update content
+      const content = JSON.stringify(flow, null, 2);
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(
+        document.uri,
+        new vscode.Range(0, 0, document.lineCount, 0),
+        content
+      );
+      await vscode.workspace.applyEdit(edit);
+    }
   }
 
   /**
@@ -479,9 +545,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     const now = new Date().toISOString();
     const triggerId = `node-${Date.now()}`;
     const inputId = `input-${Date.now()}`;
+    const shortId = Math.random().toString(36).slice(2, 6);
 
     return {
-      id: `flow-${Date.now()}`,
+      id: `untitled-flow-${shortId}`,
       name: 'Untitled Flow',
       description: '',
       version: 1,
@@ -580,6 +647,39 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         type: 'flow:filePicked',
         inputId,
         filePath: fileUri[0].fsPath,
+      });
+    }
+  }
+
+  /**
+   * Show folder picker for Save File node
+   */
+  private async showFolderPicker(
+    field: string,
+    workspacePath: string,
+    webview: vscode.Webview
+  ): Promise<void> {
+    const options: vscode.OpenDialogOptions = {
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel: 'Select Folder',
+      defaultUri: workspacePath ? vscode.Uri.file(workspacePath) : undefined,
+    };
+
+    const folderUri = await vscode.window.showOpenDialog(options);
+
+    if (folderUri && folderUri[0]) {
+      // Make path relative to workspace
+      let folderPath = folderUri[0].fsPath;
+      if (workspacePath && folderPath.startsWith(workspacePath)) {
+        folderPath = folderPath.substring(workspacePath.length + 1); // +1 for the slash
+      }
+
+      webview.postMessage({
+        type: 'flow:folderPicked',
+        field,
+        folderPath,
       });
     }
   }

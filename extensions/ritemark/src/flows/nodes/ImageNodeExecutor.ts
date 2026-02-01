@@ -119,7 +119,6 @@ async function ensureImagesDirectory(workspacePath: string): Promise<string> {
     await fs.access(imagesDir);
   } catch {
     await fs.mkdir(imagesDir, { recursive: true });
-    console.log('[ImageNodeExecutor] Created images directory:', imagesDir);
   }
   return imagesDir;
 }
@@ -184,7 +183,6 @@ async function downloadImage(
   const localPath = path.join(imagesDir, filename);
   await fs.writeFile(localPath, buffer);
 
-  console.log('[ImageNodeExecutor] Downloaded image to:', localPath);
   return localPath;
 }
 
@@ -218,12 +216,6 @@ async function generateWithOpenAI(
   const model = options.model || 'gpt-image-1.5';
   const hasInputImages = options.inputImages.length > 0;
 
-  console.log(`[ImageNodeExecutor] Generating image with ${model}`);
-  console.log('[ImageNodeExecutor] Prompt:', prompt);
-  if (hasInputImages) {
-    console.log('[ImageNodeExecutor] Input images:', options.inputImages);
-  }
-
   // Check if using GPT Image models vs DALL-E
   const isGptImageModel = model.includes('gpt-image');
   const isDallE3 = model.includes('dall-e-3');
@@ -256,8 +248,8 @@ async function generateWithOpenAI(
         const ext = path.extname(options.inputImages[0]).toLowerCase();
         const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
         imageData = `data:${mimeType};base64,${base64}`;
-      } catch (err) {
-        console.warn(`[ImageNodeExecutor] Failed to load image: ${options.inputImages[0]}`, err);
+      } catch {
+        // Image file not found or couldn't be read - continue without it
       }
     }
 
@@ -315,7 +307,6 @@ async function generateWithOpenAI(
     // GPT Image models return base64 - save directly
     const buffer = Buffer.from(imageResponseData.b64_json, 'base64');
     await fs.writeFile(localPath, buffer);
-    console.log('[ImageNodeExecutor] Saved base64 image to:', localPath);
 
     return {
       url: `file://${localPath}`,
@@ -363,9 +354,6 @@ async function generateWithGemini(
   const model = options.model || 'imagen-4.0-fast-generate-001';
   const isImagen = model.includes('imagen');
   const isNanoBanana = model.includes('gemini') && model.includes('image');
-
-  console.log(`[ImageNodeExecutor] Generating with Gemini model: ${model}`);
-  console.log('[ImageNodeExecutor] Prompt:', prompt);
 
   let imageBase64: string;
 
@@ -453,8 +441,6 @@ async function generateWithGemini(
 
   const buffer = Buffer.from(imageBase64, 'base64');
   await fs.writeFile(localPath, buffer);
-
-  console.log('[ImageNodeExecutor] Saved Gemini image to:', localPath);
 
   return {
     url: `file://${localPath}`,

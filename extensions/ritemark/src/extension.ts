@@ -135,25 +135,11 @@ export function activate(context: vscode.ExtensionContext) {
 
       // Create a new flow with a unique ID
       const flowStorage = new FlowStorage(workspacePath);
-      const flowId = `flow-${Date.now()}`;
-      const now = new Date().toISOString();
-
-      const newFlow = {
-        id: flowId,
-        name: 'New Flow',
-        description: '',
-        version: 1,
-        created: now,
-        modified: now,
-        inputs: [],
-        nodes: [],
-        edges: [],
-      };
-
+      const newFlow = flowStorage.createNewFlow('New Flow');
       await flowStorage.saveFlow(newFlow);
 
       // Open the new flow in the editor
-      const flowPath = flowStorage.getFlowPath(flowId);
+      const flowPath = flowStorage.getFlowPath(newFlow.id);
       const uri = vscode.Uri.file(flowPath);
       await vscode.commands.executeCommand('vscode.openWith', uri, FlowEditorProvider.viewType);
 
@@ -165,6 +151,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.flows.refresh', async () => {
       await flowsViewProvider?.refresh();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.flows.settings', () => {
+      settingsProvider?.open();
     })
   );
 

@@ -61,9 +61,10 @@ export interface ImageNodeData extends Record<string, unknown> {
 
 export interface SaveFileNodeData extends Record<string, unknown> {
   label: string;
-  filename: string;
-  format: 'markdown' | 'csv' | 'image';
   sourceNodeId: string;
+  format: 'markdown' | 'csv' | 'image';
+  folder: string;
+  filename: string;
 }
 
 export type FlowNodeData = TriggerNodeData | LLMNodeData | ImageNodeData | SaveFileNodeData;
