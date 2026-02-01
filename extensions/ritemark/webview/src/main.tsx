@@ -8,6 +8,11 @@ const FlowEditor = lazy(() =>
   import('./components/flows/FlowEditor').then((m) => ({ default: m.FlowEditor }))
 )
 
+// Lazy load FlowsPanel for sidebar
+const FlowsPanel = lazy(() =>
+  import('./components/flows/FlowsPanel').then((m) => ({ default: m.FlowsPanel }))
+)
+
 // Lazy load RiteMarkSettings
 const RiteMarkSettings = lazy(() =>
   import('./components/settings/RiteMarkSettings').then((m) => ({ default: m.RiteMarkSettings }))
@@ -32,7 +37,7 @@ const LoadingFallback = () => (
       color: 'var(--vscode-editor-foreground)',
     }}
   >
-    Loading editor...
+    Loading...
   </div>
 )
 
@@ -45,6 +50,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'flow' ? (
       <Suspense fallback={<LoadingFallback />}>
         <FlowEditor />
+      </Suspense>
+    ) : editorType === 'flows-panel' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <FlowsPanel />
       </Suspense>
     ) : (
       <App />

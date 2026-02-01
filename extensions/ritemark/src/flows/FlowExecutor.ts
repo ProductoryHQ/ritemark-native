@@ -110,8 +110,6 @@ export async function executeFlow(
   onProgress?: ProgressCallback,
   abortSignal?: AbortSignal
 ): Promise<ExecutionResult> {
-  console.log('[FlowExecutor] Starting execution:', flow.name);
-
   // Validate required inputs
   for (const input of flow.inputs) {
     if (input.required && !inputs[input.id]) {
@@ -157,13 +155,11 @@ export async function executeFlow(
   try {
     // Determine execution order
     const order = getExecutionOrder(flow.nodes, flow.edges);
-    console.log('[FlowExecutor] Execution order:', order);
 
     // Execute nodes sequentially
     for (let i = 0; i < order.length; i++) {
       // Check for abort
       if (abortSignal?.aborted) {
-        console.log('[FlowExecutor] Execution aborted');
         return {
           success: false,
           outputs: Object.fromEntries(context.outputs),
@@ -188,17 +184,11 @@ export async function executeFlow(
         });
       }
 
-      console.log(`[FlowExecutor] Executing node ${i + 1}/${order.length}:`, nodeId);
-
       // Execute node
       const output = await executeNode(node, context);
       context.outputs.set(nodeId, output);
-
-      console.log('[FlowExecutor] Node output:', output);
     }
 
-    // Success
-    console.log('[FlowExecutor] Execution complete');
     return {
       success: true,
       outputs: Object.fromEntries(context.outputs),

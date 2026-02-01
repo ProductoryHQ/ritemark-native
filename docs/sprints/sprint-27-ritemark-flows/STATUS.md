@@ -2,8 +2,8 @@
 
 **Sprint:** 27 - RiteMark Flows
 **Branch:** feature/ritemark-flows
-**Current Phase:** Phase 2 Complete ✅
-**Status:** Ready for testing
+**Current Phase:** Phase 2.5 Complete ✅
+**Status:** Ready for QA validation and commit
 
 ---
 
@@ -158,19 +158,82 @@ extensions/ritemark/
 
 ---
 
+## Phase 2.5: UI Refactoring ✅ COMPLETE
+
+### Decisions (Jarmo Approved - 2026-02-01)
+
+| Decision | Rationale |
+|----------|-----------|
+| **Flows gets own Activity Bar tab** | Flows is a major feature, deserves same visibility as Ritemark AI |
+| **Hover reveal UX pattern** | Cleaner default state, matches VS Code native patterns |
+| **Run button always visible** | Primary action users need quick access to |
+| **Edit/Delete on hover only** | Secondary actions, reduces visual clutter |
+| **Click item to open flow** | Natural interaction, matches VS Code Explorer |
+
+### UX Pattern: Hover Reveal (Lucide Icons)
+
+```
+NORMAL STATE:                      HOVER STATE:
+┌─────────────────────────┐        ┌─────────────────────────┐
+│ Generate Blog Post      │        │ Generate Blog Post [✏][🗑]│
+│ Creates SEO-optimized...│   →    │ Creates SEO-optimized...│
+│ [▶ Run]                 │        │ [▶ Run]                 │
+│ Modified: Jan 31        │        │ Modified: Jan 31        │
+└─────────────────────────┘        └─────────────────────────┘
+```
+
+### Implementation Tasks
+
+- [x] Register Flows as separate viewContainer in Activity Bar
+- [x] Create Flows icon for Activity Bar (`flows-icon.svg`)
+- [x] Refactor FlowsPanel with hover reveal pattern
+- [x] Click anywhere to open flow
+- [x] Use Lucide icons (Pencil, Trash2, Play, Plus)
+- [x] Switch FlowsViewProvider to use React webview bundle
+
+---
+
+## Phase 2.5 Additional Features (2026-02-01)
+
+### Storage & Naming
+- **Storage location moved:** `.flows/` → `.ritemark/flows/` (cleaner workspace)
+- **Readable filenames:** `my-blog-post-x4k9.flow.json` (sanitized name + short ID)
+- **Auto-rename on save:** Renaming flow updates filename (flicker-free using WorkspaceEdit.renameFile)
+
+### Sidebar UX
+- **Delete button fixed:** Uses VS Code native confirmation dialog (browser `confirm()` doesn't work in webviews)
+- **Auto-refresh:** Sidebar list updates after save/rename
+
+### Save File Node UX
+- **Reordered fields:** Input first (Source), output last (Folder, Filename)
+- **Folder picker:** Button opens VS Code folder dialog
+- **Variable picker:** `/` button shows available variables for filename
+
+### Header Actions
+- **Settings gear:** Opens RiteMark Settings page (same as AI panel)
+
+---
+
+## Code Cleanup ✅
+
+Removed all debug `console.log` statements from:
+- `FlowExecutor.ts` (6 logs removed)
+- `LLMNodeExecutor.ts` (9 logs removed - including sensitive prompt/response logs)
+- `ImageNodeExecutor.ts` (8 logs removed)
+- `SaveFileNodeExecutor.ts` (2 logs removed)
+- `FlowStorage.ts` (3 logs removed)
+- `FlowsViewProvider.ts` (1 log removed)
+
+Kept only `console.error` for actual error handling.
+
+---
+
 ## Next Steps
 
-1. **Test in dev mode** - Run `./scripts/code.sh` and verify:
-   - Create new flow via command palette
-   - Add nodes from palette
-   - Configure nodes in config panel
-   - Connect nodes with edges
-   - Save and reload flows
-   - Run flows with image generation
-
-2. **QA Validation** - Invoke qa-validator before commit
-
-3. **Commit** - Commit Phase 2 changes to feature/ritemark-flows
+1. ~~Complete Phase 2.5 UI refactoring~~ ✅
+2. ~~Code cleanup~~ ✅
+3. QA validation and commit
+4. Test image generation flow end-to-end
 
 ---
 
@@ -184,5 +247,5 @@ extensions/ritemark/
 
 ---
 
-**Last Updated:** 2026-01-31
+**Last Updated:** 2026-02-01
 **Sprint Manager:** Claude (sprint-manager agent)

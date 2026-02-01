@@ -2,13 +2,14 @@
  * Flows Panel
  *
  * Main sidebar panel for listing and managing flows.
+ * UX: Click item to open in editor, Edit/Delete on hover.
+ * Running flows happens in the flow editor, not sidebar.
  */
 
 import { useState, useEffect } from 'react';
-import { Play, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { Trash2, Pencil, Loader2, AlertCircle, Plus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription } from '../ui/alert';
-import { RunFlowModal } from './RunFlowModal';
 import type { Flow, FlowsMessage } from './types';
 import { vscode } from '../../lib/vscode';
 
@@ -16,8 +17,6 @@ export function FlowsPanel() {
   const [flows, setFlows] = useState<Flow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null);
-  const [showRunModal, setShowRunModal] = useState(false);
 
   useEffect(() => {
     // Handle messages from extension
@@ -51,21 +50,25 @@ export function FlowsPanel() {
     };
   }, []);
 
-  const handleRunFlow = (flow: Flow) => {
-    setSelectedFlow(flow);
-    setShowRunModal(true);
-  };
-
-  const handleDeleteFlow = async (flow: Flow) => {
-    // Confirm deletion
-    if (!confirm(`Delete flow "${flow.name}"?`)) {
-      return;
-    }
-
+  const handleOpenFlow = (flow: Flow) => {
     vscode.postMessage({
-      type: 'flow:delete',
+      type: 'flow:open',
       id: flow.id,
     });
+  };
+
+  const handleDeleteFlow = (flow: Flow, e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't trigger open
+    // Use VS Code's native confirmation dialog (confirm() doesn't work in webviews)
+    vscode.postMessage({
+      type: 'flow:delete-confirm',
+      id: flow.id,
+      name: flow.name,
+    });
+  };
+
+  const handleNewFlow = () => {
+    vscode.postMessage({ type: 'flow:new' });
   };
 
   const handleRefresh = () => {
@@ -105,11 +108,12 @@ export function FlowsPanel() {
         <div className="text-gray-500 mb-4">
           <p className="text-sm mb-2">No flows yet</p>
           <p className="text-xs text-gray-400">
-            Visual flow editor coming in Phase 2
+            Create your first automation workflow
           </p>
         </div>
-        <Button onClick={handleRefresh} variant="outline" size="sm">
-          Refresh
+        <Button onClick={handleNewFlow} size="sm">
+          <Plus className="w-4 h-4 mr-1" />
+          New Flow
         </Button>
       </div>
     );
@@ -122,37 +126,48 @@ export function FlowsPanel() {
           {flows.map((flow) => (
             <div
               key={flow.id}
-              className="border rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-800"
+              onClick={() => handleOpenFlow(flow)}
+              className="group border rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm truncate">{flow.name}</h3>
-                  {flow.description && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                      {flow.description}
-                    </p>
-                  )}
+              {/* Header with title and hover actions */}
+              <div className="flex items-start justify-between mb-1">
+                <h3 className="font-medium text-sm truncate flex-1 min-w-0">
+                  {flow.name}
+                </h3>
+                {/* Hover-revealed actions */}
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenFlow(flow);
+                    }}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    title="Edit flow"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    onClick={(e) => handleDeleteFlow(flow, e)}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 hover:text-red-500"
+                    title="Delete flow"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 mt-3">
-                <Button
-                  onClick={() => handleRunFlow(flow)}
-                  size="sm"
-                  className="flex-1"
-                >
-                  <Play className="w-3 h-3 mr-1" />
-                  Run
-                </Button>
-                <Button
-                  onClick={() => handleDeleteFlow(flow)}
-                  size="sm"
-                  variant="ghost"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
+              {/* Description */}
+              {flow.description && (
+                <p className="text-xs text-gray-500 line-clamp-2">
+                  {flow.description}
+                </p>
+              )}
 
+              {/* Modified date */}
               <div className="text-xs text-gray-400 mt-2">
                 Modified: {new Date(flow.modified).toLocaleDateString()}
               </div>
@@ -160,16 +175,6 @@ export function FlowsPanel() {
           ))}
         </div>
       </div>
-
-      {showRunModal && selectedFlow && (
-        <RunFlowModal
-          flow={selectedFlow}
-          onClose={() => {
-            setShowRunModal(false);
-            setSelectedFlow(null);
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -14,9 +14,10 @@ import type { FlowNode, ExecutionContext } from '../types';
  */
 interface SaveFileNodeData {
   label: string;
-  filename: string;
-  format: 'markdown' | 'csv' | 'image';
   sourceNodeId: string;
+  format: 'markdown' | 'csv' | 'image';
+  folder: string;
+  filename: string;
 }
 
 /**
@@ -89,7 +90,6 @@ async function ensureOutputDirectory(outputPath: string): Promise<void> {
     await fs.access(dir);
   } catch {
     await fs.mkdir(dir, { recursive: true });
-    console.log('[SaveFileNodeExecutor] Created directory:', dir);
   }
 }
 
@@ -140,10 +140,12 @@ export async function executeSaveFileNode(
     }
   }
 
-  // Determine output path (relative to workspace)
-  const outputPath = path.isAbsolute(filename)
-    ? filename
-    : path.join(context.workspacePath, filename);
+  // Determine output path (folder + filename, relative to workspace)
+  const folder = data.folder || '';
+  const relativePath = folder ? path.join(folder, filename) : filename;
+  const outputPath = path.isAbsolute(relativePath)
+    ? relativePath
+    : path.join(context.workspacePath, relativePath);
 
   // Ensure directory exists
   await ensureOutputDirectory(outputPath);
@@ -190,8 +192,6 @@ export async function executeSaveFileNode(
     default:
       throw new Error(`Unknown save format: ${format}`);
   }
-
-  console.log('[SaveFileNodeExecutor] Saved file:', outputPath, `(${size} bytes)`);
 
   return {
     path: outputPath,

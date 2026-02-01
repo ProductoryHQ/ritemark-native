@@ -3,7 +3,6 @@
  */
 
 export { FlowsPanel } from './FlowsPanel';
-export { RunFlowModal } from './RunFlowModal';
 export { FlowEditor } from './FlowEditor';
 export { FlowCanvas } from './FlowCanvas';
 export { NodePalette } from './NodePalette';
