@@ -65,6 +65,12 @@ function insertDictationPlaceholder(editor: TipTapEditor, placeholder: string) {
     .run()
 }
 
+// Feature flags sent from extension
+interface Features {
+  voiceDictation: boolean
+  markdownExport: boolean
+}
+
 function App() {
   const [content, setContent] = useState<string>('')
   const [fileType, setFileType] = useState<FileType>('markdown')
@@ -75,6 +81,10 @@ function App() {
   const [hasProperties, setHasProperties] = useState(false)
   const [isReady, setIsReady] = useState(false)
   const [imageMappings, setImageMappings] = useState<Record<string, string>>({})
+  const [features, setFeatures] = useState<Features>({
+    voiceDictation: false,
+    markdownExport: false
+  })
 
   // Track selection for AI tool execution
   const [selection, setSelection] = useState<EditorSelection | null>(null)
@@ -104,6 +114,10 @@ function App() {
           setProperties((message.properties as DocumentProperties) || {})
           setHasProperties(message.hasProperties as boolean || false)
           setImageMappings((message.imageMappings as Record<string, string>) || {})
+          setFeatures((message.features as Features) || {
+            voiceDictation: false,
+            markdownExport: false
+          })
           setIsReady(true)
           break
 
@@ -370,6 +384,7 @@ function App() {
           setShowFileChangeNotification(false)
           sendToExtension('refresh')
         }}
+        features={features}
       />
 
       {/* Editor - Takes remaining space */}

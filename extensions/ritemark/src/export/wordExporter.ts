@@ -10,8 +10,62 @@ import {
   ExternalHyperlink,
   NumberFormat,
   LevelFormat,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  ImageRun,
 } from 'docx';
 import type { DocumentProperties } from '../ritemarkEditor';
+
+/**
+ * Try to load image from path (relative to document or absolute)
+ * Returns buffer on success, null if image cannot be loaded
+ */
+function tryLoadImage(imagePath: string, documentUri?: vscode.Uri): Buffer | null {
+  try {
+    // Handle vscode-file:// scheme
+    if (imagePath.startsWith('vscode-file://')) {
+      imagePath = imagePath.replace('vscode-file://', '');
+    }
+
+    // Handle file:// scheme
+    if (imagePath.startsWith('file://')) {
+      imagePath = imagePath.replace('file://', '');
+    }
+
+    // Skip remote URLs (http://, https://)
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      console.log(`Skipping remote image: ${imagePath}`);
+      return null;
+    }
+
+    // Resolve relative paths
+    let absolutePath: string;
+    if (path.isAbsolute(imagePath)) {
+      absolutePath = imagePath;
+    } else if (documentUri) {
+      // Resolve relative to document directory
+      const docDir = path.dirname(documentUri.fsPath);
+      absolutePath = path.resolve(docDir, imagePath);
+    } else {
+      // No document URI, can't resolve relative path
+      return null;
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(absolutePath)) {
+      console.log(`Image not found: ${absolutePath}`);
+      return null;
+    }
+
+    // Read image file
+    return fs.readFileSync(absolutePath);
+  } catch (error) {
+    console.error(`Failed to load image: ${imagePath}`, error);
+    return null;
+  }
+}
 
 /**
  * Export markdown content to Word (.docx)
@@ -42,7 +96,7 @@ export async function exportToWord(
     }
 
     // Parse markdown to structured content
-    const paragraphs = parseMarkdownToDocx(markdown, properties);
+    const paragraphs = parseMarkdownToDocx(markdown, properties, documentUri);
 
     // Create docx document with numbering definitions and default font
     const doc = new Document({
@@ -121,8 +175,8 @@ export async function exportToWord(
 /**
  * Parse markdown to docx paragraphs
  */
-function parseMarkdownToDocx(markdown: string, properties: DocumentProperties): Paragraph[] {
-  const paragraphs: Paragraph[] = [];
+function parseMarkdownToDocx(markdown: string, properties: DocumentProperties, documentUri?: vscode.Uri): (Paragraph | Table)[] {
+  const paragraphs: (Paragraph | Table)[] = [];
 
   // Add title from properties if available
   const title = properties.title as string;
@@ -154,7 +208,10 @@ function parseMarkdownToDocx(markdown: string, properties: DocumentProperties): 
     paragraphs.push(new Paragraph({ text: '' })); // Spacer
   }
 
-  const lines = markdown.split('\n');
+  // CRITICAL FIX: Normalize line endings (Windows \r\n → Unix \n)
+  // This prevents regex patterns from failing due to \r at end of lines
+  const normalized = markdown.replace(/\r\n/g, '\n');
+  const lines = normalized.split('\n');
   let i = 0;
 
   while (i < lines.length) {
@@ -298,6 +355,131 @@ function parseMarkdownToDocx(markdown: string, properties: DocumentProperties): 
         })
       );
       i++;
+      continue;
+    }
+
+    // Images
+    const imageMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imageMatch) {
+      const altText = imageMatch[1];
+      const imagePath = imageMatch[2];
+
+      const imageBuffer = tryLoadImage(imagePath, documentUri);
+      if (imageBuffer) {
+        try {
+          paragraphs.push(
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: imageBuffer,
+                  transformation: {
+                    width: 400,
+                    height: 300,
+                  },
+                })
+              ]
+            })
+          );
+          // Add caption if alt text provided
+          if (altText) {
+            paragraphs.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: altText,
+                    italics: true,
+                    color: '666666',
+                    size: 20 // 10pt
+                  })
+                ]
+              })
+            );
+          }
+        } catch (error) {
+          console.error(`Failed to embed image: ${imagePath}`, error);
+          // Fall through to show placeholder text
+          paragraphs.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `[Image: ${altText || imagePath}]`,
+                  italics: true,
+                  color: '999999'
+                })
+              ]
+            })
+          );
+        }
+      } else {
+        // Image not found, show placeholder
+        paragraphs.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `[Image: ${altText || imagePath}]`,
+                italics: true,
+                color: '999999'
+              })
+            ]
+          })
+        );
+      }
+      i++;
+      continue;
+    }
+
+    // Tables (GFM style)
+    if (line.includes('|') && line.trim().startsWith('|')) {
+      const tableRows: string[][] = [];
+
+      // Collect all table rows
+      while (i < lines.length && lines[i].includes('|')) {
+        const row = lines[i];
+        // Skip separator row (|---|---|)
+        if (row.match(/^\|[\s\-:]+\|/)) {
+          i++;
+          continue;
+        }
+        // Parse cells
+        const cells = row
+          .split('|')
+          .map(cell => cell.trim())
+          .filter(cell => cell !== '');
+        if (cells.length > 0) {
+          tableRows.push(cells);
+        }
+        i++;
+      }
+
+      // Create Word table
+      if (tableRows.length > 0) {
+        const table = new Table({
+          width: {
+            size: 100,
+            type: WidthType.PERCENTAGE,
+          },
+          rows: tableRows.map((row, rowIndex) =>
+            new TableRow({
+              children: row.map(cell =>
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: cleanText(cell),
+                          bold: rowIndex === 0, // Bold header row
+                        })
+                      ]
+                    })
+                  ]
+                })
+              )
+            })
+          )
+        });
+        paragraphs.push(table);
+        paragraphs.push(new Paragraph({ text: '' })); // Spacer after table
+      }
       continue;
     }
 

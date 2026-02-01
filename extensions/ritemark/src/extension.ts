@@ -39,6 +39,33 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize connectivity monitoring (status bar + online detection)
   initConnectivity(context);
 
+  // Show RiteMark walkthrough on first launch
+  // This provides a better onboarding experience than VS Code's default Welcome page
+  const hasSeenWalkthrough = context.globalState.get('ritemark.hasSeenWalkthrough', false);
+  if (!hasSeenWalkthrough) {
+    // Delay to allow VS Code UI to fully initialize
+    setTimeout(async () => {
+      try {
+        // VS Code walkthrough ID format: publisherId.extensionName#walkthroughId
+        // Our extension: publisher="ritemark", name="ritemark", walkthrough id="ritemark.welcome"
+        await vscode.commands.executeCommand(
+          'workbench.action.openWalkthrough',
+          'ritemark.ritemark#ritemark.welcome',
+          true // Open to side
+        );
+        await context.globalState.update('ritemark.hasSeenWalkthrough', true);
+      } catch (error) {
+        console.error('Failed to show walkthrough:', error);
+        // Try alternative format
+        try {
+          await vscode.commands.executeCommand('workbench.action.openWalkthrough');
+        } catch (e) {
+          // Ignore - at least the welcome page will open
+        }
+      }
+    }, 1500);
+  }
+
   // Initialize update service
   const updateStorage = new UpdateStorage(context.globalState);
   const updateService = new UpdateService(updateStorage);

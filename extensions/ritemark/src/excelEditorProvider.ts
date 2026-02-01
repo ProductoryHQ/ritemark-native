@@ -60,9 +60,13 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
     _token: vscode.CancellationToken
   ): Promise<void> {
     // Setup webview options
-    const scriptUri = webviewPanel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js')
-    );
+    const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js');
+    const scriptUri = webviewPanel.webview.asWebviewUri(scriptPath);
+
+    // Debug logging for Windows path issues
+    console.log('[RiteMark Excel] Extension URI:', this.context.extensionUri.toString());
+    console.log('[RiteMark Excel] Script path:', scriptPath.toString());
+    console.log('[RiteMark Excel] Script URI:', scriptUri.toString());
 
     webviewPanel.webview.options = {
       enableScripts: true,
@@ -182,7 +186,7 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource};">
   <title>Excel Preview</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
