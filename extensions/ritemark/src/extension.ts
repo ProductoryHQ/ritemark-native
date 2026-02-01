@@ -4,12 +4,26 @@ import { ExcelEditorProvider } from './excelEditorProvider';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
+import { FlowsViewProvider } from './flows/FlowsViewProvider';
+import { FlowEditorProvider } from './flows/FlowEditorProvider';
+import { FlowStorage } from './flows/FlowStorage';
+import { RiteMarkSettingsProvider } from './settings/RiteMarkSettingsProvider';
+import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLMNodeExecutor';
+import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
+import { registerFlowTestCommand } from './flows/FlowTestRunner';
 import { DocumentIndexer } from './rag/indexer';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
+// Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
 export let unifiedViewProvider: UnifiedViewProvider;
+
+// Flows view provider
+let flowsViewProvider: FlowsViewProvider | null = null;
+
+// Settings provider
+let settingsProvider: RiteMarkSettingsProvider | null = null;
 
 // RAG infrastructure
 let documentIndexer: DocumentIndexer | null = null;
@@ -17,6 +31,10 @@ let documentIndexer: DocumentIndexer | null = null;
 export function activate(context: vscode.ExtensionContext) {
   // Initialize API key manager (must be first)
   initAPIKeyManager(context);
+
+  // Initialize executor contexts (for Gemini API key access)
+  setLLMExtensionContext(context);
+  setImageNodeExtensionContext(context);
 
   // Initialize connectivity monitoring (status bar + online detection)
   initConnectivity(context);
@@ -36,6 +54,16 @@ export function activate(context: vscode.ExtensionContext) {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );
+
+  // Register Flows View Provider (always register - visibility controlled by when clause in package.json)
+  if (workspacePath) {
+    flowsViewProvider = new FlowsViewProvider(context.extensionUri, workspacePath);
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, flowsViewProvider, {
+        webviewOptions: { retainContextWhenHidden: true }
+      })
+    );
+  }
 
   // AI panel opens via activity bar click, not auto-shown on startup
   // User requested Explorer (folder view) to be default
@@ -58,6 +86,9 @@ export function activate(context: vscode.ExtensionContext) {
     registerCheckApiKeyCommand(context)
   );
 
+  // Register flow test command
+  registerFlowTestCommand(context);
+
   // Register show AI panel command
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.showAIPanel', () => {
@@ -79,10 +110,53 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register AI settings command (opens API key configuration)
+  // Initialize Settings Provider
+  settingsProvider = new RiteMarkSettingsProvider(context);
+
+  // Register AI settings command (opens branded settings page)
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.aiSettings', () => {
-      vscode.commands.executeCommand('ritemark.configureApiKey');
+      settingsProvider?.open();
+    })
+  );
+
+  // Register Flow Editor Provider (visual editor for .flow.json files)
+  context.subscriptions.push(
+    FlowEditorProvider.register(context)
+  );
+
+  // Register Flows commands (always register - menu visibility controlled by when clauses in package.json)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.flows.new', async () => {
+      if (!workspacePath) {
+        vscode.window.showWarningMessage('Open a folder first to create flows.');
+        return;
+      }
+
+      // Create a new flow with a unique ID
+      const flowStorage = new FlowStorage(workspacePath);
+      const newFlow = flowStorage.createNewFlow('New Flow');
+      await flowStorage.saveFlow(newFlow);
+
+      // Open the new flow in the editor
+      const flowPath = flowStorage.getFlowPath(newFlow.id);
+      const uri = vscode.Uri.file(flowPath);
+      await vscode.commands.executeCommand('vscode.openWith', uri, FlowEditorProvider.viewType);
+
+      // Refresh the flows list
+      await flowsViewProvider?.refresh();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.flows.refresh', async () => {
+      await flowsViewProvider?.refresh();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.flows.settings', () => {
+      settingsProvider?.open();
     })
   );
 

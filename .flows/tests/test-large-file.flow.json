@@ -1,0 +1,84 @@
+{
+  "id": "test-large-file",
+  "name": "Test: Large File Processing",
+  "description": "Tests reading and processing a larger document",
+  "version": 1,
+  "created": "",
+  "modified": "",
+  "inputs": [
+    {
+      "id": "input-document",
+      "type": "file",
+      "label": "Document",
+      "required": true,
+      "defaultValue": ""
+    },
+    {
+      "id": "input-task",
+      "type": "text",
+      "label": "Task",
+      "required": true,
+      "defaultValue": "summarize"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "position": { "x": 250, "y": 50 },
+      "data": {
+        "label": "Trigger",
+        "inputs": [
+          {
+            "id": "input-document",
+            "type": "file",
+            "label": "Document",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "id": "input-task",
+            "type": "text",
+            "label": "Task",
+            "required": true,
+            "defaultValue": "summarize"
+          }
+        ]
+      }
+    },
+    {
+      "id": "processor-node",
+      "type": "llm-prompt",
+      "position": { "x": 250, "y": 200 },
+      "data": {
+        "label": "Document Processor",
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "systemPrompt": "You are a document analyst. Be thorough but concise.",
+        "userPrompt": "Please {Task} the following document:\n\n{Document}",
+        "temperature": 0.3,
+        "maxTokens": 1000
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "trigger",
+      "target": "processor-node"
+    }
+  ],
+  "_test": {
+    "inputs": {
+      "Document": "/Users/jarmotuisk/Projects/ritemark-native/.flows/fixtures/test-files/large-document.md",
+      "Task": "extract the main topics from"
+    },
+    "expectations": {
+      "processor-node": {
+        "type": "string",
+        "minLength": 100
+      }
+    },
+    "tags": ["file-content", "large"]
+  }
+}

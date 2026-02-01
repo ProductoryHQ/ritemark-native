@@ -1,0 +1,68 @@
+{
+  "id": "test-gemini-image",
+  "name": "Test: Gemini Image Generation",
+  "description": "Tests image generation using Google Imagen 4",
+  "version": 1,
+  "created": "",
+  "modified": "",
+  "inputs": [
+    {
+      "id": "input-subject",
+      "type": "text",
+      "label": "Subject",
+      "required": true,
+      "defaultValue": "a red apple"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "position": { "x": 250, "y": 50 },
+      "data": {
+        "label": "Trigger",
+        "inputs": [
+          {
+            "id": "input-subject",
+            "type": "text",
+            "label": "Subject",
+            "required": true,
+            "defaultValue": "a red apple"
+          }
+        ]
+      }
+    },
+    {
+      "id": "imagen-node",
+      "type": "image-prompt",
+      "position": { "x": 250, "y": 200 },
+      "data": {
+        "label": "Imagen Generator",
+        "provider": "gemini",
+        "model": "imagen-4.0-fast-generate-001",
+        "prompt": "A simple illustration of {Subject}, clean white background, minimalist",
+        "size": "1024x1024",
+        "quality": "standard"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "trigger",
+      "target": "imagen-node"
+    }
+  ],
+  "_test": {
+    "inputs": {
+      "Subject": "a green triangle"
+    },
+    "expectations": {
+      "imagen-node": {
+        "type": "object",
+        "hasProperty": "localPath"
+      }
+    },
+    "tags": ["expensive", "slow", "gemini"]
+  }
+}
