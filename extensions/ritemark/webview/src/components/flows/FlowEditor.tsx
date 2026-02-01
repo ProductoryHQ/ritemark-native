@@ -1,0 +1,249 @@
+/**
+ * Flow Editor Component
+ *
+ * Main component for the visual flow editor.
+ * 3-column layout: NodePalette | FlowCanvas | NodeConfigPanel
+ */
+
+import React, { useEffect, useCallback, useState, useRef } from 'react';
+import { AlertTriangle, X } from 'lucide-react';
+import { NodePalette } from './NodePalette';
+import { FlowCanvas } from './FlowCanvas';
+import { NodeConfigPanel } from './NodeConfigPanel';
+import { ExecutionPanel } from './ExecutionPanel';
+import { useFlowEditorStore } from './stores/flowEditorStore';
+import type { Flow } from './stores/flowEditorStore';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { vscode } from '../../lib/vscode';
+
+export function FlowEditor() {
+  const setFlow = useFlowEditorStore((state) => state.setFlow);
+  const toFlow = useFlowEditorStore((state) => state.toFlow);
+  const flowName = useFlowEditorStore((state) => state.flowName);
+  const flowDescription = useFlowEditorStore((state) => state.flowDescription);
+  const setFlowName = useFlowEditorStore((state) => state.setFlowName);
+  const setFlowDescription = useFlowEditorStore(
+    (state) => state.setFlowDescription
+  );
+  const isDirty = useFlowEditorStore((state) => state.isDirty);
+  const markClean = useFlowEditorStore((state) => state.markClean);
+  const validationWarnings = useFlowEditorStore(
+    (state) => state.validationWarnings
+  );
+  const setValidationWarnings = useFlowEditorStore(
+    (state) => state.setValidationWarnings
+  );
+  const selectedNodeId = useFlowEditorStore((state) => state.selectedNodeId);
+
+  const [error, setError] = useState<string | null>(null);
+  const [showWarnings, setShowWarnings] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // Ref to track isRunning for message handler (avoids stale closure)
+  const isRunningRef = useRef(isRunning);
+  isRunningRef.current = isRunning;
+
+  // Handle messages from VS Code extension
+  useEffect(() => {
+    const vscodeApi = vscode;
+
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+
+      switch (message.type) {
+        case 'flow:load':
+          setFlow(message.flow as Flow, message.workspacePath);
+          setValidationWarnings(message.warnings || []);
+          setError(null);
+          break;
+
+        case 'flow:saved':
+          markClean();
+          break;
+
+        case 'flow:validation':
+          setValidationWarnings(message.warnings || []);
+          break;
+
+        case 'flow:error':
+          // Only handle load errors here - execution errors go to ExecutionPanel
+          if (!isRunningRef.current) {
+            setError(message.error);
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Signal ready to extension
+    vscodeApi.postMessage({ type: 'ready' });
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [setFlow, markClean, setValidationWarnings]);
+
+  // Auto-save with debounce
+  useEffect(() => {
+    if (!isDirty) return;
+
+    const timer = setTimeout(() => {
+      const vscodeApi = vscode;
+      const flow = toFlow();
+      vscodeApi.postMessage({ type: 'flow:save', flow });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [isDirty, toFlow]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + S to save
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        const vscodeApi = vscode;
+        vscodeApi.postMessage({ type: 'flow:requestSave' });
+      }
+
+      // Cmd/Ctrl + Z to undo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        useFlowEditorStore.getState().undo();
+      }
+
+      // Cmd/Ctrl + Shift + Z to redo
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        useFlowEditorStore.getState().redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Handle run flow - switch right panel to execution mode
+  const handleRunFlow = useCallback(() => {
+    setIsRunning(true);
+  }, []);
+
+  // Handle node selection - exit execution mode to show properties
+  const handleNodeSelect = useCallback(() => {
+    if (isRunning) {
+      setIsRunning(false);
+    }
+  }, [isRunning]);
+
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center bg-[var(--vscode-editor-background)]">
+        <div className="max-w-md p-6 text-center">
+          <div className="text-[var(--vscode-errorForeground)] text-lg mb-2">
+            Error Loading Flow
+          </div>
+          <div className="text-sm text-[var(--vscode-descriptionForeground)] mb-4">
+            {error}
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const vscodeApi = vscode;
+              vscodeApi.postMessage({ type: 'ready' });
+            }}
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-[var(--vscode-editor-background)]">
+      {/* Header */}
+      <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)]">
+        <Input
+          value={flowName}
+          onChange={(e) => setFlowName(e.target.value)}
+          className="max-w-[200px] font-semibold"
+          placeholder="Flow name..."
+        />
+        <Input
+          value={flowDescription}
+          onChange={(e) => setFlowDescription(e.target.value)}
+          className="flex-1 text-sm"
+          placeholder="Description (optional)..."
+        />
+
+        {/* Validation warnings button */}
+        {validationWarnings.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowWarnings(!showWarnings)}
+            className="flex items-center gap-1.5 text-[var(--vscode-editorWarning-foreground)]"
+          >
+            <AlertTriangle size={14} />
+            {validationWarnings.length} warning
+            {validationWarnings.length > 1 ? 's' : ''}
+          </Button>
+        )}
+      </div>
+
+      {/* Validation warnings panel */}
+      {showWarnings && validationWarnings.length > 0 && (
+        <div className="px-4 py-2 bg-[var(--vscode-inputValidation-warningBackground)] border-b border-[var(--vscode-inputValidation-warningBorder)]">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 text-sm font-medium text-[var(--vscode-inputValidation-warningForeground)] mb-1">
+                <AlertTriangle size={14} />
+                Validation Warnings
+              </div>
+              <ul className="text-xs text-[var(--vscode-foreground)] space-y-0.5 ml-5">
+                {validationWarnings.map((warning, i) => (
+                  <li key={i}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowWarnings(false)}
+              className="text-[var(--vscode-foreground)]"
+            >
+              <X size={14} />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Main content - 3 column layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Node Palette */}
+        <div className="w-[220px] flex-shrink-0">
+          <NodePalette />
+        </div>
+
+        {/* Center: Flow Canvas */}
+        <FlowCanvas onRunFlow={handleRunFlow} onNodeSelect={handleNodeSelect} />
+
+        {/* Right: Config Panel or Execution Panel (hidden when nothing selected) */}
+        {(isRunning || selectedNodeId) && (
+          <div className="w-[280px] flex-shrink-0">
+            {isRunning ? (
+              <ExecutionPanel
+                flow={toFlow()}
+                onClose={() => setIsRunning(false)}
+              />
+            ) : (
+              <NodeConfigPanel />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

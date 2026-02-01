@@ -1,0 +1,70 @@
+{
+  "id": "test-gemini-llm",
+  "name": "Test: Gemini LLM Provider",
+  "description": "Tests LLM prompt using Google Gemini API",
+  "version": 1,
+  "created": "",
+  "modified": "",
+  "inputs": [
+    {
+      "id": "input-question",
+      "type": "text",
+      "label": "Question",
+      "required": true,
+      "defaultValue": "What is 2+2?"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "position": { "x": 250, "y": 50 },
+      "data": {
+        "label": "Trigger",
+        "inputs": [
+          {
+            "id": "input-question",
+            "type": "text",
+            "label": "Question",
+            "required": true,
+            "defaultValue": "What is 2+2?"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gemini-node",
+      "type": "llm-prompt",
+      "position": { "x": 250, "y": 200 },
+      "data": {
+        "label": "Gemini Answerer",
+        "provider": "gemini",
+        "model": "gemini-2.0-flash",
+        "systemPrompt": "Answer briefly in one sentence.",
+        "userPrompt": "{Question}",
+        "temperature": 0.3,
+        "maxTokens": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "trigger",
+      "target": "gemini-node"
+    }
+  ],
+  "_test": {
+    "inputs": {
+      "Question": "What is the capital of France?"
+    },
+    "expectations": {
+      "gemini-node": {
+        "type": "string",
+        "minLength": 5,
+        "contains": "Paris"
+      }
+    },
+    "tags": ["gemini"]
+  }
+}
