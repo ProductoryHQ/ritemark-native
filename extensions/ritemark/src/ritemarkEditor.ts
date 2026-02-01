@@ -197,9 +197,13 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     _token: vscode.CancellationToken
   ): Promise<void> {
     // Get URI for the webview bundle
-    const scriptUri = webviewPanel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js')
-    );
+    const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js');
+    const scriptUri = webviewPanel.webview.asWebviewUri(scriptPath);
+
+    // Debug logging for Windows path issues
+    console.log('[RiteMark] Extension URI:', this.context.extensionUri.toString());
+    console.log('[RiteMark] Script path:', scriptPath.toString());
+    console.log('[RiteMark] Script URI:', scriptUri.toString());
 
     // Get directory of the markdown file for local resource access
     const docDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
@@ -911,7 +915,7 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:;">
   <title>RiteMark</title>
   <style>
     * {

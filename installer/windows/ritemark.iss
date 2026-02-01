@@ -61,9 +61,9 @@ Name: "associatewithfiles"; Description: "Associate with .md files"; GroupDescri
 Name: "addtopath"; Description: "Add to PATH"; GroupDescription: "Other:"
 
 [Files]
-; Copy everything from the built app, excluding paths that exceed MAX_PATH (260 chars)
-; The docx/build folder has deeply nested paths but isn't needed at runtime
-Source: "{#SourcePath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*\node_modules\docx\build\*,*\node_modules\*\node_modules\*\node_modules\*"
+; Copy everything from the built app, excluding deeply nested node_modules that exceed MAX_PATH (260 chars)
+; NOTE: docx\build IS needed for Word export - do NOT exclude it
+Source: "{#SourcePath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*\node_modules\*\node_modules\*\node_modules\*"
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
