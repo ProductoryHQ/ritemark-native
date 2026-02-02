@@ -98,7 +98,7 @@ echo ""
 echo -e "${BLUE}Step 3/7: Copying RiteMark Extension${NC}"
 echo "----------------------------------------"
 
-APP_PATH="VSCode-darwin-arm64/RiteMark.app"
+APP_PATH="VSCode-darwin-arm64/Ritemark.app"
 EXT_DEST="$APP_PATH/Contents/Resources/app/extensions/ritemark"
 
 if [[ ! -d "$APP_PATH" ]]; then
