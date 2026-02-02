@@ -770,3 +770,114 @@ hdiutil detach /tmp/v100; hdiutil detach /tmp/v101
 3. **Compare with working build** when debugging - diff reveals missing pieces
 4. **Watch for 0-byte files** - sign of corruption, restore from git
 5. **Test the actual DMG** - not just the source app bundle
+
+---
+
+## Windows Release Process
+
+### Phase 2: Windows Artifact Download & Installer Creation
+
+After GitHub Actions completes the Windows build, download and process it on Windows machine.
+
+#### Step 1: Download Artifact from GitHub Actions
+
+```bash
+# List recent workflow runs
+gh run list --workflow=build-windows.yml --limit 5
+
+# Download the artifact (creates VSCode-win32-x64 folder)
+gh run download <run-id> --name ritemark-windows-x64 --dir VSCode-win32-x64
+
+# Or download latest successful run
+gh run download $(gh run list --workflow=build-windows.yml --status=success --limit=1 --json databaseId -q '.[0].databaseId') \
+  --name ritemark-windows-x64 --dir VSCode-win32-x64
+```
+
+**Artifact location:** `VSCode-win32-x64/` folder in repo root.
+
+#### Step 2: Patch Application Icon
+
+The GitHub Actions build produces `Ritemark.exe` with default Electron icon. **MUST patch with Ritemark icon:**
+
+```bash
+# Use rcedit from VS Code's node_modules
+"vscode/node_modules/rcedit/bin/rcedit.exe" "VSCode-win32-x64/Ritemark.exe" --set-icon "branding/icons/icon.ico"
+```
+
+**Icon source:** `branding/icons/icon.ico`
+
+#### Step 3: Build Installer with Inno Setup
+
+```bash
+# Build installer (requires Inno Setup 6 installed)
+"/c/Program Files (x86)/Inno Setup 6/ISCC.exe" \
+  "/DSourcePath=C:\dev\ritemark-native\Ritemark\VSCode-win32-x64" \
+  "/DIconPath=C:\dev\ritemark-native\Ritemark\branding\icons\icon.ico" \
+  installer/windows/ritemark.iss
+```
+
+**Output:** `installer-output/Ritemark-X.Y.Z-win32-x64-setup.exe`
+
+**Note:** Use absolute paths for SourcePath and IconPath to avoid path resolution issues.
+
+#### Step 4: Verify Installer
+
+| Check | Command | Expected |
+|-------|---------|----------|
+| Installer exists | `ls installer-output/*.exe` | File ~100MB |
+| Installer has icon | View in Explorer | Ritemark icon visible |
+| App has icon | Install & check | Ritemark icon on exe |
+
+### Windows Gate 1 Checklist
+
+| Check | How to Verify |
+|-------|---------------|
+| Artifact downloaded | `ls VSCode-win32-x64/Ritemark.exe` |
+| Icon patched | View Ritemark.exe in Explorer - shows Ritemark icon |
+| Installer built | `ls installer-output/Ritemark-*-setup.exe` |
+| Installer size | ~100MB (not too small) |
+| Install works | Run installer, completes without error |
+| App launches | Ritemark opens from Start Menu |
+| Editor loads | Open .md file, TipTap editor visible |
+
+### Creating GitHub Release with Both Platforms
+
+After BOTH macOS and Windows are approved:
+
+```bash
+gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
+  --title "Ritemark vX.Y.Z" \
+  --notes-file docs/releases/vX.Y.Z.md \
+  dist/Ritemark.dmg \
+  installer-output/Ritemark-X.Y.Z-win32-x64-setup.exe
+```
+
+### Windows Troubleshooting
+
+#### Icon Not Showing on Exe
+
+```bash
+# Re-run rcedit with absolute paths
+"C:\dev\ritemark-native\Ritemark\vscode\node_modules\rcedit\bin\rcedit.exe" \
+  "C:\dev\ritemark-native\Ritemark\VSCode-win32-x64\Ritemark.exe" \
+  --set-icon "C:\dev\ritemark-native\Ritemark\branding\icons\icon.ico"
+```
+
+#### Installer Icon Not Showing
+
+Check `installer/windows/ritemark.iss` has:
+```ini
+SetupIconFile={#IconPath}
+```
+
+And pass IconPath when building:
+```bash
+ISCC.exe "/DIconPath=C:\path\to\icon.ico" ritemark.iss
+```
+
+#### "Cannot find source" Error in ISCC
+
+Inno Setup doesn't handle relative paths well. Always pass absolute SourcePath:
+```bash
+ISCC.exe "/DSourcePath=C:\dev\ritemark-native\Ritemark\VSCode-win32-x64" ritemark.iss
+```
