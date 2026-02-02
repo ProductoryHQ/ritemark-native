@@ -30,7 +30,7 @@ echo ""
 # =============================================================================
 # Step 1: Pre-Build Validation
 # =============================================================================
-echo -e "${BLUE}Step 1/7: Pre-Build Validation${NC}"
+echo -e "${BLUE}Step 1/6: Pre-Build Validation${NC}"
 echo "----------------------------------------"
 
 if ! ./scripts/validate-build-env.sh; then
@@ -42,11 +42,22 @@ fi
 
 echo ""
 
+# =============================================================================
+# Step 1.5: Sync Branding to VS Code
+# =============================================================================
+echo -e "${BLUE}Step 1.5/6: Syncing Branding${NC}"
+echo "----------------------------------------"
+echo ""
+
+echo "Copying branding/product.json to vscode/product.json..."
+cp "$PROJECT_DIR/branding/product.json" "$PROJECT_DIR/vscode/product.json"
+echo -e "${GREEN}Branding synced${NC}"
+echo ""
 
 # =============================================================================
 # Step 2: Backup & Build VS Code
 # =============================================================================
-echo -e "${BLUE}Step 2/7: Backing Up & Building VS Code${NC}"
+echo -e "${BLUE}Step 2/6: Backing Up & Building VS Code${NC}"
 echo "----------------------------------------"
 echo ""
 
@@ -95,7 +106,7 @@ echo ""
 # =============================================================================
 # Step 3: Copy RiteMark Extension
 # =============================================================================
-echo -e "${BLUE}Step 3/7: Copying RiteMark Extension${NC}"
+echo -e "${BLUE}Step 3/6: Copying RiteMark Extension${NC}"
 echo "----------------------------------------"
 
 APP_PATH="VSCode-darwin-arm64/RiteMark.app"
@@ -128,29 +139,25 @@ PRODUCT_JSON="$APP_PATH/Contents/Resources/app/product.json"
 RITEMARK_VERSION=$(grep '"ritemarkVersion"' branding/product.json | sed 's/.*"ritemarkVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 echo "Adding RiteMark version: $RITEMARK_VERSION"
 
-# Add ritemarkVersion field using Python for proper JSON handling
-python3 -c '
-import json
-with open("'"$PRODUCT_JSON"'", "r") as f:
-    data = json.load(f)
-data["ritemarkVersion"] = "'"$RITEMARK_VERSION"'"
-with open("'"$PRODUCT_JSON"'", "w") as f:
-    json.dump(data, f, indent=2)
-'
+# Add ritemarkVersion field after the version field
+if [[ "$(uname)" == "Darwin" ]]; then
+  sed -i '' "s/\"version\":[[:space:]]*\"[^\"]*\"/\"version\": \"1.94.0\",\n\t\"ritemarkVersion\": \"$RITEMARK_VERSION\"/" "$PRODUCT_JSON"
+else
+  sed -i "s/\"version\":[[:space:]]*\"[^\"]*\"/\"version\": \"1.94.0\",\n\t\"ritemarkVersion\": \"$RITEMARK_VERSION\"/" "$PRODUCT_JSON"
+fi
 
-# Verify the ritemarkVersion was added and JSON is valid
-if python3 -c "import json; data = json.load(open('$PRODUCT_JSON')); assert 'ritemarkVersion' in data" 2>/dev/null; then
+# Verify the ritemarkVersion was added
+if grep -q "ritemarkVersion" "$PRODUCT_JSON"; then
   echo -e "${GREEN}RiteMark version $RITEMARK_VERSION added to product.json${NC}"
 else
-  echo -e "${RED}ERROR: Failed to add ritemarkVersion to product.json${NC}"
-  exit 1
+  echo -e "${RED}WARNING: ritemarkVersion field may not have been added${NC}"
 fi
 echo ""
 
 # =============================================================================
 # Step 4: Verify Extension Copy (GUARDRAIL)
 # =============================================================================
-echo -e "${BLUE}Step 4/7: Verifying Extension Copy${NC}"
+echo -e "${BLUE}Step 4/6: Verifying Extension Copy${NC}"
 echo "----------------------------------------"
 
 VALIDATION_FAILED=0
@@ -206,7 +213,7 @@ echo ""
 # =============================================================================
 # Step 5: Post-Build Validation
 # =============================================================================
-echo -e "${BLUE}Step 5/7: Post-Build Validation${NC}"
+echo -e "${BLUE}Step 5/6: Post-Build Validation${NC}"
 echo "----------------------------------------"
 
 if ! ./scripts/validate-build-output.sh; then

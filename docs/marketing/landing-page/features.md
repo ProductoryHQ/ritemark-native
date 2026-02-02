@@ -60,6 +60,14 @@ Features listed here should appear in the features grid.
 - **Description ET:** Lisa pilte /image kaasuga. Muuda suurust lohistades - Ritemark muudab tegelikku faili, mitte ainult vaadet.
 - **Description EN:** Insert images with /image command. Resize by dragging - Ritemark resizes the actual file, not just the display.
 - **Screenshot:** none (needs screenshot showing image with resize handles)
+
+### Ritemark Flows
+- **Icon:** Workflow (from lucide-react)
+- **Title ET:** Ritemark Flows
+- **Title EN:** Ritemark Flows
+- **Description ET:** Visuaalne toovoosusteem AI-sisu loomiseks. Ehita toovood lohistades, kaivita ja genereeri teksti, pilte ja faile automaatselt.
+- **Description EN:** Visual workflow automation for AI content generation. Build flows by dragging nodes, execute to generate text, images, and files automatically.
+- **Screenshot:** none (needs screenshot showing flow editor with connected nodes)
 - **Badge:** NEW
 
 ## Screenshot Needs
@@ -68,3 +76,4 @@ Features listed here should appear in the features grid.
 - [ ] Copy as Markdown - show Export menu with "Copy as Markdown" option highlighted
 - [ ] Spreadsheet refresh feature - show refresh button with blue badge indicator
 - [ ] Image Handling - show image with resize handles visible
+- [ ] Ritemark Flows - show flow editor with connected nodes (Trigger -> LLM -> Save File)

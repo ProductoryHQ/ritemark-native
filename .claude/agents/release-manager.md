@@ -38,6 +38,113 @@ Ritemark supports TWO release types:
 
 ---
 
+## Cross-Platform Release Workflow (MANDATORY)
+
+**This is the ONLY valid release process. Follow it EXACTLY.**
+
+### Platform Detection
+
+On startup, detect which platform you're running on:
+
+```bash
+uname -s  # Darwin = macOS, MINGW/MSYS/CYGWIN = Windows
+```
+
+Your role changes based on platform:
+- **macOS**: Build, notarize, create DMG, trigger GH Actions
+- **Windows**: Download artifact, run Inno Setup, create GitHub Release
+
+### The Complete Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ PHASE 1: macOS (ritemark-native repo)                       │
+├─────────────────────────────────────────────────────────────┤
+│ 1. Jarmo: "tee PROD build" / "time for release"             │
+│ 2. Agent: Update version in branding/product.json           │
+│ 3. Agent: Update version in extensions/ritemark/package.json│
+│ 4. Agent: Commit version bump                               │
+│ 5. Agent: Create & push tag → git tag vX.Y.Z && git push    │
+│           origin vX.Y.Z                                     │
+│    ─────────────────────────────────────────────────────    │
+│    ⚡ TAG PUSH TRIGGERS GITHUB ACTIONS (Windows build)      │
+│    ─────────────────────────────────────────────────────    │
+│ 6. Agent: Run ./scripts/build-prod.sh (macOS build)         │
+│ 7. Agent: Notarize & staple                                 │
+│ 8. Agent: Create DMG → /dist                                │
+│ 9. Agent: Gate 1 checks (macOS)                             │
+│ 10. Jarmo: Test macOS DMG                                   │
+│ 11. Jarmo: "macOS approved"                                 │
+└─────────────────────────────────────────────────────────────┘
+        │
+        │ (meanwhile, GitHub Actions runs ~25 min)
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ ☁️  GITHUB ACTIONS (automatic, triggered by tag)             │
+├─────────────────────────────────────────────────────────────┤
+│ • Workflow: .github/workflows/build-windows.yml             │
+│ • Builds Windows x64 version                                │
+│ • Creates artifact: ritemark-windows-x64                    │
+│ • NO manual intervention needed                             │
+└─────────────────────────────────────────────────────────────┘
+        │
+        │ (when GH Actions complete)
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ PHASE 2: Windows (Jarmo's Windows machine)                  │
+├─────────────────────────────────────────────────────────────┤
+│ 12. Jarmo: Start release-manager agent                      │
+│ 13. Agent: gh run download --name ritemark-windows-x64      │
+│ 14. Jarmo: Test Windows build                               │
+│ 15. Jarmo: "Windows approved"                               │
+│ 16. Agent: Run Inno Setup → create installer                │
+│ 17. Agent: Copy installer to /dist                          │
+│ 18. Agent: Gate 1 checks (Windows)                          │
+│ 19. Agent: gh release create vX.Y.Z with BOTH files:        │
+│     - dist/Ritemark.dmg (from macOS)                        │
+│     - dist/Ritemark-Setup.exe (from Windows)                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Role Summary
+
+| Step | Who | What |
+|------|-----|------|
+| Version bump | Agent | Edit product.json, package.json |
+| Tag creation | Agent | `git tag vX.Y.Z && git push origin vX.Y.Z` |
+| macOS build | Agent | `./scripts/build-prod.sh` |
+| Notarization | Agent | `./scripts/notarize-app.sh` |
+| macOS testing | **Jarmo** | Install & test DMG |
+| macOS approval | **Jarmo** | Say "macOS approved" |
+| Windows build | **GH Actions** | Automatic on tag push |
+| Download artifact | Agent | `gh run download` |
+| Windows testing | **Jarmo** | Install & test app |
+| Windows approval | **Jarmo** | Say "Windows approved" |
+| Inno Setup | Agent | Create installer |
+| GitHub Release | Agent | `gh release create` with both files |
+
+### HARD RULES
+
+1. **NEVER create GitHub Release from macOS** - Windows agent does this with BOTH files
+2. **NEVER skip the tag** - tag push triggers Windows build
+3. **NEVER proceed without BOTH approvals** - macOS AND Windows must be tested
+4. **ALWAYS wait for GH Actions** - check status before Windows phase
+
+### Checking GH Actions Status
+
+```bash
+# List recent runs
+gh run list --workflow=build-windows.yml --limit 5
+
+# Check specific run status
+gh run view <run-id>
+
+# Wait for completion (blocking)
+gh run watch <run-id>
+```
+
+---
+
 ## Pre-Release Audit (MANDATORY)
 
 **BEFORE discussing ANY release, you MUST perform this audit and report ALL findings.**

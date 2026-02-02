@@ -9,10 +9,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.2.0] - 2026-02-02
+
 ### Added
-- Excel file preview with multi-sheet support (Sprint 19)
-- Spreadsheet toolbar with "Open in Excel/Numbers" integration (Sprint 19.5)
-- Extension-only lightweight updates system (Sprint 20)
+- **Ritemark Flows:** Visual workflow automation for AI content generation (Sprint 27)
+  - New Activity Bar tab with Flows icon
+  - Drag-and-drop node editor using React Flow
+  - Trigger, LLM, Image, and Save File node types
+  - Auto-layout with ELKjs
+  - Undo/redo support
+  - Flow storage in `.ritemark/flows/`
+- New branded Ritemark Settings page
+
+### Fixed
+- Windows: Dictate button now hidden (macOS-only feature)
+- Windows: PDF export images now properly embedded
+- Windows: PDF export unicode checkboxes render correctly
+- Windows: Word export line-ending compatibility
+
+### Technical
+- Bundle size increased by ~2.3MB (React Flow + ELKjs)
+- Feature flagged as `ritemark-flows` (enabled by default)
+
+---
+
+## [1.1.1] - 2026-01-30
+
+### Added
+- Insert images from files with `/image` command
+- Image resize handles with actual file resizing
+- Stale file indicator with Refresh button
+- Blockquote button in bubble menu
+
+### Changed
+- Removed table button from bubble menu (still available via `/table`)
+
+### Fixed
+- Image filenames with special characters
+- Empty paragraphs around images
+
+---
+
+## [1.1.0] - 2026-01-26
+
+### Added
+- Document Search with RAG (Retrieval-Augmented Generation)
+- Natural language queries about your documents
+- Source citations in AI responses
+- Local vector database using Orama
+
+---
+
+## [1.0.3] - 2026-01-15
+
+### Added
+- Estonian voice dictation with local Whisper model
+- Voice Dictation button in editor toolbar
+- Dictation Settings dialog for language/model selection
+
+---
+
+## [1.0.2] - 2026-01-13
+
+### Added
+- Excel file preview with multi-sheet support
+- Spreadsheet toolbar with "Open in Excel/Numbers" integration
+- Extension-only lightweight updates system
 
 ---
 
@@ -67,6 +131,11 @@ Initial release of Ritemark Native.
 
 | Version | Date | Type | Notes |
 |---------|------|------|-------|
+| 1.2.0 | 2026-02-02 | Major | Ritemark Flows - visual AI workflows |
+| 1.1.1 | 2026-01-30 | Minor | Image handling improvements |
+| 1.1.0 | 2026-01-26 | Minor | Document Search (RAG) |
+| 1.0.3 | 2026-01-15 | Minor | Voice dictation |
+| 1.0.2 | 2026-01-13 | Minor | Excel preview, lightweight updates |
 | 1.0.1 | 2026-01-11 | Minor | Export, CSV preview, auto-update |
 | 1.0.0 | 2026-01-10 | Major | Initial release |
 

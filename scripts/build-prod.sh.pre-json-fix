@@ -128,22 +128,18 @@ PRODUCT_JSON="$APP_PATH/Contents/Resources/app/product.json"
 RITEMARK_VERSION=$(grep '"ritemarkVersion"' branding/product.json | sed 's/.*"ritemarkVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 echo "Adding RiteMark version: $RITEMARK_VERSION"
 
-# Add ritemarkVersion field using Python for proper JSON handling
-python3 -c '
-import json
-with open("'"$PRODUCT_JSON"'", "r") as f:
-    data = json.load(f)
-data["ritemarkVersion"] = "'"$RITEMARK_VERSION"'"
-with open("'"$PRODUCT_JSON"'", "w") as f:
-    json.dump(data, f, indent=2)
-'
+# Add ritemarkVersion field after the version field
+if [[ "$(uname)" == "Darwin" ]]; then
+  sed -i '' "s/\"version\":[[:space:]]*\"[^\"]*\"/\"version\": \"1.94.0\",\n\t\"ritemarkVersion\": \"$RITEMARK_VERSION\"/" "$PRODUCT_JSON"
+else
+  sed -i "s/\"version\":[[:space:]]*\"[^\"]*\"/\"version\": \"1.94.0\",\n\t\"ritemarkVersion\": \"$RITEMARK_VERSION\"/" "$PRODUCT_JSON"
+fi
 
-# Verify the ritemarkVersion was added and JSON is valid
-if python3 -c "import json; data = json.load(open('$PRODUCT_JSON')); assert 'ritemarkVersion' in data" 2>/dev/null; then
+# Verify the ritemarkVersion was added
+if grep -q "ritemarkVersion" "$PRODUCT_JSON"; then
   echo -e "${GREEN}RiteMark version $RITEMARK_VERSION added to product.json${NC}"
 else
-  echo -e "${RED}ERROR: Failed to add ritemarkVersion to product.json${NC}"
-  exit 1
+  echo -e "${RED}WARNING: ritemarkVersion field may not have been added${NC}"
 fi
 echo ""
 
