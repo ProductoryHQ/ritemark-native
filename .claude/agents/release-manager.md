@@ -73,8 +73,9 @@ Your role changes based on platform:
 │ 7. Agent: Notarize & staple                                 │
 │ 8. Agent: Create DMG → /dist                                │
 │ 9. Agent: Gate 1 checks (macOS)                             │
-│ 10. Jarmo: Test macOS DMG                                   │
-│ 11. Jarmo: "macOS approved"                                 │
+│ 10. Agent: Generate TEST-CHECKLIST.md                       │
+│ 11. Jarmo: Test macOS DMG (using checklist)                 │
+│ 12. Jarmo: "macOS approved"                                 │
 └─────────────────────────────────────────────────────────────┘
         │
         │ (meanwhile, GitHub Actions runs ~25 min)
@@ -114,7 +115,8 @@ Your role changes based on platform:
 | Tag creation | Agent | `git tag vX.Y.Z && git push origin vX.Y.Z` |
 | macOS build | Agent | `./scripts/build-prod.sh` |
 | Notarization | Agent | `./scripts/notarize-app.sh` |
-| macOS testing | **Jarmo** | Install & test DMG |
+| Test checklist | Agent | Generate `docs/marketing/releases/vX.Y.Z/TEST-CHECKLIST.md` |
+| macOS testing | **Jarmo** | Install & test DMG using checklist |
 | macOS approval | **Jarmo** | Say "macOS approved" |
 | Windows build | **GH Actions** | Automatic on tag push |
 | Download artifact | Agent | `gh run download` |
@@ -129,6 +131,97 @@ Your role changes based on platform:
 2. **NEVER skip the tag** - tag push triggers Windows build
 3. **NEVER proceed without BOTH approvals** - macOS AND Windows must be tested
 4. **ALWAYS wait for GH Actions** - check status before Windows phase
+5. **ALWAYS generate TEST-CHECKLIST.md** before Gate 2 testing
+
+---
+
+## Test Checklist Generation (MANDATORY)
+
+**BEFORE Jarmo begins testing (Gate 2), you MUST generate a test checklist.**
+
+### When to Generate
+
+Generate the checklist after Gate 1 passes, before asking Jarmo to test.
+
+### Location
+
+```
+docs/marketing/releases/vX.Y.Z/TEST-CHECKLIST.md
+```
+
+### Checklist Template
+
+The checklist MUST include:
+
+1. **New Features** - Based on sprint/release scope
+   - Each new feature with specific test steps
+   - Platform-specific shortcuts (Cmd vs Ctrl)
+
+2. **Core Features (Regression)** - Always include:
+   - Editor: open .md, type, format, save
+   - Dictation: start, transcribe, stop
+   - AI features (if API key configured)
+
+3. **Installation** - Platform-specific:
+   - macOS: DMG opens, no Gatekeeper warning, runs from /Applications
+   - Windows: Installer runs, no SmartScreen block, launches from Start Menu
+
+4. **Sign-off Table** - For tracking approvals
+
+### Example Structure
+
+```markdown
+# vX.Y.Z Test Checklist
+
+**Release:** [Release Name]
+**Date:** YYYY-MM-DD
+
+---
+
+## macOS (darwin-arm64)
+
+### New Features
+- [ ] [Feature 1 specific tests]
+- [ ] [Feature 2 specific tests]
+
+### Core Features (Regression)
+- [ ] Open .md file → editor loads
+- [ ] Formatting works
+- [ ] Save file works
+
+### Installation
+- [ ] DMG opens without Gatekeeper warning
+- [ ] App runs from /Applications
+
+---
+
+## Windows (x64)
+
+[Similar structure with Ctrl shortcuts]
+
+---
+
+## Sign-off
+
+| Platform | Tester | Date | Status |
+|----------|--------|------|--------|
+| macOS | | | |
+| Windows | | | |
+```
+
+### Identifying New Features
+
+To populate the "New Features" section:
+
+1. Check the release notes: `docs/marketing/releases/vX.Y.Z/release-notes.md`
+2. Check recent sprints: `docs/sprints/`
+3. Check git log since last release: `git log --oneline vPREVIOUS..HEAD`
+
+### After Generation
+
+Tell Jarmo:
+> "Test checklist created at `docs/marketing/releases/vX.Y.Z/TEST-CHECKLIST.md`.
+> Please go through the checklist and say 'macOS approved' when testing is complete."
 
 ### Checking GH Actions Status
 
