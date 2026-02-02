@@ -11,9 +11,14 @@
   #define SourcePath "..\..\VSCode-win32-x64"
 #endif
 
+; Allow IconPath to be passed from command line
+#ifndef IconPath
+  #define IconPath "..\..\branding\icons\icon.ico"
+#endif
+
 #define AppName "Ritemark"
 ; Keep in sync with extensions/ritemark/package.json version
-#define AppVersion "1.1.1"
+#define AppVersion "1.2.0"
 #define AppPublisher "Productory"
 #define AppURL "https://ritemark.app"
 #define AppExeName "Ritemark.exe"
@@ -37,8 +42,8 @@ Compression=lzma2
 SolidCompression=yes
 ; Use modern wizard style
 WizardStyle=modern
-; SetupIconFile - disabled until path issue is resolved
-; SetupIconFile=..\..\branding\icons\icon.ico
+; Setup icon (pass /DIconPath="..." if relative path doesn't work)
+SetupIconFile={#IconPath}
 ; Uninstall icon
 UninstallDisplayIcon={app}\{#AppExeName}
 ; Windows 10+ only
