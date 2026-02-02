@@ -6,7 +6,7 @@ Integrate real RiteMarcok WYSIWYG editor into the VS Code webview.
 
 * * *
 
-## RiteMark Web Editor Analysis
+## Ritemark Web Editor Analysis
 
 ### Editor Stack
 

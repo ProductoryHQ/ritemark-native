@@ -1,7 +1,7 @@
 /**
  * Version Service
  *
- * Provides version information for the RiteMark extension.
+ * Provides version information for the Ritemark extension.
  * Supports both base versions (1.0.1) and extension builds (1.0.1-ext.5).
  */
 
@@ -23,7 +23,7 @@ export interface VersionInfo {
 }
 
 /**
- * Get the current version of RiteMark from the extension's package.json
+ * Get the current version of Ritemark from the extension's package.json
  */
 export function getCurrentVersion(): string {
   const extension = vscode.extensions.getExtension('ritemark.ritemark');

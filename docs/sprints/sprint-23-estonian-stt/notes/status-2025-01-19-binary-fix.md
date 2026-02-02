@@ -52,7 +52,7 @@ Voice dictation was failing with `spawn Unknown system error -88` when trying to
     -   `libggml.dylib` (58KB)
         
 3.  Copied binaries to production app at:  
-    `VSCode-darwin-arm64/RiteMark.app/Contents/Resources/app/extensions/ritemark/binaries/darwin-arm64/`
+    `VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/extensions/ritemark/binaries/darwin-arm64/`
     
 
 ### Verification

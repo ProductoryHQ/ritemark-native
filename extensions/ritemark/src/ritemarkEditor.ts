@@ -17,7 +17,7 @@ export interface DocumentProperties {
   [key: string]: unknown;
 }
 
-export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
+export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   // Track all active webview panels for broadcasting tool execution
   private static activeWebviews: Set<vscode.Webview> = new Set();
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
@@ -36,21 +36,21 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     context: vscode.ExtensionContext,
     unifiedViewProvider: UnifiedViewProvider
   ): vscode.Disposable {
-    RiteMarkEditorProvider._unifiedViewProvider = unifiedViewProvider;
+    RitemarkEditorProvider._unifiedViewProvider = unifiedViewProvider;
 
     // Create word count status bar item (to the left of AI status, priority 101)
-    RiteMarkEditorProvider._wordCountStatusBar = vscode.window.createStatusBarItem(
+    RitemarkEditorProvider._wordCountStatusBar = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right,
       101 // Higher priority = more to the left
     );
-    RiteMarkEditorProvider._wordCountStatusBar.name = 'RiteMark Word Count';
-    RiteMarkEditorProvider._wordCountStatusBar.text = '0 words';
-    RiteMarkEditorProvider._wordCountStatusBar.tooltip = 'Word count';
-    context.subscriptions.push(RiteMarkEditorProvider._wordCountStatusBar);
+    RitemarkEditorProvider._wordCountStatusBar.name = 'Ritemark Word Count';
+    RitemarkEditorProvider._wordCountStatusBar.text = '0 words';
+    RitemarkEditorProvider._wordCountStatusBar.tooltip = 'Word count';
+    context.subscriptions.push(RitemarkEditorProvider._wordCountStatusBar);
 
     return vscode.window.registerCustomEditorProvider(
       'ritemark.editor',
-      new RiteMarkEditorProvider(context),
+      new RitemarkEditorProvider(context),
       { webviewOptions: { retainContextWhenHidden: true } }
     );
   }
@@ -65,7 +65,7 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     selection: { text: string; isEmpty: boolean; from: number; to: number };
   }) {
     // Broadcast to all active webviews
-    for (const webview of RiteMarkEditorProvider.activeWebviews) {
+    for (const webview of RitemarkEditorProvider.activeWebviews) {
       webview.postMessage({
         type: 'ai-widget',
         toolName: data.toolName,
@@ -201,9 +201,9 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     const scriptUri = webviewPanel.webview.asWebviewUri(scriptPath);
 
     // Debug logging for Windows path issues
-    console.log('[RiteMark] Extension URI:', this.context.extensionUri.toString());
-    console.log('[RiteMark] Script path:', scriptPath.toString());
-    console.log('[RiteMark] Script URI:', scriptUri.toString());
+    console.log('[Ritemark] Extension URI:', this.context.extensionUri.toString());
+    console.log('[Ritemark] Script path:', scriptPath.toString());
+    console.log('[Ritemark] Script URI:', scriptUri.toString());
 
     // Get directory of the markdown file for local resource access
     const docDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
@@ -229,12 +229,12 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
     const webview = webviewPanel.webview;
 
     // Add this webview to active set for AI tool broadcasts
-    RiteMarkEditorProvider.activeWebviews.add(webview);
+    RitemarkEditorProvider.activeWebviews.add(webview);
 
     // Show word count status bar only for markdown files
     const fileType = this.getFileType(document.uri.fsPath);
     if (fileType === 'markdown') {
-      RiteMarkEditorProvider._wordCountStatusBar?.show();
+      RitemarkEditorProvider._wordCountStatusBar?.show();
     }
 
     // Create file watcher for all file types
@@ -322,8 +322,8 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'selectionChanged':
             // Forward selection and document content to AI panel
-            if (RiteMarkEditorProvider._unifiedViewProvider) {
-              RiteMarkEditorProvider._unifiedViewProvider.sendSelection(
+            if (RitemarkEditorProvider._unifiedViewProvider) {
+              RitemarkEditorProvider._unifiedViewProvider.sendSelection(
                 message.selection,
                 document.getText()
               );
@@ -379,9 +379,9 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'wordCountChanged':
             // Update word count in status bar
-            if (RiteMarkEditorProvider._wordCountStatusBar) {
+            if (RitemarkEditorProvider._wordCountStatusBar) {
               const count = message.wordCount || 0;
-              RiteMarkEditorProvider._wordCountStatusBar.text = `${count} ${count === 1 ? 'word' : 'words'}`;
+              RitemarkEditorProvider._wordCountStatusBar.text = `${count} ${count === 1 ? 'word' : 'words'}`;
             }
             return;
 
@@ -481,15 +481,15 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
       isDisposed = true;
 
       // Remove from active set using stored reference
-      RiteMarkEditorProvider.activeWebviews.delete(webview);
+      RitemarkEditorProvider.activeWebviews.delete(webview);
       changeDocumentSubscription.dispose();
 
       // Dispose file watcher
       this.disposeFileWatcher(document.uri.fsPath);
 
-      // Hide word count if no more RiteMark editors are open
-      if (RiteMarkEditorProvider.activeWebviews.size === 0) {
-        RiteMarkEditorProvider._wordCountStatusBar?.hide();
+      // Hide word count if no more Ritemark editors are open
+      if (RitemarkEditorProvider.activeWebviews.size === 0) {
+        RitemarkEditorProvider._wordCountStatusBar?.hide();
       }
     });
   }
@@ -916,7 +916,7 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:;">
-  <title>RiteMark</title>
+  <title>Ritemark</title>
   <style>
     * {
       margin: 0;
@@ -988,7 +988,7 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
         webview.postMessage({ type: 'dictation:cancelled' });
       }
     } catch (error) {
-      console.error('[RiteMark] Dictation prepare error:', error);
+      console.error('[Ritemark] Dictation prepare error:', error);
       webview.postMessage({
         type: 'dictation:error',
         error: 'Failed to prepare voice dictation'
@@ -1068,7 +1068,7 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
         }
       });
     } catch (error) {
-      console.error('[RiteMark] Failed to get model status:', error);
+      console.error('[Ritemark] Failed to get model status:', error);
       webview.postMessage({
         type: 'dictation:modelStatus',
         status: {
@@ -1107,7 +1107,7 @@ export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
         success: true
       });
     } catch (error) {
-      console.error('[RiteMark] Failed to remove model:', error);
+      console.error('[Ritemark] Failed to remove model:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       vscode.window.showErrorMessage(`Failed to remove model: ${errorMessage}`);
       webview.postMessage({

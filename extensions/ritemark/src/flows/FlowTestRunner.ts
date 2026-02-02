@@ -1,7 +1,7 @@
 /**
  * Flow Test Runner
  *
- * Automated testing system for RiteMark Flows.
+ * Automated testing system for Ritemark Flows.
  * Runs test flows from .flows/tests/ and validates outputs.
  *
  * Modes:
@@ -61,7 +61,7 @@ export class FlowTestRunner {
     this.outputChannel.clear();
     this.outputChannel.show();
     this.log('═'.repeat(60));
-    this.log(`  RiteMark Flow Test Runner - Mode: ${mode.toUpperCase()}`);
+    this.log(`  Ritemark Flow Test Runner - Mode: ${mode.toUpperCase()}`);
     this.log('═'.repeat(60));
     this.log('');
 

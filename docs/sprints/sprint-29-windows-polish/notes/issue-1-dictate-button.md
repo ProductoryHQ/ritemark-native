@@ -56,12 +56,12 @@
 
 ### Windows Build
 1. Rebuild webview: `cd extensions/ritemark/webview && npm run build`
-2. Launch RiteMark on Windows
+2. Launch Ritemark on Windows
 3. Open any .md file
 4. **Expected:** No dictate button in header (between Properties and Export)
 
 ### macOS Build
-1. Launch RiteMark on macOS
+1. Launch Ritemark on macOS
 2. Open any .md file
 3. **Expected:** Dictate button visible and functional
 

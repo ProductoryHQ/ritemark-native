@@ -8,7 +8,7 @@
 
 ### Primary: Non-Technical Writer
 **Profile:**
-- Uses RiteMark for writing documents
+- Uses Ritemark for writing documents
 - Not a developer, may not have GitHub account
 - Wants to report bugs but intimidated by technical processes
 - Prefers simple, guided experiences
@@ -114,7 +114,7 @@
 
 ### Option 4: External Web Form
 **Method:** Open browser to pre-built form, POST to GitHub API
-**Appearance:** Web page outside RiteMark
+**Appearance:** Web page outside Ritemark
 
 **Pros:**
 - Can use advanced form features
@@ -147,7 +147,7 @@
 │                                             │
 │  ┌───────────────────────────────────────┐ │
 │  │ ▼ System Information (included)       │ │
-│  │   • RiteMark 1.0.3                   │ │
+│  │   • Ritemark 1.0.3                   │ │
 │  │   • macOS 14.2.1 (arm64)             │ │
 │  │   • VS Code OSS 1.94.0               │ │
 │  └───────────────────────────────────────┘ │
@@ -173,7 +173,7 @@
 #### 2. System Info Section
 - **Display:** Collapsible section (expanded by default)
 - **Content:**
-  - RiteMark version
+  - Ritemark version
   - OS + version
   - Architecture
   - VS Code OSS version

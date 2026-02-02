@@ -1,4 +1,4 @@
-# RiteMark Blog Strategy
+# Ritemark Blog Strategy
 
 **Version:** Draft 1.0
 **Date:** 2026-01-16
@@ -10,7 +10,7 @@
 
 ### Primary Purpose
 
-Establish RiteMark as the go-to choice for writers who value simplicity, privacy, and ownership of their work.
+Establish Ritemark as the go-to choice for writers who value simplicity, privacy, and ownership of their work.
 
 ### Goals
 
@@ -84,7 +84,7 @@ Four main categories that all content maps to:
 **What:** Release notes, new features, roadmap updates
 **Frequency:** Per release (roughly monthly)
 **Examples:**
-- "RiteMark 1.5: What's New"
+- "Ritemark 1.5: What's New"
 - "Coming Soon: Windows Support"
 
 ### Pillar 2: Writing Better
@@ -105,11 +105,11 @@ Four main categories that all content maps to:
 
 ### Pillar 4: Tutorials and How-Tos
 
-**What:** Practical guides for using RiteMark
+**What:** Practical guides for using Ritemark
 **Frequency:** As needed
 **Examples:**
 - "Exporting to PDF: A Complete Guide"
-- "Working with Spreadsheets in RiteMark"
+- "Working with Spreadsheets in Ritemark"
 
 ---
 
@@ -117,22 +117,22 @@ Four main categories that all content maps to:
 
 ### Phase 1: Foundational Posts (Start Here)
 
-These posts establish what RiteMark is and why it exists. **Must publish before other content.**
+These posts establish what Ritemark is and why it exists. **Must publish before other content.**
 
 | # | Title | Angle | Priority |
 |---|-------|-------|----------|
-| 1 | Why We Built RiteMark | Origin story - what problem we're solving, the journey | **FIRST** |
+| 1 | Why We Built Ritemark | Origin story - what problem we're solving, the journey | **FIRST** |
 | 2 | Why Local-First Matters for AI Writing | Why cloud editors fail with AI agents, local files + AI = power | **SECOND** |
-| 3 | What is RiteMark? | Product explainer - VS Code foundation, markdown native, local-first | **THIRD** |
+| 3 | What is Ritemark? | Product explainer - VS Code foundation, markdown native, local-first | **THIRD** |
 
 ### Phase 2: Differentiation Posts
 
-Why RiteMark over alternatives? Position against competitors.
+Why Ritemark over alternatives? Position against competitors.
 
 | # | Title | Pillar | Priority |
 |---|-------|--------|----------|
-| 4 | RiteMark vs Google Docs: An Honest Comparison | Philosophy | High |
-| 5 | RiteMark vs Notion: When Local Beats Cloud | Philosophy | High |
+| 4 | Ritemark vs Google Docs: An Honest Comparison | Philosophy | High |
+| 5 | Ritemark vs Notion: When Local Beats Cloud | Philosophy | High |
 | 6 | Why Not Just Use VS Code? | Philosophy | Medium |
 | 7 | The Hidden Cost of "Free" Cloud Writing Tools | Philosophy | Medium |
 
@@ -152,10 +152,10 @@ Why RiteMark over alternatives? Position against competitors.
 
 | Trigger | Post Type | Example |
 |---------|-----------|---------|
-| Major release | Deep dive blog post | "RiteMark 2.0: The Full Story" |
+| Major release | Deep dive blog post | "Ritemark 2.0: The Full Story" |
 | Minor release | Release notes + brief post | "What's New in 1.6" |
 | Patch release | No blog post (changelog only) | - |
-| New platform | Announcement post | "RiteMark is Now on Windows" |
+| New platform | Announcement post | "Ritemark is Now on Windows" |
 
 ### Seasonal/Timely Content
 
@@ -164,7 +164,7 @@ Why RiteMark over alternatives? Position against competitors.
 | January | "Fresh Start: Organize Your Writing This Year" | Writing |
 | Data Privacy Day (Jan 28) | "Your Data, Your Control" | Philosophy |
 | Back to School | "A Student's Guide to Markdown Notes" | Tutorial |
-| NaNoWriMo (November) | "Write Your Novel with RiteMark" | Writing |
+| NaNoWriMo (November) | "Write Your Novel with Ritemark" | Writing |
 
 ---
 
@@ -248,7 +248,7 @@ Jarmo reviews and approves
 copywriter agent (productory-2026)
       |
       v
-Imports content to RiteMark site
+Imports content to Ritemark site
   - Creates Estonian version if needed
   - Publishes to ritemark.ee/blog/
 ```
@@ -317,7 +317,7 @@ Imports content to RiteMark site
 ## 10. Open Questions for Jarmo
 
 1. **Frequency:** Is 2 posts/month realistic given other priorities?
-2. **Voice:** Should posts be "Jarmo writing" or "RiteMark team"?
+2. **Voice:** Should posts be "Jarmo writing" or "Ritemark team"?
 3. **Guest content:** Open to guest posts in the future?
 4. **Newsletter:** Should blog tie into email newsletter later?
 
@@ -325,7 +325,7 @@ Imports content to RiteMark site
 
 ## Approval Request
 
-This strategy document outlines the proposed approach for RiteMark's blog.
+This strategy document outlines the proposed approach for Ritemark's blog.
 
 **To proceed with blog setup and content creation, please confirm:**
 

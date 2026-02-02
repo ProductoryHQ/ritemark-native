@@ -15,12 +15,12 @@
 
 ## Sprint Overview
 
-**Goal:** Enable real-time voice dictation in RiteMark using whisper.cpp, with toggle mode and multi-language support (including Estonian).
+**Goal:** Enable real-time voice dictation in Ritemark using whisper.cpp, with toggle mode and multi-language support (including Estonian).
 
 **Why whisper.cpp:**
 - VS Code Speech extension does NOT support Estonian (confirmed blocker)
 - whisper.cpp supports 99 languages including Estonian
-- 100% local/offline processing (aligns with RiteMark philosophy)
+- 100% local/offline processing (aligns with Ritemark philosophy)
 - Fast inference on Apple Silicon (~32x realtime with tiny model)
 
 ---
@@ -42,7 +42,7 @@
 
 ```
 ┌─────────────────────────────────────────┐
-│   RiteMark Webview (React/TipTap)      │
+│   Ritemark Webview (React/TipTap)      │
 │   ┌─────────────────────────────────┐   │
 │   │ Mic Button (Toggle)             │   │
 │   │ Web Audio API (Capture)         │   │
@@ -52,7 +52,7 @@
 └─────────────────────────────────────────┘
                ▼
 ┌─────────────────────────────────────────┐
-│   RiteMark Extension (TypeScript)       │
+│   Ritemark Extension (TypeScript)       │
 │   ┌─────────────────────────────────┐   │
 │   │ whisper-node                    │   │
 │   │   ▼                             │   │
@@ -65,7 +65,7 @@
 └─────────────────────────────────────────┘
                ▼
 ┌─────────────────────────────────────────┐
-│   RiteMark Webview (React/TipTap)      │
+│   Ritemark Webview (React/TipTap)      │
 │   ┌─────────────────────────────────┐   │
 │   │ editor.insertContent(text)      │   │
 │   │ Insert at cursor position       │   │

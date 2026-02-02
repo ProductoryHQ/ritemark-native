@@ -67,13 +67,13 @@
 
 #### A. curl download (avoids quarantine)
 ```bash
-curl -L -o ~/Downloads/RiteMark.dmg "https://github.com/.../RiteMark.dmg"
+curl -L -o ~/Downloads/Ritemark.dmg "https://github.com/.../Ritemark.dmg"
 ```
 Files downloaded via curl don't get quarantine attribute.
 
 #### B. Remove quarantine manually
 ```bash
-xattr -d com.apple.quarantine ~/Downloads/RiteMark.dmg
+xattr -d com.apple.quarantine ~/Downloads/Ritemark.dmg
 ```
 
 #### C. User approves in System Settings
@@ -108,7 +108,7 @@ xattr -d com.apple.quarantine ~/Downloads/RiteMark.dmg
 
 ---
 
-## Recommendation for RiteMark
+## Recommendation for Ritemark
 
 ### Short-term (Now)
 1. **Wait for notarization** (up to 72h total)

@@ -4,7 +4,7 @@
 **Planned** - Deferred from Sprint 17
 
 ## Goal
-Add read-only Excel (.xlsx, .xls) preview to RiteMark Native.
+Add read-only Excel (.xlsx, .xls) preview to Ritemark Native.
 
 ---
 

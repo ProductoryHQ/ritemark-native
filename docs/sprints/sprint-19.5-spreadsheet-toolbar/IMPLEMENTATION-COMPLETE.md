@@ -14,13 +14,13 @@ A toolbar for Excel and CSV file previews that integrates with external spreadsh
 ## Quick Test Guide
 
 ### Test 1: Open Excel File
-1. Open any .xlsx or .xls file in RiteMark Native
+1. Open any .xlsx or .xls file in Ritemark Native
 2. **Expected:** Toolbar appears at top with filename and action button
 3. Click the button (Excel or Numbers dropdown)
 4. **Expected:** File opens in external app
 
 ### Test 2: Open CSV File
-1. Open any .csv file in RiteMark Native
+1. Open any .csv file in Ritemark Native
 2. **Expected:** Same toolbar behavior as Excel files
 3. Click the button
 4. **Expected:** File opens in external app

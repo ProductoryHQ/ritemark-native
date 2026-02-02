@@ -1,4 +1,4 @@
-# RiteMark Native - Sprint Roadmap
+# Ritemark Native - Sprint Roadmap
 
 **Last Updated:** 2026-01-13 (Sprint 19.5 complete)
 **Team:** Jarmo (Product) + Claude (Engineering)
@@ -7,7 +7,7 @@
 
 ## Overview
 
-This roadmap outlines all sprints for RiteMark Native from POC to production-ready MVP and beyond.
+This roadmap outlines all sprints for Ritemark Native from POC to production-ready MVP and beyond.
 
 | Sprint | Name | Status | Goal |
 | --- | --- | --- | --- |
@@ -43,7 +43,7 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 -   VS Code OSS as git submodule (v1.94.0)
     
--   RiteMark branding (product.json, app name)
+-   Ritemark branding (product.json, app name)
     
 -   Built-in extension structure
     
@@ -112,7 +112,7 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 ## ✅ Sprint 04: Core Polish (Complete)
 
-**Goal:** Strip VS Code chrome to create a clean, focused RiteMark experience
+**Goal:** Strip VS Code chrome to create a clean, focused Ritemark experience
 
 **Deliverables:**
 
@@ -137,7 +137,7 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 **Deliverables:**
 
--   Fix RiteMark extension not loading in prod (symlink issue)
+-   Fix Ritemark extension not loading in prod (symlink issue)
     
 -   Boot in light mode by default
     
@@ -158,7 +158,7 @@ This roadmap outlines all sprints for RiteMark Native from POC to production-rea
 
 **Deliverables:**
 
--   Custom RiteMark file icon theme
+-   Custom Ritemark file icon theme
     
 -   Lucide-style SVG icons for common file types
     

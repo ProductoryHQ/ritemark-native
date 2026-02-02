@@ -257,7 +257,7 @@ Text selection in editor
 4. Error Dialog (VS Code notification)
    "Voice dictation requires microphone access.
     Open System Preferences > Privacy > Microphone
-    and enable RiteMark."
+    and enable Ritemark."
 
 5. Return to Idle
    [🎤 gray] ← User can retry after fixing permission
@@ -348,13 +348,13 @@ After undo:       "Hello world"  ← Entire dictation removed as one action
 ### Microphone Permission Denied
 ```
 Title: Microphone Access Required
-Message: RiteMark needs microphone access for voice dictation.
+Message: Ritemark needs microphone access for voice dictation.
 
 Allow access in System Preferences:
 1. Open System Preferences > Security & Privacy
 2. Click "Privacy" tab
 3. Select "Microphone" from the list
-4. Check the box next to "RiteMark"
+4. Check the box next to "Ritemark"
 
 [Open System Preferences]  [Cancel]
 ```
@@ -370,7 +370,7 @@ Possible causes:
 - Insufficient disk space (~75MB required)
 - Corrupted model file
 
-Try restarting RiteMark or reinstalling the app.
+Try restarting Ritemark or reinstalling the app.
 
 [Retry]  [Cancel]
 ```
@@ -421,7 +421,7 @@ Windows support is coming soon!
 **Potential mobile approach:**
 - Larger touch target (48x48px minimum)
 - Simpler visual feedback (no hover states)
-- Consider voice activation instead of button ("Hey RiteMark")
+- Consider voice activation instead of button ("Hey Ritemark")
 
 ---
 

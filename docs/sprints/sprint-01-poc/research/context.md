@@ -2,7 +2,7 @@
 
 ## What We're Building
 
-**RiteMark Native** - A standalone native app built from VS Code OSS with RiteMark embedded as the default markdown editor.
+**Ritemark Native** - A standalone native app built from VS Code OSS with Ritemark embedded as the default markdown editor.
 
 - **Not an extension** - Full VS Code fork with complete control
 - **Target users** - Local-first, offline-capable markdown editing
@@ -38,7 +38,7 @@ These decisions are **final** - do not revisit:
 | VS Code integration | Git submodule (not fork) | Easy upstream sync |
 | Integration point | Custom Editor Provider | Native tab experience |
 | Marketplace | Hidden by default | Prevent conflicts |
-| Default .md handler | RiteMark WYSIWYG | Core UX |
+| Default .md handler | Ritemark WYSIWYG | Core UX |
 | Telemetry | Minimal, opt-out | Privacy first |
 
 ---

@@ -58,7 +58,7 @@ To strike through text:
 
 **Link validation:**
 - URLs must start with `http://` or `https://`
-- If you forget, RiteMark adds `https://` automatically
+- If you forget, Ritemark adds `https://` automatically
 
 **Open a link:**
 - Cmd+Click on any link to open it in your browser
@@ -93,7 +93,7 @@ The menu follows your selection. Click outside or press Escape to close it.
 - **Toggle formatting** - Press the same shortcut again to remove formatting
 - **Multiple formats** - Text can be both bold AND italic
 - **Links in lists** - Links work inside list items and tables too
-- **Copy formatted** - Copy-paste preserves formatting within RiteMark
+- **Copy formatted** - Copy-paste preserves formatting within Ritemark
 
 ---
 

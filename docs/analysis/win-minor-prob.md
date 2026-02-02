@@ -16,7 +16,7 @@ All our customizations are missing - it is standard VS Code Welcome
 
 ![](./images/image-1769887408400.png)
 
-**Analysis:** RiteMark has a custom walkthrough defined in `extensions/ritemark/package.json` (see "walkthroughs" section), but VS Code's default Welcome page is separate from extension walkthroughs. Mac probably has different default behavior. Need to check if there's a product.json setting or patch needed to point the welcome screen to our walkthrough.
+**Analysis:** Ritemark has a custom walkthrough defined in `extensions/ritemark/package.json` (see "walkthroughs" section), but VS Code's default Welcome page is separate from extension walkthroughs. Mac probably has different default behavior. Need to check if there's a product.json setting or patch needed to point the welcome screen to our walkthrough.
 
 * * *
 
@@ -39,7 +39,7 @@ The webview is NOT checking the platform before showing the Dictate button. Need
 
 ## 4\. First open - Dark theme flash
 
-When I open new Ritemark Window, it momentarily loads Dark theme and then switch back to RiteMark default light theme. It should NOT load the dark theme but light immediately.
+When I open new Ritemark Window, it momentarily loads Dark theme and then switch back to Ritemark default light theme. It should NOT load the dark theme but light immediately.
 
 **Analysis:** VS Code loads its internal default theme (Dark Modern) before applying extension configuration defaults. The `package.json` sets:
 

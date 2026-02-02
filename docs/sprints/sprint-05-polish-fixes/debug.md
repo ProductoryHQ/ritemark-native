@@ -1,4 +1,4 @@
-# RiteMark Native - Production Build Debug Report
+# Ritemark Native - Production Build Debug Report
 
 **Date:** 2025-12-05  
 **Build:** Production DMG (`VSCode-darwin-arm64/`)
@@ -146,7 +146,7 @@ These are applied TOO LATE - after initial dark theme render.
 
 **Option B: Override VS Code Initialization**
 
--   Modify `initialColorTheme` detection to respect RiteMark settings
+-   Modify `initialColorTheme` detection to respect Ritemark settings
     
 -   Requires touching VS Code core in `vscode/` submodule
     
@@ -247,11 +247,11 @@ check_file_size "extensions/ritemark/media/webview.js.map" 1
 
 ### Check Extension Activation
 
-1.  Open RiteMark Native
+1.  Open Ritemark Native
     
 2.  Help → Toggle Developer Tools
     
-3.  Console should show: `"RiteMarkEditor activated"`
+3.  Console should show: `"RitemarkEditor activated"`
     
 4.  If not shown, extension didn't activate
     

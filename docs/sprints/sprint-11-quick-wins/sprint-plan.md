@@ -20,7 +20,7 @@ Implement high-value, low-complexity features from the wishlist to improve edito
 
 | Deliverable | Description |
 |-------------|-------------|
-| CMD+B Fix | VS Code keybinding override to prevent sidebar toggle when RiteMark editor is active |
+| CMD+B Fix | VS Code keybinding override to prevent sidebar toggle when Ritemark editor is active |
 | Status Bar Widget | Extension component showing word count and reading time for active markdown file |
 | Autosave Config | Default configuration override to enable autosave |
 | Code Block Styling | CSS update to increase font size from 14px to 16px |
@@ -35,7 +35,7 @@ Implement high-value, low-complexity features from the wishlist to improve edito
 
 #### Feature 1: CMD+B Shortcut Fix
 - [x] **Root Cause:** `ToggleSidebarVisibilityAction` in `vscode/src/vs/workbench/browser/actions/layoutActions.ts` binds CMD+B globally (line 332)
-- [x] **Solution:** Create patch to add `when` condition excluding RiteMark editor context
+- [x] **Solution:** Create patch to add `when` condition excluding Ritemark editor context
 - [x] **File:** `vscode/src/vs/workbench/browser/actions/layoutActions.ts:330-333`
 - [x] **Context Key:** Need to check for `activeCustomEditorId == ritemark.editor`
 - [x] **Complexity:** LOW - Single keybinding condition change
@@ -216,7 +216,7 @@ Implement high-value, low-complexity features from the wishlist to improve edito
   ```
 - [ ] Create patch: `./scripts/create-patch.sh "cmd-b-bold-not-sidebar"`
 - [ ] Test:
-  - Open markdown file (RiteMark editor active)
+  - Open markdown file (Ritemark editor active)
   - Press CMD+B → should toggle bold
   - Focus file explorer
   - Press CMD+B → should toggle sidebar
@@ -407,7 +407,7 @@ Implement high-value, low-complexity features from the wishlist to improve edito
   ```
   feat(sprint-11): quick wins - CMD+B fix, word count, autosave, blockquotes
 
-  - Fix CMD+B to toggle bold (not sidebar) when RiteMark editor active
+  - Fix CMD+B to toggle bold (not sidebar) when Ritemark editor active
   - Add word count and reading time to status bar
   - Enable autosave by default (afterDelay, 1000ms)
   - Increase code block font size from 14px to 16px
@@ -445,7 +445,7 @@ Implement high-value, low-complexity features from the wishlist to improve edito
 **Context Key:** `activeCustomEditorId == ritemark.editor`
 
 **Behavior:**
-- **RiteMark editor active:** CMD+B triggers TipTap's built-in bold command
+- **Ritemark editor active:** CMD+B triggers TipTap's built-in bold command
 - **Other contexts:** CMD+B toggles sidebar (VS Code default)
 
 ### Word Count Status Bar

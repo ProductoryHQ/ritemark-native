@@ -36,7 +36,7 @@ File seems to be binary and cannot be opened as text
 
 ```typescript
 // src/ritemarkEditor.ts (current)
-export class RiteMarkEditorProvider implements CustomTextEditorProvider {
+export class RitemarkEditorProvider implements CustomTextEditorProvider {
   async resolveCustomTextEditor(
     document: vscode.TextDocument,  // ← Only works for text files!
     webviewPanel: vscode.WebviewPanel,
@@ -203,7 +203,7 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    // Setup webview (same as RiteMarkEditorProvider)
+    // Setup webview (same as RitemarkEditorProvider)
     const scriptUri = webviewPanel.webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js')
     );
@@ -241,7 +241,7 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
   }
 
   private getHtml(webview: vscode.Webview, scriptUri: vscode.Uri): string {
-    // Same HTML as RiteMarkEditorProvider
+    // Same HTML as RitemarkEditorProvider
     // (Could be extracted to shared utility)
     const nonce = this.getNonce();
     return `<!DOCTYPE html>
@@ -279,7 +279,7 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
 }
 ```
 
-**Key differences from RiteMarkEditorProvider:**
+**Key differences from RitemarkEditorProvider:**
 - Implements `CustomReadonlyEditorProvider<ExcelDocument>` (not `CustomTextEditorProvider`)
 - Has `openCustomDocument` method (reads binary file)
 - Has `resolveCustomEditor` (not `resolveCustomTextEditor`)
@@ -321,7 +321,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register markdown/CSV editor
   context.subscriptions.push(
-    RiteMarkEditorProvider.register(context, aiViewProvider)
+    RitemarkEditorProvider.register(context, aiViewProvider)
   );
 
   // Register Excel viewer (new)

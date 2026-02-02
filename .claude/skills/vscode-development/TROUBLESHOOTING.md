@@ -2,7 +2,7 @@
 
 Quick solutions to common issues.
 
-## RiteMark Native Specific Issues
+## Ritemark Native Specific Issues
 
 ### Issue: Broken extension symlink (MOST COMMON!)
 
@@ -54,7 +54,7 @@ xattr -l vscode/.build/electron/*.app | grep quarantine
 
 **Solution:**
 ```bash
-xattr -cr vscode/.build/electron/RiteMark.app
+xattr -cr vscode/.build/electron/Ritemark.app
 ```
 
 Then restart dev mode.
@@ -94,7 +94,7 @@ yarn install
 yarn gulp vscode-darwin-arm64
 ```
 
-### Issue: Webview not rendering (blank RiteMark editor)
+### Issue: Webview not rendering (blank Ritemark editor)
 
 **Symptoms:**
 - App launches, extension activates
@@ -124,7 +124,7 @@ ls -la ../media/webview.js  # Should be ~900KB
 
 # Copy to production if needed
 cp ../media/webview.js \
-   "../../VSCode-darwin-arm64/RiteMark Native.app/Contents/Resources/app/extensions/ritemark/media/"
+   "../../VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extensions/ritemark/media/"
 ```
 
 ### Issue: Production build fails at packaging
@@ -146,7 +146,7 @@ cp ../media/webview.js \
 }
 ```
 
-### RiteMark Build Commands
+### Ritemark Build Commands
 
 ```bash
 # Development mode
@@ -159,7 +159,7 @@ cd vscode && yarn gulp vscode-darwin-arm64
 cd extensions/ritemark/webview && npm run build
 
 # Launch production app
-open "VSCode-darwin-arm64/RiteMark Native.app"
+open "VSCode-darwin-arm64/Ritemark Native.app"
 ```
 
 ## Build Issues

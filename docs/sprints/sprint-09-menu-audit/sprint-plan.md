@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-RiteMark Native currently shows all default VS Code menu items, including many that are irrelevant for a markdown-focused editor:
+Ritemark Native currently shows all default VS Code menu items, including many that are irrelevant for a markdown-focused editor:
 
 **Edit Menu Issues:**
 
@@ -405,7 +405,7 @@ menuOpts: {
 **Patched code:**
 
 ```typescript
-// RiteMark: Emmet menu item removed - not relevant for markdown editing
+// Ritemark: Emmet menu item removed - not relevant for markdown editing
 // menuOpts: {
 //     menuId: MenuId.MenubarEditMenu,
 //     group: '5_insert',
@@ -495,7 +495,7 @@ Complexity: Medium (patch-based approach proven with `002-hide-chat-sidebar.patc
 
 ### Custom Menu Items
 
--   Add RiteMark-specific menu items (e.g., "Export to PDF")
+-   Add Ritemark-specific menu items (e.g., "Export to PDF")
     
 -   Would go in separate sprint (feature addition)
     
@@ -528,7 +528,7 @@ VS Code doesn't provide configuration-based menu filtering. Options were:
 
 -   Number patches sequentially (003, 004, 005, etc.)
     
--   Include "RiteMark:" prefix in code comments
+-   Include "Ritemark:" prefix in code comments
     
 -   Document each patch in `docs/menu-customization.md`
     

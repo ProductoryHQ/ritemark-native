@@ -1,6 +1,6 @@
 # Sprint 27 Status
 
-**Sprint:** 27 - RiteMark Flows
+**Sprint:** 27 - Ritemark Flows
 **Branch:** feature/ritemark-flows
 **Current Phase:** Phase 2.5 Complete ✅
 **Status:** Ready for QA validation and commit
@@ -49,8 +49,8 @@ Phase 2 (Visual Editor) implementation complete:
 - UI components: `Input`, `Label`, `Select` (shadcn/ui style)
 
 **Settings Page:**
-- `RiteMarkSettingsProvider.ts` - Extension-side provider for branded settings
-- `RiteMarkSettings.tsx` - React settings page with API keys, features, updates
+- `RitemarkSettingsProvider.ts` - Extension-side provider for branded settings
+- `RitemarkSettings.tsx` - React settings page with API keys, features, updates
 
 ### Architecture
 
@@ -110,7 +110,7 @@ extensions/ritemark/webview/src/components/
 │       ├── SaveFileNode.tsx  (NEW)
 │       └── index.ts          (NEW)
 ├── settings/
-│   └── RiteMarkSettings.tsx  (NEW)
+│   └── RitemarkSettings.tsx  (NEW)
 └── ui/
     ├── input.tsx             (NEW)
     ├── label.tsx             (NEW)
@@ -120,7 +120,7 @@ extensions/ritemark/webview/src/components/
 **Extension Settings:**
 ```
 extensions/ritemark/src/settings/
-└── RiteMarkSettingsProvider.ts (NEW)
+└── RitemarkSettingsProvider.ts (NEW)
 ```
 
 **Modified:**
@@ -210,7 +210,7 @@ NORMAL STATE:                      HOVER STATE:
 - **Variable picker:** `/` button shows available variables for filename
 
 ### Header Actions
-- **Settings gear:** Opens RiteMark Settings page (same as AI panel)
+- **Settings gear:** Opens Ritemark Settings page (same as AI panel)
 
 ---
 

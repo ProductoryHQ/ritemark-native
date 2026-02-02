@@ -21,12 +21,12 @@ Your app must be "notable enough" to be accepted:
 - **Minimum:** 30 forks, 30 watchers, OR 75 stars on GitHub
 - Apps that are too obscure will be rejected
 
-**RiteMark Status:** Check `jarmo-productory/ritemark-public` stats
+**Ritemark Status:** Check `jarmo-productory/ritemark-public` stats
 
 ### 2. Stable Download URL
 Must have a permanent, versioned download URL:
 ```
-https://github.com/jarmo-productory/ritemark-public/releases/download/v1.0.1/RiteMark-1.0.1.dmg
+https://github.com/jarmo-productory/ritemark-public/releases/download/v1.0.1/Ritemark-1.0.1.dmg
 ```
 
 ### 3. Code Signing
@@ -38,15 +38,15 @@ https://github.com/jarmo-productory/ritemark-public/releases/download/v1.0.1/Rit
 
 ## Cask File Format
 
-Example cask for RiteMark:
+Example cask for Ritemark:
 
 ```ruby
 cask "ritemark" do
   version "1.0.1"
   sha256 "abc123..."  # SHA256 of DMG file
 
-  url "https://github.com/jarmo-productory/ritemark-public/releases/download/v#{version}/RiteMark-#{version}.dmg"
-  name "RiteMark"
+  url "https://github.com/jarmo-productory/ritemark-public/releases/download/v#{version}/Ritemark-#{version}.dmg"
+  name "Ritemark"
   desc "Native markdown editor for focused writing"
   homepage "https://github.com/jarmo-productory/ritemark-public"
 
@@ -55,10 +55,10 @@ cask "ritemark" do
     strategy :github_latest
   end
 
-  app "RiteMark.app"
+  app "Ritemark.app"
 
   zap trash: [
-    "~/Library/Application Support/RiteMark",
+    "~/Library/Application Support/Ritemark",
     "~/Library/Preferences/com.ritemark.app.plist",
     "~/Library/Caches/com.ritemark.app",
   ]
@@ -79,7 +79,7 @@ cd homebrew-cask
 ### Step 2: Create Cask File
 ```bash
 # Create new cask
-brew create --cask https://github.com/.../RiteMark-1.0.1.dmg
+brew create --cask https://github.com/.../Ritemark-1.0.1.dmg
 
 # Or manually create
 touch Casks/r/ritemark.rb
@@ -91,7 +91,7 @@ touch Casks/r/ritemark.rb
 brew install --cask ./Casks/r/ritemark.rb
 
 # Verify it works
-open -a RiteMark
+open -a Ritemark
 
 # Audit the cask
 brew audit --cask ritemark

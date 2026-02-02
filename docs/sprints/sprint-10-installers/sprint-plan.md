@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-Currently, RiteMark Native builds to a `.app` bundle in `VSCode-darwin-arm64/`. To distribute for testing:
+Currently, Ritemark Native builds to a `.app` bundle in `VSCode-darwin-arm64/`. To distribute for testing:
 - Users must navigate into that directory
 - No standard "drag to Applications" installation
 - Harder to share with beta testers
@@ -37,7 +37,7 @@ Currently, RiteMark Native builds to a `.app` bundle in `VSCode-darwin-arm64/`. 
 - [x] Research completed (DMG creation options, build integration)
 - [ ] `scripts/create-dmg.sh` script creates working DMG installer
 - [ ] DMG includes "drag to Applications" UI
-- [ ] DMG uses RiteMark branding (icon, volume name)
+- [ ] DMG uses Ritemark branding (icon, volume name)
 - [ ] SHA256 checksum generated automatically
 - [ ] Installation tested on a non-dev Mac
 - [ ] User documentation created (installation instructions)
@@ -46,7 +46,7 @@ Currently, RiteMark Native builds to a `.app` bundle in `VSCode-darwin-arm64/`. 
 - [ ] Research completed (Windows build requirements, cross-compilation)
 - [ ] `yarn gulp vscode-win32-x64` produces working Windows build
 - [ ] NSIS installer created via VS Code's standard tooling
-- [ ] Installer includes RiteMark branding (icon, product name)
+- [ ] Installer includes Ritemark branding (icon, product name)
 - [ ] SHA256 checksum generated automatically
 - [ ] Installation tested on Windows machine
 - [ ] User documentation created (Windows installation instructions)
@@ -67,12 +67,12 @@ Currently, RiteMark Native builds to a `.app` bundle in `VSCode-darwin-arm64/`. 
 - Extracts version from `vscode/package.json`
 - Uses `create-dmg` tool to generate installer
 - Creates professional DMG with:
-  - Volume name: "RiteMark Native"
+  - Volume name: "Ritemark Native"
   - App icon on left, Applications shortcut on right
-  - Custom volume icon (RiteMark logo)
+  - Custom volume icon (Ritemark logo)
   - Standard 800x400 window
 - Generates SHA256 checksum file
-- Outputs: `RiteMark-Native-{version}-darwin-arm64.dmg`
+- Outputs: `Ritemark-Native-{version}-darwin-arm64.dmg`
 
 ### 2. Windows Build Script
 **File:** `scripts/build-windows.sh`
@@ -83,7 +83,7 @@ Currently, RiteMark Native builds to a `.app` bundle in `VSCode-darwin-arm64/`. 
 - Uses VS Code's built-in NSIS installer creation
 - Outputs to `vscode/.build/win32-x64/` (or similar)
 - Generates SHA256 checksum file
-- Outputs: `RiteMark-Native-{version}-win32-x64-Setup.exe`
+- Outputs: `Ritemark-Native-{version}-win32-x64-Setup.exe`
 
 ### 3. Environment Validation
 **Enhancement to:** `scripts/validate-build-env.sh` OR **New:** `scripts/validate-installer-env.sh`
@@ -234,44 +234,44 @@ Currently, RiteMark Native builds to a `.app` bundle in `VSCode-darwin-arm64/`. 
 
 ### macOS DMG Naming Convention
 ```
-RiteMark-Native-{version}-darwin-arm64.dmg
-RiteMark-Native-{version}-darwin-arm64.dmg.sha256
+Ritemark-Native-{version}-darwin-arm64.dmg
+Ritemark-Native-{version}-darwin-arm64.dmg.sha256
 
 Example:
-RiteMark-Native-1.94.0-darwin-arm64.dmg
-RiteMark-Native-1.94.0-darwin-arm64.dmg.sha256
+Ritemark-Native-1.94.0-darwin-arm64.dmg
+Ritemark-Native-1.94.0-darwin-arm64.dmg.sha256
 ```
 
 ### Windows Installer Naming Convention
 ```
-RiteMark-Native-{version}-win32-x64-Setup.exe
-RiteMark-Native-{version}-win32-x64-Setup.exe.sha256
+Ritemark-Native-{version}-win32-x64-Setup.exe
+Ritemark-Native-{version}-win32-x64-Setup.exe.sha256
 
 Example:
-RiteMark-Native-1.94.0-win32-x64-Setup.exe
-RiteMark-Native-1.94.0-win32-x64-Setup.exe.sha256
+Ritemark-Native-1.94.0-win32-x64-Setup.exe
+Ritemark-Native-1.94.0-win32-x64-Setup.exe.sha256
 ```
 
 ### DMG Contents
 ```
-RiteMark Native (mounted volume)
-├── RiteMark Native.app
+Ritemark Native (mounted volume)
+├── Ritemark Native.app
 └── Applications → /Applications (symlink)
 ```
 
 ### Windows Build Output
 ```
 vscode/.build/win32-x64/
-├── RiteMark Native/
-│   ├── RiteMark Native.exe
+├── Ritemark Native/
+│   ├── Ritemark Native.exe
 │   ├── resources/
 │   └── ...
 └── system-setup/
-    └── RiteMark-Native-{version}-Setup.exe (NSIS installer)
+    └── Ritemark-Native-{version}-Setup.exe (NSIS installer)
 ```
 
 ### DMG Properties
-- **Volume Name:** "RiteMark Native"
+- **Volume Name:** "Ritemark Native"
 - **Window Size:** 800x400 pixels
 - **Icon Size:** 100x100 pixels
 - **Background:** None (clean default)
@@ -280,16 +280,16 @@ vscode/.build/win32-x64/
 ### create-dmg Command
 ```bash
 create-dmg \
-  --volname "RiteMark Native" \
+  --volname "Ritemark Native" \
   --volicon "branding/icons/icon.icns" \
   --window-pos 200 120 \
   --window-size 800 400 \
   --icon-size 100 \
-  --icon "RiteMark Native.app" 200 190 \
-  --hide-extension "RiteMark Native.app" \
+  --icon "Ritemark Native.app" 200 190 \
+  --hide-extension "Ritemark Native.app" \
   --app-drop-link 600 185 \
   --no-internet-enable \
-  "RiteMark-Native-${VERSION}-darwin-arm64.dmg" \
+  "Ritemark-Native-${VERSION}-darwin-arm64.dmg" \
   "VSCode-darwin-arm64/"
 ```
 
@@ -309,23 +309,23 @@ yarn gulp vscode-win32-x64
 
 #### 1. Download DMG
 - From GitHub Releases or direct link
-- File: `RiteMark-Native-{version}-darwin-arm64.dmg`
+- File: `Ritemark-Native-{version}-darwin-arm64.dmg`
 
 #### 2. Verify Download (Optional but Recommended)
 ```bash
-shasum -a 256 RiteMark-Native-1.94.0-darwin-arm64.dmg
+shasum -a 256 Ritemark-Native-1.94.0-darwin-arm64.dmg
 # Compare with .sha256 file
 ```
 
 #### 3. Install
 - Double-click DMG to mount
-- Drag "RiteMark Native.app" to Applications folder
+- Drag "Ritemark Native.app" to Applications folder
 - Wait for copy to complete
 - Eject DMG
 
 #### 4. First Launch
 - Open Applications folder
-- **Right-click** "RiteMark Native.app" → **Open**
+- **Right-click** "Ritemark Native.app" → **Open**
 - Gatekeeper warning: "Cannot verify developer"
 - Click **Open** to create exception
 - App launches
@@ -339,11 +339,11 @@ shasum -a 256 RiteMark-Native-1.94.0-darwin-arm64.dmg
 
 #### 1. Download Installer
 - From GitHub Releases or direct link
-- File: `RiteMark-Native-{version}-win32-x64-Setup.exe`
+- File: `Ritemark-Native-{version}-win32-x64-Setup.exe`
 
 #### 2. Verify Download (Optional but Recommended)
 ```powershell
-certutil -hashfile RiteMark-Native-1.94.0-win32-x64-Setup.exe SHA256
+certutil -hashfile Ritemark-Native-1.94.0-win32-x64-Setup.exe SHA256
 # Compare with .sha256 file
 ```
 
@@ -352,19 +352,19 @@ certutil -hashfile RiteMark-Native-1.94.0-win32-x64-Setup.exe SHA256
 - Windows SmartScreen warning: "Unrecognized app"
 - Click **More info** → **Run anyway**
 - Follow installer prompts:
-  - Choose installation location (default: `C:\Program Files\RiteMark Native`)
+  - Choose installation location (default: `C:\Program Files\Ritemark Native`)
   - Create Start Menu shortcuts
   - Create desktop shortcut (optional)
 - Click **Install**
 
 #### 4. First Launch
-- Start Menu → RiteMark Native
+- Start Menu → Ritemark Native
 - Or desktop shortcut (if created)
 - App launches
 
 #### 5. Uninstall (if needed)
-- Settings → Apps → RiteMark Native → Uninstall
-- Or: Start Menu → RiteMark Native → Uninstall
+- Settings → Apps → Ritemark Native → Uninstall
+- Or: Start Menu → Ritemark Native → Uninstall
 
 ---
 
@@ -405,7 +405,7 @@ certutil -hashfile RiteMark-Native-1.94.0-win32-x64-Setup.exe SHA256
 ### Files Required
 | File | Location | Status |
 |------|----------|--------|
-| **macOS App bundle** | `VSCode-darwin-arm64/RiteMark Native.app` | ✅ Built by `build-prod.sh` |
+| **macOS App bundle** | `VSCode-darwin-arm64/Ritemark Native.app` | ✅ Built by `build-prod.sh` |
 | **macOS Icon** | `branding/icons/icon.icns` | ✅ Exists |
 | **Windows Icon** | `branding/icons/icon.ico` | ❓ Check (may need to create) |
 | Product config | `branding/product.json` | ✅ Exists |

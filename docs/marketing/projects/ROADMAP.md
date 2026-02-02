@@ -1,6 +1,6 @@
 # Marketing Roadmap
 
-Marketing projects for RiteMark, managed by the product-marketer agent.
+Marketing projects for Ritemark, managed by the product-marketer agent.
 
 * * *
 

@@ -41,7 +41,7 @@ See `sprint-plan.md` for the full checklist.
 
 | Issue | Fix (Phase 3) |
 |-------|--------------|
-| RiteMark icon missing | `cp branding/icons/icon.ico vscode/resources/win32/code.ico` before build |
+| Ritemark icon missing | `cp branding/icons/icon.ico vscode/resources/win32/code.ico` before build |
 | Sidebar: Run/Debug, Extensions, Accounts, Manage visible | Create patches 010, 011; update patch 004 |
 | No installer (ZIP only) | Add `installer/ritemark.iss` + Inno Setup 6.4.3 in CI |
 

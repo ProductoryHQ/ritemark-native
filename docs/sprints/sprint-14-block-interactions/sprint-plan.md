@@ -90,7 +90,7 @@ Enhance editor block-level interactions with clickable links, copy code buttons,
 #### Styling
 - [ ] Create `.drag-handle` CSS styles
 - [ ] Use grip/drag icon (Lucide `GripVertical`)
-- [ ] Match RiteMark design language (indigo accent)
+- [ ] Match Ritemark design language (indigo accent)
 - [ ] Add hover state styling
 
 #### Optional: + Button Menu

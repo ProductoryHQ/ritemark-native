@@ -1,4 +1,4 @@
-# RiteMark
+# Ritemark
 
 **A beautiful WYSIWYG markdown editor for your desktop.**
 

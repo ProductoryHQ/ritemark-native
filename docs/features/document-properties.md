@@ -2,7 +2,7 @@
 
 > Add metadata to your documents - titles, dates, tags, and custom fields.
 
-Document properties are stored in YAML front-matter at the top of your markdown files. RiteMark gives you a visual editor so you never have to write YAML manually.
+Document properties are stored in YAML front-matter at the top of your markdown files. Ritemark gives you a visual editor so you never have to write YAML manually.
 
 ---
 
@@ -163,14 +163,14 @@ Properties help you:
 
 - **Title vs. Heading** - The title property is metadata; your first heading is content. They can be different.
 - **Consistent tags** - Use the same tag names across documents for easier organization
-- **Required fields** - RiteMark doesn't enforce any fields. Add what you need.
+- **Required fields** - Ritemark doesn't enforce any fields. Add what you need.
 - **Editing raw YAML** - You can edit the front-matter directly in a text editor if you prefer
 
 ---
 
 ## Compatibility
 
-RiteMark uses standard YAML front-matter that works with:
+Ritemark uses standard YAML front-matter that works with:
 - Static site generators (Jekyll, Hugo, Astro)
 - Note-taking apps (Obsidian)
 - Any tool that reads markdown front-matter

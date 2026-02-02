@@ -127,11 +127,11 @@ runs-on: windows-2022  # Not windows-latest (might be smaller)
 
 ### 2.1 Extension Not Copied to Build
 
-**What happened:** Build succeeds, DMG looks fine, but opening .md files shows plain text editor. RiteMark extension missing from app bundle.
+**What happened:** Build succeeds, DMG looks fine, but opening .md files shows plain text editor. Ritemark extension missing from app bundle.
 
 **Warning signs:**
 - `ls extensions/ritemark` in build output shows nothing
-- App launches but "RiteMark" not in Extensions list
+- App launches but "Ritemark" not in Extensions list
 - Same issue we had in v1.0.1 release
 
 **Prevention:**
@@ -247,7 +247,7 @@ runs-on: windows-2022  # Not windows-latest (might be smaller)
 
 ### 3.1 Windows SmartScreen Blocks Installation
 
-**What happened:** Users download ZIP, extract, run RiteMark.exe → Windows shows scary red warning → users give up or think it's malware.
+**What happened:** Users download ZIP, extract, run Ritemark.exe → Windows shows scary red warning → users give up or think it's malware.
 
 **Warning signs:**
 - Support emails: "Windows says it's dangerous"
@@ -259,7 +259,7 @@ runs-on: windows-2022  # Not windows-latest (might be smaller)
 # In release notes (MANDATORY for unsigned builds):
 ## Windows Installation
 
-Windows SmartScreen may show a warning because RiteMark is new.
+Windows SmartScreen may show a warning because Ritemark is new.
 1. Click "More info"
 2. Click "Run anyway"
 
@@ -314,11 +314,11 @@ This is normal for new apps without expensive code signing certificates.
 # Signing checklist (add to release-manager):
 1. Download EXACT artifact from draft release
 2. Verify SHA256 matches
-3. Sign: codesign --force --deep --sign "Developer ID" RiteMark.app
+3. Sign: codesign --force --deep --sign "Developer ID" Ritemark.app
 4. Notarize: xcrun notarytool submit ...
 5. Wait for "Accepted" (not just "In Progress")
-6. Staple: xcrun stapler staple RiteMark.app
-7. Verify: spctl --assess --type exec RiteMark.app
+6. Staple: xcrun stapler staple Ritemark.app
+7. Verify: spctl --assess --type exec Ritemark.app
 8. Re-create DMG with signed app
 9. Upload signed DMG, replacing unsigned
 ```
@@ -332,7 +332,7 @@ This is normal for new apps without expensive code signing certificates.
 **What happened:** macOS build produces x64 binary instead of arm64. Works in Rosetta but slow. Or worse: Windows build produces wrong arch.
 
 **Warning signs:**
-- `file RiteMark.app/Contents/MacOS/Electron` shows wrong arch
+- `file Ritemark.app/Contents/MacOS/Electron` shows wrong arch
 - App works but CPU usage high (emulation)
 - Crash reports mention "Bad CPU type"
 
@@ -345,7 +345,7 @@ env:
 
 - name: Verify architecture
   run: |
-    file VSCode-darwin-arm64/RiteMark.app/Contents/MacOS/Electron | grep -q "arm64" || exit 1
+    file VSCode-darwin-arm64/Ritemark.app/Contents/MacOS/Electron | grep -q "arm64" || exit 1
 ```
 
 **Mitigation:** Explicit arch in all env vars. Verify in build output.
@@ -631,7 +631,7 @@ function getAssetForPlatform(assets: Asset[], platform: string): Asset {
 - name: Create ZIP
   run: |
     cd VSCode-win32-x64
-    7z a -tzip ../RiteMark-$VERSION-win32-x64.zip . -mx=9
+    7z a -tzip ../Ritemark-$VERSION-win32-x64.zip . -mx=9
     # Contents at root, not in subfolder
 ```
 
@@ -720,7 +720,7 @@ Before any release discussion:
 □ webview.js > 500KB
 □ node_modules > 100 packages
 □ App launches without error
-□ .md file opens in RiteMark editor
+□ .md file opens in Ritemark editor
 □ Version in About matches release tag
 ```
 

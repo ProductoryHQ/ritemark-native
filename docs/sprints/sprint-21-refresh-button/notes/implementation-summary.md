@@ -8,7 +8,7 @@
 
 ## Overview
 
-Sprint 21 implements a comprehensive Refresh system for Excel and CSV files in RiteMark Native. The implementation includes:
+Sprint 21 implements a comprehensive Refresh system for Excel and CSV files in Ritemark Native. The implementation includes:
 
 1. ✅ **CSV Save Bug Fix** - CRITICAL prerequisite
 2. ✅ **Refresh Button** - Manual reload UI
@@ -103,7 +103,7 @@ Check: document.isDirty?
 ```
 ⚠️ Unsaved Changes Conflict
 
-You have unsaved edits in RiteMark.
+You have unsaved edits in Ritemark.
 The file "data.csv" has also been modified on disk by another program.
 Refreshing will discard your changes and load the version from disk.
 
@@ -298,7 +298,7 @@ Refreshing will discard them.
 
 3. **Markdown Not Watched:** File watcher only applies to CSV and Excel. Markdown change detection is handled by VS Code's native text document change events.
 
-4. **Excel Read-Only:** Excel files are read-only in RiteMark, so conflict detection is not needed (simpler flow).
+4. **Excel Read-Only:** Excel files are read-only in Ritemark, so conflict detection is not needed (simpler flow).
 
 ---
 

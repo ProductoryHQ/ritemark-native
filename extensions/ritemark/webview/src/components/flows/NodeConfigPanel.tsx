@@ -361,18 +361,8 @@ interface LLMNodeConfigProps {
   onUpdate: (data: Partial<LLMNodeData>) => void;
 }
 
-// Fallback models (used when API fetch fails)
-const fallbackOpenaiModels = [
-  { id: 'gpt-5.2', name: 'GPT-5.2' },
-  { id: 'gpt-5-mini', name: 'GPT-5 Mini' },
-  { id: 'gpt-4o', name: 'GPT-4o' },
-];
-
-const fallbackGeminiModels = [
-  { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' },
-  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-];
+// Model config is received from extension - use helper functions
+import { getLLMModels, getImageModels, getDefaultLLMModel, getDefaultImageModel } from '../../config/modelConfig';
 
 function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   const provider = data.provider || 'openai';
@@ -383,8 +373,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   // Fetch models from API when provider changes
   useEffect(() => {
     // Set fallback immediately so dropdown has options
-    const fallback = provider === 'openai' ? fallbackOpenaiModels : fallbackGeminiModels;
-    setModels(fallback);
+    setModels(getLLMModels(provider));
     setIsLoading(true);
     setError(null);
 
@@ -425,10 +414,9 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
 
   // Handle provider change - reset model to first available
   const handleProviderChange = (newProvider: 'openai' | 'gemini') => {
-    const defaultModel = newProvider === 'openai' ? 'gpt-5.2' : 'gemini-2.5-flash';
     onUpdate({
       provider: newProvider,
-      model: defaultModel
+      model: getDefaultLLMModel(newProvider)
     });
   };
 
@@ -631,25 +619,10 @@ interface ImageNodeConfigProps {
   onUpdate: (data: Partial<ImageNodeData>) => void;
 }
 
-// Fallback image models if API fetch fails (includes all known models)
-const fallbackOpenaiImageModels = [
-  { id: 'gpt-image-1.5', name: 'GPT Image 1.5 (Latest)' },
-  { id: 'gpt-image-1', name: 'GPT Image 1' },
-  { id: 'gpt-image-1-mini', name: 'GPT Image 1 Mini' },
-  { id: 'dall-e-3', name: 'DALL-E 3 (Deprecated)' },
-];
-
-const fallbackGeminiImageModels = [
-  { id: 'imagen-4.0-fast-generate-001', name: 'Imagen 4 Fast' },
-  { id: 'imagen-4.0-generate-001', name: 'Imagen 4' },
-  { id: 'gemini-2.5-flash-image', name: 'Nano Banana Flash' },
-  { id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro' },
-];
-
 function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   const provider = data.provider || 'openai';
   const [models, setModels] = React.useState<Array<{ id: string; name: string }>>(
-    provider === 'openai' ? fallbackOpenaiImageModels : fallbackGeminiImageModels
+    getImageModels(provider)
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -657,8 +630,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   // Fetch models when provider changes
   React.useEffect(() => {
     // Reset to fallback immediately when provider changes
-    const fallback = provider === 'openai' ? fallbackOpenaiImageModels : fallbackGeminiImageModels;
-    setModels(fallback);
+    setModels(getImageModels(provider));
     setLoading(true);
     setError(null);
 
@@ -695,10 +667,9 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
 
   // Handle provider change - reset model to first available
   const handleProviderChange = (newProvider: 'openai' | 'gemini') => {
-    const defaultModel = newProvider === 'openai' ? 'gpt-image-1.5' : 'imagen-4.0-fast-generate-001';
     onUpdate({
       provider: newProvider,
-      model: defaultModel
+      model: getDefaultImageModel(newProvider)
     });
   };
 

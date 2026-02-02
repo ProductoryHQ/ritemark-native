@@ -1,5 +1,5 @@
 /**
- * RiteMark RAG - Markdown document retrieval and search.
+ * Ritemark RAG - Markdown document retrieval and search.
  *
  * Pipeline: Parse (markdown) → Chunk → Embed (OpenAI) → Store (Orama) → Search
  */

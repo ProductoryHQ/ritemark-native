@@ -1,7 +1,7 @@
-# Sprint 27: RiteMark Flows - Phase 1 MVP
+# Sprint 27: Ritemark Flows - Phase 1 MVP
 
 ## Goal
-Implement a lightweight node-based automation system for RiteMark Native, enabling users to create visual workflows that combine AI (LLM, image generation) with file operations. Phase 1 delivers core infrastructure and basic execution.
+Implement a lightweight node-based automation system for Ritemark Native, enabling users to create visual workflows that combine AI (LLM, image generation) with file operations. Phase 1 delivers core infrastructure and basic execution.
 
 ## Feature Flag Check
 - [x] Does this sprint need a feature flag?
@@ -45,7 +45,7 @@ Implement a lightweight node-based automation system for RiteMark Native, enabli
   ```typescript
   'ritemark-flows': {
     id: 'ritemark-flows',
-    label: 'RiteMark Flows',
+    label: 'Ritemark Flows',
     description: 'Visual automation workflows with AI and file operations',
     status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
@@ -56,7 +56,7 @@ Implement a lightweight node-based automation system for RiteMark Native, enabli
   "ritemark.experimental.ritemarkFlows": {
     "type": "boolean",
     "default": false,
-    "description": "Enable RiteMark Flows (experimental) - Visual automation workflows"
+    "description": "Enable Ritemark Flows (experimental) - Visual automation workflows"
   }
   ```
 - [ ] Test flag evaluation logic (`isEnabled('ritemark-flows')` returns correct values)

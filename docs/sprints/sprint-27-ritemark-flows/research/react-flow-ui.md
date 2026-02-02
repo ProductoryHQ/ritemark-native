@@ -319,7 +319,7 @@ const onNodesChange = useCallback(
 />
 ```
 
-## Key Decisions for RiteMark Flows
+## Key Decisions for Ritemark Flows
 
 1. **Use Workflow Editor template as reference** - Don't reinvent the wheel
 2. **Zustand for state** - Lightweight, no Provider hell

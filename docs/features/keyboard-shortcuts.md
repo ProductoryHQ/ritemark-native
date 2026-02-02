@@ -1,6 +1,6 @@
 # Keyboard Shortcuts
 
-> Every shortcut in RiteMark, organized by category.
+> Every shortcut in Ritemark, organized by category.
 
 All shortcuts use Mac notation. Cmd = Command key (⌘).
 

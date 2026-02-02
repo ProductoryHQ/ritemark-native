@@ -22,7 +22,7 @@ Setapp is a subscription service for Mac apps ("Netflix for Mac apps"):
 
 ---
 
-## Requirements for RiteMark
+## Requirements for Ritemark
 
 ### Technical Requirements
 
@@ -77,7 +77,7 @@ func applicationDidFinishLaunching() {
 
 ---
 
-## Pros & Cons for RiteMark
+## Pros & Cons for Ritemark
 
 ### Pros
 - Access to 1M+ potential users
@@ -99,7 +99,7 @@ func applicationDidFinishLaunching() {
 **Not for v1.0 launch.**
 
 Consider Setapp when:
-1. RiteMark is more mature
+1. Ritemark is more mature
 2. You want subscription revenue
 3. You have time for SDK integration
 

@@ -28,7 +28,7 @@ export function isEnabled(flagId: FlagId): boolean {
 
   // 1. Unknown flag
   if (!flag) {
-    console.warn(`[RiteMark] Unknown feature flag: ${flagId}`);
+    console.warn(`[Ritemark] Unknown feature flag: ${flagId}`);
     return false;
   }
 

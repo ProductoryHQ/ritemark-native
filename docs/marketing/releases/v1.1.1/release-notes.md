@@ -1,18 +1,18 @@
-# RiteMark v1.1.1
+# Ritemark v1.1.1
 
 **Released:** 2026-01-30
 **Type:** Minor (image workflow improvements)
-**Download:** [GitHub Release](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg)
+**Download:** [GitHub Release](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg)
 
 ## Highlights
 
-RiteMark v1.1.1 focuses on **image handling** - insert images from files with `/image`, resize them with drag handles, and keep your documents clean with automatic file organization.
+Ritemark v1.1.1 focuses on **image handling** - insert images from files with `/image`, resize them with drag handles, and keep your documents clean with automatic file organization.
 
 ## What's New
 
 ### Insert Images from Files
 
-Type `/image` in the editor to open a file picker. Select any image from your computer and RiteMark will:
+Type `/image` in the editor to open a file picker. Select any image from your computer and Ritemark will:
 
 - Copy the image to an `./images/` folder in your document's directory
 - Insert proper markdown reference
@@ -22,11 +22,11 @@ No more manual file copying or path typing.
 
 ### Image Resize Handles
 
-Click on any image to see resize handles. Drag to resize - and here's the clever part: **RiteMark actually resizes the image file**, not just the display. This keeps your markdown clean (no inline width/height attributes) and your image files appropriately sized.
+Click on any image to see resize handles. Drag to resize - and here's the clever part: **Ritemark actually resizes the image file**, not just the display. This keeps your markdown clean (no inline width/height attributes) and your image files appropriately sized.
 
 ### Stale File Indicator
 
-When a file changes outside RiteMark (e.g., edited in another app, synced from cloud), a **Refresh button** now appears in the header. This matches the behavior already present in the Data Editor - one click to reload the latest version.
+When a file changes outside Ritemark (e.g., edited in another app, synced from cloud), a **Refresh button** now appears in the header. This matches the behavior already present in the Data Editor - one click to reload the latest version.
 
 ### Blockquote in Bubble Menu
 
@@ -46,8 +46,8 @@ Select text and the bubble menu now includes a **quote button** for quick blockq
 
 ## Upgrade Notes
 
-1. Download RiteMark.dmg from GitHub Releases
+1. Download Ritemark.dmg from GitHub Releases
 2. Drag to Applications (replace existing)
-3. Launch RiteMark
+3. Launch Ritemark
 
 Your existing documents and settings are preserved.

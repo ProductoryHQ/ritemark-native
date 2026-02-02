@@ -240,7 +240,7 @@ export async function executeCommand(
   if (!openai) {
     return {
       success: false,
-      error: 'OpenAI API key not configured. Use Command Palette → "RiteMark: Configure OpenAI API Key"'
+      error: 'OpenAI API key not configured. Use Command Palette → "Ritemark: Configure OpenAI API Key"'
     };
   }
 

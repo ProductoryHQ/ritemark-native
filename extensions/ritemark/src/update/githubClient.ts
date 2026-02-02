@@ -36,7 +36,7 @@ export async function fetchLatestRelease(): Promise<GitHubRelease | null> {
     const response = await fetch(API_ENDPOINT, {
       headers: {
         'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'RiteMark-Native'
+        'User-Agent': 'Ritemark-Native'
       }
     });
 
@@ -64,7 +64,7 @@ export async function fetchUpdateManifest(tagName: string): Promise<UpdateManife
   try {
     const response = await fetch(manifestUrl, {
       headers: {
-        'User-Agent': 'RiteMark-Native'
+        'User-Agent': 'Ritemark-Native'
       }
     });
 
@@ -98,7 +98,7 @@ export async function fetchReleaseByTag(tagName: string): Promise<GitHubRelease 
     const response = await fetch(url, {
       headers: {
         'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'RiteMark-Native'
+        'User-Agent': 'Ritemark-Native'
       }
     });
 

@@ -41,7 +41,7 @@ case 'contentChanged':
 ```
 
 **Testing Required:**
-1. Open CSV file in RiteMark
+1. Open CSV file in Ritemark
 2. Edit a cell
 3. Save (Cmd+S)
 4. Verify dirty indicator clears
@@ -147,7 +147,7 @@ Is document.isDirty?
 **UX:**
 - **True Conflict Message:**
   ```
-  You have unsaved edits in RiteMark.
+  You have unsaved edits in Ritemark.
   The file [filename] has also been modified on disk by another program.
   Refreshing will discard your changes and load the version from disk.
   ```
@@ -243,7 +243,7 @@ Is document.isDirty?
 
 We track `fs.stat(file).mtimeMs` on initial load and compare it when refresh is triggered. This allows us to detect if the file was externally modified.
 
-**Caveat:** mtime resolution varies by filesystem (1s for FAT32, 1ns for ext4). This is acceptable for RiteMark's use case.
+**Caveat:** mtime resolution varies by filesystem (1s for FAT32, 1ns for ext4). This is acceptable for Ritemark's use case.
 
 ### Why ExcelDocument.buffer is readonly
 

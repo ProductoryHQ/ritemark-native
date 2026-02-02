@@ -1,4 +1,4 @@
-# RiteMark Flows - Product Strategy & Implementation Plan
+# Ritemark Flows - Product Strategy & Implementation Plan
 ## Updated January 2026 with Current Research
 
 ---
@@ -69,7 +69,7 @@ Build a **lightweight, custom** node-based automation system using modern 2026 t
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    RiteMark Flows Architecture (2026)                        │
+│                    Ritemark Flows Architecture (2026)                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  WEBVIEW (React Flow UI + shadcn/ui)     EXTENSION (TypeScript)             │
@@ -107,7 +107,7 @@ Build a **lightweight, custom** node-based automation system using modern 2026 t
 - **Minimal** - 4 node types, not 400
 - **Visual** - Drag-and-drop, no code required
 - **Local-first** - All execution on user's machine
-- **Integrated** - Feels native to RiteMark, uses existing AI infrastructure
+- **Integrated** - Feels native to Ritemark, uses existing AI infrastructure
 
 ---
 
@@ -447,7 +447,7 @@ src/flows/nodes/
 
 ## Competitive Advantage
 
-| RiteMark Flows | Node-RED / n8n / Flowise |
+| Ritemark Flows | Node-RED / n8n / Flowise |
 |----------------|--------------------------|
 | 4 focused nodes | 100s of nodes (overwhelming) |
 | ~50KB addition | ~10MB+ separate app |

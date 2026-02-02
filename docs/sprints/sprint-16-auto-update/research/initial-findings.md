@@ -5,7 +5,7 @@
 
 ## Objective
 
-Implement auto-update functionality for RiteMark Native (VS Code OSS fork) targeting macOS darwin-arm64.
+Implement auto-update functionality for Ritemark Native (VS Code OSS fork) targeting macOS darwin-arm64.
 
 ## Requirements
 
@@ -71,7 +71,7 @@ We need to:
 macOS requires signed applications for auto-update to work properly.
 
 **Key Questions:**
-- Is RiteMark Native currently code-signed?
+- Is Ritemark Native currently code-signed?
 - Do we need Apple Developer certificate?
 - How to verify update authenticity?
 - SHA256 checksum verification?
@@ -108,7 +108,7 @@ export function createUpdateURL(platform: string, quality: string, productServic
 - `commit` - Current version commit hash
 - `quality` - "stable" or "insider"
 
-### Current RiteMark Configuration
+### Current Ritemark Configuration
 
 **vscode/product.json** (our branding override):
 ```json
@@ -136,14 +136,14 @@ if (!this.productService.updateUrl || !this.productService.commit) {
 
 **Build Script:** `scripts/build-mac.sh`
 - Builds VS Code from source
-- Copies RiteMark extension
+- Copies Ritemark extension
 - Applies branding from `branding/product.json`
-- Output: `VSCode-darwin-arm64/RiteMark.app`
+- Output: `VSCode-darwin-arm64/Ritemark.app`
 
 **Installer Script:** `scripts/create-dmg.sh`
 - Uses `create-dmg` tool (Homebrew)
 - Reads version from `vscode/package.json` (currently "1.94.0")
-- Creates DMG: `dist/RiteMark-{version}-darwin-arm64.dmg`
+- Creates DMG: `dist/Ritemark-{version}-darwin-arm64.dmg`
 - Generates SHA256 checksum
 
 **No Release Automation:** Currently manual process, no GitHub Actions/releases workflow.
@@ -172,7 +172,7 @@ try {
 }
 ```
 
-This is the VS Code upstream version. We need our own versioning scheme for RiteMark Native.
+This is the VS Code upstream version. We need our own versioning scheme for Ritemark Native.
 
 ## Recommended Approach
 
@@ -192,7 +192,7 @@ This is the VS Code upstream version. We need our own versioning scheme for Rite
 
 **Implementation:**
 1. Add `updateUrl` to `branding/product.json` pointing to our update server/API
-2. Set `commit` to RiteMark Native version
+2. Set `commit` to Ritemark Native version
 3. Create update manifest endpoint that returns version info
 4. Host DMG on GitHub Releases
 5. Code sign the app (requires Apple Developer certificate)
@@ -246,7 +246,7 @@ This is the VS Code upstream version. We need our own versioning scheme for Rite
 ## Risks
 
 1. **Code Signing:** Do we have Apple Developer account? Cost: $99/year
-2. **Version Scheme:** Need to decide how RiteMark versions relate to VS Code versions
+2. **Version Scheme:** Need to decide how Ritemark versions relate to VS Code versions
 3. **Update Frequency:** How often do we release? (affects user annoyance)
 4. **Breaking Changes:** What if update requires data migration?
 5. **Rollback:** If update is broken, how do users downgrade?

@@ -9,8 +9,10 @@ import { memo } from 'react';
 import { Save } from 'lucide-react';
 import { BaseNode, NodeField } from './BaseNode';
 import type { SaveFileNodeData } from '../stores/flowEditorStore';
+import { useFlowEditorStore } from '../stores/flowEditorStore';
 
 interface SaveFileNodeProps {
+  id: string;
   data: SaveFileNodeData;
   selected?: boolean;
 }
@@ -22,7 +24,9 @@ const formatNames: Record<string, string> = {
   image: 'Image (auto)',
 };
 
-function SaveFileNodeComponent({ data, selected }: SaveFileNodeProps) {
+function SaveFileNodeComponent({ id, data, selected }: SaveFileNodeProps) {
+  const executionStep = useFlowEditorStore((state) => state.executionOrder.get(id));
+
   return (
     <BaseNode
       label={data.label}
@@ -30,6 +34,7 @@ function SaveFileNodeComponent({ data, selected }: SaveFileNodeProps) {
       selected={selected}
       showSourceHandle={false}
       headerColor="var(--vscode-charts-orange)"
+      executionStep={executionStep}
     >
       <NodeField
         label="Filename"

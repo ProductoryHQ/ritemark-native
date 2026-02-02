@@ -21,10 +21,10 @@ keybinding: {
 }
 ```
 
-This binding has no `when` clause, so it fires in ALL contexts, including when the RiteMark editor is active.
+This binding has no `when` clause, so it fires in ALL contexts, including when the Ritemark editor is active.
 
 ### Solution
-Add a `when` clause to exclude RiteMark editor context:
+Add a `when` clause to exclude Ritemark editor context:
 
 ```typescript
 keybinding: {
@@ -43,13 +43,13 @@ VS Code's Custom Editor API automatically sets the `activeCustomEditorId` contex
 We'll use the patch system (not direct edit) to ensure the change survives VS Code updates.
 
 ### Testing
-1. Open markdown file (RiteMark editor active)
+1. Open markdown file (Ritemark editor active)
 2. Select text
 3. Press CMD+B
 4. **Expected:** Text becomes bold (TipTap handles it)
 5. **Expected:** Sidebar remains visible
 
-6. Click file explorer (RiteMark editor NOT active)
+6. Click file explorer (Ritemark editor NOT active)
 7. Press CMD+B
 8. **Expected:** Sidebar toggles (VS Code default behavior)
 
@@ -132,7 +132,7 @@ const timeText = readingTime === 1 ? '1 min' : `${readingTime} min`;
 ### Current State
 VS Code's default autosave setting is `"off"` (user must press CMD+S to save).
 
-RiteMark Native already has `configurationDefaults` in `package.json` that override other settings:
+Ritemark Native already has `configurationDefaults` in `package.json` that override other settings:
 ```json
 "configurationDefaults": {
   "workbench.sideBar.location": "left",

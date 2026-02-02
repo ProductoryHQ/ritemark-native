@@ -16,6 +16,7 @@ import type { Flow } from './stores/flowEditorStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { vscode } from '../../lib/vscode';
+import { setModelConfig } from '../../config/modelConfig';
 
 export function FlowEditor() {
   const setFlow = useFlowEditorStore((state) => state.setFlow);
@@ -71,6 +72,11 @@ export function FlowEditor() {
           if (!isRunningRef.current) {
             setError(message.error);
           }
+          break;
+
+        case 'flow:modelConfig':
+          // Receive model config from extension
+          setModelConfig(message.config);
           break;
       }
     };

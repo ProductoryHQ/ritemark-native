@@ -1,8 +1,8 @@
-# RiteMark Native - Debugging Report
+# Ritemark Native - Debugging Report
 
 ## Issue 1: Dark Mode Flash on Startup
 **Root Cause Theory:**
-The `configurationDefaults` in `extensions/ritemark/package.json` are applied during the extension activation phase. When RiteMark Native launches, it initially loads the workbench with the cached or default system theme (often Dark) *before* the extension host has fully started and applied the `ritemark` extension's overrides. This causes the visual "flash" from dark to light.
+The `configurationDefaults` in `extensions/ritemark/package.json` are applied during the extension activation phase. When Ritemark Native launches, it initially loads the workbench with the cached or default system theme (often Dark) *before* the extension host has fully started and applied the `ritemark` extension's overrides. This causes the visual "flash" from dark to light.
 
 **Recommended Fix:**
 Move the configuration defaults from the extension's `package.json` to the application's global `product.json`. In a VS Code fork, `product.json` settings are applied at the application bootstrap level, ensuring the theme is set before the UI renders.
@@ -32,7 +32,7 @@ Modify `branding/product.json` to include:
 3.  **CSS Injection:** The styling is injected via JavaScript. If the JS fails, no styles load, potentially leaving content invisible (though typically unstyled content would still appear).
 
 **Debugging Steps (for user):**
-1.  **Inspect Webview:** inside RiteMark Native, run the command `Developer: Open Webview Developer Tools` while the blank editor is open. This is distinct from the main window's DevTools.
+1.  **Inspect Webview:** inside Ritemark Native, run the command `Developer: Open Webview Developer Tools` while the blank editor is open. This is distinct from the main window's DevTools.
 2.  **Check Console:** Look for red errors in the Webview DevTools console.
     *   *Likely error:* "Target container is not a DOM element" (if script runs too early) or generic Syntax Errors.
 3.  **Verify Loading:** In the Network tab of Webview DevTools, reload the webview (Cmd+R) and verify `webview.js` returns status 200.

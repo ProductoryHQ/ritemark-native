@@ -1,7 +1,7 @@
 /**
  * Update Module
  *
- * Provides auto-update functionality for RiteMark Native.
+ * Provides auto-update functionality for Ritemark Native.
  * Supports both full app updates (DMG) and lightweight extension-only updates.
  */
 

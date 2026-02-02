@@ -18,6 +18,8 @@ interface BaseNodeProps {
   showSourceHandle?: boolean;
   showTargetHandle?: boolean;
   headerColor?: string;
+  /** Execution order step number (1-indexed) */
+  executionStep?: number;
 }
 
 export function BaseNode({
@@ -29,6 +31,7 @@ export function BaseNode({
   showSourceHandle = true,
   showTargetHandle = true,
   headerColor = 'var(--vscode-editor-background)',
+  executionStep,
 }: BaseNodeProps) {
   return (
     <div
@@ -54,10 +57,16 @@ export function BaseNode({
         className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-b border-[var(--vscode-panel-border)]"
         style={{ background: headerColor }}
       >
+        {/* Execution step badge */}
+        {executionStep !== undefined && (
+          <span className="flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-white/20 text-white">
+            {executionStep}
+          </span>
+        )}
         <span className="text-white opacity-80">
           {icon}
         </span>
-        <span className="text-sm font-medium text-white truncate">
+        <span className="text-sm font-medium text-white truncate flex-1">
           {label}
         </span>
       </div>

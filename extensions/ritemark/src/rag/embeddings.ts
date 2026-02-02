@@ -25,7 +25,7 @@ async function getClient(): Promise<OpenAI> {
 	const apiKey = await keyManager.getAPIKey();
 
 	if (!apiKey) {
-		throw new Error('OpenAI API key not configured. Use "RiteMark: Configure API Key" command.');
+		throw new Error('OpenAI API key not configured. Use "Ritemark: Configure API Key" command.');
 	}
 
 	return new OpenAI({ apiKey });

@@ -1,4 +1,4 @@
-# DMG Creation Research for RiteMark Native
+# DMG Creation Research for Ritemark Native
 
 **Date:** 2025-12-08
 **Sprint:** 09
@@ -8,7 +8,7 @@
 
 ## Objective
 
-Create an unsigned macOS DMG installer for RiteMark Native that:
+Create an unsigned macOS DMG installer for Ritemark Native that:
 1. Works without Apple Developer account signing/notarization
 2. Provides a clean drag-to-Applications installation experience
 3. Can be distributed for local testing and internal use
@@ -19,7 +19,7 @@ Create an unsigned macOS DMG installer for RiteMark Native that:
 ## Current State Analysis
 
 ### What We Have
-- **Build output:** `VSCode-darwin-arm64/RiteMark Native.app`
+- **Build output:** `VSCode-darwin-arm64/Ritemark Native.app`
 - **Platform:** darwin-arm64 (Apple Silicon)
 - **Build script:** `scripts/build-prod.sh` (~25 min build)
 - **Validation:** Pre/post-build validation scripts ensure integrity
@@ -54,15 +54,15 @@ Create an unsigned macOS DMG installer for RiteMark Native that:
 **Usage:**
 ```bash
 create-dmg \
-  --volname "RiteMark Native" \
+  --volname "Ritemark Native" \
   --volicon "branding/icons/icon.icns" \
   --window-pos 200 120 \
   --window-size 800 400 \
   --icon-size 100 \
-  --icon "RiteMark Native.app" 200 190 \
-  --hide-extension "RiteMark Native.app" \
+  --icon "Ritemark Native.app" 200 190 \
+  --hide-extension "Ritemark Native.app" \
   --app-drop-link 600 185 \
-  "RiteMark-Native-Installer.dmg" \
+  "Ritemark-Native-Installer.dmg" \
   "VSCode-darwin-arm64/"
 ```
 
@@ -134,7 +134,7 @@ Build .app → Create DMG → Distribute → User opens, drags to Applications
 5. Subsequent launches: Normal double-click
 
 **Gatekeeper Warning:**
-> "RiteMark Native" cannot be opened because the developer cannot be verified.
+> "Ritemark Native" cannot be opened because the developer cannot be verified.
 
 **User Action:**
 - Right-click app → Open → Confirm "Open"
@@ -154,13 +154,13 @@ When Apple Developer account is available:
 
 ### DMG Contents
 ```
-RiteMark-Native-[version].dmg
-├── RiteMark Native.app/  (the actual app)
+Ritemark-Native-[version].dmg
+├── Ritemark Native.app/  (the actual app)
 └── Applications@ (symlink to /Applications)
 ```
 
 ### DMG Properties
-- **Volume name:** "RiteMark Native [version]"
+- **Volume name:** "Ritemark Native [version]"
 - **Window size:** 800x400 pixels
 - **Icon size:** 100x100 pixels
 - **Background:** Optional custom background image
@@ -168,11 +168,11 @@ RiteMark-Native-[version].dmg
 
 ### File Naming Convention
 ```
-RiteMark-Native-[version]-darwin-arm64.dmg
+Ritemark-Native-[version]-darwin-arm64.dmg
 
 Examples:
-- RiteMark-Native-1.0.0-beta.1-darwin-arm64.dmg
-- RiteMark-Native-1.94.0-darwin-arm64.dmg
+- Ritemark-Native-1.0.0-beta.1-darwin-arm64.dmg
+- Ritemark-Native-1.94.0-darwin-arm64.dmg
 ```
 
 Version source: `vscode/package.json` + optional suffix
@@ -195,14 +195,14 @@ scripts/build-prod.sh
 ```
 scripts/build-prod.sh
   ├─ (existing steps 1-5)
-  └─ Output: VSCode-darwin-arm64/RiteMark Native.app
+  └─ Output: VSCode-darwin-arm64/Ritemark Native.app
 
 scripts/create-dmg.sh (NEW)
   ├─ Step 1: Verify .app exists
   ├─ Step 2: Extract version from package.json
   ├─ Step 3: Run create-dmg with proper naming
   ├─ Step 4: Validate DMG created
-  └─ Output: RiteMark-Native-[version]-darwin-arm64.dmg
+  └─ Output: Ritemark-Native-[version]-darwin-arm64.dmg
 
 scripts/build-and-package.sh (NEW - Optional convenience)
   ├─ Run build-prod.sh

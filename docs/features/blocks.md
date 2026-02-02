@@ -2,7 +2,7 @@
 
 > Structure your documents with headings, lists, code blocks, tables, and more.
 
-Every piece of content in RiteMark is a "block" - a paragraph, heading, list, or other element. You can insert, reorder, and delete blocks.
+Every piece of content in Ritemark is a "block" - a paragraph, heading, list, or other element. You can insert, reorder, and delete blocks.
 
 ---
 

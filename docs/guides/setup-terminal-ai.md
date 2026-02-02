@@ -1,14 +1,14 @@
 # Set Up Terminal AI
 
-> Get Claude Code, OpenAI Codex, or Google Gemini working with RiteMark.
+> Get Claude Code, OpenAI Codex, or Google Gemini working with Ritemark.
 
-Terminal-based AIs work alongside RiteMark to help you write. They can read your documents, make edits, and understand your full project context.
+Terminal-based AIs work alongside Ritemark to help you write. They can read your documents, make edits, and understand your full project context.
 
 ---
 
 ## Claude Code (Recommended)
 
-Claude Code is the best terminal AI for writing with RiteMark. It understands markdown, makes precise edits, and handles long documents well.
+Claude Code is the best terminal AI for writing with Ritemark. It understands markdown, makes precise edits, and handles long documents well.
 
 ### Install Claude Code
 
@@ -28,9 +28,9 @@ Claude Code is the best terminal AI for writing with RiteMark. It understands ma
    ```
    Follow the prompts to sign in with your Anthropic account.
 
-### Using Claude Code with RiteMark
+### Using Claude Code with Ritemark
 
-1. Open your document in RiteMark
+1. Open your document in Ritemark
 2. Open the terminal: **View** → **Terminal** or `Ctrl+``
 3. Navigate to your document folder:
    ```bash
@@ -76,7 +76,7 @@ Good for technical documentation and code-related writing.
    echo 'export OPENAI_API_KEY="your-key"' >> ~/.zshrc
    ```
 
-### Using with RiteMark
+### Using with Ritemark
 
 Codex CLI usage varies by tool. Refer to OpenAI documentation for current CLI options.
 
@@ -98,7 +98,7 @@ Fast for quick edits and brainstorming.
    export GOOGLE_API_KEY='your-key-here'
    ```
 
-### Using with RiteMark
+### Using with Ritemark
 
 Refer to Google's Gemini CLI documentation for current usage.
 
@@ -168,9 +168,9 @@ pwd  # shows current directory
 ls   # lists files here
 ```
 
-### Changes don't appear in RiteMark
+### Changes don't appear in Ritemark
 
-1. RiteMark should auto-detect file changes
+1. Ritemark should auto-detect file changes
 2. If not, reload: Cmd+Shift+P → "Reload Window"
 
 ---

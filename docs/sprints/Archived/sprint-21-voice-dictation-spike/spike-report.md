@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The spike aimed to test VS Code Speech extension compatibility with RiteMark. However, the **first check revealed a blocker**: VS Code Speech does not support Estonian, which is a MUST requirement.
+The spike aimed to test VS Code Speech extension compatibility with Ritemark. However, the **first check revealed a blocker**: VS Code Speech does not support Estonian, which is a MUST requirement.
 
 **Recommendation:** Skip VS Code Speech → Proceed to whisper.cpp implementation.
 
@@ -79,7 +79,7 @@ Build voice dictation using whisper.cpp with:
 ### Technical Approach
 
 ```
-RiteMark Extension (TypeScript)
+Ritemark Extension (TypeScript)
         │
         ▼
     whisper-node (npm package)

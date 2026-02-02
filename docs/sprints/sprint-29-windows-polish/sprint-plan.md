@@ -11,8 +11,8 @@ Fix 6 issues: 4 Windows-specific polish issues + 2 cross-platform export bugs to
 ## Success Criteria
 
 ### Windows Polish (Issues 1-4)
-- [ ] Windows executable shows RiteMark icon in File Explorer
-- [ ] Welcome screen shows RiteMark walkthrough (not VS Code default)
+- [ ] Windows executable shows Ritemark icon in File Explorer
+- [ ] Welcome screen shows Ritemark walkthrough (not VS Code default)
 - [ ] Dictate button is hidden on Windows (uses existing platform check)
 - [ ] App opens with Light theme immediately (no dark flash)
 
@@ -27,7 +27,7 @@ Fix 6 issues: 4 Windows-specific polish issues + 2 cross-platform export bugs to
 | Deliverable | Description | Platform |
 |-------------|-------------|----------|
 | File Explorer icon | Embed `icon.ico` into Windows executable during build | Windows |
-| Welcome screen | Configure product.json or patch to show RiteMark walkthrough | Windows |
+| Welcome screen | Configure product.json or patch to show Ritemark walkthrough | Windows |
 | Dictate button visibility | Use existing `features.voiceDictation` flag in webview UI | Windows |
 | Default theme fix | Set default theme in product.json or patch VS Code defaults | Windows |
 | PDF image embedding | Fetch and embed images instead of "[Image]" placeholder | All |
@@ -86,7 +86,7 @@ Fix 6 issues: 4 Windows-specific polish issues + 2 cross-platform export bugs to
 - [x] Chose extension-based approach (no patch needed)
 - [x] Add first-launch detection in extension.ts activation
 - [x] Show walkthrough via command: `workbench.action.openWalkthrough`
-- [ ] Test: Launch fresh install, verify RiteMark walkthrough shows
+- [ ] Test: Launch fresh install, verify Ritemark walkthrough shows
 
 ### Phase 8: Dark Theme Flash
 - [ ] Check VS Code default theme location in source
@@ -105,7 +105,7 @@ Fix 6 issues: 4 Windows-specific polish issues + 2 cross-platform export bugs to
 
 #### Issue #2: Welcome Screen
 **Current:** Shows VS Code default Welcome page
-**Expected:** Shows RiteMark walkthrough (already defined in package.json)
+**Expected:** Shows Ritemark walkthrough (already defined in package.json)
 **Fix location:** product.json or VS Code welcome page patch
 **Reference:** Extension already has walkthrough at `extensions/ritemark/package.json` lines 126-164
 

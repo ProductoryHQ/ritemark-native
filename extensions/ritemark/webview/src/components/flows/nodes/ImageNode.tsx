@@ -9,8 +9,10 @@ import { memo } from 'react';
 import { Image } from 'lucide-react';
 import { BaseNode, NodeField } from './BaseNode';
 import type { ImageNodeData } from '../stores/flowEditorStore';
+import { useFlowEditorStore } from '../stores/flowEditorStore';
 
 interface ImageNodeProps {
+  id: string;
   data: ImageNodeData;
   selected?: boolean;
 }
@@ -21,7 +23,9 @@ const providerNames: Record<string, string> = {
   gemini: 'Nano Banana Pro',
 };
 
-function ImageNodeComponent({ data, selected }: ImageNodeProps) {
+function ImageNodeComponent({ id, data, selected }: ImageNodeProps) {
+  const executionStep = useFlowEditorStore((state) => state.executionOrder.get(id));
+
   // Truncate prompt for display
   const truncateText = (text: string, maxLength: number = 50) => {
     if (!text) return '';
@@ -34,6 +38,7 @@ function ImageNodeComponent({ data, selected }: ImageNodeProps) {
       icon={<Image size={16} />}
       selected={selected}
       headerColor="var(--vscode-charts-green)"
+      executionStep={executionStep}
     >
       <NodeField
         label="Provider"

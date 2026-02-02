@@ -107,7 +107,7 @@ context.subscriptions.push(
 context.subscriptions.push(
   vscode.commands.registerCommand('ritemark.insertTaskList', () => {
     // Send message to active webview
-    RiteMarkEditorProvider.executeEditorCommand('toggleTaskList');
+    RitemarkEditorProvider.executeEditorCommand('toggleTaskList');
   })
 );
 ```
@@ -119,7 +119,7 @@ context.subscriptions.push(
 "commands": [
   {
     "command": "ritemark.configureApiKey",
-    "title": "RiteMark: Configure OpenAI API Key"
+    "title": "Ritemark: Configure OpenAI API Key"
   },
   // ...
 ]
@@ -129,8 +129,8 @@ context.subscriptions.push(
 ```json
 {
   "command": "ritemark.insertTaskList",
-  "title": "RiteMark: Insert Task List",
-  "category": "RiteMark"
+  "title": "Ritemark: Insert Task List",
+  "category": "Ritemark"
 }
 ```
 

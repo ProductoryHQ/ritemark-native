@@ -16,7 +16,7 @@
 
 **Problem:** AI agents (Claude Code, Codex, Cursor) can't read binary files (PDF, Word, PPTX) in the workspace. `grep` and `Read` tools fail on non-text content. A significant portion of project knowledge is invisible to AI assistants.
 
-**Solution:** Local-first multi-modal RAG system built into RiteMark that:
+**Solution:** Local-first multi-modal RAG system built into Ritemark that:
 1. Indexes all documents in the workspace
 2. Exposes indexed content via MCP server to AI agents
 3. Provides a unified search/chat UI in the left sidebar
@@ -114,8 +114,8 @@ sqlite-vec (local SQLite file, .ritemark/rag.db)
 | Deleted | `AIViewProvider.ts`, `AIChatSidebar.tsx` |
 
 **New commands:**
-- `RiteMark: Re-index Documents` - manual full re-index with progress
-- `RiteMark: Generate MCP Config for Claude Code` - writes MCP config
+- `Ritemark: Re-index Documents` - manual full re-index with progress
+- `Ritemark: Generate MCP Config for Claude Code` - writes MCP config
 
 ---
 
@@ -193,9 +193,9 @@ sqlite-vec          # Vector search extension
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 2. Place PDF/DOCX files in workspace
-3. Run command: `RiteMark: Re-index Documents`
+3. Run command: `Ritemark: Re-index Documents`
 4. Open left sidebar → search/ask questions
-5. For Claude Code: run `RiteMark: Generate MCP Config for Claude Code`
+5. For Claude Code: run `Ritemark: Generate MCP Config for Claude Code`
 
 ---
 

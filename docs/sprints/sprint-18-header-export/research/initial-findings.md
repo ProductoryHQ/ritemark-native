@@ -4,7 +4,7 @@
 2026-01-11
 
 ## Overview
-RiteMark needs a sticky header bar with Properties toggle and Export functionality. This addresses two UX issues:
+Ritemark needs a sticky header bar with Properties toggle and Export functionality. This addresses two UX issues:
 1. Properties panel feels "awkward" hanging inline
 2. Missing export functionality (PDF, Word)
 

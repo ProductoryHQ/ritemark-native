@@ -1,8 +1,8 @@
 # Set Up Claude Code
 
-> Use Anthropic's Claude directly in RiteMark's terminal for powerful document editing.
+> Use Anthropic's Claude directly in Ritemark's terminal for powerful document editing.
 
-Claude Code is Anthropic's official CLI tool. It works exceptionally well with RiteMark because it can read and edit markdown files directly.
+Claude Code is Anthropic's official CLI tool. It works exceptionally well with Ritemark because it can read and edit markdown files directly.
 
 ---
 
@@ -20,7 +20,7 @@ After setup, you can:
 
 ### Step 1: Install Claude Code
 
-Open RiteMark's terminal (View → Terminal or Ctrl+`) and run:
+Open Ritemark's terminal (View → Terminal or Ctrl+`) and run:
 
 ```bash
 npm install -g @anthropic-ai/claude-code
@@ -68,7 +68,7 @@ Should show the installed version.
 
 ### Edit Current Document
 
-With a document open in RiteMark:
+With a document open in Ritemark:
 
 ```bash
 claude "make this document more concise"
@@ -223,7 +223,7 @@ Wait a few minutes and try again. Consider upgrading your Anthropic plan for hig
 
 ### Changes Not Appearing
 
-1. Save the file in RiteMark (Cmd+S)
+1. Save the file in Ritemark (Cmd+S)
 2. Or wait for auto-reload (1 second)
 3. Or reload window (Cmd+Shift+P → Reload Window)
 
@@ -261,4 +261,4 @@ Check usage at [Anthropic Console](https://console.anthropic.com/).
 
 - [Terminal AI Integration](../features/terminal-ai.md) - Overview of terminal AI
 - [AI Assistant](../features/ai-assistant.md) - Built-in chat sidebar
-- [Getting Started](getting-started.md) - RiteMark basics
+- [Getting Started](getting-started.md) - Ritemark basics

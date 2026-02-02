@@ -43,7 +43,7 @@ Based on Phase 1 research, Jarmo made the following decisions for Sprint 21:
 **Decision:** Include file watcher (MAXIMUM SCOPE)
 - Automatic detection of external file changes
 - Notification banner when file changes on disk
-- Better UX for the workflow: edit in Excel → RiteMark detects change
+- Better UX for the workflow: edit in Excel → Ritemark detects change
 
 ### 4. Unsaved Changes Warning
 **Decision:** Always warn before discarding
@@ -72,7 +72,7 @@ Based on Phase 1 research, Jarmo made the following decisions for Sprint 21:
 - **Refresh Strategy:** Simple reload from disk
 
 ### CSV Files
-- **Provider:** `RiteMarkEditorProvider` (CustomTextEditorProvider)
+- **Provider:** `RitemarkEditorProvider` (CustomTextEditorProvider)
 - **Editable:** YES (cell editing via DataTable)
 - **Conflict Risk:** HIGH (unsaved changes + external edits)
 - **Refresh Strategy:** Conflict detection required

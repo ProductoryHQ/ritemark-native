@@ -2,12 +2,12 @@
 
 ## Problem
 
-Windows build shows VS Code's default Welcome page instead of RiteMark's custom walkthrough.
+Windows build shows VS Code's default Welcome page instead of Ritemark's custom walkthrough.
 
-**Expected:** RiteMark walkthrough (Get Started with Ritemark)
+**Expected:** Ritemark walkthrough (Get Started with Ritemark)
 **Actual:** VS Code generic welcome screen
 
-## RiteMark Walkthrough (Already Exists)
+## Ritemark Walkthrough (Already Exists)
 
 **Location:** `extensions/ritemark/package.json` lines 126-164
 
@@ -156,7 +156,7 @@ export async function activate(context: vscode.ExtensionContext) {
 1. Build Windows app
 2. Delete user data folder: `%APPDATA%\.ritemark`
 3. Launch app
-4. Verify: RiteMark walkthrough shows automatically
+4. Verify: Ritemark walkthrough shows automatically
 
 ## Complexity
 

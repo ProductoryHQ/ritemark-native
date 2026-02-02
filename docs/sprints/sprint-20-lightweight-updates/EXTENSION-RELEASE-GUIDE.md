@@ -1,6 +1,6 @@
 # Extension-Only Release Guide
 
-This guide explains how to create and publish extension-only updates for RiteMark Native.
+This guide explains how to create and publish extension-only updates for Ritemark Native.
 
 ## Overview
 
@@ -80,7 +80,7 @@ Or manually:
 
 ### User Flow
 
-1. RiteMark checks for updates on startup
+1. Ritemark checks for updates on startup
 2. Downloads `update-manifest.json` from latest release
 3. Detects update type (extension vs full)
 4. For extension updates:
@@ -96,7 +96,7 @@ Or manually:
 |----------|---------|
 | `~/.ritemark/extensions/ritemark-{version}/` | Installed user extensions |
 | `~/.ritemark/staging/` | Temporary download location |
-| `RiteMark.app/.../extensions/ritemark/` | Bundled extension (fallback) |
+| `Ritemark.app/.../extensions/ritemark/` | Bundled extension (fallback) |
 
 ### VS Code Loading Priority
 

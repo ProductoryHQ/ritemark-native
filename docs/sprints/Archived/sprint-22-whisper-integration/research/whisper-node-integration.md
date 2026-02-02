@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document details the technical approach for integrating whisper.cpp into RiteMark via the whisper-node npm package.
+This document details the technical approach for integrating whisper.cpp into Ritemark via the whisper-node npm package.
 
 ## Package: whisper-node
 
@@ -318,7 +318,7 @@ if (!isDictationSupported()) {
 - First-use delay (1-2 minutes download)
 - Requires internet for first setup
 
-**Recommendation:** Option 1 (bundle) - aligns with RiteMark's offline-first philosophy.
+**Recommendation:** Option 1 (bundle) - aligns with Ritemark's offline-first philosophy.
 
 ---
 

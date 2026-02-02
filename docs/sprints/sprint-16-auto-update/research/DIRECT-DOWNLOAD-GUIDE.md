@@ -8,7 +8,7 @@
 ## The Problem
 
 Without notarization, macOS Gatekeeper blocks apps downloaded from the internet:
-- "RiteMark.app is damaged and can't be opened"
+- "Ritemark.app is damaged and can't be opened"
 - "Apple cannot verify the developer"
 
 ---
@@ -22,11 +22,11 @@ Without notarization, macOS Gatekeeper blocks apps downloaded from the internet:
 #### User Instructions
 ```bash
 # Download directly (no quarantine)
-curl -L -o ~/Downloads/RiteMark.dmg "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.0.1/RiteMark-1.0.1.dmg"
+curl -L -o ~/Downloads/Ritemark.dmg "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.0.1/Ritemark-1.0.1.dmg"
 
 # Mount and install
-open ~/Downloads/RiteMark.dmg
-# Drag RiteMark to Applications
+open ~/Downloads/Ritemark.dmg
+# Drag Ritemark to Applications
 ```
 
 This is the **cleanest method** - no warnings, no extra steps.
@@ -39,10 +39,10 @@ If user already downloaded via browser:
 
 ```bash
 # Remove quarantine from DMG
-xattr -d com.apple.quarantine ~/Downloads/RiteMark-1.0.1.dmg
+xattr -d com.apple.quarantine ~/Downloads/Ritemark-1.0.1.dmg
 
 # Or from app after mounting
-xattr -d com.apple.quarantine /Volumes/RiteMark/RiteMark.app
+xattr -d com.apple.quarantine /Volumes/Ritemark/Ritemark.app
 ```
 
 ---
@@ -86,18 +86,18 @@ sudo spctl --master-enable
 ### Download Section
 
 ```markdown
-## Download RiteMark
+## Download Ritemark
 
 **Latest:** v1.0.1 (January 2026)
 
 ### Option A: Direct Download (Recommended)
 Run this in Terminal:
 \`\`\`
-curl -L -o ~/Downloads/RiteMark.dmg "https://github.com/.../RiteMark-1.0.1.dmg" && open ~/Downloads/RiteMark.dmg
+curl -L -o ~/Downloads/Ritemark.dmg "https://github.com/.../Ritemark-1.0.1.dmg" && open ~/Downloads/Ritemark.dmg
 \`\`\`
 
 ### Option B: Browser Download
-1. [Download RiteMark-1.0.1.dmg](link)
+1. [Download Ritemark-1.0.1.dmg](link)
 2. If blocked by Gatekeeper, see [installation help](#gatekeeper)
 
 ---
@@ -105,7 +105,7 @@ curl -L -o ~/Downloads/RiteMark.dmg "https://github.com/.../RiteMark-1.0.1.dmg" 
 <a name="gatekeeper"></a>
 ## Gatekeeper Help
 
-RiteMark is code-signed but awaiting Apple notarization.
+Ritemark is code-signed but awaiting Apple notarization.
 If macOS blocks the app:
 
 **macOS Sequoia:** System Settings → Privacy & Security → "Open Anyway"
@@ -121,7 +121,7 @@ Even without notarization:
 - **Signed app** = "from identified developer" (yellow warning)
 - **Unsigned app** = "from unidentified developer" (harder to approve)
 
-RiteMark is signed with Developer ID, so warnings are less scary.
+Ritemark is signed with Developer ID, so warnings are less scary.
 
 ### First-Run Only
 Users only need to approve once. After that, the app opens normally.
@@ -139,18 +139,18 @@ Removing quarantine from the DMG before mounting is cleanest.
 
 ### Check if file is quarantined
 ```bash
-xattr -l ~/Downloads/RiteMark.dmg
+xattr -l ~/Downloads/Ritemark.dmg
 # Look for: com.apple.quarantine
 ```
 
 ### Check app signature
 ```bash
-codesign -dv --verbose=4 /Applications/RiteMark.app
+codesign -dv --verbose=4 /Applications/Ritemark.app
 ```
 
 ### Check notarization status
 ```bash
-spctl -a -v /Applications/RiteMark.app
+spctl -a -v /Applications/Ritemark.app
 # "accepted" = notarized
 # "rejected" = not notarized
 ```

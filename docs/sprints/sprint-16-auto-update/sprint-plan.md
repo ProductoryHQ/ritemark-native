@@ -44,7 +44,7 @@ Implement auto-update notifications that check GitHub Releases for new versions 
 
 ### Phase 2: Versioning Setup
 - [x] Add `version` field to `branding/product.json` (e.g., "1.0.0")
-- [ ] Modify `scripts/create-dmg.sh` to use RiteMark version instead of VS Code version
+- [ ] Modify `scripts/create-dmg.sh` to use Ritemark version instead of VS Code version
 - [ ] Update build scripts to inject version into product.json
 - [x] Create version constant accessible at runtime
 - [x] Document versioning scheme (semantic versioning)
@@ -69,7 +69,7 @@ Implement auto-update notifications that check GitHub Releases for new versions 
 - [x] Add "Update Now" button (opens download URL)
 - [x] Add "Later" button (dismisses notification)
 - [x] Add "Don't Show Again" option (saves preference)
-- [x] Style notification to match RiteMark branding (using VS Code native)
+- [x] Style notification to match Ritemark branding (using VS Code native)
 
 ### Phase 6: Update Check Trigger
 - [x] Check for updates on app startup (after window opens)
@@ -114,10 +114,10 @@ API_ENDPOINT  = "https://api.github.com/repos/jarmo-productory/ritemark-public/r
 
 **Release Asset Naming Convention (EXACT):**
 ```
-RiteMark-{VERSION}-darwin-arm64.dmg
+Ritemark-{VERSION}-darwin-arm64.dmg
 ```
-- Example: `RiteMark-1.0.0-darwin-arm64.dmg`
-- NO spaces, NO uppercase except "RiteMark"
+- Example: `Ritemark-1.0.0-darwin-arm64.dmg`
+- NO spaces, NO uppercase except "Ritemark"
 - Version WITHOUT "v" prefix in filename
 
 **Git Tag Convention:**
@@ -159,7 +159,7 @@ export function getCurrentVersion(): string {
 {
   "contributes": {
     "configuration": {
-      "title": "RiteMark Updates",
+      "title": "Ritemark Updates",
       "properties": {
         "ritemark.updates.enabled": {
           "type": "boolean",
@@ -296,7 +296,7 @@ export function shouldNotifyUpdate(current: string, latest: string): boolean {
 // File: extensions/ritemark/src/update/updateNotification.ts
 import * as vscode from 'vscode';
 
-const NOTIFICATION_TEXT = 'A new version of RiteMark is available';
+const NOTIFICATION_TEXT = 'A new version of Ritemark is available';
 
 const ACTIONS = {
   INSTALL_NOW: 'Install Now',
@@ -382,12 +382,12 @@ Response (relevant fields):
 ```json
 {
   "tag_name": "v1.0.1",
-  "name": "RiteMark Native 1.0.1",
+  "name": "Ritemark Native 1.0.1",
   "body": "Release notes...",
   "assets": [
     {
-      "name": "RiteMark-1.0.1-darwin-arm64.dmg",
-      "browser_download_url": "https://github.com/.../releases/download/v1.0.1/RiteMark-1.0.1-darwin-arm64.dmg"
+      "name": "Ritemark-1.0.1-darwin-arm64.dmg",
+      "browser_download_url": "https://github.com/.../releases/download/v1.0.1/Ritemark-1.0.1-darwin-arm64.dmg"
     }
   ]
 }
@@ -397,8 +397,8 @@ Response (relevant fields):
 
 ```json
 {
-  "nameShort": "RiteMark",
-  "nameLong": "RiteMark",
+  "nameShort": "Ritemark",
+  "nameLong": "Ritemark",
   "version": "1.0.0",
   "commit": "1.0.0",
   "quality": "stable",
@@ -477,15 +477,15 @@ Cursor uses a clean, non-intrusive banner at the top of the window:
 ## Release Asset Naming
 
 ```
-RiteMark-{VERSION}-{PLATFORM}.dmg
+Ritemark-{VERSION}-{PLATFORM}.dmg
 ```
 
 **Examples:**
-- `RiteMark-1.0.0-darwin-arm64.dmg`
-- `RiteMark-1.0.1-darwin-arm64.dmg`
+- `Ritemark-1.0.0-darwin-arm64.dmg`
+- `Ritemark-1.0.1-darwin-arm64.dmg`
 
 **Checksum:**
-- `RiteMark-1.0.0-darwin-arm64.dmg.sha256`
+- `Ritemark-1.0.0-darwin-arm64.dmg.sha256`
 
 ## Status
 

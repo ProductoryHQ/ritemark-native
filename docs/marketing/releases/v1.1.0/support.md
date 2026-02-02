@@ -6,7 +6,7 @@ Ask questions about your documents and get AI-powered answers with source citati
 
 ## What is Document Search?
 
-**Document Search** lets the RiteMark AI assistant search your markdown documents and provide answers based on what you've actually written. Instead of generic AI responses, you get answers grounded in your own notes.
+**Document Search** lets the Ritemark AI assistant search your markdown documents and provide answers based on what you've actually written. Instead of generic AI responses, you get answers grounded in your own notes.
 
 ![](./images/image-1769421231992.png)
 
@@ -16,12 +16,12 @@ Ask questions about your documents and get AI-powered answers with source citati
 
 1.  Open a workspace containing markdown files
     
-2.  Click the **RiteMark AI** icon in the left sidebar  
-    ![RiteMark AI icon in sidebar](./images/image-1769410779205.png)
+2.  Click the **Ritemark AI** icon in the left sidebar  
     
+    ![Ritemark AI icon in sidebar](./images/image-1769410779205.png)
 3.  Click **Re-index** in the footer  
-    ![Re-index button in footer](./images/image-1769410790440.png)
     
+    ![Re-index button in footer](./images/image-1769410790440.png)
 4.  Wait for indexing to complete (you'll see "X docs" in the footer)
     
 5.  Ask questions in natural language:
@@ -73,7 +73,7 @@ Document Search uses your existing OpenAI API key. To configure:
 
 1.  Open Command Palette (`Cmd+Shift+P`)
     
-2.  Run "RiteMark: Configure OpenAI API Key"
+2.  Run "Ritemark: Configure OpenAI API Key"
     
 3.  Enter your API key
     

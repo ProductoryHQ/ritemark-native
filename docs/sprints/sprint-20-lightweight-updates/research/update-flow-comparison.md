@@ -13,7 +13,7 @@ This document visualizes the difference between current (full DMG) and proposed 
 │                         USER TIMELINE                            │
 └──────────────────────────────────────────────────────────────────┘
 
- 0:00  User opens RiteMark
+ 0:00  User opens Ritemark
        │
        ├─ (10 sec delay)
        │
@@ -31,13 +31,13 @@ This document visualizes the difference between current (full DMG) and proposed 
        │
        ├─ User opens DMG
        │
-       ├─ User drags RiteMark to Applications
+       ├─ User drags Ritemark to Applications
        │
        ├─ macOS replaces old app
        │
-       ├─ User quits current RiteMark
+       ├─ User quits current Ritemark
        │
-       ├─ User opens new RiteMark
+       ├─ User opens new Ritemark
        │
  6:00  Update complete
 
@@ -60,7 +60,7 @@ This document visualizes the difference between current (full DMG) and proposed 
 │                         USER TIMELINE                            │
 └──────────────────────────────────────────────────────────────────┘
 
- 0:00  User opens RiteMark
+ 0:00  User opens Ritemark
        │
        ├─ (10 sec delay)
        │
@@ -103,7 +103,7 @@ This document visualizes the difference between current (full DMG) and proposed 
 │                         USER TIMELINE                            │
 └──────────────────────────────────────────────────────────────────┘
 
- 0:00  User opens RiteMark
+ 0:00  User opens Ritemark
        │
        ├─ (10 sec delay)
        │
@@ -156,7 +156,7 @@ This document visualizes the difference between current (full DMG) and proposed 
 
 ### Extension-Only Update
 ```
-VSCode-darwin-arm64/RiteMark.app/Contents/Resources/app/
+VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/
 ├── extensions/
 │   └── ritemark/                    ← UPDATED
 │       ├── out/
@@ -172,7 +172,7 @@ VSCode-darwin-arm64/RiteMark.app/Contents/Resources/app/
 
 ### Full App Update
 ```
-VSCode-darwin-arm64/RiteMark.app/
+VSCode-darwin-arm64/Ritemark.app/
 └── Contents/
     ├── MacOS/
     │   └── Electron                 ← May change

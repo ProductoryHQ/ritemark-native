@@ -13,6 +13,13 @@ import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { getAPIKeyManager } from '../ai/apiKeyManager';
+import {
+  OPENAI_LLM_MODELS,
+  OPENAI_IMAGE_MODELS,
+  GEMINI_LLM_MODELS,
+  GEMINI_IMAGE_MODELS,
+  DEFAULT_MODELS
+} from '../ai/modelConfig';
 
 /**
  * Sanitize a string for use in a filename
@@ -89,7 +96,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
         switch (message.type) {
           case 'ready':
-            // Webview is ready, send the flow data
+            // Webview is ready, send model config and flow data
+            this.sendModelConfig(webview);
             this.sendFlowData(document, webview, workspacePath);
             return;
 
@@ -101,6 +109,9 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
                 await this.updateDocument(document, message.flow, webview);
                 // Signal save complete so webview marks clean
                 webview.postMessage({ type: 'flow:saved' });
+                // Re-validate and send updated warnings
+                const saveWarnings = this.validateFlow(message.flow);
+                webview.postMessage({ type: 'flow:validation', warnings: saveWarnings });
                 // Refresh flows list in sidebar
                 vscode.commands.executeCommand('ritemark.flows.refresh');
               } finally {
@@ -199,6 +210,23 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         error: `Invalid flow JSON: ${err instanceof Error ? err.message : String(err)}`,
       });
     }
+  }
+
+  /**
+   * Send model configuration to webview
+   * This allows webview to use the same model config as extension
+   */
+  private sendModelConfig(webview: vscode.Webview): void {
+    webview.postMessage({
+      type: 'flow:modelConfig',
+      config: {
+        openaiLLM: OPENAI_LLM_MODELS.map(m => ({ id: m.id, name: m.name })),
+        openaiImage: OPENAI_IMAGE_MODELS.filter(m => !m.deprecated).map(m => ({ id: m.id, name: m.name })),
+        geminiLLM: GEMINI_LLM_MODELS.map(m => ({ id: m.id, name: m.name })),
+        geminiImage: GEMINI_IMAGE_MODELS.map(m => ({ id: m.id, name: m.name })),
+        defaults: DEFAULT_MODELS,
+      },
+    });
   }
 
   /**
@@ -312,6 +340,22 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         const data = node.data as { userPrompt?: string };
         if (!data.userPrompt?.trim()) {
           warnings.push(`LLM node "${(node.data as { label?: string }).label || node.id}" has no user prompt`);
+        }
+      }
+
+      // Check for Image nodes missing prompts
+      if (node.type === 'image-prompt') {
+        const data = node.data as { prompt?: string };
+        if (!data.prompt?.trim()) {
+          warnings.push(`Image node "${(node.data as { label?: string }).label || node.id}" has no prompt`);
+        }
+      }
+
+      // Check for Save File nodes missing source
+      if (node.type === 'save-file') {
+        const data = node.data as { sourceNodeId?: string; content?: string };
+        if (!data.sourceNodeId && !data.content) {
+          warnings.push(`Save File node "${(node.data as { label?: string }).label || node.id}" has no source node or content`);
         }
       }
     }

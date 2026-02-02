@@ -23,5 +23,5 @@
 ## Üldine
 
 - [x] App käivitub korralikult
-- [x] .md failid avanevad RiteMark editoris
+- [x] .md failid avanevad Ritemark editoris
 - [x] Salvestamine töötab (Cmd+S)

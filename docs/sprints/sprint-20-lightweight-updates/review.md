@@ -3,7 +3,7 @@
 ## Findings (ordered by severity)
 
 1) App bundle writes break code signing
-- Updating files under `RiteMark.app/Contents/Resources/app/extensions/ritemark` will invalidate the app signature and can trigger Gatekeeper or launch failures on macOS.
+- Updating files under `Ritemark.app/Contents/Resources/app/extensions/ritemark` will invalidate the app signature and can trigger Gatekeeper or launch failures on macOS.
 - This is incompatible with a "production macOS builds" success criterion unless the app is re-signed after update or the update target moves outside the bundle.
 
 2) Backup location mismatch

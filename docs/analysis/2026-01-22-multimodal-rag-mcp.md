@@ -1,4 +1,4 @@
-# Multi-Modal RAG + MCP Integration for RiteMark
+# Multi-Modal RAG + MCP Integration for Ritemark
 
 **Date:** 2026-01-22
 **Status:** Research / Feature Design
@@ -8,7 +8,7 @@
 
 ## 1. Problem Statement
 
-When a RiteMark workspace contains non-text files:
+When a Ritemark workspace contains non-text files:
 - **PDFs** - Claude Code returns "Error: This tool cannot read binary files" ([Issue #1510](https://github.com/anthropics/claude-code/issues/1510))
 - **Word (.docx)** - Binary XML archive, grep finds nothing useful
 - **PowerPoint (.pptx)** - Same as Word
@@ -23,9 +23,9 @@ Per GitHub Issue #1510, Claude Code's `Read` tool explicitly rejects binary file
 
 ---
 
-## 2. Proposed Solution: RiteMark RAG
+## 2. Proposed Solution: Ritemark RAG
 
-A **local-first** multi-modal RAG system built into RiteMark that:
+A **local-first** multi-modal RAG system built into Ritemark that:
 
 1. **Indexes** all documents in the workspace (PDF, Word, PPTX, images, etc.)
 2. **Exposes** indexed content via **MCP server** to Claude Code, Codex, Cursor, etc.
@@ -222,7 +222,7 @@ Users would add to their `.claude/settings.json`:
 }
 ```
 
-Or RiteMark could auto-generate this config when RAG is enabled.
+Or Ritemark could auto-generate this config when RAG is enabled.
 
 ---
 
@@ -246,7 +246,7 @@ Left sidebar (Primary Sidebar), own Activity Bar icon. Replaces current AI assis
 
 ```
 ┌──────────────────────────┐
-│ ✦ RiteMark AI            │  ← Activity Bar tab (left)
+│ ✦ Ritemark AI            │  ← Activity Bar tab (left)
 ├──────────────────────────┤
 │                          │
 │ 💬 Mis on Q4 raporti     │
@@ -295,7 +295,7 @@ The chat is context-aware - it detects what the user needs based on input + stat
 ### System Prompt Strategy
 
 ```
-You are RiteMark AI, a document assistant.
+You are Ritemark AI, a document assistant.
 
 CAPABILITIES:
 1. Answer questions using indexed workspace documents (RAG)
@@ -449,11 +449,11 @@ sqlite-vec            # Vector search extension for SQLite
 | `rag-mcp` (PyPI) | Yes (Docling) | Yes | Yes | No | No |
 | Cursor built-in | Text only | No | Yes | Yes | Yes |
 | Continue.dev | Text + some | Yes | Partial | Yes | VS Code |
-| **RiteMark RAG** | Yes (Docling+ColPali) | Yes | Yes | Yes | Native |
+| **Ritemark RAG** | Yes (Docling+ColPali) | Yes | Yes | Yes | Native |
 
 ### Key Differentiator
 
-RiteMark RAG would be unique in combining:
+Ritemark RAG would be unique in combining:
 1. **Native integration** (not a separate tool to install)
 2. **Multi-modal** (PDF tables, images, Word formatting)
 3. **MCP exposure** (works with ANY MCP client)

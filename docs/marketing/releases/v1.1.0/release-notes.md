@@ -1,4 +1,4 @@
-# RiteMark v1.1.0
+# Ritemark v1.1.0
 
 **Released:** 2026-01-26  
 **Type:** Minor (significant feature addition)  
@@ -6,11 +6,11 @@
 
 ## Highlights
 
-RiteMark v1.1.0 introduces **Document Search** - ask questions about your own documents and get answers from your notes, complete with source citations.
+Ritemark v1.1.0 introduces **Document Search** - ask questions about your own documents and get answers from your notes, complete with source citations.
 
 ## What's New
 
-### Document Search (with RiteMark AI assistant)
+### Document Search (with Ritemark AI assistant)
 
 Your **Ritemark AI assistant** now understands your workspace. Index your markdown files once, then ask questions like "What did I write about project X?" or "Summarize my notes on Y" - and get answers drawn from your own documents.
 
@@ -42,7 +42,7 @@ Your **Ritemark AI assistant** now understands your workspace. Index your markdo
 
 1.  Open a workspace containing markdown files
     
-2.  Click the RiteMark AI icon in the left sidebar
+2.  Click the Ritemark AI icon in the left sidebar
     
 3.  Click "Re-index" in the footer
     
@@ -96,7 +96,7 @@ This is **Phase 1** of Document Search. Here's what's planned:
 
 ## Upgrade Notes
 
-1.  Download RiteMark.dmg from GitHub Releases
+1.  Download Ritemark.dmg from GitHub Releases
     
 2.  Drag to Applications (replace existing)
     

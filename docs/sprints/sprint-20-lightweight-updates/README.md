@@ -16,7 +16,7 @@ Enable fast in-place updates for extension-only changes (webview, TypeScript cod
 
 ## Problem Statement
 
-Currently, any change to RiteMark (even a one-line webview fix) requires:
+Currently, any change to Ritemark (even a one-line webview fix) requires:
 1. Downloading 500MB DMG from GitHub
 2. Manual drag-to-Applications
 3. 5-15 minute process

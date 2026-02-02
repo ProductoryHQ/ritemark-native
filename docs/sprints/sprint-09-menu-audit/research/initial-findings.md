@@ -169,7 +169,7 @@ menuOpts: {
 
 **After:**
 ```typescript
-// RiteMark: Emmet menu item removed - not relevant for markdown editing
+// Ritemark: Emmet menu item removed - not relevant for markdown editing
 // menuOpts: {
 //     menuId: MenuId.MenubarEditMenu,
 //     group: '5_insert',
@@ -215,13 +215,13 @@ From `patches/vscode/002-hide-chat-sidebar.patch`:
 
 **Pattern observed:**
 - Comment out registration code
-- Add "RiteMark:" prefix to comments
+- Add "Ritemark:" prefix to comments
 - Keep code readable (commented, not deleted)
 - Can be easily reversed if needed
 
 **Example:**
 ```typescript
-// RiteMark: Chat sidebar registration removed - not needed without Copilot
+// Ritemark: Chat sidebar registration removed - not needed without Copilot
 // this._viewContainer = this.registerViewContainer();
 // this.registerDefaultParticipantView();
 ```

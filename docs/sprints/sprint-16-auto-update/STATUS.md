@@ -80,7 +80,7 @@ Based on implementation (testing required to verify):
 - In-app release notes viewer
 
 ### Build Script Updates (Required before production)
-- Modify `scripts/create-dmg.sh` to use RiteMark version (not VS Code version)
+- Modify `scripts/create-dmg.sh` to use Ritemark version (not VS Code version)
 - Ensure version propagates from product.json to final build
 
 ## Known Limitations
@@ -162,7 +162,7 @@ Based on implementation (testing required to verify):
 ## Context
 
 After releasing v1.0.0, users downloading the DMG from GitHub encountered:
-> "RiteMark.app is damaged and can't be opened"
+> "Ritemark.app is damaged and can't be opened"
 
 This is macOS Gatekeeper blocking unsigned apps downloaded from the internet.
 

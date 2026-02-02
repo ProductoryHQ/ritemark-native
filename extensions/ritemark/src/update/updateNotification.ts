@@ -14,7 +14,7 @@ import { UserExtensionInstaller } from './userExtensionInstaller';
 // Full App Update Notification (existing flow)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FULL_UPDATE_TEXT = 'A new version of RiteMark is available';
+const FULL_UPDATE_TEXT = 'A new version of Ritemark is available';
 
 const FULL_UPDATE_ACTIONS = {
   INSTALL_NOW: 'Install Now',
@@ -128,7 +128,7 @@ async function performExtensionUpdate(
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'Updating RiteMark Extension',
+      title: 'Updating Ritemark Extension',
       cancellable: false
     },
     async (progress) => {
@@ -199,7 +199,7 @@ async function showUpdateError(error: string): Promise<void> {
   if (selection === 'Retry') {
     // User can retry by triggering update check again
     vscode.window.showInformationMessage(
-      'Please restart RiteMark to retry the update.'
+      'Please restart Ritemark to retry the update.'
     );
   }
 }

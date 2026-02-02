@@ -111,14 +111,14 @@ Regular paragraph text.
 ### Windows Testing (CRLF)
 1. Create test.md with Windows line endings (CRLF)
 2. Add content above
-3. Open in RiteMark
+3. Open in Ritemark
 4. Export to Word
 5. **Expected:** All formatting preserved
 
 ### macOS Testing (LF)
 1. Create test.md with Unix line endings (LF)
 2. Add content above
-3. Open in RiteMark
+3. Open in Ritemark
 4. Export to Word
 5. **Expected:** All formatting preserved (no regression)
 
@@ -138,7 +138,7 @@ Open exported .docx and verify:
 **Cross-platform bug fixed:**
 - Windows users can now export to Word successfully
 - macOS users unchanged (still works)
-- Linux users will also benefit if they use RiteMark
+- Linux users will also benefit if they use Ritemark
 
 **High user impact** - Export is a core feature that was broken.
 

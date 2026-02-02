@@ -1,6 +1,6 @@
 # Building Windows Installer Locally
 
-This guide explains how to build the RiteMark Windows installer (.exe) on a Windows machine.
+This guide explains how to build the Ritemark Windows installer (.exe) on a Windows machine.
 
 GitHub Actions builds the ZIP artifact automatically. The installer is built locally to avoid CI complexity with Inno Setup.
 
@@ -20,11 +20,11 @@ C:\Program Files (x86)\Inno Setup 6\
 1. Go to: https://github.com/jarmo-productory/ritemark-native/actions
 2. Click on the latest successful "Build Windows (x64)" run
 3. Download the `ritemark-windows-x64` artifact (ZIP file)
-4. Extract to a folder, e.g., `C:\RiteMark-Build\`
+4. Extract to a folder, e.g., `C:\Ritemark-Build\`
 
 Your folder structure should look like:
 ```
-C:\RiteMark-Build\
+C:\Ritemark-Build\
 └── VSCode-win32-x64\
     ├── Code.exe
     ├── resources\
@@ -43,7 +43,7 @@ C:\RiteMark-Build\
 3. Open `installer\windows\ritemark.iss`
 4. **Important**: Edit line 60 to point to your extracted build:
    ```
-   Source: "C:\RiteMark-Build\VSCode-win32-x64\*"; ...
+   Source: "C:\Ritemark-Build\VSCode-win32-x64\*"; ...
    ```
 5. Press F9 or click Compile
 6. Installer will be created in `installer-output\` folder
@@ -61,14 +61,14 @@ mkdir installer-output -Force
 
 # Run Inno Setup compiler
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-    /DSourcePath="C:\RiteMark-Build\VSCode-win32-x64" `
+    /DSourcePath="C:\Ritemark-Build\VSCode-win32-x64" `
     installer\windows\ritemark.iss
 ```
 
 Or with CMD:
 ```cmd
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ^
-    /DSourcePath="C:\RiteMark-Build\VSCode-win32-x64" ^
+    /DSourcePath="C:\Ritemark-Build\VSCode-win32-x64" ^
     installer\windows\ritemark.iss
 ```
 
@@ -76,10 +76,10 @@ Or with CMD:
 
 The installer will be created at:
 ```
-installer-output\RiteMark-{version}-win32-x64-setup.exe
+installer-output\Ritemark-{version}-win32-x64-setup.exe
 ```
 
-Example: `RiteMark-1.96.0-win32-x64-setup.exe`
+Example: `Ritemark-1.96.0-win32-x64-setup.exe`
 
 ## Modifying the Installer Script
 

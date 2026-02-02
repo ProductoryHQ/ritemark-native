@@ -401,11 +401,11 @@ export function VoiceDictationButton() {
               </div>
               <h3 className="mic-permission-title">Microphone Access Required</h3>
               <p className="mic-permission-text">
-                RiteMark needs microphone access for voice dictation.
+                Ritemark needs microphone access for voice dictation.
               </p>
               <div className="mic-permission-steps">
                 <p><strong>To enable:</strong></p>
-                <p>System Settings → Privacy & Security → Microphone → Enable <strong>RiteMark</strong></p>
+                <p>System Settings → Privacy & Security → Microphone → Enable <strong>Ritemark</strong></p>
               </div>
               <div className="mic-permission-buttons">
                 <button

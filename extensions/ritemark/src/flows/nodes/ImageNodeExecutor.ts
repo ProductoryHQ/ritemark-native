@@ -14,6 +14,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import OpenAI from 'openai';
 import { getAPIKeyManager } from '../../ai/apiKeyManager';
+import { DEFAULT_MODELS } from '../../ai/modelConfig';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -207,7 +208,7 @@ async function generateWithOpenAI(
 
   if (!apiKey) {
     throw new Error(
-      'OpenAI API key not configured. Use Command Palette → "RiteMark: Configure OpenAI API Key"'
+      'OpenAI API key not configured. Use Command Palette → "Ritemark: Configure OpenAI API Key"'
     );
   }
 
@@ -347,11 +348,11 @@ async function generateWithGemini(
 
   if (!apiKey) {
     throw new Error(
-      'Google AI API key not configured. Go to RiteMark Settings to add your API key.'
+      'Google AI API key not configured. Go to Ritemark Settings to add your API key.'
     );
   }
 
-  const model = options.model || 'imagen-4.0-fast-generate-001';
+  const model = options.model || DEFAULT_MODELS.flowImageGemini;
   const isImagen = model.includes('imagen');
   const isNanoBanana = model.includes('gemini') && model.includes('image');
 
@@ -494,7 +495,7 @@ export async function executeImageNode(
       return await generateWithGemini(
         prompt,
         {
-          model: data.model || 'imagen-4.0-fast-generate-001',
+          model: data.model || DEFAULT_MODELS.flowImageGemini,
           size: data.size || '1024x1024',
           quality: data.quality || 'standard',
         },

@@ -1,8 +1,8 @@
-# RiteMark v1.0.2-ext.1
+# Ritemark v1.0.2-ext.1
 
 **Released:** 2026-01-17
 **Type:** Extension-only
-**Download:** [GitHub Release](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg)
+**Download:** [GitHub Release](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg)
 
 ## Highlights
 
@@ -21,14 +21,14 @@ This is especially useful when:
 
 ### File Watching
 
-RiteMark now watches open spreadsheet files for external changes. When the file is modified by another application:
+Ritemark now watches open spreadsheet files for external changes. When the file is modified by another application:
 - A blue badge appears on the refresh button
 - You can see at a glance that the file has been updated
 - No need to constantly check or manually track changes
 
 ### Conflict Detection
 
-When you click refresh on a file that has external changes, RiteMark shows a confirmation dialog. This prevents accidentally overwriting your view if you weren't expecting changes.
+When you click refresh on a file that has external changes, Ritemark shows a confirmation dialog. This prevents accidentally overwriting your view if you weren't expecting changes.
 
 ## Bug Fixes
 

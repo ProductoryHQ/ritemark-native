@@ -8,9 +8,9 @@
 
 ## Exit Criteria (Jarmo Validates)
 
-- [x] App launches with RiteMark branding (not VS Code)
+- [x] App launches with Ritemark branding (not VS Code)
 - [x] Opening .md file shows custom editor (not text editor)
-- [x] Feels like "RiteMark Native" not "VS Code with extension"
+- [x] Feels like "Ritemark Native" not "VS Code with extension"
 
 **Validated:** 2025-11-30 by Jarmo
 
@@ -39,7 +39,7 @@
 
 ### Phase 4: TEST & VALIDATE ✅
 - [x] VS Code OSS compiles from source
-- [x] RiteMark branding visible (app name, icon)
+- [x] Ritemark branding visible (app name, icon)
 - [x] .md files open in custom editor
 - [x] Prototype webview shows file content
 - [x] Dev mode runs successfully

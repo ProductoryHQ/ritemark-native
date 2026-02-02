@@ -2,7 +2,7 @@
 
 ## Goal
 
-Enable lightweight in-place updates for extension-only changes, eliminating the need for full DMG downloads when only the RiteMark extension has changed (not VS Code core).
+Enable lightweight in-place updates for extension-only changes, eliminating the need for full DMG downloads when only the Ritemark extension has changed (not VS Code core).
 
 ## Success Criteria
 
@@ -32,7 +32,7 @@ Enable lightweight in-place updates for extension-only changes, eliminating the 
 
 ### Why NOT App Bundle (Original Plan)
 
-The original plan targeted `RiteMark.app/Contents/Resources/app/extensions/ritemark/`.
+The original plan targeted `Ritemark.app/Contents/Resources/app/extensions/ritemark/`.
 
 **This approach is INVALID because:**
 
@@ -123,7 +123,7 @@ extensions/ritemark/
 **Total size:** ~1MB (vs ~500MB DMG)
 
 **Files that CANNOT be updated this way:**
-- VS Code core binaries (`RiteMark.app/Contents/MacOS/Electron`)
+- VS Code core binaries (`Ritemark.app/Contents/MacOS/Electron`)
 - VS Code core resources (`Resources/app/out/vs/...`)
 - Patches to VS Code (require full rebuild)
 
@@ -227,7 +227,7 @@ Each GitHub release includes `update-manifest.json`:
   "extensionVersion": "1.1.0",
   "type": "full",
   "releaseDate": "2026-02-01T10:00:00Z",
-  "dmgUrl": "https://github.com/.../download/v1.1.0/RiteMark-1.1.0-darwin-arm64.dmg",
+  "dmgUrl": "https://github.com/.../download/v1.1.0/Ritemark-1.1.0-darwin-arm64.dmg",
   "dmgSha256": "xyz789...",
   "dmgSize": 500000000,
   "releaseNotes": "Major update: New AI features, performance improvements"
@@ -290,13 +290,13 @@ Each GitHub release includes `update-manifest.json`:
 
 **Bundled Extension (Fallback Baseline):**
 ```
-RiteMark.app/Contents/Resources/app/extensions/ritemark/  → v1.0.1
+Ritemark.app/Contents/Resources/app/extensions/ritemark/  → v1.0.1
 ```
 
 **VS Code Loading Priority:**
 ```
 1. ~/.ritemark/extensions/ritemark-1.0.1-ext.5/  → v1.0.1-ext.5 ✓ LOADED
-2. RiteMark.app/.../extensions/ritemark/          → v1.0.1      (skipped, lower version)
+2. Ritemark.app/.../extensions/ritemark/          → v1.0.1      (skipped, lower version)
 ```
 
 ---
@@ -383,7 +383,7 @@ function isValidUpgrade(current: string, target: string): boolean {
 **Full App Update Notification (unchanged):**
 ```
 ┌────────────────────────────────────────────────────────────┐
-│ New version of RiteMark is available                       │
+│ New version of Ritemark is available                       │
 │                                        [Later] [Install Now]│
 └────────────────────────────────────────────────────────────┘
 ```

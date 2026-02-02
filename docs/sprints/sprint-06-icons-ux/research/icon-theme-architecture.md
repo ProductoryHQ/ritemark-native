@@ -12,7 +12,7 @@ File icon themes are extensions that define icon mappings via JSON. The Seti the
     "iconThemes": [
       {
         "id": "ritemark-icons",
-        "label": "RiteMark Icons",
+        "label": "Ritemark Icons",
         "path": "./fileicons/ritemark-icon-theme.json"
       }
     ]

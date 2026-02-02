@@ -1,6 +1,6 @@
-# RiteMark Content Style Guide
+# Ritemark Content Style Guide
 
-This guide ensures consistent voice, tone, and formatting across all RiteMark content.
+This guide ensures consistent voice, tone, and formatting across all Ritemark content.
 
 ---
 
@@ -44,7 +44,7 @@ This guide ensures consistent voice, tone, and formatting across all RiteMark co
 
 | Don't | Do |
 |-------|-----|
-| "We're excited to announce..." | "RiteMark 1.5 is here." |
+| "We're excited to announce..." | "Ritemark 1.5 is here." |
 | "This amazing feature..." | "New: Spreadsheet toolbar" |
 | "We think you'll love..." | "Export to Numbers in one click." |
 | "It's super easy to..." | "Open any .md file. Done." |
@@ -58,8 +58,8 @@ This guide ensures consistent voice, tone, and formatting across all RiteMark co
 
 | Term | Usage | Never |
 |------|-------|-------|
-| RiteMark | Always capitalized, one word | Rite Mark, rite mark, RITEMARK |
-| RiteMark Native | Full name (when distinguishing versions) | RiteMark native |
+| Ritemark | Always capitalized, one word | Rite Mark, rite mark, RITEMARK |
+| Ritemark Native | Full name (when distinguishing versions) | Ritemark native |
 
 ### Technical Terms
 
@@ -79,7 +79,7 @@ Use consistent names across all content:
 
 | Feature | Name |
 |---------|------|
-| Rich text editor | "RiteMark editor" or just "editor" |
+| Rich text editor | "Ritemark editor" or just "editor" |
 | Table export | "Spreadsheet toolbar" |
 | Auto-update | "Extension updates" |
 | File preview | "Document preview" |
@@ -108,13 +108,13 @@ Use consistent names across all content:
 
 ### Blog Posts
 
-- **Headline:** Action-oriented or benefit-focused (not "RiteMark 1.5 Released")
+- **Headline:** Action-oriented or benefit-focused (not "Ritemark 1.5 Released")
 - **First paragraph:** What shipped and why it matters (2-3 sentences)
 - **Body:** Features with brief explanations
 - **End:** Clear download CTA
 
 Good headline examples:
-- "RiteMark 1.5: Tables Meet Spreadsheets"
+- "Ritemark 1.5: Tables Meet Spreadsheets"
 - "Export Markdown Tables to Excel"
 - "Local-First Editing Gets Smarter"
 
@@ -234,7 +234,7 @@ Examples:
 | Primary download | "Download for Mac" |
 | Secondary action | "Learn More" |
 | Update prompt | "Install Now" |
-| Blog post end | "Get RiteMark" |
+| Blog post end | "Get Ritemark" |
 
 ---
 

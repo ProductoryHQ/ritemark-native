@@ -1,5 +1,5 @@
 /**
- * RiteMark Settings Component
+ * Ritemark Settings Component
  *
  * Branded settings page for API keys and feature configuration.
  */
@@ -18,6 +18,7 @@ import {
   Bot,
 } from 'lucide-react';
 import { vscode } from '../../lib/vscode';
+import { getDefaultAssistantModel } from '../../config/modelConfig';
 
 interface ModelInfo {
   id: string;
@@ -45,7 +46,7 @@ interface TestResult {
   message?: string;
 }
 
-export function RiteMarkSettings() {
+export function RitemarkSettings() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [openaiKey, setOpenaiKey] = useState('');
   const [googleKey, setGoogleKey] = useState('');
@@ -125,10 +126,10 @@ export function RiteMarkSettings() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[var(--vscode-foreground)] mb-2">
-          RiteMark Settings
+          Ritemark Settings
         </h1>
         <p className="text-sm text-[var(--vscode-descriptionForeground)]">
-          Configure API keys and features for RiteMark AI.
+          Configure API keys and features for Ritemark AI.
         </p>
       </div>
 
@@ -306,11 +307,11 @@ export function RiteMarkSettings() {
 
         <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
           <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-2">
-            Model for RiteMark AI Assistant
+            Model for Ritemark AI Assistant
           </label>
 
           <select
-            value={settings.aiModel || 'gpt-4o-mini'}
+            value={settings.aiModel || getDefaultAssistantModel()}
             onChange={(e) => handleSettingChange('ai.model', e.target.value)}
             className="w-full px-3 py-2 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
           >
@@ -346,7 +347,7 @@ export function RiteMarkSettings() {
           />
 
           <ToggleRow
-            label="RiteMark Flows"
+            label="Ritemark Flows"
             description="Visual automation workflows with AI and file operations"
             checked={settings.ritemarkFlows}
             onChange={(value) => handleToggle('features.ritemark-flows', value)}
@@ -365,7 +366,7 @@ export function RiteMarkSettings() {
 
         <ToggleRow
           label="Check for updates on startup"
-          description="Notify when a new version of RiteMark is available"
+          description="Notify when a new version of Ritemark is available"
           checked={settings.updatesEnabled}
           onChange={(value) => handleToggle('updates.enabled', value)}
         />

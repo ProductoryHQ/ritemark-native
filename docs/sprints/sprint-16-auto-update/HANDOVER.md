@@ -7,7 +7,7 @@
 
 ## Current State Summary
 
-RiteMark v1.0.1 has been:
+Ritemark v1.0.1 has been:
 - ✅ Built (production build completed)
 - ✅ Signed (Developer ID Application certificate)
 - ⏳ Submitted for notarization (waiting for Apple)
@@ -45,12 +45,12 @@ source .signing-config && xcrun notarytool info a8e1af43-4716-40ca-b2b8-8e433f9d
 
 1. **Staple the notarization ticket to the app:**
    ```bash
-   xcrun stapler staple "VSCode-darwin-arm64/RiteMark.app"
+   xcrun stapler staple "VSCode-darwin-arm64/Ritemark.app"
    ```
 
 2. **Verify stapling worked:**
    ```bash
-   xcrun stapler validate "VSCode-darwin-arm64/RiteMark.app"
+   xcrun stapler validate "VSCode-darwin-arm64/Ritemark.app"
    ```
 
 3. **Create the DMG:**
@@ -61,7 +61,7 @@ source .signing-config && xcrun notarytool info a8e1af43-4716-40ca-b2b8-8e433f9d
 4. **Test the DMG:**
    - Copy DMG to Downloads folder
    - Double-click to mount
-   - Drag RiteMark to Applications
+   - Drag Ritemark to Applications
    - Launch - should NOT show "damaged" warning
    - Verify version shows 1.0.1 in About
 
@@ -99,7 +99,7 @@ source .signing-config && xcrun notarytool info a8e1af43-4716-40ca-b2b8-8e433f9d
 | `scripts/notarize-app.sh` | Submits to Apple notarization |
 | `scripts/create-dmg.sh` | Creates distributable DMG |
 | `branding/entitlements.plist` | Hardened runtime permissions |
-| `VSCode-darwin-arm64/RiteMark.app` | The signed app bundle |
+| `VSCode-darwin-arm64/Ritemark.app` | The signed app bundle |
 
 ---
 
@@ -134,8 +134,8 @@ The first submission `88630781-abdf-4c95-aa13-a85e2de14f34` was also stuck for h
 
 ## Build Details
 
-- **App Location:** `VSCode-darwin-arm64/RiteMark.app`
-- **Version:** 1.0.1 (check: `cat VSCode-darwin-arm64/RiteMark.app/Contents/Resources/app/product.json | grep ritemarkVersion`)
+- **App Location:** `VSCode-darwin-arm64/Ritemark.app`
+- **Version:** 1.0.1 (check: `cat VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/product.json | grep ritemarkVersion`)
 - **Architecture:** arm64 (Apple Silicon)
 - **Build Date:** 2026-01-12
 
@@ -151,13 +151,13 @@ source .signing-config && xcrun notarytool info a8e1af43-4716-40ca-b2b8-8e433f9d
 source .signing-config && xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
 
 # Staple after acceptance
-xcrun stapler staple "VSCode-darwin-arm64/RiteMark.app"
+xcrun stapler staple "VSCode-darwin-arm64/Ritemark.app"
 
 # Verify app signature
-codesign --verify --deep --strict "VSCode-darwin-arm64/RiteMark.app"
+codesign --verify --deep --strict "VSCode-darwin-arm64/Ritemark.app"
 
 # Check signing identity
-codesign -dvvv "VSCode-darwin-arm64/RiteMark.app" 2>&1 | grep Authority
+codesign -dvvv "VSCode-darwin-arm64/Ritemark.app" 2>&1 | grep Authority
 ```
 
 ---

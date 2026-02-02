@@ -1,10 +1,10 @@
 # Architecture Analysis - File Preview
 
-## Current RiteMark Architecture
+## Current Ritemark Architecture
 
 ### Extension Structure
 - **Entry:** `extension.ts` activates the extension
-- **Provider:** `RiteMarkEditorProvider` implements `CustomTextEditorProvider`
+- **Provider:** `RitemarkEditorProvider` implements `CustomTextEditorProvider`
 - **Registration:** `vscode.window.registerCustomEditorProvider('ritemark.editor', ...)`
 - **Webview:** React + Vite + TipTap editor loaded from `media/webview.js` (~900KB)
 
@@ -12,7 +12,7 @@
 ```json
 "customEditors": [{
   "viewType": "ritemark.editor",
-  "displayName": "RiteMark",
+  "displayName": "Ritemark",
   "selector": [
     {"filenamePattern": "*.md"},
     {"filenamePattern": "*.markdown"}
@@ -193,7 +193,7 @@ npm install --save-dev @types/papaparse
 ### 4. Extension Changes
 
 **Modified Files:**
-- `RiteMarkEditorProvider.ts`:
+- `RitemarkEditorProvider.ts`:
   - Detect file type in `resolveCustomTextEditor`
   - For CSV/Excel: send raw file content
   - For Markdown: keep existing flow

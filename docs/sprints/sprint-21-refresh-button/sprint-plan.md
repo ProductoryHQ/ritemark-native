@@ -154,7 +154,7 @@ CSV changes are sent from webview but ignored by extension.
 ### Phase 3.4: Implement CSV Conflict Detection
 
 #### Step 7: Add File Metadata Tracking
-- [ ] Add `fileLoadTimes: Map<string, number>` to RiteMarkEditorProvider
+- [ ] Add `fileLoadTimes: Map<string, number>` to RitemarkEditorProvider
 - [ ] On file load: Store `fs.stat(uri).mtime.getTime()`
 - [ ] On refresh: Compare current mtime with stored mtime
 
@@ -441,7 +441,7 @@ Show ConflictDialog:
   │  ⚠️  Unsaved Changes Conflict                 │
   ├──────────────────────────────────────────────┤
   │                                              │
-  │  You have unsaved edits in RiteMark.        │
+  │  You have unsaved edits in Ritemark.        │
   │  The file "data.csv" has also been modified │
   │  on disk by another program.                │
   │                                              │
@@ -515,7 +515,7 @@ User clicks "Refresh Now" → Trigger refresh flow
 6. Multi-sheet Excel → Switch to Sheet2 → Refresh → Still on Sheet2 = PASS
 
 #### Conflict Detection Tests
-7. CSV → Edit cell in RiteMark → Refresh → Show warning → Discard → Reload = PASS
+7. CSV → Edit cell in Ritemark → Refresh → Show warning → Discard → Reload = PASS
 8. CSV → Edit externally (no local edits) → Refresh → Immediate reload = PASS
 9. CSV → Edit in both places → Refresh → Show conflict dialog = PASS
 10. CSV → Conflict dialog → Click "Discard" → Loads disk version = PASS

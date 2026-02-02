@@ -11,7 +11,7 @@
 **Conflict Potential:** NONE
 
 - Excel files are opened with `CustomReadonlyEditorProvider`
-- No editing capability in RiteMark
+- No editing capability in Ritemark
 - Refresh is always safe (just reload from disk)
 - Must preserve `selectedSheet` state across refresh
 
@@ -23,8 +23,8 @@
 **Conflict Potential:** NONE
 
 User flow:
-1. Open `data.csv` in RiteMark
-2. Edit cell value in RiteMark
+1. Open `data.csv` in Ritemark
+2. Edit cell value in Ritemark
 3. Click Refresh button
 
 **Expected behavior:** No conflict (file unchanged on disk)
@@ -40,9 +40,9 @@ User flow:
 **Conflict Potential:** LOW (no data loss risk)
 
 User flow:
-1. Open `data.csv` in RiteMark (read-only viewing)
+1. Open `data.csv` in Ritemark (read-only viewing)
 2. Edit file in external app (Excel, Numbers, etc.)
-3. Click Refresh button in RiteMark
+3. Click Refresh button in Ritemark
 
 **Expected behavior:** Safe reload
 - Check: `document.isDirty` is false (no local edits)
@@ -57,13 +57,13 @@ User flow:
 **Conflict Potential:** CRITICAL
 
 User flow:
-1. Open `data.csv` in RiteMark
-2. Edit cell A1 in RiteMark (value: "RiteMark Edit")
+1. Open `data.csv` in Ritemark
+2. Edit cell A1 in Ritemark (value: "Ritemark Edit")
 3. External app edits cell B1 (value: "Excel Edit")
-4. Click Refresh button in RiteMark
+4. Click Refresh button in Ritemark
 
 **Problem:** Both versions have changes:
-- RiteMark version: A1 changed (unsaved)
+- Ritemark version: A1 changed (unsaved)
 - Disk version: B1 changed
 - Cannot merge automatically (no merge algorithm for CSV)
 
@@ -202,7 +202,7 @@ watcher.onDidChange(uri => {
 │  ⚠️  Unsaved Changes Conflict                        │
 ├─────────────────────────────────────────────────────┤
 │                                                      │
-│  You have unsaved edits in RiteMark.                │
+│  You have unsaved edits in Ritemark.                │
 │  The file "data.csv" has also been modified on      │
 │  disk by another program.                           │
 │                                                      │
@@ -271,7 +271,7 @@ async openCustomDocument(uri: vscode.Uri, ...): Promise<ExcelDocument> {
 }
 ```
 
-**RiteMarkEditorProvider:**
+**RitemarkEditorProvider:**
 ```typescript
 private fileLoadTimes = new Map<string, number>();
 
@@ -462,7 +462,7 @@ async handleRefresh(document, webview) {
 
 5. **CSV - Conflict (Both Changed)**
    - Open CSV file
-   - Edit cell A1 in RiteMark
+   - Edit cell A1 in Ritemark
    - Edit cell B1 in external app
    - Click Refresh → Show conflict dialog
    - Click "Discard" → Reload from disk

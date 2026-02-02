@@ -1,7 +1,7 @@
 # Sprint 13: Task List Checkboxes
 
 ## Goal
-Enable GFM-style task lists with clickable checkboxes in the RiteMark editor, accessible via command palette and slash commands.
+Enable GFM-style task lists with clickable checkboxes in the Ritemark editor, accessible via command palette and slash commands.
 
 ## Success Criteria
 - [ ] Task list syntax (`- [ ]` / `- [x]`) renders as interactive checkboxes
@@ -128,7 +128,7 @@ Enable GFM-style task lists with clickable checkboxes in the RiteMark editor, ac
 
 **Delivered:** 2025-12-15
 
-**DMG:** `dist/RiteMark-1.94.0-darwin-arm64.dmg` (160MB)
+**DMG:** `dist/Ritemark-1.94.0-darwin-arm64.dmg` (160MB)
 **SHA256:** `63458388954c9e66248ba1dabb45175debbb51b4a666ba7443d3490a9fb4e5d0`
 
 **Approval Status:** ✅ APPROVED & VALIDATED - Jarmo confirmed working

@@ -1,4 +1,4 @@
-# Building RiteMark Native Installers
+# Building Ritemark Native Installers
 
 This guide covers how to build distributable installers for macOS and Windows.
 
@@ -44,10 +44,10 @@ After building, find installers in `dist/`:
 
 ```
 dist/
-├── RiteMark-Native-{version}-darwin-arm64.dmg
-├── RiteMark-Native-{version}-darwin-arm64.dmg.sha256
-├── RiteMark-Native-{version}-win32-x64.zip
-└── RiteMark-Native-{version}-win32-x64.zip.sha256
+├── Ritemark-Native-{version}-darwin-arm64.dmg
+├── Ritemark-Native-{version}-darwin-arm64.dmg.sha256
+├── Ritemark-Native-{version}-win32-x64.zip
+└── Ritemark-Native-{version}-win32-x64.zip.sha256
 ```
 
 ---
@@ -63,18 +63,18 @@ Creates a professional DMG installer with drag-to-Applications UI.
 ```
 
 **Prerequisites:**
-- Built app at `VSCode-darwin-arm64/RiteMark Native.app`
+- Built app at `VSCode-darwin-arm64/Ritemark Native.app`
 - `create-dmg` tool installed
 
 **Output:**
-- `dist/RiteMark-Native-{version}-darwin-arm64.dmg`
-- `dist/RiteMark-Native-{version}-darwin-arm64.dmg.sha256`
+- `dist/Ritemark-Native-{version}-darwin-arm64.dmg`
+- `dist/Ritemark-Native-{version}-darwin-arm64.dmg.sha256`
 
 ### DMG Properties
 
 | Property | Value |
 |----------|-------|
-| Volume Name | RiteMark Native |
+| Volume Name | Ritemark Native |
 | Window Size | 800x400 |
 | Icon Size | 100x100 |
 | Volume Icon | branding/icons/icon.icns |
@@ -104,8 +104,8 @@ Cross-compiles Windows application from macOS and packages as ZIP.
 
 **Output:**
 - `VSCode-win32-x64/` - Application folder
-- `dist/RiteMark-Native-{version}-win32-x64.zip`
-- `dist/RiteMark-Native-{version}-win32-x64.zip.sha256`
+- `dist/Ritemark-Native-{version}-win32-x64.zip`
+- `dist/Ritemark-Native-{version}-win32-x64.zip.sha256`
 
 ### Windows Icon
 
@@ -156,7 +156,7 @@ docker run --rm -i \
 
 ### DMG creation fails
 
-1. Ensure app exists: `ls VSCode-darwin-arm64/RiteMark\ Native.app`
+1. Ensure app exists: `ls VSCode-darwin-arm64/Ritemark\ Native.app`
 2. Check create-dmg: `which create-dmg`
 3. Check icon: `ls branding/icons/icon.icns`
 
@@ -188,9 +188,9 @@ Current installers are **unsigned**. For production distribution:
 ### macOS
 1. Enroll in Apple Developer Program ($99/year)
 2. Create Developer ID Application certificate
-3. Sign app: `codesign --deep --sign "Developer ID" RiteMark\ Native.app`
+3. Sign app: `codesign --deep --sign "Developer ID" Ritemark\ Native.app`
 4. Notarize: `xcrun notarytool submit ...`
-5. Staple: `xcrun stapler staple RiteMark\ Native.app`
+5. Staple: `xcrun stapler staple Ritemark\ Native.app`
 
 ### Windows
 1. Purchase code signing certificate (~$100-500/year)

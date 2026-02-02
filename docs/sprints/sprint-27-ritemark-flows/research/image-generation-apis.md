@@ -171,7 +171,7 @@ Claude API (Anthropic) does **not** support image generation. It's text-only out
 **Workaround:** Use MCP (Model Context Protocol) to connect Claude to Hugging Face image models:
 - https://huggingface.co/blog/claude-and-mcp
 
-**Not recommended for RiteMark Flows** - Adds complexity for minimal benefit.
+**Not recommended for Ritemark Flows** - Adds complexity for minimal benefit.
 
 ## Implementation Recommendations
 

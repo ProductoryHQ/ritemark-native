@@ -50,7 +50,7 @@ Add concrete use cases and before/after workflow comparison to convert visitors 
 
 Current landing page:
 
--   **Use cases are vague** - "Professionals who write a lot" doesn't show what RiteMark actually helps with
+-   **Use cases are vague** - "Professionals who write a lot" doesn't show what Ritemark actually helps with
     
 -   **No before/after comparison** - Visitors don't see how their workflow improves
     
@@ -107,9 +107,9 @@ Tools like Claude Code, Gemini CLI, and Codex can see and edit your files direct
 
 **Pain points:** Context switching, manual copy-paste, reformatting, losing document structure
 
-### AFTER: RiteMark Workflow (2 steps)
+### AFTER: Ritemark Workflow (2 steps)
 
-1.  Open document in RiteMark
+1.  Open document in Ritemark
     
 2.  AI agent sees file and edits directly
     
@@ -161,11 +161,11 @@ Tools like Claude Code, Gemini CLI, and Codex can see and edit your files direct
 
 **AFTER Card**
 
--   **Card Title:** RiteMark + AI agent
+-   **Card Title:** Ritemark + AI agent
     
 -   **Steps:**
     
-    1.  Ava fail RiteMarkis
+    1.  Ava fail Ritemarkis
         
     2.  Agent muudab faili otse
         
@@ -201,11 +201,11 @@ Tools like Claude Code, Gemini CLI, and Codex can see and edit your files direct
 
 **AFTER Card**
 
--   **Card Title:** RiteMark + AI agent
+-   **Card Title:** Ritemark + AI agent
     
 -   **Steps:**
     
-    1.  Open file in RiteMark
+    1.  Open file in Ritemark
         
     2.  Agent edits file directly
         
@@ -294,7 +294,7 @@ Tools like Claude Code, Gemini CLI, and Codex can see and edit your files direct
 
 ## New Imagery (Added 2026-01-14)
 
-Four professional product photos showing RiteMark with Claude Code sidebar:
+Four professional product photos showing Ritemark with Claude Code sidebar:
 
 | # | Filename | Content | Recommended Use |
 | --- | --- | --- | --- |

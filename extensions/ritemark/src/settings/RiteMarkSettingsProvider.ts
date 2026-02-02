@@ -1,14 +1,14 @@
 /**
- * RiteMark Settings Provider
+ * Ritemark Settings Provider
  *
- * Branded settings page for RiteMark configuration.
+ * Branded settings page for Ritemark configuration.
  * Reads/writes VS Code settings and manages API keys in SecretStorage.
  */
 
 import * as vscode from 'vscode';
-import { getAssistantModels } from '../ai/modelConfig';
+import { getAssistantModels, DEFAULT_MODELS } from '../ai/modelConfig';
 
-export class RiteMarkSettingsProvider {
+export class RitemarkSettingsProvider {
   public static readonly viewType = 'ritemark.settings';
 
   private static panel: vscode.WebviewPanel | undefined;
@@ -24,15 +24,15 @@ export class RiteMarkSettingsProvider {
       : undefined;
 
     // If panel exists, reveal it
-    if (RiteMarkSettingsProvider.panel) {
-      RiteMarkSettingsProvider.panel.reveal(column);
+    if (RitemarkSettingsProvider.panel) {
+      RitemarkSettingsProvider.panel.reveal(column);
       return;
     }
 
     // Create new panel
     const panel = vscode.window.createWebviewPanel(
-      RiteMarkSettingsProvider.viewType,
-      'RiteMark Settings',
+      RitemarkSettingsProvider.viewType,
+      'Ritemark Settings',
       column || vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -43,7 +43,7 @@ export class RiteMarkSettingsProvider {
       }
     );
 
-    RiteMarkSettingsProvider.panel = panel;
+    RitemarkSettingsProvider.panel = panel;
 
     // Get webview content
     panel.webview.html = await this.getHtmlContent(panel.webview);
@@ -59,7 +59,7 @@ export class RiteMarkSettingsProvider {
 
     // Clean up on close
     panel.onDidDispose(() => {
-      RiteMarkSettingsProvider.panel = undefined;
+      RitemarkSettingsProvider.panel = undefined;
     });
 
     // Send initial data
@@ -149,7 +149,7 @@ export class RiteMarkSettingsProvider {
         updatesEnabled: config.get('updates.enabled', true),
 
         // AI Model
-        aiModel: config.get('ai.model', 'gpt-4o-mini'),
+        aiModel: config.get('ai.model', DEFAULT_MODELS.assistant),
         availableModels,
 
         // API Keys (masked for display, full for input)
@@ -237,7 +237,7 @@ export class RiteMarkSettingsProvider {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:; connect-src https://api.openai.com;">
-  <title>RiteMark Settings</title>
+  <title>Ritemark Settings</title>
   <style>
     * {
       margin: 0;

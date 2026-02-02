@@ -7,7 +7,7 @@
 
 ## Overview
 
-RiteMark Native runs on macOS and can leverage the built-in `open` command to:
+Ritemark Native runs on macOS and can leverage the built-in `open` command to:
 1. Detect if applications are installed
 2. Open files in external applications
 3. Provide seamless integration with Excel and Numbers
@@ -344,7 +344,7 @@ const filePath = document.uri.fsPath; // Guaranteed safe path
 exec(`open -a "Numbers" "${filePath}"`);
 ```
 
-**Why it's safe in RiteMark Native:**
+**Why it's safe in Ritemark Native:**
 - File paths come from `vscode.Uri.fsPath` (validated by VS Code)
 - No user input in shell commands
 - App names are hardcoded constants

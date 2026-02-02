@@ -9,7 +9,7 @@ Content for the support/help section of the website. Each major feature needs a 
 ### How to Use
 
 1. Click the microphone button in the editor toolbar
-2. On first use, RiteMark downloads the speech model (~1.5GB one-time download)
+2. On first use, Ritemark downloads the speech model (~1.5GB one-time download)
 3. Start speaking - text appears in real-time as you talk
 4. Click the microphone button again to stop
 
@@ -17,7 +17,7 @@ Content for the support/help section of the website. Each major feature needs a 
 
 - Click the dropdown arrow (chevron) next to the mic button
 - Select from recent languages or click "More languages..." for 50+ options
-- RiteMark remembers your last used language
+- Ritemark remembers your last used language
 
 ### Settings
 
@@ -29,8 +29,8 @@ Content for the support/help section of the website. Each major feature needs a 
 
 #### "Microphone Access Required" modal appears
 - Click "Open System Settings" in the modal
-- Enable RiteMark under Privacy & Security > Microphone
-- Restart RiteMark after granting permission
+- Enable Ritemark under Privacy & Security > Microphone
+- Restart Ritemark after granting permission
 
 #### Dictation not starting / "Loading..." stuck
 - Ensure the speech model is downloaded (Settings > Model section should show model name and size)

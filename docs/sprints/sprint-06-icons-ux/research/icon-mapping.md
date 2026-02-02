@@ -1,4 +1,4 @@
-# RiteMark Icon Mapping Plan
+# Ritemark Icon Mapping Plan
 
 ## Lucide Icons to Use
 
@@ -8,7 +8,7 @@ Source: https://lucide.dev/icons/
 
 | Category | Extensions | Lucide Icon | Notes |
 |----------|-----------|-------------|-------|
-| **Markdown** | .md, .mdx | `file-text` | Primary focus - RiteMark's core |
+| **Markdown** | .md, .mdx | `file-text` | Primary focus - Ritemark's core |
 | **JSON** | .json | `braces` | Could also use `file-json-2` |
 | **JavaScript** | .js, .mjs, .cjs | `file-code` | |
 | **TypeScript** | .ts, .tsx | `file-code-2` | Differentiate from JS |
@@ -68,7 +68,7 @@ Focus on most common file types for a markdown-focused editor:
 
 ## Brand Colors
 
-Consider using RiteMark brand colors for the markdown icon:
+Consider using Ritemark brand colors for the markdown icon:
 - Primary: (from existing branding)
 - Could tint the Lucide icons with brand accent
 
@@ -88,5 +88,5 @@ When downloading from Lucide:
 
 **Question for Jarmo:** Should the markdown icon:
 1. Use standard Lucide `file-text` icon
-2. Use a custom RiteMark-branded icon (would need design)
-3. Use Lucide icon with RiteMark brand color applied
+2. Use a custom Ritemark-branded icon (would need design)
+3. Use Lucide icon with Ritemark brand color applied

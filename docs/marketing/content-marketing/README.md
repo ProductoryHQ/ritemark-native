@@ -1,6 +1,6 @@
 # Content Marketing
 
-Central hub for RiteMark's content marketing efforts.
+Central hub for Ritemark's content marketing efforts.
 
 ## Structure
 

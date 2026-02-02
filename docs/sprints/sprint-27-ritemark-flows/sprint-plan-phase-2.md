@@ -1,7 +1,7 @@
 # Sprint 27 Phase 2: Visual Flow Editor with React Flow
 
 ## Goal
-Implement a visual drag-and-drop flow editor using React Flow, enabling users to create and edit automation workflows through an intuitive canvas interface. This transforms RiteMark Flows from a manual-JSON system to a user-friendly visual tool.
+Implement a visual drag-and-drop flow editor using React Flow, enabling users to create and edit automation workflows through an intuitive canvas interface. This transforms Ritemark Flows from a manual-JSON system to a user-friendly visual tool.
 
 ## Feature Flag Check
 - [x] Does this sprint need a feature flag?
