@@ -8,6 +8,20 @@
 
 Ritemark v1.2.0 introduces **Ritemark Flows** - a visual workflow automation system for AI-powered content generation. Build workflows by connecting nodes, then execute them to generate text, images, and files automatically.
 
+## The Complete Picture: Text, Data, Flow
+
+With Flows, Ritemark completes its vision as three editors in one app:
+
+| Mode | What It Does |
+|------|--------------|
+| **Text** | WYSIWYG markdown editing for writing |
+| **Data** | Spreadsheets and YAML for structure |
+| **Flow** | Visual AI workflows for automation |
+
+Each mode handles a different kind of work, but they live together in one app. Write a blog post in Text mode. Track your content calendar in Data mode. Generate new posts automatically with Flow mode.
+
+**Three editors. One app. Text, Data, Flow.**
+
 ## What's New
 
 ### Ritemark Flows

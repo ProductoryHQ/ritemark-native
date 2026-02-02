@@ -2,7 +2,54 @@
 
 Features listed here should appear in the features grid.
 
+---
+
+## Hero Section
+
+**Headline:** Three Editors. One App.
+
+**Subheadline:** Text, Data, Flow - everything you need for writing, structure, and AI automation.
+
+**Tagline options:**
+- "Write. Structure. Automate."
+- "Text for writing. Data for structure. Flow for automation."
+
+---
+
+## The Three Pillars
+
+Display as three equal columns/cards showing the core modes.
+
+### Text
+- **Icon:** FileEdit or PenLine
+- **Title ET:** Tekst
+- **Title EN:** Text
+- **Description ET:** WYSIWYG markdowni redaktor. Kirjuta rikkas tekstis, salvesta puhta markdownina.
+- **Description EN:** WYSIWYG markdown editor. Write in rich text, save as clean markdown.
+- **Key features:** Slash commands, AI assistant, voice dictation, export
+
+### Data
+- **Icon:** Table2
+- **Title ET:** Andmed
+- **Title EN:** Data
+- **Description ET:** Tabelid ja struktuur. Muuda CSV faile, vaata Excelit, halda YAML metaandmeid.
+- **Description EN:** Spreadsheets and structure. Edit CSV files, preview Excel, manage YAML metadata.
+- **Key features:** Inline editing, auto-refresh, document properties
+
+### Flow
+- **Icon:** Workflow or GitBranch
+- **Title ET:** Voog
+- **Title EN:** Flow
+- **Description ET:** Visuaalne AI automatiseerimine. Ühenda sõlmed, käivita, genereeri sisu automaatselt.
+- **Description EN:** Visual AI automation. Connect nodes, run flows, generate content automatically.
+- **Key features:** Drag-and-drop, LLM nodes, image generation, file output
+- **Badge:** NEW
+
+---
+
 ## Current Features
+
+Organized by mode. Features under each mode should show that mode's badge/tag.
 
 ### Voice Dictation
 - **Icon:** Mic (from lucide-react)
@@ -77,3 +124,25 @@ Features listed here should appear in the features grid.
 - [ ] Spreadsheet refresh feature - show refresh button with blue badge indicator
 - [ ] Image Handling - show image with resize handles visible
 - [ ] Ritemark Flows - show flow editor with connected nodes (Trigger -> LLM -> Save File)
+
+---
+
+## Feature Categorization
+
+For landing page, organize features under their primary mode:
+
+### Text Mode Features
+- WYSIWYG Markdown Editor
+- AI Writing Assistant
+- Voice Dictation
+- Copy as Markdown
+- Image Handling
+
+### Data Mode Features
+- Data File Preview (CSV/Excel)
+
+### Flow Mode Features
+- Ritemark Flows
+
+### Cross-Cutting Features
+- Local-First Privacy (applies to all modes)

@@ -9,6 +9,7 @@ A collection of ideas for future development. No commitment, no order - just a p
 - [ ] Add Youtube (any other streaming) videos from / command palette
 - [ ] PDF preview (read-only viewer)
 - [ ] Word (.docx) preview (read-only viewer)
+- [ ] Improve "Add link" dialog to smart-search from files inside the repository when user starts typing with "@"
 
 ## Data Editor
 
@@ -16,8 +17,12 @@ CSV editing, Excel/spreadsheet preview
 
 - [ ] Rebrand current Excel viewer as "Data Editor"
 - [ ] CSV full editing improvements (sort, filter, column operations)
+- [ ] CSV cell in "editable" mode must be multi-line and extend to "full-height"
+- [ ] CSV open in Excel (automatically export as UTF-8)
 - [ ] Excel (.xlsx) editing (currently preview-only)
 - [ ] PowerPoint (.pptx) preview
+
+## Flow editor
 
 ## Onboarding / Welcome Screen
 
@@ -35,7 +40,8 @@ Redesign Welcome screen for total newbies
 
 ## File Management
 
-- [ ] Recent files list on welcome page - \[ \] File templates (blog post, meeting notes, etc.)
+- [ ] Recent files list on welcome page
+- [ ] File templates (blog post, meeting notes, etc.)
 - [ ] Quick switcher improvements
 
 ## AI Assistant
