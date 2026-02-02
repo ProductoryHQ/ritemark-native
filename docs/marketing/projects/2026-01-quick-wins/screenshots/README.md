@@ -15,7 +15,7 @@ Use these example files to capture screenshots for the landing page.
 
 ## Setup
 
-1. Open RiteMark
+1. Open Ritemark
 2. Dark mode preferred (matches landing page)
 3. Window size ~1400×900
 4. Hide unnecessary panels

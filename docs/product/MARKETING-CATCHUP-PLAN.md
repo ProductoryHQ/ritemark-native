@@ -1,4 +1,4 @@
-# Marketing Catch-Up Plan for RiteMark
+# Marketing Catch-Up Plan for Ritemark
 
 **Created:** 2026-01-14
 **Status:** Awaiting Jarmo approval
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-RiteMark has shipped significant features that customers don't know about. The landing page focuses on "AI agents" but hides concrete value like PDF export, CSV editing, and offline mode.
+Ritemark has shipped significant features that customers don't know about. The landing page focuses on "AI agents" but hides concrete value like PDF export, CSV editing, and offline mode.
 
 **The Fix:**
 1. Make "FREE" prominent
@@ -99,7 +99,7 @@ These competitive advantages are invisible:
 | `/docs/user-guide/FAQ.md` | Common questions |
 
 **FAQ Questions to Answer:**
-1. Is RiteMark really free?
+1. Is Ritemark really free?
 2. Why do I need to right-click to open? (notarization)
 3. Does it work offline?
 4. Where are my files stored?
@@ -123,7 +123,7 @@ These competitive advantages are invisible:
 
 | Content | Format |
 |---------|--------|
-| "Introducing RiteMark" | Blog post |
+| "Introducing Ritemark" | Blog post |
 | "New: Export to PDF and Word" | Blog post |
 | Demo video | 2-minute walkthrough |
 | ProductHunt assets | Thumbnail, gallery, description |

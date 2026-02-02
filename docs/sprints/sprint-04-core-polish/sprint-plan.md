@@ -1,6 +1,6 @@
 # Sprint 04: Core Polish
 
-**Goal:** Strip VS Code chrome to create a clean, focused RiteMark experience
+**Goal:** Strip VS Code chrome to create a clean, focused Ritemark experience
 
 **Status:** ✅ COMPLETE
 
@@ -10,7 +10,7 @@
 
 ## Exit Criteria (Jarmo Validates)
 
-- [x] App feels like "RiteMark" not "VS Code"
+- [x] App feels like "Ritemark" not "VS Code"
 - [x] No dev-focused UI elements visible (except Terminal)
 - [x] Clean, minimal interface for writing
 - [x] Terminal still works (for Claude Code integration)
@@ -52,7 +52,7 @@
 - [x] Hide Debug/Run menu (`debug.contribution.ts:242-249`)
 - [x] Keep Terminal menu (for Claude Code!)
 - [ ] Review View menu - remove dev items? (deferred)
-- [ ] Review Help menu - RiteMark-specific? (deferred)
+- [ ] Review Help menu - Ritemark-specific? (deferred)
 
 #### Task 4: Panel Cleanup ✅
 - [x] Keep Terminal panel
@@ -65,7 +65,7 @@
 - [x] Hide layout controls (toggle buttons)
 
 #### Task 6: Branding ✅
-- [x] Fix Mac menu bar name (was "Code - OSS", now "RiteMark")
+- [x] Fix Mac menu bar name (was "Code - OSS", now "Ritemark")
 - [x] Fix About dialog branding
 - [x] Update product.ts fallback branding
 
@@ -82,7 +82,7 @@
 - [x] Jarmo design approval
 
 ### Phase 5: CLEANUP ✅
-- [x] Add RiteMark comments to modified files
+- [x] Add Ritemark comments to modified files
 - [x] Remove any debug code
 - [x] Document changes
 
@@ -96,7 +96,7 @@
 ## Additional Work Completed (Welcome Page Branding)
 
 #### Task 8: Welcome Page Branding ✅
-- [x] RiteMark logo with "BY PRODUCTORY" tagline
+- [x] Ritemark logo with "BY PRODUCTORY" tagline
 - [x] Productory brand colors (Indigo #4338ca, Cyan #2dd4bf, Magenta #d946ef)
 - [x] Brand fonts (Space Grotesk for headers, Sofia Sans for body)
 - [x] Left-aligned hero layout

@@ -18,7 +18,7 @@
 | **Debug/Run Menu** | `debug.contribution.ts:242-249` | Comment `MenuRegistry.appendMenuItem` |
 | **Terminal Menu** | `menubarControl.ts:98-106` | Comment menu registration |
 | **Terminal Panel** | `terminal.contribution.ts:127-152` | Comment `registerViewContainer` |
-| **Window Title** | `product.json` | Already branded "RiteMark" |
+| **Window Title** | `product.json` | Already branded "Ritemark" |
 
 ---
 
@@ -136,16 +136,16 @@ Comment out in `terminal.contribution.ts`:
 **Already done in product.json:**
 ```json
 {
-  "nameShort": "RiteMark",
-  "nameLong": "RiteMark Native",
+  "nameShort": "Ritemark",
+  "nameLong": "Ritemark Native",
   "applicationName": "ritemark",
-  "appName": "RiteMark"
+  "appName": "Ritemark"
 }
 ```
 
 ---
 
-## Implementation Priority for RiteMark
+## Implementation Priority for Ritemark
 
 ### HIDE (High Priority)
 1. Accounts icon - `globalCompositeBar.ts:106`

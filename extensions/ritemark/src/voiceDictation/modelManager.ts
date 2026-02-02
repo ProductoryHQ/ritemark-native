@@ -106,7 +106,7 @@ async function resolveRedirects(url: string, maxRedirects: number = MAX_REDIRECT
       const protocol = currentUrl.startsWith('https') ? https : http;
 
       const request = protocol.get(currentUrl, {
-        headers: { 'User-Agent': 'RiteMark/1.0' },
+        headers: { 'User-Agent': 'Ritemark/1.0' },
         timeout: 10000
       }, (response) => {
         if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
@@ -196,7 +196,7 @@ export async function downloadModel(
       let lastProgressBytes = startByte;
 
       const headers: Record<string, string> = {
-        'User-Agent': 'RiteMark/1.0'
+        'User-Agent': 'Ritemark/1.0'
       };
 
       // Request range if resuming

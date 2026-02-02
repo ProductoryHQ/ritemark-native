@@ -5,9 +5,9 @@
 
 ## Problem
 
-Windows build showed VS Code's default Welcome page instead of RiteMark's custom walkthrough on first launch.
+Windows build showed VS Code's default Welcome page instead of Ritemark's custom walkthrough on first launch.
 
-**Expected:** RiteMark walkthrough (Get Started with Ritemark)
+**Expected:** Ritemark walkthrough (Get Started with Ritemark)
 **Actual:** VS Code generic welcome screen
 
 ## Solution
@@ -25,7 +25,7 @@ Windows build showed VS Code's default Welcome page instead of RiteMark's custom
 **Added first-launch detection and walkthrough trigger:**
 
 ```typescript
-// Show RiteMark walkthrough on first launch
+// Show Ritemark walkthrough on first launch
 // This provides a better onboarding experience than VS Code's default Welcome page
 const hasSeenWalkthrough = context.globalState.get('ritemark.hasSeenWalkthrough', false);
 if (!hasSeenWalkthrough) {
@@ -122,28 +122,28 @@ The walkthrough is already defined in `extensions/ritemark/package.json`:
 
 **VS Code default welcome:**
 - Still accessible via Command Palette: "Welcome: Open Welcome"
-- Not shown automatically anymore (RiteMark walkthrough takes priority)
+- Not shown automatically anymore (Ritemark walkthrough takes priority)
 
 ## Testing Required
 
 ### Test 1: Fresh Install (First Launch)
 
 **Setup:**
-1. Build RiteMark (Windows or macOS)
+1. Build Ritemark (Windows or macOS)
 2. Delete user data folder:
    - Windows: `%APPDATA%\.ritemark`
    - macOS: `~/Library/Application Support/.ritemark`
-3. Launch RiteMark
+3. Launch Ritemark
 
 **Expected:**
-- RiteMark walkthrough opens automatically
+- Ritemark walkthrough opens automatically
 - Shows "Get Started with Ritemark" title
 - 4 steps visible: Welcome, Configure API Key, Open Markdown, Try AI
 
 ### Test 2: Subsequent Launches
 
 **Setup:**
-1. Close RiteMark (after first launch test)
+1. Close Ritemark (after first launch test)
 2. Launch again
 
 **Expected:**
@@ -169,7 +169,7 @@ The walkthrough is already defined in `extensions/ritemark/package.json`:
 1. Open Command Palette
 2. Run: "Developer: Open Global State"
 3. Remove: `ritemark.hasSeenWalkthrough` key
-4. Restart RiteMark
+4. Restart Ritemark
 
 **Expected:**
 - Walkthrough shows again (like first launch)
@@ -177,15 +177,15 @@ The walkthrough is already defined in `extensions/ritemark/package.json`:
 ## User Experience Flow
 
 **New User:**
-1. Installs RiteMark
+1. Installs Ritemark
 2. Launches app
 3. 👉 **Walkthrough automatically opens**
 4. Learns about features (API key, markdown, AI)
 5. Closes walkthrough when ready
-6. Starts using RiteMark
+6. Starts using Ritemark
 
 **Returning User:**
-1. Launches RiteMark
+1. Launches Ritemark
 2. Normal view (no walkthrough)
 3. Can access walkthrough manually if needed
 

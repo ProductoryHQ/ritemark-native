@@ -2,7 +2,7 @@
 
 > Write in rich text, save in markdown. Never lose your work.
 
-RiteMark gives you a visual editor that feels like a word processor but saves everything as plain markdown files. Your documents stay portable, readable, and yours.
+Ritemark gives you a visual editor that feels like a word processor but saves everything as plain markdown files. Your documents stay portable, readable, and yours.
 
 ---
 
@@ -21,7 +21,7 @@ RiteMark gives you a visual editor that feels like a word processor but saves ev
 
 ### Visual Editing
 
-When you open a markdown file, RiteMark shows it as formatted text:
+When you open a markdown file, Ritemark shows it as formatted text:
 - **Bold text** appears bold (not `**bold**`)
 - Headings appear large (not `# Heading`)
 - Lists show bullets (not `- item`)
@@ -35,7 +35,7 @@ Your document saves automatically:
 2. Wait 1 second
 3. File saves to disk
 
-No save button needed. No "unsaved changes" warnings. If RiteMark crashes, you lose at most 1 second of work.
+No save button needed. No "unsaved changes" warnings. If Ritemark crashes, you lose at most 1 second of work.
 
 ### Slash Commands
 
@@ -88,7 +88,7 @@ The status bar at the bottom shows:
 
 - **Quick formatting** - Select text to see the formatting bubble menu
 - **Keyboard shortcuts** - Cmd+B for bold, Cmd+I for italic, Cmd+K for links
-- **External changes** - If you edit the file outside RiteMark, it reloads automatically
+- **External changes** - If you edit the file outside Ritemark, it reloads automatically
 
 ---
 

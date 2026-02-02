@@ -44,7 +44,7 @@ yarn gulp vscode-darwin-arm64
 
 ### 1.2 Webview Rendering Fix
 
-**Problem:** RiteMark editor showing blank white area
+**Problem:** Ritemark editor showing blank white area
 
 **Symptoms:**
 - webview.js was ~64KB (should be ~900KB)
@@ -64,7 +64,7 @@ ls -la ../media/webview.js  # Should be ~900KB
 
 # Copy to production app
 cp ../media/webview.js \
-   "../../VSCode-darwin-arm64/RiteMark Native.app/Contents/Resources/app/extensions/ritemark/media/"
+   "../../VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extensions/ritemark/media/"
 ```
 
 ### 1.3 Production Build Configuration
@@ -240,7 +240,7 @@ dlopen: mach-o file, but is an incompatible architecture (have 'arm64', need 'x8
 **Discovery:**
 ```bash
 # The dev Electron was x86_64
-file vscode/.build/electron/RiteMark\ Native.app/Contents/MacOS/Electron
+file vscode/.build/electron/Ritemark\ Native.app/Contents/MacOS/Electron
 # Output: Mach-O 64-bit executable x86_64
 
 # But native modules were arm64
@@ -296,7 +296,7 @@ The `setup.sh` script should:
 | Extension in VSCode | `vscode/extensions/ritemark/` | Should be symlink |
 | Webview Source | `extensions/ritemark/webview/` | React + Vite |
 | Webview Bundle | `extensions/ritemark/media/webview.js` | ~900KB when built correctly |
-| Production App | `VSCode-darwin-arm64/RiteMark Native.app/` | Standalone build |
+| Production App | `VSCode-darwin-arm64/Ritemark Native.app/` | Standalone build |
 | Dev App | `vscode/.build/electron/` | Development build |
 
 ---

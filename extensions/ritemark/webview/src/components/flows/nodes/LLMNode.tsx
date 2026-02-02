@@ -9,25 +9,17 @@ import { memo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { BaseNode, NodeField } from './BaseNode';
 import type { LLMNodeData } from '../stores/flowEditorStore';
+import { useFlowEditorStore } from '../stores/flowEditorStore';
+import { getLLMModels, getDefaultLLMModel } from '../../../config/modelConfig';
 
 interface LLMNodeProps {
+  id: string;
   data: LLMNodeData;
   selected?: boolean;
 }
 
-// Short display names for models
-const modelDisplayNames: Record<string, string> = {
-  'gpt-4.1-mini': 'GPT-4.1 Mini',
-  'gpt-4.1': 'GPT-4.1',
-  'gpt-4o-mini': 'GPT-4o Mini',
-  'gpt-4o': 'GPT-4o',
-  'o3-mini': 'o3-mini',
-  'gemini-3-flash': 'Gemini 3 Flash',
-  'gemini-2.5-flash': 'Gemini 2.5 Flash',
-  'gemini-2.5-pro': 'Gemini 2.5 Pro',
-};
-
-function LLMNodeComponent({ data, selected }: LLMNodeProps) {
+function LLMNodeComponent({ id, data, selected }: LLMNodeProps) {
+  const executionStep = useFlowEditorStore((state) => state.executionOrder.get(id));
   // Truncate long prompts for display
   const truncateText = (text: string, maxLength: number = 50) => {
     if (!text) return '';
@@ -35,8 +27,10 @@ function LLMNodeComponent({ data, selected }: LLMNodeProps) {
   };
 
   const provider = data.provider || 'openai';
-  const model = data.model || (provider === 'openai' ? 'gpt-4.1-mini' : 'gemini-3-flash');
-  const modelName = modelDisplayNames[model] || model;
+  const model = data.model || getDefaultLLMModel(provider);
+  // Get model name from config, fallback to model id
+  const models = getLLMModels(provider);
+  const modelName = models.find(m => m.id === model)?.name || model;
 
   return (
     <BaseNode
@@ -44,6 +38,7 @@ function LLMNodeComponent({ data, selected }: LLMNodeProps) {
       icon={<Sparkles size={16} />}
       selected={selected}
       headerColor="var(--vscode-charts-purple)"
+      executionStep={executionStep}
     >
       <NodeField label="Model" value={modelName} />
       {data.systemPrompt && (

@@ -9,7 +9,7 @@
 
 ## Overview
 
-Add GitHub Flavored Markdown (GFM) task list support to RiteMark with interactive checkboxes.
+Add GitHub Flavored Markdown (GFM) task list support to Ritemark with interactive checkboxes.
 
 **User Story:**
 > As a markdown user, I want to create task lists with `- [ ]` syntax that render as clickable checkboxes, so I can manage my to-do items directly in the editor.
@@ -20,7 +20,7 @@ Add GitHub Flavored Markdown (GFM) task list support to RiteMark with interactiv
 - ✅ Interactive checkboxes for `- [ ]` and `- [x]` syntax
 - ✅ Click to toggle checkbox state
 - ✅ Slash command: `/task` or `/checklist`
-- ✅ Command palette: "RiteMark: Insert Task List"
+- ✅ Command palette: "Ritemark: Insert Task List"
 - ✅ Keyboard navigation and editing
 - ✅ Nested task lists support
 
@@ -81,7 +81,7 @@ This is a relatively straightforward sprint:
 ### Rendered Output
 - Interactive checkboxes users can click
 - Proper indentation for nested lists
-- Visual styling consistent with RiteMark theme
+- Visual styling consistent with Ritemark theme
 
 ## Next Actions
 

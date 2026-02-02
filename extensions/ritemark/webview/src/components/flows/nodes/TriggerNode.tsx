@@ -11,6 +11,7 @@ import { Zap, FileText, File } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
 import { cn } from '../../../lib/utils';
 import type { FlowInput } from '../stores/flowEditorStore';
+import { useFlowEditorStore } from '../stores/flowEditorStore';
 
 export interface TriggerNodeData extends Record<string, unknown> {
   label: string;
@@ -18,12 +19,14 @@ export interface TriggerNodeData extends Record<string, unknown> {
 }
 
 interface TriggerNodeProps {
+  id: string;
   data: TriggerNodeData;
   selected?: boolean;
 }
 
-function TriggerNodeComponent({ data, selected }: TriggerNodeProps) {
+function TriggerNodeComponent({ id, data, selected }: TriggerNodeProps) {
   const inputs = data.inputs || [];
+  const executionStep = useFlowEditorStore((state) => state.executionOrder.get(id));
 
   return (
     <div
@@ -39,6 +42,12 @@ function TriggerNodeComponent({ data, selected }: TriggerNodeProps) {
         className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-b border-[var(--vscode-panel-border)]"
         style={{ background: '#2563eb' }}
       >
+        {/* Execution step badge */}
+        {executionStep !== undefined && (
+          <span className="flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-white/20 text-white">
+            {executionStep}
+          </span>
+        )}
         <Zap className="text-white opacity-80" size={16} />
         <span className="text-sm font-medium text-white truncate">
           {data.label || 'Trigger'}

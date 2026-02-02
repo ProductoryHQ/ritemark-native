@@ -78,7 +78,7 @@
 ## Pattern Used
 
 All patches follow the same pattern:
-1. Add RiteMark comment explaining why the change was made
+1. Add Ritemark comment explaining why the change was made
 2. Comment out the menu registration code (don't delete it)
 3. Keep the view container registration intact
 4. Use `hideIfEmpty: true` where applicable
@@ -86,7 +86,7 @@ All patches follow the same pattern:
 
 ## Rationale
 
-These changes support RiteMark's goal of being a **focused markdown editor**, not a general-purpose code editor. By removing code-specific menu items:
+These changes support Ritemark's goal of being a **focused markdown editor**, not a general-purpose code editor. By removing code-specific menu items:
 
 - Edit menu shows only text editing commands
 - View menu shows only markdown-relevant views (Explorer, Search, Source Control)

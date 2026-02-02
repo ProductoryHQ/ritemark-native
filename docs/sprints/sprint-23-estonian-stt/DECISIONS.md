@@ -14,7 +14,7 @@ All design questions have been answered by Jarmo:
 **Decision**: ✅ **Bundle binary with extension (~5-10MB)**
 - Zero installation required
 - Self-contained distribution
-- Aligns with RiteMark philosophy
+- Aligns with Ritemark philosophy
 
 ### 2. Model Download Timing
 **Question**: Bundle model or download on first use?

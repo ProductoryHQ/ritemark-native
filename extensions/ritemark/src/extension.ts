@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { RiteMarkEditorProvider } from './ritemarkEditor';
+import { RitemarkEditorProvider } from './ritemarkEditor';
 import { ExcelEditorProvider } from './excelEditorProvider';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
@@ -7,7 +7,7 @@ import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { FlowsViewProvider } from './flows/FlowsViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
 import { FlowStorage } from './flows/FlowStorage';
-import { RiteMarkSettingsProvider } from './settings/RiteMarkSettingsProvider';
+import { RitemarkSettingsProvider } from './settings/RitemarkSettingsProvider';
 import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLMNodeExecutor';
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
 import { registerFlowTestCommand } from './flows/FlowTestRunner';
@@ -23,7 +23,7 @@ export let unifiedViewProvider: UnifiedViewProvider;
 let flowsViewProvider: FlowsViewProvider | null = null;
 
 // Settings provider
-let settingsProvider: RiteMarkSettingsProvider | null = null;
+let settingsProvider: RitemarkSettingsProvider | null = null;
 
 // RAG infrastructure
 let documentIndexer: DocumentIndexer | null = null;
@@ -38,33 +38,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize connectivity monitoring (status bar + online detection)
   initConnectivity(context);
-
-  // Show RiteMark walkthrough on first launch
-  // This provides a better onboarding experience than VS Code's default Welcome page
-  const hasSeenWalkthrough = context.globalState.get('ritemark.hasSeenWalkthrough', false);
-  if (!hasSeenWalkthrough) {
-    // Delay to allow VS Code UI to fully initialize
-    setTimeout(async () => {
-      try {
-        // VS Code walkthrough ID format: publisherId.extensionName#walkthroughId
-        // Our extension: publisher="ritemark", name="ritemark", walkthrough id="ritemark.welcome"
-        await vscode.commands.executeCommand(
-          'workbench.action.openWalkthrough',
-          'ritemark.ritemark#ritemark.welcome',
-          true // Open to side
-        );
-        await context.globalState.update('ritemark.hasSeenWalkthrough', true);
-      } catch (error) {
-        console.error('Failed to show walkthrough:', error);
-        // Try alternative format
-        try {
-          await vscode.commands.executeCommand('workbench.action.openWalkthrough');
-        } catch (e) {
-          // Ignore - at least the welcome page will open
-        }
-      }
-    }, 1500);
-  }
 
   // Initialize update service
   const updateStorage = new UpdateStorage(context.globalState);
@@ -138,7 +111,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // Initialize Settings Provider
-  settingsProvider = new RiteMarkSettingsProvider(context);
+  settingsProvider = new RitemarkSettingsProvider(context);
 
   // Register AI settings command (opens branded settings page)
   context.subscriptions.push(
@@ -194,14 +167,14 @@ export function activate(context: vscode.ExtensionContext) {
       args: Record<string, unknown>;
       selection: { text: string; isEmpty: boolean; from: number; to: number };
     }) => {
-      // Broadcast to active editor via RiteMarkEditorProvider
-      RiteMarkEditorProvider.executeAITool(data);
+      // Broadcast to active editor via RitemarkEditorProvider
+      RitemarkEditorProvider.executeAITool(data);
     })
   );
 
   // Register markdown/CSV custom editor
   context.subscriptions.push(
-    RiteMarkEditorProvider.register(context, unifiedViewProvider)
+    RitemarkEditorProvider.register(context, unifiedViewProvider)
   );
 
   // Register Excel viewer (read-only)

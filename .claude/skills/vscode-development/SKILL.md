@@ -15,7 +15,7 @@ Comprehensive knowledge for VS Code OSS development, building from source, and e
 - Developing VS Code extensions
 - Troubleshooting build failures
 - Setting up VS Code development environment
-- Working with VS Code forks (like RiteMark Native)
+- Working with VS Code forks (like Ritemark Native)
 - Understanding VS Code architecture
 
 ## Quick Reference

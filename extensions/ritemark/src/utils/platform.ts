@@ -16,6 +16,6 @@ export function getCurrentPlatform(): Platform {
   }
 
   // Unknown platform - fallback to linux and warn
-  console.warn(`[RiteMark] Unknown platform: ${platform}, falling back to 'linux'`);
+  console.warn(`[Ritemark] Unknown platform: ${platform}, falling back to 'linux'`);
   return 'linux';
 }

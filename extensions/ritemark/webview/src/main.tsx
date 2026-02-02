@@ -13,9 +13,9 @@ const FlowsPanel = lazy(() =>
   import('./components/flows/FlowsPanel').then((m) => ({ default: m.FlowsPanel }))
 )
 
-// Lazy load RiteMarkSettings
-const RiteMarkSettings = lazy(() =>
-  import('./components/settings/RiteMarkSettings').then((m) => ({ default: m.RiteMarkSettings }))
+// Lazy load RitemarkSettings
+const RitemarkSettings = lazy(() =>
+  import('./components/settings/RitemarkSettings').then((m) => ({ default: m.RitemarkSettings }))
 )
 
 // Check if this is a flow editor instance
@@ -23,7 +23,7 @@ const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
 
 // Debug logging
-console.log('[RiteMark] Initializing editor, type:', editorType)
+console.log('[Ritemark] Initializing editor, type:', editorType)
 
 // Loading fallback
 const LoadingFallback = () => (
@@ -45,7 +45,7 @@ ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     {editorType === 'settings' ? (
       <Suspense fallback={<LoadingFallback />}>
-        <RiteMarkSettings />
+        <RitemarkSettings />
       </Suspense>
     ) : editorType === 'flow' ? (
       <Suspense fallback={<LoadingFallback />}>

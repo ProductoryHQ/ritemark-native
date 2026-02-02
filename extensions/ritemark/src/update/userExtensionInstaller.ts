@@ -252,7 +252,7 @@ export class UserExtensionInstaller {
   private async downloadFile(url: string): Promise<Buffer> {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'RiteMark-Native'
+        'User-Agent': 'Ritemark-Native'
       }
     });
 

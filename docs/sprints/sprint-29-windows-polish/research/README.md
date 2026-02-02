@@ -167,10 +167,10 @@ After all fixes:
 2. Delete user data folder
 3. First launch checklist:
    - [ ] Light theme (no dark flash)
-   - [ ] RiteMark walkthrough shows
+   - [ ] Ritemark walkthrough shows
    - [ ] No dictate button in header
 4. File Explorer:
-   - [ ] RiteMark icon on exe
+   - [ ] Ritemark icon on exe
 5. Export features:
    - [ ] PDF with images works
    - [ ] Word formatting works

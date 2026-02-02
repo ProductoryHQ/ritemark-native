@@ -91,7 +91,7 @@ export function initConnectivity(context: vscode.ExtensionContext): void {
     vscode.StatusBarAlignment.Right,
     100
   );
-  _statusBarItem.name = 'RiteMark AI Status';
+  _statusBarItem.name = 'Ritemark AI Status';
   _statusBarItem.command = 'ritemark.showAIPanel';
   context.subscriptions.push(_statusBarItem);
 

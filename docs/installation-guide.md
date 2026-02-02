@@ -1,6 +1,6 @@
-# RiteMark Native Installation Guide
+# Ritemark Native Installation Guide
 
-This guide covers installing RiteMark Native on macOS and Windows.
+This guide covers installing Ritemark Native on macOS and Windows.
 
 ---
 
@@ -9,28 +9,28 @@ This guide covers installing RiteMark Native on macOS and Windows.
 ### Download
 
 Download the latest DMG from [Releases](https://github.com/your-repo/releases):
-- `RiteMark-Native-{version}-darwin-arm64.dmg` (Apple Silicon)
+- `Ritemark-Native-{version}-darwin-arm64.dmg` (Apple Silicon)
 
 ### Verify Download (Optional)
 
 ```bash
-shasum -a 256 RiteMark-Native-*.dmg
+shasum -a 256 Ritemark-Native-*.dmg
 # Compare with .sha256 file
 ```
 
 ### Install
 
 1. Double-click the DMG file to mount it
-2. Drag **RiteMark Native** to the **Applications** folder
+2. Drag **Ritemark Native** to the **Applications** folder
 3. Wait for the copy to complete
 4. Eject the DMG (right-click > Eject)
 
 ### First Launch (Gatekeeper)
 
-Since RiteMark Native is not signed with an Apple Developer certificate, macOS will show a security warning on first launch:
+Since Ritemark Native is not signed with an Apple Developer certificate, macOS will show a security warning on first launch:
 
 1. Open **Applications** folder in Finder
-2. **Right-click** (or Control-click) on **RiteMark Native**
+2. **Right-click** (or Control-click) on **Ritemark Native**
 3. Select **Open** from the context menu
 4. Click **Open** in the dialog that appears
 
@@ -39,7 +39,7 @@ After this, subsequent launches will work normally with a double-click.
 **Alternative method:**
 ```bash
 # Remove quarantine attribute
-xattr -d com.apple.quarantine /Applications/RiteMark\ Native.app
+xattr -d com.apple.quarantine /Applications/Ritemark\ Native.app
 ```
 
 ---
@@ -49,22 +49,22 @@ xattr -d com.apple.quarantine /Applications/RiteMark\ Native.app
 ### Download
 
 Download the latest ZIP from [Releases](https://github.com/your-repo/releases):
-- `RiteMark-Native-{version}-win32-x64.zip` (64-bit Windows)
+- `Ritemark-Native-{version}-win32-x64.zip` (64-bit Windows)
 
 ### Verify Download (Optional)
 
 ```powershell
-Get-FileHash RiteMark-Native-*.zip -Algorithm SHA256
+Get-FileHash Ritemark-Native-*.zip -Algorithm SHA256
 # Compare with .sha256 file
 ```
 
 ### Install
 
-RiteMark Native for Windows is a **portable application** - no installer required.
+Ritemark Native for Windows is a **portable application** - no installer required.
 
 1. Extract the ZIP file to your desired location:
-   - `C:\Program Files\RiteMark Native\` (system-wide)
-   - `C:\Users\YourName\Apps\RiteMark Native\` (user only)
+   - `C:\Program Files\Ritemark Native\` (system-wide)
+   - `C:\Users\YourName\Apps\Ritemark Native\` (user only)
    - Or any folder you prefer
 
 2. Inside the extracted folder, find `Code - OSS.exe`
@@ -102,13 +102,13 @@ After this, subsequent launches will work normally.
 
 Run in Terminal:
 ```bash
-xattr -cr /Applications/RiteMark\ Native.app
+xattr -cr /Applications/Ritemark\ Native.app
 ```
 
 ### macOS: App won't open at all
 
 1. Check System Preferences > Security & Privacy > General
-2. Look for "RiteMark Native was blocked" message
+2. Look for "Ritemark Native was blocked" message
 3. Click "Open Anyway"
 
 ### Windows: Missing DLL errors
@@ -127,12 +127,12 @@ Ensure you have the Visual C++ Redistributable installed:
 ## Uninstalling
 
 ### macOS
-1. Drag **RiteMark Native** from Applications to Trash
-2. (Optional) Remove settings: `rm -rf ~/Library/Application\ Support/RiteMark\ Native`
+1. Drag **Ritemark Native** from Applications to Trash
+2. (Optional) Remove settings: `rm -rf ~/Library/Application\ Support/Ritemark\ Native`
 
 ### Windows
-1. Delete the `RiteMark Native` folder
-2. (Optional) Remove settings: Delete `%APPDATA%\RiteMark Native`
+1. Delete the `Ritemark Native` folder
+2. (Optional) Remove settings: Delete `%APPDATA%\Ritemark Native`
 
 ---
 

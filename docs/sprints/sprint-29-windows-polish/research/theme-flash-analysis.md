@@ -2,9 +2,9 @@
 
 ## Problem
 
-On Windows (and likely all platforms), when launching RiteMark:
+On Windows (and likely all platforms), when launching Ritemark:
 1. VS Code loads with Dark Modern theme (brief flash)
-2. Then switches to RiteMark's Default Light Modern theme
+2. Then switches to Ritemark's Default Light Modern theme
 
 This creates a jarring dark flash on startup.
 

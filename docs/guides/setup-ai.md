@@ -2,7 +2,7 @@
 
 > Enable AI-powered text editing with your OpenAI API key.
 
-RiteMark's AI assistant helps you rephrase text, make bulk replacements, and insert content. It requires an OpenAI API key to work.
+Ritemark's AI assistant helps you rephrase text, make bulk replacements, and insert content. It requires an OpenAI API key to work.
 
 ---
 
@@ -20,7 +20,7 @@ RiteMark's AI assistant helps you rephrase text, make bulk replacements, and ins
 2. Sign in or create an account
 3. Navigate to **API Keys** (under your profile menu)
 4. Click **Create new secret key**
-5. Name it something like "RiteMark"
+5. Name it something like "Ritemark"
 6. Copy the key (starts with `sk-`)
 
 **Important:** You can only see the key once. Save it somewhere safe.
@@ -30,18 +30,18 @@ RiteMark's AI assistant helps you rephrase text, make bulk replacements, and ins
 OpenAI requires prepaid credits:
 - New accounts may include free credits
 - Add payment method and credits at Billing section
-- RiteMark uses GPT-4o-mini (cost-effective)
+- Ritemark uses GPT-4o-mini (cost-effective)
 
 Typical usage costs pennies per session.
 
 ---
 
-## Step 2: Add Key to RiteMark
+## Step 2: Add Key to Ritemark
 
-1. Open RiteMark
+1. Open Ritemark
 2. Open Command Palette: **Cmd+Shift+P**
 3. Type "Configure OpenAI"
-4. Select **RiteMark: Configure OpenAI API Key**
+4. Select **Ritemark: Configure OpenAI API Key**
 5. Paste your API key
 6. Press Enter
 
@@ -95,7 +95,7 @@ If you need to update or fix your key:
 
 1. **Cmd+Shift+P**
 2. Search for "Check API Key"
-3. Select **RiteMark: Check API Key**
+3. Select **Ritemark: Check API Key**
 4. Shows whether key is valid
 
 ---
@@ -104,14 +104,14 @@ If you need to update or fix your key:
 
 - Your API key is stored in macOS Secure Storage
 - Text is sent to OpenAI's servers for processing
-- RiteMark doesn't store or transmit your data elsewhere
+- Ritemark doesn't store or transmit your data elsewhere
 - See [OpenAI's usage policies](https://openai.com/policies/usage-policies)
 
 ---
 
 ## Without an API Key
 
-RiteMark works fine without AI:
+Ritemark works fine without AI:
 - All editing features work
 - Export works
 - CSV/Excel viewing works

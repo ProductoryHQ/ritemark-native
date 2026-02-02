@@ -1,8 +1,8 @@
-# CLAUDE.md - RiteMark Native
+# CLAUDE.md - Ritemark Native
 
 ## Project Identity
 
-RiteMark Native is a VS Code OSS fork with RiteMark built-in as the native markdown editor. This is a standalone branded app, **not an extension**.
+Ritemark Native is a VS Code OSS fork with Ritemark built-in as the native markdown editor. This is a standalone branded app, **not an extension**.
 
 **Target:** Local-first markdown editing with offline support.
 
@@ -13,7 +13,7 @@ RiteMark Native is a VS Code OSS fork with RiteMark built-in as the native markd
 | Component | Choice | Non-Negotiable |
 | --- | --- | --- |
 | VS Code OSS | Git submodule | NOT a fork - easy upstream sync |
-| Integration | Custom Editor Provider | .md files open in RiteMark webview |
+| Integration | Custom Editor Provider | .md files open in Ritemark webview |
 | Build target | darwin-arm64 | Apple Silicon |
 | Marketplace | Hidden | Prevent extension conflicts |
 | Telemetry | Minimal, opt-out | Privacy first |
@@ -26,12 +26,12 @@ RiteMark Native is a VS Code OSS fork with RiteMark built-in as the native markd
 ritemark-native/
 ├── vscode/                      # VS Code OSS submodule (patches applied here)
 │   └── extensions/ritemark/     # SYMLINK → ../../extensions/ritemark
-├── extensions/ritemark/         # RiteMark extension SOURCE (edit here!)
+├── extensions/ritemark/         # Ritemark extension SOURCE (edit here!)
 │   ├── src/                     # TypeScript source
 │   ├── out/                     # Compiled JS
 │   ├── webview/                 # React webview (TipTap editor)
 │   └── media/                   # webview.js bundle (~900KB)
-├── patches/                     # RiteMark customizations to VS Code
+├── patches/                     # Ritemark customizations to VS Code
 │   └── vscode/                  # Patch files (numbered, e.g., 001-*.patch)
 ├── branding/                    # Icons, logos, product.json overrides
 ├── scripts/                     # Development and release scripts
@@ -99,6 +99,26 @@ Project uses feature flags for platform-specific, experimental, and premium feat
 
 * * *
 
+## AI Model Configuration
+
+**IMPORTANT:** All AI model information is in `extensions/ritemark/src/ai/modelConfig.ts`
+
+This file is the **single source of truth** for:
+- OpenAI LLM models (GPT-5.x, GPT-4o family)
+- OpenAI Image models (GPT Image 1.5, etc.)
+- Gemini LLM models (Gemini 3, 2.5 family)
+- Gemini Image models (Imagen 4, Nano Banana)
+- Default model selections for different use cases
+
+**NEVER hardcode model names elsewhere.** Use imports from modelConfig.ts:
+```typescript
+import { DEFAULT_MODELS, OPENAI_LLM_MODELS } from '../ai/modelConfig';
+```
+
+For webview code, model config is sent from extension via `flow:modelConfig` message and stored in `webview/src/config/modelConfig.ts`.
+
+* * *
+
 ## UI Components
 
 Webview uses **Tailwind CSS** with custom components. Future migration to **shadcn/ui** is planned.
@@ -157,7 +177,7 @@ Responding without invoking the required agent is a **VIOLATION** of project gov
 
 **NEVER run** `gulp vscode-darwin-arm64` **directly.** Running gulp directly will:
 
--   Build VS Code without copying the RiteMark extension
+-   Build VS Code without copying the Ritemark extension
     
 -   Result in a broken app that can't open .md files
     

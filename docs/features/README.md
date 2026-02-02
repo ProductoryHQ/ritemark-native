@@ -1,6 +1,6 @@
-# RiteMark Features
+# Ritemark Features
 
-Everything you can do with RiteMark, organized by category.
+Everything you can do with Ritemark, organized by category.
 
 ---
 
@@ -18,7 +18,7 @@ Everything you can do with RiteMark, organized by category.
 | Feature | Description |
 |---------|-------------|
 | [AI Assistant](ai-assistant.md) | Built-in chat sidebar with text tools |
-| [Terminal AI](terminal-ai.md) | Use Claude Code, Codex, or Gemini alongside RiteMark |
+| [Terminal AI](terminal-ai.md) | Use Claude Code, Codex, or Gemini alongside Ritemark |
 
 ## Document Management
 
@@ -32,7 +32,7 @@ Everything you can do with RiteMark, organized by category.
 
 ## Quick Reference
 
-### What RiteMark Opens
+### What Ritemark Opens
 
 | File Type | Mode | What You Can Do |
 |-----------|------|-----------------|

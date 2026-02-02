@@ -2,7 +2,7 @@
 
 > Rephrase, replace, and insert text with AI - right from your editor.
 
-RiteMark includes a built-in AI assistant that can help you rewrite text, make bulk changes, and add new content. It works with your selected text and understands your document context.
+Ritemark includes a built-in AI assistant that can help you rewrite text, make bulk changes, and add new content. It works with your selected text and understands your document context.
 
 ---
 
@@ -19,7 +19,7 @@ RiteMark includes a built-in AI assistant that can help you rewrite text, make b
 
 The AI assistant requires an OpenAI API key. See [Set Up AI](../guides/setup-ai.md) for instructions.
 
-Without an API key, the AI sidebar shows "AI Offline" and tools are disabled. Everything else in RiteMark works normally.
+Without an API key, the AI sidebar shows "AI Offline" and tools are disabled. Everything else in Ritemark works normally.
 
 ---
 
@@ -148,7 +148,7 @@ If you lose internet connection:
 
 - Your text is sent to OpenAI's API for processing
 - Your API key is stored securely on your machine
-- No data is stored by RiteMark's servers (there are none)
+- No data is stored by Ritemark's servers (there are none)
 - See OpenAI's privacy policy for their data handling
 
 ---

@@ -43,7 +43,7 @@ Webview (client side):
 - `openCustomDocument()`: Async file read with error handling
 - `resolveCustomEditor()`: Setup webview, send Base64 content once
 - Message handlers: `ready`, `error`
-- HTML and CSP setup (similar to RiteMarkEditorProvider)
+- HTML and CSP setup (similar to RitemarkEditorProvider)
 
 ---
 

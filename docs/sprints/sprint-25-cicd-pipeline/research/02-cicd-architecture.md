@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document proposes a **3-level maturity model** for RiteMark's CI/CD pipeline, starting with "Works" and evolving to "Pro" quality over multiple phases.
+This document proposes a **3-level maturity model** for Ritemark's CI/CD pipeline, starting with "Works" and evolving to "Pro" quality over multiple phases.
 
 ---
 
@@ -122,7 +122,7 @@ jobs:
         working-directory: vscode
         run: npm run compile
 
-      - name: TypeScript compilation (RiteMark extension)
+      - name: TypeScript compilation (Ritemark extension)
         working-directory: extensions/ritemark
         run: npm run compile
 
@@ -163,7 +163,7 @@ Produce a working, tested Windows x64 production build.
 
 ### Key Challenges
 1. **Native build required** - Must run on `windows-latest` (no cross-compile)
-2. **Extension copy critical** - Must copy RiteMark extension after build
+2. **Extension copy critical** - Must copy Ritemark extension after build
 3. **Path handling** - Windows uses backslashes, bash uses forward slashes
 4. **Validation** - Must verify webview.js, extension.js sizes
 
@@ -225,7 +225,7 @@ jobs:
         working-directory: vscode
         run: npm run gulp vscode-win32-x64-min
 
-      - name: Copy RiteMark extension
+      - name: Copy Ritemark extension
         shell: bash
         run: |
           APP_DIR="VSCode-win32-x64"
@@ -263,7 +263,7 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./branding/product.json').ritemarkVersion")
-          ZIP_NAME="RiteMark-${VERSION}-win32-x64.zip"
+          ZIP_NAME="Ritemark-${VERSION}-win32-x64.zip"
 
           7z a "dist/$ZIP_NAME" ./VSCode-win32-x64/*
 
@@ -281,7 +281,7 @@ jobs:
 3. ✅ Apply patches before build
 4. ✅ Pre-validate webview bundle exists
 5. ✅ Build VS Code with `gulp vscode-win32-x64-min`
-6. ✅ **Copy RiteMark extension** (CRITICAL - missing from old script)
+6. ✅ **Copy Ritemark extension** (CRITICAL - missing from old script)
 7. ✅ Post-validate build output (size checks)
 8. ✅ Create ZIP for distribution
 
@@ -607,13 +607,13 @@ echo "All checks passed!"
 ```yaml
 - name: Smoke test - Launch app
   run: |
-    ./VSCode-darwin-arm64/RiteMark.app/Contents/MacOS/Electron --version
+    ./VSCode-darwin-arm64/Ritemark.app/Contents/MacOS/Electron --version
 
 - name: Smoke test - Verify extension
   run: |
-    EXTS=$(./VSCode-darwin-arm64/RiteMark.app/Contents/MacOS/Electron --list-extensions)
+    EXTS=$(./VSCode-darwin-arm64/Ritemark.app/Contents/MacOS/Electron --list-extensions)
     if ! echo "$EXTS" | grep -q "ritemark"; then
-      echo "ERROR: RiteMark extension not found"
+      echo "ERROR: Ritemark extension not found"
       exit 1
     fi
 ```

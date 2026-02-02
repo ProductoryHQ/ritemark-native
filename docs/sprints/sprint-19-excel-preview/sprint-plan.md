@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Sprint 19 adds read-only Excel file preview to RiteMark Native. This was deferred from Sprint 17 when we discovered that `CustomTextEditorProvider` cannot handle binary files.
+Sprint 19 adds read-only Excel file preview to Ritemark Native. This was deferred from Sprint 17 when we discovered that `CustomTextEditorProvider` cannot handle binary files.
 
 **Scope Confirmed by Jarmo:**
 - ✅ Read-only Excel preview (NO editing - too complex)
@@ -488,7 +488,7 @@ const parseExcel = (base64Content: string, enc?: string, sheetName?: string) => 
 "customEditors": [
   {
     "viewType": "ritemark.editor",
-    "displayName": "RiteMark",
+    "displayName": "Ritemark",
     "selector": [
       {"filenamePattern": "*.md"},
       {"filenamePattern": "*.markdown"},
@@ -522,7 +522,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register markdown/CSV editor
   context.subscriptions.push(
-    RiteMarkEditorProvider.register(context, aiViewProvider)
+    RitemarkEditorProvider.register(context, aiViewProvider)
   );
 
   // Register Excel viewer (NEW)

@@ -32,7 +32,7 @@ All files created according to exact specifications in sprint plan:
    - `parseVersionFromTag()` - Converts "v1.0.1" → "1.0.1"
 
 6. **updateNotification.ts** - VS Code notification UI
-   - Text: "A new version of RiteMark is available"
+   - Text: "A new version of Ritemark is available"
    - Buttons: "Install Now", "Later", "Don't Show Again"
    - Opens DMG URL in browser on "Install Now"
    - Persists "Don't Show Again" preference
@@ -76,7 +76,7 @@ All files created according to exact specifications in sprint plan:
 ### GitHub Repository
 - Owner: `jarmo-productory`
 - Repository: `ritemark-public`
-- Release asset naming: `RiteMark-{VERSION}-darwin-arm64.dmg`
+- Release asset naming: `Ritemark-{VERSION}-darwin-arm64.dmg`
 - Git tag format: `v{VERSION}` (e.g., `v1.0.0`)
 
 ### Update Check Flow

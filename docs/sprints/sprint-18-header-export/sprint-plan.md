@@ -1,7 +1,7 @@
 # Sprint 18: Document Header & Export
 
 ## Goal
-Add a minimal sticky header with Properties toggle and Export menu, enabling PDF and Word export functionality for RiteMark documents.
+Add a minimal sticky header with Properties toggle and Export menu, enabling PDF and Word export functionality for Ritemark documents.
 
 ## Success Criteria
 - [ ] Sticky header appears at top of editor and remains visible when scrolling

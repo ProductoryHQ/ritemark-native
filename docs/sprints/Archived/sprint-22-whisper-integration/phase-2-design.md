@@ -32,7 +32,7 @@ After evaluating native Node modules, we chose a **subprocess approach** for rel
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    RiteMark Webview                         │
+│                    Ritemark Webview                         │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
@@ -57,7 +57,7 @@ After evaluating native Node modules, we chose a **subprocess approach** for rel
           postMessage('audioChunk', { audio: base64, format: 'webm' })
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              RiteMark Extension (Node.js)                   │
+│              Ritemark Extension (Node.js)                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  voiceDictation.ts                                          │

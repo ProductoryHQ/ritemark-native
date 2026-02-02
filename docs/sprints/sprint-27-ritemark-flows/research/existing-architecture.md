@@ -257,7 +257,7 @@ cd vscode
 ./scripts/code.sh --extensions-dir=../extensions/ritemark
 ```
 
-This launches VS Code OSS with the RiteMark extension loaded, allowing live testing.
+This launches VS Code OSS with the Ritemark extension loaded, allowing live testing.
 
 ## Summary
 

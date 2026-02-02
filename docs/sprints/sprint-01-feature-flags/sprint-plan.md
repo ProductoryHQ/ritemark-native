@@ -45,7 +45,7 @@ Implement a minimal, type-safe feature flag system that supports platform filter
 - [x] `src/features/flags.ts` - FeatureFlag interface, FlagId type, FLAGS register
 - [x] `src/features/featureGate.ts` - `isEnabled()` with full evaluation logic
 - [x] `src/features/index.ts` - Public API exports
-- [x] `package.json` - "RiteMark Features" config section with voice-dictation toggle
+- [x] `package.json` - "Ritemark Features" config section with voice-dictation toggle
 
 ### Phase 4: Integration (COMPLETED)
 - [x] Single early-return gate for all `dictation:*` messages

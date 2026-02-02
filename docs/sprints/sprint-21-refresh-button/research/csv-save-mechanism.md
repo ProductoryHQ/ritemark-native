@@ -91,7 +91,7 @@ No `contentChanged` handler for CSV exists!
 ## Testing Required
 
 **ACTION FOR JARMO:** Please test in current version:
-1. Open a CSV file in RiteMark
+1. Open a CSV file in Ritemark
 2. Edit a cell value
 3. Close the file (without using Cmd+S)
 4. Reopen the file

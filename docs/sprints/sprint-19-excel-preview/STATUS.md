@@ -139,7 +139,7 @@ npm run compile
 
 ## Quick Reference
 
-**Goal:** Add read-only Excel (.xlsx, .xls) preview to RiteMark Native.
+**Goal:** Add read-only Excel (.xlsx, .xls) preview to Ritemark Native.
 
 **Success Criteria:**
 - Excel files open in tabular preview

@@ -98,7 +98,7 @@ Enable users to add, view, and edit document properties (metadata) through a fri
 
 ## Build Output
 
-**DMG:** `dist/RiteMark-1.94.0-darwin-arm64.dmg` (224MB)
+**DMG:** `dist/Ritemark-1.94.0-darwin-arm64.dmg` (224MB)
 **SHA256:** `f6cba48f2714f2ce6e9ac617f4c0f39eee5b1b5be871a152c73236cd32544284`
 
 ## Validated

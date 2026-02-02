@@ -17,7 +17,7 @@ Extension-only updates are technically possible and offer massive UX improvement
 
 ### 1. Can we write to app bundle files after installation?
 
-**Question:** macOS apps are typically signed and sealed. Can we modify files inside `RiteMark.app/Contents/Resources/app/extensions/ritemark/`?
+**Question:** macOS apps are typically signed and sealed. Can we modify files inside `Ritemark.app/Contents/Resources/app/extensions/ritemark/`?
 
 **Investigation:**
 
@@ -35,10 +35,10 @@ Extension-only updates are technically possible and offer massive UX improvement
 **Test Plan:**
 ```bash
 # Check if current build is signed
-codesign -dv VSCode-darwin-arm64/RiteMark.app
+codesign -dv VSCode-darwin-arm64/Ritemark.app
 
 # Test write permissions
-touch VSCode-darwin-arm64/RiteMark.app/Contents/Resources/app/extensions/ritemark/test.txt
+touch VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/extensions/ritemark/test.txt
 ```
 
 **Recommendation:** Implement write permission check before attempting update. If write fails, show "Full update required" message.
@@ -248,7 +248,7 @@ Enable only after thorough testing.
 
 ### Existing Update Flow (Sprint 16)
 ```
-User opens RiteMark
+User opens Ritemark
   ↓
 (10 second delay)
   ↓
@@ -269,7 +269,7 @@ Open DMG URL in browser
 
 ### New Update Flow (Sprint 20)
 ```
-User opens RiteMark
+User opens Ritemark
   ↓
 (10 second delay)
   ↓
@@ -324,7 +324,7 @@ ritemark-native/
 ### Production Environment
 ```
 VSCode-darwin-arm64/
-└── RiteMark.app/
+└── Ritemark.app/
     └── Contents/
         ├── MacOS/
         │   └── Electron                        ← Cannot update
@@ -338,19 +338,19 @@ VSCode-darwin-arm64/
                         └── package.json        ← Update this
 ```
 
-**Update target in prod:** `VSCode-darwin-arm64/RiteMark.app/Contents/Resources/app/extensions/ritemark/`
+**Update target in prod:** `VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/extensions/ritemark/`
 
 **Critical Path Resolution:**
 ```typescript
 function getExtensionDirectory(): string {
   // vscode.env.appRoot points to:
   // Dev:  /path/to/ritemark-native/vscode/out
-  // Prod: /path/to/RiteMark.app/Contents/Resources/app
+  // Prod: /path/to/Ritemark.app/Contents/Resources/app
 
   const appRoot = vscode.env.appRoot;
 
-  // Prod: /path/to/RiteMark.app/Contents/Resources/app
-  // → /path/to/RiteMark.app/Contents/Resources/app/extensions/ritemark
+  // Prod: /path/to/Ritemark.app/Contents/Resources/app
+  // → /path/to/Ritemark.app/Contents/Resources/app/extensions/ritemark
   return path.join(appRoot, 'extensions', 'ritemark');
 }
 ```

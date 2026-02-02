@@ -97,7 +97,7 @@ Transform CLAUDE.md from a monolithic documentation file into a "Governor/CEO" p
 - [x] **4.1** Ensure vscode-development skill has all technical details
   - Verified: development commands present in SKILL.md
   - Verified: environment setup present
-  - Verified: TROUBLESHOOTING.md has RiteMark-specific issues
+  - Verified: TROUBLESHOOTING.md has Ritemark-specific issues
 
 ### Phase 5: Validation
 
@@ -172,7 +172,7 @@ model: sonnet
 ```yaml
 name: webview-expert
 description: >
-  Specialist for RiteMark webview/editor issues. Invoke when user mentions:
+  Specialist for Ritemark webview/editor issues. Invoke when user mentions:
   webview, tiptap, react, vite, bundle, editor blank, editor not loading.
   Knows TipTap, Vite bundling, React in VS Code context.
 tools: Read, Write, Edit, Bash, Glob, Grep

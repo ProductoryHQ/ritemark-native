@@ -126,7 +126,7 @@ All patches modify VS Code source files to comment out menu registration calls:
 
 6. **Test production app:**
    ```bash
-   open VSCode-darwin-arm64/RiteMark.app
+   open VSCode-darwin-arm64/Ritemark.app
    ```
 
 7. **Verify all menu changes in production build**

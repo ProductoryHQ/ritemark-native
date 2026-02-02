@@ -7,7 +7,7 @@
 
 ## Current Issue
 
-After installing RiteMark via the Inno Setup installer (`RiteMark-1.94.0-win32-x64-setup.exe`), the application fails to launch silently - no window appears, no error message.
+After installing Ritemark via the Inno Setup installer (`Ritemark-1.94.0-win32-x64-setup.exe`), the application fails to launch silently - no window appears, no error message.
 
 ---
 
@@ -21,7 +21,7 @@ We created a Windows installer using:
 - **Wrapper script** at `scripts/create-windows-installer.sh`
 
 ### Installer Features
-- Installs to `%LOCALAPPDATA%\Programs\RiteMark\` (user mode) or `C:\Program Files\RiteMark\` (admin mode)
+- Installs to `%LOCALAPPDATA%\Programs\Ritemark\` (user mode) or `C:\Program Files\Ritemark\` (admin mode)
 - Creates Start Menu shortcuts
 - Optional desktop icon
 - Optional `.md` file association
@@ -29,7 +29,7 @@ We created a Windows installer using:
 - Proper uninstaller
 
 ### Output
-- `dist/RiteMark-1.94.0-win32-x64-setup.exe` (135 MB)
+- `dist/Ritemark-1.94.0-win32-x64-setup.exe` (135 MB)
 - SHA256 checksum file
 
 ---
@@ -41,14 +41,14 @@ We created a Windows installer using:
 Open Command Prompt and run:
 
 ```cmd
-cd %LOCALAPPDATA%\Programs\RiteMark
-RiteMark.exe --verbose
+cd %LOCALAPPDATA%\Programs\Ritemark
+Ritemark.exe --verbose
 ```
 
 Or with full logging:
 
 ```cmd
-"%LOCALAPPDATA%\Programs\RiteMark\RiteMark.exe" --log trace
+"%LOCALAPPDATA%\Programs\Ritemark\Ritemark.exe" --log trace
 ```
 
 **What to look for:**
@@ -61,7 +61,7 @@ Or with full logging:
 1. Press `Win+R`, type `eventvwr.msc`, press Enter
 2. Navigate to: **Windows Logs → Application**
 3. Look for:
-   - Red error entries from "RiteMark" or "Application Error"
+   - Red error entries from "Ritemark" or "Application Error"
    - Yellow warning entries
    - Entries around the time you tried to launch
 
@@ -75,15 +75,15 @@ Or with full logging:
 Check if all files were installed:
 
 ```cmd
-dir "%LOCALAPPDATA%\Programs\RiteMark"
-dir "%LOCALAPPDATA%\Programs\RiteMark\resources"
-dir "%LOCALAPPDATA%\Programs\RiteMark\resources\app"
+dir "%LOCALAPPDATA%\Programs\Ritemark"
+dir "%LOCALAPPDATA%\Programs\Ritemark\resources"
+dir "%LOCALAPPDATA%\Programs\Ritemark\resources\app"
 ```
 
 **Expected structure:**
 ```
-RiteMark/
-├── RiteMark.exe           # Main executable
+Ritemark/
+├── Ritemark.exe           # Main executable
 ├── *.dll                  # Various DLLs
 ├── resources/
 │   ├── app/
@@ -108,7 +108,7 @@ If not found, download and install:
 ### Step 5: Test with Dependency Walker
 
 1. Download [Dependencies](https://github.com/lucasg/Dependencies) (modern Dependency Walker)
-2. Open `RiteMark.exe` with it
+2. Open `Ritemark.exe` with it
 3. Look for missing DLLs (highlighted in red)
 
 ### Step 6: Check Windows Defender / Antivirus
@@ -117,11 +117,11 @@ Sometimes unsigned executables get silently blocked:
 
 1. Open Windows Security
 2. Go to **Virus & threat protection → Protection history**
-3. Look for blocked items related to RiteMark
+3. Look for blocked items related to Ritemark
 
 ### Step 7: Try Running as Administrator
 
-Right-click `RiteMark.exe` → **Run as administrator**
+Right-click `Ritemark.exe` → **Run as administrator**
 
 If this works, there may be permission issues with the install location.
 
@@ -152,7 +152,7 @@ If this works, there may be permission issues with the install location.
 ### 5. Antivirus Blocking
 
 **Symptoms:** Silent failure, entries in AV logs
-**Solution:** Add exception for RiteMark folder
+**Solution:** Add exception for Ritemark folder
 
 ### 6. Wrong Architecture
 
@@ -162,7 +162,7 @@ If this works, there may be permission issues with the install location.
 ### 7. Path Too Long
 
 **Symptoms:** Installation appears successful but files missing
-**Solution:** Install to shorter path (e.g., `C:\RiteMark`)
+**Solution:** Install to shorter path (e.g., `C:\Ritemark`)
 
 ---
 
@@ -182,13 +182,13 @@ This assumes the Windows build is at `VSCode-win32-x64/` relative to project roo
 **Verify on macOS:**
 ```bash
 ls -la VSCode-win32-x64/
-ls -la VSCode-win32-x64/RiteMark.exe
+ls -la VSCode-win32-x64/Ritemark.exe
 ```
 
 ### Check 2: Executable Name
 
 ```ini
-#define AppExeName "RiteMark.exe"
+#define AppExeName "Ritemark.exe"
 ```
 
 **Verify actual exe name in build:**
@@ -220,7 +220,7 @@ Our simplified script may be missing critical steps.
 
 ### Key Differences to Investigate
 
-| Feature | VS Code | RiteMark | Status |
+| Feature | VS Code | Ritemark | Status |
 |---------|---------|----------|--------|
 | ISPP usage | Yes | No | May need |
 | Quality parameter | Yes (`-DQuality=...`) | No | Check impact |
@@ -282,7 +282,7 @@ Check if these are in the Windows build:
 | `installer/windows/ritemark.iss` | Inno Setup script |
 | `scripts/create-windows-installer.sh` | Docker wrapper script |
 | `VSCode-win32-x64/` | Source Windows build |
-| `dist/RiteMark-*.exe` | Generated installer |
+| `dist/Ritemark-*.exe` | Generated installer |
 
 ---
 

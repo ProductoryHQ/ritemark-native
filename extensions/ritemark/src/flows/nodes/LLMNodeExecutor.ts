@@ -10,7 +10,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import OpenAI from 'openai';
 import { getAPIKeyManager } from '../../ai/apiKeyManager';
-import { usesResponsesAPI, getReasoningEffort } from '../../ai/modelConfig';
+import { usesResponsesAPI, getReasoningEffort, DEFAULT_MODELS, GEMINI_LLM_MODELS } from '../../ai/modelConfig';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -191,12 +191,12 @@ async function executeWithOpenAI(
 
   if (!apiKey) {
     throw new Error(
-      'OpenAI API key not configured. Go to RiteMark Settings to add your API key.'
+      'OpenAI API key not configured. Go to Ritemark Settings to add your API key.'
     );
   }
 
   const openai = new OpenAI({ apiKey });
-  const model = data.model || 'gpt-4o';
+  const model = data.model || DEFAULT_MODELS.flowLLM;
 
   // Build input with system prompt if provided
   const input = systemPrompt
@@ -266,7 +266,7 @@ async function executeWithGemini(
 
   if (!apiKey) {
     throw new Error(
-      'Google AI API key not configured. Go to RiteMark Settings to add your API key.'
+      'Google AI API key not configured. Go to Ritemark Settings to add your API key.'
     );
   }
 
@@ -276,7 +276,7 @@ async function executeWithGemini(
     : userPrompt;
 
   // Use Gemini REST API (v1beta for preview models like Gemini 3)
-  const model = data.model || 'gemini-2.0-flash';
+  const model = data.model || DEFAULT_MODELS.flowLLMGemini;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {

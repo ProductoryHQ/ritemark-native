@@ -64,9 +64,9 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
     const scriptUri = webviewPanel.webview.asWebviewUri(scriptPath);
 
     // Debug logging for Windows path issues
-    console.log('[RiteMark Excel] Extension URI:', this.context.extensionUri.toString());
-    console.log('[RiteMark Excel] Script path:', scriptPath.toString());
-    console.log('[RiteMark Excel] Script URI:', scriptUri.toString());
+    console.log('[Ritemark Excel] Extension URI:', this.context.extensionUri.toString());
+    console.log('[Ritemark Excel] Script path:', scriptPath.toString());
+    console.log('[Ritemark Excel] Script URI:', scriptUri.toString());
 
     webviewPanel.webview.options = {
       enableScripts: true,

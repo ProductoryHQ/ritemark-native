@@ -1,7 +1,7 @@
 # Welcome Screen UX Analysis
 
 **Date:** 2026-01-18
-**Context:** Analyzing the first-run experience for new RiteMark users
+**Context:** Analyzing the first-run experience for new Ritemark users
 **Key Assumption:** 95% of users seeing this screen are NEW users
 
 ---
@@ -33,7 +33,7 @@ A new user arrives thinking:
 
 | Element | Content |
 |---------|---------|
-| Logo | RiteMark icon with "RITEMARK" text |
+| Logo | Ritemark icon with "RITEMARK" text |
 | Subtitle | "BY PRODUCTORY" |
 | Tagline | "Write smarter. Think faster." |
 | START section | "New Document" and "Open..." buttons |
@@ -52,7 +52,7 @@ A new user arrives thinking:
 
 | Question | Current Answer |
 |----------|----------------|
-| What makes RiteMark different? | None - just a generic tagline |
+| What makes Ritemark different? | None - just a generic tagline |
 | What are the key features? | Not shown |
 | How do I use AI features? | Not mentioned |
 | Is there a tutorial? | Not offered |
@@ -73,7 +73,7 @@ A new user arrives thinking:
 ### Specific Problems
 
 #### Problem 1: Generic Tagline
-"Write smarter. Think faster." could describe literally any writing app. It doesn't communicate what makes RiteMark unique.
+"Write smarter. Think faster." could describe literally any writing app. It doesn't communicate what makes Ritemark unique.
 
 #### Problem 2: Empty RECENT Section (First Run)
 For new users, the RECENT section is empty or shows unrelated folders. This emphasizes "you've done nothing here" rather than inviting exploration.
@@ -89,7 +89,7 @@ Clicking "New Document" leads to a blank page. New users don't know:
 - What makes this different from TextEdit
 
 #### Problem 5: No Path to First Success
-There's no guided path to help users experience RiteMark's value. They must figure it out themselves.
+There's no guided path to help users experience Ritemark's value. They must figure it out themselves.
 
 ---
 
@@ -133,7 +133,7 @@ When a user clicks "New Document" for the **first time**:
 
 **Option A: Pre-populated template**
 ```markdown
-# Welcome to RiteMark
+# Welcome to Ritemark
 
 Try these features:
 - Select this text and press **Cmd+K** for AI assistance
@@ -240,13 +240,13 @@ The current welcome screen is **functional but not persuasive**. It assumes the 
 
 For ProductHunt traffic (high curiosity, low commitment), the screen needs to:
 
-1. **Reinforce the value proposition** - Why RiteMark? (not just "write smarter")
+1. **Reinforce the value proposition** - Why Ritemark? (not just "write smarter")
 2. **Provide a path to first success** - Within 60 seconds
 3. **Show, don't tell** - Let users experience features immediately
 
 **The goal:** Get users from "I downloaded this" to "Oh wow, this is good" as fast as possible.
 
-Currently, users must figure out RiteMark's value entirely on their own.
+Currently, users must figure out Ritemark's value entirely on their own.
 
 ---
 
@@ -257,7 +257,7 @@ Currently, users must figure out RiteMark's value entirely on their own.
 ```
 ┌────────────────────────────────────────────────────────────┐
 │                                                            │
-│              [RiteMark Logo]                               │
+│              [Ritemark Logo]                               │
 │                                                            │
 │           Write smarter. Think faster.                     │
 │                                                            │
@@ -291,7 +291,7 @@ Currently, users must figure out RiteMark's value entirely on their own.
 ### First-Run Document Template
 
 ```markdown
-# Welcome to RiteMark!
+# Welcome to Ritemark!
 
 You're using a **local-first** markdown editor with AI superpowers.
 

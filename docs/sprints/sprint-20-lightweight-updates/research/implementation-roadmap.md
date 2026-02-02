@@ -147,7 +147,7 @@ export class BackupManager {
   }
 
   private getExtensionDirectory(): string {
-    // vscode.env.appRoot = .../RiteMark.app/Contents/Resources/app
+    // vscode.env.appRoot = .../Ritemark.app/Contents/Resources/app
     return path.join(vscode.env.appRoot, 'extensions', 'ritemark');
   }
 }
@@ -399,7 +399,7 @@ export class LightweightUpdater {
       );
     } catch (rollbackError) {
       vscode.window.showErrorMessage(
-        'Critical: Update and rollback both failed. Please reinstall RiteMark.'
+        'Critical: Update and rollback both failed. Please reinstall Ritemark.'
       );
     }
   }

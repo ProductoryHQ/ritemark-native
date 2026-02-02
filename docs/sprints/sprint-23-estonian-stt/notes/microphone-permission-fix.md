@@ -1,4 +1,4 @@
-# Microphone Permission Fix for RiteMark Webview
+# Microphone Permission Fix for Ritemark Webview
 
 **Date:** 2026-01-18
 **Status:** ✅ Implemented
@@ -55,7 +55,7 @@ The `'media'` permission enables:
 - ✅ Camera access (`video: true`)
 - ✅ Screen sharing (if needed in the future)
 
-For RiteMark's voice dictation, only microphone is used:
+For Ritemark's voice dictation, only microphone is used:
 ```typescript
 const stream = await navigator.mediaDevices.getUserMedia({
   audio: {
@@ -71,13 +71,13 @@ const stream = await navigator.mediaDevices.getUserMedia({
 
 To verify the fix works:
 
-1. Build RiteMark with the patch applied:
+1. Build Ritemark with the patch applied:
    ```bash
    ./scripts/apply-patches.sh
    # Then rebuild if needed
    ```
 
-2. Launch RiteMark and open a markdown file
+2. Launch Ritemark and open a markdown file
 
 3. Click the microphone button in the header toolbar
 
@@ -100,7 +100,7 @@ To verify the fix works:
 4. **Same Domain as Clipboard**: We already allow clipboard access for the same webview, microphone follows the same security model
 
 ### What This Enables
-- Voice dictation in RiteMark editor
+- Voice dictation in Ritemark editor
 - Future audio features (e.g., voice memos, audio notes)
 
 ### What This Does NOT Enable

@@ -1,12 +1,12 @@
 # Sprint 17: CSV File Preview
 
 ## Goal
-Add read-only CSV preview to RiteMark Native using the existing editor infrastructure.
+Add read-only CSV preview to Ritemark Native using the existing editor infrastructure.
 
 **Note:** Excel support deferred to Sprint 19 due to `CustomTextEditorProvider` limitations with binary files. See `docs/sprints/sprint-19-excel-preview/lessons-learned.md`.
 
 ## Success Criteria
-- [x] CSV files open in RiteMark with tabular preview
+- [x] CSV files open in Ritemark with tabular preview
 - [ ] ~~Excel files (.xlsx, .xls) open with tabular preview~~ → Deferred to Sprint 19
 - [x] Large files (10k+ rows) render without performance issues
 - [x] File type selector in package.json includes CSV
@@ -21,7 +21,7 @@ Add read-only CSV preview to RiteMark Native using the existing editor infrastru
 | `DataTable.tsx` | Shared TanStack Table component with virtualization |
 | Updated `package.json` | Add CSV/Excel to customEditors selector |
 | Updated `App.tsx` | File type routing logic |
-| Updated `RiteMarkEditorProvider.ts` | Detect file type and send appropriate content |
+| Updated `RitemarkEditorProvider.ts` | Detect file type and send appropriate content |
 | Dependency updates | Install xlsx, papaparse, @tanstack/react-table, @tanstack/react-virtual |
 
 ## Implementation Checklist
@@ -32,7 +32,7 @@ Add read-only CSV preview to RiteMark Native using the existing editor infrastru
 - [ ] Verify extension compiles after dependency changes
 
 ### Phase 2: Extension-Side Changes
-- [ ] Modify `RiteMarkEditorProvider.ts` to detect file extension
+- [ ] Modify `RitemarkEditorProvider.ts` to detect file extension
 - [ ] Add file type to 'load' message payload
 - [ ] Send raw file content for CSV/Excel (not parsed)
 - [ ] Test with sample CSV and Excel files
@@ -128,7 +128,7 @@ Extension sends `load` message to webview. Payload varies by file type:
 
 ### Extension-Side Implementation
 ```typescript
-// In RiteMarkEditorProvider.ts
+// In RitemarkEditorProvider.ts
 const ext = path.extname(document.uri.fsPath).toLowerCase();
 
 if (ext === '.xlsx' || ext === '.xls') {

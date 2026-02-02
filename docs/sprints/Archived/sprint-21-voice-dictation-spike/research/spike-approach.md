@@ -8,7 +8,7 @@
 
 ## Background
 
-Based on the comprehensive research document at `/docs/analysis/2026-01-15-voice-dictation-research.md`, we are taking a phased approach to adding voice dictation to RiteMark.
+Based on the comprehensive research document at `/docs/analysis/2026-01-15-voice-dictation-research.md`, we are taking a phased approach to adding voice dictation to Ritemark.
 
 ### Key Findings from Research
 
@@ -30,7 +30,7 @@ Based on the comprehensive research document at `/docs/analysis/2026-01-15-voice
 
 ## This Spike's Objective
 
-**Question:** Does the VS Code Speech extension work in RiteMark Native's webview editor?
+**Question:** Does the VS Code Speech extension work in Ritemark Native's webview editor?
 
 ### Why Start Here?
 
@@ -52,7 +52,7 @@ Based on the comprehensive research document at `/docs/analysis/2026-01-15-voice
 ## Test Plan
 
 ### 1. Extension Installation Test
-- [ ] Install VS Code Speech extension in RiteMark Native
+- [ ] Install VS Code Speech extension in Ritemark Native
 - [ ] Verify extension loads without errors
 - [ ] Check if extension appears in Extensions panel
 
@@ -61,8 +61,8 @@ Based on the comprehensive research document at `/docs/analysis/2026-01-15-voice
 - [ ] Verify keyboard shortcut works (⌥⌘V)
 - [ ] Check microphone permissions flow
 
-### 3. RiteMark Webview Test (CRITICAL)
-- [ ] Open markdown file in RiteMark editor (webview)
+### 3. Ritemark Webview Test (CRITICAL)
+- [ ] Open markdown file in Ritemark editor (webview)
 - [ ] Attempt to activate dictation (⌥⌘V)
 - [ ] Verify if transcribed text appears in TipTap editor
 - [ ] Test cursor positioning and text insertion
@@ -87,7 +87,7 @@ After testing, we make a recommendation based on:
 
 | Criterion | Weight | Pass/Fail |
 |-----------|--------|-----------|
-| Works in RiteMark webview | Critical | Must pass |
+| Works in Ritemark webview | Critical | Must pass |
 | Transcription accuracy | High | >95% accuracy |
 | Latency | High | <500ms speech-to-text |
 | Setup friction | Medium | <1 minute first-time setup |
@@ -117,7 +117,7 @@ After testing, we make a recommendation based on:
 - **Mode:** Push-to-talk and toggle modes supported
 - **Local Processing:** Uses OS-level speech recognition (offline-capable)
 
-### RiteMark Context
+### Ritemark Context
 
 - **Editor:** TipTap (ProseMirror-based) in webview
 - **Integration:** Custom Editor Provider for .md files
@@ -128,8 +128,8 @@ After testing, we make a recommendation based on:
 
 1. Can VS Code commands reach the webview context?
 2. Does the extension's text insertion work with TipTap?
-3. Are microphone permissions handled by RiteMark or extension?
-4. Does the extension respect RiteMark's custom editor context?
+3. Are microphone permissions handled by Ritemark or extension?
+4. Does the extension respect Ritemark's custom editor context?
 
 ---
 
@@ -137,7 +137,7 @@ After testing, we make a recommendation based on:
 
 ### If Extension Works
 1. Document installation instructions
-2. Consider bundling extension with RiteMark
+2. Consider bundling extension with Ritemark
 3. Add voice dictation documentation
 4. Gather user feedback
 

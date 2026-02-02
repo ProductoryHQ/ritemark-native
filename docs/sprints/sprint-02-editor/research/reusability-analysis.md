@@ -1,4 +1,4 @@
-# Reusability Analysis - RiteMark Web App
+# Reusability Analysis - Ritemark Web App
 
 ## Summary
 

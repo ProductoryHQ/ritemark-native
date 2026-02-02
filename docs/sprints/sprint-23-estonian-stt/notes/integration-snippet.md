@@ -12,10 +12,10 @@ import { DictationController } from './voiceDictation/controller';
 
 ## Step 2: Add Instance Variable
 
-In the `RiteMarkEditorProvider` class (around line 18-28), add:
+In the `RitemarkEditorProvider` class (around line 18-28), add:
 
 ```typescript
-export class RiteMarkEditorProvider implements vscode.CustomTextEditorProvider {
+export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   // ... existing static properties ...
 
   // Add this:
@@ -32,8 +32,8 @@ In the `webview.onDidReceiveMessage` switch statement (around line 248-300), add
 ```typescript
 case 'selectionChanged':
   // Forward selection and document content to AI panel
-  if (RiteMarkEditorProvider._aiViewProvider) {
-    RiteMarkEditorProvider._aiViewProvider.sendSelection(
+  if (RitemarkEditorProvider._aiViewProvider) {
+    RitemarkEditorProvider._aiViewProvider.sendSelection(
       message.selection,
       document.getText()
     );

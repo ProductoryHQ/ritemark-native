@@ -1,7 +1,7 @@
 # Sprint 25: Bug Reporting Sidebar
 
 ## Goal
-Add an easy-to-use bug reporting feature that allows customers to submit GitHub issues directly from RiteMark's AI sidebar with auto-collected system information.
+Add an easy-to-use bug reporting feature that allows customers to submit GitHub issues directly from Ritemark's AI sidebar with auto-collected system information.
 
 ## Feature Flag Check
 - [ ] Does this sprint need a feature flag?
@@ -51,7 +51,7 @@ Add an easy-to-use bug reporting feature that allows customers to submit GitHub 
 
 ### Phase 2: System Info Collection
 - [ ] Create `src/utils/systemInfo.ts` with collection function
-- [ ] Collect RiteMark version from extension package.json
+- [ ] Collect Ritemark version from extension package.json
 - [ ] Collect VS Code OSS version from `vscode.version`
 - [ ] Collect OS name and version via `process.platform` and `os.release()`
 - [ ] Collect architecture via `process.arch`

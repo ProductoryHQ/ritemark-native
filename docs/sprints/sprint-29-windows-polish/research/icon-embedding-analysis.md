@@ -2,9 +2,9 @@
 
 ## Problem
 
-Windows executable doesn't show RiteMark icon in File Explorer when viewing the unzipped app directory.
+Windows executable doesn't show Ritemark icon in File Explorer when viewing the unzipped app directory.
 
-**Expected:** RiteMark logo icon
+**Expected:** Ritemark logo icon
 **Actual:** Generic Windows application icon
 
 ## Icon Asset Exists
@@ -61,10 +61,10 @@ If VS Code uses electron-builder for packaging:
 1. Run Windows build: `./scripts/build-prod-windows.sh`
 2. Navigate to: `VSCode-win32-x64/`
 3. View in Windows File Explorer
-4. Verify: `Code.exe` (or `Ritemark.exe`) shows RiteMark icon
+4. Verify: `Code.exe` (or `Ritemark.exe`) shows Ritemark icon
 
 **Alternative test:**
-- Right-click exe → Properties → Icon should show RiteMark logo
+- Right-click exe → Properties → Icon should show Ritemark logo
 
 ## Expected Fix
 

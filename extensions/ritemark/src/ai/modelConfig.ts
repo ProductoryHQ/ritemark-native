@@ -1,8 +1,8 @@
 /**
  * Model Configuration
  *
- * Central configuration for all AI models used in RiteMark.
- * Used by: RiteMark AI Assistant, Flow Executor, Settings
+ * Central configuration for all AI models used in Ritemark.
+ * Used by: Ritemark AI Assistant, Flow Executor, Settings
  *
  * Model ID source: OpenAI API (openai.models.list())
  */
@@ -290,14 +290,20 @@ export const GEMINI_IMAGE_MODELS: ImageModelConfig[] = [
  * Default models for different use cases
  */
 export const DEFAULT_MODELS = {
-  /** Default for RiteMark AI Assistant (needs tools + streaming) */
+  /** Default for Ritemark AI Assistant (needs tools + streaming) */
   assistant: 'gpt-4o-mini',
 
-  /** Default for Flow LLM nodes (general purpose) */
+  /** Default for Flow LLM nodes - OpenAI */
   flowLLM: 'gpt-5.2',
 
-  /** Default for Flow Image nodes */
+  /** Default for Flow LLM nodes - Gemini */
+  flowLLMGemini: 'gemini-2.5-flash',
+
+  /** Default for Flow Image nodes - OpenAI */
   flowImage: 'gpt-image-1.5',
+
+  /** Default for Flow Image nodes - Gemini */
+  flowImageGemini: 'imagen-4.0-fast-generate-001',
 } as const;
 
 /**
@@ -339,7 +345,7 @@ export function supportsToolCalling(modelId: string): boolean {
 }
 
 /**
- * Get models suitable for RiteMark AI Assistant
+ * Get models suitable for Ritemark AI Assistant
  * (requires tool calling support)
  */
 export function getAssistantModels(): ModelConfig[] {

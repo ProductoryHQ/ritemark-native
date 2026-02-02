@@ -50,7 +50,7 @@ Output:  "Hello" "my name" "is Jarmo"
 
 ## Architecture Options
 
-### Option 1: Worker Pool (Recommended for RiteMark)
+### Option 1: Worker Pool (Recommended for Ritemark)
 
 ```
            +-----------------+
@@ -136,7 +136,7 @@ Output:  "Hello" "my name" "is Jarmo"
 - Adds Redis dependency
 - Network latency between components
 
-**Verdict:** Too heavy for RiteMark's use case.
+**Verdict:** Too heavy for Ritemark's use case.
 
 ---
 
@@ -185,7 +185,7 @@ Approaches like **WhisperKit** or **whisper.cpp streaming mode** that produce to
 
 ---
 
-## Recommended Design for RiteMark
+## Recommended Design for Ritemark
 
 ### Phase 1: Simple Parallel Workers (Low Effort, High Impact)
 

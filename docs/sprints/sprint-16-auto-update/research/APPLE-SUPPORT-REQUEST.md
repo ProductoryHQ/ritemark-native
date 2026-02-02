@@ -24,8 +24,8 @@ I've noticed multiple developers reporting similar issues in the Apple Developer
 
 - **Submission ID:** a8e1af43-4716-40ca-b2b8-8e433f9d87ad
 - **Submitted:** 2026-01-12T09:38:28.241Z (over 28 hours ago)
-- **Package name:** RiteMark-notarize.zip
-- **App name:** RiteMark
+- **Package name:** Ritemark-notarize.zip
+- **App name:** Ritemark
 - **Team ID:** JKBSC3ZDT5
 - **Apple ID:** jarmo@productory.eu
 
@@ -54,7 +54,7 @@ Response:
 Successfully received submission info
   createdDate: 2026-01-12T09:38:28.241Z
   id: a8e1af43-4716-40ca-b2b8-8e433f9d87ad
-  name: RiteMark-notarize.zip
+  name: Ritemark-notarize.zip
   status: In Progress
 ```
 

@@ -89,7 +89,7 @@ UpdateService.checkAndNotify()
 
 ### Release Conventions
 - Tag format: `v1.0.0`, `v1.0.1`, `v2.0.0`
-- Asset naming: `RiteMark-1.0.0-darwin-arm64.dmg`
+- Asset naming: `Ritemark-1.0.0-darwin-arm64.dmg`
 - Pre-release: Ignored (only stable releases shown)
 
 ## Version Comparison Logic
@@ -134,7 +134,7 @@ Before merging:
 - Release notes viewer
 
 ### Build Script Updates Needed
-- [ ] Modify `scripts/create-dmg.sh` to use RiteMark version from product.json
+- [ ] Modify `scripts/create-dmg.sh` to use Ritemark version from product.json
 - [ ] Update build scripts to ensure version is properly injected
 
 ## Code Statistics

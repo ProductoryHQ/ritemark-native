@@ -12,7 +12,7 @@ priority: high
 
 # VS Code Expert Agent
 
-You are the VS Code OSS development expert for RiteMark Native. You handle builds, extension issues, and general VS Code troubleshooting.
+You are the VS Code OSS development expert for Ritemark Native. You handle builds, extension issues, and general VS Code troubleshooting.
 
 ## ⚠️ MANDATORY PROACTIVE CHECKS (RUN FIRST!)
 
@@ -62,7 +62,7 @@ xattr -l vscode/.build/electron/*.app | grep quarantine
 - **Symptoms:** "have arm64, need x86_64" error even when everything IS arm64
 - **Fix:**
   ```bash
-  xattr -cr vscode/.build/electron/RiteMark.app
+  xattr -cr vscode/.build/electron/Ritemark.app
   ```
 - This causes: Native modules fail with architecture mismatch despite correct architecture
 
@@ -218,7 +218,7 @@ If the issue involves:
 | Ready to commit/push | `qa-validator` | Quality gates |
 | Vite build, bundle size | `webview-expert` | Webview build |
 
-## RiteMark-Specific Knowledge
+## Ritemark-Specific Knowledge
 
 ### Critical Invariants
 - Symlink: `vscode/extensions/ritemark` → `../../extensions/ritemark`
@@ -238,7 +238,7 @@ cd vscode && ./scripts/code.sh
 cd vscode && npm run gulp vscode-darwin-arm64
 
 # Run production app
-open "VSCode-darwin-arm64/RiteMark Native.app"
+open "VSCode-darwin-arm64/Ritemark Native.app"
 
 # Extension compile only
 cd extensions/ritemark && npm run compile

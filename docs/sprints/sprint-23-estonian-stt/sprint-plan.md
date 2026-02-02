@@ -1,7 +1,7 @@
 # Sprint 23: Estonian STT (Second Attempt)
 
 ## Goal
-Implement real-time voice dictation in RiteMark using bundled whisper.cpp binary, with Estonian language support and zero user installation required.
+Implement real-time voice dictation in Ritemark using bundled whisper.cpp binary, with Estonian language support and zero user installation required.
 
 ## Success Criteria
 - [ ] User can click mic button to start/stop dictation
@@ -31,7 +31,7 @@ Implement real-time voice dictation in RiteMark using bundled whisper.cpp binary
 This is the **second attempt** at voice dictation. The first attempt (Sprint 22, now archived) failed because:
 
 - ❌ Required `brew install whisper-cpp` (user installation)
-- ❌ Violated RiteMark's zero-install philosophy
+- ❌ Violated Ritemark's zero-install philosophy
 - ❌ External dependency
 
 **Sprint 23 fixes this by:**
@@ -290,7 +290,7 @@ This is the **second attempt** at voice dictation. The first attempt (Sprint 22,
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    RiteMark Webview (React)                 │
+│                    Ritemark Webview (React)                 │
 ├─────────────────────────────────────────────────────────────┤
 │  Editor Toolbar (Fixed Position)                            │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -310,7 +310,7 @@ This is the **second attempt** at voice dictation. The first attempt (Sprint 22,
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              RiteMark Extension (TypeScript)                │
+│              Ritemark Extension (TypeScript)                │
 ├─────────────────────────────────────────────────────────────┤
 │  voiceDictation/controller.ts                               │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -340,7 +340,7 @@ This is the **second attempt** at voice dictation. The first attempt (Sprint 22,
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    RiteMark Webview (React)                 │
+│                    Ritemark Webview (React)                 │
 ├─────────────────────────────────────────────────────────────┤
 │  Text Insertion (TipTap)                                    │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -408,7 +408,7 @@ This is the **second attempt** at voice dictation. The first attempt (Sprint 22,
 | **User installation** | ❌ Required | ✅ None (zero-install) |
 | **Integration** | nodejs-whisper (npm native module) | whisper.cpp (spawned process) |
 | **Dependencies** | FFmpeg, Homebrew, system tools | None (self-contained) |
-| **Philosophy alignment** | ❌ Violated zero-install | ✅ Aligned with RiteMark |
+| **Philosophy alignment** | ❌ Violated zero-install | ✅ Aligned with Ritemark |
 
 ## Status
 **Current Phase:** 1 (Research - Complete)

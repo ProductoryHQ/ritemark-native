@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Sprint 19 will add read-only Excel file preview (.xlsx, .xls) to RiteMark Native. This was deferred from Sprint 17 when we discovered that `CustomTextEditorProvider` cannot handle binary files.
+Sprint 19 will add read-only Excel file preview (.xlsx, .xls) to Ritemark Native. This was deferred from Sprint 17 when we discovered that `CustomTextEditorProvider` cannot handle binary files.
 
 **Effort:** Small (2 new files, 2 modified files, ~200 lines of code)
 **Risk:** Low (proven solution, existing components ready)

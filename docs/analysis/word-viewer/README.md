@@ -1,7 +1,7 @@
 # Word Document Viewer - Integration Analysis
 
 **Date:** 2025-12-15
-**Purpose:** Evaluate OSS libraries for .docx preview in RiteMark extension
+**Purpose:** Evaluate OSS libraries for .docx preview in Ritemark extension
 
 ---
 
@@ -153,7 +153,7 @@ pandoc -s -f docx -t html5 document.docx -o document.html
 | Preserves structure | Loses complex formatting |
 | Free, OSS | Not for visual preview |
 
-**Best for:** "Import DOCX as Markdown" feature in RiteMark
+**Best for:** "Import DOCX as Markdown" feature in Ritemark
 
 ---
 
@@ -194,7 +194,7 @@ await shell.openPath('/path/to/document.docx');
 
 | Pros | Cons |
 |------|------|
-| Zero effort | No preview in RiteMark |
+| Zero effort | No preview in Ritemark |
 | Perfect fidelity | Leaves the app |
 | Works everywhere | Bad UX |
 

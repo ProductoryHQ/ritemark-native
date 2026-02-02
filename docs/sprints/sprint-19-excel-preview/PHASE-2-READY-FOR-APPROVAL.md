@@ -9,7 +9,7 @@
 
 ## Quick Summary
 
-Sprint 19 will add **read-only Excel file preview with multi-sheet support** to RiteMark Native.
+Sprint 19 will add **read-only Excel file preview with multi-sheet support** to Ritemark Native.
 
 **What's changing:**
 - Create new `ExcelEditorProvider` for binary Excel files (.xlsx, .xls)

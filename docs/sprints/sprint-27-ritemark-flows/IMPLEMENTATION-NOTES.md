@@ -1,4 +1,4 @@
-# RiteMark Flows - Implementation Notes
+# Ritemark Flows - Implementation Notes
 
 ## Current State (Phase 2 Complete)
 

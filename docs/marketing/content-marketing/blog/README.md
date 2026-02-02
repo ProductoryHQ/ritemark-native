@@ -7,17 +7,17 @@
 
 ## Goal
 
-Define a sustainable blogging strategy for RiteMark that builds awareness, establishes thought leadership, and supports product growth.
+Define a sustainable blogging strategy for Ritemark that builds awareness, establishes thought leadership, and supports product growth.
 
 ---
 
 ## Problem
 
-RiteMark lacks a content marketing presence. Without a blog:
+Ritemark lacks a content marketing presence. Without a blog:
 - No organic search discovery
 - No platform to share product updates meaningfully
 - No way to build authority in the local-first / markdown writing space
-- Release notes alone don't tell the story of why RiteMark matters
+- Release notes alone don't tell the story of why Ritemark matters
 
 ---
 

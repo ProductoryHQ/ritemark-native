@@ -75,7 +75,7 @@ https://github.com/OWNER/REPO/issues/new?
 {USER_EXPECTED}
 
 ## System Information
-- **RiteMark Version:** {APP_VERSION}
+- **Ritemark Version:** {APP_VERSION}
 - **VS Code OSS Version:** {VSCODE_VERSION}
 - **Operating System:** {OS_NAME} {OS_VERSION}
 - **Architecture:** {ARCH}
@@ -85,13 +85,13 @@ https://github.com/OWNER/REPO/issues/new?
 - **Feature Flags Enabled:** {FLAGS}
 
 ---
-*This issue was submitted via RiteMark's built-in bug reporter.*
+*This issue was submitted via Ritemark's built-in bug reporter.*
 ```
 
 ### Dynamic Fields
 
 **Always Include:**
-- RiteMark version (e.g., "1.0.3")
+- Ritemark version (e.g., "1.0.3")
 - VS Code OSS version (e.g., "1.94.0")
 - OS (e.g., "macOS 14.2.1", "Windows 11", "Ubuntu 22.04")
 - Architecture (e.g., "arm64", "x64")
@@ -141,12 +141,12 @@ function generateBugReportUrl(userInput: {
   }
 
   body += '## System Information\n';
-  body += `- **RiteMark Version:** ${systemInfo.ritemarkVersion}\n`;
+  body += `- **Ritemark Version:** ${systemInfo.ritemarkVersion}\n`;
   body += `- **VS Code OSS Version:** ${systemInfo.vscodeVersion}\n`;
   body += `- **Operating System:** ${systemInfo.os}\n`;
   body += `- **Architecture:** ${systemInfo.arch}\n\n`;
   body += '---\n';
-  body += '*This issue was submitted via RiteMark\\'s built-in bug reporter.*';
+  body += '*This issue was submitted via Ritemark\\'s built-in bug reporter.*';
 
   // Encode parameters
   const params = new URLSearchParams({
@@ -195,7 +195,7 @@ Before deploying this feature, we need to create these labels in the ritemark-pu
 - ❌ Workspace folder names
 
 ### What We Collect (with Transparency)
-- ✅ RiteMark version number (public info)
+- ✅ Ritemark version number (public info)
 - ✅ OS version (standard for bug reports)
 - ✅ Architecture (arm64/x64)
 - ✅ File type extension only (`.md`, `.csv`, etc.)
@@ -252,7 +252,7 @@ Instead of URL parameters, we could:
 
 ## Internationalization Considerations
 
-**Current:** RiteMark is English-only
+**Current:** Ritemark is English-only
 **Future:** If we add localization:
 - Issue title/body should remain in English (for maintainer)
 - UI strings (dialog, buttons) can be translated

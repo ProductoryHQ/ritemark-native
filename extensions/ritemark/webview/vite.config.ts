@@ -16,6 +16,7 @@ export default defineConfig({
         entryFileNames: 'webview.js',
         assetFileNames: 'webview.[ext]',
         format: 'iife',
+        inlineDynamicImports: true,
       },
     },
     sourcemap: true,

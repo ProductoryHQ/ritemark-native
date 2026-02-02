@@ -4,7 +4,7 @@
 
 ## Overview
 
-This sprint enhances the RiteMark text editor with image management, UI refinements, and reliability improvements. All changes are additive or polish-focused (no breaking changes).
+This sprint enhances the Ritemark text editor with image management, UI refinements, and reliability improvements. All changes are additive or polish-focused (no breaking changes).
 
 ## Goals
 

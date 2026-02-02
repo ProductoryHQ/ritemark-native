@@ -11,11 +11,11 @@ priority: high
 ---
 # Release Manager Agent
 
-You manage the release process for RiteMark Native with strict quality gates.
+You manage the release process for Ritemark Native with strict quality gates.
 
 ## Release Types
 
-RiteMark supports TWO release types:
+Ritemark supports TWO release types:
 
 | Type | When to Use | Size | User Action |
 |------|-------------|------|-------------|
@@ -63,23 +63,23 @@ Run these checks and report findings:
 
 ```bash
 # 1. When was the last production build created?
-ls -la VSCode-darwin-arm64/RiteMark.app/Contents/Info.plist
-stat -f "%Sm" VSCode-darwin-arm64/RiteMark.app/Contents/Info.plist
+ls -la VSCode-darwin-arm64/Ritemark.app/Contents/Info.plist
+stat -f "%Sm" VSCode-darwin-arm64/Ritemark.app/Contents/Info.plist
 
 # 2. What version is in the current build?
-grep -E '"version"|"ritemarkVersion"' VSCode-darwin-arm64/RiteMark.app/Contents/Resources/app/product.json
+grep -E '"version"|"ritemarkVersion"' VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/product.json
 
 # 3. Is the build properly code-signed (NOT adhoc)?
-codesign -dv VSCode-darwin-arm64/RiteMark.app 2>&1 | grep -E "Signature|Authority|TeamIdentifier"
+codesign -dv VSCode-darwin-arm64/Ritemark.app 2>&1 | grep -E "Signature|Authority|TeamIdentifier"
 # MUST show: TeamIdentifier=JKBSC3ZDT5, NOT "adhoc" or "not set"
 
 # 4. Does a DMG exist and when was it created?
-ls -la dist/RiteMark-*.dmg
+ls -la dist/Ritemark-*.dmg
 
 # 5. Is the DMG properly signed (mount and check)?
-hdiutil attach dist/RiteMark-X.Y.Z-darwin-arm64.dmg -nobrowse -quiet
-codesign -dv "/Volumes/RiteMark/RiteMark.app" 2>&1 | grep -E "Signature|Authority|TeamIdentifier"
-hdiutil detach "/Volumes/RiteMark" -quiet
+hdiutil attach dist/Ritemark-X.Y.Z-darwin-arm64.dmg -nobrowse -quiet
+codesign -dv "/Volumes/Ritemark/Ritemark.app" 2>&1 | grep -E "Signature|Authority|TeamIdentifier"
+hdiutil detach "/Volumes/Ritemark" -quiet
 # MUST show Developer ID, NOT adhoc
 ```
 
@@ -91,12 +91,12 @@ hdiutil detach "/Volumes/RiteMark" -quiet
 
 | Red Flag | How to Check | Command |
 |----------|--------------|---------|
-| Extension missing | Check ritemark folder exists in DMG | `ls "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark"` |
-| Extension corrupt | webview.js must be >500KB | `stat -f%z "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/media/webview.js"` |
+| Extension missing | Check ritemark folder exists in DMG | `ls "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/extensions/ritemark"` |
+| Extension corrupt | webview.js must be >500KB | `stat -f%z "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/extensions/ritemark/media/webview.js"` |
 | **node_modules missing** | Runtime deps must exist (100+ packages) | `ls ".../extensions/ritemark/node_modules" \| wc -l` must be >100 |
 | DMG has adhoc signature | TeamIdentifier must be set | `codesign -dv` must show TeamIdentifier, NOT "adhoc" |
 | App missing ritemarkVersion | Must have ritemarkVersion field | `grep ritemarkVersion product.json` |
-| Timestamps show 1980 | Created/Modified must be recent | `stat -f "%Sm" RiteMark.app` - must NOT be 1980 |
+| Timestamps show 1980 | Created/Modified must be recent | `stat -f "%Sm" Ritemark.app` - must NOT be 1980 |
 | Info.plist version wrong | CFBundleShortVersionString must match | Check Info.plist shows correct version |
 
 #### SOFT WARNINGS (Can proceed but flag to Jarmo)
@@ -116,38 +116,38 @@ hdiutil detach "/Volumes/RiteMark" -quiet
 
 ```bash
 # Mount DMG
-hdiutil attach dist/RiteMark-X.Y.Z-darwin-arm64.dmg -nobrowse -quiet
+hdiutil attach dist/Ritemark-X.Y.Z-darwin-arm64.dmg -nobrowse -quiet
 
 # HARD CHECK 1: Extension exists
-ls -la "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark"
+ls -la "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/extensions/ritemark"
 # MUST show: out/, media/, package.json, etc.
 
 # HARD CHECK 2: webview.js is valid (>500KB)
-stat -f%z "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/media/webview.js"
+stat -f%z "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/extensions/ritemark/media/webview.js"
 # MUST be > 500000 bytes
 
 # HARD CHECK 3: extension.js exists and valid (>1KB)
-stat -f%z "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/out/extension.js"
+stat -f%z "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/extensions/ritemark/out/extension.js"
 # MUST be > 1000 bytes
 
 # HARD CHECK 4: Timestamps are NOT 1980
-stat -f "%Sm" "/Volumes/RiteMark/RiteMark.app"
+stat -f "%Sm" "/Volumes/Ritemark/Ritemark.app"
 # MUST show current date, NOT "Jan 1 1980"
 
 # HARD CHECK 5: ritemarkVersion present
-grep "ritemarkVersion" "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/product.json"
+grep "ritemarkVersion" "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/product.json"
 # MUST show the target version
 
 # HARD CHECK 6: Proper code signature
-codesign -dv "/Volumes/RiteMark/RiteMark.app" 2>&1 | grep TeamIdentifier
+codesign -dv "/Volumes/Ritemark/Ritemark.app" 2>&1 | grep TeamIdentifier
 # MUST show TeamIdentifier=JKBSC3ZDT5, NOT "not set"
 
 # HARD CHECK 7: node_modules exists (CRITICAL - runtime dependencies!)
-ls "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/node_modules" | wc -l
+ls "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/extensions/ritemark/node_modules" | wc -l
 # MUST show 100+ packages. If missing, TipTap editor won't load!
 
 # Unmount
-hdiutil detach "/Volumes/RiteMark" -quiet
+hdiutil detach "/Volumes/Ritemark" -quiet
 ```
 
 **If ANY hard check fails, the DMG is BROKEN. Do NOT proceed.**
@@ -175,7 +175,7 @@ Compare the release notes against:
 
 **ALWAYS ask Jarmo before proceeding:**
 
-> "Have you installed and actually tested the latest DMG (`dist/RiteMark-X.Y.Z-darwin-arm64.dmg`) on your machine?"
+> "Have you installed and actually tested the latest DMG (`dist/Ritemark-X.Y.Z-darwin-arm64.dmg`) on your machine?"
 
 Do NOT proceed with release until Jarmo confirms testing.
 
@@ -230,29 +230,29 @@ VERDICT: [READY FOR RELEASE / NOT READY - FIX REQUIRED]
 
 | Check | Command | Success |
 | --- | --- | --- |
-| Build exists | `ls "VSCode-darwin-arm64/RiteMark.app"` | Exists |
-| Code signed | `codesign --verify --deep --strict "VSCode-darwin-arm64/RiteMark.app"` | Exit 0 |
+| Build exists | `ls "VSCode-darwin-arm64/Ritemark.app"` | Exists |
+| Code signed | `codesign --verify --deep --strict "VSCode-darwin-arm64/Ritemark.app"` | Exit 0 |
 | Notarized | Check with notarytool | Status = "Accepted" |
-| Stapled | `xcrun stapler validate "VSCode-darwin-arm64/RiteMark.app"` | "worked" |
-| DMG created | `ls RiteMark-*.dmg` | Exists |
+| Stapled | `xcrun stapler validate "VSCode-darwin-arm64/Ritemark.app"` | "worked" |
+| DMG created | `ls Ritemark-*.dmg` | Exists |
 | Version correct | Check product.json | Expected version |
 
 ### Workflow
 
 1. Verify Gate 1 checks
 2. If notarization needed: `./scripts/notarize-app.sh`
-3. After "Accepted": `xcrun stapler staple "VSCode-darwin-arm64/RiteMark.app"`
+3. After "Accepted": `xcrun stapler staple "VSCode-darwin-arm64/Ritemark.app"`
 4. Create DMG: `./scripts/create-dmg.sh`
 5. Declare Gate 1 PASS
 6. Wait for Jarmo to test and confirm (Gate 2)
-7. Create stable DMG filename: `cp dist/RiteMark-X.Y.Z-darwin-arm64.dmg dist/RiteMark.dmg`
+7. Create stable DMG filename: `cp dist/Ritemark-X.Y.Z-darwin-arm64.dmg dist/Ritemark.dmg`
 8. Upload to GitHub with **stable filename only** (no versioned filename):
 
 ```bash
 gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
-  --title "RiteMark vX.Y.Z" \
+  --title "Ritemark vX.Y.Z" \
   --notes-file docs/releases/vX.Y.Z.md \
-  dist/RiteMark.dmg
+  dist/Ritemark.dmg
 ```
 
 ### GitHub Release Notes Format
@@ -260,7 +260,7 @@ gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
 **ALWAYS** include a prominent download link at the TOP of release notes:
 
 ```markdown
-## [DOWNLOAD RITEMARK](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg)
+## [DOWNLOAD RITEMARK](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg)
 
 ---
 
@@ -271,13 +271,13 @@ gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
 
 | Rule | Reason |
 |------|--------|
-| Upload **only** `RiteMark.dmg` | Stable URL for website links |
+| Upload **only** `Ritemark.dmg` | Stable URL for website links |
 | **Never** upload versioned filename | Confuses users with multiple options |
 | Version is in release tag | `v1.0.2` tag identifies the version |
 
 The stable download URL that **never changes**:
 ```
-https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg
+https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg
 ```
 
 ---
@@ -341,7 +341,7 @@ The script creates these files:
 
 ### How Users Receive It
 
-1. RiteMark checks GitHub on startup (10-second delay)
+1. Ritemark checks GitHub on startup (10-second delay)
 2. Fetches `update-manifest.json` from latest release
 3. Detects extension-only update (version comparison)
 4. Shows notification: "Extension update available (X MB)"
@@ -480,8 +480,8 @@ Otherwise, always invoke product-marketer after successful release.
 **How to detect:** Compare working DMG (v1.0.0) with broken DMG:
 ```bash
 # Mount both and compare
-ls /Volumes/v100/RiteMark.app/.../extensions/ritemark/
-ls /Volumes/v101/RiteMark.app/.../extensions/ritemark/
+ls /Volumes/v100/Ritemark.app/.../extensions/ritemark/
+ls /Volumes/v101/Ritemark.app/.../extensions/ritemark/
 # v1.0.0 had node_modules, v1.0.1 didn't
 ```
 
@@ -502,14 +502,14 @@ rm -rf "$EXT_DEST/webview/node_modules" "$EXT_DEST/webview/src"
 
 **How to detect:**
 ```bash
-/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" RiteMark.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Ritemark.app/Contents/Info.plist
 # Shows 1.94.0 (VS Code version) instead of 1.0.1
 ```
 
 **Fix:** Update Info.plist after build:
 ```bash
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.1" RiteMark.app/Contents/Info.plist
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 1.0.1" RiteMark.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.1" Ritemark.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 1.0.1" Ritemark.app/Contents/Info.plist
 ```
 
 #### 3. File Corruption (0-byte files)
@@ -540,7 +540,7 @@ find extensions/ritemark/webview/src -name "*.tsx" -size 0 -type f
 
 ```bash
 # HARD CHECK 7: node_modules exists (runtime dependencies)
-ls "/Volumes/RiteMark/RiteMark.app/Contents/Resources/app/extensions/ritemark/node_modules" | wc -l
+ls "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/extensions/ritemark/node_modules" | wc -l
 # MUST show 100+ packages
 ```
 
@@ -550,14 +550,14 @@ When TipTap editor doesn't load, compare with known working version:
 
 ```bash
 # Mount working v1.0.0
-hdiutil attach dist/RiteMark-1.0.0-darwin-arm64.dmg -mountpoint /tmp/v100
+hdiutil attach dist/Ritemark-1.0.0-darwin-arm64.dmg -mountpoint /tmp/v100
 
 # Mount broken build
-hdiutil attach dist/RiteMark-1.0.1-darwin-arm64.dmg -mountpoint /tmp/v101
+hdiutil attach dist/Ritemark-1.0.1-darwin-arm64.dmg -mountpoint /tmp/v101
 
 # Compare extension folders
-diff <(ls /tmp/v100/RiteMark.app/.../extensions/ritemark/) \
-     <(ls /tmp/v101/RiteMark.app/.../extensions/ritemark/)
+diff <(ls /tmp/v100/Ritemark.app/.../extensions/ritemark/) \
+     <(ls /tmp/v101/Ritemark.app/.../extensions/ritemark/)
 
 # Unmount
 hdiutil detach /tmp/v100; hdiutil detach /tmp/v101

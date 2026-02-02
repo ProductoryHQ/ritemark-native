@@ -1,6 +1,6 @@
 # Sprint 05: Polish & Fixes
 
-**Goal:** Fix production build issues, enforce light mode, and ensure RiteMark extension loads
+**Goal:** Fix production build issues, enforce light mode, and ensure Ritemark extension loads
 
 **Status:** IN PROGRESS - Development started
 
@@ -8,8 +8,8 @@
 
 ## Exit Criteria (Jarmo Validates)
 
-- [ ] RiteMark extension loads in production build (WYSIWYG editor works)
-- [ ] RiteMark AI sidebar is visible and functional
+- [ ] Ritemark extension loads in production build (WYSIWYG editor works)
+- [ ] Ritemark AI sidebar is visible and functional
 - [ ] App boots in light mode by default
 - [ ] App works in light mode only (dark mode disabled/hidden)
 - [ ] Welcome page logo displays correctly in production build
@@ -23,9 +23,9 @@
 
 ### Phase 1: RESEARCH
 
-#### Issue 1: RiteMark Extension Not Loading in Production - Root Cause Found
+#### Issue 1: Ritemark Extension Not Loading in Production - Root Cause Found
 
-**Problem:** The RiteMark extension exists as a symlink in `vscode/extensions/ritemark` pointing to `../extensions/ritemark`. The production build process does NOT follow symlinks, resulting in an empty `.build/extensions/ritemark/` folder.
+**Problem:** The Ritemark extension exists as a symlink in `vscode/extensions/ritemark` pointing to `../extensions/ritemark`. The production build process does NOT follow symlinks, resulting in an empty `.build/extensions/ritemark/` folder.
 
 **Evidence:**
 - Symlink: `vscode/extensions/ritemark -> /Users/jarmotuisk/Projects/ritemark-native/extensions/ritemark`
@@ -123,7 +123,7 @@
 
 #### Issue 5: macOS App Icon Doesn't Match System Style
 
-**Problem:** The RiteMark dock icon appears flat/simple compared to other macOS icons which have depth, shadows, and rounded-rectangle style (macOS Big Sur+).
+**Problem:** The Ritemark dock icon appears flat/simple compared to other macOS icons which have depth, shadows, and rounded-rectangle style (macOS Big Sur+).
 
 **Current icon location:** `branding/icons/icon.icns`
 
@@ -154,7 +154,7 @@
 
 ### Phase 2: PLAN
 
-#### Task 1: Fix RiteMark Extension in Production Build (CRITICAL)
+#### Task 1: Fix Ritemark Extension in Production Build (CRITICAL)
 - [ ] Remove symlink from `vscode/extensions/ritemark`
 - [ ] Copy actual extension files to `vscode/extensions/ritemark/`
 - [ ] Verify extension builds correctly with gulp
@@ -178,7 +178,7 @@
 - [ ] Set `chat.agent.enabled: false`
 - [ ] Set `github.copilot.enable: {"*": false}`
 - [ ] Test that no VS Code chat/copilot UI appears
-- [ ] Ensure RiteMark AI sidebar is the only AI interface
+- [ ] Ensure Ritemark AI sidebar is the only AI interface
 
 #### Task 5: Welcome Page - Start Buttons
 - [ ] Remove "New File..." button (or change to create .md by default)
@@ -201,7 +201,7 @@
 _Implementation pending approval_
 
 ### Phase 4: TEST & VALIDATE
-- [ ] RiteMark extension loads and WYSIWYG works
+- [ ] Ritemark extension loads and WYSIWYG works
 - [ ] AI sidebar visible and functional
 - [ ] Logo displays in production
 - [ ] App always in light mode
@@ -264,7 +264,7 @@ vscode/src/vs/workbench/contrib/chat/
 _Sprint 5 focuses on production-ready polish before wider testing_
 
 **Priority Order:**
-1. RiteMark extension loading (CRITICAL - app is useless without it)
+1. Ritemark extension loading (CRITICAL - app is useless without it)
 2. Remove unknown chat interface
 3. Fix logo
 4. Force light mode

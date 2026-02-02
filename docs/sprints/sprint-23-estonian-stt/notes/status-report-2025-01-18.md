@@ -247,7 +247,7 @@ Fixed resampling from 48kHz → 16kHz. Still getting "Tõmmele põhle".
 3.  But dev mode still fails because Electron binary is unsigned
     
 
-**Solution:** Must test with **production build** (signed `RiteMark.app`), not dev mode.
+**Solution:** Must test with **production build** (signed `Ritemark.app`), not dev mode.
 
 ## Technical Notes: macOS Microphone Access in Electron
 

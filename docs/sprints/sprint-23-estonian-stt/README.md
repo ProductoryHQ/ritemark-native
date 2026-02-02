@@ -16,11 +16,11 @@
 
 ## Sprint Overview
 
-**Goal:** Enable real-time voice dictation in RiteMark using bundled whisper.cpp binary, with Estonian language support and zero user installation required.
+**Goal:** Enable real-time voice dictation in Ritemark using bundled whisper.cpp binary, with Estonian language support and zero user installation required.
 
 ### Why Sprint 23? (Second Attempt)
 
-Sprint 22 failed because it required `brew install whisper-cpp`, violating RiteMark's zero-install philosophy.
+Sprint 22 failed because it required `brew install whisper-cpp`, violating Ritemark's zero-install philosophy.
 
 **Sprint 23 fixes this by:**
 - ✅ Bundling whisper.cpp binary with extension
@@ -48,7 +48,7 @@ Sprint 22 failed because it required `brew install whisper-cpp`, violating RiteM
 
 ```
 ┌────────────────────────────────────┐
-│   RiteMark Webview                │
+│   Ritemark Webview                │
 │   ┌────────────────────────────┐   │
 │   │ Mic Button (Toggle)        │   │
 │   │ Web Audio API (Capture)    │   │
@@ -58,7 +58,7 @@ Sprint 22 failed because it required `brew install whisper-cpp`, violating RiteM
 └────────────────────────────────────┘
                ▼
 ┌────────────────────────────────────┐
-│   RiteMark Extension               │
+│   Ritemark Extension               │
 │   ┌────────────────────────────┐   │
 │   │ whisper.cpp (bundled)      │   │
 │   │ Binary: darwin-arm64       │   │
@@ -70,7 +70,7 @@ Sprint 22 failed because it required `brew install whisper-cpp`, violating RiteM
 └────────────────────────────────────┘
                ▼
 ┌────────────────────────────────────┐
-│   RiteMark Webview                │
+│   Ritemark Webview                │
 │   ┌────────────────────────────┐   │
 │   │ editor.insertContent(text) │   │
 │   │ Insert at cursor           │   │

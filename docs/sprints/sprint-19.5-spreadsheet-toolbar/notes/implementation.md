@@ -56,7 +56,7 @@ Added external app integration for Excel files:
   - `openInExternalApp(filePath, app)`: Opens file with `open -a "AppName" "file"`
 - User feedback via VS Code notifications
 
-### 4. RiteMark Editor Provider Updates
+### 4. Ritemark Editor Provider Updates
 
 **File:** `extensions/ritemark/src/ritemarkEditor.ts`
 

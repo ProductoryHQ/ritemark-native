@@ -2,43 +2,43 @@
 
 > From download to editing in 5 minutes.
 
-This guide walks you through installing RiteMark and creating your first document.
+This guide walks you through installing Ritemark and creating your first document.
 
 ---
 
 ## 1. Download
 
-Get RiteMark from GitHub:
-1. Download [RiteMark.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg)
+Get Ritemark from GitHub:
+1. Download [Ritemark.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg)
 2. Open the downloaded file
 
 ---
 
 ## 2. Install
 
-1. Drag **RiteMark** to your **Applications** folder
+1. Drag **Ritemark** to your **Applications** folder
 2. Eject the disk image
 
 ### First Launch
 
-When you first open RiteMark, macOS may show a security warning:
+When you first open Ritemark, macOS may show a security warning:
 
-> "RiteMark" cannot be opened because Apple cannot check it for malicious software.
+> "Ritemark" cannot be opened because Apple cannot check it for malicious software.
 
 **To open anyway:**
-1. **Right-click** (or Control-click) on RiteMark in Applications
+1. **Right-click** (or Control-click) on Ritemark in Applications
 2. Select **Open** from the menu
 3. Click **Open** in the dialog
 
-You only need to do this once. After that, RiteMark opens normally.
+You only need to do this once. After that, Ritemark opens normally.
 
 ---
 
 ## 3. Open a Folder
 
-RiteMark works with folders (projects), not individual files:
+Ritemark works with folders (projects), not individual files:
 
-1. Launch RiteMark
+1. Launch Ritemark
 2. Click **Open Folder** or use File → Open Folder
 3. Select a folder containing your markdown files (or create a new one)
 
@@ -96,7 +96,7 @@ The status bar at the bottom shows the file state.
 
 ### Enable AI Features
 
-RiteMark includes an AI assistant for text editing. [Set up your API key →](setup-ai.md)
+Ritemark includes an AI assistant for text editing. [Set up your API key →](setup-ai.md)
 
 ### Learn the Features
 
@@ -116,7 +116,7 @@ Share your markdown as PDF or Word. [Learn about export →](../features/export.
 |-----|-----|
 | Use slash commands | Faster than menus for inserting blocks |
 | Learn Cmd+B and Cmd+I | Quick formatting without leaving keyboard |
-| Open folders, not files | RiteMark is project-based |
+| Open folders, not files | Ritemark is project-based |
 | Trust auto-save | No need to Cmd+S constantly |
 
 ---

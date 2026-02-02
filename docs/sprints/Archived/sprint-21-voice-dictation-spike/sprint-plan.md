@@ -1,10 +1,10 @@
 # Sprint 21: Voice Dictation Spike
 
 ## Goal
-Validate the feasibility of adding voice dictation to RiteMark by testing if the VS Code Speech extension works in our fork, and determine the technical path forward based on findings.
+Validate the feasibility of adding voice dictation to Ritemark by testing if the VS Code Speech extension works in our fork, and determine the technical path forward based on findings.
 
 ## Success Criteria
-- [ ] VS Code Speech extension tested in RiteMark Native
+- [ ] VS Code Speech extension tested in Ritemark Native
 - [ ] **Estonian language support verified** (MUST HAVE)
 - [ ] Toggle mode (not push-to-talk) verified
 - [ ] Compatibility documented (works / doesn't work / partially works)
@@ -35,7 +35,7 @@ Validate the feasibility of adding voice dictation to RiteMark by testing if the
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  RiteMark Toolbar                                       │
+│  Ritemark Toolbar                                       │
 │  ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐         ┌────┐         │
 │  │B │ │I │ │H1│ │""│ │••│ │🔗│   ...   │ 🎤 │         │
 │  └──┘ └──┘ └──┘ └──┘ └──┘ └──┘         └────┘         │
@@ -69,7 +69,7 @@ Validate the feasibility of adding voice dictation to RiteMark by testing if the
 ### Phase 1: Research
 - [ ] Review existing research document (2026-01-15-voice-dictation-research.md)
 - [ ] Document current VS Code Speech extension architecture
-- [ ] Identify RiteMark webview integration points
+- [ ] Identify Ritemark webview integration points
 - [ ] Document potential blockers (extension API, permissions, webview context)
 
 ### Phase 2: Plan
@@ -80,9 +80,9 @@ Validate the feasibility of adding voice dictation to RiteMark by testing if the
 
 ### Phase 3: Spike Execution
 - [ ] **Check Estonian language support in VS Code Speech** (do this FIRST - may be blocker)
-- [ ] Install VS Code Speech extension in RiteMark Native
+- [ ] Install VS Code Speech extension in Ritemark Native
 - [ ] Test basic dictation in regular markdown files
-- [ ] Test dictation in RiteMark webview editor
+- [ ] Test dictation in Ritemark webview editor
 - [ ] Test keyboard shortcuts (⌥⌘V)
 - [ ] **Test toggle mode** (start/stop, not hold-to-talk)
 - [ ] **Test Estonian dictation** if supported
@@ -124,7 +124,7 @@ The research identified 4 potential approaches:
 
 ### Key Questions to Answer in Spike
 
-1. Does VS Code Speech extension work in RiteMark webview?
+1. Does VS Code Speech extension work in Ritemark webview?
 2. If yes, is it good enough for our needs?
 3. If no, what breaks? (extension API, webview context, permissions?)
 4. What's the recommended path forward?
@@ -136,8 +136,8 @@ The research identified 4 potential approaches:
 | **VS Code Speech doesn't support Estonian** | Check FIRST before full testing → if no Estonian, skip to whisper.cpp |
 | Extension doesn't work in webview | Already planned - research identified alternatives |
 | No toggle mode (only push-to-talk) | Document, may need custom implementation |
-| Microphone permissions differ in RiteMark fork | Test early, document permission flow |
-| Extension conflicts with RiteMark editor | Document conflicts, plan workarounds |
+| Microphone permissions differ in Ritemark fork | Test early, document permission flow |
+| Extension conflicts with Ritemark editor | Document conflicts, plan workarounds |
 | Spike inconclusive | Define clear decision criteria upfront |
 
 ## Status

@@ -10,7 +10,7 @@ priority: medium
 ---
 # Product Marketer Agent
 
-You prepare user-facing content and marketing materials for RiteMark. All content stays in this repo (`ritemark-native`) in a structured format that other repos can consume.
+You prepare user-facing content and marketing materials for Ritemark. All content stays in this repo (`ritemark-native`) in a structured format that other repos can consume.
 
 ## Core Principle
 
@@ -184,7 +184,7 @@ Cannot write content files without approval:
 ### release-notes.md
 
 ```markdown
-# RiteMark vX.X.X
+# Ritemark vX.X.X
 
 **Released:** YYYY-MM-DD
 **Type:** Major | Minor | Patch | Extension-only
@@ -227,14 +227,14 @@ How to upgrade (if different from standard process).
 
 ## Hashtags
 
-#RiteMark #Markdown #Writing
+#Ritemark #Markdown #Writing
 ```
 
 ### blog/et.md and blog/en.md
 
 ```markdown
 ---
-title: 'RiteMark X.X: [Headline]'
+title: 'Ritemark X.X: [Headline]'
 slug: ritemark-x-x-[slug]
 description: '[One sentence summary]'
 date: 'YYYY-MM-DD'
@@ -256,10 +256,10 @@ tags: ['ritemark', 'release']
 
 version: 1.5.0
 release_date: 2025-01-14
-download_url: https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg
+download_url: https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg
 ```
 
-**Note:** Always use the stable `RiteMark.dmg` filename - this URL never changes between releases.
+**Note:** Always use the stable `Ritemark.dmg` filename - this URL never changes between releases.
 
 ### landing-page/features.md
 

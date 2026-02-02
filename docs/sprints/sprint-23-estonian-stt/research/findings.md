@@ -8,13 +8,13 @@
 
 ## Context: Why Sprint 23?
 
-This is the **second attempt** at voice dictation. The first attempt (previous Sprint 22, now archived) failed because it required users to run `brew install whisper-cpp`, which **violates RiteMark's zero-install philosophy**.
+This is the **second attempt** at voice dictation. The first attempt (previous Sprint 22, now archived) failed because it required users to run `brew install whisper-cpp`, which **violates Ritemark's zero-install philosophy**.
 
 ### What Went Wrong in Sprint 22
 
 | Problem | Impact |
 |---------|--------|
-| Required Homebrew installation | User friction, against RiteMark principles |
+| Required Homebrew installation | User friction, against Ritemark principles |
 | No bundled binary | Feature unusable out-of-the-box |
 | External dependency | Not truly "local-first" |
 
@@ -106,7 +106,7 @@ TalTech (Tallinn University of Technology) has fine-tuned Whisper models specifi
 ### The Zero-Install Solution
 
 ```
-RiteMark Extension
+Ritemark Extension
 ├── binaries/
 │   └── darwin-arm64/
 │       └── whisper.cpp        # Pre-compiled binary (bundled!)

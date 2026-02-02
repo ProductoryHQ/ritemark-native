@@ -1,13 +1,13 @@
 ---
 name: feature-flags
-description: Feature flag system for RiteMark - when to use flags, how to implement them, lifecycle management. Use when adding new features that need gating, platform restrictions, or experimental status.
+description: Feature flag system for Ritemark - when to use flags, how to implement them, lifecycle management. Use when adding new features that need gating, platform restrictions, or experimental status.
 version: 1.0.0
 allowed-tools: Read, Grep, Glob, Edit, Write
 ---
 
 # Feature Flags
 
-RiteMark uses feature flags to control feature availability based on platform, stability, and user preferences.
+Ritemark uses feature flags to control feature availability based on platform, stability, and user preferences.
 
 ## When to Use This Skill
 

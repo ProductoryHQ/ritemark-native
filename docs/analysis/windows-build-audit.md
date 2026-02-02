@@ -1,8 +1,8 @@
-# Windows Build Audit - RiteMark Native
+# Windows Build Audit - Ritemark Native
 
 **Date:** 2026-01-24
 **Status:** Research / Pre-Implementation
-**Goal:** Determine the best strategy for producing a Windows production build of RiteMark Native.
+**Goal:** Determine the best strategy for producing a Windows production build of Ritemark Native.
 
 ---
 
@@ -342,13 +342,13 @@ jobs:
           xcopy /E /I extensions\ritemark VSCode-win32-x64\resources\app\extensions\ritemark
 
       # 9. Package as ZIP
-      - run: 7z a dist/RiteMark-win32-x64.zip ./VSCode-win32-x64/*
+      - run: 7z a dist/Ritemark-win32-x64.zip ./VSCode-win32-x64/*
 
       # 10. Upload artifact
       - uses: actions/upload-artifact@v4
         with:
           name: ritemark-windows-x64
-          path: dist/RiteMark-win32-x64.zip
+          path: dist/Ritemark-win32-x64.zip
 ```
 
 ### Caching Strategy
@@ -379,8 +379,8 @@ jobs:
 5. **Update `githubClient.ts`** - Platform-aware asset detection for updates.
 6. **Update `updateService.ts`** - Support ZIP/EXE downloads on Windows.
 7. **Create `.github/workflows/build-windows.yml`** - Automated CI builds.
-8. **Test extension loading** - Verify RiteMark extension activates on Windows build.
-9. **Test file associations** - Verify `.md` files open in RiteMark editor.
+8. **Test extension loading** - Verify Ritemark extension activates on Windows build.
+9. **Test file associations** - Verify `.md` files open in Ritemark editor.
 
 ### Medium-Term (Production Quality)
 

@@ -2,7 +2,7 @@
 
 > Use Claude Code, OpenAI Codex, or Google Gemini directly in your writing workflow.
 
-RiteMark is built on VS Code, which means it has a full integrated terminal. This lets you run AI assistants like Claude Code right alongside your documents.
+Ritemark is built on VS Code, which means it has a full integrated terminal. This lets you run AI assistants like Claude Code right alongside your documents.
 
 ---
 
@@ -35,7 +35,7 @@ This is different from the [built-in AI Assistant](ai-assistant.md), which is a 
 
 ### Claude Code (Recommended)
 
-Anthropic's official CLI for Claude. Works exceptionally well with RiteMark.
+Anthropic's official CLI for Claude. Works exceptionally well with Ritemark.
 
 **Why Claude Code?**
 - Can read and edit your markdown files directly
@@ -75,12 +75,12 @@ Google's Gemini models via command line.
 
 ## How It Works
 
-1. **Open Terminal** in RiteMark (View → Terminal or Ctrl+\`)
+1. **Open Terminal** in Ritemark (View → Terminal or Ctrl+\`)
 2. **Navigate to your document** (usually already there)
 3. **Run AI commands** that reference your file
 4. **Watch changes** appear in the editor automatically
 
-The terminal AI reads your file, makes changes, and saves. RiteMark's auto-reload shows the updates instantly.
+The terminal AI reads your file, makes changes, and saves. Ritemark's auto-reload shows the updates instantly.
 
 ---
 
@@ -89,7 +89,7 @@ The terminal AI reads your file, makes changes, and saves. RiteMark's auto-reloa
 **Scenario:** You have a rough draft and want to polish it.
 
 ```bash
-# Open terminal in RiteMark
+# Open terminal in Ritemark
 # Navigate to document folder (if needed)
 
 # Ask Claude Code to improve it

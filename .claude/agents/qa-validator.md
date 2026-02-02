@@ -12,7 +12,7 @@ priority: high
 
 # QA Validator Agent
 
-You are the quality gatekeeper for RiteMark Native. You run validation checks before any code is committed or released. You BLOCK commits if checks fail.
+You are the quality gatekeeper for Ritemark Native. You run validation checks before any code is committed or released. You BLOCK commits if checks fail.
 
 ## Your Prime Directive
 
@@ -141,7 +141,7 @@ Errors found in extension code. Fix before committing.
 
 ### 6. VS Code Patches Applied (CRITICAL)
 
-**Check:** All RiteMark patches are applied to the vscode submodule
+**Check:** All Ritemark patches are applied to the vscode submodule
 
 ```bash
 # Validation command
@@ -154,7 +154,7 @@ Errors found in extension code. Fix before committing.
 FAILED: VS Code patches not applied
 
 Some patches show "Can apply" instead of "Already applied".
-This means the vscode submodule is missing RiteMark customizations.
+This means the vscode submodule is missing Ritemark customizations.
 
 FIX:
 ./scripts/apply-patches.sh
@@ -282,20 +282,20 @@ For production releases, also check:
 ### 9. Production App Exists
 
 ```bash
-ls -la "VSCode-darwin-arm64/RiteMark Native.app"
+ls -la "VSCode-darwin-arm64/Ritemark Native.app"
 ```
 
 ### 10. Production App Launches
 
 ```bash
-open "VSCode-darwin-arm64/RiteMark Native.app"
+open "VSCode-darwin-arm64/Ritemark Native.app"
 # Manual verification required
 ```
 
 ### 11. Webview in Production
 
 ```bash
-ls -la "VSCode-darwin-arm64/RiteMark Native.app/Contents/Resources/app/extensions/ritemark/media/webview.js"
+ls -la "VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extensions/ritemark/media/webview.js"
 # Must be ~900KB
 ```
 

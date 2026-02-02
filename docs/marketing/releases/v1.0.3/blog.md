@@ -1,8 +1,8 @@
 ---
-title: 'RiteMark 1.0.3: Voice Dictation That Never Leaves Your Machine'
+title: 'Ritemark 1.0.3: Voice Dictation That Never Leaves Your Machine'
 slug: ritemark-1-0-3-voice-dictation
 description: >-
-  RiteMark now includes fully local speech-to-text powered by whisper.cpp.
+  Ritemark now includes fully local speech-to-text powered by whisper.cpp.
   Dictate in Estonian or 50+ languages without any data leaving your computer.
 date: '2026-01-23'
 category: tooted
@@ -19,7 +19,7 @@ tags:
 ---
 # Voice Dictation That Never Leaves Your Machine
 
-RiteMark v1.0.3 ships with a feature I have wanted to build for a long time: voice dictation that runs entirely on your computer.
+Ritemark v1.0.3 ships with a feature I have wanted to build for a long time: voice dictation that runs entirely on your computer.
 
 No cloud. No API calls. No data sent anywhere. Just your voice, transcribed locally by whisper.cpp.
 
@@ -29,7 +29,7 @@ Most writing tools with voice input do the same thing: record your audio, send i
 
 For private writing, that is a non-starter. Journal entries, client notes, sensitive drafts - these should not travel through the internet just to convert speech to text.
 
-So we bundled whisper.cpp directly into RiteMark.
+So we bundled whisper.cpp directly into Ritemark.
 
 ## How It Works
 
@@ -37,13 +37,13 @@ Click the mic button in the toolbar. Start speaking. Your words appear in real-t
 
 That is it. No setup wizards, no account creation, no API keys to manage.
 
-Under the hood, RiteMark uses whisper.cpp - a C/C++ port of OpenAI's Whisper model - compiled natively for Apple Silicon. The first time you use voice dictation, it downloads a language model (~244MB). After that, everything works offline.
+Under the hood, Ritemark uses whisper.cpp - a C/C++ port of OpenAI's Whisper model - compiled natively for Apple Silicon. The first time you use voice dictation, it downloads a language model (~244MB). After that, everything works offline.
 
 The transcription happens on your Mac's hardware. Your audio stays in memory, gets processed locally, and the text goes straight into your document.
 
 ## Estonian-First, 50+ Languages
 
-RiteMark started as an Estonian writing tool, so Estonian language support was the priority. The Whisper model handles Estonian well - not perfectly, but remarkably well for a model that runs locally without internet.
+Ritemark started as an Estonian writing tool, so Estonian language support was the priority. The Whisper model handles Estonian well - not perfectly, but remarkably well for a model that runs locally without internet.
 
 Beyond Estonian, the same model supports 50+ languages. Switch between them as needed. The model handles multiple languages without downloading additional files.
 
@@ -51,7 +51,7 @@ Beyond Estonian, the same model supports 50+ languages. Switch between them as n
 
 One detail that makes a big difference: text appears as you speak, not after you stop.
 
-Many dictation tools wait for you to finish a sentence or pause, then dump a block of text. RiteMark streams the transcription in real-time, so you see words appearing as you say them. This makes it feel natural - more like typing than batch processing.
+Many dictation tools wait for you to finish a sentence or pause, then dump a block of text. Ritemark streams the transcription in real-time, so you see words appearing as you say them. This makes it feel natural - more like typing than batch processing.
 
 ## Privacy by Design
 
@@ -68,7 +68,7 @@ This is not just about checking a privacy box. Local processing means:
 
 ## Getting Started
 
-1.  Update to RiteMark v1.0.3 (download from ritemark.ee)
+1.  Update to Ritemark v1.0.3 (download from ritemark.ee)
     
 2.  Open Settings and enable Voice Dictation (it is experimental, so opt-in for now)
     
@@ -93,6 +93,6 @@ Documents with many frontmatter properties (15+) no longer overflow the Properti
 
 ## What is Next
 
-Voice dictation is the foundation for more local AI features in RiteMark. The same philosophy - powerful, private, no cloud required - will guide what we build next.
+Voice dictation is the foundation for more local AI features in Ritemark. The same philosophy - powerful, private, no cloud required - will guide what we build next.
 
-Download RiteMark v1.0.3: [ritemark.ee](https://ritemark.ee)
+Download Ritemark v1.0.3: [ritemark.ee](https://ritemark.ee)

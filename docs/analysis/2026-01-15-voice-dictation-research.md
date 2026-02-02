@@ -1,4 +1,4 @@
-# Voice Dictation Research for RiteMark
+# Voice Dictation Research for Ritemark
 
 **Date:** 2026-01-15  
 **Status:** Research Complete  
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document explores adding real-time voice dictation to RiteMark, enabling users to dictate notes directly into the markdown editor. The research focuses on local-first solutions that align with RiteMark's offline-first philosophy.
+This document explores adding real-time voice dictation to Ritemark, enabling users to dictate notes directly into the markdown editor. The research focuses on local-first solutions that align with Ritemark's offline-first philosophy.
 
 **Key Finding:** WhisperKit (Swift/CoreML) and whisper.cpp are the most promising solutions for local, fast, privacy-preserving voice dictation on macOS.
 
@@ -71,7 +71,7 @@ This document explores adding real-time voice dictation to RiteMark, enabling us
 | **Keyboard Shortcut** | e.g., `⌥⌘V` (VS Code standard) | Fast, familiar | Requires keyboard |
 | **Push-to-Talk** | Hold key to dictate, release to stop | Clear boundaries | Can't multitask |
 | **Toggle Mode** | Click to start, click to stop | Hands-free after activation | May forget to stop |
-| **Voice Activation** | "Hey RiteMark, start dictating" | Fully hands-free | False positives, always listening |
+| **Voice Activation** | "Hey Ritemark, start dictating" | Fully hands-free | False positives, always listening |
 
 **Recommendation:** Keyboard shortcut with push-to-talk option (matches VS Code Speech extension pattern).
 
@@ -195,7 +195,7 @@ Essential feedback elements:
 **Integration Approach:**
 
 ```plaintext
-RiteMark Extension (TypeScript)
+Ritemark Extension (TypeScript)
         │
         ▼
     VS Code API (spawn process)
@@ -244,7 +244,7 @@ RiteMark Extension (TypeScript)
 **Integration Approach:**
 
 ```plaintext
-RiteMark Extension (TypeScript)
+Ritemark Extension (TypeScript)
         │
         ▼
     whisper-node (npm package)
@@ -285,7 +285,7 @@ RiteMark Extension (TypeScript)
 **Integration Approach:**
 
 ```plaintext
-RiteMark Extension (TypeScript)
+Ritemark Extension (TypeScript)
         │
         ▼
     Native Node module (node-ffi / Neon)
@@ -311,7 +311,7 @@ RiteMark Extension (TypeScript)
 
 **Cons:**
 
--   May not work in RiteMark webview context
+-   May not work in Ritemark webview context
     
 -   Less control over UX
     
@@ -320,7 +320,7 @@ RiteMark Extension (TypeScript)
 
 **Integration Approach:**
 
--   Test if extension works in RiteMark fork
+-   Test if extension works in Ritemark fork
     
 -   If yes, bundle or recommend installation
     
@@ -344,7 +344,7 @@ RiteMark Extension (TypeScript)
 
 #### Phase 1: Evaluate VS Code Speech Extension
 
--   Test if VS Code Speech extension works in RiteMark
+-   Test if VS Code Speech extension works in Ritemark
     
 -   Minimal effort, immediate result if successful
     
@@ -373,7 +373,7 @@ RiteMark Extension (TypeScript)
 
 ```plaintext
 ┌─────────────────────────────────────────────────────────┐
-│                    RiteMark Extension                   │
+│                    Ritemark Extension                   │
 ├─────────────────────────────────────────────────────────┤
 │  Voice Dictation Module                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐ │
@@ -431,11 +431,11 @@ RiteMark Extension (TypeScript)
 
 If proceeding:
 
-1.  **Spike: VS Code Speech Extension** - Test compatibility with RiteMark fork
+1.  **Spike: VS Code Speech Extension** - Test compatibility with Ritemark fork
     
 2.  **Prototype: whisper.cpp** - Build minimal working demo with whisper-node
     
-3.  **UX Design** - Create mockups for dictation UI in RiteMark
+3.  **UX Design** - Create mockups for dictation UI in Ritemark
     
 4.  **Sprint Planning** - Define scope for MVP implementation
     

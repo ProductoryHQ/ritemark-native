@@ -58,7 +58,7 @@ export function ConflictDialog({
         <div className="conflict-body">
           {isDiskConflict ? (
             <>
-              <p>You have unsaved edits in RiteMark.</p>
+              <p>You have unsaved edits in Ritemark.</p>
               <p>
                 The file <strong>{filename}</strong> has also been modified on disk by
                 another program.

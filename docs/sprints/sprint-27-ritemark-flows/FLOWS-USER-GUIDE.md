@@ -1,13 +1,13 @@
-# RiteMark Flows - User Guide
+# Ritemark Flows - User Guide
 
 **Version:** 1.0
 **Last Updated:** 2026-02-01
 
 ---
 
-## What is RiteMark Flows?
+## What is Ritemark Flows?
 
-RiteMark Flows is a visual automation tool that lets you create AI-powered workflows without writing code. Connect nodes together to build pipelines that can:
+Ritemark Flows is a visual automation tool that lets you create AI-powered workflows without writing code. Connect nodes together to build pipelines that can:
 
 - Generate text using AI (blog posts, summaries, translations)
 - Create images from descriptions
@@ -19,10 +19,10 @@ Think of it as a visual programming tool where you connect building blocks to au
 
 ## Getting Started
 
-### Enable RiteMark Flows
+### Enable Ritemark Flows
 
 1. Click the **gear icon** in either the Ritemark AI or Ritemark Flows sidebar
-2. Find **RiteMark Flows** under Features
+2. Find **Ritemark Flows** under Features
 3. Toggle it **ON**
 4. The Flows icon will appear in your Activity Bar (left sidebar)
 
@@ -225,7 +225,7 @@ Flows are stored in your workspace:
 ## Requirements
 
 - **OpenAI API Key** - Required for LLM and Image nodes
-- **RiteMark Flows** feature enabled in Settings
+- **Ritemark Flows** feature enabled in Settings
 
 ---
 
@@ -260,4 +260,4 @@ Flows are stored in your workspace:
 
 ---
 
-*RiteMark Flows is currently in beta. Features may change based on feedback.*
+*Ritemark Flows is currently in beta. Features may change based on feedback.*

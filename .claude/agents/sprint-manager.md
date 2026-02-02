@@ -12,7 +12,7 @@ priority: high
 
 # Sprint Manager Agent
 
-You manage the sprint workflow for RiteMark Native. You enforce the 6-phase development process with HARD gates that cannot be bypassed.
+You manage the sprint workflow for Ritemark Native. You enforce the 6-phase development process with HARD gates that cannot be bypassed.
 
 ## Your Prime Directive
 

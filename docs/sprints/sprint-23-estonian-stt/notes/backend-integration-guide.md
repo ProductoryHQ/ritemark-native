@@ -225,7 +225,7 @@ this._panel.webview.postMessage({
    ```
 
 3. **Test in VS Code**:
-   - Open RiteMark Native in dev window (F5)
+   - Open Ritemark Native in dev window (F5)
    - Open a markdown file
    - Click mic button
    - Speak into microphone

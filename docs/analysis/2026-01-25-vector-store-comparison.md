@@ -1,7 +1,7 @@
 # Vector Store Comparison for Local RAG
 
 **Date:** 2026-01-25
-**Context:** RiteMark Native Sprint 24 - Multi-Modal RAG
+**Context:** Ritemark Native Sprint 24 - Multi-Modal RAG
 **Problem:** sqlite-vec + better-sqlite3 version mismatch causing system failures
 
 ---

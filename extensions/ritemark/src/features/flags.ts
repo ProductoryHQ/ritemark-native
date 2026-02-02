@@ -1,7 +1,7 @@
 /**
  * Feature Flag Definitions
  *
- * This module contains all feature flags for RiteMark.
+ * This module contains all feature flags for Ritemark.
  * Flags control feature availability based on:
  * - Platform (darwin, win32, linux)
  * - Status (stable, experimental, disabled, premium)
@@ -50,9 +50,9 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   },
   'ritemark-flows': {
     id: 'ritemark-flows',
-    label: 'RiteMark Flows',
+    label: 'Ritemark Flows',
     description: 'Visual automation workflows with AI and file operations',
-    status: 'experimental',
+    status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
 };

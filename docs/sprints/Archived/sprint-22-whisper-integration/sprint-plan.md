@@ -1,7 +1,7 @@
 # Sprint 22: Voice Dictation with whisper.cpp
 
 ## Goal
-Implement real-time voice dictation in RiteMark using whisper.cpp, enabling users to dictate text directly into the markdown editor with toggle mode and multi-language support (including Estonian).
+Implement real-time voice dictation in Ritemark using whisper.cpp, enabling users to dictate text directly into the markdown editor with toggle mode and multi-language support (including Estonian).
 
 ## Success Criteria
 - [ ] User can click mic button in editor toolbar to start/stop dictation
@@ -172,7 +172,7 @@ Implement real-time voice dictation in RiteMark using whisper.cpp, enabling user
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    RiteMark Webview                         │
+│                    Ritemark Webview                         │
 ├─────────────────────────────────────────────────────────────┤
 │  Editor Toolbar / FormattingBubbleMenu                      │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -190,7 +190,7 @@ Implement real-time voice dictation in RiteMark using whisper.cpp, enabling user
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              RiteMark Extension (TypeScript)                │
+│              Ritemark Extension (TypeScript)                │
 ├─────────────────────────────────────────────────────────────┤
 │  voiceDictation.ts                                          │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -208,7 +208,7 @@ Implement real-time voice dictation in RiteMark using whisper.cpp, enabling user
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    RiteMark Webview                         │
+│                    Ritemark Webview                         │
 ├─────────────────────────────────────────────────────────────┤
 │  Text Insertion (TipTap)                                    │
 │  ┌──────────────────────────────────────────────────────┐   │

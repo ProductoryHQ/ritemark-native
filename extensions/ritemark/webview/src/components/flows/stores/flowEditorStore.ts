@@ -16,6 +16,7 @@ import {
   NodeChange,
   EdgeChange,
 } from '@xyflow/react';
+import { getDefaultLLMModel, getDefaultImageModel } from '../../../config/modelConfig';
 
 // Flow input type (used in Trigger node)
 export interface FlowInput {
@@ -111,6 +112,56 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Calculate execution order using topological sort (Kahn's algorithm)
+ * Returns Map of nodeId -> execution step (1-indexed)
+ */
+function calculateExecutionOrder(
+  nodes: Array<{ id: string }>,
+  edges: Array<{ source: string; target: string }>
+): Map<string, number> {
+  const order = new Map<string, number>();
+  if (nodes.length === 0) return order;
+
+  const graph = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+
+  // Initialize
+  for (const node of nodes) {
+    graph.set(node.id, []);
+    inDegree.set(node.id, 0);
+  }
+
+  // Build adjacency list and in-degree
+  for (const edge of edges) {
+    const targets = graph.get(edge.source) || [];
+    targets.push(edge.target);
+    graph.set(edge.source, targets);
+    inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
+  }
+
+  // Find start nodes (in-degree 0)
+  const queue: string[] = [];
+  for (const [nodeId, degree] of inDegree.entries()) {
+    if (degree === 0) queue.push(nodeId);
+  }
+
+  // Kahn's algorithm
+  let step = 1;
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    order.set(current, step++);
+
+    for (const neighbor of graph.get(current) || []) {
+      const newDegree = (inDegree.get(neighbor) || 0) - 1;
+      inDegree.set(neighbor, newDegree);
+      if (newDegree === 0) queue.push(neighbor);
+    }
+  }
+
+  return order;
+}
+
 interface FlowEditorState {
   // Flow metadata
   flowId: string;
@@ -131,6 +182,9 @@ interface FlowEditorState {
   // History for undo/redo
   history: Array<{ nodes: Node<FlowNodeData>[]; edges: Edge[] }>;
   historyIndex: number;
+
+  // Execution order (nodeId -> step number, 1-indexed)
+  executionOrder: Map<string, number>;
 
   // Actions
   setFlow: (flow: Flow, workspacePath: string) => void;
@@ -175,7 +229,7 @@ function getDefaultNodeData(type: string): FlowNodeData {
       return {
         label: 'LLM Prompt',
         provider: 'openai',
-        model: 'gpt-5.2',
+        model: getDefaultLLMModel('openai'),
         systemPrompt: '',
         userPrompt: '',
         temperature: 0.7,
@@ -185,7 +239,7 @@ function getDefaultNodeData(type: string): FlowNodeData {
       return {
         label: 'Generate Image',
         provider: 'openai',
-        model: 'gpt-image-1.5',
+        model: getDefaultImageModel('openai'),
         prompt: '',
         inputImages: [],
         action: 'auto',
@@ -220,6 +274,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   workspacePath: '',
   history: [],
   historyIndex: -1,
+  executionOrder: new Map(),
 
   // Load flow from JSON
   setFlow: (flow: Flow, workspacePath: string) => {
@@ -246,6 +301,9 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       ? currentState.selectedNodeId
       : null;
 
+    // Calculate execution order
+    const executionOrder = calculateExecutionOrder(nodes, edges);
+
     set({
       flowId: flow.id,
       flowName: flow.name,
@@ -258,23 +316,38 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       workspacePath,
       history: isSameFlow ? currentState.history : [{ nodes, edges }],
       historyIndex: isSameFlow ? currentState.historyIndex : 0,
+      executionOrder,
     });
   },
 
-  setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
+  setNodes: (nodes) => set((state) => ({
+    nodes,
+    executionOrder: calculateExecutionOrder(nodes, state.edges),
+  })),
+  setEdges: (edges) => set((state) => ({
+    edges,
+    executionOrder: calculateExecutionOrder(state.nodes, edges),
+  })),
 
   onNodesChange: (changes) => {
     set((state) => {
       const newNodes = applyNodeChanges(changes, state.nodes);
-      return { nodes: newNodes, isDirty: true };
+      return {
+        nodes: newNodes,
+        isDirty: true,
+        executionOrder: calculateExecutionOrder(newNodes, state.edges),
+      };
     });
   },
 
   onEdgesChange: (changes) => {
     set((state) => {
       const newEdges = applyEdgeChanges(changes, state.edges);
-      return { edges: newEdges, isDirty: true };
+      return {
+        edges: newEdges,
+        isDirty: true,
+        executionOrder: calculateExecutionOrder(state.nodes, newEdges),
+      };
     });
   },
 
@@ -287,7 +360,11 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
         },
         state.edges
       );
-      return { edges: newEdges, isDirty: true };
+      return {
+        edges: newEdges,
+        isDirty: true,
+        executionOrder: calculateExecutionOrder(state.nodes, newEdges),
+      };
     });
     // Save to history
     get().saveToHistory();

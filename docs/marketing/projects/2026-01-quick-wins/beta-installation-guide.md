@@ -1,6 +1,6 @@
 # Copywriting: Beta Installation Guide
 
-Web copy for installing RiteMark before Apple notarization completes.
+Web copy for installing Ritemark before Apple notarization completes.
 
 **Status:** Draft - awaiting review  
 **Date:** 2026-01-14
@@ -9,7 +9,7 @@ Web copy for installing RiteMark before Apple notarization completes.
 
 ## Context
 
-RiteMark is code-signed with Apple Developer ID but awaiting notarization approval. macOS Gatekeeper will show a warning on first launch. This page guides users through the one-time approval process.
+Ritemark is code-signed with Apple Developer ID but awaiting notarization approval. macOS Gatekeeper will show a warning on first launch. This page guides users through the one-time approval process.
 
 **Goals:**
 
@@ -28,17 +28,17 @@ RiteMark is code-signed with Apple Developer ID but awaiting notarization approv
 
 ### Estonian (ET)
 
-**Headline:** RiteMark'i paigaldamine
+**Headline:** Ritemark'i paigaldamine
 
-**Subhead:** RiteMark on Apple'i poolt allkirjastatud, kuid ootab veel Apple'i lõplikku heakskiitu. See tähendab, et macOS küsib sinult esmakordsel avamisel kinnitust. Teeme selle lihtsaks.
+**Subhead:** Ritemark on Apple'i poolt allkirjastatud, kuid ootab veel Apple'i lõplikku heakskiitu. See tähendab, et macOS küsib sinult esmakordsel avamisel kinnitust. Teeme selle lihtsaks.
 
 **Badge:** Beta · Turvaline · Ainult üks kord
 
 ### English (EN)
 
-**Headline:** Installing RiteMark Beta
+**Headline:** Installing Ritemark Beta
 
-**Subhead:** RiteMark is signed with Apple Developer ID but still awaiting final Apple approval. This means macOS will ask for your confirmation on first launch. Let's make this easy.
+**Subhead:** Ritemark is signed with Apple Developer ID but still awaiting final Apple approval. This means macOS will ask for your confirmation on first launch. Let's make this easy.
 
 **Badge:** Beta · Safe · One-time only
 
@@ -56,15 +56,15 @@ RiteMark is code-signed with Apple Developer ID but awaiting notarization approv
 
 1.  **Lae alla ja ava**
     
-    Lae RiteMark DMG alla Githubis, ava see ja tõmba sealt Ritemark.app Applications kausta. Topeltkliki rakenduse avamiseks.
+    Lae Ritemark DMG alla Githubis, ava see ja tõmba sealt Ritemark.app Applications kausta. Topeltkliki rakenduse avamiseks.
     
 2.  **macOS blokeerib rakenduse**
     
-    Näed teadet: "RiteMarki ei saa avada, kuna Apple ei saa seda kontrollida." See on normaalne – kliki "OK".
+    Näed teadet: "Ritemarki ei saa avada, kuna Apple ei saa seda kontrollida." See on normaalne – kliki "OK".
     
 3.  **Ava System Settings**
     
-    Mine **System Settings → Privacy & Security**. Keri alla kuni näed teadet RiteMarki kohta.
+    Mine **System Settings → Privacy & Security**. Keri alla kuni näed teadet Ritemarki kohta.
     
 4.  **Kliki "Open Anyway"**
     
@@ -72,7 +72,7 @@ RiteMark is code-signed with Apple Developer ID but awaiting notarization approv
     
 5.  **Valmis!**
     
-    RiteMark avaneb nüüd normaalselt. Seda protsessi tuleb teha ainult üks kord.
+    Ritemark avaneb nüüd normaalselt. Seda protsessi tuleb teha ainult üks kord.
     
 
 **Note:** Kui sul on macOS 14 või vanem: tee lihtsalt paremkliki rakendusel ja vali "Open".
@@ -87,15 +87,15 @@ RiteMark is code-signed with Apple Developer ID but awaiting notarization approv
 
 1.  **Download and open**
     
-    Download RiteMark DMG, open it and drag it to your Applications folder. Double-click to open.
+    Download Ritemark DMG, open it and drag it to your Applications folder. Double-click to open.
     
 2.  **macOS blocks the app**
     
-    You'll see: "RiteMark cannot be opened because Apple cannot check it for malicious software." This is normal – click "OK".
+    You'll see: "Ritemark cannot be opened because Apple cannot check it for malicious software." This is normal – click "OK".
     
 3.  **Open System Settings**
     
-    Go to **System Settings → Privacy & Security**. Scroll down until you see the message about RiteMark.
+    Go to **System Settings → Privacy & Security**. Scroll down until you see the message about Ritemark.
     
 4.  **Click "Open Anyway"**
     
@@ -103,7 +103,7 @@ RiteMark is code-signed with Apple Developer ID but awaiting notarization approv
     
 5.  **Done!**
     
-    RiteMark now opens normally. You only need to do this once.
+    Ritemark now opens normally. You only need to do this once.
     
 
 **Note:** On macOS 14 or earlier: simply right-click the app and select "Open".
@@ -121,7 +121,7 @@ RiteMark is code-signed with Apple Developer ID but awaiting notarization approv
 **Code Block:**
 
 ```bash
-curl -L -o ~/Downloads/RiteMark.dmg "https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg" && open ~/Downloads/RiteMark.dmg
+curl -L -o ~/Downloads/Ritemark.dmg "https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg" && open ~/Downloads/Ritemark.dmg
 ```
 
 **Explanation:** Terminali kaudu laetud failidel pole macOS karantiini märgendit, seega Gatekeeper hoiatust ei tule.
@@ -135,7 +135,7 @@ curl -L -o ~/Downloads/RiteMark.dmg "https://github.com/jarmo-productory/ritemar
 **Code Block:**
 
 ```bash
-curl -L -o ~/Downloads/RiteMark.dmg "https://github.com/jarmo-productory/ritemark-public/releases/latest/download/RiteMark.dmg" && open ~/Downloads/RiteMark.dmg
+curl -L -o ~/Downloads/Ritemark.dmg "https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg" && open ~/Downloads/Ritemark.dmg
 ```
 
 **Explanation:** Files downloaded via terminal don't have the macOS quarantine flag, so no Gatekeeper warning appears.
@@ -148,9 +148,9 @@ curl -L -o ~/Downloads/RiteMark.dmg "https://github.com/jarmo-productory/ritemar
 
 **Section Title:** Korduma kippuvad küsimused
 
-**Q: Kas RiteMark on turvaline?**
+**Q: Kas Ritemark on turvaline?**
 
-A: Jah. RiteMark on allkirjastatud Apple Developer ID-ga, mis tähendab, et Apple teab, kes rakenduse tegi. Notariseerimine on lihtsalt lisasamm Apple'i poolt, mis võtab uutel arendajatel aega. Sinu failid jäävad alati sinu arvutisse – me ei saada midagi kuhugi.
+A: Jah. Ritemark on allkirjastatud Apple Developer ID-ga, mis tähendab, et Apple teab, kes rakenduse tegi. Notariseerimine on lihtsalt lisasamm Apple'i poolt, mis võtab uutel arendajatel aega. Sinu failid jäävad alati sinu arvutisse – me ei saada midagi kuhugi.
 
 **Q: Miks ma pean seda tegema?**
 
@@ -168,9 +168,9 @@ A: Täiesti mõistlik! Võid oodata, kuni Apple meid ametlikult notariseerib. J�
 
 **Section Title:** Frequently Asked Questions
 
-**Q: Is RiteMark safe?**
+**Q: Is Ritemark safe?**
 
-A: Yes. RiteMark is signed with Apple Developer ID, which means Apple knows who made the app. Notarization is just an extra verification step that takes time for new developers. Your files always stay on your machine – we never send anything anywhere.
+A: Yes. Ritemark is signed with Apple Developer ID, which means Apple knows who made the app. Notarization is just an extra verification step that takes time for new developers. Your files always stay on your machine – we never send anything anywhere.
 
 **Q: Why do I need to do this?**
 

@@ -7,7 +7,7 @@
 
 ## Overview
 
-This document describes how automated CI/CD pipelines integrate with RiteMark's human-in-the-loop release process. The goal is to automate builds while preserving quality gates and human approval.
+This document describes how automated CI/CD pipelines integrate with Ritemark's human-in-the-loop release process. The goal is to automate builds while preserving quality gates and human approval.
 
 ---
 
@@ -119,8 +119,8 @@ CI/CD ──► release-manager ──► product-marketer ──► Published
 
 | Artifact | Platform | Format | Signed? |
 |----------|----------|--------|---------|
-| `RiteMark-X.Y.Z-darwin-arm64.dmg` | macOS | DMG | Level 1: No, Level 2: Yes |
-| `RiteMark-X.Y.Z-win32-x64.zip` | Windows | ZIP | Level 1: No, Level 2: Yes |
+| `Ritemark-X.Y.Z-darwin-arm64.dmg` | macOS | DMG | Level 1: No, Level 2: Yes |
+| `Ritemark-X.Y.Z-win32-x64.zip` | Windows | ZIP | Level 1: No, Level 2: Yes |
 | `checksums.sha256` | All | Text | N/A |
 
 ### What release-manager Needs
@@ -128,8 +128,8 @@ CI/CD ──► release-manager ──► product-marketer ──► Published
 **Current (local builds):**
 ```bash
 # Checks local files
-ls "VSCode-darwin-arm64/RiteMark.app"
-codesign -dv "VSCode-darwin-arm64/RiteMark.app"
+ls "VSCode-darwin-arm64/Ritemark.app"
+codesign -dv "VSCode-darwin-arm64/Ritemark.app"
 ```
 
 **Future (CI builds):**
@@ -139,7 +139,7 @@ gh release download vX.Y.Z --repo jarmo-productory/ritemark-native \
   --pattern "*.dmg" --dir /tmp/release-verify/
 
 # Then runs same verification
-hdiutil attach /tmp/release-verify/RiteMark-*.dmg
+hdiutil attach /tmp/release-verify/Ritemark-*.dmg
 # ... verification checks ...
 ```
 
@@ -233,10 +233,10 @@ This is normal for new applications. We're working on code signing for future re
 Workflow: release.yml
   │
   ├── build-macos.yml (parallel)
-  │   └── Produces: RiteMark-1.2.0-darwin-arm64.dmg
+  │   └── Produces: Ritemark-1.2.0-darwin-arm64.dmg
   │
   ├── build-windows.yml (parallel)
-  │   └── Produces: RiteMark-1.2.0-win32-x64.zip
+  │   └── Produces: Ritemark-1.2.0-win32-x64.zip
   │
   └── Creates draft release with both artifacts
 ```
@@ -387,10 +387,10 @@ Workflow: ci.yml (fast validation only)
     p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
 
 - name: Sign app
-  run: codesign --force --deep --sign "$IDENTITY" RiteMark.app
+  run: codesign --force --deep --sign "$IDENTITY" Ritemark.app
 
 - name: Notarize
-  run: xcrun notarytool submit RiteMark.dmg --wait ...
+  run: xcrun notarytool submit Ritemark.dmg --wait ...
 ```
 
 ### Smoke Tests in CI
@@ -399,7 +399,7 @@ Workflow: ci.yml (fast validation only)
 # Future: Headless app launch test
 - name: Smoke test (macOS)
   run: |
-    open -a RiteMark.app --args --smoke-test
+    open -a Ritemark.app --args --smoke-test
     # App writes success marker and exits
     test -f /tmp/ritemark-smoke-ok
 ```

@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-RiteMark Native currently has **NO automated CI/CD pipeline**. All builds are manual, macOS-specific, and error-prone. This research documents the current state and gaps that must be addressed.
+Ritemark Native currently has **NO automated CI/CD pipeline**. All builds are manual, macOS-specific, and error-prone. This research documents the current state and gaps that must be addressed.
 
 ---
 
@@ -69,7 +69,7 @@ fi
 1. **Runs `yarn gulp vscode-win32-x64` from macOS**
    - Will fail on native modules (node-pty, native-keymap, etc.)
    - node-gyp can't cross-compile to Windows from macOS
-2. **Missing RiteMark extension copy step**
+2. **Missing Ritemark extension copy step**
    - Only builds VS Code, doesn't copy `extensions/ritemark/`
    - Resulting app won't open `.md` files
 3. **No validation steps**
@@ -89,7 +89,7 @@ fi
 **File:** `extensions/ritemark/src/update/githubClient.ts`
 ```typescript
 // PROBLEM: Hardcoded darwin-arm64
-const assetPattern = /RiteMark.*darwin-arm64\.dmg$/;
+const assetPattern = /Ritemark.*darwin-arm64\.dmg$/;
 ```
 
 **File:** `extensions/ritemark/src/update/updateService.ts`
@@ -152,7 +152,7 @@ private async downloadUpdate(downloadUrl: string): Promise<string> {
 6. Jarmo manually uploads DMG
 
 **Release Assets (Current):**
-- `RiteMark-1.0.3-darwin-arm64.dmg` (signed, notarized)
+- `Ritemark-1.0.3-darwin-arm64.dmg` (signed, notarized)
 - No Windows builds
 - No checksums
 - No release notes automation

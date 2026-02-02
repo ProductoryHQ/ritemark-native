@@ -10,7 +10,7 @@
 
 ## Exit Criteria (Jarmo Validates)
 
-- [ ] Custom RiteMark file icon theme installed by default
+- [ ] Custom Ritemark file icon theme installed by default
 - [ ] Lucide-style icons for common file types
 - [ ] Folder icons (open/closed states)
 - [ ] Explorer looks cohesive and branded
@@ -138,7 +138,7 @@ Also potentially:
 ## Questions for Jarmo
 
 1. **Markdown icon:** Use standard Lucide `file-text` or want a custom branded icon?
-2. **Brand colors:** Should icons use RiteMark accent colors, or keep neutral?
+2. **Brand colors:** Should icons use Ritemark accent colors, or keep neutral?
 3. **Scope:** Start with minimal ~12 icons as planned, or want more coverage?
 
 ---

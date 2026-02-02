@@ -33,13 +33,13 @@ New feature card for CSV/Excel capabilities. Updated to include refresh feature.
 
 **Title:** Andmefailide eelvaade
 
-**Description:** Vaata CSV ja Excel faile otse RiteMarkis. Värskenda faile automaatselt, kui need muutuvad. Sinu AI agent saab CSV failidega otse töötada.
+**Description:** Vaata CSV ja Excel faile otse Ritemarkis. Värskenda faile automaatselt, kui need muutuvad. Sinu AI agent saab CSV failidega otse töötada.
 
 ### English (EN)
 
 **Title:** Data File Preview
 
-**Description:** Preview CSV and Excel files right inside RiteMark. Refresh files automatically when they change. Your AI agent can work with CSV files directly.
+**Description:** Preview CSV and Excel files right inside Ritemark. Refresh files automatically when they change. Your AI agent can work with CSV files directly.
 
 **Icon:** Table2 (Lucide)
 

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Automated GitHub Actions pipeline that builds, validates, and releases RiteMark Native for Windows (x64) and macOS (arm64). Level 1 maturity: unsigned builds, draft releases, quality gates.
+Automated GitHub Actions pipeline that builds, validates, and releases Ritemark Native for Windows (x64) and macOS (arm64). Level 1 maturity: unsigned builds, draft releases, quality gates.
 
 ## Feature Flag
 
@@ -10,7 +10,7 @@ No. Infrastructure work, no runtime behavior changes.
 
 ## Success Criteria
 
-- [ ] `build-windows.yml` produces a working Windows build with RiteMark icon and clean UI
+- [ ] `build-windows.yml` produces a working Windows build with Ritemark icon and clean UI
 - [ ] `build-macos.yml` produces a working macOS arm64 DMG
 - [ ] `release.yml` creates draft GitHub Release with both platform artifacts + checksums
 - [ ] `ci.yml` runs fast PR validation (TypeScript, webview integrity)
@@ -27,7 +27,7 @@ No. Infrastructure work, no runtime behavior changes.
 
 | Issue | Root Cause | Fix |
 | --- | --- | --- |
-| RiteMark icon missing | CI doesn't copy `branding/icons/icon.ico` to `vscode/resources/win32/code.ico` | Add `cp` step before gulp build |
+| Ritemark icon missing | CI doesn't copy `branding/icons/icon.ico` to `vscode/resources/win32/code.ico` | Add `cp` step before gulp build |
 | Sidebar shows Run/Debug, Extensions, Accounts, Manage | CI clones fresh VS Code — submodule-only UI customizations are lost (no patches for them) | Create missing patches (010, 011, update 004) |
 | No installer | ZIP only, no Inno Setup | Add `installer/ritemark.iss` + Inno Setup CI step |
 

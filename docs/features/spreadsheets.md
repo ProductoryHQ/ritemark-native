@@ -1,8 +1,8 @@
 # Spreadsheets
 
-> View and edit CSV files. Preview Excel spreadsheets without leaving RiteMark.
+> View and edit CSV files. Preview Excel spreadsheets without leaving Ritemark.
 
-RiteMark handles spreadsheet files directly - edit CSV files inline or preview Excel files with multi-sheet support.
+Ritemark handles spreadsheet files directly - edit CSV files inline or preview Excel files with multi-sheet support.
 
 ---
 
@@ -53,7 +53,7 @@ Double-click any `.csv` file in the explorer. It opens in spreadsheet view inste
 
 ### Large Files
 
-RiteMark handles large CSV files efficiently:
+Ritemark handles large CSV files efficiently:
 - **Virtual scrolling** - Only visible rows are rendered
 - **Row limit** - Up to 10,000 rows displayed
 - **Size warning** - Files over 5MB show a warning before loading
@@ -79,7 +79,7 @@ Excel workbooks with multiple sheets show tabs at the top:
 
 ### Limitations
 
-Excel files are **read-only** in RiteMark:
+Excel files are **read-only** in Ritemark:
 - You can view but not edit
 - Use the toolbar to open in Excel or Numbers for editing
 
@@ -128,7 +128,7 @@ This opens the actual file in the external app, not a copy.
 
 ## Tips
 
-- **Quick edits** - For simple CSV changes, edit directly in RiteMark
+- **Quick edits** - For simple CSV changes, edit directly in Ritemark
 - **Complex work** - For formulas or formatting, open in Excel
 - **Large datasets** - If you hit the 10K row limit, use a dedicated tool
 - **Data integrity** - CSV saves exactly what you see (no hidden formatting)
@@ -139,8 +139,8 @@ This opens the actual file in the external app, not a copy.
 
 | Task | Recommended |
 |------|-------------|
-| Quick CSV data entry | RiteMark |
-| Viewing Excel reports | RiteMark |
+| Quick CSV data entry | Ritemark |
+| Viewing Excel reports | Ritemark |
 | Complex spreadsheet work | Excel/Numbers via toolbar |
 | Large data analysis | Dedicated spreadsheet app |
 

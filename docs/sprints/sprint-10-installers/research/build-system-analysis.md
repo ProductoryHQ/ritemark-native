@@ -24,7 +24,7 @@
 
 ```
 VSCode-darwin-arm64/
-└── RiteMark Native.app/
+└── Ritemark Native.app/
     ├── Contents/
     │   ├── Info.plist
     │   ├── MacOS/
@@ -58,10 +58,10 @@ VSCode-darwin-arm64/
    }
    ```
 
-2. **RiteMark branding:** `branding/product.json`
+2. **Ritemark branding:** `branding/product.json`
    ```json
    {
-     "nameLong": "RiteMark Native",
+     "nameLong": "Ritemark Native",
      "quality": "stable"
    }
    ```
@@ -70,12 +70,12 @@ VSCode-darwin-arm64/
 
 ### Proposed Version Format for DMG
 
-**Pattern:** `RiteMark-Native-{vscode-version}-{quality}-{arch}.dmg`
+**Pattern:** `Ritemark-Native-{vscode-version}-{quality}-{arch}.dmg`
 
 **Examples:**
-- `RiteMark-Native-1.94.0-stable-darwin-arm64.dmg`
-- `RiteMark-Native-1.94.0-beta-darwin-arm64.dmg`
-- `RiteMark-Native-1.94.0-dev-darwin-arm64.dmg`
+- `Ritemark-Native-1.94.0-stable-darwin-arm64.dmg`
+- `Ritemark-Native-1.94.0-beta-darwin-arm64.dmg`
+- `Ritemark-Native-1.94.0-dev-darwin-arm64.dmg`
 
 **Version extraction script:**
 ```bash
@@ -86,7 +86,7 @@ VERSION=$(node -p "require('./vscode/package.json').version")
 QUALITY=$(node -p "require('./branding/product.json').quality")
 
 # Build DMG filename
-DMG_NAME="RiteMark-Native-${VERSION}-${QUALITY}-darwin-arm64.dmg"
+DMG_NAME="Ritemark-Native-${VERSION}-${QUALITY}-darwin-arm64.dmg"
 ```
 
 ---
@@ -131,7 +131,7 @@ CREATE_DMG=true ./scripts/build-prod.sh
 ## DMG Creation Script Requirements
 
 ### Inputs
-1. `.app` bundle at `VSCode-darwin-arm64/RiteMark Native.app`
+1. `.app` bundle at `VSCode-darwin-arm64/Ritemark Native.app`
 2. Version from `vscode/package.json`
 3. Quality from `branding/product.json`
 4. Optional: Custom DMG background image
@@ -144,8 +144,8 @@ CREATE_DMG=true ./scripts/build-prod.sh
 - [ ] No existing DMG with same name (or prompt to overwrite)
 
 ### Outputs
-1. DMG file in project root: `RiteMark-Native-{version}-{arch}.dmg`
-2. SHA256 checksum file: `RiteMark-Native-{version}-{arch}.dmg.sha256`
+1. DMG file in project root: `Ritemark-Native-{version}-{arch}.dmg`
+2. SHA256 checksum file: `Ritemark-Native-{version}-{arch}.dmg.sha256`
 3. Build log (optional)
 
 ### Error Handling
@@ -205,7 +205,7 @@ rm -rf tmp.iconset
 ### create-dmg Flags
 
 **Essential:**
-- `--volname "RiteMark Native"` - Volume name when mounted
+- `--volname "Ritemark Native"` - Volume name when mounted
 - `--app-drop-link X Y` - Creates Applications folder symlink
 
 **Nice-to-have:**
@@ -224,16 +224,16 @@ rm -rf tmp.iconset
 
 ```bash
 create-dmg \
-  --volname "RiteMark Native" \
+  --volname "Ritemark Native" \
   --volicon "branding/icons/icon.icns" \
   --window-pos 200 120 \
   --window-size 800 400 \
   --icon-size 100 \
-  --icon "RiteMark Native.app" 200 190 \
-  --hide-extension "RiteMark Native.app" \
+  --icon "Ritemark Native.app" 200 190 \
+  --hide-extension "Ritemark Native.app" \
   --app-drop-link 600 185 \
   --no-internet-enable \
-  "RiteMark-Native-${VERSION}-darwin-arm64.dmg" \
+  "Ritemark-Native-${VERSION}-darwin-arm64.dmg" \
   "VSCode-darwin-arm64/"
 ```
 
@@ -255,7 +255,7 @@ create-dmg \
 
 ### DMG Functionality Tests
 - [ ] Double-click DMG → mounts successfully
-- [ ] Volume name is "RiteMark Native"
+- [ ] Volume name is "Ritemark Native"
 - [ ] Window shows app and Applications shortcut
 - [ ] Drag app to Applications → copies successfully
 - [ ] Eject DMG → clean unmount
@@ -315,8 +315,8 @@ fi
 
 ```
 ritemark-native/
-├── RiteMark-Native-1.94.0-darwin-arm64.dmg
-├── RiteMark-Native-1.94.0-darwin-arm64.dmg.sha256
+├── Ritemark-Native-1.94.0-darwin-arm64.dmg
+├── Ritemark-Native-1.94.0-darwin-arm64.dmg.sha256
 └── VSCode-darwin-arm64/ (existing)
 ```
 
@@ -336,13 +336,13 @@ ritemark-native/
 
 **GitHub Release Notes Template:**
 ```markdown
-## RiteMark Native v1.94.0-beta.1
+## Ritemark Native v1.94.0-beta.1
 
 ### Installation
 
-1. Download `RiteMark-Native-1.94.0-darwin-arm64.dmg`
+1. Download `Ritemark-Native-1.94.0-darwin-arm64.dmg`
 2. Double-click to mount
-3. Drag "RiteMark Native" to Applications folder
+3. Drag "Ritemark Native" to Applications folder
 4. Right-click app → Open (first time only)
 5. Accept Gatekeeper warning
 
@@ -350,7 +350,7 @@ ritemark-native/
 
 SHA256: (from .sha256 file)
 \`\`\`bash
-shasum -a 256 RiteMark-Native-1.94.0-darwin-arm64.dmg
+shasum -a 256 Ritemark-Native-1.94.0-darwin-arm64.dmg
 \`\`\`
 
 ### Known Limitations

@@ -1,10 +1,10 @@
-# RiteMark Menu Customization
+# Ritemark Menu Customization
 
-This document describes menu items removed from RiteMark Native to create a focused markdown editing experience.
+This document describes menu items removed from Ritemark Native to create a focused markdown editing experience.
 
 ## Overview
 
-RiteMark Native removes code-focused menu items that aren't relevant for markdown editing. Changes are implemented via patch files in `patches/vscode/`.
+Ritemark Native removes code-focused menu items that aren't relevant for markdown editing. Changes are implemented via patch files in `patches/vscode/`.
 
 ## Removed Items
 
@@ -64,7 +64,7 @@ All items kept.
 To restore a removed item:
 
 1. Find the relevant patch in `patches/vscode/`
-2. Locate the commented-out code (marked with `// RiteMark:`)
+2. Locate the commented-out code (marked with `// Ritemark:`)
 3. Uncomment the relevant section
 4. Regenerate the patch:
    ```bash
@@ -76,7 +76,7 @@ To restore a removed item:
 
 ## Adding New Menu Items
 
-To add a RiteMark-specific menu item:
+To add a Ritemark-specific menu item:
 
 1. Create a new patch file
 2. Use `MenuRegistry.appendMenuItem()` with the appropriate `MenuId`

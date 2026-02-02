@@ -25,8 +25,8 @@ Features listed here should appear in the features grid.
 - **Icon:** Table2 (from lucide-react)
 - **Title ET:** Andmefailide eelvaade
 - **Title EN:** Data File Preview
-- **Description ET:** Vaata CSV ja Excel faile otse RiteMarkis. Värskenda faile automaatselt, kui need muutuvad. Sinu AI agent saab CSV failidega otse töötada.
-- **Description EN:** Preview CSV and Excel files right inside RiteMark. Refresh files automatically when they change. Your AI agent can work with CSV files directly.
+- **Description ET:** Vaata CSV ja Excel faile otse Ritemarkis. Värskenda faile automaatselt, kui need muutuvad. Sinu AI agent saab CSV failidega otse töötada.
+- **Description EN:** Preview CSV and Excel files right inside Ritemark. Refresh files automatically when they change. Your AI agent can work with CSV files directly.
 - **Screenshot:** none (consider adding spreadsheet-refresh.png)
 
 ### WYSIWYG Markdown Editor
@@ -57,8 +57,8 @@ Features listed here should appear in the features grid.
 - **Icon:** Image (from lucide-react)
 - **Title ET:** Pildihaldus
 - **Title EN:** Image Handling
-- **Description ET:** Lisa pilte /image kaasuga. Muuda suurust lohistades - RiteMark muudab tegelikku faili, mitte ainult vaadet.
-- **Description EN:** Insert images with /image command. Resize by dragging - RiteMark resizes the actual file, not just the display.
+- **Description ET:** Lisa pilte /image kaasuga. Muuda suurust lohistades - Ritemark muudab tegelikku faili, mitte ainult vaadet.
+- **Description EN:** Insert images with /image command. Resize by dragging - Ritemark resizes the actual file, not just the display.
 - **Screenshot:** none (needs screenshot showing image with resize handles)
 - **Badge:** NEW
 

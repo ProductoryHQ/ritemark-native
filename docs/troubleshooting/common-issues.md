@@ -8,9 +8,9 @@
 
 ### "Cannot be opened because Apple cannot check it"
 
-RiteMark isn't notarized with Apple yet. To open:
+Ritemark isn't notarized with Apple yet. To open:
 
-1. **Right-click** on RiteMark in Applications
+1. **Right-click** on Ritemark in Applications
 2. Select **Open**
 3. Click **Open** in the dialog
 
@@ -32,12 +32,12 @@ You only need to do this once.
 The editor webview didn't load. Try:
 
 1. **Reload Window**: Cmd+Shift+P → "Reload Window"
-2. **Restart RiteMark**: Quit and reopen
+2. **Restart Ritemark**: Quit and reopen
 3. **Check file type**: Only `.md` files open in WYSIWYG mode
 
 ### Changes not saving
 
-RiteMark auto-saves after 1 second. If changes aren't saving:
+Ritemark auto-saves after 1 second. If changes aren't saving:
 
 1. Check file permissions (can you write to that folder?)
 2. Look for error messages in bottom status bar
@@ -143,7 +143,7 @@ For very large data, use a dedicated spreadsheet app.
 ### High memory usage
 
 1. Close unused files
-2. Restart RiteMark
+2. Restart Ritemark
 3. This is a known issue being improved
 
 ---
@@ -160,8 +160,8 @@ For very large data, use a dedicated spreadsheet app.
 
 1. Download new DMG from GitHub
 2. Open DMG
-3. Drag RiteMark to Applications (replace existing)
-4. Launch RiteMark
+3. Drag Ritemark to Applications (replace existing)
+4. Launch Ritemark
 
 ---
 
@@ -190,4 +190,4 @@ If you've found a bug:
 | AI not working | Check internet + API key |
 | Can't open app | Right-click → Open |
 | File won't save | Check folder permissions |
-| Slow performance | Restart RiteMark |
+| Slow performance | Restart Ritemark |
