@@ -1,12 +1,10 @@
 name: Build Windows (x64)
 
 on:
-  workflow_dispatch:
-  workflow_call:
+  workflow_dispatch:  # Manual trigger (backup)
   push:
-    branches: [main]
-    paths:
-      - '.github/workflows/build-windows.yml'
+    tags:
+      - 'v*'          # Triggers ONLY on version tags: v1.0.0, v1.2.0, etc.
 
 jobs:
   build:
