@@ -63,7 +63,7 @@ git clean -xfd && npm install
 
 ### Platform-Specific
 
-**macOS (our target: darwin-arm64)**
+**macOS (targets: darwin-arm64 AND darwin-x64)**
 ```bash
 xcode-select --install  # Command Line Tools
 ```
@@ -75,6 +75,116 @@ xcode-select --install  # Command Line Tools
 ```bash
 apt install build-essential g++ libx11-dev libxkbfile-dev libsecret-1-dev
 ```
+
+## Multi-Platform Production Builds
+
+VS Code supports building for multiple platforms from a single host.
+
+### Supported Build Targets
+
+| Platform | Architecture | Gulp Task | Output Directory |
+|----------|--------------|-----------|------------------|
+| macOS Apple Silicon | darwin-arm64 | `vscode-darwin-arm64-min` | `VSCode-darwin-arm64/` |
+| macOS Intel | darwin-x64 | `vscode-darwin-x64-min` | `VSCode-darwin-x64/` |
+| Windows | win32-x64 | `vscode-win32-x64-min` | `VSCode-win32-x64/` |
+| Linux | linux-x64 | `vscode-linux-x64-min` | `VSCode-linux-x64/` |
+
+### Cross-Compilation Matrix
+
+| Build Target | From macOS arm64 | From macOS x64 | From Windows | From Linux |
+|--------------|------------------|----------------|--------------|------------|
+| darwin-arm64 | ✅ Native | ✅ Works | ❌ No | ❌ No |
+| darwin-x64 | ✅ Cross | ✅ Native | ❌ No | ❌ No |
+| win32-x64 | ✅ Cross | ✅ Cross | ✅ Native | ✅ Cross |
+| linux-x64 | ✅ Cross | ✅ Cross | ✅ Cross | ✅ Native |
+
+**Key limitation:** macOS builds REQUIRE a macOS host (Electron framework requirement).
+
+### Build Commands (Ritemark Native)
+
+```bash
+# Apple Silicon (default)
+./scripts/build-prod.sh
+
+# Intel Mac
+./scripts/build-prod.sh darwin-x64
+
+# Windows (via GitHub Actions, or locally with Wine)
+./scripts/build-windows.sh
+```
+
+### Gulp Commands (Raw VS Code)
+
+```bash
+cd vscode
+
+# Development builds (fast, with sourcemaps)
+npm run gulp vscode-darwin-arm64
+npm run gulp vscode-darwin-x64
+npm run gulp vscode-win32-x64
+
+# Production builds (minified, no sourcemaps)
+npm run gulp vscode-darwin-arm64-min
+npm run gulp vscode-darwin-x64-min
+npm run gulp vscode-win32-x64-min
+```
+
+### Build Output Structure
+
+```
+VSCode-darwin-arm64/
+└── Ritemark.app/
+    └── Contents/
+        ├── Info.plist
+        ├── MacOS/Electron
+        └── Resources/
+            └── app/
+                ├── product.json
+                └── extensions/
+                    └── ritemark/
+
+VSCode-darwin-x64/
+└── Ritemark.app/
+    └── [same structure, x64 binaries]
+
+VSCode-win32-x64/
+├── Ritemark.exe
+└── resources/
+    └── app/
+        ├── product.json
+        └── extensions/
+            └── ritemark/
+```
+
+### Post-Build Steps (macOS)
+
+After gulp build completes, ALWAYS:
+
+1. **Copy extension** to app bundle:
+   ```bash
+   cp -R extensions/ritemark VSCode-darwin-*/Ritemark.app/Contents/Resources/app/extensions/
+   ```
+
+2. **Update Info.plist version** (Finder displays this):
+   ```bash
+   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString X.Y.Z" Ritemark.app/Contents/Info.plist
+   ```
+
+3. **Code sign** (required for distribution):
+   ```bash
+   codesign --deep --force --verify --sign "Developer ID Application: ..." Ritemark.app
+   ```
+
+4. **Notarize** (required for Gatekeeper):
+   ```bash
+   ./scripts/notarize-app.sh
+   ```
+
+### Reference
+
+- Analysis document: `docs/analysis/2026-02-03-multi-platform-build.md`
+- Build script: `scripts/build-prod.sh`
+- DMG creation: `scripts/create-dmg.sh`
 
 ### Important Notes
 - Clone to path WITHOUT spaces (node-gyp issues)

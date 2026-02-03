@@ -4,6 +4,14 @@
 # =============================================================================
 # Single command to build a working production app.
 # Validates environment, builds VS Code, copies extension, validates output.
+#
+# Usage:
+#   ./scripts/build-prod.sh              # Build for Apple Silicon (default)
+#   ./scripts/build-prod.sh darwin-x64   # Build for Intel Mac
+#
+# Supported targets:
+#   darwin-arm64 (default) - Apple Silicon Mac (M1/M2/M3)
+#   darwin-x64             - Intel Mac
 # =============================================================================
 
 set -e
@@ -13,6 +21,25 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Parse target argument
+TARGET="${1:-darwin-arm64}"
+
+# Validate target
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    # Valid targets
+    ;;
+  *)
+    echo -e "${RED}ERROR: Invalid target '$TARGET'${NC}"
+    echo "Supported targets: darwin-arm64 (default), darwin-x64"
+    echo ""
+    echo "Usage:"
+    echo "  ./scripts/build-prod.sh              # Apple Silicon"
+    echo "  ./scripts/build-prod.sh darwin-x64   # Intel Mac"
+    exit 1
+    ;;
+esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -25,6 +52,7 @@ echo -e "${BLUE}RiteMark Native Production Build${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 echo "Project directory: $PROJECT_DIR"
+echo "Target platform:   $TARGET"
 echo ""
 
 # =============================================================================
@@ -65,7 +93,8 @@ echo ""
 cd vscode
 
 # Use npm (VS Code switched from yarn)
-npm run gulp vscode-darwin-arm64
+# Build for specified target
+npm run gulp vscode-$TARGET
 
 cd "$PROJECT_DIR"
 
@@ -98,7 +127,7 @@ echo ""
 echo -e "${BLUE}Step 3/7: Copying RiteMark Extension${NC}"
 echo "----------------------------------------"
 
-APP_PATH="VSCode-darwin-arm64/Ritemark.app"
+APP_PATH="VSCode-$TARGET/Ritemark.app"
 EXT_DEST="$APP_PATH/Contents/Resources/app/extensions/ritemark"
 
 if [[ ! -d "$APP_PATH" ]]; then

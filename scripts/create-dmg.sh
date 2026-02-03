@@ -2,11 +2,17 @@
 #
 # create-dmg.sh - Create macOS DMG installer for RiteMark Native
 #
-# Usage: ./scripts/create-dmg.sh
+# Usage:
+#   ./scripts/create-dmg.sh       # Create DMG for Apple Silicon (default)
+#   ./scripts/create-dmg.sh x64   # Create DMG for Intel Mac
+#
+# Supported architectures:
+#   arm64 (default) - Apple Silicon Mac (M1/M2/M3)
+#   x64             - Intel Mac
 #
 # Requirements:
 #   - brew install create-dmg
-#   - Built app at VSCode-darwin-arm64/RiteMark.app
+#   - Built app at VSCode-darwin-{arch}/RiteMark.app
 #
 
 set -e
@@ -17,16 +23,36 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Parse architecture argument
+ARCH="${1:-arm64}"
+
+# Validate architecture
+case "$ARCH" in
+  arm64|x64)
+    # Valid architectures
+    ;;
+  *)
+    echo -e "${RED}ERROR: Invalid architecture '$ARCH'${NC}"
+    echo "Supported architectures: arm64 (default), x64"
+    echo ""
+    echo "Usage:"
+    echo "  ./scripts/create-dmg.sh       # Apple Silicon"
+    echo "  ./scripts/create-dmg.sh x64   # Intel Mac"
+    exit 1
+    ;;
+esac
+
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_PATH="$PROJECT_ROOT/VSCode-darwin-arm64/RiteMark.app"
+APP_PATH="$PROJECT_ROOT/VSCode-darwin-$ARCH/RiteMark.app"
 ICON_PATH="$PROJECT_ROOT/branding/icons/icon.icns"
 OUTPUT_DIR="$PROJECT_ROOT/dist"
 
 echo "========================================"
 echo "RiteMark Native - DMG Creator"
 echo "========================================"
+echo "Architecture: darwin-$ARCH"
 echo
 
 # Pre-flight checks
@@ -43,7 +69,7 @@ echo "  ✓ create-dmg installed"
 # Check app exists
 if [ ! -d "$APP_PATH" ]; then
     echo -e "${RED}ERROR: App not found at $APP_PATH${NC}"
-    echo "Build first with: cd vscode && yarn gulp vscode-darwin-arm64"
+    echo "Build first with: ./scripts/build-prod.sh darwin-$ARCH"
     exit 1
 fi
 echo "  ✓ App bundle found"
@@ -71,7 +97,7 @@ echo "[3/5] Preparing output directory..."
 mkdir -p "$OUTPUT_DIR"
 
 # DMG filename
-DMG_NAME="RiteMark-${VERSION}-darwin-arm64.dmg"
+DMG_NAME="RiteMark-${VERSION}-darwin-$ARCH.dmg"
 DMG_PATH="$OUTPUT_DIR/$DMG_NAME"
 
 # Remove existing DMG if present
