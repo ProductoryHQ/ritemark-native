@@ -82,6 +82,21 @@ export interface ExecutionProgress {
 }
 
 /**
+ * Claude Code specific progress updates
+ */
+export interface ClaudeCodeProgress {
+  type: 'init' | 'tool_use' | 'thinking' | 'text' | 'done';
+  message: string;
+  tool?: string;
+  file?: string;
+}
+
+/**
+ * Progress callback function type
+ */
+export type ProgressCallback = (progress: ClaudeCodeProgress) => void;
+
+/**
  * Node execution function signature
  */
 export type NodeExecutor = (

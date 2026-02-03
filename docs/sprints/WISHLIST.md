@@ -6,16 +6,15 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Text Editor
 
+- [ ] /command list is missing "Quote" - I want to add quotes ![](./images/image-1770143061718.png)
+- [ ] Improve "Add link" dialog to smart-search from files inside the repository when user starts typing with "@"
 - [ ] Add Youtube (any other streaming) videos from / command palette
 - [ ] PDF preview (read-only viewer)
 - [ ] Word (.docx) preview (read-only viewer)
-- [ ] Improve "Add link" dialog to smart-search from files inside the repository when user starts typing with "@"
 
 ## Data Editor
 
-CSV editing, Excel/spreadsheet preview
-
-- [ ] Rebrand current Excel viewer as "Data Editor"
+- [ ] Rebrand current Excel viewer/CSV editor as "Data Editor"
 - [ ] CSV full editing improvements (sort, filter, column operations)
 - [ ] CSV cell in "editable" mode must be multi-line and extend to "full-height"
 - [ ] CSV open in Excel (automatically export as UTF-8)
@@ -34,6 +33,16 @@ Redesign Welcome screen for total newbies
 - [ ] Visual tutorials / article links
 - [ ] Make it obvious what to do first
 
+### Built-in Support Module
+
+In-app help system accessible from activity bar:
+
+- [ ] **"?" icon** at bottom of activity bar (like Settings gear position)
+- [ ] **Support sidebar** with collapsible topic sections
+- [ ] **Built-in .md articles** bundled with app (offline, no browser needed)
+- [ ] Search functionality for finding help
+- [ ] Article categories: Getting Started, Writing, AI Features, Troubleshooting
+
 ## Dictate
 
 - [ ] When launched first time easy to digest checklist whether the dependencies are installed in computer (first-launch wizard)
@@ -46,7 +55,7 @@ Redesign Welcome screen for total newbies
 
 ## AI Assistant
 
-- [ ] Advanced Claude Code harness support - \[ \] Sub-agents - \[ \] Skills
+- [ ] Advanced Claude Code harness support
 - [ ] Memories
 - [ ] Customization (CLAUDE.md, Agents.md support)
 - [ ] AI image generation via command palette - \[ \] Opens dialog to configure Google API key - \[ \] Uses Gemini API to generate images
@@ -90,6 +99,14 @@ Consolidate UI components using shadcn/ui for consistency.
 ## Integrations
 
 - [ ] Sync to cloud (Google Drive, SharePoint)
+
+## Developer Experience
+
+- [ ] **Claude Code auto-launch** - Detect and auto-launch Claude Code in terminal on new window -   Setting: `ritemark.claudeCode.autoLaunch` (default: false)      -   Setting: `ritemark.claudeCode.flags` (e.g., `--dangerously-skip-permissions`)      -   One-time prompt before enabling
+
+## Distribution
+
+- [ ] **Homebrew Cask support** - `brew install --cask ritemark` -   See `docs/sprints/sprint-16-auto-update/research/HOMEBREW-CASK-GUIDE.md`
 
 * * *
 

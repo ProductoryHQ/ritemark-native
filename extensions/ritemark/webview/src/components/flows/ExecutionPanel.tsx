@@ -21,6 +21,7 @@ import {
   Zap,
   AlertTriangle,
   FolderOpen,
+  Terminal,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -31,10 +32,12 @@ import { vscode } from '../../lib/vscode';
 interface ExecutionStep {
   nodeId: string;
   label: string;
-  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file';
+  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
   status: 'pending' | 'running' | 'complete' | 'error';
   output?: string;
   error?: string;
+  /** Claude Code progress messages */
+  progress?: Array<{ type: string; message: string; tool?: string }>;
 }
 
 interface ExecutionPanelProps {
@@ -48,6 +51,7 @@ const nodeIcons: Record<string, typeof Sparkles> = {
   'llm-prompt': Sparkles,
   'image-prompt': Image,
   'save-file': Save,
+  'claude-code': Terminal,
 };
 
 // Validate flow can run
@@ -60,9 +64,9 @@ function validateFlow(flow: Flow): string[] {
     errors.push('Flow only has a Trigger node - add more nodes to process');
   }
 
-  // Check if there's at least one processing node (LLM, Image, or Save)
+  // Check if there's at least one processing node (LLM, Image, Claude Code, or Save)
   const hasProcessingNode = flow.nodes.some(
-    (n) => n.type === 'llm-prompt' || n.type === 'image-prompt' || n.type === 'save-file'
+    (n) => n.type === 'llm-prompt' || n.type === 'image-prompt' || n.type === 'save-file' || n.type === 'claude-code'
   );
   if (!hasProcessingNode && flow.nodes.length > 0) {
     errors.push('Flow needs at least one AI or Output node');
@@ -164,6 +168,23 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
             setInputs((prev) => ({ ...prev, [message.inputId]: message.filePath }));
           }
           break;
+
+        case 'flow:claudeCodeProgress':
+          // Claude Code progress update - add to step's progress array
+          setSteps((prev) =>
+            prev.map((step) =>
+              step.nodeId === message.nodeId
+                ? {
+                    ...step,
+                    progress: [
+                      ...(step.progress || []),
+                      message.progress,
+                    ].slice(-10), // Keep last 10 messages
+                  }
+                : step
+            )
+          );
+          break;
       }
     };
 
@@ -182,8 +203,8 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
 
     setPhase('running');
 
-    // Reset steps to pending
-    setSteps((prev) => prev.map((step) => ({ ...step, status: 'pending', output: undefined, error: undefined })));
+    // Reset steps to pending (clear all previous output, errors, and progress)
+    setSteps((prev) => prev.map((step) => ({ ...step, status: 'pending', output: undefined, error: undefined, progress: undefined })));
 
     vscode.postMessage({
       type: 'flow:run',
@@ -364,6 +385,23 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
                         : <ChevronRight className="w-4 h-4 text-[var(--vscode-descriptionForeground)]" />
                     )}
                   </button>
+
+                  {/* Claude Code Live Progress */}
+                  {step.type === 'claude-code' && step.status === 'running' && step.progress && step.progress.length > 0 && (
+                    <div className="ml-10 mr-2 mb-2 p-2 rounded bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {step.progress.map((p, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs">
+                            {p.type === 'init' && <Terminal className="w-3 h-3 mt-0.5 text-[var(--vscode-terminal-ansiBlue)]" />}
+                            {p.type === 'tool_use' && <Zap className="w-3 h-3 mt-0.5 text-[var(--vscode-terminal-ansiYellow)]" />}
+                            {p.type === 'thinking' && <Sparkles className="w-3 h-3 mt-0.5 text-[var(--vscode-terminal-ansiMagenta)]" />}
+                            {p.type === 'done' && <CheckCircle className="w-3 h-3 mt-0.5 text-[var(--vscode-testing-iconPassed)]" />}
+                            <span className="text-[var(--vscode-descriptionForeground)] leading-tight">{p.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Expanded Content */}
                   {isExpanded && hasContent && (

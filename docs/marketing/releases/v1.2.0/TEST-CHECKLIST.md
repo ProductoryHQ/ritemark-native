@@ -60,29 +60,29 @@
 
 **Ritemark Flows**
 
-- [ ] Create new flow (Ctrl+Shift+P → "Ritemark: New Flow")
-- [ ] Add nodes: Text Input, LLM, Output
-- [ ] Connect nodes with edges
-- [ ] Run flow → output appears
-- [ ] Save flow → reopen → state preserved
+- [x] Create new flow (Ctrl+Shift+P → "Ritemark: New Flow")
+- [x] Add nodes: Text Input, LLM, Output
+- [x] Connect nodes with edges
+- [x] Run flow → output appears
+- [x] Save flow → reopen → state preserved
 
 **Settings Page**
 
-- [ ] Open settings (Ctrl+,)
-- [ ] API keys section visible
+- [x] Open settings (Ctrl+,)
+- [x] API keys section visible
 
 ### Core Features (Regression)
 
 **Editor**
 
-- [ ] Open .md file → editor loads
-- [ ] Type text → renders correctly
-- [ ] Formatting works
-- [ ] Save file (Ctrl+S)
+- [x] Open .md file → editor loads
+- [x] Type text → renders correctly
+- [x] Formatting works
+- [x] Save file (Ctrl+S)
 
 **Dictation**
 
-- [ ] Dictation works (if microphone available)
+- [x] Dictation works (if microphone available)
 
 ### Installation
 

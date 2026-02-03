@@ -16,6 +16,7 @@ import type { Flow, FlowNode, ExecutionContext } from './types';
 import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
+import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
 
 interface TestExpectation {
   type?: 'string' | 'object' | 'number';
@@ -310,6 +311,9 @@ export class FlowTestRunner {
       case 'save-file':
         return await executeSaveFileNode(node, context);
 
+      case 'claude-code':
+        return await executeClaudeCodeNode(node, context);
+
       default:
         throw new Error(`Unknown node type: ${node.type}`);
     }
@@ -336,6 +340,12 @@ export class FlowTestRunner {
         return {
           path: '/mock/output.md',
           success: true,
+        };
+
+      case 'claude-code':
+        return {
+          text: 'Mock Claude Code response for testing purposes.',
+          files: ['/mock/generated-file.md'],
         };
 
       default:

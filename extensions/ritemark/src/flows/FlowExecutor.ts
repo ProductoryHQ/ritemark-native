@@ -83,6 +83,12 @@ async function executeNode(
   context: ExecutionContext,
   abortSignal?: AbortSignal
 ): Promise<unknown> {
+  console.log('[FlowExecutor] executeNode called with:', {
+    nodeId: node.id,
+    nodeType: node.type,
+    nodeTypeTypeof: typeof node.type,
+    nodeKeys: Object.keys(node),
+  });
   switch (node.type) {
     case 'trigger':
       // Trigger node provides inputs to the flow
@@ -101,6 +107,7 @@ async function executeNode(
       return await executeClaudeCodeNode(node, context, abortSignal);
 
     default:
+      console.error('[FlowExecutor] Unknown node type! Full node:', JSON.stringify(node, null, 2));
       throw new Error(`Unknown node type: ${(node as FlowNode).type}`);
   }
 }
