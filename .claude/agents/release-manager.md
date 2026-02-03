@@ -38,6 +38,31 @@ Ritemark supports TWO release types:
 
 ---
 
+## Supported Platforms
+
+Ritemark Native supports THREE platforms:
+
+| Platform | Architecture | Build Target | Installer |
+|----------|--------------|--------------|-----------|
+| **macOS Apple Silicon** | darwin-arm64 | `vscode-darwin-arm64-min` | DMG |
+| **macOS Intel** | darwin-x64 | `vscode-darwin-x64-min` | DMG |
+| **Windows** | win32-x64 | `vscode-win32-x64-min` | Inno Setup .exe |
+
+### Build Matrix
+
+| Build Target | Build Host | Works? |
+|--------------|------------|--------|
+| darwin-arm64 | macOS arm64 | ✅ Native |
+| darwin-arm64 | macOS x64 | ✅ Works |
+| darwin-x64 | macOS arm64 | ✅ Cross-compile |
+| darwin-x64 | macOS x64 | ✅ Native |
+| win32-x64 | macOS | ✅ Cross-compile via GH Actions |
+| win32-x64 | Windows | ✅ Native |
+
+**Note:** macOS builds CANNOT be done from Windows (Electron requirement).
+
+---
+
 ## Cross-Platform Release Workflow (MANDATORY)
 
 **This is the ONLY valid release process. Follow it EXACTLY.**
@@ -51,8 +76,8 @@ uname -s  # Darwin = macOS, MINGW/MSYS/CYGWIN = Windows
 ```
 
 Your role changes based on platform:
-- **macOS**: Build, notarize, create DMG, trigger GH Actions
-- **Windows**: Download artifact, run Inno Setup, create GitHub Release
+- **macOS**: Build ALL macOS variants (arm64 + x64), notarize, create DMGs, trigger GH Actions
+- **Windows**: Download artifact, run Inno Setup, create GitHub Release with ALL files
 
 ### The Complete Flow
 
@@ -69,13 +94,14 @@ Your role changes based on platform:
 │    ─────────────────────────────────────────────────────    │
 │    ⚡ TAG PUSH TRIGGERS GITHUB ACTIONS (Windows build)      │
 │    ─────────────────────────────────────────────────────    │
-│ 6. Agent: Run ./scripts/build-prod.sh (macOS build)         │
-│ 7. Agent: Notarize & staple                                 │
-│ 8. Agent: Create DMG → /dist                                │
-│ 9. Agent: Gate 1 checks (macOS)                             │
-│ 10. Agent: Generate TEST-CHECKLIST.md                       │
-│ 11. Jarmo: Test macOS DMG (using checklist)                 │
-│ 12. Jarmo: "macOS approved"                                 │
+│ 6. Agent: Run ./scripts/build-prod.sh (Apple Silicon)       │
+│ 7. Agent: Run ./scripts/build-prod.sh darwin-x64 (Intel)    │
+│ 8. Agent: Notarize & staple BOTH macOS builds               │
+│ 9. Agent: Create DMGs for BOTH architectures → /dist        │
+│ 10. Agent: Gate 1 checks (BOTH macOS variants)              │
+│ 11. Agent: Generate TEST-CHECKLIST.md                       │
+│ 12. Jarmo: Test macOS DMGs (using checklist)                │
+│ 13. Jarmo: "macOS approved"                                 │
 └─────────────────────────────────────────────────────────────┘
         │
         │ (meanwhile, GitHub Actions runs ~25 min)
@@ -94,16 +120,17 @@ Your role changes based on platform:
 ┌─────────────────────────────────────────────────────────────┐
 │ PHASE 2: Windows (Jarmo's Windows machine)                  │
 ├─────────────────────────────────────────────────────────────┤
-│ 12. Jarmo: Start release-manager agent                      │
-│ 13. Agent: gh run download --name ritemark-windows-x64      │
-│ 14. Jarmo: Test Windows build                               │
-│ 15. Jarmo: "Windows approved"                               │
-│ 16. Agent: Run Inno Setup → create installer                │
-│ 17. Agent: Copy installer to /dist                          │
-│ 18. Agent: Gate 1 checks (Windows)                          │
-│ 19. Agent: gh release create vX.Y.Z with BOTH files:        │
-│     - dist/Ritemark.dmg (from macOS)                        │
-│     - dist/Ritemark-Setup.exe (from Windows)                │
+│ 14. Jarmo: Start release-manager agent                      │
+│ 15. Agent: gh run download --name ritemark-windows-x64      │
+│ 16. Jarmo: Test Windows build                               │
+│ 17. Jarmo: "Windows approved"                               │
+│ 18. Agent: Run Inno Setup → create installer                │
+│ 19. Agent: Copy installer to /dist                          │
+│ 20. Agent: Gate 1 checks (Windows)                          │
+│ 21. Agent: gh release create vX.Y.Z with ALL files:         │
+│     - dist/Ritemark-arm64.dmg (macOS Apple Silicon)         │
+│     - dist/Ritemark-x64.dmg (macOS Intel)                   │
+│     - dist/Ritemark-Setup.exe (Windows)                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -113,25 +140,28 @@ Your role changes based on platform:
 |------|-----|------|
 | Version bump | Agent | Edit product.json, package.json |
 | Tag creation | Agent | `git tag vX.Y.Z && git push origin vX.Y.Z` |
-| macOS build | Agent | `./scripts/build-prod.sh` |
-| Notarization | Agent | `./scripts/notarize-app.sh` |
+| macOS Apple Silicon build | Agent | `./scripts/build-prod.sh` (default) |
+| macOS Intel build | Agent | `./scripts/build-prod.sh darwin-x64` |
+| Notarization (both) | Agent | `./scripts/notarize-app.sh` for each |
+| DMG creation (both) | Agent | `./scripts/create-dmg.sh` and `./scripts/create-dmg.sh x64` |
 | Test checklist | Agent | Generate `docs/marketing/releases/vX.Y.Z/TEST-CHECKLIST.md` |
-| macOS testing | **Jarmo** | Install & test DMG using checklist |
+| macOS testing | **Jarmo** | Install & test BOTH DMGs using checklist |
 | macOS approval | **Jarmo** | Say "macOS approved" |
 | Windows build | **GH Actions** | Automatic on tag push |
 | Download artifact | Agent | `gh run download` |
 | Windows testing | **Jarmo** | Install & test app |
 | Windows approval | **Jarmo** | Say "Windows approved" |
 | Inno Setup | Agent | Create installer |
-| GitHub Release | Agent | `gh release create` with both files |
+| GitHub Release | Agent | `gh release create` with ALL THREE files |
 
 ### HARD RULES
 
-1. **NEVER create GitHub Release from macOS** - Windows agent does this with BOTH files
+1. **NEVER create GitHub Release from macOS** - Windows agent does this with ALL files
 2. **NEVER skip the tag** - tag push triggers Windows build
-3. **NEVER proceed without BOTH approvals** - macOS AND Windows must be tested
+3. **NEVER proceed without ALL approvals** - BOTH macOS variants AND Windows must be tested
 4. **ALWAYS wait for GH Actions** - check status before Windows phase
 5. **ALWAYS generate TEST-CHECKLIST.md** before Gate 2 testing
+6. **ALWAYS build BOTH macOS architectures** - arm64 AND x64 for full platform coverage
 
 ---
 
@@ -178,7 +208,7 @@ The checklist MUST include:
 
 ---
 
-## macOS (darwin-arm64)
+## macOS Apple Silicon (darwin-arm64)
 
 ### New Features
 - [ ] [Feature 1 specific tests]
@@ -195,6 +225,24 @@ The checklist MUST include:
 
 ---
 
+## macOS Intel (darwin-x64)
+
+### New Features
+- [ ] [Feature 1 specific tests]
+- [ ] [Feature 2 specific tests]
+
+### Core Features (Regression)
+- [ ] Open .md file → editor loads
+- [ ] Formatting works
+- [ ] Save file works
+
+### Installation
+- [ ] DMG opens without Gatekeeper warning
+- [ ] App runs from /Applications
+- [ ] Rosetta NOT required (native Intel binary)
+
+---
+
 ## Windows (x64)
 
 [Similar structure with Ctrl shortcuts]
@@ -205,7 +253,8 @@ The checklist MUST include:
 
 | Platform | Tester | Date | Status |
 |----------|--------|------|--------|
-| macOS | | | |
+| macOS Apple Silicon | | | |
+| macOS Intel | | | |
 | Windows | | | |
 ```
 
@@ -424,43 +473,77 @@ VERDICT: [READY FOR RELEASE / NOT READY - FIX REQUIRED]
 
 ---
 
-## Full App Release (DMG)
+## Full App Release (DMG) - Multi-Platform macOS
 
-### Gate 1: Technical Checks
+### Build Commands by Architecture
 
-| Check | Command | Success |
-| --- | --- | --- |
-| Build exists | `ls "VSCode-darwin-arm64/Ritemark.app"` | Exists |
-| Code signed | `codesign --verify --deep --strict "VSCode-darwin-arm64/Ritemark.app"` | Exit 0 |
-| Notarized | Check with notarytool | Status = "Accepted" |
-| Stapled | `xcrun stapler validate "VSCode-darwin-arm64/Ritemark.app"` | "worked" |
-| DMG created | `ls Ritemark-*.dmg` | Exists |
-| Version correct | Check product.json | Expected version |
+| Architecture | Build Command | Output Directory |
+|--------------|---------------|------------------|
+| Apple Silicon | `./scripts/build-prod.sh` | `VSCode-darwin-arm64/` |
+| Intel | `./scripts/build-prod.sh darwin-x64` | `VSCode-darwin-x64/` |
 
-### Workflow
+### DMG Commands by Architecture
 
-1. Verify Gate 1 checks
-2. If notarization needed: `./scripts/notarize-app.sh`
-3. After "Accepted": `xcrun stapler staple "VSCode-darwin-arm64/Ritemark.app"`
-4. Create DMG: `./scripts/create-dmg.sh`
-5. Declare Gate 1 PASS
-6. Wait for Jarmo to test and confirm (Gate 2)
-7. Create stable DMG filename: `cp dist/Ritemark-X.Y.Z-darwin-arm64.dmg dist/Ritemark.dmg`
-8. Upload to GitHub with **stable filename only** (no versioned filename):
+| Architecture | DMG Command | Output File |
+|--------------|-------------|-------------|
+| Apple Silicon | `./scripts/create-dmg.sh` | `dist/Ritemark-X.Y.Z-darwin-arm64.dmg` |
+| Intel | `./scripts/create-dmg.sh x64` | `dist/Ritemark-X.Y.Z-darwin-x64.dmg` |
+
+### Gate 1: Technical Checks (BOTH Architectures)
+
+**Run these checks for BOTH darwin-arm64 AND darwin-x64:**
+
+| Check | Command (arm64) | Command (x64) | Success |
+| --- | --- | --- | --- |
+| Build exists | `ls "VSCode-darwin-arm64/Ritemark.app"` | `ls "VSCode-darwin-x64/Ritemark.app"` | Exists |
+| Code signed | `codesign --verify --deep --strict "VSCode-darwin-arm64/Ritemark.app"` | `codesign --verify --deep --strict "VSCode-darwin-x64/Ritemark.app"` | Exit 0 |
+| Notarized | Check with notarytool | Check with notarytool | Status = "Accepted" |
+| Stapled | `xcrun stapler validate "VSCode-darwin-arm64/Ritemark.app"` | `xcrun stapler validate "VSCode-darwin-x64/Ritemark.app"` | "worked" |
+| DMG created | `ls dist/Ritemark-*-darwin-arm64.dmg` | `ls dist/Ritemark-*-darwin-x64.dmg` | Exists |
+| Version correct | Check product.json | Check product.json | Expected version |
+
+### Workflow (Multi-Platform)
+
+1. **Build Apple Silicon:** `./scripts/build-prod.sh`
+2. **Build Intel:** `./scripts/build-prod.sh darwin-x64`
+3. **Notarize Apple Silicon:** `./scripts/notarize-app.sh VSCode-darwin-arm64/Ritemark.app`
+4. **Notarize Intel:** `./scripts/notarize-app.sh VSCode-darwin-x64/Ritemark.app`
+5. **Staple Apple Silicon:** `xcrun stapler staple "VSCode-darwin-arm64/Ritemark.app"`
+6. **Staple Intel:** `xcrun stapler staple "VSCode-darwin-x64/Ritemark.app"`
+7. **Create DMG (arm64):** `./scripts/create-dmg.sh`
+8. **Create DMG (x64):** `./scripts/create-dmg.sh x64`
+9. Verify Gate 1 checks for BOTH architectures
+10. Declare Gate 1 PASS
+11. Wait for Jarmo to test BOTH DMGs and confirm (Gate 2)
+12. Create stable DMG filenames:
+    ```bash
+    cp dist/Ritemark-X.Y.Z-darwin-arm64.dmg dist/Ritemark-arm64.dmg
+    cp dist/Ritemark-X.Y.Z-darwin-x64.dmg dist/Ritemark-x64.dmg
+    ```
+13. Upload to GitHub with stable filenames:
 
 ```bash
+# Final release command (run from Windows after ALL approvals)
 gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
   --title "Ritemark vX.Y.Z" \
   --notes-file docs/releases/vX.Y.Z.md \
-  dist/Ritemark.dmg
+  dist/Ritemark-arm64.dmg \
+  dist/Ritemark-x64.dmg \
+  installer-output/Ritemark-X.Y.Z-win32-x64-setup.exe
 ```
 
 ### GitHub Release Notes Format
 
-**ALWAYS** include a prominent download link at the TOP of release notes:
+**ALWAYS** include prominent download links at the TOP of release notes:
 
 ```markdown
-## [DOWNLOAD RITEMARK](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg)
+## Downloads
+
+| Platform | Download |
+|----------|----------|
+| macOS Apple Silicon (M1/M2/M3) | [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-arm64.dmg) |
+| macOS Intel | [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-x64.dmg) |
+| Windows | [Ritemark-Setup.exe](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-X.Y.Z-win32-x64-setup.exe) |
 
 ---
 
@@ -469,16 +552,13 @@ gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
 
 ### DMG Naming Rules
 
-| Rule | Reason |
-|------|--------|
-| Upload **only** `Ritemark.dmg` | Stable URL for website links |
-| **Never** upload versioned filename | Confuses users with multiple options |
-| Version is in release tag | `v1.0.2` tag identifies the version |
+| File | Platform | Stable URL |
+|------|----------|------------|
+| `Ritemark-arm64.dmg` | Apple Silicon | `.../releases/latest/download/Ritemark-arm64.dmg` |
+| `Ritemark-x64.dmg` | Intel Mac | `.../releases/latest/download/Ritemark-x64.dmg` |
+| `Ritemark-*-setup.exe` | Windows | `.../releases/latest/download/Ritemark-*-setup.exe` |
 
-The stable download URL that **never changes**:
-```
-https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg
-```
+**Never** upload versioned filenames for macOS - confuses users with multiple options.
 
 ---
 
