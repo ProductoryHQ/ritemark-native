@@ -890,6 +890,16 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
 
       <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
         <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+          <strong className="text-[var(--vscode-foreground)]">Tip:</strong>{' '}
+          Reference upstream file outputs using{' '}
+          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Node Label}'}</code>.
+          Example: "Process the file at{' '}
+          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Save File}'}</code>"
+        </div>
+      </div>
+
+      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
+        <div className="text-xs text-[var(--vscode-descriptionForeground)]">
           <strong className="text-[var(--vscode-foreground)]">Note:</strong>{' '}
           Claude Code CLI must be installed and authenticated. Run{' '}
           <code className="px-1 bg-[var(--vscode-editor-background)] rounded">claude</code>{' '}

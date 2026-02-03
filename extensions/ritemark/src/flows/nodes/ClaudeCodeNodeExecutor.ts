@@ -1,15 +1,25 @@
 /**
  * Claude Code Node Executor
  *
- * Executes autonomous coding tasks using Claude Code CLI.
- * Runs claude in headless mode with JSON output.
+ * Executes autonomous coding tasks using Claude Agent SDK.
+ * Runs Claude Code programmatically with full tool access.
  */
 
-import * as child_process from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import type { FlowNode, ExecutionContext } from '../types';
+import type { FlowNode, ExecutionContext, ProgressCallback } from '../types';
+
+// Dynamic import for ES Module SDK (VS Code extensions use CommonJS)
+// Using Function constructor to bypass TypeScript's import() → require() transformation
+let queryFn: ((options: { prompt: string; options: Record<string, unknown> }) => AsyncIterable<unknown>) | null = null;
+
+async function getQuery() {
+  if (!queryFn) {
+    // This trick prevents TypeScript from converting import() to require()
+    const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<typeof import('@anthropic-ai/claude-agent-sdk')>;
+    const sdk = await dynamicImport('@anthropic-ai/claude-agent-sdk');
+    queryFn = sdk.query;
+  }
+  return queryFn;
+}
 
 /**
  * Claude Code Node configuration
@@ -30,42 +40,6 @@ export interface ClaudeCodeResult {
 }
 
 /**
- * Find Claude Code binary in common locations
- */
-function findClaudeCodeBinary(): string | null {
-  const possiblePaths = [
-    '/usr/local/bin/claude',
-    '/opt/homebrew/bin/claude',
-    path.join(os.homedir(), '.npm', 'bin', 'claude'),
-    path.join(os.homedir(), '.local', 'bin', 'claude'),
-  ];
-
-  // Also check PATH
-  const pathEnv = process.env.PATH || '';
-  const pathDirs = pathEnv.split(path.delimiter);
-  for (const dir of pathDirs) {
-    possiblePaths.push(path.join(dir, 'claude'));
-  }
-
-  for (const binPath of possiblePaths) {
-    if (fs.existsSync(binPath)) {
-      return binPath;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Check if Claude Code is authenticated
- * Looks for ~/.claude/ directory
- */
-function checkClaudeCodeAuth(): boolean {
-  const claudeDir = path.join(os.homedir(), '.claude');
-  return fs.existsSync(claudeDir);
-}
-
-/**
  * Interpolate variables in prompt using context
  * Supports {Label} syntax for inputs and node labels
  */
@@ -82,7 +56,8 @@ function interpolateVariables(
 
     // Check input labels first
     if (context.inputLabels?.has(trimmedLabel)) {
-      return context.inputLabels.get(trimmedLabel) || match;
+      const value = context.inputLabels.get(trimmedLabel);
+      return value !== undefined ? String(value) : match;
     }
 
     // Check node labels
@@ -120,152 +95,191 @@ function interpolateVariables(
 }
 
 /**
- * Execute Claude Code node
+ * Execute Claude Code node using Agent SDK
  */
 export async function executeClaudeCodeNode(
   node: FlowNode,
   context: ExecutionContext,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  onProgress?: ProgressCallback
 ): Promise<ClaudeCodeResult> {
+  console.log('[ClaudeCode] Starting execution for node:', node.id);
+
+  // Helper to emit progress
+  const emitProgress = (type: 'init' | 'tool_use' | 'thinking' | 'text' | 'done', message: string, tool?: string, file?: string) => {
+    if (onProgress) {
+      onProgress({ type, message, tool, file });
+    }
+  };
   const data = node.data as unknown as ClaudeCodeNodeData;
 
   // Validate configuration
   if (!data.prompt || data.prompt.trim() === '') {
+    console.error('[ClaudeCode] Missing prompt');
     throw new Error('Claude Code node missing prompt');
-  }
-
-  // Find Claude Code binary
-  const binaryPath = findClaudeCodeBinary();
-  if (!binaryPath) {
-    throw new Error(
-      'Claude Code CLI not found. Install it from https://github.com/anthropics/claude-code'
-    );
-  }
-
-  // Check authentication
-  if (!checkClaudeCodeAuth()) {
-    throw new Error(
-      "Claude Code not authenticated. Run 'claude' in your terminal to set up."
-    );
   }
 
   // Interpolate variables in prompt
   const interpolatedPrompt = interpolateVariables(data.prompt, context);
+  console.log('[ClaudeCode] Interpolated prompt:', interpolatedPrompt.substring(0, 100) + '...');
 
   // Calculate timeout in milliseconds
   const timeoutMinutes = data.timeout || 5;
   const timeoutMs = timeoutMinutes * 60 * 1000;
+  console.log('[ClaudeCode] Timeout set to', timeoutMinutes, 'minutes');
 
-  // Build command arguments
-  const args = ['-p', interpolatedPrompt, '--output-format', 'json'];
+  // Create abort controller for timeout
+  const abortController = new AbortController();
 
-  return new Promise<ClaudeCodeResult>((resolve, reject) => {
-    let resolved = false;
+  // Set up timeout
+  const timeoutId = setTimeout(() => {
+    console.log('[ClaudeCode] Timeout reached, aborting...');
+    abortController.abort();
+  }, timeoutMs);
 
-    // Spawn Claude Code subprocess
-    const claudeProc = child_process.spawn(binaryPath, args, {
-      cwd: context.workspacePath,
-      env: {
-        ...process.env,
+  // Forward external abort signal
+  if (abortSignal) {
+    abortSignal.addEventListener('abort', () => {
+      console.log('[ClaudeCode] External abort signal received');
+      abortController.abort();
+    });
+  }
+
+  try {
+    console.log('[ClaudeCode] Starting SDK query...');
+    console.log('[ClaudeCode] Working directory:', context.workspacePath);
+
+    // Dynamic import for ES Module compatibility
+    const query = await getQuery();
+    const result = query({
+      prompt: interpolatedPrompt,
+      options: {
+        cwd: context.workspacePath,
+        permissionMode: 'bypassPermissions',
+        allowDangerouslySkipPermissions: true,
+        allowedTools: ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'],
+        abortController,
       },
     });
 
-    let stdout = '';
-    let stderr = '';
+    let resultText = '';
+    const filesModified: string[] = [];
 
-    claudeProc.stdout?.on('data', (data: Buffer) => {
-      stdout += data.toString('utf-8');
-    });
-
-    claudeProc.stderr?.on('data', (data: Buffer) => {
-      stderr += data.toString('utf-8');
-    });
-
-    claudeProc.on('error', (error: Error) => {
-      if (resolved) return;
-      resolved = true;
-      reject(new Error(`Claude Code process error: ${error.message}`));
-    });
-
-    claudeProc.on('exit', (code: number | null) => {
-      if (resolved) return;
-      resolved = true;
-
-      // Check if aborted
-      if (abortSignal?.aborted) {
-        resolve({
-          text: '',
-          files: [],
-          error: 'Execution cancelled by user.',
-        });
-        return;
-      }
-
-      if (code === 0) {
-        // Success - parse JSON output
-        try {
-          const jsonOutput = JSON.parse(stdout);
-
-          // Extract result text and files
-          const resultText = jsonOutput.result || jsonOutput.summary || '';
-          const filesModified = jsonOutput.files_modified || [];
-          const filesCreated = jsonOutput.files_created || [];
-          const allFiles = [...filesModified, ...filesCreated];
-
-          resolve({
-            text: resultText,
-            files: allFiles,
-          });
-        } catch (parseError) {
-          // JSON parse failed - return raw output
-          resolve({
-            text: stdout.trim(),
-            files: [],
-            error: `Failed to parse Claude Code output. Raw output: ${stdout}`,
-          });
-        }
-      } else {
-        // Error exit
-        const errorMsg = stderr.trim() || `Claude Code exited with code ${code}`;
-        resolve({
-          text: '',
-          files: [],
-          error: errorMsg,
-        });
-      }
-    });
-
-    // Handle abortion
-    if (abortSignal) {
-      abortSignal.addEventListener('abort', () => {
-        if (!resolved) {
-          resolved = true;
-          claudeProc.kill('SIGTERM');
-          resolve({
-            text: '',
-            files: [],
-            error: 'Execution cancelled by user.',
-          });
-        }
-      });
+    // SDK message types (minimal definitions for our use)
+    interface SDKMessage {
+      type: string;
+      model?: string;
+      message?: { content?: Array<{ type: string; name?: string; text?: string; input?: unknown }> };
+      duration_ms?: number;
+      total_cost_usd?: number;
+      subtype?: string;
+      result?: string;
+      errors?: string[];
     }
 
-    // Timeout handler
-    const timeoutId = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        claudeProc.kill('SIGTERM');
-        resolve({
+    // Iterate through messages
+    for await (const rawMessage of result) {
+      const message = rawMessage as SDKMessage;
+      // Check for abort
+      if (abortController.signal.aborted) {
+        console.log('[ClaudeCode] Aborted during execution');
+        clearTimeout(timeoutId);
+        return {
           text: '',
           files: [],
-          error: `Claude Code execution timed out after ${timeoutMinutes} minutes. Try increasing the timeout or simplifying the task.`,
-        });
+          error: 'Execution cancelled',
+        };
       }
-    }, timeoutMs);
 
-    // Clean up timeout if process exits early
-    claudeProc.on('exit', () => {
-      clearTimeout(timeoutId);
-    });
-  });
+      if (message.type === 'system') {
+        console.log('[ClaudeCode] System init - model:', message.model);
+        emitProgress('init', `Starting Claude Code (${message.model || 'claude'})`);
+      } else if (message.type === 'assistant') {
+        // Track tool usage for file modifications
+        const content = message.message?.content;
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'text' && block.text) {
+              // Show thinking/text snippets
+              const snippet = block.text.substring(0, 100);
+              emitProgress('thinking', snippet.length < block.text.length ? snippet + '...' : snippet);
+            } else if (block.type === 'tool_use') {
+              console.log('[ClaudeCode] Tool use:', block.name);
+              const input = block.input as { file_path?: string; command?: string; pattern?: string };
+
+              // Create descriptive message based on tool
+              let toolMessage = `Using ${block.name}`;
+              if (block.name === 'Write' && input?.file_path) {
+                toolMessage = `Writing file: ${input.file_path.split('/').pop()}`;
+                filesModified.push(input.file_path);
+              } else if (block.name === 'Edit' && input?.file_path) {
+                toolMessage = `Editing file: ${input.file_path.split('/').pop()}`;
+                filesModified.push(input.file_path);
+              } else if (block.name === 'Read' && input?.file_path) {
+                toolMessage = `Reading file: ${input.file_path.split('/').pop()}`;
+              } else if (block.name === 'Bash' && input?.command) {
+                const cmd = input.command.substring(0, 50);
+                toolMessage = `Running: ${cmd}${input.command.length > 50 ? '...' : ''}`;
+              } else if (block.name === 'Glob' && input?.pattern) {
+                toolMessage = `Searching: ${input.pattern}`;
+              } else if (block.name === 'Grep' && input?.pattern) {
+                toolMessage = `Searching for: ${input.pattern}`;
+              }
+
+              emitProgress('tool_use', toolMessage, block.name, input?.file_path);
+            }
+          }
+        }
+      } else if (message.type === 'result') {
+        console.log('[ClaudeCode] Result received');
+        console.log('[ClaudeCode] Duration:', message.duration_ms, 'ms');
+        console.log('[ClaudeCode] Cost: $', message.total_cost_usd?.toFixed(4));
+
+        if (message.subtype === 'success') {
+          resultText = message.result || '';
+          emitProgress('done', `Completed in ${((message.duration_ms || 0) / 1000).toFixed(1)}s`);
+        } else {
+          // Error result
+          const errors = message.errors || [];
+          emitProgress('done', `Failed: ${errors.join('; ') || 'Unknown error'}`);
+          return {
+            text: '',
+            files: [],
+            error: errors.join('; ') || 'Execution failed',
+          };
+        }
+      }
+    }
+
+    clearTimeout(timeoutId);
+
+    console.log('[ClaudeCode] Execution complete');
+    console.log('[ClaudeCode] Files modified:', filesModified);
+
+    return {
+      text: resultText,
+      files: [...new Set(filesModified)], // Deduplicate
+    };
+
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[ClaudeCode] Error:', errorMessage);
+
+    // Check if it was an abort
+    if (abortController.signal.aborted) {
+      return {
+        text: '',
+        files: [],
+        error: 'Execution cancelled or timed out',
+      };
+    }
+
+    return {
+      text: '',
+      files: [],
+      error: errorMessage,
+    };
+  }
 }

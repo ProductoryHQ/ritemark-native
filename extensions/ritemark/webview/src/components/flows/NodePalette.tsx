@@ -2,7 +2,7 @@
  * Node Palette Component
  *
  * Fixed category sidebar for dragging nodes onto the canvas.
- * Categories: Input, AI, Output (following OpenAI's pattern).
+ * Categories: Start, AI, Actions.
  */
 
 import React from 'react';
@@ -58,13 +58,13 @@ const nodeCategories: NodeCategory[] = [
     ],
   },
   {
-    name: 'Output',
+    name: 'Actions',
     nodes: [
       {
         type: 'saveFileNode',
         label: 'Save File',
         icon: <Save size={18} />,
-        description: 'Save output to a file in your workspace',
+        description: 'Save to file and output the path for downstream nodes',
       },
     ],
   },

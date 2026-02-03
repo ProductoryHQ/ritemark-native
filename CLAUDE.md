@@ -39,7 +39,10 @@ ritemark-native/
 └── docs/
     ├── analysis/                # Technical analysis documents
     └── sprints/                 # Sprint documentation
+        └── WISHLIST.md          # Feature wishlist (add ideas here!)
 ```
+
+**WISHLIST location:** `docs/sprints/WISHLIST.md` — All feature ideas go here (linked to sprint planning).
 
 * * *
 
@@ -135,7 +138,7 @@ When doing UI refactoring, use **shadcn/ui** components:
 - Tailwind-based (already in use)
 - Copy-paste pattern (code is ours, not dependency)
 - Radix UI primitives (accessible)
-- See WISHLIST.md for full migration plan
+- See `docs/sprints/WISHLIST.md` for full migration plan
 
 **Invoke `ux-expert` when designing new UI components.**
 

@@ -32,7 +32,7 @@ function SaveFileNodeComponent({ id, data, selected }: SaveFileNodeProps) {
       label={data.label}
       icon={<Save size={16} />}
       selected={selected}
-      showSourceHandle={false}
+      showSourceHandle={true}
       headerColor="var(--vscode-charts-orange)"
       executionStep={executionStep}
     >

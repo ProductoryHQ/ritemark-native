@@ -8,10 +8,11 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import OpenAI from 'openai';
-import type { Flow, FlowNode, ExecutionContext } from './types';
+import type { Flow, FlowNode, ExecutionContext, ClaudeCodeProgress } from './types';
 import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
+import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
 import { getAPIKeyManager } from '../ai/apiKeyManager';
 import {
   OPENAI_LLM_MODELS,
@@ -468,8 +469,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         });
 
         try {
-          // Execute the node
-          const output = await this.executeNode(node, context);
+          // Execute the node (pass webview for Claude Code progress)
+          const output = await this.executeNode(node, context, webview);
           context.outputs.set(nodeId, output);
 
           // Signal step complete
@@ -515,7 +516,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
    */
   private async executeNode(
     node: FlowNode,
-    context: ExecutionContext
+    context: ExecutionContext,
+    webview?: vscode.Webview
   ): Promise<unknown> {
     switch (node.type) {
       case 'trigger':
@@ -530,6 +532,21 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
       case 'save-file':
         return await executeSaveFileNode(node, context);
+
+      case 'claude-code': {
+        // Create progress callback that posts to webview
+        const onProgress = webview
+          ? (progress: ClaudeCodeProgress) => {
+              webview.postMessage({
+                type: 'flow:claudeCodeProgress',
+                nodeId: node.id,
+                progress,
+              });
+            }
+          : undefined;
+
+        return await executeClaudeCodeNode(node, context, undefined, onProgress);
+      }
 
       default:
         throw new Error(`Unknown node type: ${node.type}`);

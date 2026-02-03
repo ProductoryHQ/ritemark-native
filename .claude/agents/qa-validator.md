@@ -173,7 +173,40 @@ FIX:
 4. Delete the old patch, commit the new one
 ```
 
-### 7. Debug Code Check (WARNING)
+### 7. Flow Tests (CRITICAL when flows modified)
+
+**Check:** All flow integration tests pass
+
+```bash
+# Validation command
+cd extensions/ritemark && npm test
+# Must pass all tests including FlowIntegration.test.ts
+```
+
+**When to run:** If any of these are modified:
+- `src/flows/**/*.ts`
+- `.ritemark/flows/*.flow.json`
+- `webview/src/components/flows/**/*`
+
+**For detailed flow testing procedures, see skill:** `.claude/skills/flow-testing/SKILL.md`
+
+**If fails:**
+```
+FAILED: Flow tests
+
+Flow integration tests failed. This means:
+- Flow validation errors
+- Execution order problems
+- Variable interpolation bugs
+- Node chaining issues
+
+FIX:
+1. Run: cd extensions/ritemark && npx tsx src/flows/FlowIntegration.test.ts
+2. Check specific test failures
+3. See .claude/skills/flow-testing/SKILL.md for debugging guide
+```
+
+### 8. Debug Code Check (WARNING)
 
 **Check:** No console.log or debugger statements in production code
 
@@ -192,7 +225,7 @@ Found console.log or debugger statements:
 Remove or mark with "// DEBUG" comment if intentional.
 ```
 
-### 8. Commit Message Format (WARNING)
+### 9. Commit Message Format (WARNING)
 
 **Check:** Follows conventional commit format
 
@@ -228,6 +261,7 @@ QA VALIDATION REPORT
 [PASS] CSS processing verified
 [PASS] TypeScript compilation
 [PASS] VS Code patches applied (1 patch)
+[PASS] Flow tests (48 passed)
 [WARN] Debug code (2 console.log found)
 [PASS] Commit format ready
 
@@ -324,5 +358,10 @@ ls -la extensions/ritemark/media/webview.js                    # 2. Bundle size
 grep -q "@tailwind base" extensions/ritemark/media/webview.js && echo FAIL || echo OK  # 4. CSS processed
 cd extensions/ritemark && npm run compile                      # 5. TypeScript
 ./scripts/apply-patches.sh --dry-run                           # 6. Patches applied
-grep -r "console\.log" extensions/ritemark/src/                # 7. Debug code
+cd extensions/ritemark && npm test                             # 7. Flow tests (+ all unit tests)
+grep -r "console\.log" extensions/ritemark/src/                # 8. Debug code
 ```
+
+## Skills Reference
+
+- **Flow Testing**: `.claude/skills/flow-testing/SKILL.md` - detailed flow testing procedures
