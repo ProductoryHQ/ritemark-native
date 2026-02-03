@@ -23,6 +23,7 @@ import type {
   LLMNodeData,
   ImageNodeData,
   SaveFileNodeData,
+  ClaudeCodeNodeData,
   FlowInput,
 } from './stores/flowEditorStore';
 import { cn } from '../../lib/utils';
@@ -115,6 +116,14 @@ export function NodeConfigPanel() {
           <SaveFileNodeConfig
             nodeId={selectedNode.id}
             data={selectedNode.data as SaveFileNodeData}
+            onUpdate={(data) => updateNodeData(selectedNode.id, data)}
+          />
+        )}
+
+        {selectedNode.type === 'claudeCodeNode' && (
+          <ClaudeCodeNodeConfig
+            nodeId={selectedNode.id}
+            data={selectedNode.data as ClaudeCodeNodeData}
             onUpdate={(data) => updateNodeData(selectedNode.id, data)}
           />
         )}
@@ -828,6 +837,64 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
             </SelectContent>
           </Select>
         </Field>
+      </div>
+    </>
+  );
+}
+
+// Claude Code Node Configuration
+interface ClaudeCodeNodeConfigProps {
+  nodeId: string;
+  data: ClaudeCodeNodeData;
+  onUpdate: (data: Partial<ClaudeCodeNodeData>) => void;
+}
+
+function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigProps) {
+  return (
+    <>
+      <Field label="Label">
+        <Input
+          value={data.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          placeholder="Enter label..."
+        />
+      </Field>
+
+      <Field
+        label="Prompt"
+        description="Type / to insert variables. Describe the coding task for Claude Code."
+      >
+        <PromptTextArea
+          value={data.prompt || ''}
+          onChange={(val) => onUpdate({ prompt: val })}
+          placeholder="Create a README.md file for this project..."
+          nodeId={nodeId}
+          className="min-h-[150px]"
+        />
+      </Field>
+
+      <Field
+        label="Timeout (minutes)"
+        description="1-60 minutes. Increase for complex tasks."
+      >
+        <Input
+          type="number"
+          min={1}
+          max={60}
+          value={data.timeout ?? 5}
+          onChange={(e) =>
+            onUpdate({ timeout: parseInt(e.target.value) || 5 })
+          }
+        />
+      </Field>
+
+      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
+        <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+          <strong className="text-[var(--vscode-foreground)]">Note:</strong>{' '}
+          Claude Code CLI must be installed and authenticated. Run{' '}
+          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">claude</code>{' '}
+          in your terminal to set up.
+        </div>
       </div>
     </>
   );

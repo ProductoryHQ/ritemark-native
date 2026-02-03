@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { Sparkles, Image, Save, Zap } from 'lucide-react';
+import { Sparkles, Image, Save, Zap, Bot } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface NodeTemplate {
@@ -48,6 +48,12 @@ const nodeCategories: NodeCategory[] = [
         label: 'Image Generation',
         icon: <Image size={18} />,
         description: 'Generate images with AI',
+      },
+      {
+        type: 'claudeCodeNode',
+        label: 'Claude Code',
+        icon: <Bot size={18} />,
+        description: 'Run autonomous coding tasks with Claude Code',
       },
     ],
   },

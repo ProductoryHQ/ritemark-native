@@ -15,6 +15,7 @@ import type {
 import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
+import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
 
 /**
  * Progress callback
@@ -79,7 +80,8 @@ function getExecutionOrder(nodes: FlowNode[], edges: { source: string; target: s
  */
 async function executeNode(
   node: FlowNode,
-  context: ExecutionContext
+  context: ExecutionContext,
+  abortSignal?: AbortSignal
 ): Promise<unknown> {
   switch (node.type) {
     case 'trigger':
@@ -94,6 +96,9 @@ async function executeNode(
 
     case 'save-file':
       return await executeSaveFileNode(node, context);
+
+    case 'claude-code':
+      return await executeClaudeCodeNode(node, context, abortSignal);
 
     default:
       throw new Error(`Unknown node type: ${(node as FlowNode).type}`);
@@ -185,7 +190,7 @@ export async function executeFlow(
       }
 
       // Execute node
-      const output = await executeNode(node, context);
+      const output = await executeNode(node, context, abortSignal);
       context.outputs.set(nodeId, output);
     }
 

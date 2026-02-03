@@ -68,7 +68,13 @@ export interface SaveFileNodeData extends Record<string, unknown> {
   filename: string;
 }
 
-export type FlowNodeData = TriggerNodeData | LLMNodeData | ImageNodeData | SaveFileNodeData;
+export interface ClaudeCodeNodeData extends Record<string, unknown> {
+  label: string;
+  prompt: string;
+  timeout: number;
+}
+
+export type FlowNodeData = TriggerNodeData | LLMNodeData | ImageNodeData | SaveFileNodeData | ClaudeCodeNodeData;
 
 // Flow types from extension
 export interface Flow {
@@ -81,7 +87,7 @@ export interface Flow {
   inputs: FlowInput[];
   nodes: Array<{
     id: string;
-    type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file';
+    type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
     position: { x: number; y: number };
     data: Record<string, unknown>;
   }>;
@@ -98,6 +104,7 @@ const flowTypeToReactFlowType: Record<string, string> = {
   'llm-prompt': 'llmNode',
   'image-prompt': 'imageNode',
   'save-file': 'saveFileNode',
+  'claude-code': 'claudeCodeNode',
 };
 
 const reactFlowTypeToFlowType: Record<string, string> = {
@@ -105,6 +112,7 @@ const reactFlowTypeToFlowType: Record<string, string> = {
   'llmNode': 'llm-prompt',
   'imageNode': 'image-prompt',
   'saveFileNode': 'save-file',
+  'claudeCodeNode': 'claude-code',
 };
 
 // Helper to escape special regex characters
@@ -254,6 +262,12 @@ function getDefaultNodeData(type: string): FlowNodeData {
         filename: 'output.md',
         format: 'markdown',
         sourceNodeId: '',
+      };
+    case 'claudeCodeNode':
+      return {
+        label: 'Claude Code',
+        prompt: '',
+        timeout: 5,
       };
     default:
       return { label: 'Unknown' } as FlowNodeData;
@@ -617,7 +631,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
           | 'trigger'
           | 'llm-prompt'
           | 'image-prompt'
-          | 'save-file',
+          | 'save-file'
+          | 'claude-code',
         position: node.position,
         data: node.data as Record<string, unknown>,
       })),
