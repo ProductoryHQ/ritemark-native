@@ -35,7 +35,7 @@ export interface FlowInput {
  */
 export interface FlowNode {
   id: string;
-  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file';
+  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
   position: { x: number; y: number };
   data: Record<string, unknown>;
 }

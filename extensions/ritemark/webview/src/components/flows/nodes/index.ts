@@ -8,8 +8,9 @@ import { TriggerNode } from './TriggerNode';
 import { LLMNode } from './LLMNode';
 import { ImageNode } from './ImageNode';
 import { SaveFileNode } from './SaveFileNode';
+import { ClaudeCodeNode } from './ClaudeCodeNode';
 
-export { TriggerNode, LLMNode, ImageNode, SaveFileNode };
+export { TriggerNode, LLMNode, ImageNode, SaveFileNode, ClaudeCodeNode };
 export { BaseNode, NodeField } from './BaseNode';
 
 // Node types mapping for React Flow
@@ -18,4 +19,5 @@ export const nodeTypes = {
   llmNode: LLMNode,
   imageNode: ImageNode,
   saveFileNode: SaveFileNode,
+  claudeCodeNode: ClaudeCodeNode,
 };
