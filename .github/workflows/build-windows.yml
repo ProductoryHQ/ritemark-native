@@ -78,7 +78,7 @@ jobs:
       - name: Install extension dependencies
         shell: bash
         working-directory: r/vscode/extensions/ritemark
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       # =========================================================================
       # Step 5: Apply patches + branding
