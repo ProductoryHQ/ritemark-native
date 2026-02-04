@@ -175,9 +175,16 @@ After gulp build completes, ALWAYS:
    codesign --deep --force --verify --sign "Developer ID Application: ..." Ritemark.app
    ```
 
-4. **Notarize** (required for Gatekeeper):
+4. **Create DMG**:
    ```bash
-   ./scripts/notarize-app.sh
+   ./scripts/create-dmg.sh        # arm64
+   ./scripts/create-dmg.sh x64    # Intel
+   ```
+
+5. **Notarize DMG** (required for Gatekeeper):
+   ```bash
+   ./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg
+   ./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg
    ```
 
 ### Reference
@@ -185,6 +192,7 @@ After gulp build completes, ALWAYS:
 - Analysis document: `docs/analysis/2026-02-03-multi-platform-build.md`
 - Build script: `scripts/build-prod.sh`
 - DMG creation: `scripts/create-dmg.sh`
+- DMG notarization: `scripts/notarize-dmg.sh`
 
 ### Important Notes
 - Clone to path WITHOUT spaces (node-gyp issues)

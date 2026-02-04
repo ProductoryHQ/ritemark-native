@@ -1,11 +1,46 @@
 # Apple Notarization Reference
 
+## IMPORTANT: Notarize the DMG, NOT the .app!
+
+**Always notarize the DMG file, not the .app bundle.** This ensures:
+- Users download a file with the notarization ticket already stapled
+- No Gatekeeper warnings when opening the DMG
+- Offline verification works immediately
+
+## Correct Workflow
+
+```
+1. Sign app         → ./scripts/codesign-app.sh
+2. Create DMG       → ./scripts/create-dmg.sh [arm64|x64]
+3. Notarize DMG     → ./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-ARCH.dmg
+4. Verify           → ./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-ARCH.dmg
+5. Release          → ./scripts/release-dmg.sh X.Y.Z
+```
+
+### Multi-Architecture Builds
+
+For full releases, notarize BOTH architectures:
+
+```bash
+# Apple Silicon (M1/M2/M3)
+./scripts/notarize-dmg.sh dist/Ritemark-1.3.0-darwin-arm64.dmg
+
+# Intel Mac
+./scripts/notarize-dmg.sh dist/Ritemark-1.3.0-darwin-x64.dmg
+```
+
+---
+
 ## Pre-Release Verification (MANDATORY)
 
 **Before uploading ANY DMG to GitHub, run the verification script:**
 
 ```bash
+# Apple Silicon
 ./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg
+
+# Intel Mac
+./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg
 ```
 
 This script MUST pass. It checks:
@@ -65,14 +100,14 @@ source .signing-config && xcrun notarytool history --apple-id "$APPLE_ID" --pass
 source .signing-config && xcrun notarytool log <submission-id> --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
 ```
 
-**Staple after acceptance:**
+**Staple ticket to DMG:**
 ```bash
-xcrun stapler staple "VSCode-darwin-arm64/Ritemark.app"
+xcrun stapler staple "dist/Ritemark-X.Y.Z-darwin-arm64.dmg"
 ```
 
 **Validate stapling:**
 ```bash
-xcrun stapler validate "VSCode-darwin-arm64/Ritemark.app"
+xcrun stapler validate "dist/Ritemark-X.Y.Z-darwin-arm64.dmg"
 ```
 
 ## Status Values
@@ -99,11 +134,17 @@ xcrun stapler validate "VSCode-darwin-arm64/Ritemark.app"
 |------|---------|
 | `.signing-config` | Apple credentials (APPLE_TEAM_ID, APPLE_ID, APPLE_APP_PASSWORD) |
 | `scripts/codesign-app.sh` | Signs all app components with Developer ID |
-| `scripts/notarize-app.sh` | Submits app to Apple notarization |
-| `scripts/create-dmg.sh` | Creates distributable DMG image |
+| `scripts/create-dmg.sh` | Creates and signs DMG image |
+| `scripts/notarize-dmg.sh` | **Submits DMG to Apple notarization and staples ticket** |
 | `scripts/verify-notarization.sh` | **Verifies DMG is properly notarized (MANDATORY before release)** |
 | `scripts/release-dmg.sh` | **Safe release wrapper with automatic verification** |
 | `branding/entitlements.plist` | Hardened runtime permissions |
+
+### Deprecated
+
+| File | Status |
+|------|--------|
+| `scripts/notarize-app.sh` | **DEPRECATED** - use `notarize-dmg.sh` instead |
 
 ## Apple Developer Account
 
@@ -113,12 +154,11 @@ xcrun stapler validate "VSCode-darwin-arm64/Ritemark.app"
 
 ## Release Checklist
 
-Before any GitHub release:
+Before any GitHub release (for EACH architecture):
 
 - [ ] App is code-signed: `./scripts/codesign-app.sh`
-- [ ] App is notarized: `./scripts/notarize-app.sh`
-- [ ] Ticket is stapled: `xcrun stapler staple "VSCode-darwin-arm64/Ritemark.app"`
-- [ ] DMG is created: `./scripts/create-dmg.sh`
-- [ ] **Verification passes: `./scripts/verify-notarization.sh`**
+- [ ] DMG is created: `./scripts/create-dmg.sh [arm64|x64]`
+- [ ] **DMG is notarized: `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-ARCH.dmg`**
+- [ ] **Verification passes: `./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-ARCH.dmg`**
 - [ ] Release notes exist: `docs/releases/vX.Y.Z.md`
 - [ ] Upload to GitHub: `./scripts/release-dmg.sh X.Y.Z`
