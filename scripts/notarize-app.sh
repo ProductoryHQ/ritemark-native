@@ -1,5 +1,19 @@
 #!/bin/bash
 #
+# ============================================================================
+# DEPRECATED - Use notarize-dmg.sh instead!
+# ============================================================================
+#
+# This script notarizes the .app bundle, but the CORRECT approach is to
+# notarize the DMG file. Use:
+#
+#   ./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg
+#
+# Notarizing the DMG ensures the downloaded file has the ticket stapled,
+# giving users a seamless experience without Gatekeeper warnings.
+#
+# ============================================================================
+#
 # notarize-app.sh - Submit RiteMark.app to Apple for notarization
 #
 # Usage: ./scripts/notarize-app.sh

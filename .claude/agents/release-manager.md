@@ -96,8 +96,8 @@ Your role changes based on platform:
 │    ─────────────────────────────────────────────────────    │
 │ 6. Agent: Run ./scripts/build-prod.sh (Apple Silicon)       │
 │ 7. Agent: Run ./scripts/build-prod.sh darwin-x64 (Intel)    │
-│ 8. Agent: Notarize & staple BOTH macOS builds               │
-│ 9. Agent: Create DMGs for BOTH architectures → /dist        │
+│ 8. Agent: Create DMGs for BOTH architectures → /dist        │
+│ 9. Agent: Notarize BOTH DMGs (not .app!)                    │
 │ 10. Agent: Gate 1 checks (BOTH macOS variants)              │
 │ 11. Agent: Generate TEST-CHECKLIST.md                       │
 │ 12. Jarmo: Test macOS DMGs (using checklist)                │
@@ -142,8 +142,8 @@ Your role changes based on platform:
 | Tag creation | Agent | `git tag vX.Y.Z && git push origin vX.Y.Z` |
 | macOS Apple Silicon build | Agent | `./scripts/build-prod.sh` (default) |
 | macOS Intel build | Agent | `./scripts/build-prod.sh darwin-x64` |
-| Notarization (both) | Agent | `./scripts/notarize-app.sh` for each |
 | DMG creation (both) | Agent | `./scripts/create-dmg.sh` and `./scripts/create-dmg.sh x64` |
+| Notarization (both) | Agent | `./scripts/notarize-dmg.sh` for each DMG |
 | Test checklist | Agent | Generate `docs/marketing/releases/vX.Y.Z/TEST-CHECKLIST.md` |
 | macOS testing | **Jarmo** | Install & test BOTH DMGs using checklist |
 | macOS approval | **Jarmo** | Say "macOS approved" |
@@ -504,14 +504,16 @@ VERDICT: [READY FOR RELEASE / NOT READY - FIX REQUIRED]
 
 ### Workflow (Multi-Platform)
 
+**IMPORTANT: Notarize the DMG, not the .app!**
+
 1. **Build Apple Silicon:** `./scripts/build-prod.sh`
 2. **Build Intel:** `./scripts/build-prod.sh darwin-x64`
-3. **Notarize Apple Silicon:** `./scripts/notarize-app.sh VSCode-darwin-arm64/Ritemark.app`
-4. **Notarize Intel:** `./scripts/notarize-app.sh VSCode-darwin-x64/Ritemark.app`
-5. **Staple Apple Silicon:** `xcrun stapler staple "VSCode-darwin-arm64/Ritemark.app"`
-6. **Staple Intel:** `xcrun stapler staple "VSCode-darwin-x64/Ritemark.app"`
-7. **Create DMG (arm64):** `./scripts/create-dmg.sh`
-8. **Create DMG (x64):** `./scripts/create-dmg.sh x64`
+3. **Create DMG (arm64):** `./scripts/create-dmg.sh`
+4. **Create DMG (x64):** `./scripts/create-dmg.sh x64`
+5. **Notarize DMG (arm64):** `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
+6. **Notarize DMG (x64):** `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
+7. **Verify (arm64):** `./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
+8. **Verify (x64):** `./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
 9. Verify Gate 1 checks for BOTH architectures
 10. Declare Gate 1 PASS
 11. Wait for Jarmo to test BOTH DMGs and confirm (Gate 2)
