@@ -89,19 +89,20 @@ Your role changes based on platform:
 │ 2. Agent: Update version in branding/product.json           │
 │ 3. Agent: Update version in extensions/ritemark/package.json│
 │ 4. Agent: Commit version bump                               │
-│ 5. Agent: Create & push tag → git tag vX.Y.Z && git push    │
+│ 5. Agent: Push commit → git push origin main                │
+│ 6. Agent: Create & push tag → git tag vX.Y.Z && git push    │
 │           origin vX.Y.Z                                     │
 │    ─────────────────────────────────────────────────────    │
 │    ⚡ TAG PUSH TRIGGERS GITHUB ACTIONS (Windows build)      │
 │    ─────────────────────────────────────────────────────    │
-│ 6. Agent: Run ./scripts/build-prod.sh (Apple Silicon)       │
-│ 7. Agent: Run ./scripts/build-prod.sh darwin-x64 (Intel)    │
-│ 8. Agent: Create DMGs for BOTH architectures → /dist        │
-│ 9. Agent: Notarize BOTH DMGs (not .app!)                    │
-│ 10. Agent: Gate 1 checks (BOTH macOS variants)              │
-│ 11. Agent: Generate TEST-CHECKLIST.md                       │
-│ 12. Jarmo: Test macOS DMGs (using checklist)                │
-│ 13. Jarmo: "macOS approved"                                 │
+│ 7. Agent: Run ./scripts/build-prod.sh (Apple Silicon)       │
+│ 8. Agent: Run ./scripts/build-prod.sh darwin-x64 (Intel)    │
+│ 9. Agent: Create DMGs for BOTH architectures → /dist        │
+│ 10. Agent: Notarize BOTH DMGs (not .app!)                   │
+│ 11. Agent: Gate 1 checks (BOTH macOS variants)              │
+│ 12. Agent: Generate TEST-CHECKLIST.md                       │
+│ 13. Jarmo: Test macOS DMGs (using checklist)                │
+│ 14. Jarmo: "macOS approved"                                 │
 └─────────────────────────────────────────────────────────────┘
         │
         │ (meanwhile, GitHub Actions runs ~25 min)
@@ -120,14 +121,14 @@ Your role changes based on platform:
 ┌─────────────────────────────────────────────────────────────┐
 │ PHASE 2: Windows (Jarmo's Windows machine)                  │
 ├─────────────────────────────────────────────────────────────┤
-│ 14. Jarmo: Start release-manager agent                      │
-│ 15. Agent: gh run download --name ritemark-windows-x64      │
-│ 16. Jarmo: Test Windows build                               │
-│ 17. Jarmo: "Windows approved"                               │
-│ 18. Agent: Run Inno Setup → create installer                │
-│ 19. Agent: Copy installer to /dist                          │
-│ 20. Agent: Gate 1 checks (Windows)                          │
-│ 21. Agent: gh release create vX.Y.Z with ALL files:         │
+│ 15. Jarmo: Start release-manager agent                      │
+│ 16. Agent: gh run download --name ritemark-windows-x64      │
+│ 17. Jarmo: Test Windows build                               │
+│ 18. Jarmo: "Windows approved"                               │
+│ 19. Agent: Run Inno Setup → create installer                │
+│ 20. Agent: Copy installer to /dist                          │
+│ 21. Agent: Gate 1 checks (Windows)                          │
+│ 22. Agent: gh release create vX.Y.Z with ALL files:         │
 │     - dist/Ritemark-arm64.dmg (macOS Apple Silicon)         │
 │     - dist/Ritemark-x64.dmg (macOS Intel)                   │
 │     - dist/Ritemark-Setup.exe (Windows)                     │
@@ -139,6 +140,7 @@ Your role changes based on platform:
 | Step | Who | What |
 |------|-----|------|
 | Version bump | Agent | Edit product.json, package.json |
+| Commit & push | Agent | `git commit` then `git push origin main` |
 | Tag creation | Agent | `git tag vX.Y.Z && git push origin vX.Y.Z` |
 | macOS Apple Silicon build | Agent | `./scripts/build-prod.sh` (default) |
 | macOS Intel build | Agent | `./scripts/build-prod.sh darwin-x64` |
@@ -158,10 +160,11 @@ Your role changes based on platform:
 
 1. **NEVER create GitHub Release from macOS** - Windows agent does this with ALL files
 2. **NEVER skip the tag** - tag push triggers Windows build
-3. **NEVER proceed without ALL approvals** - BOTH macOS variants AND Windows must be tested
-4. **ALWAYS wait for GH Actions** - check status before Windows phase
-5. **ALWAYS generate TEST-CHECKLIST.md** before Gate 2 testing
-6. **ALWAYS build BOTH macOS architectures** - arm64 AND x64 for full platform coverage
+3. **ALWAYS push commit BEFORE creating tag** - otherwise GH Actions won't have the version bump
+4. **NEVER proceed without ALL approvals** - BOTH macOS variants AND Windows must be tested
+5. **ALWAYS wait for GH Actions** - check status before Windows phase
+6. **ALWAYS generate TEST-CHECKLIST.md** before Gate 2 testing
+7. **ALWAYS build BOTH macOS architectures** - arm64 AND x64 for full platform coverage
 
 ---
 
