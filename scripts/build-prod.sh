@@ -127,7 +127,7 @@ echo ""
 echo -e "${BLUE}Step 3/7: Copying RiteMark Extension${NC}"
 echo "----------------------------------------"
 
-APP_PATH="VSCode-$TARGET/Ritemark.app"
+APP_PATH="$PROJECT_DIR/VSCode-$TARGET/Ritemark.app"
 EXT_DEST="$APP_PATH/Contents/Resources/app/extensions/ritemark"
 
 if [[ ! -d "$APP_PATH" ]]; then
@@ -238,7 +238,7 @@ echo ""
 echo -e "${BLUE}Step 5/7: Post-Build Validation${NC}"
 echo "----------------------------------------"
 
-if ! ./scripts/validate-build-output.sh; then
+if ! ./scripts/validate-build-output.sh "$TARGET"; then
   echo ""
   echo -e "${RED}Post-build validation failed!${NC}"
   echo "The build completed but has issues."

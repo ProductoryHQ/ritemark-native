@@ -52,16 +52,13 @@ Ritemark Native supports THREE platforms:
 
 ### Build Matrix
 
-| Build Target | Build Host | Works? |
+| Build Target | Build Host | Method |
 | --- | --- | --- |
-| darwin-arm64 | macOS arm64 | ✅ Native |
-| darwin-arm64 | macOS x64 | ✅ Works |
-| darwin-x64 | macOS arm64 | ✅ Cross-compile |
-| darwin-x64 | macOS x64 | ✅ Native |
-| win32-x64 | macOS | ✅ Cross-compile via GH Actions |
-| win32-x64 | Windows | ✅ Native |
+| darwin-arm64 | macOS arm64 (local) | ✅ Native local build |
+| darwin-x64 | GitHub Actions macos-13 | ✅ CI (Intel runner) |
+| win32-x64 | GitHub Actions windows-latest | ✅ CI |
 
-**Note:** macOS builds CANNOT be done from Windows (Electron requirement).
+**Note:** macOS x64 is built on CI (Intel runner) to get correct native modules (sqlite3, node-pty). Cross-compiling from arm64 produces arm64 native modules that break on Intel Macs.
 
 * * *
 
@@ -76,8 +73,9 @@ Ritemark Native supports THREE platforms:
 1. Create a task for EACH step using TaskCreate:
    ```
    Task 0: Run preflight checks
-   Task 1: Version bump and tag
-   Task 2: Build macOS apps
+   Task 1: Version bump and tag (triggers CI for Windows + macOS x64)
+   Task 2: Build macOS arm64 locally
+   Task 2b: Download + sign macOS x64 from CI
    Task 3: [GATE 1] Wait for app approval
    Task 4: Create and notarize DMGs
    Task 5: [GATE 2] Wait for DMG approval
@@ -145,21 +143,45 @@ On startup, create tasks for all steps using TaskCreate, then work through them 
 
 ---
 
-#### STEP 2: BUILD macOS APPS
+#### STEP 2: BUILD macOS arm64 (LOCAL)
 
 1. Build arm64: `./scripts/build-prod.sh`
-2. Build x64: `./scripts/build-prod.sh darwin-x64`
-3. Generate TEST-CHECKLIST.md in `docs/marketing/releases/vX.Y.Z/`
+2. Generate TEST-CHECKLIST.md in `docs/marketing/releases/vX.Y.Z/`
 
 **Output:**
 - `VSCode-darwin-arm64/Ritemark.app`
-- `VSCode-darwin-x64/Ritemark.app`
+
+**Note:** macOS x64 build is handled by GitHub Actions (triggered by tag push in Step 1). Do NOT build x64 locally - cross-compiling from arm64 produces broken native modules.
+
+---
+
+#### STEP 2b: DOWNLOAD + SIGN macOS x64 (FROM CI)
+
+Wait for GitHub Actions `build-macos-x64.yml` to complete, then:
+
+1. Check CI status:
+   ```bash
+   gh run list --workflow=build-macos-x64.yml --limit 3
+   ```
+
+2. Download artifact:
+   ```bash
+   gh run download <run-id> --name ritemark-darwin-x64 --dir VSCode-darwin-x64
+   ```
+
+3. Code sign locally:
+   ```bash
+   ./scripts/codesign-app.sh darwin-x64
+   ```
+
+**Output:**
+- `VSCode-darwin-x64/Ritemark.app` (signed with Developer ID)
 
 ---
 
 #### ⛔ GATE 1: APP TESTING (STOP AND WAIT)
 
-**Tell Jarmo:** "macOS apps built. Please test both .app files."
+**Tell Jarmo:** "macOS arm64 app built locally. x64 app downloaded from CI and signed. Please test both .app files."
 
 **DO NOT proceed until Jarmo says:** "approved", "apps approved", or "GATE 1 passed"
 
@@ -190,7 +212,9 @@ On startup, create tasks for all steps using TaskCreate, then work through them 
 
 #### STEP 4: WINDOWS VERIFICATION
 
-1. Check GH Actions status: `gh run list --workflow=build-windows.yml --limit 3`
+1. Check GH Actions status:
+   - Windows: `gh run list --workflow=build-windows.yml --limit 3`
+   - macOS x64 (should already be done by Step 2b): `gh run list --workflow=build-macos-x64.yml --limit 3`
 2. Wait for Windows build to complete
 3. Jarmo downloads artifact and creates installer
 4. Jarmo tests Windows installer
@@ -236,13 +260,14 @@ On startup, create tasks for all steps using TaskCreate, then work through them 
 | Version bump | Agent | Edit product.json, package.json |
 | Commit & push | Agent | `git commit` then `git push origin main` |
 | Tag creation | Agent | `git tag vX.Y.Z && git push origin vX.Y.Z` |
-| macOS Apple Silicon build | Agent | `./scripts/build-prod.sh` (default) |
-| macOS Intel build | Agent | `./scripts/build-prod.sh darwin-x64` |
+| macOS Apple Silicon build | Agent (local) | `./scripts/build-prod.sh` |
+| macOS Intel build | **GH Actions** | Automatic on tag push (`build-macos-x64.yml`) |
+| Download + sign x64 | Agent (local) | `gh run download` then `./scripts/codesign-app.sh darwin-x64` |
 | **GATE 1: App testing** | **Jarmo** | Test both .app files |
 | DMG creation (both) | Agent | `./scripts/create-dmg.sh` and `./scripts/create-dmg.sh x64` |
 | Notarization (both) | Agent | `./scripts/notarize-dmg.sh` for each DMG |
 | **GATE 2: DMG testing** | **Jarmo** | Install & test BOTH DMGs |
-| Windows build | **GH Actions** | Automatic on tag push |
+| Windows build | **GH Actions** | Automatic on tag push (`build-windows.yml`) |
 | **GATE 3: Windows testing** | **Jarmo** | Install & test Windows app |
 | GitHub Release | Agent | `gh release create` with ALL THREE files |
 
@@ -264,7 +289,7 @@ On startup, create tasks for all steps using TaskCreate, then work through them 
 
 8.  **ALWAYS generate TEST-CHECKLIST.md** - before asking Jarmo to test
 
-9.  **ALWAYS build BOTH macOS architectures** - arm64 AND x64 for full platform coverage
+9.  **arm64 local, x64 from CI** - Build arm64 locally, download x64 from GitHub Actions. Both code-signed locally. NEVER cross-compile x64 from arm64.
     
 
 * * *
@@ -391,14 +416,20 @@ Tell Jarmo:
 ### Checking GH Actions Status
 
 ```bash
-# List recent runs
+# List recent Windows runs
 gh run list --workflow=build-windows.yml --limit 5
+
+# List recent macOS x64 runs
+gh run list --workflow=build-macos-x64.yml --limit 5
 
 # Check specific run status
 gh run view <run-id>
 
 # Wait for completion (blocking)
 gh run watch <run-id>
+
+# Download macOS x64 artifact
+gh run download <run-id> --name ritemark-darwin-x64 --dir VSCode-darwin-x64
 ```
 
 * * *
@@ -600,10 +631,10 @@ VERDICT: [READY FOR RELEASE / NOT READY - FIX REQUIRED]
 
 ### Build Commands by Architecture
 
-| Architecture | Build Command | Output Directory |
+| Architecture | Build Method | Output Directory |
 | --- | --- | --- |
-| Apple Silicon | `./scripts/build-prod.sh` | `VSCode-darwin-arm64/` |
-| Intel | `./scripts/build-prod.sh darwin-x64` | `VSCode-darwin-x64/` |
+| Apple Silicon | Local: `./scripts/build-prod.sh` | `VSCode-darwin-arm64/` |
+| Intel | CI: `build-macos-x64.yml` → `gh run download` | `VSCode-darwin-x64/` |
 
 ### DMG Commands by Architecture
 
@@ -629,36 +660,38 @@ VERDICT: [READY FOR RELEASE / NOT READY - FIX REQUIRED]
 
 **IMPORTANT: Notarize the DMG, not the .app!**
 
-1.  **Build Apple Silicon:** `./scripts/build-prod.sh`
+1.  **Build Apple Silicon (local):** `./scripts/build-prod.sh`
+
+2.  **Download Intel from CI:** `gh run download <run-id> --name ritemark-darwin-x64 --dir VSCode-darwin-x64`
+
+3.  **Code sign Intel locally:** `./scripts/codesign-app.sh darwin-x64`
+
+4.  **Create DMG (arm64):** `./scripts/create-dmg.sh`
+
+5.  **Create DMG (x64):** `./scripts/create-dmg.sh x64`
     
-2.  **Build Intel:** `./scripts/build-prod.sh darwin-x64`
-    
-3.  **Create DMG (arm64):** `./scripts/create-dmg.sh`
-    
-4.  **Create DMG (x64):** `./scripts/create-dmg.sh x64`
-    
-5.  **Notarize DMG (arm64):** `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
-    
-6.  **Notarize DMG (x64):** `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
-    
-7.  **Verify (arm64):** `./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
-    
-8.  **Verify (x64):** `./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
-    
-9.  Verify Gate 1 checks for BOTH architectures
-    
-10.  Declare Gate 1 PASS
-     
-11.  Wait for Jarmo to test BOTH DMGs and confirm (Gate 2)
-     
-12.  Create stable DMG filenames:
+6.  **Notarize DMG (arm64):** `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
+
+7.  **Notarize DMG (x64):** `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
+
+8.  **Verify (arm64):** `./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
+
+9.  **Verify (x64):** `./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
+
+10.  Verify Gate 1 checks for BOTH architectures
+
+11.  Declare Gate 1 PASS
+
+12.  Wait for Jarmo to test BOTH DMGs and confirm (Gate 2)
+
+13.  Create stable DMG filenames:
      
      ```bash
      cp dist/Ritemark-X.Y.Z-darwin-arm64.dmg dist/Ritemark-arm64.dmg
      cp dist/Ritemark-X.Y.Z-darwin-x64.dmg dist/Ritemark-x64.dmg
      ```
      
-13.  Upload to GitHub with stable filenames:
+14.  Upload to GitHub with stable filenames:
      
 
 ```bash
