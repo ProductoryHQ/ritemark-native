@@ -4,6 +4,8 @@
 
 Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort, add/delete operations, and multi-line cell editing.
 
+**Design principle:** PDF and DOCX viewers are part of the **Text Editor** feature family — they must feel like natural extensions of the Ritemark writing experience, not separate tools. All new UI uses **shadcn/ui patterns** from day one.
+
 ## Feature Flag Check
 
 - [ ] Does this sprint need a feature flag?
@@ -52,10 +54,12 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 - [x] Document dependency requirements and bundle size impact
 - [x] Design technical architecture (follows existing patterns)
 - [x] Evaluate feature flag needs (none needed)
+- [x] UX/UI design for all viewers (see `research/05-ux-design.md`)
 
-### Phase 2: Dependencies & Setup
+### Phase 2: Dependencies & shadcn/ui Setup
 - [ ] Install pdfjs-dist in webview (`npm install pdfjs-dist`)
 - [ ] Install mammoth in webview (`npm install mammoth`)
+- [ ] Add shadcn/ui components: DropdownMenu, ContextMenu, Textarea, Tooltip
 - [ ] Configure PDF.js worker in Vite build
 - [ ] Test webview builds successfully
 - [ ] Verify bundle size is acceptable (<5MB)
@@ -69,13 +73,16 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 - [ ] Add custom editor declaration to `package.json`
 
 #### Webview Side
-- [ ] Create `webview/src/components/PdfViewer.tsx`
-- [ ] Implement PDF loading with pdfjs-dist
-- [ ] Add page navigation controls (prev/next/jump)
-- [ ] Add zoom controls (fit width/fit page/custom zoom)
-- [ ] Add toolbar with refresh and download buttons
+- [ ] Create `webview/src/components/viewers/PDFViewer.tsx`
+- [ ] Implement continuous-scroll PDF rendering with pdfjs-dist (lazy page loading)
+- [ ] Create `webview/src/components/header/PDFToolbar.tsx` (shared toolbar pattern)
+  - Filename (left), page nav input (center-right), zoom dropdown (right), refresh (rightmost)
+- [ ] Implement zoom: DropdownMenu with 50%-200%, Fit Width, Fit Page (shadcn DropdownMenu)
+- [ ] Page styling: shadow, border, white background, max-width centered like editor
 - [ ] Add routing in `App.tsx` for 'pdf' fileType
 - [ ] Add file change notification support
+- [ ] Loading state: Progress component + "Loading {filename}..."
+- [ ] Error state: Alert component with retry button
 
 #### Testing
 - [ ] Test small PDF (1 page)
@@ -95,13 +102,16 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 - [ ] Add custom editor declaration to `package.json`
 
 #### Webview Side
-- [ ] Create `webview/src/components/DocxViewer.tsx`
-- [ ] Implement DOCX to HTML conversion with mammoth
-- [ ] Add styled document container (white background, max-width, margins)
-- [ ] Add toolbar with refresh and download buttons
+- [ ] Create `webview/src/components/viewers/DOCXViewer.tsx`
+- [ ] Implement DOCX → HTML conversion with mammoth
+- [ ] Apply editor CSS to rendered content (same fonts, spacing, colors as markdown editor)
+  - max-width: 900px, font-size: 18px, line-height: 1.7, editor padding
+  - Reuse heading, list, table, blockquote styles from ProseMirror CSS
+- [ ] Create `webview/src/components/header/DOCXToolbar.tsx` (minimal — filename + "Open in Word" + refresh)
 - [ ] Add routing in `App.tsx` for 'docx' fileType
 - [ ] Add file change notification support
 - [ ] Add error handling for .doc files (show "only .docx supported" message)
+- [ ] Loading/error states using shadcn Progress and Alert
 
 #### Testing
 - [ ] Test simple DOCX (text only)
@@ -115,15 +125,16 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 
 - [ ] Add TanStack Table sorting state to `DataTable.tsx`
 - [ ] Enable `getSortedRowModel` in table config
-- [ ] Add click handler to column headers
-- [ ] Add sort indicators (↑/↓) to headers
+- [ ] Make column headers clickable (shadcn Button ghost variant)
+- [ ] Add sort indicators: `ChevronUp` / `ChevronDown` / `ChevronsUpDown` (lucide-react)
+- [ ] Click cycle: ascending → descending → unsorted
 - [ ] Test sorting ascending/descending/none
 - [ ] Verify sorting doesn't trigger save (view-only until edit)
 
 ### Phase 6: CSV Editing - Row Operations
 
 #### Add Row
-- [ ] Add "Add Row" button to SpreadsheetToolbar
+- [ ] Add `[+ Row]` button to SpreadsheetToolbar (shadcn Button ghost)
 - [ ] Implement `handleAddRow` in SpreadsheetViewer
 - [ ] Create empty row with all columns
 - [ ] Append to rows array
@@ -131,7 +142,8 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 - [ ] Test adding multiple rows
 
 #### Delete Row
-- [ ] Add delete icon to row number cell (on hover)
+- [ ] Add right-click context menu on row number (shadcn ContextMenu)
+  - "Insert Row Above", "Insert Row Below", separator, "Delete Row"
 - [ ] Implement `handleDeleteRow` in SpreadsheetViewer
 - [ ] Remove row from array
 - [ ] Serialize to CSV and trigger onChange
@@ -141,8 +153,8 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 ### Phase 7: CSV Editing - Column Operations
 
 #### Add Column
-- [ ] Add "Add Column" button to SpreadsheetToolbar
-- [ ] Create dialog to prompt for column name
+- [ ] Add `[+ Column]` button to SpreadsheetToolbar (shadcn Button ghost)
+- [ ] Create "New Column" dialog (shadcn Dialog + Input) to prompt for name
 - [ ] Implement `handleAddColumn` in SpreadsheetViewer
 - [ ] Add column to columns array
 - [ ] Add empty value to all rows
@@ -150,8 +162,10 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 - [ ] Test adding column with various names
 
 #### Delete Column
-- [ ] Add delete icon to column header (on hover or context menu)
+- [ ] Add dropdown menu on column header (shadcn DropdownMenu)
+  - "Sort Ascending", "Sort Descending", separator, "Insert Left", "Insert Right", "Rename...", separator, "Delete Column"
 - [ ] Implement `handleDeleteColumn` in SpreadsheetViewer
+- [ ] Implement `handleRenameColumn` with shadcn Dialog + Input
 - [ ] Remove column from columns array
 - [ ] Remove column from all rows
 - [ ] Serialize to CSV and trigger onChange
@@ -160,13 +174,12 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 
 ### Phase 8: CSV Editing - Multi-line Cells
 
-- [ ] Create `EditCellDialog` component using Dialog (radix-ui)
-- [ ] Add textarea with min-height and resize capability
-- [ ] Add Save/Cancel buttons
-- [ ] Modify `DataTable.tsx` to handle double-click (opens dialog)
-- [ ] Keep single-click for row selection/expansion
+- [ ] Replace `<input>` with `<textarea>` in EditableCell (shadcn Textarea pattern)
+- [ ] Auto-size textarea based on content (min 2rem, max ~10 lines)
+- [ ] Keyboard: Enter = save, Shift+Enter = newline, Escape = cancel
+- [ ] Non-editing cells show `whitespace-pre-wrap` to preserve newlines
 - [ ] Test multi-line text editing
-- [ ] Test Enter within textarea (should insert newline, not save)
+- [ ] Test Shift+Enter inserts newline (not save)
 - [ ] Test Escape to cancel
 - [ ] Verify multi-line content saves correctly to CSV
 
@@ -334,6 +347,15 @@ Detailed technical research completed in Phase 1:
    - Risk assessment for each feature
    - Flag requirement evaluation (conclusion: no flags needed)
 
+5. **UX Design** (`research/05-ux-design.md`)
+   - Ritemark visual DNA analysis (colors, typography, component patterns)
+   - PDF viewer: continuous scroll, page nav, zoom dropdown, document reader mode
+   - DOCX viewer: rendered with editor CSS, feels like native Ritemark content
+   - CSV editing: sort arrows, context menus, toolbar buttons, textarea cells
+   - shadcn/ui component plan (DropdownMenu, ContextMenu, Textarea, Tooltip)
+   - Shared toolbar pattern for all viewer types
+   - Wireframes for all three features
+
 ## Notes
 
 - This is an ambitious sprint with 3 major features
@@ -343,3 +365,5 @@ Detailed technical research completed in Phase 1:
 - All features are low-risk (read-only viewers + standard spreadsheet ops)
 - No feature flags needed (see flags analysis)
 - Webview bundle increase is acceptable for built-in app
+- All new UI uses shadcn/ui patterns (DropdownMenu, ContextMenu, Textarea, Tooltip)
+- Viewers are part of Text Editor family, not standalone tools (see UX design doc)
