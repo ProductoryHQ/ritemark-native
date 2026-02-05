@@ -80,6 +80,21 @@ jobs:
         working-directory: r/vscode/extensions/ritemark
         run: npm install --legacy-peer-deps
 
+      - name: Remove non-Windows binaries from claude-agent-sdk
+        shell: bash
+        working-directory: r/vscode/extensions/ritemark
+        run: |
+          # rcedit.exe fails on Linux/Darwin binaries, remove them
+          SDK_VENDOR="node_modules/@anthropic-ai/claude-agent-sdk/vendor"
+          if [ -d "$SDK_VENDOR/ripgrep" ]; then
+            echo "Removing non-Windows ripgrep binaries..."
+            rm -rf "$SDK_VENDOR/ripgrep/arm64-darwin"
+            rm -rf "$SDK_VENDOR/ripgrep/arm64-linux"
+            rm -rf "$SDK_VENDOR/ripgrep/x64-darwin"
+            rm -rf "$SDK_VENDOR/ripgrep/x64-linux"
+            echo "Kept only: $(ls $SDK_VENDOR/ripgrep/)"
+          fi
+
       # =========================================================================
       # Step 5: Apply patches + branding
       # =========================================================================
