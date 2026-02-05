@@ -6,6 +6,10 @@
 # Uses Mach-O detection to find executables that need signing.
 # Verifies each binary individually for notarization compliance.
 #
+# Usage:
+#   ./scripts/codesign-app.sh              # Sign arm64 build (default)
+#   ./scripts/codesign-app.sh darwin-x64   # Sign x64 build
+#
 
 # Don't use set -e as it causes issues with arithmetic when count=0
 # We handle errors explicitly
@@ -17,10 +21,29 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# Parse target argument
+TARGET="${1:-darwin-arm64}"
+
+# Validate target
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    # Valid targets
+    ;;
+  *)
+    echo -e "${RED}ERROR: Invalid target '$TARGET'${NC}"
+    echo "Supported targets: darwin-arm64 (default), darwin-x64"
+    echo ""
+    echo "Usage:"
+    echo "  ./scripts/codesign-app.sh              # Apple Silicon"
+    echo "  ./scripts/codesign-app.sh darwin-x64   # Intel Mac"
+    exit 1
+    ;;
+esac
+
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_PATH="$PROJECT_ROOT/VSCode-darwin-arm64/RiteMark.app"
+APP_PATH="$PROJECT_ROOT/VSCode-$TARGET/RiteMark.app"
 ENTITLEMENTS_PATH="$PROJECT_ROOT/branding/entitlements.plist"
 
 # Counters (using temp files to persist across subshells)
@@ -51,6 +74,8 @@ echo ""
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}RiteMark Native - Smart Code Signing${NC}"
 echo -e "${BLUE}========================================${NC}"
+echo ""
+echo "Target: $TARGET"
 echo ""
 
 # =============================================================================
@@ -196,9 +221,13 @@ while IFS= read -r -d '' nodefile; do
 done < <(find "$APP_PATH" -name "*.node" -type f -print0 2>/dev/null)
 echo "    ✓ .node files signed"
 
-# 5b. Sign all .dylib files
+# 5b. Sign all .dylib files (EXCEPT those in Electron Framework/Libraries - handled later)
 echo "  [5b] Signing .dylib files..."
 while IFS= read -r -d '' dylibfile; do
+    # Skip Electron Framework Libraries - we'll sign these AFTER the framework
+    if [[ "$dylibfile" == *"Electron Framework.framework/Versions/"*"/Libraries/"* ]]; then
+        continue
+    fi
     basename_file=$(basename "$dylibfile")
     if sign_item "$dylibfile" "false" > /dev/null 2>&1; then
         increment_signed
@@ -283,15 +312,47 @@ for fw in Squirrel Mantle ReactiveObjC; do
     fi
 done
 
-# Electron Framework (special handling)
+# Electron Framework (SPECIAL THREE-STAGE SIGNING)
+# CRITICAL FIX for libffmpeg.dylib Team ID mismatch crash:
+# Electron ships these libraries with adhoc signatures (no Team ID).
+# macOS refuses to load them if they have different Team ID than main app.
+# Solution: Re-sign libraries with our Developer ID AFTER framework signing.
 ELECTRON_FW="$APP_PATH/Contents/Frameworks/Electron Framework.framework"
 if [ -d "$ELECTRON_FW" ]; then
+    # Stage 1: Sign the framework (signs main executable and resources)
     if sign_item "$ELECTRON_FW" "false" > /dev/null 2>&1; then
-        echo "    ✓ Signed: Electron Framework.framework"
+        echo "    ✓ Signed: Electron Framework.framework (stage 1)"
         increment_signed
     else
-        echo -e "    ${RED}FAILED: Electron Framework.framework${NC}"
+        echo -e "    ${RED}FAILED: Electron Framework.framework (stage 1)${NC}"
         increment_failed
+    fi
+    
+    # Stage 2: Re-sign Electron Framework libraries with Developer ID
+    echo "  [5d-extra] Re-signing Electron Framework libraries with Developer ID..."
+    ELECTRON_LIBS="$ELECTRON_FW/Versions/A/Libraries"
+    if [ -d "$ELECTRON_LIBS" ]; then
+        while IFS= read -r -d '' libfile; do
+            basename_lib=$(basename "$libfile")
+            if sign_item "$libfile" "false" > /dev/null 2>&1; then
+                echo "    ✓ Re-signed: $basename_lib"
+                increment_signed
+            else
+                echo -e "    ${RED}FAILED: $basename_lib${NC}"
+                increment_failed
+            fi
+        done < <(find "$ELECTRON_LIBS" -name "*.dylib" -type f -print0 2>/dev/null)
+        
+        # Stage 3: Re-sign the framework to incorporate library signatures
+        if sign_item "$ELECTRON_FW" "false" > /dev/null 2>&1; then
+            echo "    ✓ Signed: Electron Framework.framework (stage 2 - final)"
+            increment_signed
+        else
+            echo -e "    ${RED}FAILED: Electron Framework.framework (stage 2 - final)${NC}"
+            increment_failed
+        fi
+    else
+        echo -e "    ${YELLOW}⚠ Electron libraries directory not found${NC}"
     fi
 fi
 
@@ -386,6 +447,32 @@ else
     exit 1
 fi
 
+# 7d. CRITICAL: Verify Electron Framework libraries have our Team ID
+echo ""
+echo "  Verifying Electron Framework libraries Team ID..."
+TEAMID_MISMATCH=0
+ELECTRON_LIBS="$ELECTRON_FW/Versions/A/Libraries"
+if [ -d "$ELECTRON_LIBS" ]; then
+    while IFS= read -r -d '' libfile; do
+        basename_lib=$(basename "$libfile")
+        LIB_TEAMID=$(codesign -dv "$libfile" 2>&1 | grep "TeamIdentifier=" | cut -d'=' -f2)
+        if [ "$LIB_TEAMID" != "$APPLE_TEAM_ID" ]; then
+            echo -e "    ${RED}WRONG TEAM ID: $basename_lib (Team: $LIB_TEAMID, Expected: $APPLE_TEAM_ID)${NC}"
+            TEAMID_MISMATCH=1
+        else
+            echo -e "    ${GREEN}✓ $basename_lib (Team: $APPLE_TEAM_ID)${NC}"
+        fi
+    done < <(find "$ELECTRON_LIBS" -name "*.dylib" -type f -print0 2>/dev/null)
+else
+    echo -e "    ${YELLOW}⚠ Electron libraries directory not found${NC}"
+fi
+
+if [ "$TEAMID_MISMATCH" -gt 0 ]; then
+    echo -e "  ${RED}ERROR: Team ID mismatch detected!${NC}"
+    echo "  App will crash on launch due to code signature verification failure."
+    exit 1
+fi
+
 FINAL_SIGNED=$(get_signed)
 FINAL_FAILED=$(get_failed)
 
@@ -403,5 +490,5 @@ if [ "$FINAL_FAILED" -gt 0 ]; then
     exit 1
 fi
 echo "Next step: Notarize the app"
-echo "  ./scripts/notarize-app.sh"
+echo "  ./scripts/notarize-app.sh $TARGET"
 echo ""

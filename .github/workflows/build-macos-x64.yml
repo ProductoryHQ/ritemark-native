@@ -1,0 +1,263 @@
+name: Build macOS (x64)
+
+on:
+  workflow_dispatch:  # Manual trigger (backup)
+  push:
+    tags:
+      - 'v*'          # Triggers ONLY on version tags: v1.0.0, v1.2.0, etc.
+
+jobs:
+  build:
+    runs-on: macos-13  # Last Intel-native macOS runner
+
+    steps:
+      # =========================================================================
+      # Step 1: Checkout + clone VS Code
+      # =========================================================================
+      - name: Checkout RiteMark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Clone VS Code OSS (1.94.0)
+        run: |
+          git clone --depth 1 --branch 1.94.0 https://github.com/microsoft/vscode.git r/vscode
+          echo "VS Code 1.94.0 cloned"
+
+      # =========================================================================
+      # Step 2: Setup toolchain
+      # =========================================================================
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # =========================================================================
+      # Step 3: Handle extension symlink
+      # =========================================================================
+      - name: Copy extension (replace symlink)
+        working-directory: r
+        run: |
+          rm -rf vscode/extensions/ritemark 2>/dev/null || true
+          # Remove non-x64 binaries that won't be needed
+          rm -rf extensions/ritemark/binaries/darwin-arm64 2>/dev/null || true
+          cp -R extensions/ritemark vscode/extensions/ritemark
+          echo "Extension copied to vscode/extensions/ritemark"
+
+      # =========================================================================
+      # Step 4: Install dependencies
+      # =========================================================================
+      - name: Install VS Code dependencies
+        working-directory: r/vscode
+        env:
+          npm_config_disturl: https://electronjs.org/headers
+          npm_config_target: 30.5.1
+          npm_config_runtime: electron
+          npm_config_build_from_source: true
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+        run: |
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            npm install && break || echo "Attempt $i failed, retrying..."
+            sleep 10
+          done
+
+      - name: Install extension dependencies
+        working-directory: r/vscode/extensions/ritemark
+        run: npm install --legacy-peer-deps
+
+      - name: Remove non-x64-darwin binaries from claude-agent-sdk
+        working-directory: r/vscode/extensions/ritemark
+        run: |
+          SDK_VENDOR="node_modules/@anthropic-ai/claude-agent-sdk/vendor"
+          if [ -d "$SDK_VENDOR/ripgrep" ]; then
+            echo "Removing non-x64-darwin ripgrep binaries..."
+            rm -rf "$SDK_VENDOR/ripgrep/arm64-darwin"
+            rm -rf "$SDK_VENDOR/ripgrep/arm64-linux"
+            rm -rf "$SDK_VENDOR/ripgrep/x64-linux"
+            rm -rf "$SDK_VENDOR/ripgrep/x64-win32"
+            echo "Kept only: $(ls $SDK_VENDOR/ripgrep/)"
+          fi
+
+      # =========================================================================
+      # Step 5: Apply patches + branding
+      # =========================================================================
+      - name: Apply patches
+        working-directory: r
+        run: ./scripts/apply-patches.sh
+
+      # =========================================================================
+      # Step 6: Compile extension
+      # =========================================================================
+      - name: Compile extension
+        working-directory: r/vscode/extensions/ritemark
+        run: npm run compile
+
+      # =========================================================================
+      # Step 7: Build VS Code for macOS x64
+      # =========================================================================
+      - name: Build VS Code (darwin-x64)
+        working-directory: r/vscode
+        run: |
+          echo "Starting macOS x64 build at $(date)"
+          npm run gulp vscode-darwin-x64
+          echo "Build completed at $(date)"
+
+      # =========================================================================
+      # Step 8: Copy extension to build output
+      # =========================================================================
+      - name: Copy extension to build output
+        working-directory: r
+        run: |
+          BUILD_DIR="VSCode-darwin-x64"
+          APP_PATH="$BUILD_DIR/Ritemark.app"
+          EXT_DEST="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: App bundle not found at $APP_PATH"
+            exit 1
+          fi
+
+          rm -rf "$EXT_DEST" || true
+          cp -R vscode/extensions/ritemark "$EXT_DEST"
+          # Remove dev dependencies only - keep runtime node_modules!
+          rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
+          rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
+          echo "Extension copied successfully"
+
+      # =========================================================================
+      # Step 9: Inject ritemarkVersion into product.json
+      # =========================================================================
+      - name: Inject ritemarkVersion into product.json
+        working-directory: r
+        run: |
+          APP_PATH="VSCode-darwin-x64/Ritemark.app"
+          PRODUCT_JSON="$APP_PATH/Contents/Resources/app/product.json"
+
+          # Read ritemarkVersion from branding/product.json
+          RITEMARK_VERSION=$(python3 -c "
+          import json
+          with open('branding/product.json') as f:
+              data = json.load(f)
+          print(data.get('ritemarkVersion', ''))
+          ")
+
+          if [ -z "$RITEMARK_VERSION" ]; then
+            echo "ERROR: ritemarkVersion not found in branding/product.json"
+            exit 1
+          fi
+
+          echo "Injecting ritemarkVersion: $RITEMARK_VERSION"
+
+          python3 -c "
+          import json
+          with open('$PRODUCT_JSON', 'r') as f:
+              data = json.load(f)
+          data['ritemarkVersion'] = '$RITEMARK_VERSION'
+          with open('$PRODUCT_JSON', 'w') as f:
+              json.dump(data, f, indent=2)
+          "
+
+          # Verify
+          if python3 -c "import json; data = json.load(open('$PRODUCT_JSON')); assert data.get('ritemarkVersion') == '$RITEMARK_VERSION'"; then
+            echo "ritemarkVersion $RITEMARK_VERSION injected successfully"
+          else
+            echo "ERROR: ritemarkVersion injection failed"
+            exit 1
+          fi
+
+      # =========================================================================
+      # Step 10: Validate build
+      # =========================================================================
+      - name: Validate build
+        working-directory: r
+        run: |
+          APP_PATH="VSCode-darwin-x64/Ritemark.app"
+          EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+          PRODUCT_JSON="$APP_PATH/Contents/Resources/app/product.json"
+          ERRORS=0
+
+          # Check webview.js (must be >500KB)
+          if [ -f "$EXT_PATH/media/webview.js" ]; then
+            WEBVIEW_SIZE=$(stat -f%z "$EXT_PATH/media/webview.js" 2>/dev/null || wc -c < "$EXT_PATH/media/webview.js" | tr -d ' ')
+            if [ "$WEBVIEW_SIZE" -lt 500000 ]; then
+              echo "FAIL: webview.js too small ($WEBVIEW_SIZE bytes)"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: webview.js ($WEBVIEW_SIZE bytes)"
+            fi
+          else
+            echo "FAIL: webview.js not found"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Check extension.js (must be >1KB)
+          if [ -f "$EXT_PATH/out/extension.js" ]; then
+            EXTENSION_SIZE=$(stat -f%z "$EXT_PATH/out/extension.js" 2>/dev/null || wc -c < "$EXT_PATH/out/extension.js" | tr -d ' ')
+            if [ "$EXTENSION_SIZE" -lt 1000 ]; then
+              echo "FAIL: extension.js too small ($EXTENSION_SIZE bytes)"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: extension.js ($EXTENSION_SIZE bytes)"
+            fi
+          else
+            echo "FAIL: extension.js not found"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Check ritemarkVersion in product.json
+          if grep -q "ritemarkVersion" "$PRODUCT_JSON"; then
+            echo "OK: ritemarkVersion present in product.json"
+          else
+            echo "FAIL: ritemarkVersion missing from product.json"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Check node_modules exist (runtime dependencies)
+          NODE_MODULES_COUNT=$(ls "$EXT_PATH/node_modules" 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$NODE_MODULES_COUNT" -gt 50 ]; then
+            echo "OK: node_modules ($NODE_MODULES_COUNT packages)"
+          else
+            echo "FAIL: node_modules missing or incomplete ($NODE_MODULES_COUNT packages)"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "Validation FAILED with $ERRORS error(s)"
+            exit 1
+          fi
+          echo "Validation PASSED"
+
+      # =========================================================================
+      # Step 11: Upload artifact
+      # =========================================================================
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ritemark-darwin-x64
+          path: r/VSCode-darwin-x64/
+          retention-days: 30
+
+      # =========================================================================
+      # Step 12: Build summary
+      # =========================================================================
+      - name: Build summary
+        working-directory: r
+        run: |
+          echo "========================================"
+          echo "macOS x64 Build Complete"
+          echo "========================================"
+          echo ""
+          echo "App bundle:"
+          ls -lh VSCode-darwin-x64/Ritemark.app/Contents/MacOS/
+          echo ""
+          echo "Extension:"
+          ls -lh VSCode-darwin-x64/Ritemark.app/Contents/Resources/app/extensions/ritemark/ | head -10
+          echo ""
+          echo "Artifact: ritemark-darwin-x64"
+          echo "NOTE: Code sign and notarize locally after downloading"

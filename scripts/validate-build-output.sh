@@ -13,12 +13,30 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Parse target argument
+TARGET="${1:-darwin-arm64}"
+
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    ;;
+  *)
+    echo -e "${RED}ERROR: Invalid target '$TARGET'${NC}"
+    echo "Supported targets: darwin-arm64 (default), darwin-x64"
+    echo ""
+    echo "Usage:"
+    echo "  ./scripts/validate-build-output.sh              # Apple Silicon (default)"
+    echo "  ./scripts/validate-build-output.sh darwin-x64   # Intel Mac"
+    exit 1
+    ;;
+esac
+
 echo "========================================"
 echo "Post-Build Output Validation"
 echo "========================================"
+echo "Target: $TARGET"
 echo ""
 
-APP_PATH="VSCode-darwin-arm64/RiteMark.app"
+APP_PATH="VSCode-$TARGET/RiteMark.app"
 EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
 
 ERRORS=0
