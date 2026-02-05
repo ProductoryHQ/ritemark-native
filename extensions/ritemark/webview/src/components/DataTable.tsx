@@ -2,10 +2,13 @@ import { useMemo, useRef, useState, useCallback } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
+  getSortedRowModel,
   flexRender,
   createColumnHelper,
   type ColumnDef,
+  type SortingState,
 } from '@tanstack/react-table'
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 
 export interface DataTableProps {
@@ -82,6 +85,7 @@ function EditableCell({ value, rowIndex, columnId, onCellChange }: EditableCellP
 export function DataTable({ data, columns, editable = false, onCellChange }: DataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+  const [sorting, setSorting] = useState<SortingState>([])
 
   const toggleRowExpanded = useCallback((rowIndex: number) => {
     setExpandedRows(prev => {
@@ -127,7 +131,10 @@ export function DataTable({ data, columns, editable = false, onCellChange }: Dat
   const table = useReactTable({
     data,
     columns: columnDefs,
+    state: { sorting },
+    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
   })
 
   const { rows } = table.getRowModel()
@@ -177,15 +184,25 @@ export function DataTable({ data, columns, editable = false, onCellChange }: Dat
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="px-3 py-2 text-left font-semibold border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)]"
-                  style={{ minWidth: 100 }}
+                  className="px-3 py-2 text-left font-semibold border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] select-none"
+                  style={{ minWidth: 100, cursor: 'pointer' }}
+                  onClick={header.column.getToggleSortingHandler()}
                 >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
+                  <div className="flex items-center gap-1">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                    {header.column.getIsSorted() === 'asc' ? (
+                      <ChevronUp size={14} className="text-[var(--vscode-descriptionForeground)] flex-shrink-0" />
+                    ) : header.column.getIsSorted() === 'desc' ? (
+                      <ChevronDown size={14} className="text-[var(--vscode-descriptionForeground)] flex-shrink-0" />
+                    ) : (
+                      <ChevronsUpDown size={14} className="text-[var(--vscode-descriptionForeground)] opacity-30 flex-shrink-0" />
+                    )}
+                  </div>
                 </th>
               ))}
             </tr>

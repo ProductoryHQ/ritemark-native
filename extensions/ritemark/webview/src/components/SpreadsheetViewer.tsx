@@ -225,6 +225,29 @@ export function SpreadsheetViewer({
     onChange(csvString)
   }, [parsedData, onChange])
 
+  // Handle adding a new empty row (CSV only)
+  const handleAddRow = useCallback(() => {
+    if (!parsedData || !onChange) return
+
+    // Create empty row with all columns
+    const emptyRow: Record<string, unknown> = {}
+    for (const col of parsedData.columns) {
+      emptyRow[col] = ''
+    }
+
+    const newRows = [...parsedData.rows, emptyRow]
+    setParsedData({
+      ...parsedData,
+      rows: newRows,
+    })
+
+    // Serialize back to CSV and notify parent
+    const csvString = Papa.unparse(newRows, {
+      columns: parsedData.columns,
+    })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
   // Handle conflict dialog actions
   const handleConfirmDiscard = useCallback(() => {
     sendToExtension('confirmRefresh', {})
@@ -351,6 +374,7 @@ export function SpreadsheetViewer({
           onOpenInNumbers={handleOpenInNumbers}
           hasExcel={hasExcel}
           hasFileChanged={hasFileChanged}
+          onAddRow={isEditable ? handleAddRow : undefined}
         />
 
       {/* Status bar */}

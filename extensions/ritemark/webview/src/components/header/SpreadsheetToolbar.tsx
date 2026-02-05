@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowUpRight, ChevronDown, Table2, Grid3X3, RotateCw } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Table2, Grid3X3, RotateCw, Plus } from 'lucide-react'
 
 interface SpreadsheetToolbarProps {
   filename: string
@@ -9,6 +9,7 @@ interface SpreadsheetToolbarProps {
   onRefresh?: () => void
   refreshDisabled?: boolean
   hasFileChanged?: boolean // Show badge when file changed externally
+  onAddRow?: () => void // CSV only: add a new empty row
 }
 
 /**
@@ -29,6 +30,7 @@ export function SpreadsheetToolbar({
   onRefresh,
   refreshDisabled = false,
   hasFileChanged = false,
+  onAddRow,
 }: SpreadsheetToolbarProps) {
   const [showDropdown, setShowDropdown] = React.useState(false)
   const dropdownRef = React.useRef<HTMLDivElement>(null)
@@ -59,6 +61,19 @@ export function SpreadsheetToolbar({
       <div className="toolbar-content">
         {/* Filename on the left */}
         <div className="toolbar-filename">{filename}</div>
+
+        {/* Add Row button (CSV only) */}
+        {onAddRow && (
+          <button
+            className="add-row-button"
+            onClick={onAddRow}
+            aria-label="Add row"
+            title="Add row"
+          >
+            <Plus size={14} />
+            <span>Row</span>
+          </button>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -149,6 +164,25 @@ export function SpreadsheetToolbar({
           font-size: 13px;
           color: var(--vscode-descriptionForeground);
           font-weight: 500;
+        }
+
+        /* Add Row button */
+        .add-row-button {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 8px;
+          border: none;
+          background: transparent;
+          color: var(--vscode-descriptionForeground);
+          font-size: 12px;
+          cursor: pointer;
+          border-radius: 4px;
+          margin-left: 8px;
+        }
+        .add-row-button:hover {
+          background: var(--vscode-toolbar-hoverBackground);
+          color: var(--vscode-foreground);
         }
 
         /* Split button container */

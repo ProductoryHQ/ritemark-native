@@ -3,13 +3,14 @@ import { onMessage, sendToExtension, onInternalEvent, InternalEvent } from './br
 import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from './components/Editor'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
+import { DOCXViewer } from './components/viewers/DOCXViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { DocumentProperties } from './components/properties'
 
-type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf'
+type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf' | 'docx'
 
 // Dictation placeholder texts
 const LISTENING_PLACEHOLDER = '🎤 Listening...'
@@ -368,6 +369,16 @@ function App() {
         content={content}
         filename={filename}
         workerSrc={workerSrc}
+      />
+    )
+  }
+
+  // Route to DOCXViewer for Word documents
+  if (fileType === 'docx') {
+    return (
+      <DOCXViewer
+        content={content}
+        filename={filename}
       />
     )
   }
