@@ -55,7 +55,7 @@ Ritemark Native supports THREE platforms:
 | Build Target | Build Host | Method |
 | --- | --- | --- |
 | darwin-arm64 | macOS arm64 (local) | ✅ Native local build |
-| darwin-x64 | GitHub Actions macos-13 | ✅ CI (Intel runner) |
+| darwin-x64 | GitHub Actions macos-15-intel | ✅ CI (Intel runner) |
 | win32-x64 | GitHub Actions windows-latest | ✅ CI |
 
 **Note:** macOS x64 is built on CI (Intel runner) to get correct native modules (sqlite3, node-pty). Cross-compiling from arm64 produces arm64 native modules that break on Intel Macs.

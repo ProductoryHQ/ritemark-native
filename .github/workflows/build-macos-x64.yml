@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13  # Last Intel-native macOS runner
+    runs-on: macos-15-intel  # Intel-native macOS runner (macos-13 retired)
 
     steps:
       # =========================================================================
