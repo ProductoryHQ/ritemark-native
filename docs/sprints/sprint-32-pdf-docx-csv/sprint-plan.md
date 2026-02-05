@@ -104,9 +104,9 @@ Add read-only viewers for PDF and DOCX files, and enhance CSV editing with sort,
 #### Webview Side
 - [ ] Create `webview/src/components/viewers/DOCXViewer.tsx`
 - [ ] Implement DOCX → HTML conversion with mammoth
-- [ ] Apply editor CSS to rendered content (same fonts, spacing, colors as markdown editor)
-  - max-width: 900px, font-size: 18px, line-height: 1.7, editor padding
-  - Reuse heading, list, table, blockquote styles from ProseMirror CSS
+- [ ] Render content faithfully — do NOT override document formatting
+  - Minimal container: max-width 900px, centered, padding
+  - Only provide sensible defaults where mammoth output has none (img max-width, table borders)
 - [ ] Create `webview/src/components/header/DOCXToolbar.tsx` (minimal — filename + "Open in Word" + refresh)
 - [ ] Add routing in `App.tsx` for 'docx' fileType
 - [ ] Add file change notification support

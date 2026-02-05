@@ -6,7 +6,8 @@ PDF and DOCX viewers are part of the **Text Editor** feature family — not sepa
 
 **Core principles:**
 - **Document-focused**: Minimal chrome, maximum content
-- **Consistent visual language**: Same fonts, colors, spacing as the markdown editor
+- **Content fidelity**: PDF and DOCX content renders **as-is** — we do NOT restyle document content. The original author's formatting must remain intact
+- **Consistent chrome**: Toolbars, buttons, loading states, error states follow Ritemark visual language — the UI _around_ the document is Ritemark, the document itself is untouched
 - **Ghost button UI**: Transparent buttons, subtle hover states, 6px border-radius
 - **40px sticky toolbars**: Consistent header pattern across all viewer types
 - **shadcn/ui from day one**: Use shadcn components for all new UI
@@ -101,28 +102,30 @@ The PDF viewer feels like a read-only version of the markdown editor — same vi
 
 ## DOCX Viewer Design
 
-### Concept: "Rendered Markdown" Style
+### Concept: Faithful Document Rendering
 
-DOCX content is styled to look like it was **written in Ritemark**. Apply the same editor CSS to mammoth's HTML output so it feels cohesive — not like a different application.
+DOCX content renders **as-is** — the original author's formatting must remain intact. We do NOT apply Ritemark editor styles to the document content. mammoth converts DOCX to HTML preserving the document's own structure, and we render that HTML with minimal, neutral styling.
+
+The Ritemark touch is in the **chrome** (toolbar, loading states, error handling) — not the content.
 
 ### Layout
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ [draft.docx]                                       [⟳]  │  ← Minimal toolbar
+│ [draft.docx]                          [Open in Word] [⟳] │  ← Minimal toolbar
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
-│  # Meeting Notes                                         │
+│  Meeting Notes                                           │
 │                                                          │
-│  **Date:** January 15, 2026                              │
-│  **Attendees:** Alice, Bob, Charlie                      │
+│  Date: January 15, 2026                                  │
+│  Attendees: Alice, Bob, Charlie                          │
 │                                                          │
-│  ## Action Items                                         │
+│  Action Items                                            │
 │                                                          │
-│  - Review Q4 results                                     │
-│  - Prepare budget proposal                               │
+│  • Review Q4 results                                     │
+│  • Prepare budget proposal                               │
 │                                                          │
-│  (Styled exactly like editor content)                    │
+│  (Content rendered faithfully from DOCX)                 │
 │                                                          │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -136,27 +139,43 @@ DOCX content is styled to look like it was **written in Ritemark**. Apply the sa
 
 ### Content Styling
 
-Reuse ALL editor styles from the ProseMirror/TipTap CSS:
+Minimal container styling only — do NOT override document formatting:
 
 ```css
 .docx-viewer-content {
   max-width: 900px;
   margin: 0 auto;
-  padding: 2rem 2rem 0 4rem;  /* Same as editor */
-  font-size: 18px;
-  line-height: 1.7;
-  color: #374151;
+  padding: 2rem;
+  overflow-wrap: break-word;
+}
+
+/* Only provide sensible defaults where mammoth output has none */
+.docx-viewer-content img {
+  max-width: 100%;  /* Prevent images from overflowing */
+  height: auto;
+}
+
+.docx-viewer-content table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.docx-viewer-content table td,
+.docx-viewer-content table th {
+  border: 1px solid var(--vscode-panel-border);
+  padding: 0.5rem;
 }
 ```
 
-Headings, lists, tables, blockquotes, code blocks — all inherit editor styles. Users won't notice they're in a different viewer.
+mammoth's HTML output carries the document's own semantic structure. We provide sensible defaults for elements that need them (images, tables) but do NOT force fonts, colors, or spacing.
 
 ### Edge Cases
 
 - Complex formatting: Show subtle banner if unsupported features detected
-- Large images: Auto-scale to max-width
-- Tables: Use Ritemark table styling (1px gray borders)
+- Large images: Auto-scale to max-width (prevent overflow)
+- Tables: Minimal border styling only where DOCX has none
 - Links: Cmd+Click opens in browser
+- Embedded fonts: Not supported — system fonts used as fallback (acceptable)
 
 ### shadcn components: Button (ghost), Alert (formatting warning)
 
