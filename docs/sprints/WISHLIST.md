@@ -9,13 +9,13 @@ A collection of ideas for future development. No commitment, no order - just a p
 - [ ] /command list is missing "Quote" - I want to add quotes ![](./images/image-1770143061718.png)
 - [ ] Improve "Add link" dialog to smart-search from files inside the repository when user starts typing with "@"
 - [ ] Add Youtube (any other streaming) videos from / command palette
-- [ ] PDF preview (read-only viewer)
-- [ ] Word (.docx) preview (read-only viewer)
+- [x] PDF preview (read-only viewer) → **Sprint 32**
+- [x] Word (.docx) preview (read-only viewer) → **Sprint 32**
 
 ## Data Editor
 
 - [ ] Rebrand current Excel viewer/CSV editor as "Data Editor"
-- [ ] CSV full editing improvements (sort, filter, column operations)
+- [ ] CSV full editing improvements (~~sort~~, filter, column operations) — sort done in **Sprint 32**
 - [ ] CSV cell in "editable" mode must be multi-line and extend to "full-height"
 - [ ] CSV open in Excel (automatically export as UTF-8)
 - [ ] Excel (.xlsx) editing (currently preview-only)
@@ -118,6 +118,10 @@ Consolidate UI components using shadcn/ui for consistency.
 - [x] Image selected state (click shows selection, resize handles for local images) → **Sprint 26**
 - [x] Image resize - resize actual file when user drags handles → **Sprint 26**
 - [x] Stale file indicator (Refresh button when file changes externally) → **Sprint 26**
+- [x] PDF preview (read-only viewer) → **Sprint 32**
+- [x] Word (.docx) preview (read-only viewer) → **Sprint 32**
+- [x] CSV column sorting (click headers) → **Sprint 32**
+- [x] CSV add row (toolbar button) → **Sprint 32**
 - [x] In-app update notifications (like Cursor) - \[x\] Show banner when new version available - \[x\] "Later" / "Install Now" buttons
 - [x] Save as PDF
 - [x] Save as DOCX
@@ -144,4 +148,4 @@ Consolidate UI components using shadcn/ui for consistency.
 
 * * *
 
-*Last updated: 2026-01-30*
+*Last updated: 2026-02-05*
