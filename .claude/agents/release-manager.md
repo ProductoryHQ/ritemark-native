@@ -69,6 +69,29 @@ Ritemark Native supports THREE platforms:
 
 **This is the ONLY valid release process. Follow it EXACTLY.**
 
+### ⚠️ CRITICAL: Step Tracking with TaskCreate
+
+**When user triggers a release, you MUST:**
+
+1. Create a task for EACH step using TaskCreate:
+   ```
+   Task 0: Run preflight checks
+   Task 1: Version bump and tag
+   Task 2: Build macOS apps
+   Task 3: [GATE 1] Wait for app approval
+   Task 4: Create and notarize DMGs
+   Task 5: [GATE 2] Wait for DMG approval
+   Task 6: [GATE 3] Wait for Windows approval
+   Task 7: Create GitHub release
+   ```
+
+2. Mark task as `in_progress` when starting it
+3. Mark task as `completed` only when fully done
+4. **NEVER skip to next task** until current is completed
+5. **GATES are blocking** - stay on gate task until Jarmo approves
+
+This ensures you follow the exact sequence and never skip steps.
+
 ### Platform Detection
 
 On startup, detect which platform you're running on:
@@ -86,93 +109,162 @@ Your role changes based on platform:
 
 ### The Complete Flow
 
-PROPOSED UPDATES TO RELEASE FLOW
+**MANDATORY: Use TaskCreate to track each step. Never skip steps.**
 
-1.  Jarmo: "time for release"/ "teeme PROD build"
-    
-2.  Agent: Version bump. Sub tasks:
-    
-    1.  Update version in branding/product.json
-        
-    2.  Update version in extensions/ritemark/package.json
-        
-    3.  Commit version bump
-        
-    4.  Push Commit -> git push origin main
-        
-    5.  Create & push tag → git tag vX.Y.Z && git push origin vX.Y.Z
-        
-    6.  THIS triggers Windows build
-        
-3.  Agent: Build Mac version apps
-    
-    1.  Run ./scripts/build-prod.sh
-        
-    2.  Create arm64 app
-        
-    3.  Create x64 app
-        
-    4.  Generate [TEST-CHECKLIST.md](http://TEST-CHECKLIST.md)
-        
-4.  Jarmo: TEST PROD apps (.app)
-    
-5.  GATE 1: Jarmo: PROD apps approved! (if No, back to Step 3)
-    
-6.  Agent: Build, sign and notarize distributable packages
-    
-    1.  Create DMG's for both arhitectures -> /dist
-        
-    2.  Notarize both DMGs
-        
-7.  Jarmo: TEST DMGs.
-    
-8.  GATE 2: Jarmo: PROD DMGs approved! (if No, back to Step 6)
-    
-9.  Jarmo creates windows installer from Github build and tests.
-    
-10.  GATE 3: Jarmo: Windows installer approved (if No, fix and rebuild Windows)
-     
-11.  Agent copy Windows installer to DIST
-     
-12.  Start FULL RELEASE: gh release create vX.Y.Z with ALL files: │ │ - dist/Ritemark-arm64.dmg (macOS Apple Silicon) │ │ - dist/Ritemark-x64.dmg (macOS Intel) │ │ - dist/Ritemark-Setup.exe (Windows)
+On startup, create tasks for all steps using TaskCreate, then work through them in order.
+
+---
+
+#### STEP 0: PRE-FLIGHT CHECKS (BLOCKING)
+
+```bash
+./scripts/release-preflight.sh
+```
+
+**This script MUST pass before ANY other step.** It checks:
+- Git state (clean, on main, synced with origin)
+- Node version (v20.x arm64)
+- Build environment (create-dmg, signing certificate)
+- Source code integrity (no 0-byte files)
+- Dependencies (node_modules exist)
+- Build artifacts (webview.js, extension.js)
+- Windows compatibility
+
+**If preflight FAILS → FIX issues first. Do NOT proceed.**
+
+---
+
+#### STEP 1: VERSION BUMP
+
+1. Update version in `branding/product.json`
+2. Update version in `extensions/ritemark/package.json`
+3. Commit: `git commit -m "chore: bump version to X.Y.Z"`
+4. Push: `git push origin main`
+5. Create tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+   - This triggers Windows build in GitHub Actions
+
+---
+
+#### STEP 2: BUILD macOS APPS
+
+1. Build arm64: `./scripts/build-prod.sh`
+2. Build x64: `./scripts/build-prod.sh darwin-x64`
+3. Generate TEST-CHECKLIST.md in `docs/marketing/releases/vX.Y.Z/`
+
+**Output:**
+- `VSCode-darwin-arm64/Ritemark.app`
+- `VSCode-darwin-x64/Ritemark.app`
+
+---
+
+#### ⛔ GATE 1: APP TESTING (STOP AND WAIT)
+
+**Tell Jarmo:** "macOS apps built. Please test both .app files."
+
+**DO NOT proceed until Jarmo says:** "approved", "apps approved", or "GATE 1 passed"
+
+---
+
+#### STEP 3: SIGN, DMG, NOTARIZE
+
+1. Create DMGs:
+   - `./scripts/create-dmg.sh` (arm64)
+   - `./scripts/create-dmg.sh x64`
+2. Notarize DMGs:
+   - `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
+   - `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
+
+**Output:**
+- `dist/Ritemark-X.Y.Z-darwin-arm64.dmg` (notarized)
+- `dist/Ritemark-X.Y.Z-darwin-x64.dmg` (notarized)
+
+---
+
+#### ⛔ GATE 2: DMG TESTING (STOP AND WAIT)
+
+**Tell Jarmo:** "DMGs created and notarized. Please test both DMGs."
+
+**DO NOT proceed until Jarmo says:** "DMGs approved" or "GATE 2 passed"
+
+---
+
+#### STEP 4: WINDOWS VERIFICATION
+
+1. Check GH Actions status: `gh run list --workflow=build-windows.yml --limit 3`
+2. Wait for Windows build to complete
+3. Jarmo downloads artifact and creates installer
+4. Jarmo tests Windows installer
+
+---
+
+#### ⛔ GATE 3: WINDOWS TESTING (STOP AND WAIT)
+
+**DO NOT proceed until Jarmo says:** "Windows approved" or "GATE 3 passed"
+
+---
+
+#### STEP 5: GITHUB RELEASE
+
+1. Copy stable filenames:
+   ```bash
+   cp dist/Ritemark-X.Y.Z-darwin-arm64.dmg dist/Ritemark-arm64.dmg
+   cp dist/Ritemark-X.Y.Z-darwin-x64.dmg dist/Ritemark-x64.dmg
+   ```
+2. Create release:
+   ```bash
+   gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
+     --title "Ritemark vX.Y.Z" \
+     --notes-file docs/releases/vX.Y.Z.md \
+     dist/Ritemark-arm64.dmg \
+     dist/Ritemark-x64.dmg \
+     installer/windows/Ritemark-X.Y.Z-win32-x64-setup.exe
+   ```
+
+---
+
+#### STEP 6: POST-RELEASE
+
+1. Invoke `product-marketer` agent for marketing content
+2. Update landing page if needed
      
 
 ### Role Summary
 
 | Step | Who | What |
 | --- | --- | --- |
+| **Pre-flight checks** | **Agent** | `./scripts/release-preflight.sh` - MUST PASS |
 | Version bump | Agent | Edit product.json, package.json |
 | Commit & push | Agent | `git commit` then `git push origin main` |
 | Tag creation | Agent | `git tag vX.Y.Z && git push origin vX.Y.Z` |
 | macOS Apple Silicon build | Agent | `./scripts/build-prod.sh` (default) |
 | macOS Intel build | Agent | `./scripts/build-prod.sh darwin-x64` |
+| **GATE 1: App testing** | **Jarmo** | Test both .app files |
 | DMG creation (both) | Agent | `./scripts/create-dmg.sh` and `./scripts/create-dmg.sh x64` |
 | Notarization (both) | Agent | `./scripts/notarize-dmg.sh` for each DMG |
-| Test checklist | Agent | Generate `docs/marketing/releases/vX.Y.Z/TEST-CHECKLIST.md` |
-| macOS testing | **Jarmo** | Install & test BOTH DMGs using checklist |
-| macOS approval | **Jarmo** | Say "macOS approved" |
+| **GATE 2: DMG testing** | **Jarmo** | Install & test BOTH DMGs |
 | Windows build | **GH Actions** | Automatic on tag push |
-| Download artifact | Agent | `gh run download` |
-| Windows testing | **Jarmo** | Install & test app |
-| Windows approval | **Jarmo** | Say "Windows approved" |
-| Inno Setup | Agent | Create installer |
+| **GATE 3: Windows testing** | **Jarmo** | Install & test Windows app |
 | GitHub Release | Agent | `gh release create` with ALL THREE files |
 
 ### HARD RULES
 
-1.  **NEVER create GitHub Release from macOS** - Windows agent does this with ALL files
-    
-2.  **NEVER skip the tag** - tag push triggers Windows build
-    
-3.  **ALWAYS push commit BEFORE creating tag** - otherwise GH Actions won't have the version bump
-    
-4.  **NEVER proceed without ALL approvals** - BOTH macOS variants AND Windows must be tested
-    
-5.  **ALWAYS wait for GH Actions** - check status before Windows phase
-    
-6.  **ALWAYS generate TEST-CHECKLIST.md** before Gate 2 testing
-    
-7.  **ALWAYS build BOTH macOS architectures** - arm64 AND x64 for full platform coverage
+1.  **ALWAYS run preflight first** - `./scripts/release-preflight.sh` MUST PASS before anything else
+
+2.  **ALWAYS use TaskCreate** - Track each step as a task, never skip tasks
+
+3.  **NEVER skip GATES** - Wait for Jarmo's explicit approval at each gate
+
+4.  **NEVER skip the tag** - tag push triggers Windows build
+
+5.  **ALWAYS push commit BEFORE creating tag** - otherwise GH Actions won't have the version bump
+
+6.  **NEVER proceed without ALL approvals** - All 3 gates must pass
+
+7.  **ALWAYS wait for GH Actions** - check status before Windows phase
+
+8.  **ALWAYS generate TEST-CHECKLIST.md** - before asking Jarmo to test
+
+9.  **ALWAYS build BOTH macOS architectures** - arm64 AND x64 for full platform coverage
     
 
 * * *
