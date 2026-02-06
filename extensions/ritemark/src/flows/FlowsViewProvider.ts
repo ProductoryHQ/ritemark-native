@@ -312,7 +312,7 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
-      background: var(--vscode-sideBar-background);
+      background: var(--vscode-sideBar-background) !important;
     }
   </style>
 </head>
