@@ -1,6 +1,6 @@
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
 import { useState, useEffect, useRef } from 'react'
-import { Link2, Check, X, List, ListOrdered, ListChecks, ExternalLink, Quote } from 'lucide-react'
+import { Link2, Check, X, List, ListOrdered, ListChecks, ExternalLink, Quote, Code } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
 import { openExternalUrl } from '../bridge'
@@ -314,6 +314,18 @@ export function FormattingBubbleMenu({
             title="Blockquote"
           >
             <Quote size={16} />
+          </button>
+
+          {/* Code Block Button - Toggle on/off */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
+              editor.isActive('codeBlock') ? 'bg-gray-200' : ''
+            }`}
+            title="Code Block"
+          >
+            <Code size={16} />
           </button>
 
           {/* Link Button - Keyboard: Cmd+K / Ctrl+K */}

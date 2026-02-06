@@ -225,6 +225,51 @@ export function SpreadsheetViewer({
     onChange(csvString)
   }, [parsedData, onChange])
 
+  // Handle adding a new empty row at the end (CSV only)
+  const handleAddRow = useCallback(() => {
+    if (!parsedData || !onChange) return
+
+    const emptyRow: Record<string, unknown> = {}
+    for (const col of parsedData.columns) {
+      emptyRow[col] = ''
+    }
+
+    const newRows = [...parsedData.rows, emptyRow]
+    setParsedData({ ...parsedData, rows: newRows })
+
+    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
+  // Handle inserting a new empty row at a specific index (CSV only)
+  const handleInsertRowAt = useCallback((index: number) => {
+    if (!parsedData || !onChange) return
+
+    const emptyRow: Record<string, unknown> = {}
+    for (const col of parsedData.columns) {
+      emptyRow[col] = ''
+    }
+
+    const newRows = [...parsedData.rows]
+    newRows.splice(index, 0, emptyRow)
+    setParsedData({ ...parsedData, rows: newRows })
+
+    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
+  // Handle deleting a row at a specific index (CSV only)
+  const handleDeleteRow = useCallback((index: number) => {
+    if (!parsedData || !onChange) return
+
+    const newRows = [...parsedData.rows]
+    newRows.splice(index, 1)
+    setParsedData({ ...parsedData, rows: newRows })
+
+    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
   // Handle conflict dialog actions
   const handleConfirmDiscard = useCallback(() => {
     sendToExtension('confirmRefresh', {})
@@ -398,6 +443,9 @@ export function SpreadsheetViewer({
           columns={parsedData.columns}
           editable={isEditable}
           onCellChange={handleCellChange}
+          onAddRow={isEditable ? handleAddRow : undefined}
+          onInsertRowAt={isEditable ? handleInsertRowAt : undefined}
+          onDeleteRow={isEditable ? handleDeleteRow : undefined}
         />
       </div>
     </div>

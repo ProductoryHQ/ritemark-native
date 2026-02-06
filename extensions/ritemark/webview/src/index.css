@@ -9,8 +9,17 @@
   --muted: var(--vscode-input-background, #3c3c3c);
   --muted-foreground: var(--vscode-descriptionForeground, #8c8c8c);
   --border: var(--vscode-panel-border, #3c3c3c);
+  --input: var(--vscode-input-border, #3c3c3c);
+  --ring: var(--vscode-focusBorder, #007fd4);
   --primary: var(--vscode-button-background, #4338ca);
   --primary-foreground: var(--vscode-button-foreground, #ffffff);
+  --secondary: var(--vscode-button-secondaryBackground, #3a3d41);
+  --secondary-foreground: var(--vscode-button-secondaryForeground, #cccccc);
+  --accent: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+  --accent-foreground: var(--vscode-foreground, #cccccc);
+  --destructive: var(--vscode-errorForeground, #f44747);
+  --destructive-foreground: #ffffff;
+  --radius: 0.375rem;
 }
 
 body {
