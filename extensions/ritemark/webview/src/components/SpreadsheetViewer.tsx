@@ -225,26 +225,48 @@ export function SpreadsheetViewer({
     onChange(csvString)
   }, [parsedData, onChange])
 
-  // Handle adding a new empty row (CSV only)
+  // Handle adding a new empty row at the end (CSV only)
   const handleAddRow = useCallback(() => {
     if (!parsedData || !onChange) return
 
-    // Create empty row with all columns
     const emptyRow: Record<string, unknown> = {}
     for (const col of parsedData.columns) {
       emptyRow[col] = ''
     }
 
     const newRows = [...parsedData.rows, emptyRow]
-    setParsedData({
-      ...parsedData,
-      rows: newRows,
-    })
+    setParsedData({ ...parsedData, rows: newRows })
 
-    // Serialize back to CSV and notify parent
-    const csvString = Papa.unparse(newRows, {
-      columns: parsedData.columns,
-    })
+    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
+  // Handle inserting a new empty row at a specific index (CSV only)
+  const handleInsertRowAt = useCallback((index: number) => {
+    if (!parsedData || !onChange) return
+
+    const emptyRow: Record<string, unknown> = {}
+    for (const col of parsedData.columns) {
+      emptyRow[col] = ''
+    }
+
+    const newRows = [...parsedData.rows]
+    newRows.splice(index, 0, emptyRow)
+    setParsedData({ ...parsedData, rows: newRows })
+
+    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
+  // Handle deleting a row at a specific index (CSV only)
+  const handleDeleteRow = useCallback((index: number) => {
+    if (!parsedData || !onChange) return
+
+    const newRows = [...parsedData.rows]
+    newRows.splice(index, 1)
+    setParsedData({ ...parsedData, rows: newRows })
+
+    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
     onChange(csvString)
   }, [parsedData, onChange])
 
@@ -374,7 +396,6 @@ export function SpreadsheetViewer({
           onOpenInNumbers={handleOpenInNumbers}
           hasExcel={hasExcel}
           hasFileChanged={hasFileChanged}
-          onAddRow={isEditable ? handleAddRow : undefined}
         />
 
       {/* Status bar */}
@@ -422,6 +443,9 @@ export function SpreadsheetViewer({
           columns={parsedData.columns}
           editable={isEditable}
           onCellChange={handleCellChange}
+          onAddRow={isEditable ? handleAddRow : undefined}
+          onInsertRowAt={isEditable ? handleInsertRowAt : undefined}
+          onDeleteRow={isEditable ? handleDeleteRow : undefined}
         />
       </div>
     </div>

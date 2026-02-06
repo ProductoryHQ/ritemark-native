@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -9,14 +9,102 @@ interface PDFViewerProps {
   workerSrc?: string
 }
 
+/**
+ * Lazy page wrapper — only renders the actual <Page> when within viewport margin.
+ * Uses IntersectionObserver for reliable, layout-stable visibility detection.
+ */
+function LazyPage({
+  pageNumber,
+  scale,
+  width,
+  height,
+  onFirstPageLoad,
+}: {
+  pageNumber: number
+  scale: number
+  width: number
+  height: number
+  onFirstPageLoad?: (page: { width: number; height: number }) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Once loaded, keep rendered to avoid thrashing
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+        } else if (!hasLoaded) {
+          setIsVisible(false)
+        }
+      },
+      { rootMargin: '800px 0px' } // Pre-render pages 800px above/below viewport
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasLoaded])
+
+  const scaledWidth = width * scale
+  const scaledHeight = height * scale
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        width: scaledWidth,
+        height: scaledHeight,
+        margin: '0 auto 16px auto',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        border: '1px solid var(--vscode-panel-border, #e0e0e0)',
+        background: 'white',
+        overflow: 'hidden',
+      }}
+    >
+      {isVisible ? (
+        <Page
+          pageNumber={pageNumber}
+          scale={scale}
+          renderTextLayer={true}
+          renderAnnotationLayer={true}
+          onLoadSuccess={(page) => {
+            setHasLoaded(true)
+            if (onFirstPageLoad) onFirstPageLoad(page)
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ccc',
+            fontSize: '13px',
+          }}
+        >
+          {pageNumber}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
+  const [pageWidth, setPageWidth] = useState<number>(595)  // A4 default
+  const [pageHeight, setPageHeight] = useState<number>(842)
 
   // Configure PDF.js worker
   useEffect(() => {
@@ -43,36 +131,34 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages)
-    setLoading(false)
     setError(null)
   }, [])
 
   const onDocumentLoadError = useCallback((err: Error) => {
     setError(err.message || 'Failed to load PDF')
-    setLoading(false)
   }, [])
 
-  // Track current page based on scroll position
+  // Memoize file data so Document doesn't re-load on every render
+  const fileData = useMemo(() => {
+    if (!pdfData) return null
+    return { data: pdfData.slice(0) }
+  }, [pdfData])
+
+  // Capture first page dimensions
+  const onFirstPageLoad = useCallback((page: { width: number; height: number }) => {
+    setPageWidth(page.width)
+    setPageHeight(page.height)
+  }, [])
+
+  // Track current page from scroll position
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return
     const container = containerRef.current
-    const pages = container.querySelectorAll('.react-pdf__Page')
-
-    let closestPage = 1
-    let closestDistance = Infinity
-
-    pages.forEach((page, index) => {
-      const rect = page.getBoundingClientRect()
-      const containerRect = container.getBoundingClientRect()
-      const distance = Math.abs(rect.top - containerRect.top)
-      if (distance < closestDistance) {
-        closestDistance = distance
-        closestPage = index + 1
-      }
-    })
-
-    setCurrentPage(closestPage)
-  }, [])
+    const scrollTop = container.scrollTop
+    const slotHeight = (pageHeight * scale) + 16
+    const page = Math.floor(scrollTop / slotHeight) + 1
+    setCurrentPage(Math.max(1, Math.min(page, numPages)))
+  }, [pageHeight, scale, numPages])
 
   if (error) {
     return (
@@ -106,12 +192,10 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
         <span style={{ color: 'var(--vscode-descriptionForeground, #888)', fontSize: '13px' }}>{filename}</span>
         <div style={{ flex: 1 }} />
 
-        {/* Page navigation */}
         <span style={{ fontSize: '13px', color: 'var(--vscode-descriptionForeground, #888)' }}>
           {currentPage} / {numPages || '...'}
         </span>
 
-        {/* Zoom controls */}
         <button
           onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
           style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', color: 'var(--vscode-foreground)' }}
@@ -131,21 +215,14 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
         </button>
       </div>
 
-      {/* PDF Content - continuous scroll */}
+      {/* PDF Content */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '1rem 0'
-        }}
+        style={{ flex: 1, overflow: 'auto', padding: '16px 0' }}
       >
         <Document
-          file={{ data: pdfData }}
+          file={fileData}
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           loading={
@@ -154,22 +231,15 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
             </div>
           }
         >
-          {Array.from(new Array(numPages), (_, index) => (
-            <div
-              key={`page_${index + 1}`}
-              style={{
-                marginBottom: '1rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                border: '1px solid var(--vscode-panel-border, #e0e0e0)'
-              }}
-            >
-              <Page
-                pageNumber={index + 1}
-                scale={scale}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-              />
-            </div>
+          {Array.from({ length: numPages }, (_, i) => (
+            <LazyPage
+              key={i}
+              pageNumber={i + 1}
+              scale={scale}
+              width={pageWidth}
+              height={pageHeight}
+              onFirstPageLoad={i === 0 ? onFirstPageLoad : undefined}
+            />
           ))}
         </Document>
       </div>
