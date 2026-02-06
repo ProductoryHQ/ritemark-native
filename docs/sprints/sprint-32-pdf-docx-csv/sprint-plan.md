@@ -13,7 +13,7 @@ An independent review identified critical blockers and over-engineering. Scope h
 ### In Scope
 
 | Feature | Description |
-|---------|-------------|
+| --- | --- |
 | PDF Viewer | Read-only preview with page nav, zoom, text selection |
 | DOCX Viewer | Read-only preview with faithful visual rendering |
 | CSV Sort | Click column headers to sort asc/desc |
@@ -22,7 +22,7 @@ An independent review identified critical blockers and over-engineering. Scope h
 ### Deferred to Follow-Up Sprint
 
 | Feature | Reason |
-|---------|--------|
+| --- | --- |
 | CSV column operations | Complex edge cases (delete all, rename) |
 | CSV context menus | Needs @radix-ui/react-context-menu, may conflict with VS Code context menu |
 | CSV multi-line cells | Keyboard handling complexity (Enter vs Shift+Enter) |
@@ -31,7 +31,7 @@ An independent review identified critical blockers and over-engineering. Scope h
 ### Key Dependency Changes
 
 | Original | Changed To | Why |
-|----------|-----------|-----|
+| --- | --- | --- |
 | mammoth | **docx-preview** | mammoth strips visual formatting; docx-preview preserves fonts, colors, alignment |
 | pdfjs-dist (raw) | **react-pdf** (or pdfjs-dist) | react-pdf wraps PDF.js with React components, handles worker config |
 
@@ -79,7 +79,7 @@ An independent review identified critical blockers and over-engineering. Scope h
 
 ### Phase 3: Dependencies & shadcn/ui Setup ✓ COMPLETED
 
-- [x] Install chosen PDF library in webview (react-pdf@10.3.0)
+- [x] Install chosen PDF library in webview ([react-pdf@10.3.0](mailto:react-pdf@10.3.0))
 - [x] Install docx-preview in webview
 - [x] Fix Tailwind theme: add missing CSS variables (`accent`, `destructive`, `secondary`, `ring`, `input`) to `index.css`
 - [x] Add missing colors to `tailwind.config.ts`
@@ -90,15 +90,15 @@ An independent review identified critical blockers and over-engineering. Scope h
 ### Phase 4: PDF Preview Implementation ✓ COMPLETED
 
 #### Extension Side
+
 - [x] Create `src/pdfDocument.ts` (document class)
-- [x] Create `src/pdfEditorProvider.ts` (CustomReadonlyEditorProvider)
-  - CSP includes: `worker-src ${webview.cspSource} blob:;`
-  - CSP includes: `img-src ${webview.cspSource} data: blob:;`
+- [x] Create `src/pdfEditorProvider.ts` (CustomReadonlyEditorProvider) -   CSP includes: `worker-src ${webview.cspSource} blob:;`      -   CSP includes: `img-src ${webview.cspSource} data: blob:;`
 - [x] Register provider in `src/extension.ts`
 - [x] Add custom editor declaration to `package.json` for `*.pdf`
 - [x] Pass worker URI to webview via message (using `webview.asWebviewUri()`)
 
 #### Webview Side
+
 - [x] Create `webview/src/components/viewers/PDFViewer.tsx`
 - [x] Implement continuous-scroll PDF rendering
 - [x] Include PDF.js **text layer** for text selection and copy
@@ -110,23 +110,22 @@ An independent review identified critical blockers and over-engineering. Scope h
 - [x] Error state with retry
 
 #### Testing
+
 - [ ] Needs real-device testing (PDF files of various sizes and content)
 
 ### Phase 5: DOCX Preview Implementation ✓ COMPLETED
 
 #### Extension Side
+
 - [x] Create `src/docxDocument.ts` (document class)
-- [x] Create `src/docxEditorProvider.ts` (CustomReadonlyEditorProvider)
-  - CSP includes: `style-src 'unsafe-inline';` (docx-preview generates inline styles)
-  - CSP includes: `img-src data: blob:;` (base64 images via useBase64URL)
-  - CSP includes: `font-src data:;` (embedded fonts)
+- [x] Create `src/docxEditorProvider.ts` (CustomReadonlyEditorProvider) -   CSP includes: `style-src 'unsafe-inline';` (docx-preview generates inline styles)      -   CSP includes: `img-src data: blob:;` (base64 images via useBase64URL)      -   CSP includes: `font-src data:;` (embedded fonts)
 - [x] Register provider in `src/extension.ts`
 - [x] Add custom editor declaration to `package.json` for `*.docx`
 
 #### Webview Side
+
 - [x] Create `webview/src/components/viewers/DOCXViewer.tsx`
-- [x] Implement rendering with `docx-preview`'s `renderAsync()`
-  - Options: `{ useBase64URL: true, inWrapper: true }`
+- [x] Implement rendering with `docx-preview`'s `renderAsync()` -   Options: `{ useBase64URL: true, inWrapper: true }`
 - [x] Render content faithfully — docx-preview preserves fonts, colors, alignment
 - [x] Minimal container styling (max-width, centered, overflow handling)
 - [x] Toolbar with filename, "Open in Word" button, refresh
@@ -135,6 +134,7 @@ An independent review identified critical blockers and over-engineering. Scope h
 - [x] Loading/error states
 
 #### Testing
+
 - [ ] Needs real-device testing (DOCX files with various formatting)
 
 ### Phase 6: CSV Sort ✓ COMPLETED
@@ -171,7 +171,7 @@ An independent review identified critical blockers and over-engineering. Scope h
 ## Risks & Mitigation
 
 | Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
+| --- | --- | --- | --- |
 | **PDF.js worker fails in webview CSP** | **Medium** | **BLOCKING** | **PoC in Phase 2 before any other work** |
 | Bundle size too large (>5MB) | Low | Medium | Worker is separate file, not bundled in webview.js |
 | docx-preview inline styles blocked by CSP | Low | High | CSP already allows `'unsafe-inline'` for styles |
@@ -182,35 +182,55 @@ An independent review identified critical blockers and over-engineering. Scope h
 ## Technical Notes
 
 ### Bundle Size Monitoring
-- Final webview.js: ~3.95MB (includes react-pdf + docx-preview)
-- PDF.js worker: separate file (~1MB), NOT in bundle
-- Total: ~5MB (at target limit)
-- Original webview.js was ~900KB before sprint
+
+-   Final webview.js: ~3.95MB (includes react-pdf + docx-preview)
+    
+-   PDF.js worker: separate file (~1MB), NOT in bundle
+    
+-   Total: ~5MB (at target limit)
+    
+-   Original webview.js was ~900KB before sprint
+    
 
 ### PDF.js Worker Strategy
+
 Worker loaded as separate file via `webview.asWebviewUri()`:
-1. Copy `pdf.worker.min.mjs` to `media/` during build
-2. Extension passes worker URI to webview via postMessage
-3. Webview sets `GlobalWorkerOptions.workerSrc = workerUri`
-4. CSP: `worker-src ${webview.cspSource} blob:;`
+
+1.  Copy `pdf.worker.min.mjs` to `media/` during build
+    
+2.  Extension passes worker URI to webview via postMessage
+    
+3.  Webview sets `GlobalWorkerOptions.workerSrc = workerUri`
+    
+4.  CSP: `worker-src ${webview.cspSource} blob:;`
+    
 
 Reference: [vscode-pdf](https://github.com/tomoki1207/vscode-pdfviewer), [Modern PDF Preview](https://github.com/chocolatedesue/vscode-pdf)
 
 ### DOCX Rendering with docx-preview
-- `renderAsync(data, container, styleContainer, { useBase64URL: true })`
-- `useBase64URL: true` required because VS Code webview restricts blob: URLs
-- CSP needs: `img-src data:`, `font-src data:`, `style-src 'unsafe-inline'`
+
+-   `renderAsync(data, container, styleContainer, { useBase64URL: true })`
+    
+-   `useBase64URL: true` required because VS Code webview restricts blob: URLs
+    
+-   CSP needs: `img-src data:`, `font-src data:`, `style-src 'unsafe-inline'`
+    
 
 Reference: [AdamRaichu Docx Renderer](https://github.com/AdamRaichu/vscode-docx-viewer) uses same approach
 
 ### CSV Sort Row Index Safety
-- TanStack Table's `getSortedRowModel` preserves original `row.index` values
-- `onCellChange(rowIndex, ...)` must use `row.index` (original), not visual position
-- Must verify this during implementation
+
+-   TanStack Table's `getSortedRowModel` preserves original `row.index` values
+    
+-   `onCellChange(rowIndex, ...)` must use `row.index` (original), not visual position
+    
+-   Must verify this during implementation
+    
 
 ## Testing Checklist
 
 ### PDF Viewer
+
 - [ ] Small PDF (1 page, <1MB)
 - [ ] Medium PDF (10 pages, ~5MB)
 - [ ] Large PDF (100+ pages, >10MB - should warn)
@@ -221,7 +241,10 @@ Reference: [AdamRaichu Docx Renderer](https://github.com/AdamRaichu/vscode-docx-
 - [ ] Corrupted PDF file
 - [ ] Password-protected PDF (should show error)
 
+/
+
 ### DOCX Viewer
+
 - [ ] Simple DOCX (text only)
 - [ ] Formatted DOCX (bold, italic, headings, lists, colors, fonts)
 - [ ] DOCX with images
@@ -233,6 +256,7 @@ Reference: [AdamRaichu Docx Renderer](https://github.com/AdamRaichu/vscode-docx-
 - [ ] Corrupted DOCX file
 
 ### CSV Sort
+
 - [ ] Sort text column (A-Z, Z-A)
 - [ ] Sort number column (ascending, descending)
 - [ ] Sort mixed content column
@@ -241,12 +265,14 @@ Reference: [AdamRaichu Docx Renderer](https://github.com/AdamRaichu/vscode-docx-
 - [ ] Cell editing works correctly while sorted (correct row updated)
 
 ### CSV Add Row
+
 - [ ] Add row to empty CSV
 - [ ] Add row to existing CSV
 - [ ] Add multiple rows in sequence
 - [ ] Added row saves correctly to file
 
 ### Regression Testing
+
 - [ ] Markdown editor still works
 - [ ] Excel viewer still works
 - [ ] Existing CSV editing (single-line) still works
@@ -256,6 +282,7 @@ Reference: [AdamRaichu Docx Renderer](https://github.com/AdamRaichu/vscode-docx-
 - [ ] File change notifications still work
 
 ### Build Testing
+
 - [ ] Dev mode works
 - [ ] Production build succeeds
 - [ ] Production app opens all file types correctly
@@ -264,7 +291,7 @@ Reference: [AdamRaichu Docx Renderer](https://github.com/AdamRaichu/vscode-docx-
 
 ## Status
 
-**Current Phase:** 9 (DOCUMENTATION) - COMPLETE
+**Current Phase:** 9 (DOCUMENTATION) - COMPLETE  
 **All phases implemented.** Awaiting real-device testing by Jarmo.
 
 ## Approval
@@ -272,17 +299,26 @@ Reference: [AdamRaichu Docx Renderer](https://github.com/AdamRaichu/vscode-docx-
 - [x] Jarmo approved this sprint plan
 - [ ] Jarmo tested on real device
 
----
+* * *
 
 ## Research Documents
 
-1. **Existing Patterns** (`research/01-existing-patterns.md`)
-2. **Dependency Analysis** (`research/02-dependency-analysis.md`)
-3. **Technical Design** (`research/03-technical-design.md`)
-4. **Feature Flags Analysis** (`research/04-feature-flags-analysis.md`)
-5. **UX Design** (`research/05-ux-design.md`)
-6. **Review Findings** (`research/06-review-findings.md`)
-   - Independent review: critical gaps, over-engineering, suboptimal patterns
-   - Web research: how existing VS Code PDF/DOCX extensions handle CSP/worker
-   - Dependency change: mammoth -> docx-preview
-   - Scope reduction to achievable targets
+1.  **Existing Patterns** (`research/01-existing-patterns.md`)
+    
+2.  **Dependency Analysis** (`research/02-dependency-analysis.md`)
+    
+3.  **Technical Design** (`research/03-technical-design.md`)
+    
+4.  **Feature Flags Analysis** (`research/04-feature-flags-analysis.md`)
+    
+5.  **UX Design** (`research/05-ux-design.md`)
+    
+6.  **Review Findings** (`research/06-review-findings.md`)
+    
+    -   Independent review: critical gaps, over-engineering, suboptimal patterns
+        
+    -   Web research: how existing VS Code PDF/DOCX extensions handle CSP/worker
+        
+    -   Dependency change: mammoth -> docx-preview
+        
+    -   Scope reduction to achievable targets
