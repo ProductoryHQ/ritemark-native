@@ -25,6 +25,11 @@ const editorType = rootElement.getAttribute('data-editor-type')
 // Debug logging
 console.log('[Ritemark] Initializing editor, type:', editorType)
 
+// Sidebar panels use sideBar background (grey) instead of editor background (white)
+if (editorType === 'flows-panel') {
+  document.body.style.backgroundColor = 'var(--vscode-sideBar-background)'
+}
+
 // Loading fallback
 const LoadingFallback = () => (
   <div
