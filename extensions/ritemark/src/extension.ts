@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { RitemarkEditorProvider } from './ritemarkEditor';
 import { ExcelEditorProvider } from './excelEditorProvider';
+import { PdfEditorProvider } from './pdfEditorProvider';
+import { DocxEditorProvider } from './docxEditorProvider';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
@@ -180,6 +182,16 @@ export function activate(context: vscode.ExtensionContext) {
   // Register Excel viewer (read-only)
   context.subscriptions.push(
     ExcelEditorProvider.register(context)
+  );
+
+  // Register PDF viewer (read-only)
+  context.subscriptions.push(
+    PdfEditorProvider.register(context)
+  );
+
+  // Register DOCX viewer (read-only)
+  context.subscriptions.push(
+    DocxEditorProvider.register(context)
   );
 
   // Register reindex command (initializes indexer on-demand if needed)

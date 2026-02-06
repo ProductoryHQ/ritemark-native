@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { onMessage, sendToExtension, onInternalEvent, InternalEvent } from './bridge'
 import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from './components/Editor'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
+import { PDFViewer } from './components/viewers/PDFViewer'
+import { DOCXViewer } from './components/viewers/DOCXViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { DocumentProperties } from './components/properties'
 
-type FileType = 'markdown' | 'csv' | 'xlsx'
+type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf' | 'docx'
 
 // Dictation placeholder texts
 const LISTENING_PLACEHOLDER = '🎤 Listening...'
@@ -77,6 +79,7 @@ function App() {
   const [filename, setFilename] = useState<string>('')
   const [encoding, setEncoding] = useState<string | undefined>()
   const [sizeBytes, setSizeBytes] = useState<number | undefined>()
+  const [workerSrc, setWorkerSrc] = useState<string | undefined>()
   const [properties, setProperties] = useState<DocumentProperties>({})
   const [hasProperties, setHasProperties] = useState(false)
   const [isReady, setIsReady] = useState(false)
@@ -111,6 +114,7 @@ function App() {
           setFilename((message.filename as string) || '')
           setEncoding(message.encoding as string | undefined)
           setSizeBytes(message.sizeBytes as number | undefined)
+          if (message.workerSrc) setWorkerSrc(message.workerSrc as string)
           setProperties((message.properties as DocumentProperties) || {})
           setHasProperties(message.hasProperties as boolean || false)
           setImageMappings((message.imageMappings as Record<string, string>) || {})
@@ -355,6 +359,27 @@ function App() {
       <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
         <div className="text-[var(--vscode-foreground)]">Loading...</div>
       </div>
+    )
+  }
+
+  // Route to PDFViewer for PDF files
+  if (fileType === 'pdf') {
+    return (
+      <PDFViewer
+        content={content}
+        filename={filename}
+        workerSrc={workerSrc}
+      />
+    )
+  }
+
+  // Route to DOCXViewer for Word documents
+  if (fileType === 'docx') {
+    return (
+      <DOCXViewer
+        content={content}
+        filename={filename}
+      />
     )
   }
 
