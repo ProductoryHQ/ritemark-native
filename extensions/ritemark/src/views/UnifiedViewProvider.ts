@@ -264,10 +264,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._activeAbortController = new AbortController();
 
     try {
+      // Read user-configured excluded folders, fall back to defaults in AgentRunner
+      const excludedFolders = vscode.workspace
+        .getConfiguration('ritemark.ai')
+        .get<string[]>('excludedFolders');
+
       const result = await runAgent({
         prompt,
         workspacePath: this._workspacePath,
         timeoutMinutes: 10,
+        ...(excludedFolders ? { excludedFolders } : {}),
         abortSignal: this._activeAbortController.signal,
         onProgress: (progress: AgentProgress) => {
           this._view?.webview.postMessage({

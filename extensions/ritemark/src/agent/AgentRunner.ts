@@ -36,6 +36,38 @@ const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'];
 const DEFAULT_TIMEOUT_MINUTES = 5;
 
 /**
+ * Default folders/patterns excluded from agent operations.
+ * The agent is instructed not to read or modify files matching these.
+ * Users can override via ritemark.ai.excludedFolders setting.
+ */
+const DEFAULT_EXCLUDED_FOLDERS = [
+  '.git',
+  'node_modules',
+  '.env',
+  '.env.*',
+  '.vscode',
+  '.DS_Store',
+  '*.pem',
+  '*.key',
+  'credentials*',
+  'secrets*',
+];
+
+/**
+ * Build a system prompt prefix that tells the agent about workspace boundaries
+ * and excluded paths. This is a soft guard -- the agent respects instructions.
+ * The hard guard is the cwd constraint from the SDK.
+ */
+function buildSafetyPrefix(workspacePath: string, excludedFolders: string[]): string {
+  if (excludedFolders.length === 0) return '';
+  const exclusions = excludedFolders.map(f => `  - ${f}`).join('\n');
+  return `IMPORTANT: You are working inside this workspace: ${workspacePath}
+Do NOT read, write, edit, or delete files matching these patterns:
+${exclusions}
+If a user asks you to operate on these paths, explain that they are excluded for safety.\n\n`;
+}
+
+/**
  * Execute an agent task using the Claude Agent SDK.
  *
  * Streams progress events via the onProgress callback and returns
@@ -46,6 +78,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     prompt,
     workspacePath,
     allowedTools = DEFAULT_TOOLS,
+    excludedFolders = DEFAULT_EXCLUDED_FOLDERS,
     timeoutMinutes = DEFAULT_TIMEOUT_MINUTES,
     abortSignal,
     onProgress,
@@ -65,6 +98,10 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     throw new Error('Agent prompt is empty');
   }
 
+  // Build the full prompt with safety prefix
+  const safetyPrefix = buildSafetyPrefix(workspacePath, excludedFolders);
+  const fullPrompt = safetyPrefix + prompt;
+
   // Abort controller: merges internal timeout + external signal
   const abortController = new AbortController();
   const timeoutMs = timeoutMinutes * 60 * 1000;
@@ -80,7 +117,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
   try {
     const query = await getQuery();
     const stream = query({
-      prompt,
+      prompt: fullPrompt,
       options: {
         cwd: workspacePath,
         permissionMode: 'bypassPermissions',

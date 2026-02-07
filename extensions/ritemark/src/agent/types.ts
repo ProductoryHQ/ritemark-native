@@ -83,7 +83,7 @@ export interface AgentExecutionOptions {
   prompt: string;
   workspacePath: string;
   allowedTools?: string[];
-  allowedFolders?: string[];
+  excludedFolders?: string[];
   timeoutMinutes?: number;
   abortSignal?: AbortSignal;
   onProgress?: (progress: AgentProgress) => void;
