@@ -1,0 +1,24 @@
+# RiteMark Patch: Default Light Theme
+#
+# Purpose: Default to Light theme on all platforms (not just web)
+#
+# Why: VS Code defaults to Dark theme on desktop, Light on web. Ritemark
+#      targets non-technical users who expect Light theme. Dark theme flash
+#      on every new window is jarring UX. Users can still switch to Dark.
+#
+# File(s): src/vs/workbench/services/themes/common/themeConfiguration.ts
+# Created: 2025-02-07
+#
+diff --git a/src/vs/workbench/services/themes/common/themeConfiguration.ts b/src/vs/workbench/services/themes/common/themeConfiguration.ts
+index b4a84348fb7..5e5698b2349 100644
+--- a/src/vs/workbench/services/themes/common/themeConfiguration.ts
++++ b/src/vs/workbench/services/themes/common/themeConfiguration.ts
+@@ -34,7 +34,7 @@ export const COLOR_THEME_CONFIGURATION_SETTINGS_TAG = 'colorThemeConfiguration';
+ const colorThemeSettingSchema: IConfigurationPropertySchema = {
+ 	type: 'string',
+ 	markdownDescription: nls.localize({ key: 'colorTheme', comment: ['{0} will become a link to another setting.'] }, "Specifies the color theme used in the workbench when {0} is not enabled.", formatSettingAsLink(ThemeSettings.DETECT_COLOR_SCHEME)),
+-	default: isWeb ? ThemeSettingDefaults.COLOR_THEME_LIGHT : ThemeSettingDefaults.COLOR_THEME_DARK,
++	default: ThemeSettingDefaults.COLOR_THEME_LIGHT,
+ 	tags: [COLOR_THEME_CONFIGURATION_SETTINGS_TAG],
+ 	enum: colorThemeSettingEnum,
+ 	enumDescriptions: colorThemeSettingEnumDescriptions,

@@ -89,6 +89,21 @@ These MUST always be true. If broken, the project won't work:
 | Webview bundle | `media/webview.js` is ~900KB (not 64KB) | Invoke `webview-expert` |
 | Node architecture | `node -p "process.arch"` shows `arm64` | Invoke `vscode-expert` |
 | Patches applied | `./scripts/apply-patches.sh --dry-run` shows all "Already applied" | Run `./scripts/apply-patches.sh` |
+| Settings page | `RitemarkSettings.tsx` has full implementation (400+ lines, NOT a stub) | Restore from git history |
+
+### NEVER Remove, Stub, or Disable Existing Features
+
+**HARD RULE #1:** You MUST NEVER replace a working component with a stub, placeholder, or "coming soon" message. This includes:
+
+- Replacing a full implementation with a skeleton/placeholder
+- Commenting out or deleting functional code "temporarily"
+- Removing imports, components, or features during unrelated sprint work
+
+**HARD RULE #2:** ALL features are ON by default. You may ONLY disable a feature when **Jarmo explicitly tells you to**. No exceptions. Do not proactively disable, hide, or gate features without direct instruction from Jarmo.
+
+**If Jarmo asks to disable a feature**, use the feature flag system (`extensions/ritemark/src/features/flags.ts`). Feature flags allow toggling without destroying code.
+
+**Violation of this rule in v1.3.0** broke the Settings page, which meant users could not configure API keys and ALL AI features (Flows, Chat) were unusable.
 
 * * *
 
