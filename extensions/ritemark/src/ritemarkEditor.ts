@@ -5,8 +5,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import matter from 'gray-matter';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
-import { exportToPDF } from './export/pdfExporter';
-import { exportToWord } from './export/wordExporter';
+import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
+import { exportToWordV2 } from './export/v2/wordHtmlExporter';
 import { DictationController } from './voiceDictation/controller';
 import { isEnabled } from './features';
 
@@ -391,19 +391,27 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             return;
 
           case 'exportPDF':
-            // Export document to PDF
-            exportToPDF(
-              message.content as string,
-              message.properties as DocumentProperties,
+            // Export document to PDF (V2 HTML contract with markdown fallback)
+            exportToPDFV2(
+              {
+                html: (message.html as string) || '',
+                markdownFallback: (message.content as string) || '',
+                properties: (message.properties as DocumentProperties) || {},
+                templateId: message.templateId as string | undefined,
+              },
               document.uri
             );
             return;
 
           case 'exportWord':
-            // Export document to Word
-            exportToWord(
-              message.markdown as string,
-              message.properties as DocumentProperties,
+            // Export document to Word (V2 HTML contract with markdown fallback)
+            exportToWordV2(
+              {
+                html: (message.html as string) || '',
+                markdownFallback: (message.markdown as string) || (message.content as string) || '',
+                properties: (message.properties as DocumentProperties) || {},
+                templateId: message.templateId as string | undefined,
+              },
               document.uri
             );
             return;
