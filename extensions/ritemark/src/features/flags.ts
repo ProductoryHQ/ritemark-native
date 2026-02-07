@@ -21,7 +21,7 @@ export interface FeatureFlag {
 /**
  * All known flag IDs
  */
-export type FlagId = 'voice-dictation' | 'markdown-export' | 'document-search' | 'ritemark-flows';
+export type FlagId = 'voice-dictation' | 'markdown-export' | 'document-search' | 'ritemark-flows' | 'agentic-assistant';
 
 /**
  * Feature flag registry
@@ -53,6 +53,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     label: 'Ritemark Flows',
     description: 'Visual automation workflows with AI and file operations',
     status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  'agentic-assistant': {
+    id: 'agentic-assistant',
+    label: 'Agentic AI Assistant',
+    description: 'Enable Claude Code agent for autonomous file operations in the AI sidebar',
+    status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },
 };
