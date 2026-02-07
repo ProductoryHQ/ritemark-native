@@ -1,0 +1,41 @@
+# RiteMark Patch: Disable Integrity Check
+#
+# Purpose: Skip VS Code installation integrity/checksum verification
+#
+# Why: VS Code forks always fail integrity checks because files are modified.
+#      This causes a false "corrupt installation" warning on every launch.
+#      Standard practice for VS Code forks (VSCodium does the same).
+#
+# File(s): src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts
+# Created: 2025-02-07
+#
+diff --git a/src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts b/src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts
+index 8050895e5f6..e5ad1ca5b9c 100644
+--- a/src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts
++++ b/src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts
+@@ -101,24 +101,7 @@ export class IntegrityService implements IIntegrityService {
+ 	}
+
+ 	private async _isPure(): Promise<IntegrityTestResult> {
+-		const expectedChecksums = this.productService.checksums || {};
+-
+-		await this.lifecycleService.when(LifecyclePhase.Eventually);
+-
+-		const allResults = await Promise.all(Object.keys(expectedChecksums).map(filename => this._resolve(<AppResourcePath>filename, expectedChecksums[filename])));
+-
+-		let isPure = true;
+-		for (let i = 0, len = allResults.length; i < len; i++) {
+-			if (!allResults[i].isPure) {
+-				isPure = false;
+-				break;
+-			}
+-		}
+-
+-		return {
+-			isPure,
+-			proof: allResults
+-		};
++		return { isPure: true, proof: [] };
+ 	}
+
+ 	private async _resolve(filename: AppResourcePath, expected: string): Promise<ChecksumPair> {
