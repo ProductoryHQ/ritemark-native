@@ -30,6 +30,7 @@ Redesign Welcome screen for total newbies
 - [ ] How to install AI coding assistants from terminal: Claude Code Codex CLI Gemini CLI
 - [ ] Visual tutorials / article links
 - [ ] Make it obvious what to do first
+- [ ] **Custom Welcome tab icon** - Replace default VS Code editor icon with Ritemark icon in the Welcome tab (especially visible on Windows)
 
 ### Built-in Support Module
 
@@ -95,13 +96,17 @@ Consolidate UI components using shadcn/ui for consistency.
 
 - [ ] Sync to cloud (Google Drive, SharePoint)
 
+## VS Code Upstream
+
+- [ ] **Update base VS Code to 1.109+** - Investigate release notes, breaking changes, and patch compatibility. Current base: 1.94.0
+
 ## Developer Experience
 
-- [ ] **Claude Code auto-launch** - Detect and auto-launch Claude Code in terminal on new window -   Setting: `ritemark.claudeCode.autoLaunch` (default: false)      -   Setting: `ritemark.claudeCode.flags` (e.g., `--dangerously-skip-permissions`)      -   One-time prompt before enabling
+- [ ] **Claude Code auto-launch** - Detect and auto-launch Claude Code in terminal on new window - Setting: `ritemark.claudeCode.autoLaunch` (default: false) - Setting: `ritemark.claudeCode.flags` (e.g., `--dangerously-skip-permissions`) - One-time prompt before enabling
 
 ## Distribution
 
-- [ ] **Homebrew Cask support** - `brew install --cask ritemark` -   See `docs/sprints/sprint-16-auto-update/research/HOMEBREW-CASK-GUIDE.md`
+- [ ] **Homebrew Cask support** - `brew install --cask ritemark` - See `docs/sprints/sprint-16-auto-update/research/HOMEBREW-CASK-GUIDE.md`
 
 * * *
 
