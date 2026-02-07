@@ -21,6 +21,8 @@ import {
 } from '../ai/index';
 import { searchDocuments, buildRAGContext, RAGSearchResult } from '../rag/search';
 import { VectorStore, getDefaultDbPath } from '../rag/vectorStore';
+import { runAgent, AGENTS, type AgentId, type AgentProgress } from '../agent';
+import { isEnabled } from '../features';
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -73,6 +75,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._sendApiKeyStatus();
           this._sendConnectivityStatus();
           this._sendIndexStatus();
+          this._sendAgentConfig();
           break;
 
         case 'ai-configure-key':
@@ -113,6 +116,26 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'open-source':
           // Open source document at specific location
           this._openSourceDocument(message.filePath, message.page);
+          break;
+
+        case 'ai-select-agent':
+          // Persist agent selection to settings
+          await vscode.workspace.getConfiguration('ritemark.ai').update(
+            'selectedAgent',
+            message.agentId,
+            vscode.ConfigurationTarget.Global
+          );
+          break;
+
+        case 'ai-execute-agent':
+          await this._handleAgentExecution(message.prompt);
+          break;
+
+        case 'ai-cancel-agent':
+          if (this._activeAbortController) {
+            this._activeAbortController.abort();
+            this._activeAbortController = null;
+          }
           break;
       }
     });
@@ -197,6 +220,79 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   private _sendConnectivityStatus() {
     this._view?.webview.postMessage({ type: 'connectivity-status', isOnline: isOnline() });
+  }
+
+  /**
+   * Send agent configuration to webview (selected agent, available agents, feature flag state)
+   */
+  private _sendAgentConfig() {
+    const agenticEnabled = isEnabled('agentic-assistant');
+    const selectedAgent = vscode.workspace.getConfiguration('ritemark.ai').get<string>('selectedAgent', 'ritemark-agent');
+
+    this._view?.webview.postMessage({
+      type: 'agent:config',
+      agenticEnabled,
+      selectedAgent,
+      agents: Object.values(AGENTS),
+    });
+  }
+
+  /**
+   * Execute a prompt using the Claude Code agent (AgentRunner)
+   */
+  private async _handleAgentExecution(prompt: string) {
+    if (!isEnabled('agentic-assistant')) {
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: 'Agentic assistant is not enabled. Enable it in Settings > Ritemark Features.',
+      });
+      return;
+    }
+
+    if (!this._workspacePath) {
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: 'No workspace folder open. Please open a folder first.',
+      });
+      return;
+    }
+
+    // Cancel any existing execution
+    if (this._activeAbortController) {
+      this._activeAbortController.abort();
+    }
+    this._activeAbortController = new AbortController();
+
+    try {
+      const result = await runAgent({
+        prompt,
+        workspacePath: this._workspacePath,
+        timeoutMinutes: 10,
+        abortSignal: this._activeAbortController.signal,
+        onProgress: (progress: AgentProgress) => {
+          this._view?.webview.postMessage({
+            type: 'agent-progress',
+            progress,
+          });
+        },
+      });
+
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        text: result.text,
+        filesModified: result.filesModified,
+        metrics: result.metrics,
+        error: result.error,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: errorMessage,
+      });
+    } finally {
+      this._activeAbortController = null;
+    }
   }
 
   private async _sendIndexStatus() {
@@ -560,6 +656,94 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
     .empty-state ul { list-style: none; margin-top: 12px; }
     .empty-state li { margin: 4px 0; font-size: 11px; }
+    /* Agent selector */
+    .agent-selector {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+    .agent-selector label {
+      color: var(--vscode-descriptionForeground);
+      white-space: nowrap;
+    }
+    .agent-selector select {
+      flex: 1;
+      padding: 3px 6px;
+      font-size: 11px;
+      background: var(--vscode-dropdown-background);
+      color: var(--vscode-dropdown-foreground);
+      border: 1px solid var(--vscode-dropdown-border);
+      border-radius: 2px;
+      outline: none;
+    }
+    .agent-selector select:focus { border-color: var(--vscode-focusBorder); }
+    /* Activity feed (Claude Code agent) */
+    .activity-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .activity-card {
+      padding: 8px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1.4;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .activity-card .icon {
+      flex-shrink: 0;
+      width: 16px;
+      text-align: center;
+      font-size: 12px;
+    }
+    .activity-card .content { flex: 1; min-width: 0; }
+    .activity-card .content .label {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .activity-card .content .detail {
+      color: var(--vscode-descriptionForeground);
+      word-break: break-word;
+    }
+    .activity-card.init { background: var(--vscode-textBlockQuote-background); }
+    .activity-card.thinking { background: var(--vscode-textBlockQuote-background); }
+    .activity-card.tool_use { background: var(--vscode-input-background); }
+    .activity-card.done {
+      background: var(--vscode-inputValidation-infoBackground);
+      border: 1px solid var(--vscode-charts-green, #4ec9b0);
+    }
+    .activity-card.error {
+      background: var(--vscode-inputValidation-errorBackground);
+      border: 1px solid var(--vscode-errorForeground);
+    }
+    .activity-card.user-prompt {
+      background: var(--vscode-input-background);
+    }
+    .agent-result-summary {
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: var(--vscode-textBlockQuote-background);
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .agent-result-summary .files-list {
+      margin-top: 4px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .agent-result-summary .metrics {
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+    }
   </style>
 </head>
 <body style="padding: 0 !important;">
@@ -568,6 +752,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     <h3>OpenAI API Key Required</h3>
     <p>Add your API key to enable AI features</p>
     <button class="btn" id="configure-key-btn">Configure API Key</button>
+  </div>
+
+  <div id="agent-selector" class="agent-selector" style="display: none;">
+    <label for="agent-select">Agent:</label>
+    <select id="agent-select">
+      <option value="ritemark-agent">Ritemark Agent</option>
+    </select>
   </div>
 
   <div id="offline-banner" class="offline-banner" style="display: none;">
@@ -579,6 +770,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       <span class="label">Selected:</span>
       <span class="text" id="selection-text"></span>
     </div>
+
+    <!-- Activity feed for Claude Code agent (replaces messages) -->
+    <div id="agent-feed" class="activity-feed" style="display: none;"></div>
 
     <div id="messages" class="messages">
       <div class="empty-state">
@@ -629,6 +823,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     let indexingInProgress = false;
     let activeWidget = null;
     let ragResults = [];
+    let selectedAgent = 'ritemark-agent';
+    let agenticEnabled = false;
+    let agentActivities = [];
+    let agentIsRunning = false;
 
     const noKeyEl = document.getElementById('no-key');
     const offlineBanner = document.getElementById('offline-banner');
@@ -640,24 +838,44 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const selectionInfo = document.getElementById('selection-info');
     const selectionText = document.getElementById('selection-text');
     const indexStats = document.getElementById('index-stats');
+    const agentSelectorEl = document.getElementById('agent-selector');
+    const agentSelectEl = document.getElementById('agent-select');
+    const agentFeedEl = document.getElementById('agent-feed');
 
     function render() {
+      // Show agent selector when feature is enabled and user has API key
+      agentSelectorEl.style.display = (hasApiKey && agenticEnabled) ? 'flex' : 'none';
+
+      const isClaudeCode = selectedAgent === 'claude-code';
+
       if (!hasApiKey) {
         noKeyEl.style.display = 'flex';
         offlineBanner.style.display = 'none';
         chatContainer.style.display = 'none';
+        agentFeedEl.style.display = 'none';
       } else if (!online) {
         noKeyEl.style.display = 'none';
         offlineBanner.style.display = 'block';
-        chatContainer.style.display = 'flex';
+        chatContainer.style.display = isClaudeCode ? 'none' : 'flex';
+        agentFeedEl.style.display = isClaudeCode ? 'flex' : 'none';
         inputEl.disabled = true;
         sendBtn.disabled = true;
       } else {
         noKeyEl.style.display = 'none';
         offlineBanner.style.display = 'none';
+        // Both modes share the chat-container (for input area), but swap content
         chatContainer.style.display = 'flex';
-        inputEl.disabled = false;
-        sendBtn.disabled = false;
+        // Show activity feed inside messages area for Claude Code, hide regular messages
+        agentFeedEl.style.display = isClaudeCode ? 'flex' : 'none';
+        messagesEl.style.display = isClaudeCode ? 'none' : 'flex';
+        inputEl.disabled = isClaudeCode ? agentIsRunning : false;
+        sendBtn.disabled = isClaudeCode ? agentIsRunning : false;
+        inputEl.placeholder = isClaudeCode ? 'Ask Claude Code to do something...' : 'Ask anything...';
+      }
+
+      // Render agent activity feed
+      if (isClaudeCode) {
+        renderAgentFeed();
       }
 
       // Selection indicator
@@ -759,10 +977,62 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return html;
     }
 
+    function renderAgentFeed() {
+      if (agentActivities.length === 0 && !agentIsRunning) {
+        agentFeedEl.innerHTML = '<div class="empty-state"><p>Claude Code can work with your files</p><ul><li>"Reorganize my research notes"</li><li>"Create an outline from these files"</li><li>"Find all mentions of X and summarize"</li></ul></div>';
+        return;
+      }
+      let html = '';
+      for (const activity of agentActivities) {
+        html += renderActivityCard(activity);
+      }
+      if (agentIsRunning) {
+        html += '<div class="activity-card thinking"><div class="icon">...</div><div class="content"><div class="detail">Working...</div></div></div>';
+      }
+      agentFeedEl.innerHTML = html;
+      agentFeedEl.scrollTop = agentFeedEl.scrollHeight;
+    }
+
+    function renderActivityCard(a) {
+      const icons = { init: '>', thinking: '?', tool_use: '#', done: '+', error: '!', text: '>', 'user-prompt': '>' };
+      const icon = icons[a.type] || '>';
+      let label = '';
+      let detail = escapeHtml(a.message);
+      if (a.type === 'init') { label = 'Starting'; }
+      else if (a.type === 'thinking') { label = 'Thinking'; }
+      else if (a.type === 'tool_use') { label = a.tool || 'Tool'; }
+      else if (a.type === 'done') { label = 'Done'; }
+      else if (a.type === 'error') { label = 'Error'; }
+      else if (a.type === 'user-prompt') { label = 'You'; }
+      else if (a.type === 'result') { label = 'Result'; }
+
+      return '<div class="activity-card ' + a.type + '">'
+        + '<div class="icon">' + icon + '</div>'
+        + '<div class="content">'
+        + '<div class="label">' + escapeHtml(label) + '</div>'
+        + '<div class="detail">' + detail + '</div>'
+        + (a.filesModified ? '<div class="files-list">Files: ' + escapeHtml(a.filesModified.join(', ')) + '</div>' : '')
+        + (a.metrics ? '<div class="metrics">' + (a.metrics.durationMs/1000).toFixed(1) + 's' + (a.metrics.costUsd != null ? ' | $' + a.metrics.costUsd.toFixed(4) : '') + '</div>' : '')
+        + '</div></div>';
+    }
+
     function sendMessage() {
       const prompt = inputEl.value.trim();
-      if (!prompt || isLoading) return;
+      if (!prompt) return;
 
+      // Route to different handlers based on selected agent
+      if (selectedAgent === 'claude-code') {
+        if (agentIsRunning) return;
+        agentActivities.push({ type: 'user-prompt', message: prompt });
+        inputEl.value = '';
+        agentIsRunning = true;
+        render();
+        vscode.postMessage({ type: 'ai-execute-agent', prompt });
+        return;
+      }
+
+      // Default: Ritemark Agent (original behavior)
+      if (isLoading) return;
       messages.push({ role: 'user', content: prompt });
       conversationHistory.push({ role: 'user', content: prompt });
       inputEl.value = '';
@@ -780,6 +1050,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     function cancelRequest() {
+      if (selectedAgent === 'claude-code') {
+        vscode.postMessage({ type: 'ai-cancel-agent' });
+        agentIsRunning = false;
+        agentActivities.push({ type: 'error', message: 'Cancelled by user' });
+        render();
+        return;
+      }
       vscode.postMessage({ type: 'ai-cancel' });
       isLoading = false;
       streamingContent = '';
@@ -936,7 +1213,55 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           indexingInProgress = false;
           render();
           break;
+
+        case 'agent:config':
+          agenticEnabled = message.agenticEnabled;
+          selectedAgent = message.selectedAgent || 'ritemark-agent';
+          agentSelectEl.value = selectedAgent;
+          // Populate agent options
+          if (message.agents && message.agents.length > 0) {
+            agentSelectEl.innerHTML = '';
+            for (const agent of message.agents) {
+              if (agent.experimental && !agenticEnabled) continue;
+              const opt = document.createElement('option');
+              opt.value = agent.id;
+              opt.textContent = agent.label + (agent.experimental ? ' (experimental)' : '');
+              agentSelectEl.appendChild(opt);
+            }
+            agentSelectEl.value = selectedAgent;
+          }
+          render();
+          break;
+
+        case 'agent-progress':
+          if (message.progress) {
+            agentActivities.push(message.progress);
+            renderAgentFeed();
+          }
+          break;
+
+        case 'agent-result':
+          agentIsRunning = false;
+          if (message.error) {
+            agentActivities.push({ type: 'error', message: message.error });
+          } else {
+            agentActivities.push({
+              type: 'done',
+              message: message.text || 'Completed',
+              filesModified: message.filesModified,
+              metrics: message.metrics
+            });
+          }
+          render();
+          break;
       }
+    });
+
+    // Agent selector change
+    agentSelectEl.addEventListener('change', () => {
+      selectedAgent = agentSelectEl.value;
+      vscode.postMessage({ type: 'ai-select-agent', agentId: selectedAgent });
+      render();
     });
 
     // Initialize
