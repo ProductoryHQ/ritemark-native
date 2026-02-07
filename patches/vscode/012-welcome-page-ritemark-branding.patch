@@ -23,7 +23,7 @@ index 4641275f880..6afd2a3022d 100644
  		}));
  
 +		// RiteMark: Updated Welcome page with logo
-+		const logoUri = FileAccess.asBrowserUri('vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-logo.svg');
++		const logoUri = FileAccess.asBrowserUri('vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg');
  		const header = $('.header', {},
 -			$('h1.product-name.caption', {}, this.productService.nameLong),
 -			$('p.subtitle.description', {}, localize({ key: 'gettingStarted.editingEvolved', comment: ['Shown as subtitle on the Welcome page.'] }, "Editing evolved"))
@@ -552,11 +552,11 @@ index 00000000000..5cd35545863
 +	color: var(--productory-indigo, #4338ca) !important;
 +}
 +
-diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-logo.svg b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-logo.svg
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg b/src/vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg
 new file mode 100644
 index 00000000000..8decc154a0e
 --- /dev/null
-+++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-logo.svg
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg
 @@ -0,0 +1,51 @@
 +<svg width="424" height="130" viewBox="0 0 424 130" fill="none" xmlns="http://www.w3.org/2000/svg">
 +<g filter="url(#filter0_dd_891_1858)">
