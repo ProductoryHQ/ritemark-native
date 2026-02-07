@@ -108,6 +108,15 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
   const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
   if (abortSignal) {
+    if (abortSignal.aborted) {
+      clearTimeout(timeoutId);
+      return {
+        text: '',
+        filesModified: [],
+        metrics: { durationMs: 0, costUsd: null, model: null },
+        error: 'Execution cancelled',
+      };
+    }
     abortSignal.addEventListener('abort', () => abortController.abort(), { once: true });
   }
 
