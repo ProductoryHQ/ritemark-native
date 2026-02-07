@@ -33,11 +33,12 @@ Make the AI assistant agentic: users can ask the assistant to perform multi-step
 
 - [ ] AgentRunner service successfully extracted from ClaudeCodeNodeExecutor
 - [ ] Flows continue to work (no regression)
-- [ ] Unified AI View has three-mode selector (Chat / Assist / Auto)
-- [ ] Activity feed shows structured cards instead of terminal output
+- [ ] Unified AI View has agent selector dropdown (Ritemark Agent / Claude Code)
+- [ ] Agent selection persists across sessions (stored in VS Code settings)
+- [ ] Activity feed shows structured cards when Claude Code agent is selected
 - [ ] Folder permission UI allows users to restrict agent access
 - [ ] Research tool integrates RAG with agent (agent can search workspace)
-- [ ] Feature flag properly gates the new modes
+- [ ] Feature flag properly gates Claude Code agent option
 - [ ] Users can enable feature via Settings UI
 - [ ] All changes work in both dev and production builds
 
@@ -46,8 +47,8 @@ Make the AI assistant agentic: users can ask the assistant to perform multi-step
 | Deliverable | Description |
 |-------------|-------------|
 | AgentRunner service | Reusable agent execution service (`src/agent/AgentRunner.ts`) |
-| Three-mode selector | Chat (default), Assist (approval), Auto (autonomous) |
-| Activity feed UI | Structured cards with icons, timestamps, file tracking |
+| Agent selector | Persistent dropdown: Ritemark Agent (default) / Claude Code. Stored in `ritemark.ai.selectedAgent` setting. Extensible for future agents (Codex, Gemini). |
+| Activity feed UI | Structured cards with icons, timestamps, file tracking (Claude Code agent only) |
 | Folder permissions | UI to select allowed folders, path validation |
 | Research tool | Custom tool that integrates RAG search for agent |
 | Feature flag | `agentic-assistant` flag with Settings UI integration |
@@ -100,15 +101,16 @@ Make the AI assistant agentic: users can ask the assistant to perform multi-step
 - [ ] Gate agent messages with feature flag check
 - [ ] Handle abort/cancel for agent execution
 
-### Phase 5: Webview UI - Mode Selector
+### Phase 5: Webview UI - Agent Selector
 
-- [ ] Update webview types to include agent modes
-- [ ] Create `AgentModeSelector.tsx` component (Chat/Assist/Auto tabs)
-- [ ] Add state management for current mode
-- [ ] Hide Assist/Auto modes if feature flag is OFF
-- [ ] Send mode change events to extension
-- [ ] Style mode selector (VS Code theme integration)
-- [ ] Show first-time prompt when enabling agent modes
+- [ ] Update webview types to include agent selection
+- [ ] Create `AgentSelector.tsx` component (dropdown: Ritemark Agent / Claude Code)
+- [ ] Add state management for selected agent (persisted via VS Code settings)
+- [ ] Show Claude Code option as "(experimental)" when feature flag is ON
+- [ ] Disable/hide Claude Code option when feature flag is OFF
+- [ ] Send agent selection change to extension (`ai-select-agent` message)
+- [ ] Style dropdown (VS Code theme integration)
+- [ ] Load persisted selection on webview init
 
 ### Phase 6: Webview UI - Activity Feed
 
@@ -130,13 +132,13 @@ Make the AI assistant agentic: users can ask the assistant to perform multi-step
 ### Phase 7: Webview UI - Folder Selector
 
 - [ ] Create `FolderSelector.tsx` component
-- [ ] Show/hide based on current mode (Assist/Auto only)
+- [ ] Show/hide based on selected agent (Claude Code only)
 - [ ] Send folder picker request to extension
 - [ ] Display selected folders with checkboxes
 - [ ] Add "Add Folder" button
 - [ ] Add remove folder action
-- [ ] Show warning if entire workspace is selected
-- [ ] Persist folder selections in webview state
+- [ ] Default to workspace root with clear indicator
+- [ ] Persist folder selections in VS Code settings
 
 ### Phase 8: Research Tool Integration
 
@@ -159,9 +161,10 @@ Make the AI assistant agentic: users can ask the assistant to perform multi-step
 ### Phase 10: Integration & Polish
 
 - [ ] Update message protocol between extension and webview
-- [ ] Test all three modes (Chat, Assist, Auto)
+- [ ] Test both agents (Ritemark Agent, Claude Code)
+- [ ] Test agent switching preserves/clears conversation correctly
 - [ ] Test feature flag toggle (enable/disable without restart)
-- [ ] Test abort/cancel in all modes
+- [ ] Test abort/cancel with Claude Code agent
 - [ ] Verify file modification tracking works
 - [ ] Test with real Claude API calls (not mocks)
 - [ ] Verify webview bundle size is acceptable
@@ -205,11 +208,13 @@ Make the AI assistant agentic: users can ask the assistant to perform multi-step
 
 **Extension → Webview:**
 - `features:state` - Feature flag states
+- `agent:selected` - Currently selected agent (on init)
 - `agent-progress` - Progress event (thinking, tool_use, etc.)
 - `agent-result` - Final result (success/error, files modified, cost)
 
 **Webview → Extension:**
-- `ai-execute-agent` - Execute agent with prompt and mode
+- `ai-select-agent` - User changed agent selection (persists to settings)
+- `ai-execute-agent` - Execute agent with prompt
 - `ai-cancel-agent` - Abort current agent execution
 - `agent-select-folder` - Open folder picker dialog
 
@@ -260,20 +265,21 @@ Make the AI assistant agentic: users can ask the assistant to perform multi-step
 - [ ] Works standalone (no Flow dependencies)
 
 ### Unified View Integration
-- [ ] Mode selector appears when feature flag is ON
-- [ ] Mode selector hidden when feature flag is OFF
-- [ ] Activity feed replaces chat messages in agent modes
-- [ ] Folder selector appears in Assist/Auto modes
+- [ ] Agent selector dropdown appears in sidebar
+- [ ] Claude Code option disabled/hidden when feature flag is OFF
+- [ ] Agent selection persists across sessions
+- [ ] Activity feed replaces chat messages when Claude Code is selected
+- [ ] Folder selector appears when Claude Code is selected
 - [ ] Progress events stream correctly
 - [ ] Result displays correctly (success and error cases)
 - [ ] Abort/cancel works
+- [ ] Switching back to Ritemark Agent restores original chat UI
 
 ### Feature Flag
-- [ ] Flag ON: Agent modes available
-- [ ] Flag OFF: Agent modes hidden, requests blocked
+- [ ] Flag ON: Claude Code option available in agent selector
+- [ ] Flag OFF: Claude Code option disabled/hidden in agent selector
 - [ ] Settings UI shows experimental setting
 - [ ] Setting persists across restarts
-- [ ] First-time prompt shows when user tries agent mode while flag is OFF
 
 ### Research Tool
 - [ ] RAG search returns relevant results

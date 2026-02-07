@@ -258,47 +258,61 @@ For long-running tasks (reorganize 50 notes, generate summaries for a folder):
 
 ## Recommended Approach
 
-### Phase 1: Extend Claude Agent SDK to Main AI View
+**UX Decision (Jarmo):** No abstract modes (Chat/Assist/Auto). Instead, a **persistent agent selector dropdown** with concrete agent names. Users pick their agent and it stays until they change it.
+
+```
+Agent: [Ritemark Agent ▼]
+        ┌─────────────────────┐
+        │ Ritemark Agent     ← │  (current chat + RAG, default)
+        │ Claude Code          │  (Phase 1: agentic, Claude SDK)
+        │ Codex                │  (Phase 2: agentic, OpenAI Codex)
+        └─────────────────────┘
+```
+
+Each agent is a real product with its own personality, tools, and provider -- not an abstraction layer.
+
+### Phase 1: Claude Code Agent (via Claude Agent SDK)
 
 **Effort:** Medium (infrastructure already exists)
 **Impact:** High (proves the concept with existing users)
 
 1. Extract `ClaudeCodeNodeExecutor` patterns into a reusable `AgentRunner`
-2. Add agentic mode to `UnifiedViewProvider` (the existing sidebar)
-3. Implement activity feed UI in the webview
-4. Add per-step checkpoints with undo
-5. Define writing-specific tools (not just code tools)
-6. Three-mode selector: Chat / Assist / Auto
+2. Add agent selector dropdown to `UnifiedViewProvider` sidebar
+3. When "Claude Code" is selected, switch to activity feed UI
+4. When "Ritemark Agent" is selected, keep current chat UI unchanged
+5. Implement activity feed with structured cards
+6. Define writing-specific tools (not just code tools)
+7. Persist agent selection in VS Code settings
 
 This leverages the proven Claude Agent SDK integration. The ~7% Claude subscription market is small but these are power users who will validate the UX before wider rollout.
 
-### Phase 2: Add Codex SDK as Alternative Provider
+### Phase 2: Codex Agent (via OpenAI Codex SDK)
 
 **Effort:** Medium
 **Impact:** High (captures ChatGPT market)
 
 1. Add `@openai/codex-sdk` as optional dependency
-2. Implement `CodexAgentProvider` alongside `ClaudeAgentProvider`
-3. Provider selection in settings (or auto-detect based on available keys)
-4. Map Codex events (tool calls, file changes) to the shared activity feed
+2. Add "Codex" option to the agent selector dropdown
+3. Implement `CodexAgentProvider` with same activity feed UI
+4. Map Codex events (tool calls, file changes) to shared card types
 5. Handle "Sign in with ChatGPT" flow if Codex CLI is installed
 
-### Phase 3: Custom OpenAI Tool Loop (API Key Users)
+### Phase 3: Custom OpenAI Agent (API Key Users)
 
 **Effort:** Medium-High
 **Impact:** Medium (catches users without Codex CLI installed)
 
 1. Implement agentic loop using OpenAI Responses API directly
-2. Custom writing-optimized tools (not shell/apply_patch)
-3. Works with any OpenAI API key (no Codex dependency)
-4. Same activity feed and checkpoint UI
+2. Add as "OpenAI Agent" option in the selector (or merge with Codex option)
+3. Custom writing-optimized tools (not shell/apply_patch)
+4. Same activity feed and card types
 
-### Phase 4: Provider-Agnostic Polish
+### Phase 4: Polish & Future Agents
 
-1. Unified settings panel for all providers
-2. Smart provider recommendation ("You have a ChatGPT subscription? Use OpenAI provider")
-3. Capability comparison (which provider is better for which task)
-4. Cost estimation per task
+1. Unified settings panel for all agents
+2. Smart agent recommendation based on available API keys
+3. Per-agent capability indicators in the dropdown
+4. Gemini Agent option when/if Google ships agent SDK
 
 ---
 
@@ -323,7 +337,7 @@ The promise of "leveraging ChatGPT subscriptions" has a catch:
 
 ```
 +-----------------------------------------------+
-| Ritemark AI Assistant            [Chat|Assist|Auto]
+| Agent: [Claude Code ▼]                         |
 +-----------------------------------------------+
 | How can I help with your writing?              |
 |                                                |
@@ -346,33 +360,26 @@ The promise of "leveraging ChatGPT subscriptions" has a catch:
 |   4. Results (from data-analysis.md + ...)     |
 |   5. Discussion (new, synthesized)             |
 |                                                |
-|   [Accept Plan] [Modify] [Cancel]              |
-|                                                |
 | [Writing] Creating thesis-outline.md           |
 |   "Moving methodology before results because   |
 |    this follows standard academic structure"    |
 |                                                |
 | [Done] Created thesis-outline.md               |
 |   3 files reorganized, 1 new file created      |
+|   Duration: 4.2s | Cost: $0.08                 |
 |                                                |
-|   [Review Changes] [Undo All] [Accept]         |
-|                                                |
-| ──────── Checkpoint: 2 min ago ────────        |
-|   [Timeline] ●───●───●───●                    |
-|              ^           ^                     |
-|            start       current                 |
+|   [Review Changes] [Undo All]                  |
 +-----------------------------------------------+
 | [Type a message...]                   [Send]   |
 +-----------------------------------------------+
 ```
 
 Key UX elements:
-- **Mode selector** (top right): Chat/Assist/Auto
-- **Activity feed**: Structured cards, not terminal output
+- **Agent selector** (top): Persistent dropdown -- Ritemark Agent / Claude Code
+- **Activity feed**: Structured cards, not terminal output (only in Claude Code)
 - **Explanations**: Agent explains WHY, not just what
-- **Plan approval**: User confirms before execution
-- **Checkpoint timeline**: Visual scrubber for undo
 - **Review changes**: Diff view before accepting
+- **Switching to "Ritemark Agent"** restores the familiar chat UI instantly
 
 ---
 

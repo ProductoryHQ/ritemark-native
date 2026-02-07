@@ -2,91 +2,88 @@
 
 **Sprint 33: Agentic GUI - Phase 1**
 **Date:** 2026-02-07
+**Updated:** 2026-02-07 (Jarmo feedback: simplified agent selector)
 
 ## Design Principles (from Research Doc)
 
-1. **Progressive autonomy:** Users choose risk level
+1. **Simplicity first:** Two clear choices, not abstract mode names
 2. **Activity feed, not terminal:** Structured cards with icons
 3. **Undo > Approval:** Easy rollback is the real safety net
 4. **Folder permissions:** Non-technical users understand folders
 5. **Show the "why":** Agent explains reasoning, not just actions
 6. **Writing-specific skills:** Not just code tools
-7. **Background tasks:** Long operations with notifications
+7. **Persistent selection:** Choice sticks until user changes it
 
-## Three-Mode Selector
+## Agent Selector (Replaces Three-Mode)
 
-Located at top of Unified AI View sidebar.
+**Jarmo's decision:** No abstract modes (Chat/Assist/Auto). Instead, a simple persistent agent selector with two concrete choices.
+
+Located at top of Unified AI View sidebar as a dropdown or toggle.
 
 ```
 ┌──────────────────────────────────────┐
-│ Ritemark AI  [Chat▼][Assist][Auto]   │
+│ Agent: [Ritemark Agent ▼]            │
+│        ┌─────────────────────┐       │
+│        │ Ritemark Agent    ← │       │
+│        │ Claude Code         │       │
+│        └─────────────────────┘       │
 └──────────────────────────────────────┘
 ```
 
-### Mode: Chat (Default)
+### Agent: Ritemark Agent (Default)
 
-**What it does:**
-- Current behavior (LLM chat + RAG)
-- No file modifications
-- Zero risk
+**What it is:** Current AI chat behavior + RAG. The familiar Ritemark assistant.
 
-**UI state:**
-- Chat mode active (highlighted)
-- No folder selector visible
-- Standard chat input
+**Capabilities:**
+- LLM chat with context (existing behavior)
+- RAG-powered knowledge search
+- Image generation
+- No autonomous file operations
 
-### Mode: Assist
+**UI:** Unchanged from current -- same chat interface users already know.
 
-**What it does:**
-- Agent can read files, suggest edits
-- User approves each action
-- Low risk
+### Agent: Claude Code
 
-**UI additions:**
-- Folder selector appears below mode tabs
-- Activity feed shows proposed actions
-- Approve/Deny buttons per action
+**What it is:** Full agentic assistant powered by Claude Agent SDK. Can read, write, search, and organize files autonomously.
 
-**Example:**
+**Capabilities:**
+- Everything Ritemark Agent does, plus:
+- Read/write/edit files in workspace
+- Search across files (grep, glob)
+- Execute multi-step tasks autonomously
+- Activity feed shows all operations in real time
+
+**UI additions when selected:**
+- Activity feed with structured cards (replaces plain chat)
+- Folder permission selector
+- Stop/cancel button during execution
+- Results summary with file change review
+
+**Requirements:**
+- Anthropic API key configured
+- Feature flag enabled (experimental phase)
+
+### Persistence
+
+- Selection stored in VS Code settings (`ritemark.ai.selectedAgent`)
+- Persists across sessions, restarts, workspace changes
+- Default: `ritemark-agent`
+- No per-conversation switching -- global preference
+
+### Future: More Agents
+
+The selector is designed as a dropdown, not a toggle, so it naturally accommodates future additions:
+
 ```
-[Thinking] I'll reorganize your notes...
-
-[Proposed Action]
-├─ Read: research/chapter-1.md
-├─ Read: research/chapter-2.md
-└─ Write: outline.md (new file)
-
-[ Approve ] [ Deny ]
+┌─────────────────────┐
+│ Ritemark Agent     ← │  (default, current chat + RAG)
+│ Claude Code          │  (Phase 1: Claude Agent SDK)
+│ Codex                │  (Phase 2: OpenAI Codex SDK)
+│ Gemini Agent         │  (Future: if Google ships agent SDK)
+└─────────────────────┘
 ```
 
-### Mode: Auto
-
-**What it does:**
-- Agent executes multi-step tasks autonomously
-- User can pause at any time
-- Medium risk
-
-**UI additions:**
-- Folder selector (required)
-- Activity feed shows real-time progress
-- Pause button always visible
-- Checkpoint timeline
-
-**Example:**
-```
-[Working on: "Reorganize research notes"]
-
-● Reading files...              12/23 files
-● Analyzing content...          Done
-● Creating outline...           In progress
-
-[ ⏸ Pause ]
-
-──── Checkpoint: 2 min ago ────
-[Timeline] ●───●───●
-           ^       ^
-         start   current
-```
+This also means each provider's agent can have its own personality, tool set, and capabilities -- no need to abstract them behind generic mode names.
 
 ## Activity Feed UI
 
@@ -172,7 +169,7 @@ Replaces terminal-style output with structured cards.
 
 ## Folder Selector
 
-Appears when Assist or Auto mode is active.
+Appears when Claude Code agent is selected.
 
 ```
 ┌──────────────────────────────────────┐
@@ -193,9 +190,9 @@ Appears when Assist or Auto mode is active.
 - Agent cannot access paths outside selected folders
 - Validation happens before SDK execution
 
-## Checkpoint Timeline
+## Checkpoint Timeline (Future)
 
-Appears at bottom of activity feed in Auto mode.
+Appears at bottom of activity feed when Claude Code agent is selected. Deferred to future sprint.
 
 ```
 ──────── Checkpoints ────────
@@ -218,11 +215,10 @@ Appears at bottom of activity feed in Auto mode.
 
 ### Changes to UnifiedViewProvider Webview
 
-1. **Add mode tabs** at top
-2. **Add folder selector** (conditional, Assist/Auto only)
-3. **Replace chat messages** with activity feed cards
-4. **Add checkpoint timeline** at bottom (Auto only)
-5. **Keep input area** unchanged (prompt entry)
+1. **Add agent selector dropdown** at top
+2. **Add folder selector** (conditional, Claude Code only)
+3. **Replace chat messages** with activity feed cards (when Claude Code selected)
+4. **Keep input area** unchanged (prompt entry)
 
 ### What Stays the Same
 
@@ -231,6 +227,7 @@ Appears at bottom of activity feed in Auto mode.
 - Index footer (RAG stats)
 - Message input field
 - Send/Stop buttons
+- Everything when "Ritemark Agent" is selected (zero UI change)
 
 ## Responsive Behavior
 
@@ -266,19 +263,21 @@ N/A - VS Code desktop only
 - Timeline scrubber smooth scroll
 - No excessive animation (VS Code aesthetic)
 
+## Resolved Questions
+
+1. ~~Should we use Chat/Assist/Auto modes?~~
+   - **RESOLVED (Jarmo):** No. Simple agent selector: Ritemark Agent / Claude Code. Persistent until user changes it. Dropdown to support future agents (Codex, Gemini).
+
 ## Open Questions for Jarmo
 
-1. Should Chat mode still show RAG citations?
-   - **Recommendation:** Yes, keep existing behavior
+1. Should folder selector default to workspace root or require explicit selection?
+   - **Recommendation:** Default to workspace root with clear indicator
 
-2. Should folder selector default to workspace root or require explicit selection?
-   - **Recommendation:** Show warning if entire workspace, encourage folder selection
+2. Should we show cost per request after completion?
+   - **Recommendation:** Yes, in the Done card ("Duration: 2.3s | Cost: $0.04")
 
-3. Should we show cost estimation before execution in Assist mode?
-   - **Recommendation:** Yes, "Estimated cost: ~$0.05" before approval
-
-4. Maximum number of allowed folders?
+3. Maximum number of allowed folders?
    - **Recommendation:** No limit, but UI collapses after 5 (scroll list)
 
-5. Should timeline checkpoints auto-expire after X operations?
-   - **Recommendation:** Keep last 20 checkpoints, older ones garbage collected
+4. Should agent selector be visible only when feature flag is ON, or always visible but Claude Code option disabled?
+   - **Recommendation:** Always show dropdown, but Claude Code option shows "(experimental)" label and requires flag to be ON
