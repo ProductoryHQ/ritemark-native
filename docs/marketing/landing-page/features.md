@@ -68,13 +68,14 @@ Organized by mode. Features under each mode should show that mode's badge/tag.
 - **Description EN:** Export document or selection as clean markdown text. Ideal for GitHub, email, and other tools.
 - **Screenshot:** none
 
-### Data File Preview
-- **Icon:** Table2 (from lucide-react)
-- **Title ET:** Andmefailide eelvaade
-- **Title EN:** Data File Preview
-- **Description ET:** Vaata CSV ja Excel faile otse Ritemarkis. Värskenda faile automaatselt, kui need muutuvad. Sinu AI agent saab CSV failidega otse töötada.
-- **Description EN:** Preview CSV and Excel files right inside Ritemark. Refresh files automatically when they change. Your AI agent can work with CSV files directly.
-- **Screenshot:** none (consider adding spreadsheet-refresh.png)
+### Document Preview
+- **Icon:** FileText (from lucide-react)
+- **Title ET:** Dokumendieelvaade
+- **Title EN:** Document Preview
+- **Description ET:** Ava PDF-id ja Word dokumendid otse Ritemarkis. Tekstivalik PDF-ides, truutaseline kujundus DOCX-is. CSV ja Excel failide toimetamine ja sorteerimine.
+- **Description EN:** Open PDFs and Word documents right in Ritemark. Text selection in PDFs, faithful formatting in DOCX. Edit and sort CSV and Excel files.
+- **Screenshot:** none (needs screenshot showing PDF or DOCX viewer)
+- **Badge:** UPDATED
 
 ### WYSIWYG Markdown Editor
 - **Icon:** FileEdit (from lucide-react)
@@ -112,10 +113,10 @@ Organized by mode. Features under each mode should show that mode's badge/tag.
 - **Icon:** Workflow (from lucide-react)
 - **Title ET:** Ritemark Flows
 - **Title EN:** Ritemark Flows
-- **Description ET:** Visuaalne toovoosusteem AI-sisu loomiseks. Ehita toovood lohistades, kaivita ja genereeri teksti, pilte ja faile automaatselt.
-- **Description EN:** Visual workflow automation for AI content generation. Build flows by dragging nodes, execute to generate text, images, and files automatically.
+- **Description ET:** Visuaalne toovoosusteem AI-sisu loomiseks. Ehita toovood lohistades, kaivita ja genereeri teksti, pilte ja faile automaatselt. Claude Code solm keerukate uurimistoodude jaoks.
+- **Description EN:** Visual workflow automation for AI content generation. Build flows by dragging nodes, execute to generate text, images, and files automatically. Claude Code node for complex research tasks.
 - **Screenshot:** none (needs screenshot showing flow editor with connected nodes)
-- **Badge:** NEW
+- **Badge:** UPDATED
 
 ## Screenshot Needs
 
@@ -124,6 +125,9 @@ Organized by mode. Features under each mode should show that mode's badge/tag.
 - [ ] Spreadsheet refresh feature - show refresh button with blue badge indicator
 - [ ] Image Handling - show image with resize handles visible
 - [ ] Ritemark Flows - show flow editor with connected nodes (Trigger -> LLM -> Save File)
+- [ ] PDF Preview - show PDF viewer with multiple pages, zoom controls, page navigation
+- [ ] DOCX Preview - show Word document with formatted text, colors, and tables
+- [ ] CSV Sort - show column header with sort indicator (up/down arrows)
 
 ---
 
@@ -139,7 +143,7 @@ For landing page, organize features under their primary mode:
 - Image Handling
 
 ### Data Mode Features
-- Data File Preview (CSV/Excel)
+- Document Preview (PDF/DOCX/CSV/Excel)
 
 ### Flow Mode Features
 - Ritemark Flows

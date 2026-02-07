@@ -6,18 +6,16 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Text Editor
 
-- [ ] /command list is missing "Quote" - I want to add quotes ![](./images/image-1770143061718.png)
 - [ ] Improve "Add link" dialog to smart-search from files inside the repository when user starts typing with "@"
 - [ ] Add Youtube (any other streaming) videos from / command palette
-- [x] PDF preview (read-only viewer) → **Sprint 32**
-- [x] Word (.docx) preview (read-only viewer) → **Sprint 32**
 
 ## Data Editor
 
 - [ ] Rebrand current Excel viewer/CSV editor as "Data Editor"
-- [ ] CSV full editing improvements (~~sort~~, filter, column operations) — sort done in **Sprint 32**
+- [ ] CSV filter and column operations (add/delete/rename columns)
 - [ ] CSV cell in "editable" mode must be multi-line and extend to "full-height"
 - [ ] CSV open in Excel (automatically export as UTF-8)
+- [ ] CSV row deletion with context menu
 - [ ] Excel (.xlsx) editing (currently preview-only)
 - [ ] PowerPoint (.pptx) preview
 
@@ -68,16 +66,14 @@ In-app help system accessible from activity bar:
 
 ## Export V2 (Major Refactor)
 
-Current PDF/Word export has limitations. V2 should be production-quality.
+Current PDF/Word export works but has limitations. V2 should use HTML-based rendering for production-quality output.
 
+- [ ] **HTML-based rendering** - Use editor's HTML output instead of markdown parsing (WYSIWYG export)
 - [ ] **Table support** - Tables not exported correctly to PDF/Word (critical)
 - [ ] **Better styling** - Professional document styling, proper fonts
-- [ ] **Images** - Embedded images in exports (not broken links)
 - [ ] **Headers/footers** - Page numbers, document title
-- [ ] **Code blocks** - Syntax highlighting in exports
-- [ ] **Front-matter** - Include document properties (title, author, date)
+- [ ] **Syntax highlighting** - Code blocks with colored syntax in exports
 - [ ] **Template system** - User can choose export templates
-- [ ] **Error handling** - Clear error messages, graceful fallbacks
 
 ## UI/UX Refactoring (shadcn/ui)
 
@@ -90,7 +86,6 @@ Consolidate UI components using shadcn/ui for consistency.
 - [ ] **Text Editor refactor** - Migrate FormattingBubbleMenu, BlockMenu, SlashCommands
 - [ ] **Data Editor refactor** - Migrate SpreadsheetViewer components
 - [ ] **Update CLAUDE.md** - Add shadcn/ui guidelines for agents
-- [ ] **Create ux-expert agent** - Agent specialized in shadcn/ui patterns
 
 ## Collaboration
 
@@ -112,6 +107,7 @@ Consolidate UI components using shadcn/ui for consistency.
 
 ## Completed
 
+- [x] /command list "Quote" (blockquote in slash commands) → **Sprint 26**
 - [x] Add images from command palette (`/image` slash command) → **Sprint 26**
 - [x] Remove Table from bubble menu → **Sprint 26**
 - [x] Add quote style to bubble (formatting) menu → **Sprint 26**
@@ -122,6 +118,14 @@ Consolidate UI components using shadcn/ui for consistency.
 - [x] Word (.docx) preview (read-only viewer) → **Sprint 32**
 - [x] CSV column sorting (click headers) → **Sprint 32**
 - [x] CSV add row (toolbar button) → **Sprint 32**
+- [x] Claude Code node (Flows) → **Sprint 30**
+- [x] Intel Mac support (darwin-x64) → **Sprint 25**
+- [x] GitHub Actions CI (Windows + x64 builds) → **Sprint 25**
+- [x] Create ux-expert agent → **Sprint 26**
+- [x] Export: embedded images in PDF/Word
+- [x] Export: code blocks with monospace styling
+- [x] Export: front-matter (title, author, date)
+- [x] Export: error handling with user-facing messages
 - [x] In-app update notifications (like Cursor) - \[x\] Show banner when new version available - \[x\] "Later" / "Install Now" buttons
 - [x] Save as PDF
 - [x] Save as DOCX
@@ -148,4 +152,4 @@ Consolidate UI components using shadcn/ui for consistency.
 
 * * *
 
-*Last updated: 2026-02-05*
+*Last updated: 2026-02-07*
