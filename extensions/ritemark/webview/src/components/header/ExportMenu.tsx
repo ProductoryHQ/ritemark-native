@@ -4,8 +4,8 @@ import { FileText, FileType, Clipboard, Check } from 'lucide-react'
 interface ExportMenuProps {
   isOpen: boolean
   onClose: () => void
-  onExportPDF: () => void
-  onExportWord: () => void
+  onExportPDF: (templateId?: string) => void
+  onExportWord: (templateId?: string) => void
   onCopyAsMarkdown: () => void
   anchorElement: HTMLElement | null
 }
@@ -93,13 +93,13 @@ export function ExportMenu({
     }
   }, [isOpen, anchorElement])
 
-  const handleExportPDF = useCallback(() => {
-    onExportPDF()
+  const handleExportPDF = useCallback((templateId = 'default') => {
+    onExportPDF(templateId)
     onClose()
   }, [onExportPDF, onClose])
 
-  const handleExportWord = useCallback(() => {
-    onExportWord()
+  const handleExportWord = useCallback((templateId = 'default') => {
+    onExportWord(templateId)
     onClose()
   }, [onExportWord, onClose])
 
@@ -124,10 +124,14 @@ export function ExportMenu({
           transform: 'translateX(-100%)', // Right-align with button
         }}
       >
-        {/* Export PDF */}
-        <button className="export-menu-item" onClick={handleExportPDF}>
+        <button className="export-menu-section" type="button">PDF Templates</button>
+        <button className="export-menu-item" onClick={() => handleExportPDF('default')}>
           <FileText size={16} className="export-menu-icon" />
-          <span>Export PDF</span>
+          <span>Export PDF (Default)</span>
+        </button>
+        <button className="export-menu-item" onClick={() => handleExportPDF('clean')}>
+          <FileText size={16} className="export-menu-icon" />
+          <span>Export PDF (Clean)</span>
         </button>
 
         {/* Copy as Markdown */}
@@ -148,10 +152,14 @@ export function ExportMenu({
           )}
         </button>
 
-        {/* Export Word */}
-        <button className="export-menu-item" onClick={handleExportWord}>
+        <button className="export-menu-section" type="button">Word Templates</button>
+        <button className="export-menu-item" onClick={() => handleExportWord('default')}>
           <FileType size={16} className="export-menu-icon" />
-          <span>Export Word</span>
+          <span>Export Word (Default)</span>
+        </button>
+        <button className="export-menu-item" onClick={() => handleExportWord('clean')}>
+          <FileType size={16} className="export-menu-icon" />
+          <span>Export Word (Clean)</span>
         </button>
       </div>
 
@@ -194,6 +202,19 @@ export function ExportMenu({
           text-align: left;
           cursor: pointer;
           transition: background-color 0.15s ease;
+        }
+
+        .export-menu-section {
+          width: 100%;
+          border: none;
+          border-top: 1px solid var(--vscode-menu-border);
+          background: var(--vscode-editor-background);
+          color: var(--vscode-descriptionForeground);
+          padding: 6px 12px;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          text-align: left;
         }
 
         .export-menu-item:hover {

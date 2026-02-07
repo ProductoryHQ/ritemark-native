@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback } from 'react'
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -21,93 +21,27 @@ export interface DataTableProps {
   onDeleteRow?: (index: number) => void
 }
 
-interface EditableCellProps {
-  value: string
-  rowIndex: number
-  columnId: string
-  onCellChange?: (rowIndex: number, columnId: string, value: string) => void
-}
-
-function EditableCell({ value, rowIndex, columnId, onCellChange }: EditableCellProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState(value)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const handleClick = useCallback(() => {
-    setIsEditing(true)
-    setEditValue(value)
-    // Focus input after render
-    setTimeout(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select() // Select all text for easy replacement
-    }, 0)
-  }, [value])
-
-  const handleBlur = useCallback(() => {
-    setIsEditing(false)
-    if (editValue !== value && onCellChange) {
-      onCellChange(rowIndex, columnId, editValue)
-    }
-  }, [editValue, value, rowIndex, columnId, onCellChange])
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleBlur()
-    } else if (e.key === 'Escape') {
-      setIsEditing(false)
-      setEditValue(value)
-    }
-  }, [handleBlur, value])
-
-  if (isEditing) {
-    return (
-      <input
-        ref={inputRef}
-        type="text"
-        value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        className="w-full bg-transparent text-[var(--vscode-foreground)] outline-none"
-        style={{ margin: 0, padding: 0 }}
-      />
-    )
-  }
-
-  return (
-    <span
-      onClick={handleClick}
-      className="block w-full cursor-text"
-    >
-      {value || '\u00A0'}
-    </span>
-  )
+interface ActiveCell {
+  rowPosition: number
+  columnIndex: number
 }
 
 export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onInsertRowAt, onDeleteRow }: DataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const [sorting, setSorting] = useState<SortingState>([])
   const [hoverInsertIndex, setHoverInsertIndex] = useState<number | null>(null)
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
   const [confirmDeleteRow, setConfirmDeleteRow] = useState<number | null>(null)
 
-  const toggleRowExpanded = useCallback((rowIndex: number) => {
-    setExpandedRows(prev => {
-      const next = new Set(prev)
-      if (next.has(rowIndex)) {
-        next.delete(rowIndex)
-      } else {
-        next.add(rowIndex)
-      }
-      return next
-    })
-  }, [])
+  const [activeCell, setActiveCell] = useState<ActiveCell | null>(null)
+  const [editingCell, setEditingCell] = useState<ActiveCell | null>(null)
+  const [editValue, setEditValue] = useState('')
+
+  const cellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map())
+  const editorRef = useRef<HTMLTextAreaElement>(null)
 
   // Create column definitions from column names
   const columnHelper = createColumnHelper<Record<string, unknown>>()
-
   const columnDefs: ColumnDef<Record<string, unknown>, unknown>[] = useMemo(() => {
     return columns.map((col) =>
       columnHelper.accessor((row) => row[col], {
@@ -115,24 +49,11 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
         header: col,
         cell: (info) => {
           const value = info.getValue()
-          const stringValue = value === null || value === undefined ? '' : String(value)
-
-          if (editable) {
-            return (
-              <EditableCell
-                value={stringValue}
-                rowIndex={info.row.index}
-                columnId={col}
-                onCellChange={onCellChange}
-              />
-            )
-          }
-
-          return stringValue
+          return value === null || value === undefined ? '' : String(value)
         },
       })
     )
-  }, [columns, editable, onCellChange])
+  }, [columns])
 
   const table = useReactTable({
     data,
@@ -145,9 +66,8 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
 
   const { rows } = table.getRowModel()
 
-  const ROW_HEIGHT = 37 // Fixed row height (py-2 = 16px + text ~20px + border 1px)
+  const ROW_HEIGHT = 37
 
-  // Virtual scrolling for performance with large datasets
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
@@ -158,12 +78,90 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
   const virtualRows = rowVirtualizer.getVirtualItems()
   const totalSize = rowVirtualizer.getTotalSize()
 
-  // Calculate padding to position rows correctly with safe bounds
   const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0
   const lastRow = virtualRows[virtualRows.length - 1]
   const paddingBottom = virtualRows.length > 0 && lastRow
     ? Math.max(0, totalSize - (lastRow.end ?? totalSize))
     : 0
+
+  const getCellKey = useCallback((cell: ActiveCell) => `${cell.rowPosition}:${cell.columnIndex}`, [])
+  const isSameCell = useCallback((a: ActiveCell | null, b: ActiveCell | null) => {
+    if (!a || !b) return false
+    return a.rowPosition === b.rowPosition && a.columnIndex === b.columnIndex
+  }, [])
+
+  const getCellValue = useCallback((cell: ActiveCell): string => {
+    const row = rows[cell.rowPosition]
+    const columnId = columns[cell.columnIndex]
+    if (!row || !columnId) return ''
+    const value = row.getValue(columnId)
+    return value === null || value === undefined ? '' : String(value)
+  }, [rows, columns])
+
+  const commitEdit = useCallback((nextCell?: ActiveCell | null) => {
+    if (!editingCell) return
+
+    const row = rows[editingCell.rowPosition]
+    const columnId = columns[editingCell.columnIndex]
+    if (!row || !columnId) {
+      setEditingCell(null)
+      return
+    }
+
+    const originalValue = getCellValue(editingCell)
+    if (editValue !== originalValue && onCellChange) {
+      onCellChange(row.index, columnId, editValue)
+    }
+
+    setEditingCell(null)
+    if (nextCell) {
+      setActiveCell(nextCell)
+    }
+  }, [editingCell, rows, columns, editValue, getCellValue, onCellChange])
+
+  const cancelEdit = useCallback(() => {
+    if (!editingCell) return
+    setEditValue(getCellValue(editingCell))
+    setEditingCell(null)
+  }, [editingCell, getCellValue])
+
+  const setActiveAndFocus = useCallback((cell: ActiveCell) => {
+    setActiveCell(cell)
+  }, [])
+
+  const moveActiveCell = useCallback((rowDelta: number, colDelta: number) => {
+    if (!activeCell) return
+
+    const maxRow = Math.max(0, rows.length - 1)
+    const maxCol = Math.max(0, columns.length - 1)
+    const next: ActiveCell = {
+      rowPosition: Math.min(maxRow, Math.max(0, activeCell.rowPosition + rowDelta)),
+      columnIndex: Math.min(maxCol, Math.max(0, activeCell.columnIndex + colDelta)),
+    }
+    setActiveAndFocus(next)
+  }, [activeCell, rows.length, columns.length, setActiveAndFocus])
+
+  const startEditing = useCallback((cell: ActiveCell, initialValue?: string) => {
+    setActiveCell(cell)
+    setEditingCell(cell)
+    setEditValue(initialValue ?? getCellValue(cell))
+  }, [getCellValue])
+
+  const activeColumnId = activeCell ? columns[activeCell.columnIndex] : ''
+  const activeCellValue = activeCell ? getCellValue(activeCell) : ''
+  const formulaValue = isSameCell(editingCell, activeCell) ? editValue : activeCellValue
+
+  useEffect(() => {
+    if (!activeCell || editingCell) return
+    const key = getCellKey(activeCell)
+    cellRefs.current.get(key)?.focus()
+  }, [activeCell, editingCell, getCellKey])
+
+  useEffect(() => {
+    if (!editingCell) return
+    editorRef.current?.focus()
+    editorRef.current?.select()
+  }, [editingCell])
 
   if (data.length === 0) {
     return (
@@ -177,13 +175,58 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
     <div
       ref={parentRef}
       className="h-full overflow-auto"
-      onClick={() => { setSelectedRow(null); setConfirmDeleteRow(null) }}
+      onClick={() => {
+        setSelectedRow(null)
+        setConfirmDeleteRow(null)
+      }}
     >
+      {editable && (
+        <div className="sticky top-0 z-20 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] px-3 py-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-[var(--vscode-descriptionForeground)]">fx</span>
+            <span className="min-w-[90px] text-xs text-[var(--vscode-descriptionForeground)]">
+              {activeCell ? `${activeColumnId || '-'}${activeCell.rowPosition + 1}` : 'No cell selected'}
+            </span>
+            <textarea
+              value={formulaValue}
+              onChange={(e) => {
+                if (!activeCell) return
+                if (!isSameCell(editingCell, activeCell)) {
+                  setEditingCell(activeCell)
+                }
+                setEditValue(e.target.value)
+              }}
+              onBlur={() => {
+                if (isSameCell(editingCell, activeCell)) {
+                  commitEdit()
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  commitEdit()
+                  return
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  cancelEdit()
+                }
+              }}
+              disabled={!activeCell}
+              rows={1}
+              className="min-h-[28px] flex-1 resize-y rounded border border-[var(--vscode-input-border,var(--vscode-panel-border))] bg-[var(--vscode-input-background,var(--vscode-editor-background))] px-2 py-1 text-xs text-[var(--vscode-input-foreground,var(--vscode-foreground))] outline-none"
+              placeholder="Select a cell to view/edit full value"
+            />
+          </div>
+        </div>
+      )}
       <table className="w-full border-collapse text-sm">
-        <thead className="sticky top-0 z-10 bg-[var(--vscode-editor-background)]">
+        <thead
+          className="sticky z-10 bg-[var(--vscode-editor-background)]"
+          style={{ top: editable ? 38 : 0 }}
+        >
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              {/* Row number header */}
               <th
                 className="px-2 py-2 text-center font-semibold border-b border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-descriptionForeground)]"
                 style={{ minWidth: 50, width: 50 }}
@@ -223,18 +266,14 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
           )}
           {virtualRows.map((virtualRow) => {
             const row = rows[virtualRow.index]
-            const isExpanded = expandedRows.has(virtualRow.index)
             return (
               <tr
                 key={row.id}
                 data-index={virtualRow.index}
-                onClick={() => toggleRowExpanded(virtualRow.index)}
-                className={`hover:bg-[var(--vscode-list-hoverBackground)] cursor-pointer ${isExpanded ? 'bg-[var(--vscode-list-activeSelectionBackground)]' : ''} ${selectedRow === virtualRow.index ? 'bg-[var(--vscode-editor-selectionBackground)]' : ''}`}
-                style={{ height: isExpanded ? 'auto' : ROW_HEIGHT, minHeight: ROW_HEIGHT }}
+                style={{ height: ROW_HEIGHT, minHeight: ROW_HEIGHT }}
               >
-                {/* Row number with insert hover zone + select-to-delete */}
                 <td
-                  className={`relative px-2 py-2 text-center text-xs border-b border-r border-[var(--vscode-panel-border)] text-[var(--vscode-descriptionForeground)] ${isExpanded ? '' : 'whitespace-nowrap'} ${selectedRow === virtualRow.index ? 'bg-[var(--vscode-editor-selectionBackground)]' : 'bg-[var(--vscode-sideBar-background)]'}`}
+                  className={`relative px-2 py-2 text-center text-xs border-b border-r border-[var(--vscode-panel-border)] whitespace-nowrap bg-[var(--vscode-sideBar-background)] text-[var(--vscode-descriptionForeground)]`}
                   style={{ minWidth: 50, width: 50, verticalAlign: 'top', overflow: 'visible', cursor: onDeleteRow ? 'pointer' : 'default' }}
                   onClick={(e) => {
                     if (onDeleteRow) {
@@ -243,7 +282,6 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                     }
                   }}
                 >
-                  {/* Delete confirmation → Delete button → Row number */}
                   {confirmDeleteRow === virtualRow.index && onDeleteRow ? (
                     <div className="flex items-center justify-center gap-1">
                       <button
@@ -287,7 +325,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                   ) : (
                     virtualRow.index + 1
                   )}
-                  {/* Insert-between hover zone (top edge of this row = insert before this row) */}
+
                   {onInsertRowAt && (
                     <div
                       className="absolute left-0 right-0 flex items-center justify-center z-20"
@@ -314,38 +352,138 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                     </div>
                   )}
                 </td>
-                {row.getVisibleCells().map((cell) => (
-                  <td
-                    key={cell.id}
-                    className={`px-3 py-2 border-b border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] ${isExpanded ? 'whitespace-pre-wrap break-words' : 'overflow-hidden whitespace-nowrap text-ellipsis'}`}
-                    style={{ maxWidth: isExpanded ? 'none' : 300, verticalAlign: 'top' }}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
+
+                {row.getVisibleCells().map((cell, columnIndex) => {
+                  const isActive = activeCell?.rowPosition === virtualRow.index && activeCell?.columnIndex === columnIndex
+                  const isEditing = editingCell?.rowPosition === virtualRow.index && editingCell?.columnIndex === columnIndex
+                  const renderedValue = flexRender(cell.column.columnDef.cell, cell.getContext()) as string
+                  const cellCoord: ActiveCell = { rowPosition: virtualRow.index, columnIndex }
+
+                  return (
+                    <td
+                      key={cell.id}
+                      ref={(el) => {
+                        const key = `${virtualRow.index}:${columnIndex}`
+                        if (el) {
+                          cellRefs.current.set(key, el)
+                        } else {
+                          cellRefs.current.delete(key)
+                        }
+                      }}
+                      tabIndex={isActive ? 0 : -1}
+                      className={`relative px-3 py-2 border-b border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] cursor-cell focus:outline-none ${isEditing ? 'overflow-visible whitespace-normal' : 'overflow-hidden whitespace-nowrap text-ellipsis'}`}
+                      style={{
+                        boxShadow: isActive
+                          ? 'inset 0 0 0 2px var(--vscode-focusBorder, var(--vscode-textLink-foreground))'
+                          : undefined,
+                        background: isActive
+                          ? 'var(--vscode-editor-selectionHighlightBackground, transparent)'
+                          : undefined,
+                        zIndex: isEditing ? 30 : undefined,
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation()
+                        setSelectedRow(null)
+                        setConfirmDeleteRow(null)
+                        if (editable && isActive && !isEditing) {
+                          startEditing(cellCoord)
+                          return
+                        }
+                        setActiveAndFocus(cellCoord)
+                      }}
+                      onDoubleClick={(e) => {
+                        if (!editable) return
+                        e.stopPropagation()
+                        startEditing(cellCoord)
+                      }}
+                      onKeyDown={(e) => {
+                        if (!editable) return
+
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          moveActiveCell(-1, 0)
+                          return
+                        }
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          moveActiveCell(1, 0)
+                          return
+                        }
+                        if (e.key === 'ArrowLeft') {
+                          e.preventDefault()
+                          moveActiveCell(0, -1)
+                          return
+                        }
+                        if (e.key === 'ArrowRight') {
+                          e.preventDefault()
+                          moveActiveCell(0, 1)
+                          return
+                        }
+                        if (e.key === 'Tab') {
+                          e.preventDefault()
+                          moveActiveCell(0, e.shiftKey ? -1 : 1)
+                          return
+                        }
+                        if (e.key === 'Enter' || e.key === 'F2') {
+                          e.preventDefault()
+                          startEditing(cellCoord)
+                          return
+                        }
+                        if (e.key === 'Backspace' || e.key === 'Delete') {
+                          e.preventDefault()
+                          startEditing(cellCoord, '')
+                          return
+                        }
+                        if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                          e.preventDefault()
+                          startEditing(cellCoord, e.key)
+                        }
+                      }}
+                    >
+                      {isEditing ? (
+                        <textarea
+                          ref={editorRef}
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => commitEdit()}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.preventDefault()
+                              cancelEdit()
+                              return
+                            }
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              commitEdit({
+                                rowPosition: Math.min(rows.length - 1, virtualRow.index + 1),
+                                columnIndex,
+                              })
+                              return
+                            }
+                            if (e.key === 'Tab') {
+                              e.preventDefault()
+                              commitEdit({
+                                rowPosition: virtualRow.index,
+                                columnIndex: Math.max(0, Math.min(columns.length - 1, columnIndex + (e.shiftKey ? -1 : 1))),
+                              })
+                            }
+                          }}
+                          className="absolute left-[2px] top-[2px] z-10 w-[calc(100%-4px)] resize-none rounded-sm border border-[var(--vscode-focusBorder,var(--vscode-textLink-foreground))] bg-[var(--vscode-editor-background)] p-1 text-[var(--vscode-foreground)] outline-none"
+                          rows={Math.max(2, Math.min(8, editValue.split('\n').length))}
+                          style={{ minHeight: 56 }}
+                        />
+                      ) : (
+                        <span className="block w-full truncate" title={renderedValue || ''}>
+                          {renderedValue || '\u00A0'}
+                        </span>
+                      )}
+                    </td>
+                  )
+                })}
               </tr>
             )
           })}
-          {/* Add row button at the bottom of row numbers */}
-          {onAddRow && (
-            <tr>
-              <td
-                className="px-2 py-2 text-center border-b border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)]"
-                style={{ minWidth: 50, width: 50 }}
-                onClick={onAddRow}
-                title="Add row"
-              >
-                <Plus size={14} className="mx-auto text-[var(--vscode-descriptionForeground)]" />
-              </td>
-              <td
-                colSpan={columns.length}
-                className="px-3 py-2 border-b border-[var(--vscode-panel-border)] text-[var(--vscode-descriptionForeground)] text-xs cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)]"
-                onClick={onAddRow}
-              >
-                Add row
-              </td>
-            </tr>
-          )}
           {paddingBottom > 0 && (
             <tr>
               <td style={{ height: `${paddingBottom}px` }} />
@@ -353,6 +491,18 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
           )}
         </tbody>
       </table>
+
+      {editable && onAddRow && (
+        <div className="sticky bottom-0 left-0 right-0 p-2 bg-[var(--vscode-editor-background)] border-t border-[var(--vscode-panel-border)]">
+          <button
+            onClick={onAddRow}
+            className="inline-flex items-center gap-1 px-3 py-1 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+          >
+            <Plus size={14} />
+            Add row
+          </button>
+        </div>
+      )}
     </div>
   )
 }
