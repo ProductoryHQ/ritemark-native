@@ -849,12 +849,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const agentFeedEl = document.getElementById('agent-feed');
 
     function render() {
-      // Show agent selector when feature is enabled and user has API key
-      agentSelectorEl.style.display = (hasApiKey && agenticEnabled) ? 'flex' : 'none';
+      // Show agent selector when agentic feature is enabled.
+      // This allows switching to Claude Code mode even without OpenAI key.
+      agentSelectorEl.style.display = agenticEnabled ? 'flex' : 'none';
 
       const isClaudeCode = selectedAgent === 'claude-code';
+      const requiresOpenAIKey = !isClaudeCode;
 
-      if (!hasApiKey) {
+      if (requiresOpenAIKey && !hasApiKey) {
         noKeyEl.style.display = 'flex';
         offlineBanner.style.display = 'none';
         chatContainer.style.display = 'none';
@@ -862,8 +864,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       } else if (!online) {
         noKeyEl.style.display = 'none';
         offlineBanner.style.display = 'block';
-        chatContainer.style.display = isClaudeCode ? 'none' : 'flex';
+        chatContainer.style.display = 'flex';
         agentFeedEl.style.display = isClaudeCode ? 'flex' : 'none';
+        messagesEl.style.display = isClaudeCode ? 'none' : 'flex';
+        inputEl.placeholder = isClaudeCode ? 'Ask Claude Code to do something...' : 'Ask anything...';
         inputEl.disabled = true;
         sendBtn.disabled = true;
       } else {
@@ -926,9 +930,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
-      sendBtn.style.display = isLoading ? 'none' : 'flex';
-      stopBtn.style.display = isLoading ? 'flex' : 'none';
-      inputEl.disabled = isLoading;
+      const loadingState = isClaudeCode ? agentIsRunning : isLoading;
+      sendBtn.style.display = loadingState ? 'none' : 'flex';
+      stopBtn.style.display = loadingState ? 'flex' : 'none';
+      inputEl.disabled = loadingState;
     }
 
     function renderMessage(msg) {
@@ -1223,7 +1228,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'agent:config':
           agenticEnabled = message.agenticEnabled;
           selectedAgent = message.selectedAgent || 'ritemark-agent';
-          agentSelectEl.value = selectedAgent;
           // Populate agent options
           if (message.agents && message.agents.length > 0) {
             agentSelectEl.innerHTML = '';
@@ -1233,6 +1237,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               opt.value = agent.id;
               opt.textContent = agent.label + (agent.experimental ? ' (experimental)' : '');
               agentSelectEl.appendChild(opt);
+            }
+            const availableAgentIds = Array.from(agentSelectEl.options).map(o => o.value);
+            if (!availableAgentIds.includes(selectedAgent)) {
+              selectedAgent = availableAgentIds[0] || 'ritemark-agent';
+              vscode.postMessage({ type: 'ai-select-agent', agentId: selectedAgent });
             }
             agentSelectEl.value = selectedAgent;
           }
