@@ -124,17 +124,17 @@ export function ExportMenu({
           transform: 'translateX(-100%)', // Right-align with button
         }}
       >
-        <button className="export-menu-section" type="button">PDF Templates</button>
-        <button className="export-menu-item" onClick={() => handleExportPDF('default')}>
-          <FileText size={16} className="export-menu-icon" />
-          <span>Export PDF (Default)</span>
-        </button>
         <button className="export-menu-item" onClick={() => handleExportPDF('clean')}>
           <FileText size={16} className="export-menu-icon" />
-          <span>Export PDF (Clean)</span>
+          <span>Export PDF</span>
+        </button>
+        <button className="export-menu-item" onClick={() => handleExportWord('clean')}>
+          <FileType size={16} className="export-menu-icon" />
+          <span>Export Word</span>
         </button>
 
-        {/* Copy as Markdown */}
+        <div className="export-menu-divider" />
+
         <button
           className={`export-menu-item ${copied ? 'export-menu-item-success' : ''}`}
           onClick={handleCopyAsMarkdown}
@@ -150,16 +150,6 @@ export function ExportMenu({
               <span>Copy as Markdown</span>
             </>
           )}
-        </button>
-
-        <button className="export-menu-section" type="button">Word Templates</button>
-        <button className="export-menu-item" onClick={() => handleExportWord('default')}>
-          <FileType size={16} className="export-menu-icon" />
-          <span>Export Word (Default)</span>
-        </button>
-        <button className="export-menu-item" onClick={() => handleExportWord('clean')}>
-          <FileType size={16} className="export-menu-icon" />
-          <span>Export Word (Clean)</span>
         </button>
       </div>
 
@@ -204,17 +194,10 @@ export function ExportMenu({
           transition: background-color 0.15s ease;
         }
 
-        .export-menu-section {
-          width: 100%;
-          border: none;
-          border-top: 1px solid var(--vscode-menu-border);
-          background: var(--vscode-editor-background);
-          color: var(--vscode-descriptionForeground);
-          padding: 6px 12px;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          text-align: left;
+        .export-menu-divider {
+          height: 1px;
+          background: var(--vscode-menu-border);
+          margin: 4px 0;
         }
 
         .export-menu-item:hover {

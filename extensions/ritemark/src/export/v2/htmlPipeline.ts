@@ -42,8 +42,8 @@ const TEMPLATE_STYLES: Record<string, ExportTemplateStyle> = {
     borderColor: '#cfd7e3',
   },
   clean: {
-    bodyFont: 'Times-Roman',
-    headingFont: 'Times-Bold',
+    bodyFont: 'Helvetica',
+    headingFont: 'Helvetica-Bold',
     codeFont: 'Courier',
     bodySize: 11,
     codeSize: 9,

@@ -6,6 +6,7 @@ import {
   Packer,
   Paragraph,
   TextRun,
+  ImageRun,
   HeadingLevel,
   ExternalHyperlink,
   Table,
@@ -13,8 +14,6 @@ import {
   TableCell,
   WidthType,
   BorderStyle,
-  AlignmentType,
-  Footer,
   type ISectionOptions,
 } from 'docx';
 import { parse, HTMLElement, type Node as HtmlNode, TextNode } from 'node-html-parser';
@@ -22,6 +21,48 @@ import { buildNormalizedExportHtml, type ExportTemplateStyle } from './htmlPipel
 import type { ExportV2Request } from './types';
 
 type DocChild = Paragraph | Table;
+
+function tryLoadImage(imagePath: string, documentUri: vscode.Uri): Buffer | null {
+  try {
+    let normalizedPath = imagePath.trim();
+    if (normalizedPath.startsWith('vscode-file://')) normalizedPath = normalizedPath.replace('vscode-file://', '');
+    if (normalizedPath.startsWith('file://')) normalizedPath = normalizedPath.replace('file://', '');
+    if (normalizedPath.startsWith('http://') || normalizedPath.startsWith('https://')) return null;
+
+    const absolutePath = path.isAbsolute(normalizedPath)
+      ? normalizedPath
+      : path.resolve(path.dirname(documentUri.fsPath), normalizedPath);
+
+    if (!fs.existsSync(absolutePath)) {
+      return null;
+    }
+    return fs.readFileSync(absolutePath);
+  } catch {
+    return null;
+  }
+}
+
+function getImageDimensions(data: Buffer): { width: number; height: number } | null {
+  try {
+    // PNG: signature 0x89504E47, dimensions in IHDR chunk
+    if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
+      return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+    }
+    // JPEG: scan for SOF0 (0xFFC0) or SOF2 (0xFFC2) marker
+    if (data[0] === 0xFF && data[1] === 0xD8) {
+      let offset = 2;
+      while (offset < data.length - 9) {
+        if (data[offset] !== 0xFF) break;
+        const marker = data[offset + 1];
+        if (marker === 0xC0 || marker === 0xC2) {
+          return { width: data.readUInt16BE(offset + 7), height: data.readUInt16BE(offset + 5) };
+        }
+        offset += 2 + data.readUInt16BE(offset + 2);
+      }
+    }
+  } catch { /* ignore parse errors */ }
+  return null;
+}
 
 interface InlineStyleState {
   bold?: boolean;
@@ -163,7 +204,7 @@ function parseTable(node: HTMLElement, style: ExportTemplateStyle): Table | null
   });
 }
 
-function parseBlocks(node: HtmlNode, style: ExportTemplateStyle): DocChild[] {
+function parseBlocks(node: HtmlNode, style: ExportTemplateStyle, documentUri: vscode.Uri): DocChild[] {
   if (!isElement(node)) return [];
   const tag = node.tagName;
 
@@ -171,22 +212,23 @@ function parseBlocks(node: HtmlNode, style: ExportTemplateStyle): DocChild[] {
     case 'P':
       return [paragraphFromNode(node, style)];
     case 'H1':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_1 })];
+      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_1, spacing: { before: 360, after: 160 }, keepNext: true })];
     case 'H2':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_2 })];
+      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 140 }, keepNext: true })];
     case 'H3':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_3 })];
+      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_3, spacing: { before: 240, after: 120 }, keepNext: true })];
     case 'H4':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_4 })];
+      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_4, spacing: { before: 200, after: 100 }, keepNext: true })];
     case 'H5':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_5 })];
+      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_5, spacing: { before: 160, after: 80 }, keepNext: true })];
     case 'H6':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_6 })];
+      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_6, spacing: { before: 160, after: 80 }, keepNext: true })];
     case 'BLOCKQUOTE':
       return [new Paragraph({
-        children: collectInlineRuns(node, style),
+        children: collectInlineRuns(node, style, { italics: true }),
         indent: { left: 480 },
         spacing: { after: 120 },
+        border: { left: { style: BorderStyle.SINGLE, size: 6, color: style.borderColor.replace('#', '') } },
       })];
     case 'PRE':
       return [new Paragraph({
@@ -202,28 +244,46 @@ function parseBlocks(node: HtmlNode, style: ExportTemplateStyle): DocChild[] {
       return table ? [table, new Paragraph({ text: '' })] : [];
     }
     case 'HR':
-      return [new Paragraph({ children: [new TextRun({ text: '──────────────────────────────' })], spacing: { after: 120 } })];
+      return [new Paragraph({
+        children: [new TextRun({ text: '' })],
+        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: style.borderColor.replace('#', '') } },
+        spacing: { before: 120, after: 120 },
+      })];
+    case 'IMG': {
+      // TipTap stores original relative path in title, webview URI in src
+      const title = node.getAttribute('title');
+      const src = node.getAttribute('src');
+      const imagePath = title || src;
+      if (!imagePath) return [];
+      const imgData = tryLoadImage(imagePath, documentUri);
+      if (!imgData) return [];
+
+      const dims = getImageDimensions(imgData);
+      const maxWidth = 580; // ~6 inches at 96 DPI
+      let imgWidth = dims?.width || 580;
+      let imgHeight = dims?.height || 400;
+      if (imgWidth > maxWidth) {
+        const scale = maxWidth / imgWidth;
+        imgHeight = Math.round(imgHeight * scale);
+        imgWidth = maxWidth;
+      }
+
+      return [new Paragraph({
+        children: [new ImageRun({
+          data: imgData,
+          transformation: { width: imgWidth, height: imgHeight },
+        })],
+        spacing: { after: 120 },
+      })];
+    }
     default:
-      return node.childNodes.flatMap(child => parseBlocks(child, style));
+      return node.childNodes.flatMap(child => parseBlocks(child, style, documentUri));
   }
 }
 
-function buildSection(children: DocChild[], title: string): ISectionOptions {
+function buildSection(children: DocChild[]): ISectionOptions {
   return {
     properties: {},
-    footers: {
-      default: new Footer({
-        children: [
-          new Paragraph({
-            alignment: AlignmentType.RIGHT,
-            children: [
-              new TextRun({ text: title ? `${title} — ` : '' }),
-              new TextRun({ text: 'Exported from Ritemark' }),
-            ],
-          }),
-        ],
-      }),
-    },
     children,
   };
 }
@@ -259,13 +319,13 @@ export async function exportToWordV2(
     }
 
     nodes.forEach(node => {
-      children.push(...parseBlocks(node, normalized.style));
+      children.push(...parseBlocks(node, normalized.style, documentUri));
     });
 
     const doc = new Document({
       creator: normalized.metadata.author || 'Ritemark',
       title: normalized.metadata.title || docName,
-      sections: [buildSection(children, normalized.metadata.title || docName)],
+      sections: [buildSection(children)],
       styles: {
         default: {
           document: {

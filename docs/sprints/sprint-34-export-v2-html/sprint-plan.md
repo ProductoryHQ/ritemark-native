@@ -51,8 +51,8 @@ Export V2 establishes a single HTML-first rendering pipeline for both PDF and DO
 - [ ] PDF includes page numbers and document title in header/footer
 - [ ] Existing Export UI remains backward-compatible for users
 - [ ] No regressions in images, headings, lists, links, blockquotes
-- [ ] CSV cell edit mode shows full text while editing (not truncated one-line input)
-- [ ] CSV active cell has clear Excel-like focus border and keyboard navigation parity (Enter/Tab/Esc)
+- [x] CSV cell edit mode shows full text while editing (not truncated one-line input)
+- [x] CSV active cell has clear Excel-like focus border and keyboard navigation parity (Enter/Tab/Esc)
 
 ## Implementation Checklist
 
@@ -114,15 +114,31 @@ Export V2 establishes a single HTML-first rendering pipeline for both PDF and DO
 - [ ] Update `docs/sprints/WISHLIST.md` status for Export V2 items
 - [ ] Create release summary notes for release manager/product marketer
 
-### Phase 10: CSV Cell Editor UX Bug Fix
+### Phase 10: CSV Cell Editor UX Overhaul (DONE)
 
-- [ ] Review current table edit component behavior in webview (`DataTable` / `SpreadsheetViewer`)
-- [ ] Replace one-line cell input with edit mode that preserves full text visibility
-- [ ] Add Excel-like active-cell border/focus styling for selected and editing cell
-- [ ] Add optional formula-bar style top editor (single source of truth for active cell value)
-- [ ] Ensure keyboard behavior is predictable: Enter commits, Esc cancels, Tab moves cell
-- [ ] Verify long text, multiline values, and copy/paste flows
+- [x] Review current table edit component behavior in webview (`DataTable` / `SpreadsheetViewer`)
+- [x] Replace one-line cell input with edit mode that preserves full text visibility
+- [x] Add Excel-like active-cell border/focus styling for selected and editing cell
+- [x] Add optional formula-bar style top editor (single source of truth for active cell value)
+- [x] Ensure keyboard behavior is predictable: Enter commits, Esc cancels, Tab moves cell
+- [x] Verify long text, multiline values, and copy/paste flows
 - [ ] Add regression tests for active-cell state and value commit/cancel behavior
+
+#### Bugs Fixed
+
+- **In-cell editing only allowed 1 character** — Root cause: keydown event on `<textarea>` bubbled to parent `<td>`, which intercepted single-character keys and called `startEditing(cellCoord, e.key)`, resetting `editValue` to just that character each keystroke. Fix: added `if (isEditing) return` guard in td's `onKeyDown`.
+- **First character selected on type-to-edit** — `useEffect` called `textarea.select()` unconditionally when editing started. Fix: added `editStartedByTyping` ref — typing places cursor at end, double-click/Enter/F2 selects all.
+- **Double-click didn't enter edit mode** — After first mousedown started editing, textarea appeared and intercepted the second click (different element = no dblclick event). Fix: replaced `onDoubleClick` with `e.detail >= 2` check in `onMouseDown`.
+- **Formula bar scrolled horizontally with table** — Formula bar was inside the `overflow-auto` scroll container. Fix: restructured to flex column layout — formula bar outside scroll container, table inside.
+- **`[object Object]` in cell display and title** — `flexRender()` returns a React element, not a string. Fix: replaced with `getCellValue()` raw string for cell display and `title` attribute.
+
+#### New Features Added
+
+- **Copy-paste (Cmd+C / Cmd+V)** — Copy works on any selected cell (including read-only mode). Paste writes clipboard content into active cell via `onCellChange`.
+- **Add column** — `+` button in header row (rightmost). Creates new column with auto-generated name (`Column<N>`), empty values in all rows.
+- **Rename column** — Double-click column header opens inline input. Enter/blur confirms, Escape cancels. Duplicate names prevented.
+- **Delete column** — Click header to select → red minus circle → Yes/No confirmation. Same UX pattern as row deletion. Last column protected from deletion.
+- **Add row redesign** — Replaced large blue sticky button with subtle inline table row (faded `+` and "Add row" text, lights up on hover).
 
 ## Risks & Mitigation
 

@@ -2,6 +2,11 @@
  * Dialog Components (shadcn/ui style)
  *
  * Re-exports using Radix UI primitives with VS Code styling.
+ * Visual standard matches Dictation Settings dialog:
+ * - Header row: icon + title + X close button, border-bottom
+ * - Content area: scrollable, padding 16px
+ * - Footer: border-top, buttons right-aligned
+ * - Modal: rounded-xl, shadow
  */
 
 import * as React from 'react';
@@ -24,7 +29,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/50',
+      'fixed inset-0 z-50 bg-black/40',
       'data-[state=open]:animate-in data-[state=closed]:animate-out',
       'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className
@@ -43,8 +48,9 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%]',
-        'rounded-lg p-6 shadow-lg',
+        'fixed left-[50%] top-[50%] z-50 w-full max-w-[400px] translate-x-[-50%] translate-y-[-50%]',
+        'flex flex-col max-h-[80vh]',
+        'rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.24)]',
         'bg-[var(--vscode-editor-background)]',
         'border border-[var(--vscode-panel-border)]',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -57,36 +63,67 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none">
-        <X className="h-4 w-4 text-[var(--vscode-foreground)]" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
+/** Header row with icon + title + close button. Renders border-bottom separator. */
 const DialogHeader = ({
+  className,
+  icon,
+  children,
+  onClose,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  icon?: React.ReactNode
+  onClose?: () => void
+}) => (
+  <div
+    className={cn(
+      'flex items-center justify-between px-4 py-3',
+      'border-b border-[var(--vscode-panel-border)]',
+      className
+    )}
+    {...props}
+  >
+    <div className="flex items-center gap-2 text-[var(--vscode-foreground)]">
+      {icon}
+      {children}
+    </div>
+    {onClose && (
+      <DialogPrimitive.Close
+        onClick={onClose}
+        className="flex items-center justify-center w-7 h-7 rounded-md border-none bg-transparent text-[var(--vscode-foreground)] cursor-pointer transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+      >
+        <X size={16} />
+      </DialogPrimitive.Close>
+    )}
+  </div>
+);
+DialogHeader.displayName = 'DialogHeader';
+
+/** Scrollable content area with padding. */
+const DialogBody = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn(
-      'flex flex-col space-y-1.5 text-center sm:text-left',
-      className
-    )}
+    className={cn('flex-1 overflow-y-auto p-4', className)}
     {...props}
   />
 );
-DialogHeader.displayName = 'DialogHeader';
+DialogBody.displayName = 'DialogBody';
 
+/** Footer with border-top separator and right-aligned buttons. */
 const DialogFooter = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2',
+      'flex justify-end gap-2 px-4 py-3',
+      'border-t border-[var(--vscode-panel-border)]',
       className
     )}
     {...props}
@@ -101,7 +138,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      'text-lg font-semibold leading-none tracking-tight',
+      'text-base font-semibold leading-none',
       'text-[var(--vscode-foreground)]',
       className
     )}
@@ -122,6 +159,27 @@ const DialogDescription = React.forwardRef<
 ));
 DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
+/** Standard dialog button. Use variant="primary" for action, "secondary" for cancel. */
+const DialogButton = ({
+  className,
+  variant = 'primary',
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'secondary' | 'danger'
+}) => (
+  <button
+    className={cn(
+      'px-4 py-2 rounded-md text-[13px] font-medium border-none cursor-pointer transition-colors',
+      variant === 'primary' && 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]',
+      variant === 'secondary' && 'bg-[var(--vscode-button-secondaryBackground,#3a3d41)] text-[var(--vscode-button-secondaryForeground,#fff)] hover:bg-[var(--vscode-button-secondaryHoverBackground,#45494e)]',
+      variant === 'danger' && 'bg-[var(--vscode-errorForeground,#ef4444)] text-white hover:opacity-90',
+      className
+    )}
+    {...props}
+  />
+);
+DialogButton.displayName = 'DialogButton';
+
 export {
   Dialog,
   DialogPortal,
@@ -130,7 +188,9 @@ export {
   DialogTrigger,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  DialogButton,
 };

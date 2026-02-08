@@ -17,6 +17,9 @@ export interface DataTableProps {
   editable?: boolean
   onCellChange?: (rowIndex: number, columnId: string, value: string) => void
   onAddRow?: () => void
+  onAddColumn?: () => void
+  onRenameColumn?: (oldName: string, newName: string) => void
+  onDeleteColumn?: (columnName: string) => void
   onInsertRowAt?: (index: number) => void
   onDeleteRow?: (index: number) => void
 }
@@ -26,7 +29,7 @@ interface ActiveCell {
   columnIndex: number
 }
 
-export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onInsertRowAt, onDeleteRow }: DataTableProps) {
+export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onAddColumn, onRenameColumn, onDeleteColumn, onInsertRowAt, onDeleteRow }: DataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const [sorting, setSorting] = useState<SortingState>([])
   const [hoverInsertIndex, setHoverInsertIndex] = useState<number | null>(null)
@@ -37,8 +40,15 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
   const [editingCell, setEditingCell] = useState<ActiveCell | null>(null)
   const [editValue, setEditValue] = useState('')
 
+  const [selectedColumn, setSelectedColumn] = useState<string | null>(null)
+  const [confirmDeleteColumn, setConfirmDeleteColumn] = useState<string | null>(null)
+  const [renamingColumn, setRenamingColumn] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const renameRef = useRef<HTMLInputElement>(null)
+
   const cellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map())
   const editorRef = useRef<HTMLTextAreaElement>(null)
+  const editStartedByTyping = useRef(false)
 
   // Create column definitions from column names
   const columnHelper = createColumnHelper<Record<string, unknown>>()
@@ -142,6 +152,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
   }, [activeCell, rows.length, columns.length, setActiveAndFocus])
 
   const startEditing = useCallback((cell: ActiveCell, initialValue?: string) => {
+    editStartedByTyping.current = initialValue !== undefined
     setActiveCell(cell)
     setEditingCell(cell)
     setEditValue(initialValue ?? getCellValue(cell))
@@ -159,9 +170,23 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
 
   useEffect(() => {
     if (!editingCell) return
-    editorRef.current?.focus()
-    editorRef.current?.select()
+    const el = editorRef.current
+    if (!el) return
+    el.focus()
+    if (editStartedByTyping.current) {
+      // Cursor at end when user typed a character to start editing
+      el.selectionStart = el.selectionEnd = el.value.length
+    } else {
+      // Select all when entering edit via double-click / Enter / F2
+      el.select()
+    }
   }, [editingCell])
+
+  useEffect(() => {
+    if (!renamingColumn) return
+    renameRef.current?.focus()
+    renameRef.current?.select()
+  }, [renamingColumn])
 
   if (data.length === 0) {
     return (
@@ -172,16 +197,9 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
   }
 
   return (
-    <div
-      ref={parentRef}
-      className="h-full overflow-auto"
-      onClick={() => {
-        setSelectedRow(null)
-        setConfirmDeleteRow(null)
-      }}
-    >
+    <div className="flex h-full flex-col">
       {editable && (
-        <div className="sticky top-0 z-20 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] px-3 py-1">
+        <div className="flex-shrink-0 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] px-3 py-1 z-20">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-[var(--vscode-descriptionForeground)]">fx</span>
             <span className="min-w-[90px] text-xs text-[var(--vscode-descriptionForeground)]">
@@ -220,10 +238,20 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
           </div>
         </div>
       )}
+    <div
+      ref={parentRef}
+      className="flex-1 overflow-auto"
+      onClick={() => {
+        setSelectedRow(null)
+        setConfirmDeleteRow(null)
+        setSelectedColumn(null)
+        setConfirmDeleteColumn(null)
+      }}
+    >
       <table className="w-full border-collapse text-sm">
         <thead
           className="sticky z-10 bg-[var(--vscode-editor-background)]"
-          style={{ top: editable ? 38 : 0 }}
+          style={{ top: 0 }}
         >
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
@@ -231,13 +259,108 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 className="px-2 py-2 text-center font-semibold border-b border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-descriptionForeground)]"
                 style={{ minWidth: 50, width: 50 }}
               />
-              {headerGroup.headers.map((header) => (
+              {headerGroup.headers.map((header) => {
+                const colId = header.column.id
+                const isRenaming = renamingColumn === colId
+                const isColSelected = selectedColumn === colId
+                const isColConfirming = confirmDeleteColumn === colId
+                return (
                 <th
                   key={header.id}
-                  className="px-3 py-2 text-left font-semibold border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] select-none"
+                  className="relative px-3 py-2 text-left font-semibold border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] select-none"
                   style={{ minWidth: 100, cursor: 'pointer' }}
-                  onClick={header.column.getToggleSortingHandler()}
+                  onClick={(e) => {
+                    if (isRenaming) return
+                    if (isColConfirming || isColSelected) return
+                    // Toggle column selection on click when deletable
+                    if (editable && onDeleteColumn) {
+                      e.stopPropagation()
+                      setSelectedColumn(prev => prev === colId ? null : colId)
+                      setConfirmDeleteColumn(null)
+                      return
+                    }
+                    header.column.getToggleSortingHandler()?.(e)
+                  }}
+                  onMouseDown={(e) => {
+                    if (editable && onRenameColumn && e.detail >= 2) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setSelectedColumn(null)
+                      setConfirmDeleteColumn(null)
+                      setRenamingColumn(colId)
+                      setRenameValue(colId)
+                    }
+                  }}
                 >
+                  {isRenaming ? (
+                    <input
+                      ref={renameRef}
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={() => {
+                        const trimmed = renameValue.trim()
+                        if (trimmed && trimmed !== colId && onRenameColumn) {
+                          onRenameColumn(colId, trimmed)
+                        }
+                        setRenamingColumn(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          ;(e.target as HTMLInputElement).blur()
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setRenamingColumn(null)
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-focusBorder)] rounded-sm px-1 py-0 text-sm font-semibold outline-none"
+                    />
+                  ) : isColConfirming && onDeleteColumn ? (
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        className="rounded px-1 text-white"
+                        style={{ background: 'var(--vscode-errorForeground, #f44)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDeleteColumn(colId)
+                          setConfirmDeleteColumn(null)
+                          setSelectedColumn(null)
+                        }}
+                        title="Confirm delete"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        className="rounded px-1"
+                        style={{ background: 'var(--vscode-button-secondaryBackground, #555)', color: 'var(--vscode-button-secondaryForeground, #fff)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConfirmDeleteColumn(null)
+                          setSelectedColumn(null)
+                        }}
+                        title="Cancel"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : isColSelected && onDeleteColumn ? (
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="truncate">{colId}</span>
+                      <div
+                        className="flex items-center justify-center rounded-full flex-shrink-0"
+                        style={{ width: 20, height: 20, background: 'var(--vscode-errorForeground, #f44)', cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConfirmDeleteColumn(colId)
+                        }}
+                        title="Delete column"
+                      >
+                        <Minus size={12} className="text-white" />
+                      </div>
+                    </div>
+                  ) : (
                   <div className="flex items-center gap-1">
                     {header.isPlaceholder
                       ? null
@@ -253,8 +376,27 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                       <ChevronsUpDown size={14} className="text-[var(--vscode-descriptionForeground)] opacity-30 flex-shrink-0" />
                     )}
                   </div>
+                  )}
                 </th>
-              ))}
+                )
+              })}
+              {editable && onAddColumn && (
+                <th
+                  className="px-2 py-2 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-center"
+                  style={{ width: 36, minWidth: 36 }}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onAddColumn()
+                    }}
+                    className="inline-flex items-center justify-center rounded-sm opacity-40 hover:opacity-100 transition-opacity text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-textLink-foreground)]"
+                    title="Add column"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </th>
+              )}
             </tr>
           ))}
         </thead>
@@ -356,8 +498,8 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 {row.getVisibleCells().map((cell, columnIndex) => {
                   const isActive = activeCell?.rowPosition === virtualRow.index && activeCell?.columnIndex === columnIndex
                   const isEditing = editingCell?.rowPosition === virtualRow.index && editingCell?.columnIndex === columnIndex
-                  const renderedValue = flexRender(cell.column.columnDef.cell, cell.getContext()) as string
                   const cellCoord: ActiveCell = { rowPosition: virtualRow.index, columnIndex }
+                  const rawValue = getCellValue(cellCoord)
 
                   return (
                     <td
@@ -385,19 +527,45 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                         e.stopPropagation()
                         setSelectedRow(null)
                         setConfirmDeleteRow(null)
+                        // Double-click: enter editing directly (detail >= 2)
+                        // This is more reliable than onDoubleClick because the textarea
+                        // appearing after the first click can intercept the second click
+                        if (editable && e.detail >= 2) {
+                          startEditing(cellCoord)
+                          return
+                        }
                         if (editable && isActive && !isEditing) {
                           startEditing(cellCoord)
                           return
                         }
                         setActiveAndFocus(cellCoord)
                       }}
-                      onDoubleClick={(e) => {
-                        if (!editable) return
-                        e.stopPropagation()
-                        startEditing(cellCoord)
-                      }}
                       onKeyDown={(e) => {
+                        // Copy works even in read-only mode
+                        if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault()
+                          navigator.clipboard.writeText(rawValue)
+                          return
+                        }
+
                         if (!editable) return
+                        // When already editing, let the textarea handle all keys
+                        if (isEditing) return
+
+                        // Paste into selected cell
+                        if (e.key === 'v' && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault()
+                          navigator.clipboard.readText().then((text) => {
+                            if (onCellChange) {
+                              const row = rows[cellCoord.rowPosition]
+                              const columnId = columns[cellCoord.columnIndex]
+                              if (row && columnId) {
+                                onCellChange(row.index, columnId, text)
+                              }
+                            }
+                          })
+                          return
+                        }
 
                         if (e.key === 'ArrowUp') {
                           e.preventDefault()
@@ -474,13 +642,19 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                           style={{ minHeight: 56 }}
                         />
                       ) : (
-                        <span className="block w-full truncate" title={renderedValue || ''}>
-                          {renderedValue || '\u00A0'}
+                        <span className="block w-full truncate" title={rawValue || ''}>
+                          {rawValue || '\u00A0'}
                         </span>
                       )}
                     </td>
                   )
                 })}
+                {editable && onAddColumn && (
+                  <td
+                    className="border-b border-[var(--vscode-panel-border)]"
+                    style={{ width: 36, minWidth: 36 }}
+                  />
+                )}
               </tr>
             )
           })}
@@ -493,16 +667,29 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
       </table>
 
       {editable && onAddRow && (
-        <div className="sticky bottom-0 left-0 right-0 p-2 bg-[var(--vscode-editor-background)] border-t border-[var(--vscode-panel-border)]">
-          <button
-            onClick={onAddRow}
-            className="inline-flex items-center gap-1 px-3 py-1 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
-          >
-            <Plus size={14} />
-            Add row
-          </button>
-        </div>
+        <table className="w-full border-collapse text-sm">
+          <tbody>
+            <tr
+              className="group cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)]"
+              onClick={onAddRow}
+            >
+              <td
+                className="px-2 py-1.5 text-center border-b border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)]"
+                style={{ width: 50, minWidth: 50 }}
+              >
+                <Plus size={12} className="mx-auto opacity-40 group-hover:opacity-100 text-[var(--vscode-textLink-foreground)] transition-opacity" />
+              </td>
+              <td
+                colSpan={columns.length + (onAddColumn ? 1 : 0)}
+                className="px-3 py-1.5 text-xs border-b border-[var(--vscode-panel-border)] text-[var(--vscode-descriptionForeground)] opacity-40 group-hover:opacity-100 transition-opacity"
+              >
+                Add row
+              </td>
+            </tr>
+          </tbody>
+        </table>
       )}
+    </div>
     </div>
   )
 }
