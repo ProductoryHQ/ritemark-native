@@ -11,7 +11,15 @@ import { NodeViewWrapper } from '@tiptap/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ImageIcon } from 'lucide-react'
 import { sendToExtension } from '../bridge'
-import { Dialog } from './Dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogBody,
+  DialogFooter,
+  DialogTitle,
+  DialogButton,
+} from './ui/dialog'
 
 interface ResizableImageProps {
   node: {
@@ -225,31 +233,26 @@ export function ResizableImage({ node, selected }: ResizableImageProps) {
       </div>
 
       {/* Confirmation Dialog */}
-      <Dialog
-        isOpen={showConfirmDialog && pendingSize !== null}
-        onClose={handleCancelResize}
-        title="Resize Image"
-        icon={<ImageIcon size={18} />}
-        width={360}
-        footer={
-          <>
-            <button className="dialog-btn dialog-btn-secondary" onClick={handleCancelResize}>
-              Cancel
-            </button>
-            <button className="dialog-btn dialog-btn-primary" onClick={handleConfirmResize}>
-              Resize File
-            </button>
-          </>
-        }
-      >
-        <p style={{ margin: '0 0 12px 0', color: 'var(--vscode-foreground)' }}>
-          This will permanently resize the image file from{' '}
-          <strong>{originalSize?.width} × {originalSize?.height}</strong> to{' '}
-          <strong>{pendingSize?.width} × {pendingSize?.height}</strong>.
-        </p>
-        <p style={{ margin: 0, color: 'var(--vscode-errorForeground, #f48771)', fontWeight: 500 }}>
-          This action cannot be undone.
-        </p>
+      <Dialog open={showConfirmDialog && pendingSize !== null} onOpenChange={(open) => { if (!open) handleCancelResize() }}>
+        <DialogContent className="max-w-[360px]">
+          <DialogHeader icon={<ImageIcon size={18} />} onClose={handleCancelResize}>
+            <DialogTitle>Resize Image</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <p className="text-sm text-[var(--vscode-foreground)] m-0 mb-3">
+              This will permanently resize the image file from{' '}
+              <strong>{originalSize?.width} × {originalSize?.height}</strong> to{' '}
+              <strong>{pendingSize?.width} × {pendingSize?.height}</strong>.
+            </p>
+            <p className="text-sm font-medium text-[var(--vscode-errorForeground,#f48771)] m-0">
+              This action cannot be undone.
+            </p>
+          </DialogBody>
+          <DialogFooter>
+            <DialogButton variant="secondary" onClick={handleCancelResize}>Cancel</DialogButton>
+            <DialogButton onClick={handleConfirmResize}>Resize File</DialogButton>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
 
       <style>{`

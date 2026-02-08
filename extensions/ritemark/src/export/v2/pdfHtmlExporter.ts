@@ -7,8 +7,6 @@ import { buildNormalizedExportHtml, type ExportTemplateStyle } from './htmlPipel
 import type { ExportV2Request } from './types';
 
 const PAGE_MARGIN = 72;
-const HEADER_Y = 30;
-const FOOTER_Y_OFFSET = 36;
 const RESERVED_FOOTER_SPACE = 24;
 
 function isElement(node: HtmlNode): node is HTMLElement {
@@ -111,6 +109,7 @@ function renderCodeBlock(doc: PDFKit.PDFDocument, code: string, style: ExportTem
   });
 
   doc.font(style.bodyFont).fontSize(style.bodySize).fillColor(style.textColor);
+  doc.x = PAGE_MARGIN;
   doc.y = startY + blockHeight + 6;
 }
 
@@ -163,6 +162,7 @@ function renderTable(doc: PDFKit.PDFDocument, table: HTMLElement, style: ExportT
     doc.y = y + rowHeight;
   });
 
+  doc.x = PAGE_MARGIN;
   doc.moveDown(0.4);
 }
 
@@ -186,11 +186,15 @@ function renderList(doc: PDFKit.PDFDocument, listNode: HTMLElement, ordered: boo
     if (nestedUl) renderList(doc, nestedUl, false, depth + 1, style);
     if (nestedOl) renderList(doc, nestedOl, true, depth + 1, style);
   });
+  doc.x = PAGE_MARGIN;
   doc.moveDown(0.25);
 }
 
 function renderNode(doc: PDFKit.PDFDocument, node: HtmlNode, documentUri: vscode.Uri, style: ExportTemplateStyle): void {
   if (!isElement(node)) return;
+
+  // Always reset x to left margin before rendering any element
+  doc.x = PAGE_MARGIN;
 
   const tag = node.tagName;
   const text = compactText(getNodeText(node));
@@ -205,32 +209,46 @@ function renderNode(doc: PDFKit.PDFDocument, node: HtmlNode, documentUri: vscode
     case 'H5':
     case 'H6': {
       const sizes: Record<string, number> = { H1: 24, H2: 20, H3: 16, H4: 14, H5: 12, H6: 11 };
-      ensurePageRoom(doc, sizes[tag] * 1.7);
-      doc.moveDown(0.3);
+      const spaceBefore: Record<string, number> = { H1: 0.7, H2: 0.6, H3: 0.5, H4: 0.4, H5: 0.35, H6: 0.3 };
+      const spaceAfter: Record<string, number> = { H1: 0.3, H2: 0.25, H3: 0.2, H4: 0.15, H5: 0.15, H6: 0.1 };
+      // Ensure heading + at least one line of following content stays together
+      ensurePageRoom(doc, sizes[tag] * 2.5 + style.bodySize * 2);
+      doc.moveDown(spaceBefore[tag]);
       doc.font(style.headingFont).fontSize(sizes[tag]).fillColor(style.headingColor).text(text, {
         lineGap: style.lineGap,
       });
-      doc.moveDown(0.2);
+      doc.moveDown(spaceAfter[tag]);
       return;
     }
 
     case 'P':
-      ensurePageRoom(doc, style.bodySize * 1.8);
+      ensurePageRoom(doc, style.bodySize * 2.5);
       doc.font(style.bodyFont).fontSize(style.bodySize).fillColor(style.textColor).text(text, {
         lineGap: style.lineGap,
       });
-      doc.moveDown(0.2);
+      doc.moveDown(0.3);
       return;
 
-    case 'BLOCKQUOTE':
-      ensurePageRoom(doc, style.bodySize * 2);
-      doc.fillColor(style.mutedColor).font(style.bodyFont).fontSize(style.bodySize).text(text, PAGE_MARGIN + 16, doc.y, {
-        width: doc.page.width - PAGE_MARGIN * 2 - 16,
+    case 'BLOCKQUOTE': {
+      ensurePageRoom(doc, style.bodySize * 2.5);
+      const bqStartY = doc.y;
+      doc.font(style.bodyFont).fontSize(style.bodySize).fillColor(style.mutedColor);
+      doc.text(text, PAGE_MARGIN + 18, doc.y, {
+        width: doc.page.width - PAGE_MARGIN * 2 - 18,
         lineGap: style.lineGap,
       });
+      const bqEndY = doc.y;
+      // Draw left border line
+      doc.moveTo(PAGE_MARGIN + 6, bqStartY)
+        .lineTo(PAGE_MARGIN + 6, bqEndY)
+        .lineWidth(2.5)
+        .strokeColor(style.borderColor)
+        .stroke();
       doc.fillColor(style.textColor);
-      doc.moveDown(0.25);
+      doc.x = PAGE_MARGIN;
+      doc.moveDown(0.3);
       return;
+    }
 
     case 'PRE':
       renderCodeBlock(doc, node.textContent || '', style);
@@ -253,51 +271,40 @@ function renderNode(doc: PDFKit.PDFDocument, node: HtmlNode, documentUri: vscode
       return;
 
     case 'HR': {
-      ensurePageRoom(doc, 12);
-      const y = doc.y + 3;
-      doc.moveTo(PAGE_MARGIN, y).lineTo(doc.page.width - PAGE_MARGIN, y).lineWidth(1).strokeColor(style.borderColor).stroke();
+      ensurePageRoom(doc, 20);
+      doc.moveDown(0.3);
+      const hrY = doc.y;
+      doc.moveTo(PAGE_MARGIN, hrY).lineTo(doc.page.width - PAGE_MARGIN, hrY).lineWidth(0.5).strokeColor(style.borderColor).stroke();
       doc.moveDown(0.5);
       return;
     }
 
     case 'IMG': {
+      // TipTap stores original relative path in title, webview URI in src
+      const title = node.getAttribute('title');
       const src = node.getAttribute('src');
-      if (!src) return;
-      const img = tryLoadImage(src, documentUri);
-      if (!img) return;
+      const imagePath = title || src;
+      if (!imagePath) return;
+      const imgBuffer = tryLoadImage(imagePath, documentUri);
+      if (!imgBuffer) return;
 
-      ensurePageRoom(doc, 180);
       const maxWidth = doc.page.width - PAGE_MARGIN * 2;
-      doc.image(img, PAGE_MARGIN, doc.y, { fit: [maxWidth, 320], align: 'center' });
-      doc.moveDown(0.5);
+      const maxHeight = 400;
+      // Get actual image dimensions for proper scaling
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pdfImage = (doc as any).openImage(imgBuffer);
+      const scale = Math.min(maxWidth / pdfImage.width, maxHeight / pdfImage.height, 1);
+      const renderWidth = pdfImage.width * scale;
+      const renderHeight = pdfImage.height * scale;
+
+      ensurePageRoom(doc, renderHeight + 8);
+      doc.image(pdfImage, PAGE_MARGIN, doc.y, { width: renderWidth, height: renderHeight });
+      doc.y += renderHeight + 6;
       return;
     }
   }
 
   node.childNodes.forEach(child => renderNode(doc, child, documentUri, style));
-}
-
-function applyHeaderFooter(
-  doc: PDFKit.PDFDocument,
-  title: string,
-  style: ExportTemplateStyle
-): void {
-  const range = doc.bufferedPageRange();
-  for (let i = 0; i < range.count; i++) {
-    doc.switchToPage(i);
-    const pageNo = i + 1;
-    const totalPages = range.count;
-
-    doc.font(style.bodyFont).fontSize(9).fillColor(style.mutedColor)
-      .text(title, PAGE_MARGIN, HEADER_Y, {
-        width: doc.page.width - PAGE_MARGIN * 2 - 100,
-        align: 'left',
-      })
-      .text(`${pageNo} / ${totalPages}`, PAGE_MARGIN, doc.page.height - FOOTER_Y_OFFSET, {
-        width: doc.page.width - PAGE_MARGIN * 2,
-        align: 'right',
-      });
-  }
 }
 
 export async function exportToPDFV2(
@@ -319,7 +326,6 @@ export async function exportToPDFV2(
     const pdf = new PDFDocument({
       size: 'A4',
       margins: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN },
-      bufferPages: true,
       info: {
         Title: normalized.metadata.title || docName,
         Author: normalized.metadata.author || '',
@@ -344,7 +350,6 @@ export async function exportToPDFV2(
     }
 
     nodes.forEach(node => renderNode(pdf, node, documentUri, normalized.style));
-    applyHeaderFooter(pdf, normalized.metadata.title || docName, normalized.style);
     pdf.end();
 
     await new Promise<void>((resolve, reject) => {

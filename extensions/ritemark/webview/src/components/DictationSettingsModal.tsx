@@ -1,6 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { X, Settings, Trash2, HardDrive } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Settings, Trash2, HardDrive } from 'lucide-react'
 import { sendToExtension, onMessage } from '../bridge'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogBody,
+  DialogFooter,
+  DialogTitle,
+  DialogButton,
+} from './ui/dialog'
 
 // Settings stored in localStorage
 export interface DictationSettings {
@@ -92,30 +101,6 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
     return unsubscribe
   }, [])
 
-  // Handle ESC key
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
-
-  // Handle click outside modal
-  const handleBackdropClick = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (event.target === event.currentTarget) {
-        onClose()
-      }
-    },
-    [onClose]
-  )
-
   // Update settings
   const updateSettings = (updates: Partial<DictationSettings>) => {
     const newSettings = { ...settings, ...updates }
@@ -151,450 +136,107 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
     return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`
   }
 
-  if (!isOpen) return null
-
   return (
-    <>
-      {/* Backdrop */}
-      <div className="dictation-settings-backdrop" onClick={handleBackdropClick}>
-        {/* Modal container */}
-        <div className="dictation-settings-modal" onClick={(e) => e.stopPropagation()}>
-          {/* Header */}
-          <div className="dictation-settings-header">
-            <div className="dictation-settings-header-left">
-              <Settings size={18} />
-              <h2 className="dictation-settings-title">Dictation Settings</h2>
-            </div>
-            <button
-              className="dictation-settings-close"
-              onClick={onClose}
-              aria-label="Close"
-              title="Close"
-            >
-              <X size={16} />
-            </button>
-          </div>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent>
+        <DialogHeader icon={<Settings size={18} />} onClose={onClose}>
+          <DialogTitle>Dictation Settings</DialogTitle>
+        </DialogHeader>
 
-          {/* Content */}
-          <div className="dictation-settings-content">
-            {/* Model Section */}
-            <div className="dictation-settings-section">
-              <div className="dictation-settings-section-header">MODEL</div>
-              <div className="dictation-settings-model">
-                <div className="dictation-settings-model-info">
-                  <div className="dictation-settings-model-name">
-                    <HardDrive size={14} />
-                    {modelStatus?.modelName || 'Loading...'}
-                    {modelStatus?.modelSizeDisplay && (
-                      <span className="model-size-label">({modelStatus.modelSizeDisplay})</span>
-                    )}
-                  </div>
-                  <div className="dictation-settings-model-status">
-                    {modelStatus === null ? (
-                      'Checking...'
-                    ) : modelStatus.downloaded ? (
-                      <span className="model-downloaded">{formatSize(modelStatus.sizeBytes)}</span>
-                    ) : (
-                      <span className="model-not-downloaded">Not downloaded</span>
-                    )}
-                  </div>
+        <DialogBody>
+          {/* Model Section */}
+          <div className="mb-6">
+            <div className="text-[11px] font-semibold text-[var(--vscode-descriptionForeground)] uppercase tracking-wider mb-3">MODEL</div>
+            <div className="flex items-center justify-between p-3 bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)] rounded-lg">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--vscode-foreground)]">
+                  <HardDrive size={14} />
+                  {modelStatus?.modelName || 'Loading...'}
+                  {modelStatus?.modelSizeDisplay && (
+                    <span className="font-normal text-[var(--vscode-descriptionForeground)]">({modelStatus.modelSizeDisplay})</span>
+                  )}
                 </div>
-                {modelStatus?.downloaded && !showConfirmRemove && (
-                  <button
-                    className="dictation-settings-remove-btn"
-                    onClick={handleRemoveClick}
-                    disabled={isRemoving || modelStatus.isDictationActive}
-                    title={modelStatus.isDictationActive ? 'Stop dictation first' : 'Remove model'}
-                  >
-                    <Trash2 size={14} />
-                    {isRemoving ? 'Removing...' : modelStatus.isDictationActive ? 'In use' : 'Remove'}
-                  </button>
-                )}
-                {showConfirmRemove && (
-                  <div className="dictation-settings-confirm">
-                    <span>Delete?</span>
-                    <button className="confirm-yes" onClick={handleConfirmRemove}>Yes</button>
-                    <button className="confirm-no" onClick={handleCancelRemove}>No</button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Audio Processing Section */}
-            <div className="dictation-settings-section">
-              <div className="dictation-settings-section-header">AUDIO PROCESSING</div>
-
-              {/* Chunk Duration */}
-              <div className="dictation-settings-row">
-                <div className="dictation-settings-label">
-                  <span>Chunk duration</span>
-                  <span className="dictation-settings-description">
-                    How often audio is sent for transcription
-                  </span>
-                </div>
-                <div className="dictation-settings-radio-group">
-                  {([3000, 5000, 10000] as const).map((duration) => (
-                    <label key={duration} className="dictation-settings-radio">
-                      <input
-                        type="radio"
-                        name="chunkDuration"
-                        checked={settings.chunkDuration === duration}
-                        onChange={() => updateSettings({ chunkDuration: duration })}
-                      />
-                      <span className="radio-label">{duration / 1000}s</span>
-                    </label>
-                  ))}
+                <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+                  {modelStatus === null ? (
+                    'Checking...'
+                  ) : modelStatus.downloaded ? (
+                    <span className="text-[var(--vscode-charts-green,#4ade80)]">{formatSize(modelStatus.sizeBytes)}</span>
+                  ) : (
+                    <span className="text-[var(--vscode-charts-yellow,#facc15)]">Not downloaded</span>
+                  )}
                 </div>
               </div>
-
-              {/* VAD Toggle */}
-              <div className="dictation-settings-row disabled">
-                <div className="dictation-settings-label">
-                  <span>Voice Activity Detection</span>
-                  <span className="dictation-settings-description">
-                    Only transcribe when speech is detected
-                  </span>
+              {modelStatus?.downloaded && !showConfirmRemove && (
+                <button
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-[var(--vscode-input-border)] rounded-md text-xs text-[var(--vscode-errorForeground,#ef4444)] cursor-pointer transition-colors hover:bg-[rgba(239,68,68,0.1)] hover:border-[var(--vscode-errorForeground,#ef4444)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleRemoveClick}
+                  disabled={isRemoving || modelStatus.isDictationActive}
+                  title={modelStatus.isDictationActive ? 'Stop dictation first' : 'Remove model'}
+                >
+                  <Trash2 size={14} />
+                  {isRemoving ? 'Removing...' : modelStatus.isDictationActive ? 'In use' : 'Remove'}
+                </button>
+              )}
+              {showConfirmRemove && (
+                <div className="flex items-center gap-2 text-xs text-[var(--vscode-foreground)]">
+                  <span>Delete?</span>
+                  <button className="px-2.5 py-1 rounded bg-[var(--vscode-errorForeground,#ef4444)] text-white text-xs border-none cursor-pointer hover:opacity-90" onClick={handleConfirmRemove}>Yes</button>
+                  <button className="px-2.5 py-1 rounded bg-transparent text-[var(--vscode-foreground)] text-xs border border-[var(--vscode-input-border)] cursor-pointer hover:bg-[var(--vscode-toolbar-hoverBackground)]" onClick={handleCancelRemove}>No</button>
                 </div>
-                <div className="dictation-settings-toggle-group">
-                  <span className="coming-soon">Coming soon</span>
-                </div>
-              </div>
-
-              {/* Noise Reduction Toggle */}
-              <div className="dictation-settings-row disabled">
-                <div className="dictation-settings-label">
-                  <span>Noise Reduction</span>
-                  <span className="dictation-settings-description">
-                    Filter background noise before transcription
-                  </span>
-                </div>
-                <div className="dictation-settings-toggle-group">
-                  <span className="coming-soon">Coming soon</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="dictation-settings-footer">
-            <button className="dictation-settings-done-btn" onClick={onClose}>
-              Done
-            </button>
+          {/* Audio Processing Section */}
+          <div>
+            <div className="text-[11px] font-semibold text-[var(--vscode-descriptionForeground)] uppercase tracking-wider mb-3">AUDIO PROCESSING</div>
+
+            {/* Chunk Duration */}
+            <div className="flex items-start justify-between py-3 border-b border-[var(--vscode-panel-border)]">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[13px] font-medium text-[var(--vscode-foreground)]">Chunk duration</span>
+                <span className="text-[11px] text-[var(--vscode-descriptionForeground)]">How often audio is sent for transcription</span>
+              </div>
+              <div className="flex gap-2">
+                {([3000, 5000, 10000] as const).map((duration) => (
+                  <label key={duration} className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="chunkDuration"
+                      className="m-0 cursor-pointer"
+                      checked={settings.chunkDuration === duration}
+                      onChange={() => updateSettings({ chunkDuration: duration })}
+                    />
+                    <span className="text-[13px] text-[var(--vscode-foreground)]">{duration / 1000}s</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* VAD Toggle */}
+            <div className="flex items-start justify-between py-3 border-b border-[var(--vscode-panel-border)] opacity-60">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[13px] font-medium text-[var(--vscode-foreground)]">Voice Activity Detection</span>
+                <span className="text-[11px] text-[var(--vscode-descriptionForeground)]">Only transcribe when speech is detected</span>
+              </div>
+              <span className="text-[11px] px-2 py-1 bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)] rounded">Coming soon</span>
+            </div>
+
+            {/* Noise Reduction Toggle */}
+            <div className="flex items-start justify-between py-3 opacity-60">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[13px] font-medium text-[var(--vscode-foreground)]">Noise Reduction</span>
+                <span className="text-[11px] text-[var(--vscode-descriptionForeground)]">Filter background noise before transcription</span>
+              </div>
+              <span className="text-[11px] px-2 py-1 bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)] rounded">Coming soon</span>
+            </div>
           </div>
-        </div>
-      </div>
+        </DialogBody>
 
-      <style>{`
-        /* Backdrop */
-        .dictation-settings-backdrop {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.4);
-          z-index: 9999;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          animation: dictation-modal-fade-in 150ms ease-out;
-        }
-
-        @keyframes dictation-modal-fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        /* Modal */
-        .dictation-settings-modal {
-          position: relative;
-          width: 400px;
-          max-width: 90vw;
-          max-height: 80vh;
-          background: var(--vscode-editor-background);
-          border: 1px solid var(--vscode-panel-border);
-          border-radius: 12px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
-          z-index: 10000;
-          display: flex;
-          flex-direction: column;
-          animation: dictation-modal-scale-in 150ms ease-out;
-        }
-
-        @keyframes dictation-modal-scale-in {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-
-        /* Header */
-        .dictation-settings-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 16px;
-          border-bottom: 1px solid var(--vscode-panel-border);
-        }
-
-        .dictation-settings-header-left {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: var(--vscode-foreground);
-        }
-
-        .dictation-settings-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: var(--vscode-foreground);
-          margin: 0;
-        }
-
-        .dictation-settings-close {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 28px;
-          height: 28px;
-          border: none;
-          border-radius: 6px;
-          background: transparent;
-          color: var(--vscode-foreground);
-          cursor: pointer;
-          transition: background-color 0.15s ease;
-        }
-
-        .dictation-settings-close:hover {
-          background: var(--vscode-toolbar-hoverBackground);
-        }
-
-        /* Content */
-        .dictation-settings-content {
-          flex: 1;
-          overflow-y: auto;
-          padding: 16px;
-        }
-
-        /* Section */
-        .dictation-settings-section {
-          margin-bottom: 24px;
-        }
-
-        .dictation-settings-section:last-child {
-          margin-bottom: 0;
-        }
-
-        .dictation-settings-section-header {
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--vscode-descriptionForeground);
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          margin-bottom: 12px;
-        }
-
-        /* Model info */
-        .dictation-settings-model {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px;
-          background: var(--vscode-input-background);
-          border: 1px solid var(--vscode-input-border);
-          border-radius: 8px;
-        }
-
-        .dictation-settings-model-info {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .dictation-settings-model-name {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--vscode-foreground);
-        }
-
-        .model-size-label {
-          font-weight: 400;
-          color: var(--vscode-descriptionForeground);
-        }
-
-        .dictation-settings-model-status {
-          font-size: 12px;
-          color: var(--vscode-descriptionForeground);
-        }
-
-        .model-downloaded {
-          color: var(--vscode-charts-green, #4ade80);
-        }
-
-        .model-not-downloaded {
-          color: var(--vscode-charts-yellow, #facc15);
-        }
-
-        .dictation-settings-remove-btn {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 12px;
-          background: transparent;
-          border: 1px solid var(--vscode-input-border);
-          border-radius: 6px;
-          color: var(--vscode-errorForeground, #ef4444);
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .dictation-settings-remove-btn:hover:not(:disabled) {
-          background: var(--vscode-inputValidation-errorBackground, rgba(239, 68, 68, 0.1));
-          border-color: var(--vscode-errorForeground, #ef4444);
-        }
-
-        .dictation-settings-remove-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        /* Confirmation dialog */
-        .dictation-settings-confirm {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 12px;
-          color: var(--vscode-foreground);
-        }
-
-        .dictation-settings-confirm button {
-          padding: 4px 10px;
-          border-radius: 4px;
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .confirm-yes {
-          background: var(--vscode-errorForeground, #ef4444);
-          color: white;
-          border: none;
-        }
-
-        .confirm-yes:hover {
-          opacity: 0.9;
-        }
-
-        .confirm-no {
-          background: transparent;
-          color: var(--vscode-foreground);
-          border: 1px solid var(--vscode-input-border);
-        }
-
-        .confirm-no:hover {
-          background: var(--vscode-toolbar-hoverBackground);
-        }
-
-        /* Settings rows */
-        .dictation-settings-row {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          padding: 12px 0;
-          border-bottom: 1px solid var(--vscode-panel-border);
-        }
-
-        .dictation-settings-row:last-child {
-          border-bottom: none;
-        }
-
-        .dictation-settings-row.disabled {
-          opacity: 0.6;
-        }
-
-        .dictation-settings-label {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .dictation-settings-label > span:first-child {
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--vscode-foreground);
-        }
-
-        .dictation-settings-description {
-          font-size: 11px;
-          color: var(--vscode-descriptionForeground);
-        }
-
-        /* Radio group */
-        .dictation-settings-radio-group {
-          display: flex;
-          gap: 8px;
-        }
-
-        .dictation-settings-radio {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          cursor: pointer;
-        }
-
-        .dictation-settings-radio input {
-          margin: 0;
-          cursor: pointer;
-        }
-
-        .dictation-settings-radio .radio-label {
-          font-size: 13px;
-          color: var(--vscode-foreground);
-        }
-
-        /* Toggle group */
-        .dictation-settings-toggle-group {
-          display: flex;
-          align-items: center;
-        }
-
-        .coming-soon {
-          font-size: 11px;
-          padding: 4px 8px;
-          background: var(--vscode-badge-background);
-          color: var(--vscode-badge-foreground);
-          border-radius: 4px;
-        }
-
-        /* Footer */
-        .dictation-settings-footer {
-          display: flex;
-          justify-content: flex-end;
-          padding: 16px;
-          border-top: 1px solid var(--vscode-panel-border);
-        }
-
-        .dictation-settings-done-btn {
-          padding: 8px 16px;
-          background: var(--vscode-button-background);
-          color: var(--vscode-button-foreground);
-          border: none;
-          border-radius: 6px;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: background-color 0.15s ease;
-        }
-
-        .dictation-settings-done-btn:hover {
-          background: var(--vscode-button-hoverBackground);
-        }
-      `}</style>
-    </>
+        <DialogFooter>
+          <DialogButton onClick={onClose}>Done</DialogButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

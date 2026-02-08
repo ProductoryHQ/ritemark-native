@@ -97,11 +97,11 @@ Consolidate UI components using shadcn/ui for consistency.
 
 ## Developer Experience
 
-- [ ] **Claude Code auto-launch** - Detect and auto-launch Claude Code in terminal on new window -   Setting: `ritemark.claudeCode.autoLaunch` (default: false)      -   Setting: `ritemark.claudeCode.flags` (e.g., `--dangerously-skip-permissions`)      -   One-time prompt before enabling
+- [ ] **Claude Code auto-launch** - Detect and auto-launch Claude Code in terminal on new window - Setting: `ritemark.claudeCode.autoLaunch` (default: false) - Setting: `ritemark.claudeCode.flags` (e.g., `--dangerously-skip-permissions`) - One-time prompt before enabling
 
 ## Distribution
 
-- [ ] **Homebrew Cask support** - `brew install --cask ritemark` -   See `docs/sprints/sprint-16-auto-update/research/HOMEBREW-CASK-GUIDE.md`
+- [ ] **Homebrew Cask support** - `brew install --cask ritemark` - See `docs/sprints/sprint-16-auto-update/research/HOMEBREW-CASK-GUIDE.md`
 
 * * *
 
