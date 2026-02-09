@@ -140,6 +140,31 @@ Export V2 establishes a single HTML-first rendering pipeline for both PDF and DO
 - **Delete column** — Click header to select → red minus circle → Yes/No confirmation. Same UX pattern as row deletion. Last column protected from deletion.
 - **Add row redesign** — Replaced large blue sticky button with subtle inline table row (faded `+` and "Add row" text, lights up on hover).
 
+### Phase 11: QA Fixes & Polish (DONE)
+
+Post-Codex review and manual testing fixes:
+
+- [x] **Simplified export menu** — removed confusing Default/Clean template choices, single "Export PDF" / "Export Word" / "Copy as Markdown"
+- [x] **PDF heading alignment** — fixed `doc.x` not resetting to left margin after tables, code blocks, blockquotes, lists
+- [x] **PDF fonts** — changed Clean template from Times-Roman to Helvetica (matching Default)
+- [x] **PDF no headers/footers** — removed automatic header (title) and footer (page numbers), removed dead `applyHeaderFooter()` code
+- [x] **PDF empty pages** — removed `bufferPages: true` that caused blank pages at end
+- [x] **PDF image support** — fixed images not appearing: use `title` attribute (original relative path) instead of `src` (webview URI); proper aspect-ratio scaling via `doc.openImage()`; manual `doc.y` advance after image
+- [x] **Word image support** — added `ImageRun` with `getImageDimensions()` (PNG/JPEG header parsing) for proper aspect ratio
+- [x] **Word no footer** — removed "Exported from Ritemark" footer
+- [x] **Word HR full-width** — replaced text-character HR with `BorderStyle.SINGLE` bottom border (margin-to-margin)
+- [x] **PDF heading spacing** — per-level `spaceBefore`/`spaceAfter` values (H1 gets most space, H6 least)
+- [x] **PDF heading orphan protection** — `ensurePageRoom` checks heading + at least one line of following content
+- [x] **PDF blockquote border** — added 2.5pt left vertical border line
+- [x] **PDF HR refined** — thinner (0.5pt) with more spacing around it
+- [x] **Word heading spacing** — `before`/`after` spacing values + `keepNext: true` (orphan protection)
+- [x] **Word blockquote** — italic style + left border
+
+### Phase 12: UX Fixes (DONE)
+
+- [x] **CMD+B / CTRL+B conflict** — disabled sidebar toggle when Ritemark editor is active (keybinding override in package.json), Bold now works without toggling folder tree
+- [x] **Terminal auto-open** — terminal only opens on startup if no terminal exists yet (was unconditionally creating new terminal on every window)
+
 ## Risks & Mitigation
 
 | Risk | Likelihood | Impact | Mitigation |

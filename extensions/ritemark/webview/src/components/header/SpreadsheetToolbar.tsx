@@ -63,17 +63,18 @@ export function SpreadsheetToolbar({
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Refresh button (if provided) */}
-        {onRefresh && (
+        {/* Refresh button - only shows when file changed externally (same as DocumentHeader) */}
+        {hasFileChanged && onRefresh && (
           <button
-            className={`refresh-button ${hasFileChanged ? 'has-changes' : ''}`}
+            className="refresh-button has-changes"
             onClick={onRefresh}
             disabled={refreshDisabled}
-            aria-label={hasFileChanged ? 'File changed on disk - click to refresh' : 'Refresh from disk'}
-            title={hasFileChanged ? 'File changed on disk' : 'Refresh from disk'}
+            aria-label="File changed on disk - click to refresh"
+            title="File changed on disk - click to reload"
           >
             <RotateCw size={16} />
-            {hasFileChanged && <span className="refresh-badge" />}
+            <span className="refresh-text">Refresh</span>
+            <span className="refresh-badge" />
           </button>
         )}
 
@@ -263,18 +264,19 @@ export function SpreadsheetToolbar({
           color: var(--vscode-menu-selectionForeground);
         }
 
-        /* Refresh button */
+        /* Refresh button - matches DocumentHeader style */
         .refresh-button {
           position: relative;
           display: flex;
           align-items: center;
-          justify-content: center;
-          width: 32px;
-          height: 32px;
+          gap: 6px;
+          padding: 6px 12px;
           border: none;
           border-radius: 6px;
           background: transparent;
           color: var(--vscode-foreground);
+          font-size: 13px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           cursor: pointer;
           transition: background-color 0.15s ease;
         }
@@ -283,16 +285,23 @@ export function SpreadsheetToolbar({
           background: var(--vscode-toolbar-hoverBackground);
         }
 
-        .refresh-button:active:not(:disabled) {
-          background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
-        }
-
         .refresh-button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
 
-        /* Badge indicator when file changed on disk */
+        .refresh-button.has-changes {
+          color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+        }
+
+        .refresh-text {
+          display: inline;
+        }
+
+        @media (max-width: 500px) {
+          .refresh-text { display: none; }
+        }
+
         .refresh-badge {
           position: absolute;
           top: 4px;
@@ -301,12 +310,12 @@ export function SpreadsheetToolbar({
           height: 8px;
           background: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
           border-radius: 50%;
-          border: 2px solid var(--vscode-editor-background);
+          animation: pulse 2s infinite;
         }
 
-        /* Subtle glow effect when file changed */
-        .refresh-button.has-changes {
-          color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
       `}</style>
     </header>

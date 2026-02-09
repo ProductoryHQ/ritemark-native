@@ -14,6 +14,7 @@ import {
   TableCell,
   WidthType,
   BorderStyle,
+  ShadingType,
   type ISectionOptions,
 } from 'docx';
 import { parse, HTMLElement, type Node as HtmlNode, TextNode } from 'node-html-parser';
@@ -231,10 +232,33 @@ function parseBlocks(node: HtmlNode, style: ExportTemplateStyle, documentUri: vs
         border: { left: { style: BorderStyle.SINGLE, size: 6, color: style.borderColor.replace('#', '') } },
       })];
     case 'PRE':
+    case 'CODE': {
+      // Code block: preserve indentation, add background shading
+      // TipTap generates: <pre><code class="language-xxx">content</code></pre>
+      // Navigate to CODE child to avoid tag leakage from textContent on PRE
+      let codeSource: HTMLElement = node;
+      if (tag === 'PRE') {
+        const codeChild = node.querySelector('code');
+        if (codeChild) codeSource = codeChild;
+      }
+      // Get text and strip any residual HTML tags as safety measure
+      const rawCodeText = codeSource.textContent || codeSource.text || '';
+      const codeText = rawCodeText.replace(/<\/?[^>]+(>|$)/g, '');
+      const codeLines = codeText.split('\n');
+      // Remove leading/trailing empty lines but preserve internal whitespace
+      while (codeLines.length > 0 && codeLines[0].trim() === '') codeLines.shift();
+      while (codeLines.length > 0 && codeLines[codeLines.length - 1].trim() === '') codeLines.pop();
+      const codeRuns: TextRun[] = [];
+      codeLines.forEach((line, i) => {
+        if (i > 0) codeRuns.push(new TextRun({ break: 1 }));
+        codeRuns.push(new TextRun({ text: line || ' ', font: style.codeFont, size: style.codeSize * 2 }));
+      });
       return [new Paragraph({
-        children: [new TextRun({ text: node.textContent || '', font: style.codeFont })],
-        spacing: { after: 120 },
+        children: codeRuns.length > 0 ? codeRuns : [new TextRun({ text: ' ', font: style.codeFont })],
+        spacing: { before: 60, after: 120 },
+        shading: { type: ShadingType.CLEAR, fill: style.codeBackground.replace('#', '') },
       })];
+    }
     case 'UL':
       return parseList(node, style, false, 0);
     case 'OL':
