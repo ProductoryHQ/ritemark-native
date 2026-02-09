@@ -4,8 +4,8 @@ import { FileText, FileType, Clipboard, Check } from 'lucide-react'
 interface ExportMenuProps {
   isOpen: boolean
   onClose: () => void
-  onExportPDF: () => void
-  onExportWord: () => void
+  onExportPDF: (templateId?: string) => void
+  onExportWord: (templateId?: string) => void
   onCopyAsMarkdown: () => void
   anchorElement: HTMLElement | null
 }
@@ -93,13 +93,13 @@ export function ExportMenu({
     }
   }, [isOpen, anchorElement])
 
-  const handleExportPDF = useCallback(() => {
-    onExportPDF()
+  const handleExportPDF = useCallback((templateId = 'default') => {
+    onExportPDF(templateId)
     onClose()
   }, [onExportPDF, onClose])
 
-  const handleExportWord = useCallback(() => {
-    onExportWord()
+  const handleExportWord = useCallback((templateId = 'default') => {
+    onExportWord(templateId)
     onClose()
   }, [onExportWord, onClose])
 
@@ -124,13 +124,17 @@ export function ExportMenu({
           transform: 'translateX(-100%)', // Right-align with button
         }}
       >
-        {/* Export PDF */}
-        <button className="export-menu-item" onClick={handleExportPDF}>
+        <button className="export-menu-item" onClick={() => handleExportPDF('clean')}>
           <FileText size={16} className="export-menu-icon" />
           <span>Export PDF</span>
         </button>
+        <button className="export-menu-item" onClick={() => handleExportWord('clean')}>
+          <FileType size={16} className="export-menu-icon" />
+          <span>Export Word</span>
+        </button>
 
-        {/* Copy as Markdown */}
+        <div className="export-menu-divider" />
+
         <button
           className={`export-menu-item ${copied ? 'export-menu-item-success' : ''}`}
           onClick={handleCopyAsMarkdown}
@@ -146,12 +150,6 @@ export function ExportMenu({
               <span>Copy as Markdown</span>
             </>
           )}
-        </button>
-
-        {/* Export Word */}
-        <button className="export-menu-item" onClick={handleExportWord}>
-          <FileType size={16} className="export-menu-icon" />
-          <span>Export Word</span>
         </button>
       </div>
 
@@ -194,6 +192,12 @@ export function ExportMenu({
           text-align: left;
           cursor: pointer;
           transition: background-color 0.15s ease;
+        }
+
+        .export-menu-divider {
+          height: 1px;
+          background: var(--vscode-menu-border);
+          margin: 4px 0;
         }
 
         .export-menu-item:hover {
