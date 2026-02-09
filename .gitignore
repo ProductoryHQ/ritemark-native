@@ -45,6 +45,7 @@ temp/
 
 # Build artifacts
 *.dmg
+*.exe
 *.app
 VSCode-darwin-arm64/
 VSCode-darwin-x64/
