@@ -258,6 +258,66 @@ export function SpreadsheetViewer({
     onChange(csvString)
   }, [parsedData, onChange])
 
+  // Handle adding a new column (CSV only)
+  const handleAddColumn = useCallback(() => {
+    if (!parsedData || !onChange) return
+
+    // Generate a unique column name
+    let colName = `Column${parsedData.columns.length + 1}`
+    let counter = parsedData.columns.length + 1
+    while (parsedData.columns.includes(colName)) {
+      counter++
+      colName = `Column${counter}`
+    }
+
+    const newColumns = [...parsedData.columns, colName]
+    const newRows = parsedData.rows.map(row => ({ ...row, [colName]: '' }))
+    setParsedData({ ...parsedData, columns: newColumns, rows: newRows })
+
+    const csvString = Papa.unparse(newRows, { columns: newColumns })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
+  // Handle renaming a column (CSV only)
+  const handleRenameColumn = useCallback((oldName: string, newName: string) => {
+    if (!parsedData || !onChange) return
+    if (oldName === newName) return
+    // Prevent duplicate column names
+    if (parsedData.columns.includes(newName)) return
+
+    const newColumns = parsedData.columns.map(c => c === oldName ? newName : c)
+    const newRows = parsedData.rows.map(row => {
+      const newRow: Record<string, unknown> = {}
+      for (const col of parsedData.columns) {
+        newRow[col === oldName ? newName : col] = row[col]
+      }
+      return newRow
+    })
+    setParsedData({ ...parsedData, columns: newColumns, rows: newRows })
+
+    const csvString = Papa.unparse(newRows, { columns: newColumns })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
+  // Handle deleting a column by name (CSV only)
+  const handleDeleteColumn = useCallback((columnName: string) => {
+    if (!parsedData || !onChange) return
+    if (parsedData.columns.length <= 1) return // Don't delete the last column
+
+    const newColumns = parsedData.columns.filter(c => c !== columnName)
+    const newRows = parsedData.rows.map(row => {
+      const newRow: Record<string, unknown> = {}
+      for (const col of newColumns) {
+        newRow[col] = row[col]
+      }
+      return newRow
+    })
+    setParsedData({ ...parsedData, columns: newColumns, rows: newRows })
+
+    const csvString = Papa.unparse(newRows, { columns: newColumns })
+    onChange(csvString)
+  }, [parsedData, onChange])
+
   // Handle deleting a row at a specific index (CSV only)
   const handleDeleteRow = useCallback((index: number) => {
     if (!parsedData || !onChange) return
@@ -444,6 +504,9 @@ export function SpreadsheetViewer({
           editable={isEditable}
           onCellChange={handleCellChange}
           onAddRow={isEditable ? handleAddRow : undefined}
+          onAddColumn={isEditable ? handleAddColumn : undefined}
+          onRenameColumn={isEditable ? handleRenameColumn : undefined}
+          onDeleteColumn={isEditable ? handleDeleteColumn : undefined}
           onInsertRowAt={isEditable ? handleInsertRowAt : undefined}
           onDeleteRow={isEditable ? handleDeleteRow : undefined}
         />

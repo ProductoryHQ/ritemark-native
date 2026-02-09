@@ -142,7 +142,7 @@ export function Dialog({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 16px;
+          padding: 12px 16px;
           border-bottom: 1px solid var(--vscode-panel-border);
         }
 
@@ -150,32 +150,39 @@ export function Dialog({
           display: flex;
           align-items: center;
           gap: 8px;
-          color: var(--vscode-foreground);
+          color: var(--vscode-descriptionForeground);
+        }
+
+        .dialog-header-left svg {
+          flex-shrink: 0;
+          opacity: 0.6;
         }
 
         .dialog-title {
-          font-size: 16px;
+          font-size: 13px;
           font-weight: 600;
           color: var(--vscode-foreground);
           margin: 0;
+          letter-spacing: -0.01em;
         }
 
         .dialog-close {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 28px;
+          width: 24px;
+          height: 24px;
           border: none;
-          border-radius: 6px;
+          border-radius: 4px;
           background: transparent;
-          color: var(--vscode-foreground);
+          color: var(--vscode-descriptionForeground);
           cursor: pointer;
-          transition: background-color 0.15s ease;
+          transition: background-color 0.15s ease, color 0.15s ease;
         }
 
         .dialog-close:hover {
           background: var(--vscode-toolbar-hoverBackground);
+          color: var(--vscode-foreground);
         }
 
         /* Content */

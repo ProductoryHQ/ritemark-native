@@ -2,7 +2,7 @@
 
 > Share your documents as PDF or Word files with one click.
 
-Export your markdown documents to professional formats that anyone can open. No extra software needed.
+Export your markdown documents to professional formats that anyone can open. Export V2 uses HTML-based rendering for higher visual fidelity.
 
 ---
 
@@ -10,7 +10,9 @@ Export your markdown documents to professional formats that anyone can open. No 
 
 - **Export to PDF** - Universal format, looks the same everywhere
 - **Export to Word** - Editable .docx for Microsoft Word or Google Docs
-- **Preserve formatting** - Headings, lists, tables, code blocks all export correctly
+- **HTML-based rendering** - Export from editor HTML, not line-by-line markdown parsing
+- **Template styles** - Choose `Default` or `Clean` template from Export menu
+- **Preserve formatting** - Headings, lists, tables, code blocks, and metadata export more reliably
 
 ---
 
@@ -18,7 +20,7 @@ Export your markdown documents to professional formats that anyone can open. No 
 
 1. Open any markdown document
 2. Click **Export** in the document header (top-right)
-3. Choose **PDF** or **Word**
+3. Choose **PDF** or **Word** template option (`Default` or `Clean`)
 4. Pick a save location
 5. Done - file is saved
 
@@ -37,14 +39,15 @@ Creates a `.pdf` file that looks great on any device.
 | Headings | H1 (24pt), H2 (18pt), H3 (14pt) |
 | Paragraphs | 11pt body text |
 | Bold/Italic | Preserved |
-| Links | Text only (not clickable in PDF) |
+| Links | Link text preserved |
 | Bullet lists | Standard bullets (•) |
 | Numbered lists | Sequential numbers |
 | Task lists | Checkboxes (checked/unchecked) |
 | Blockquotes | Italic gray text |
-| Code blocks | Monospace font, light gray background |
+| Code blocks | Monospace font, syntax-colored tokens |
 | Tables | Grid with borders |
 | Horizontal rules | Light gray line |
+| Header/Footer | Document title and page numbering |
 
 ### Document Properties
 
@@ -56,7 +59,7 @@ If you've set [document properties](document-properties.md):
 
 - **Size:** A4
 - **Margins:** 1 inch on all sides
-- **Font:** Helvetica (body), Courier (code)
+- **Templates:** Default (sans-serif), Clean (serif)
 
 ---
 
@@ -69,10 +72,11 @@ Creates a `.docx` file editable in Microsoft Word, Google Docs, or LibreOffice.
 | Element | How It Appears |
 |---------|----------------|
 | Headings | Styled as Heading 1, 2, 3 |
-| Paragraphs | Normal style, 12pt |
+| Paragraphs | Normal style with template fonts |
 | Bold/Italic | Preserved |
-| Lists | Proper bullet/number formatting |
+| Lists | Proper bullet/number formatting (incl. nested) |
 | Tables | Formatted tables |
+| Footer | Document label in footer |
 
 ### Document Properties
 
@@ -82,20 +86,20 @@ If you've set document properties:
 
 ### Page Format
 
-- **Font:** Arial throughout
+- **Font:** Based on chosen template (`Default` or `Clean`)
 - **Size:** Letter/A4 (depends on your region)
 
 ---
 
-## What Doesn't Export
+## Known Limitations
 
 Some elements have limitations:
 
 | Element | PDF | Word |
 |---------|-----|------|
-| Images | Shows `[Image]` placeholder | Not included |
-| Syntax highlighting | Code has background, no colors | Plain monospace |
-| Internal links | Text only | Text only |
+| Remote (http/https) images | Not embedded | Not embedded |
+| Very complex merged tables | May need manual adjustment | May need manual adjustment |
+| Advanced CSS from editor | Simplified for print-safe output | Simplified for document-safe output |
 
 ---
 

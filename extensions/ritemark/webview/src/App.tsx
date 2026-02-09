@@ -320,17 +320,25 @@ function App() {
   }, [])
 
   // Export handlers
-  const handleExportPDF = useCallback(() => {
+  const handleExportPDF = useCallback((templateId = 'default') => {
+    const html = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
+
     sendToExtension('exportPDF', {
-      content,
+      content, // markdown fallback (V1 compatibility)
+      html,
       properties,
+      templateId,
     })
   }, [content, properties])
 
-  const handleExportWord = useCallback(() => {
+  const handleExportWord = useCallback((templateId = 'default') => {
+    const html = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
+
     sendToExtension('exportWord', {
-      markdown: content,
+      markdown: content, // markdown fallback (V1 compatibility)
+      html,
       properties,
+      templateId,
     })
   }, [content, properties])
 
