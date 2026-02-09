@@ -70,13 +70,13 @@ export function activate(context: vscode.ExtensionContext) {
   // AI panel opens via activity bar click, not auto-shown on startup
   // User requested Explorer (folder view) to be default
 
-  // Auto-open terminal in right sidebar (auxiliary bar) on startup
+  // Auto-open terminal in right sidebar only if no terminal exists yet
   setTimeout(async () => {
     try {
-      // Show the auxiliary bar (right sidebar) where terminal is registered
-      await vscode.commands.executeCommand('workbench.action.focusAuxiliaryBar');
-      // Create a new terminal - goes to aux bar per patch 001
-      await vscode.commands.executeCommand('workbench.action.terminal.new');
+      if (vscode.window.terminals.length === 0) {
+        await vscode.commands.executeCommand('workbench.action.focusAuxiliaryBar');
+        await vscode.commands.executeCommand('workbench.action.terminal.new');
+      }
     } catch (e) {
       console.log('Failed to auto-open terminal:', e);
     }
