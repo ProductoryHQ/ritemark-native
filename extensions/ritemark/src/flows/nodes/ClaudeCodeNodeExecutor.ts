@@ -111,8 +111,10 @@ export async function executeClaudeCodeNode(
     abortSignal,
     onProgress: onProgress
       ? (progress) => {
-          // Map 'error' type to 'done' since flow ProgressCallback doesn't support 'error'
-          const type = progress.type === 'error' ? 'done' as const : progress.type;
+          // Map unsupported types to 'done' since flow ProgressCallback has a limited set
+          const type = (progress.type === 'error' || progress.type === 'plan_ready')
+            ? 'done' as const
+            : progress.type;
           onProgress({ type, message: progress.message, tool: progress.tool, file: progress.file });
         }
       : undefined,

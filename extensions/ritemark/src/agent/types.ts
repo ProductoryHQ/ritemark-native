@@ -28,7 +28,7 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
   'ritemark-agent': {
     id: 'ritemark-agent',
     label: 'Ritemark Agent',
-    description: 'Chat assistant with RAG search and image generation',
+    description: 'Chat & document search',
     experimental: false,
     requiresApiKey: null, // Uses whatever AI provider is configured
   },
@@ -36,15 +36,32 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
     id: 'claude-code',
     label: 'Claude Code',
     description: 'Autonomous agent that can read, write, and organize your files',
-    experimental: true,
+    experimental: false,
     requiresApiKey: 'anthropic',
   },
 };
 
 /**
+ * Available models for Claude Code agent
+ */
+export interface ModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export const CLAUDE_MODELS: ModelOption[] = [
+  { id: 'claude-sonnet-4-5', label: 'Sonnet', description: 'Fast & capable' },
+  { id: 'claude-opus-4-6', label: 'Opus', description: 'Most powerful' },
+  { id: 'claude-haiku-4-5', label: 'Haiku', description: 'Quick & light' },
+];
+
+export const DEFAULT_MODEL = 'claude-sonnet-4-5';
+
+/**
  * Progress event types from agent execution
  */
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'done' | 'error';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error';
 
 /**
  * Progress event emitted during agent execution
@@ -77,11 +94,47 @@ export interface AgentResult {
 }
 
 /**
+ * Setup status for Claude Code CLI
+ */
+export interface SetupStatus {
+  cliInstalled: boolean;
+  cliVersion?: string;
+  authenticated: boolean;
+}
+
+/**
+ * Progress events during Claude Code installation/login
+ */
+export interface InstallProgress {
+  stage: 'downloading' | 'installing' | 'verifying' | 'login' | 'done' | 'error';
+  message: string;
+  error?: string;
+}
+
+/**
+ * File attachment passed from the webview.
+ * Supports images (base64), PDFs (base64), and text files (raw text content).
+ */
+export type AttachmentKind = 'image' | 'pdf' | 'text';
+
+export interface FileAttachment {
+  id: string;
+  kind: AttachmentKind;
+  name: string;           // original filename for display
+  data: string;           // base64 for images/PDFs, raw text for text files
+  mediaType: string;      // MIME type (image/png, application/pdf, text/plain, etc.)
+}
+
+/** @deprecated Use FileAttachment instead */
+export type ImageAttachment = FileAttachment;
+
+/**
  * Configuration for agent execution
  */
 export interface AgentExecutionOptions {
   prompt: string;
   workspacePath: string;
+  attachments?: FileAttachment[];
   allowedTools?: string[];
   excludedFolders?: string[];
   timeoutMinutes?: number;
@@ -90,11 +143,52 @@ export interface AgentExecutionOptions {
 }
 
 /**
+ * Configuration for a persistent agent session (multi-turn)
+ */
+export interface AgentSessionConfig {
+  workspacePath: string;
+  excludedFolders?: string[];
+  allowedTools?: string[];
+  model?: string;
+  anthropicApiKey?: string;
+}
+
+/**
+ * Context about the currently active file in the editor
+ */
+export interface ActiveFileContext {
+  path: string;
+  selection?: string;
+}
+
+/**
+ * Options for a single turn within an agent session
+ */
+export interface AgentTurnOptions {
+  prompt: string;
+  attachments?: FileAttachment[];
+  activeFile?: ActiveFileContext;
+  timeoutMinutes?: number;
+  onProgress?: (progress: AgentProgress) => void;
+}
+
+/**
+ * Minimal interface for the SDK Query object (dynamically imported).
+ * Extends AsyncIterable so we can for-await over messages, plus control methods.
+ */
+export interface QueryHandle extends AsyncIterable<unknown> {
+  interrupt(): Promise<void>;
+  close(): void;
+}
+
+/**
  * SDK message types (from @anthropic-ai/claude-agent-sdk)
  */
 export interface SDKMessage {
   type: string;
+  subtype?: string;
   model?: string;
+  session_id?: string;
   message?: {
     content?: Array<{
       type: string;
@@ -105,7 +199,6 @@ export interface SDKMessage {
   };
   duration_ms?: number;
   total_cost_usd?: number;
-  subtype?: string;
   result?: string;
   errors?: string[];
 }

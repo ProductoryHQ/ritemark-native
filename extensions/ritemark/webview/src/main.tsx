@@ -18,6 +18,11 @@ const RitemarkSettings = lazy(() =>
   import('./components/settings/RitemarkSettings').then((m) => ({ default: m.RitemarkSettings }))
 )
 
+// Lazy load AISidebar
+const AISidebar = lazy(() =>
+  import('./components/ai-sidebar/AISidebar').then((m) => ({ default: m.AISidebar }))
+)
+
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
@@ -26,7 +31,7 @@ const editorType = rootElement.getAttribute('data-editor-type')
 console.log('[Ritemark] Initializing editor, type:', editorType)
 
 // Sidebar panels use sideBar background (grey) instead of editor background (white)
-if (editorType === 'flows-panel') {
+if (editorType === 'flows-panel' || editorType === 'ai-sidebar') {
   document.body.style.backgroundColor = 'var(--vscode-sideBar-background)'
 }
 
@@ -59,6 +64,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'flows-panel' ? (
       <Suspense fallback={<LoadingFallback />}>
         <FlowsPanel />
+      </Suspense>
+    ) : editorType === 'ai-sidebar' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <AISidebar />
       </Suspense>
     ) : (
       <App />
