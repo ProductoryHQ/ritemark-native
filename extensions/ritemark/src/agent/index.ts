@@ -2,13 +2,16 @@
  * Agent System - Public API
  *
  * ```typescript
- * import { runAgent, AGENTS } from './agent';
+ * import { runAgent, AgentSession, AGENTS } from './agent';
  * ```
  */
 
-export { runAgent } from './AgentRunner';
-export { AGENTS } from './types';
+export { runAgent, AgentSession } from './AgentRunner';
+export { getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth } from './setup';
+export { installClaude, openClaudeLoginTerminal, openAnthropicKeySettings } from './installer';
+export { AGENTS, CLAUDE_MODELS, DEFAULT_MODEL } from './types';
 export type {
+  ModelOption,
   AgentId,
   AgentInfo,
   AgentProgress,
@@ -16,4 +19,12 @@ export type {
   AgentResult,
   AgentMetrics,
   AgentExecutionOptions,
+  AgentSessionConfig,
+  AgentTurnOptions,
+  ActiveFileContext,
+  FileAttachment,
+  ImageAttachment,
+  AttachmentKind,
+  SetupStatus,
+  InstallProgress,
 } from './types';
