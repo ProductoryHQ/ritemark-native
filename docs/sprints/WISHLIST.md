@@ -8,6 +8,7 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 - [ ] Improve "Add link" dialog to smart-search from files inside the repository when user starts typing with "@"
 - [ ] Add Youtube (any other streaming) videos from / command palette
+- [ ] **Windows: save triggers "file updated" notification** - On Windows, every save triggers the stale file indicator as if the file was modified externally. Needs investigation — likely the file watcher is not distinguishing between internal saves and external changes on Windows
 
 ## Data Editor
 
@@ -54,12 +55,13 @@ In-app help system accessible from activity bar:
 
 ## AI Assistant
 
-- [ ] Advanced Claude Code harness support
+- [x] Advanced Claude Code harness in AI sidebar → **Sprint 33** (multi-turn sessions, model selector, image paste, clickable file paths)
 - [ ] Memories
 - [ ] Customization (CLAUDE.md, Agents.md support)
 - [ ] AI image generation via command palette - \[ \] Opens dialog to configure Google API key - \[ \] Uses Gemini API to generate images
 - [ ] On left sidebar - possibility to edit Agents and Skills/Tools of Claude Code
 - [ ] RAG to support pdf, word, ppt etc (finishing sprint-24 ideas, but we need to solve local-first dilemma)
+- [ ] RAG integration as agent tool (agent can search workspace documents)
 
 ## Export
 
@@ -157,4 +159,4 @@ Consolidate UI components using shadcn/ui for consistency.
 
 * * *
 
-*Last updated: 2026-02-07*
+*Last updated: 2026-02-10*

@@ -50,7 +50,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register Unified View Provider (Primary Sidebar / left)
   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath);
+  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }

@@ -115,6 +115,8 @@ export class RitemarkSettingsProvider {
           await this.testOpenAIKey(webview);
         } else if (message.key === 'google-ai-key') {
           await this.testGoogleAIKey(webview);
+        } else if (message.key === 'anthropic-api-key') {
+          await this.testAnthropicKey(webview);
         }
         break;
     }
@@ -129,6 +131,7 @@ export class RitemarkSettingsProvider {
     // Get API keys (masked)
     const openaiKey = await this.context.secrets.get('openai-api-key');
     const googleKey = await this.context.secrets.get('google-ai-key');
+    const anthropicKey = await this.context.secrets.get('anthropic-api-key');
 
     // Get available AI models from config
     const availableModels = getAssistantModels().map(m => ({
@@ -157,6 +160,8 @@ export class RitemarkSettingsProvider {
         openaiKeyConfigured: !!openaiKey,
         googleKey: googleKey || '',
         googleKeyConfigured: !!googleKey,
+        anthropicKey: anthropicKey || '',
+        anthropicKeyConfigured: !!anthropicKey,
       },
     });
   }
@@ -222,6 +227,47 @@ export class RitemarkSettingsProvider {
   }
 
   /**
+   * Test Anthropic API key
+   */
+  private async testAnthropicKey(webview: vscode.Webview): Promise<void> {
+    const key = await this.context.secrets.get('anthropic-api-key');
+    if (!key) {
+      webview.postMessage({ type: 'testResult', key: 'anthropic', success: false, error: 'No API key configured' });
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 10,
+          messages: [{ role: 'user', content: 'Hi' }],
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: response.statusText } }));
+        throw new Error(error.error?.message || `HTTP ${response.status}`);
+      }
+
+      webview.postMessage({ type: 'testResult', key: 'anthropic', success: true, message: 'API key is valid' });
+    } catch (err) {
+      webview.postMessage({
+        type: 'testResult',
+        key: 'anthropic',
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
    * Get HTML content for the webview
    */
   private async getHtmlContent(webview: vscode.Webview): Promise<string> {
@@ -236,7 +282,7 @@ export class RitemarkSettingsProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:; connect-src https://api.openai.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:; connect-src https://api.openai.com https://api.anthropic.com;">
   <title>Ritemark Settings</title>
   <style>
     * {
