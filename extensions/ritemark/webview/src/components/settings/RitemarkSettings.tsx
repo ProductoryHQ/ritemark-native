@@ -37,10 +37,12 @@ interface SettingsData {
   openaiKeyConfigured: boolean;
   googleKey: string;
   googleKeyConfigured: boolean;
+  anthropicKey: string;
+  anthropicKeyConfigured: boolean;
 }
 
 interface TestResult {
-  key: 'openai' | 'google';
+  key: 'openai' | 'google' | 'anthropic';
   success: boolean;
   error?: string;
   message?: string;
@@ -50,10 +52,13 @@ export function RitemarkSettings() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [openaiKey, setOpenaiKey] = useState('');
   const [googleKey, setGoogleKey] = useState('');
+  const [anthropicKey, setAnthropicKey] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
+  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [testingOpenai, setTestingOpenai] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
+  const [testingAnthropic, setTestingAnthropic] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
 
   useEffect(() => {
@@ -70,12 +75,16 @@ export function RitemarkSettings() {
           if (!googleKey && message.data.googleKey) {
             setGoogleKey(message.data.googleKey);
           }
+          if (!anthropicKey && message.data.anthropicKey) {
+            setAnthropicKey(message.data.anthropicKey);
+          }
           break;
 
         case 'testResult':
           setTestResults((prev) => ({ ...prev, [message.key]: message }));
           if (message.key === 'openai') setTestingOpenai(false);
           if (message.key === 'google') setTestingGoogle(false);
+          if (message.key === 'anthropic') setTestingAnthropic(false);
           break;
       }
     };
@@ -97,9 +106,10 @@ export function RitemarkSettings() {
   const handleSaveApiKey = (keyName: string, value: string) => {
     vscode.postMessage({ type: 'setApiKey', key: keyName, value });
     // Clear test result when key changes
+    const resultKey = keyName === 'openai-api-key' ? 'openai' : keyName === 'anthropic-api-key' ? 'anthropic' : 'google';
     setTestResults((prev) => {
       const next = { ...prev };
-      delete next[keyName === 'openai-api-key' ? 'openai' : 'google'];
+      delete next[resultKey];
       return next;
     });
   };
@@ -107,6 +117,8 @@ export function RitemarkSettings() {
   const handleTestApiKey = (keyName: string) => {
     if (keyName === 'openai-api-key') {
       setTestingOpenai(true);
+    } else if (keyName === 'anthropic-api-key') {
+      setTestingAnthropic(true);
     } else {
       setTestingGoogle(true);
     }
@@ -288,6 +300,82 @@ export function RitemarkSettings() {
             Used for: Gemini models, Imagen 3 (coming soon)
             <a
               href="https://aistudio.google.com/apikey"
+              className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+            >
+              Get API key <ExternalLink size={10} />
+            </a>
+          </p>
+        </div>
+        {/* Anthropic */}
+        <div className="mt-6 p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+              Anthropic API Key
+              <span className="ml-2 text-xs text-[var(--vscode-descriptionForeground)]">(optional)</span>
+            </label>
+            {settings.anthropicKeyConfigured && (
+              <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
+                <Check size={12} />
+                Configured
+              </span>
+            )}
+          </div>
+
+          <div className="flex gap-2 mb-2">
+            <div className="flex-1 relative">
+              <input
+                type={showAnthropicKey ? 'text' : 'password'}
+                value={anthropicKey}
+                onChange={(e) => setAnthropicKey(e.target.value)}
+                placeholder="sk-ant-..."
+                className="w-full px-3 py-2 pr-10 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+              />
+              <button
+                onClick={() => setShowAnthropicKey(!showAnthropicKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)]"
+              >
+                {showAnthropicKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <button
+              onClick={() => handleSaveApiKey('anthropic-api-key', anthropicKey)}
+              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => handleTestApiKey('anthropic-api-key')}
+              disabled={!settings.anthropicKeyConfigured || testingAnthropic}
+              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:opacity-50"
+            >
+              {testingAnthropic ? <Loader2 size={16} className="animate-spin" /> : 'Test'}
+            </button>
+          </div>
+
+          {testResults.anthropic && (
+            <div
+              className={`text-xs p-2 rounded ${
+                testResults.anthropic.success
+                  ? 'bg-[var(--vscode-testing-iconPassed)]/10 text-[var(--vscode-testing-iconPassed)]'
+                  : 'bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]'
+              }`}
+            >
+              {testResults.anthropic.success ? (
+                <span className="flex items-center gap-1">
+                  <Check size={12} /> {testResults.anthropic.message || 'API key is valid'}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <X size={12} /> {testResults.anthropic.error}
+                </span>
+              )}
+            </div>
+          )}
+
+          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+            Used for: Claude Code agent (alternative to signing in with Claude.ai)
+            <a
+              href="https://console.anthropic.com/settings/keys"
               className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
             >
               Get API key <ExternalLink size={10} />

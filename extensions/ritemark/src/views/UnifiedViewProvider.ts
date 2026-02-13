@@ -21,19 +21,23 @@ import {
 } from '../ai/index';
 import { searchDocuments, buildRAGContext, RAGSearchResult } from '../rag/search';
 import { VectorStore, getDefaultDbPath } from '../rag/vectorStore';
+import { AgentSession, AGENTS, CLAUDE_MODELS, DEFAULT_MODEL, getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth, installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, type AgentId, type AgentProgress, type FileAttachment, type SetupStatus } from '../agent';
+import { isEnabled } from '../features';
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
 
   private _view?: vscode.WebviewView;
   private _activeAbortController: AbortController | null = null;
+  private _agentSession: AgentSession | null = null;
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
   private _vectorStore: VectorStore | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _workspacePath: string | undefined
+    private readonly _workspacePath: string | undefined,
+    private readonly _secrets?: vscode.SecretStorage
   ) {
     // Initialize vector store if workspace is available
     if (_workspacePath) {
@@ -73,6 +77,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._sendApiKeyStatus();
           this._sendConnectivityStatus();
           this._sendIndexStatus();
+          this._sendAgentConfig();
           break;
 
         case 'ai-configure-key':
@@ -113,6 +118,62 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'open-source':
           // Open source document at specific location
           this._openSourceDocument(message.filePath, message.page);
+          break;
+
+        case 'ai-select-agent':
+          // Persist agent selection to settings
+          await vscode.workspace.getConfiguration('ritemark.ai').update(
+            'selectedAgent',
+            message.agentId,
+            vscode.ConfigurationTarget.Global
+          );
+          // Re-send config (triggers setup check for Claude Code)
+          this._sendAgentConfig();
+          break;
+
+        case 'ai-select-model':
+          // Persist model selection and recreate session with new model
+          await vscode.workspace.getConfiguration('ritemark.ai').update(
+            'selectedModel',
+            message.modelId,
+            vscode.ConfigurationTarget.Global
+          );
+          // Close existing session so next message uses the new model
+          if (this._agentSession) {
+            this._agentSession.close();
+            this._agentSession = null;
+          }
+          break;
+
+        case 'ai-execute-agent':
+          await this._handleAgentExecution(message.prompt, message.images);
+          break;
+
+        case 'ai-cancel-agent':
+          if (this._agentSession?.isActive) {
+            this._agentSession.interrupt();
+          }
+          break;
+
+        case 'agent-setup:install':
+          this._handleClaudeInstall();
+          break;
+
+        case 'agent-setup:login':
+          this._handleClaudeLogin();
+          break;
+
+        case 'agent-setup:apikey':
+          openAnthropicKeySettings();
+          break;
+
+        case 'agent-setup:check':
+          clearSetupCache();
+          this._sendAgentConfig();
+          break;
+
+        case 'agent-setup:dismiss-welcome':
+          vscode.workspace.getConfiguration('ritemark.ai').update('hasSeenClaudeWelcome', true, vscode.ConfigurationTarget.Global);
           break;
       }
     });
@@ -178,10 +239,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Clear chat history and start fresh conversation
    */
   public clearChat() {
+    this._agentSession?.close();
+    this._agentSession = null;
     this._view?.webview.postMessage({ type: 'clear-chat' });
   }
 
   public dispose() {
+    this._agentSession?.close();
     this._vectorStore?.close();
   }
 
@@ -197,6 +261,162 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   private _sendConnectivityStatus() {
     this._view?.webview.postMessage({ type: 'connectivity-status', isOnline: isOnline() });
+  }
+
+  /**
+   * Send agent configuration to webview (selected agent, available agents, feature flag state)
+   */
+  private async _sendAgentConfig() {
+    const agenticEnabled = isEnabled('agentic-assistant');
+    const config = vscode.workspace.getConfiguration('ritemark.ai');
+    const selectedAgent = config.get<string>('selectedAgent', 'ritemark-agent');
+    const selectedModel = config.get<string>('selectedModel', DEFAULT_MODEL);
+
+    let setupStatus: SetupStatus | undefined;
+    let hasSeenWelcome = false;
+    if (selectedAgent === 'claude-code') {
+      // Check SecretStorage for Anthropic API key before setup status check
+      if (this._secrets) {
+        const anthropicKey = await this._secrets.get('anthropic-api-key');
+        setAnthropicKeyAvailable(!!anthropicKey);
+      }
+      setupStatus = await getSetupStatus();
+      hasSeenWelcome = config.get<boolean>('hasSeenClaudeWelcome', false);
+    }
+
+    this._view?.webview.postMessage({
+      type: 'agent:config',
+      agenticEnabled,
+      selectedAgent,
+      selectedModel,
+      agents: Object.values(AGENTS),
+      models: CLAUDE_MODELS,
+      setupStatus,
+      hasSeenWelcome,
+    });
+  }
+
+  /**
+   * Execute a prompt using the Claude Code agent (persistent session).
+   * Reuses the same process across turns so the agent retains context.
+   */
+  private async _handleAgentExecution(prompt: string, images?: Array<{ id: string; data: string; mediaType: string }>) {
+    if (!isEnabled('agentic-assistant')) {
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: 'Agentic assistant is not enabled. Enable it in Settings > Ritemark Features.',
+      });
+      return;
+    }
+
+    // Guard: check if Claude Code is set up
+    const status = await getSetupStatus();
+    if (!status.cliInstalled || !status.authenticated) {
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: 'Claude Code is not fully set up. Please complete the setup wizard first.',
+      });
+      return;
+    }
+
+    if (!this._workspacePath) {
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: 'No workspace folder open. Please open a folder first.',
+      });
+      return;
+    }
+
+    // Create or reuse persistent session
+    if (!this._agentSession) {
+      const config = vscode.workspace.getConfiguration('ritemark.ai');
+      const excludedFolders = config.get<string[]>('excludedFolders');
+      const model = config.get<string>('selectedModel', DEFAULT_MODEL);
+
+      // Only use the API key as fallback when user doesn't have CLI OAuth.
+      // CLI OAuth uses Claude.ai billing; API key uses Anthropic API billing.
+      // Injecting the API key when CLI OAuth exists would override their billing.
+      let anthropicApiKey: string | undefined;
+      if (!hasCliOAuth() && this._secrets) {
+        anthropicApiKey = await this._secrets.get('anthropic-api-key');
+      }
+
+      this._agentSession = new AgentSession({
+        workspacePath: this._workspacePath,
+        model,
+        ...(excludedFolders ? { excludedFolders } : {}),
+        ...(anthropicApiKey ? { anthropicApiKey } : {}),
+      });
+    }
+
+    // Get active file context — works for both TextEditor and custom editors (Ritemark)
+    const activeFile = this._getActiveFileContext();
+
+    try {
+      const result = await this._agentSession.sendMessage({
+        prompt,
+        attachments: images as FileAttachment[] | undefined,
+        activeFile,
+        timeoutMinutes: 10,
+        onProgress: (progress: AgentProgress) => {
+          this._view?.webview.postMessage({
+            type: 'agent-progress',
+            progress,
+          });
+        },
+      });
+
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        text: result.text,
+        filesModified: result.filesModified,
+        metrics: result.metrics,
+        error: result.error,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Handle Claude Code CLI installation request from webview.
+   */
+  private async _handleClaudeInstall() {
+    const result = await installClaude((progress) => {
+      this._view?.webview.postMessage({ type: 'agent-setup:progress', progress });
+    });
+
+    if (result.success) {
+      clearSetupCache();
+      const status = await getSetupStatus();
+      this._view?.webview.postMessage({ type: 'agent-setup:complete', status });
+    } else {
+      this._view?.webview.postMessage({ type: 'agent-setup:error', error: result.error || 'Installation failed' });
+    }
+  }
+
+  /**
+   * Handle Claude Code login request from webview.
+   * Opens a VS Code terminal with `claude` — the CLI prompts for login on first launch.
+   * User authenticates via browser, then clicks "Recheck" in the wizard.
+   */
+  private _handleClaudeLogin() {
+    openClaudeLoginTerminal();
+    // Don't send complete — the user needs to finish login in the terminal,
+    // then click "Recheck" in the wizard which triggers agent-setup:check.
+    this._view?.webview.postMessage({
+      type: 'agent-setup:progress',
+      progress: { stage: 'login', message: 'Complete login in the terminal, then click Recheck.' },
+    });
+    // Reset inProgress so the wizard doesn't stay in loading state
+    this._view?.webview.postMessage({
+      type: 'agent-setup:complete',
+      status: { cliInstalled: true, authenticated: false },
+    });
   }
 
   private async _sendIndexStatus() {
@@ -333,15 +553,47 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     vscode.commands.executeCommand('vscode.open', uri);
   }
 
+  /**
+   * Get the active file context from the editor.
+   * Uses tabGroups API which works for both TextEditor and custom editors (Ritemark).
+   * Falls back to activeTextEditor for non-custom editors.
+   */
+  private _getActiveFileContext(): { path: string; selection?: string } | undefined {
+    // Try tabGroups first — works for custom editors (Ritemark .md files)
+    const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    if (activeTab?.input && typeof activeTab.input === 'object' && 'uri' in activeTab.input) {
+      const uri = (activeTab.input as { uri: vscode.Uri }).uri;
+      return {
+        path: vscode.workspace.asRelativePath(uri),
+        selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,
+      };
+    }
+
+    // Fallback to activeTextEditor (standard text files)
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+      return {
+        path: vscode.workspace.asRelativePath(activeEditor.document.uri),
+        selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,
+      };
+    }
+
+    return undefined;
+  }
+
   private _getHtmlForWebview(webview: vscode.Webview): string {
     const nonce = this._getNonce();
+
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, 'media', 'webview.js')
+    );
 
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: data:; font-src ${webview.cspSource};">
   <title>Ritemark AI</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -349,600 +601,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
-      background: var(--vscode-sideBar-background);
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      padding: 0 !important;
-      overflow: hidden;
+      background: var(--vscode-sideBar-background) !important;
     }
-    .no-key {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      text-align: center;
-    }
-    .no-key h3 { font-size: 13px; margin-bottom: 8px; }
-    .no-key p { font-size: 12px; color: var(--vscode-descriptionForeground); margin-bottom: 16px; }
-    .btn {
-      padding: 8px 16px;
-      font-size: 12px;
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      border: none;
-      border-radius: 2px;
-      cursor: pointer;
-    }
-    .btn:hover { background: var(--vscode-button-hoverBackground); }
-    .offline-banner {
-      background: var(--vscode-inputValidation-warningBackground, #5a4a00);
-      border: 1px solid var(--vscode-inputValidation-warningBorder, #b89500);
-      border-radius: 4px;
-      padding: 8px 12px;
-      margin: 8px 12px;
-      font-size: 11px;
-    }
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-    }
-    .message {
-      margin-bottom: 12px;
-      font-size: 12px;
-      line-height: 1.5;
-    }
-    .message.user {
-      background: var(--vscode-input-background);
-      padding: 8px 10px;
-      border-radius: 4px;
-    }
-    .message.assistant { color: var(--vscode-foreground); }
-    .message.assistant code {
-      background: var(--vscode-textCodeBlock-background);
-      padding: 1px 4px;
-      border-radius: 3px;
-      font-family: var(--vscode-editor-font-family);
-      font-size: 11px;
-    }
-    .message.assistant pre {
-      background: var(--vscode-textCodeBlock-background);
-      padding: 8px;
-      border-radius: 4px;
-      overflow-x: auto;
-      margin: 8px 0;
-    }
-    .message.assistant pre code { background: none; padding: 0; }
-    .message.assistant strong { font-weight: 600; }
-    .message.error { color: var(--vscode-errorForeground); }
-    .streaming .cursor { animation: blink 1s infinite; }
-    @keyframes blink { 50% { opacity: 0; } }
-    .selection-info {
-      padding: 6px 12px;
-      background: var(--vscode-inputValidation-infoBackground);
-      border-bottom: 1px solid var(--vscode-panel-border);
-      font-size: 11px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .selection-info .label { color: var(--vscode-descriptionForeground); }
-    .selection-info .text {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    /* Citations */
-    .citations {
-      margin-top: 8px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-    .citation-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      background: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
-      border-radius: 10px;
-      font-size: 10px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .citation-chip:hover {
-      opacity: 0.8;
-    }
-    /* Widget inline actions */
-    .widget-actions {
-      margin-top: 8px;
-      display: flex;
-      gap: 8px;
-    }
-    .widget-actions button {
-      padding: 4px 12px;
-      font-size: 11px;
-      border-radius: 2px;
-      cursor: pointer;
-      border: none;
-    }
-    .btn-apply {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
-    .btn-apply:hover { background: var(--vscode-button-hoverBackground); }
-    .btn-discard {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-    }
-    .btn-discard:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    /* Preview block for edits */
-    .edit-preview {
-      margin-top: 8px;
-      padding: 8px;
-      border-radius: 4px;
-      background: var(--vscode-inputValidation-infoBackground);
-      border: 1px solid var(--vscode-focusBorder);
-      font-size: 12px;
-      white-space: pre-wrap;
-    }
-    /* Input area */
-    .input-area {
-      padding: 12px;
-      border-top: 1px solid var(--vscode-panel-border);
-    }
-    .input-row {
-      display: flex;
-      gap: 8px;
-    }
-    .input-row input {
-      flex: 1;
-      padding: 6px 10px;
-      font-size: 12px;
-      background: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border);
-      border-radius: 2px;
-      outline: none;
-    }
-    .input-row input:focus { border-color: var(--vscode-focusBorder); }
-    .input-row button {
-      padding: 6px 12px;
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      border: none;
-      border-radius: 2px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-    }
-    .input-row button:hover { background: var(--vscode-button-hoverBackground); }
-    .input-row button:disabled { opacity: 0.5; cursor: default; }
-    .input-row button.stop {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-    }
-    /* Index status footer */
-    .index-footer {
-      padding: 6px 12px;
-      border-top: 1px solid var(--vscode-panel-border);
-      font-size: 10px;
-      color: var(--vscode-descriptionForeground);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .index-footer button {
-      background: none;
-      border: none;
-      color: var(--vscode-textLink-foreground);
-      cursor: pointer;
-      font-size: 10px;
-      padding: 2px 4px;
-    }
-    .index-footer button:hover { text-decoration: underline; }
-    .empty-state {
-      text-align: center;
-      padding: 20px;
-      color: var(--vscode-descriptionForeground);
-      font-size: 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
-    }
-    .empty-state ul { list-style: none; margin-top: 12px; }
-    .empty-state li { margin: 4px 0; font-size: 11px; }
   </style>
 </head>
-<body style="padding: 0 !important;">
-
-  <div id="no-key" class="no-key" style="display: none;">
-    <h3>OpenAI API Key Required</h3>
-    <p>Add your API key to enable AI features</p>
-    <button class="btn" id="configure-key-btn">Configure API Key</button>
-  </div>
-
-  <div id="offline-banner" class="offline-banner" style="display: none;">
-    <strong>Offline</strong> - AI features require internet connection
-  </div>
-
-  <div id="chat-container" style="display: none; flex: 1; flex-direction: column; overflow: hidden;">
-    <div id="selection-info" class="selection-info" style="display: none;">
-      <span class="label">Selected:</span>
-      <span class="text" id="selection-text"></span>
-    </div>
-
-    <div id="messages" class="messages">
-      <div class="empty-state">
-        <p>Ask about your documents or edit text</p>
-        <ul>
-          <li>"What does the contract say about deadlines?"</li>
-          <li>"Summarize report.pdf"</li>
-          <li>"Make this paragraph shorter"</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="input-area">
-      <div class="input-row">
-        <input type="text" id="input" placeholder="Ask anything..." />
-        <button id="send-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
-        <button id="stop-btn" class="stop" style="display: none;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="6" width="12" height="12"></rect>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div id="index-footer" class="index-footer">
-    <span id="index-stats"></span>
-    <button id="reindex-btn">Re-index</button>
-    <button id="cancel-index-btn" style="display:none; color: var(--vscode-errorForeground);">Cancel</button>
-  </div>
-
-  <script nonce="${nonce}">
-    const vscode = acquireVsCodeApi();
-
-    let hasApiKey = false;
-    let isLoading = false;
-    let online = true;
-    let messages = [];
-    let conversationHistory = [];
-    let currentSelection = { text: '', isEmpty: true, from: 0, to: 0 };
-    let streamingContent = '';
-    let indexStatus = { totalDocs: 0, totalChunks: 0 };
-    let indexingInProgress = false;
-    let activeWidget = null;
-    let ragResults = [];
-
-    const noKeyEl = document.getElementById('no-key');
-    const offlineBanner = document.getElementById('offline-banner');
-    const chatContainer = document.getElementById('chat-container');
-    const messagesEl = document.getElementById('messages');
-    const inputEl = document.getElementById('input');
-    const sendBtn = document.getElementById('send-btn');
-    const stopBtn = document.getElementById('stop-btn');
-    const selectionInfo = document.getElementById('selection-info');
-    const selectionText = document.getElementById('selection-text');
-    const indexStats = document.getElementById('index-stats');
-
-    function render() {
-      if (!hasApiKey) {
-        noKeyEl.style.display = 'flex';
-        offlineBanner.style.display = 'none';
-        chatContainer.style.display = 'none';
-      } else if (!online) {
-        noKeyEl.style.display = 'none';
-        offlineBanner.style.display = 'block';
-        chatContainer.style.display = 'flex';
-        inputEl.disabled = true;
-        sendBtn.disabled = true;
-      } else {
-        noKeyEl.style.display = 'none';
-        offlineBanner.style.display = 'none';
-        chatContainer.style.display = 'flex';
-        inputEl.disabled = false;
-        sendBtn.disabled = false;
-      }
-
-      // Selection indicator
-      if (currentSelection && !currentSelection.isEmpty) {
-        selectionInfo.style.display = 'flex';
-        const text = currentSelection.text;
-        selectionText.textContent = text.length > 60 ? text.substring(0, 60) + '...' : text;
-      } else {
-        selectionInfo.style.display = 'none';
-      }
-
-      // Index status and buttons
-      const reindexBtn = document.getElementById('reindex-btn');
-      const cancelBtn = document.getElementById('cancel-index-btn');
-      if (indexingInProgress) {
-        reindexBtn.style.display = 'none';
-        cancelBtn.style.display = 'inline';
-      } else {
-        reindexBtn.style.display = 'inline';
-        cancelBtn.style.display = 'none';
-        if (indexStatus.totalDocs > 0) {
-          indexStats.textContent = indexStatus.totalDocs + ' docs';
-        } else {
-          indexStats.textContent = '';
-        }
-      }
-
-      // Messages
-      if (messages.length === 0 && !streamingContent) {
-        messagesEl.innerHTML = '<div class="empty-state"><p>Ask about your documents or edit text</p><ul><li>"What does the contract say about deadlines?"</li><li>"Summarize report.pdf"</li><li>"Make this paragraph shorter"</li></ul></div>';
-      } else {
-        let html = '';
-        for (const msg of messages) {
-          html += renderMessage(msg);
-        }
-        if (streamingContent) {
-          html += '<div class="message assistant streaming">' + renderMarkdown(streamingContent) + '<span class="cursor">|</span></div>';
-        } else if (isLoading) {
-          html += '<div class="message assistant" style="color: var(--vscode-descriptionForeground)">Searching & thinking...</div>';
-        }
-        messagesEl.innerHTML = html;
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
-
-      sendBtn.style.display = isLoading ? 'none' : 'flex';
-      stopBtn.style.display = isLoading ? 'flex' : 'none';
-      inputEl.disabled = isLoading;
-    }
-
-    function renderMessage(msg) {
-      if (msg.role === 'user') {
-        return '<div class="message user">' + escapeHtml(msg.content) + '</div>';
-      }
-
-      let html = '<div class="message assistant' + (msg.isError ? ' error' : '') + '">';
-      html += renderMarkdown(msg.content);
-
-      // Citations
-      if (msg.citations && msg.citations.length > 0) {
-        html += '<div class="citations">';
-        for (const c of msg.citations) {
-          html += '<span class="citation-chip" data-path="' + escapeHtml(c.source) + '" data-page="' + (c.page || '') + '">';
-          html += c.citation;
-          html += '</span>';
-        }
-        html += '</div>';
-      }
-
-      // Widget preview (inline)
-      if (msg.widget) {
-        html += '<div class="edit-preview">' + escapeHtml(msg.widget.preview) + '</div>';
-        html += '<div class="widget-actions">';
-        html += '<button class="btn-apply" data-widget-id="' + msg.widgetId + '">Apply</button>';
-        html += '<button class="btn-discard" data-widget-id="' + msg.widgetId + '">Discard</button>';
-        html += '</div>';
-      }
-
-      html += '</div>';
-      return html;
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text || '';
-      return div.innerHTML;
-    }
-
-    function renderMarkdown(text) {
-      if (!text) return '';
-      let html = escapeHtml(text);
-      html = html.replace(/\\\`\\\`\\\`([^]*?)\\\`\\\`\\\`/g, '<pre><code>$1</code></pre>');
-      html = html.replace(/\\\`([^\\\`]+)\\\`/g, '<code>$1</code>');
-      html = html.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
-      html = html.replace(/[*]([^*]+)[*]/g, '<em>$1</em>');
-      html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
-      html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
-      html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-      html = html.replace(/\\n/g, '<br>');
-      return html;
-    }
-
-    function sendMessage() {
-      const prompt = inputEl.value.trim();
-      if (!prompt || isLoading) return;
-
-      messages.push({ role: 'user', content: prompt });
-      conversationHistory.push({ role: 'user', content: prompt });
-      inputEl.value = '';
-      isLoading = true;
-      streamingContent = '';
-      ragResults = [];
-      render();
-
-      vscode.postMessage({
-        type: 'ai-execute',
-        prompt,
-        selection: currentSelection,
-        conversationHistory
-      });
-    }
-
-    function cancelRequest() {
-      vscode.postMessage({ type: 'ai-cancel' });
-      isLoading = false;
-      streamingContent = '';
-      render();
-    }
-
-    // Event listeners
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    sendBtn.addEventListener('click', sendMessage);
-    stopBtn.addEventListener('click', cancelRequest);
-    document.getElementById('configure-key-btn').addEventListener('click', () => {
-      vscode.postMessage({ type: 'ai-configure-key' });
-    });
-    document.getElementById('reindex-btn').addEventListener('click', () => {
-      vscode.postMessage({ type: 'reindex' });
-    });
-    document.getElementById('cancel-index-btn').addEventListener('click', () => {
-      vscode.postMessage({ type: 'cancelIndex' });
-    });
-
-    // Handle clicks on citations and widget actions
-    messagesEl.addEventListener('click', (e) => {
-      const chip = e.target.closest('.citation-chip');
-      if (chip) {
-        vscode.postMessage({
-          type: 'open-source',
-          filePath: chip.dataset.path,
-          page: chip.dataset.page ? parseInt(chip.dataset.page) : undefined
-        });
-        return;
-      }
-
-      const applyBtn = e.target.closest('.btn-apply');
-      if (applyBtn && activeWidget) {
-        vscode.postMessage({
-          type: 'execute-widget',
-          toolName: activeWidget.type,
-          args: activeWidget.args,
-          selection: activeWidget.selection || currentSelection
-        });
-        messages.push({ role: 'assistant', content: 'Applied.' });
-        activeWidget = null;
-        render();
-        return;
-      }
-
-      const discardBtn = e.target.closest('.btn-discard');
-      if (discardBtn) {
-        activeWidget = null;
-        messages.push({ role: 'assistant', content: 'Discarded.' });
-        render();
-      }
-    });
-
-    // Messages from extension
-    window.addEventListener('message', (event) => {
-      const message = event.data;
-
-      switch (message.type) {
-        case 'ai-key-status':
-          hasApiKey = message.hasKey;
-          render();
-          break;
-
-        case 'clear-chat':
-          messages = [];
-          conversationHistory = [];
-          streamingContent = '';
-          ragResults = [];
-          activeWidget = null;
-          render();
-          break;
-
-        case 'ai-streaming':
-          streamingContent = message.content;
-          render();
-          break;
-
-        case 'ai-result':
-          isLoading = false;
-          streamingContent = '';
-          if (message.message) {
-            const msg = { role: 'assistant', content: message.message };
-            if (message.hasRagContext && ragResults.length > 0) {
-              msg.citations = ragResults;
-            }
-            messages.push(msg);
-            conversationHistory.push({ role: 'assistant', content: message.message });
-          }
-          render();
-          break;
-
-        case 'rag-results':
-          ragResults = message.results || [];
-          break;
-
-        case 'ai-widget':
-          isLoading = false;
-          streamingContent = '';
-          activeWidget = { type: message.toolName, args: message.args, selection: message.selection };
-          // Show inline preview
-          const preview = message.args.newText || message.args.content || JSON.stringify(message.args);
-          messages.push({
-            role: 'assistant',
-            content: 'Here\\'s what I\\'ll do:',
-            widget: { preview: typeof preview === 'string' ? preview : JSON.stringify(preview) },
-            widgetId: Date.now()
-          });
-          render();
-          break;
-
-        case 'ai-error':
-          isLoading = false;
-          streamingContent = '';
-          messages.push({ role: 'assistant', content: message.error, isError: true });
-          render();
-          break;
-
-        case 'ai-stopped':
-          isLoading = false;
-          streamingContent = '';
-          render();
-          break;
-
-        case 'selection-update':
-          currentSelection = message.selection;
-          render();
-          break;
-
-        case 'connectivity-status':
-          online = message.isOnline;
-          render();
-          break;
-
-        case 'index-status':
-          indexStatus = { totalDocs: message.totalDocs, totalChunks: message.totalChunks };
-          indexingInProgress = false;
-          render();
-          break;
-
-        case 'index-progress':
-          indexingInProgress = true;
-          indexStats.textContent = 'Indexing ' + message.processed + '/' + message.total + ': ' + message.current;
-          render();
-          break;
-
-        case 'index-done':
-          indexingInProgress = false;
-          render();
-          break;
-      }
-    });
-
-    // Initialize
-    vscode.postMessage({ type: 'ready' });
-    render();
-  </script>
+<body>
+  <div id="root" data-editor-type="ai-sidebar"></div>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
   }
