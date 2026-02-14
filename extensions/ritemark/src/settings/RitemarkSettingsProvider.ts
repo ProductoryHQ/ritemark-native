@@ -158,6 +158,9 @@ export class RitemarkSettingsProvider {
         // Agent
         agentTimeout: config.get('ai.agentTimeout', 15),
 
+        // Chat appearance
+        chatFontSize: config.get('chat.fontSize', 13),
+
         // API Keys (masked for display, full for input)
         openaiKey: openaiKey || '',
         openaiKeyConfigured: !!openaiKey,

@@ -66,7 +66,7 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
  */
 export const markdownStyles = `
 .rendered-markdown {
-  font-size: 12px;
+  font-size: var(--chat-font-size, 13px);
   line-height: 1.6;
   color: var(--vscode-foreground);
   word-wrap: break-word;
@@ -87,10 +87,10 @@ export const markdownStyles = `
   font-weight: 600;
   line-height: 1.3;
 }
-.rendered-markdown h1 { font-size: 16px; }
-.rendered-markdown h2 { font-size: 14px; }
-.rendered-markdown h3 { font-size: 13px; }
-.rendered-markdown h4 { font-size: 12px; }
+.rendered-markdown h1 { font-size: 1.3em; }
+.rendered-markdown h2 { font-size: 1.15em; }
+.rendered-markdown h3 { font-size: 1.05em; }
+.rendered-markdown h4 { font-size: 1em; }
 
 /* Paragraphs */
 .rendered-markdown p {
@@ -116,7 +116,7 @@ export const markdownStyles = `
   padding: 1px 4px;
   border-radius: 3px;
   font-family: var(--vscode-editor-font-family);
-  font-size: 11px;
+  font-size: 0.9em;
 }
 
 /* Clickable file path codes (inline only, not inside pre) */
@@ -139,7 +139,7 @@ export const markdownStyles = `
   background: none;
   padding: 0;
   border-radius: 0;
-  font-size: 11px;
+  font-size: 0.9em;
   line-height: 1.5;
 }
 
@@ -161,7 +161,7 @@ export const markdownStyles = `
   border-collapse: collapse;
   width: 100%;
   margin: 8px 0;
-  font-size: 11px;
+  font-size: 0.9em;
 }
 .rendered-markdown th,
 .rendered-markdown td {

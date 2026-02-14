@@ -132,6 +132,13 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize Settings Provider
   settingsProvider = new RitemarkSettingsProvider(context);
 
+  // Register chat history command (toggles history panel in webview)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.chatHistory', () => {
+      unifiedViewProvider.toggleHistoryPanel();
+    })
+  );
+
   // Register AI settings command (opens branded settings page)
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.aiSettings', () => {

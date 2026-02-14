@@ -595,6 +595,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         });
         break;
 
+      case 'toggle-history-panel':
+        get().toggleHistoryPanel();
+        break;
+
       case 'index-status':
         set({
           indexStatus: { totalDocs: message.totalDocs, totalChunks: message.totalChunks },

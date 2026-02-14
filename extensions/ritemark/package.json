@@ -52,6 +52,11 @@
         "icon": "$(gear)"
       },
       {
+        "command": "ritemark.chatHistory",
+        "title": "Chat History",
+        "icon": "$(history)"
+      },
+      {
         "command": "ritemark.flows.new",
         "title": "New Flow",
         "icon": "$(add)"
@@ -224,9 +229,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "ritemark.aiSettings",
+          "command": "ritemark.chatHistory",
           "when": "view == ritemark.unifiedView",
           "group": "navigation@2"
+        },
+        {
+          "command": "ritemark.aiSettings",
+          "when": "view == ritemark.unifiedView",
+          "group": "navigation@3"
         },
         {
           "command": "ritemark.flows.new",

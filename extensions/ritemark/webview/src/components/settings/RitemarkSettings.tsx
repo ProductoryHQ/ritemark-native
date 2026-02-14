@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { vscode } from '../../lib/vscode';
 import { getDefaultAssistantModel } from '../../config/modelConfig';
+import { Slider } from '../ui/slider';
 
 interface ModelInfo {
   id: string;
@@ -64,6 +65,8 @@ export function RitemarkSettings() {
   const [testingGoogle, setTestingGoogle] = useState(false);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+  const [localAgentTimeout, setLocalAgentTimeout] = useState(15);
+  const [localChatFontSize, setLocalChatFontSize] = useState(13);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -72,6 +75,8 @@ export function RitemarkSettings() {
       switch (message.type) {
         case 'settings':
           setSettings(message.data);
+          setLocalAgentTimeout(message.data.agentTimeout || 15);
+          setLocalChatFontSize(message.data.chatFontSize || 13);
           // Don't overwrite user input if they're typing
           if (!openaiKey && message.data.openaiKey) {
             setOpenaiKey(message.data.openaiKey);
@@ -436,17 +441,17 @@ export function RitemarkSettings() {
           </label>
 
           <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min="5"
-              max="60"
-              step="5"
-              value={settings.agentTimeout || 15}
-              onChange={(e) => handleSettingChange('ai.agentTimeout', parseInt(e.target.value, 10))}
-              className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-[var(--vscode-input-background)]"
+            <Slider
+              min={5}
+              max={60}
+              step={5}
+              value={[localAgentTimeout]}
+              onValueChange={([v]) => setLocalAgentTimeout(v)}
+              onValueCommit={([v]) => handleSettingChange('ai.agentTimeout', v)}
+              className="flex-1"
             />
             <span className="text-sm font-mono w-16 text-right text-[var(--vscode-foreground)]">
-              {settings.agentTimeout || 15} min
+              {localAgentTimeout} min
             </span>
           </div>
 
@@ -472,23 +477,24 @@ export function RitemarkSettings() {
           </label>
 
           <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min="10"
-              max="20"
-              value={settings.chatFontSize || 13}
-              onChange={(e) => handleSettingChange('chat.fontSize', parseInt(e.target.value, 10))}
-              className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-[var(--vscode-input-background)]"
+            <Slider
+              min={10}
+              max={20}
+              step={1}
+              value={[localChatFontSize]}
+              onValueChange={([v]) => setLocalChatFontSize(v)}
+              onValueCommit={([v]) => handleSettingChange('chat.fontSize', v)}
+              className="flex-1"
             />
             <span className="text-sm font-mono w-12 text-right text-[var(--vscode-foreground)]">
-              {settings.chatFontSize || 13}px
+              {localChatFontSize}px
             </span>
           </div>
 
           <div className="mt-3 p-3 rounded bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)]">
             <p
               className="text-[var(--vscode-foreground)]"
-              style={{ fontSize: `${settings.chatFontSize || 13}px` }}
+              style={{ fontSize: `${localChatFontSize}px` }}
             >
               Preview: This is how text will appear in the AI chat interface.
             </p>
