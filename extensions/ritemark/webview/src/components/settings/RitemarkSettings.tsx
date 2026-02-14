@@ -33,6 +33,7 @@ interface ModelInfo {
 interface SettingsData {
   voiceDictation: boolean;
   ritemarkFlows: boolean;
+  codexIntegration: boolean;
   updatesEnabled: boolean;
   aiModel: string;
   availableModels: ModelInfo[];
@@ -44,6 +45,19 @@ interface SettingsData {
   anthropicKey: string;
   anthropicKeyConfigured: boolean;
   chatFontSize: number;
+}
+
+interface CodexAuthStatus {
+  enabled: boolean;
+  authenticated?: boolean;
+  email?: string;
+  plan?: 'free' | 'plus' | 'pro' | 'team' | 'business';
+  credits?: {
+    used: number;
+    limit: number;
+    resetAt?: string;
+  };
+  error?: string;
 }
 
 interface TestResult {
@@ -67,6 +81,8 @@ export function RitemarkSettings() {
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [localAgentTimeout, setLocalAgentTimeout] = useState(15);
   const [localChatFontSize, setLocalChatFontSize] = useState(13);
+  const [codexAuth, setCodexAuth] = useState<CodexAuthStatus>({ enabled: false });
+  const [codexLoading, setCodexLoading] = useState(false);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -94,6 +110,15 @@ export function RitemarkSettings() {
           if (message.key === 'openai') setTestingOpenai(false);
           if (message.key === 'google') setTestingGoogle(false);
           if (message.key === 'anthropic') setTestingAnthropic(false);
+          break;
+
+        case 'codex:authStatus':
+          setCodexAuth(message.data);
+          setCodexLoading(false);
+          break;
+
+        case 'codex:loginStarting':
+          setCodexLoading(true);
           break;
       }
     };
@@ -391,6 +416,102 @@ export function RitemarkSettings() {
             </a>
           </p>
         </div>
+
+        {/* Codex ChatGPT Auth (experimental) */}
+        {settings.codexIntegration && codexAuth.enabled && (
+          <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+                  ChatGPT Account
+                </label>
+                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+                  Experimental
+                </span>
+              </div>
+              {codexAuth.authenticated && (
+                <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
+                  <Check size={12} />
+                  Connected
+                </span>
+              )}
+            </div>
+
+            {!codexAuth.authenticated ? (
+              <>
+                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                  Sign in with your ChatGPT account to use Codex agents without an API key.
+                  Requires ChatGPT Plus ($20/mo) or Pro ($200/mo) subscription.
+                </p>
+                <button
+                  onClick={() => {
+                    setCodexLoading(true);
+                    vscode.postMessage({ type: 'codex:startLogin' });
+                  }}
+                  disabled={codexLoading}
+                  className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 flex items-center gap-2"
+                >
+                  {codexLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Opening browser...
+                    </>
+                  ) : (
+                    'Sign in with ChatGPT'
+                  )}
+                </button>
+                {codexAuth.error && (
+                  <div className="text-xs p-2 mt-2 rounded bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]">
+                    <span className="flex items-center gap-1">
+                      <X size={12} /> {codexAuth.error}
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="space-y-2 mb-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--vscode-descriptionForeground)]">Email:</span>
+                    <span className="text-[var(--vscode-foreground)] font-mono">{codexAuth.email}</span>
+                  </div>
+                  {codexAuth.plan && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[var(--vscode-descriptionForeground)]">Plan:</span>
+                      <span className="text-[var(--vscode-foreground)] font-semibold">
+                        ChatGPT {codexAuth.plan.charAt(0).toUpperCase() + codexAuth.plan.slice(1)}
+                      </span>
+                    </div>
+                  )}
+                  {codexAuth.credits && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[var(--vscode-descriptionForeground)]">API Credits:</span>
+                      <span className="text-[var(--vscode-foreground)]">
+                        ${(codexAuth.credits.limit - codexAuth.credits.used).toFixed(2)} / ${codexAuth.credits.limit.toFixed(2)} remaining
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => vscode.postMessage({ type: 'codex:logout' })}
+                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                >
+                  Sign Out
+                </button>
+              </>
+            )}
+
+            <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-3">
+              Used for: Codex Agents (autonomous coding), Codex Flow nodes
+              <a
+                href="https://developers.openai.com/codex/cli"
+                className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+              >
+                Learn more <ExternalLink size={10} />
+              </a>
+            </p>
+          </div>
+        )}
       </section>
 
       {/* AI Model Section */}
@@ -529,6 +650,14 @@ export function RitemarkSettings() {
             checked={settings.ritemarkFlows}
             onChange={(value) => handleToggle('features.ritemark-flows', value)}
           />
+
+          <ToggleRow
+            label="Codex Integration"
+            description="ChatGPT-authenticated coding agents (experimental, requires codex binary)"
+            checked={settings.codexIntegration}
+            onChange={(value) => handleToggle('experimental.codexIntegration', value)}
+            badge="Experimental"
+          />
         </div>
       </section>
 
@@ -557,13 +686,21 @@ interface ToggleRowProps {
   description: string;
   checked: boolean;
   onChange: (value: boolean) => void;
+  badge?: string;
 }
 
-function ToggleRow({ label, description, checked, onChange }: ToggleRowProps) {
+function ToggleRow({ label, description, checked, onChange, badge }: ToggleRowProps) {
   return (
     <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
       <div>
-        <div className="text-sm font-medium text-[var(--vscode-foreground)]">{label}</div>
+        <div className="text-sm font-medium text-[var(--vscode-foreground)] flex items-center gap-2">
+          {label}
+          {badge && (
+            <span className="text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+              {badge}
+            </span>
+          )}
+        </div>
         <div className="text-xs text-[var(--vscode-descriptionForeground)]">{description}</div>
       </div>
       <button

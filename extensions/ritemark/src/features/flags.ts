@@ -21,7 +21,7 @@ export interface FeatureFlag {
 /**
  * All known flag IDs
  */
-export type FlagId = 'voice-dictation' | 'markdown-export' | 'document-search' | 'ritemark-flows' | 'agentic-assistant';
+export type FlagId = 'voice-dictation' | 'markdown-export' | 'document-search' | 'ritemark-flows' | 'agentic-assistant' | 'codex-integration';
 
 /**
  * Feature flag registry
@@ -60,6 +60,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     label: 'Agentic AI Assistant',
     description: 'Enable Claude Code agent for autonomous file operations in the AI sidebar',
     status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  'codex-integration': {
+    id: 'codex-integration',
+    label: 'Codex CLI Integration',
+    description: 'ChatGPT-authenticated coding agent using OpenAI Codex CLI',
+    status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },
 };

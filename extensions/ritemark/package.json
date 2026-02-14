@@ -102,6 +102,12 @@
             "default": false,
             "description": "Enable Claude Code agent in the AI sidebar (experimental). Allows autonomous file operations.",
             "scope": "application"
+          },
+          "ritemark.experimental.codexIntegration": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable Codex CLI integration with ChatGPT authentication (experimental). Requires codex binary installed.",
+            "scope": "application"
           }
         }
       },
