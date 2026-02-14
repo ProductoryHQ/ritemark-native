@@ -252,6 +252,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'clear-chat' });
   }
 
+  /**
+   * Toggle the chat history panel in the webview
+   */
+  public toggleHistoryPanel() {
+    this._view?.webview.postMessage({ type: 'toggle-history-panel' });
+  }
+
   public dispose() {
     this._agentSession?.close();
     this._vectorStore?.close();
