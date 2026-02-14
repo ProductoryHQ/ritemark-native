@@ -7,10 +7,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Send, Square, X, Paperclip, FileText, FileImage, File, Bot } from 'lucide-react';
 import { useAISidebarStore } from './store';
-import { AgentMentionPopup } from './AgentMentionPopup';
-import { SlashCommandPopup } from './SlashCommandPopup';
+import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
+import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
-import { type SlashCommand, parseCommand } from './slashCommands';
+import { type SlashCommand, type CommandAction, parseCommand } from './slashCommands';
 import type { FileAttachment, AttachmentKind } from './types';
 
 let attachmentIdCounter = 0;
@@ -119,6 +119,8 @@ export function ChatInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mentionPopupRef = useRef<AgentMentionPopupHandle>(null);
+  const commandPopupRef = useRef<SlashCommandPopupHandle>(null);
 
   const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
   const isStreaming = useAISidebarStore((s) => s.isStreaming);
@@ -132,8 +134,6 @@ export function ChatInput() {
   const lastTurn = agentConversation[agentConversation.length - 1];
   const agentRunning = lastTurn?.isRunning ?? false;
   const isLoading = isClaudeCode ? agentRunning : isStreaming;
-  const selection = useAISidebarStore((s) => s.selection);
-
   const placeholder = isClaudeCode
     ? 'Ask Claude Code... (type @ to mention an agent, / for commands)'
     : 'Ask anything... (type / for commands)';
@@ -173,38 +173,86 @@ export function ChatInput() {
     }
   }, [buildFinalPrompt, attachments, isLoading, isClaudeCode, sendAgentMessage, sendChatMessage]);
 
-  // Execute a slash command
-  const executeCommand = useCallback(
-    (command: SlashCommand, args: string) => {
-      const context = {
-        selection: selection?.text || '',
-        // documentContent would come from extension — for now just use selection
-      };
+  const clearChat = useAISidebarStore((s) => s.clearChat);
+  const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
+  const toggleHistoryPanel = useAISidebarStore((s) => s.toggleHistoryPanel);
+  const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
 
-      const prompt = command.buildPrompt(args, context);
-      if (!prompt || isLoading) return;
-
-      // Send through normal chat flow
-      if (isClaudeCode) {
-        sendAgentMessage(prompt);
-      } else {
-        sendChatMessage(prompt);
+  // Execute a slash command action
+  const executeCommandAction = useCallback(
+    (action: CommandAction) => {
+      switch (action) {
+        case 'clear':
+          clearChat();
+          break;
+        case 'new':
+          startNewConversation();
+          break;
+        case 'history':
+          toggleHistoryPanel();
+          break;
+        case 'compact':
+          // Send compact instruction to agent
+          if (isClaudeCode) {
+            sendAgentMessage('Please compact and summarize our conversation so far, preserving key context.');
+          }
+          break;
+        case 'help': {
+          // Show help as a system message in chat
+          const helpText = 'Available commands:\n' +
+            '  /clear — Clear conversation\n' +
+            '  /new — Start new conversation\n' +
+            '  /history — Show saved conversations\n' +
+            '  /compact — Compact conversation context\n' +
+            '  /settings — Open settings\n' +
+            '  /cancel — Cancel current request\n' +
+            '  /cost — Show cost of last turn\n' +
+            '  /help — Show this help';
+          if (isClaudeCode) {
+            sendAgentMessage(helpText);
+          } else {
+            sendChatMessage(helpText);
+          }
+          break;
+        }
+        case 'settings':
+          openApiKeySettings();
+          break;
+        case 'cancel':
+          cancelRequest();
+          break;
+        case 'cost': {
+          // Find the last completed turn's metrics
+          const lastCompleted = [...agentConversation].reverse().find((t) => t.result?.metrics);
+          if (lastCompleted?.result?.metrics) {
+            const m = lastCompleted.result.metrics;
+            const cost = m.costUsd != null ? `$${m.costUsd.toFixed(4)}` : 'N/A';
+            const duration = m.durationMs ? `${(m.durationMs / 1000).toFixed(1)}s` : 'N/A';
+            const model = m.model || 'unknown';
+            const msg = `Last turn: ${cost} | ${duration} | ${model}`;
+            if (isClaudeCode) {
+              sendAgentMessage(msg);
+            } else {
+              sendChatMessage(msg);
+            }
+          }
+          break;
+        }
       }
-
       setValue('');
       setShowCommandPopup(false);
     },
-    [selection, isLoading, isClaudeCode, sendAgentMessage, sendChatMessage]
+    [clearChat, startNewConversation, toggleHistoryPanel, openApiKeySettings, cancelRequest, agentConversation, isClaudeCode, sendAgentMessage, sendChatMessage]
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Don't handle Enter/Tab if popup is open (popup handles it)
-      if (
-        (showMentionPopup || showCommandPopup) &&
-        ['Enter', 'Tab', 'ArrowUp', 'ArrowDown', 'Escape'].includes(e.key)
-      ) {
-        return; // Let the popup handle these
+      // Forward to popup if open — popup handles navigation keys
+      if (showMentionPopup && mentionPopupRef.current?.handleKeyDown(e)) {
+        return;
+      }
+      if (showCommandPopup && commandPopupRef.current?.handleKeyDown(e)) {
+        return;
       }
 
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -213,7 +261,7 @@ export function ChatInput() {
         // Check if this is a complete slash command
         const parsed = parseCommand(value);
         if (parsed) {
-          executeCommand(parsed.command, parsed.args);
+          executeCommandAction(parsed.command.action);
           return;
         }
 
@@ -225,7 +273,7 @@ export function ChatInput() {
         setShowCommandPopup(false);
       }
     },
-    [handleSend, showMentionPopup, showCommandPopup, value, executeCommand]
+    [handleSend, showMentionPopup, showCommandPopup, value, executeCommandAction]
   );
 
   // Handle text changes, @ mention detection, and / command detection
@@ -236,15 +284,17 @@ export function ChatInput() {
 
     const textBeforeCursor = newValue.slice(0, cursorPos);
 
-    // Detect / command trigger (only at start of input or after newline)
+    // Detect / command trigger (only at start of input)
+    // Show popup while typing command name (before first space)
     if (newValue.startsWith('/')) {
-      const match = newValue.match(/^\/(\S*)$/);
-      if (match) {
-        // Still typing the command name
-        setCommandQuery(match[1] || '');
+      const firstSpace = newValue.indexOf(' ');
+      const commandPart = firstSpace === -1 ? newValue.slice(1) : null;
+      if (commandPart !== null) {
+        // Still typing the command name (no space yet)
+        setCommandQuery(commandPart);
         setShowCommandPopup(true);
         setShowMentionPopup(false);
-        setCommandPosition({ top: -280, left: 0 });
+        setCommandPosition({ top: 0, left: 0 });
         return;
       }
     }
@@ -262,8 +312,8 @@ export function ChatInput() {
       if (charBefore === ' ' || charBefore === '\n' || atIndex === 0) {
         // Extract the query after @
         const query = textBeforeCursor.slice(atIndex + 1);
-        // Only show popup if query doesn't contain spaces (still typing agent name)
-        if (!query.includes(' ')) {
+        // Show popup while typing agent name — allow letters, digits, hyphens
+        if (/^[a-zA-Z0-9-]*$/.test(query)) {
           setMentionQuery(query);
           setMentionStartIndex(atIndex);
           setShowMentionPopup(true);
@@ -271,7 +321,7 @@ export function ChatInput() {
           // Position the popup above the cursor
           if (textareaRef.current && containerRef.current) {
             setMentionPosition({
-              top: -200, // Position above (will be adjusted by popup height)
+              top: 0,
               left: 0,
             });
           }
@@ -316,23 +366,12 @@ export function ChatInput() {
     setShowMentionPopup(false);
   }, []);
 
-  // Handle slash command selection from popup
+  // Handle slash command selection from popup — execute immediately
   const handleCommandSelect = useCallback(
     (command: SlashCommand) => {
-      // Insert the command name and a space
-      const newValue = `/${command.id} `;
-      setValue(newValue);
-      setShowCommandPopup(false);
-
-      // Focus and set cursor at the end
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          textareaRef.current.setSelectionRange(newValue.length, newValue.length);
-        }
-      }, 0);
+      executeCommandAction(command.action);
     },
-    []
+    [executeCommandAction]
   );
 
   // Handle command popup close
@@ -535,6 +574,7 @@ export function ChatInput() {
       {/* @ Mention Popup */}
       {showMentionPopup && (
         <AgentMentionPopup
+          ref={mentionPopupRef}
           query={mentionQuery}
           onSelect={handleAgentSelect}
           onClose={handleMentionClose}
@@ -545,6 +585,7 @@ export function ChatInput() {
       {/* Slash Command Popup */}
       {showCommandPopup && (
         <SlashCommandPopup
+          ref={commandPopupRef}
           query={commandQuery}
           onSelect={handleCommandSelect}
           onClose={handleCommandClose}
