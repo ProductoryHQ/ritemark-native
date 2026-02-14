@@ -49,7 +49,7 @@ export function AgentView() {
       {agentConversation.map((turn) => (
         <div key={turn.id} className="space-y-2">
           {/* User prompt */}
-          <div className="px-2.5 py-2 rounded bg-[var(--vscode-input-background)] text-xs">
+          <div className="px-2.5 py-2 rounded bg-[var(--vscode-input-background)]" style={{ fontSize: 'var(--chat-font-size, 13px)' }}>
             {turn.attachments && turn.attachments.length > 0 && (
               <div className="flex gap-1.5 mb-1.5 flex-wrap">
                 {turn.attachments.map((att) =>

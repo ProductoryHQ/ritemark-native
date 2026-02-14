@@ -45,6 +45,7 @@ export function AISidebar() {
         useAISidebarStore.setState({
           chatMessages: savedState.chatMessages as typeof store.chatMessages,
           conversationHistory: (savedState.conversationHistory || []) as typeof store.conversationHistory,
+          currentConversationId: (savedState.currentConversationId as string | null) ?? null,
         });
       }
       if (savedState.agentConversation) {
@@ -67,6 +68,7 @@ export function AISidebar() {
         chatMessages: state.chatMessages,
         conversationHistory: state.conversationHistory,
         agentConversation: state.agentConversation,
+        currentConversationId: state.currentConversationId,
       });
     });
   }, []);
