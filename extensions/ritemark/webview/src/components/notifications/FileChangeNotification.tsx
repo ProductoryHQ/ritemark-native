@@ -148,7 +148,7 @@ export function FileChangeNotification({
           border-radius: 4px;
           font-size: 12px;
           font-weight: 500;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: var(--ritemark-ui-font-family);
           cursor: pointer;
           transition: all 0.15s ease;
         }

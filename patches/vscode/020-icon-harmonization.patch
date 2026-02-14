@@ -1,0 +1,153 @@
+# RiteMark Patch: icon-harmonization
+#
+# Purpose: Replace remaining VS Code codicons with Lucide icons in all view containers
+#          (Terminal, Output, Markers, Outline, Timeline)
+#
+# Why: Unified icon language across the entire UI using Lucide icon set
+#
+# File(s): iconRegistry.ts, terminalIcons.ts, output.contribution.ts,
+#          markers.contribution.ts, outline.contribution.ts, timeline.contribution.ts
+# Created: 2026-02-13
+#
+diff --git a/src/vs/platform/theme/common/iconRegistry.ts b/src/vs/platform/theme/common/iconRegistry.ts
+index c40afcf6bae..e8824d2ec9d 100644
+--- a/src/vs/platform/theme/common/iconRegistry.ts
++++ b/src/vs/platform/theme/common/iconRegistry.ts
+@@ -22,12 +22,17 @@ const LucideIcons = {
+ 	files: 0xe0cf,
+ 	file: 0xe0c0,
+ 	fileText: 0xe0cc,
++	fileOutput: 0xe0c8,
+ 	search: 0xe151,
+ 	gitBranch: 0xe0e2,
+ 	settings: 0xe154,
+ 	user: 0xe19f,
+ 	sparkle: 0xe47e,
+ 	bookOpen: 0xe05f,
++	terminal: 0xe181,
++	triangleAlert: 0xe193,
++	clock: 0xe087,
++	list: 0xe106,
+ } as const;
+
+ //  ------ API types
+@@ -350,12 +355,17 @@ export const Lucide = {
+ 	files: { id: 'lucide-files' } as ThemeIcon,
+ 	file: { id: 'lucide-file' } as ThemeIcon,
+ 	fileText: { id: 'lucide-fileText' } as ThemeIcon,
++	fileOutput: { id: 'lucide-fileOutput' } as ThemeIcon,
+ 	search: { id: 'lucide-search' } as ThemeIcon,
+ 	gitBranch: { id: 'lucide-gitBranch' } as ThemeIcon,
+ 	settings: { id: 'lucide-settings' } as ThemeIcon,
+ 	user: { id: 'lucide-user' } as ThemeIcon,
+ 	sparkle: { id: 'lucide-sparkle' } as ThemeIcon,
+ 	bookOpen: { id: 'lucide-bookOpen' } as ThemeIcon,
++	terminal: { id: 'lucide-terminal' } as ThemeIcon,
++	triangleAlert: { id: 'lucide-triangleAlert' } as ThemeIcon,
++	clock: { id: 'lucide-clock' } as ThemeIcon,
++	list: { id: 'lucide-list' } as ThemeIcon,
+ } as const;
+
+ export const iconsSchemaId = 'vscode://schemas/icons';
+diff --git a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
+index 35c070a2eca..284ffe819b0 100644
+--- a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
++++ b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
+@@ -31,7 +31,7 @@ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContaine
+ import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
+ import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
+ import { Codicon } from '../../../../base/common/codicons.js';
+-import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
++import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
+ import { ViewAction } from '../../../browser/parts/views/viewPane.js';
+ import { IActivityService, NumberBadge } from '../../../services/activity/common/activity.js';
+ import { viewFilterSubmenu } from '../../../browser/parts/views/viewFilter.js';
+@@ -125,7 +125,7 @@ Registry.as<IConfigurationRegistry>(Extensions.Configuration).registerConfigurat
+ 	}
+ });
+
+-const markersViewIcon = registerIcon('markers-view-icon', Codicon.warning, localize('markersViewIcon', 'View icon of the markers view.'));
++const markersViewIcon = registerIcon('markers-view-icon', Lucide.triangleAlert, localize('markersViewIcon', 'View icon of the markers view.'));
+
+ // markers view container
+ const VIEW_CONTAINER: ViewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer({
+diff --git a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
+index eef090cd9a4..abf16b64698 100644
+--- a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
++++ b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
+@@ -10,8 +10,7 @@ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { IConfigurationRegistry, Extensions as ConfigurationExtensions, ConfigurationScope } from '../../../../platform/configuration/common/configurationRegistry.js';
+ import { VIEW_CONTAINER } from '../../files/browser/explorerViewlet.js';
+ import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
+-import { Codicon } from '../../../../base/common/codicons.js';
+-import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
++import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
+ import { OutlineConfigKeys } from '../../../services/outline/browser/outline.js';
+ import { IOutlinePane } from './outline.js';
+
+@@ -21,7 +20,7 @@ import './outlineActions.js';
+
+ // --- view
+
+-const outlineViewIcon = registerIcon('outline-view-icon', Codicon.symbolClass, localize('outlineViewIcon', 'View icon of the outline view.'));
++const outlineViewIcon = registerIcon('outline-view-icon', Lucide.list, localize('outlineViewIcon', 'View icon of the outline view.'));
+
+ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
+ 	id: IOutlinePane.Id,
+diff --git a/src/vs/workbench/contrib/output/browser/output.contribution.ts b/src/vs/workbench/contrib/output/browser/output.contribution.ts
+index a06d596b9b0..93997d19b5b 100644
+--- a/src/vs/workbench/contrib/output/browser/output.contribution.ts
++++ b/src/vs/workbench/contrib/output/browser/output.contribution.ts
+@@ -25,7 +25,7 @@ import { AUX_WINDOW_GROUP, AUX_WINDOW_GROUP_TYPE, IEditorService } from '../../.
+ import { assertIsDefined } from '../../../../base/common/types.js';
+ import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+ import { Codicon } from '../../../../base/common/codicons.js';
+-import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
++import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+ import { Disposable, dispose, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
+ import { IFilesConfigurationService } from '../../../services/filesConfiguration/common/filesConfigurationService.js';
+@@ -56,7 +56,7 @@ ModesRegistry.registerLanguage({
+ });
+
+ // register output container
+-const outputViewIcon = registerIcon('output-view-icon', Codicon.output, nls.localize('outputViewIcon', 'View icon of the output view.'));
++const outputViewIcon = registerIcon('output-view-icon', Lucide.fileOutput, nls.localize('outputViewIcon', 'View icon of the output view.'));
+ const VIEW_CONTAINER: ViewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer({
+ 	id: OUTPUT_VIEW_ID,
+ 	title: nls.localize2('output', "Output"),
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts b/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
+index 128ffba2e27..e17fa4adafe 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
+@@ -5,9 +5,9 @@
+
+ import { Codicon } from '../../../../base/common/codicons.js';
+ import { localize } from '../../../../nls.js';
+-import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
++import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
+
+-export const terminalViewIcon = registerIcon('terminal-view-icon', Codicon.terminal, localize('terminalViewIcon', 'View icon of the terminal view.'));
++export const terminalViewIcon = registerIcon('terminal-view-icon', Lucide.terminal, localize('terminalViewIcon', 'View icon of the terminal view.'));
+
+ export const renameTerminalIcon = registerIcon('terminal-rename', Codicon.edit, localize('renameTerminalIcon', 'Icon for rename in the terminal quick menu.'));
+ export const killTerminalIcon = registerIcon('terminal-kill', Codicon.trash, localize('killTerminalIcon', 'Icon for killing a terminal instance.'));
+diff --git a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
+index 3574e11e5f9..e8a9451b2e2 100644
+--- a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
++++ b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
+@@ -19,11 +19,11 @@ import { ICommandHandler, CommandsRegistry } from '../../../../platform/commands
+ import { ExplorerFolderContext } from '../../files/common/files.js';
+ import { ResourceContextKey } from '../../../common/contextkeys.js';
+ import { Codicon } from '../../../../base/common/codicons.js';
+-import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
++import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
+ import { ILocalizedString } from '../../../../platform/action/common/action.js';
+
+-const timelineViewIcon = registerIcon('timeline-view-icon', Codicon.history, localize('timelineViewIcon', 'View icon of the timeline view.'));
+-const timelineOpenIcon = registerIcon('timeline-open', Codicon.history, localize('timelineOpenIcon', 'Icon for the open timeline action.'));
++const timelineViewIcon = registerIcon('timeline-view-icon', Lucide.clock, localize('timelineViewIcon', 'View icon of the timeline view.'));
++const timelineOpenIcon = registerIcon('timeline-open', Lucide.clock, localize('timelineOpenIcon', 'Icon for the open timeline action.'));
+
+ export class TimelinePaneDescriptor implements IViewDescriptor {
+ 	readonly id = TimelinePaneId;

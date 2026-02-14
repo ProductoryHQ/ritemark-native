@@ -106,7 +106,7 @@ export function DocumentHeader({
           background: transparent;
           color: var(--vscode-foreground);
           font-size: 13px;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-family: var(--ritemark-ui-font-family);
           cursor: pointer;
           transition: background-color 0.15s ease;
         }

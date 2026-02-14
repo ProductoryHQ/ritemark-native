@@ -198,7 +198,7 @@ export function LanguagePickerModal({ isOpen, onClose, onSelect, currentLanguage
           border-radius: 4px;
           color: var(--vscode-input-foreground);
           font-size: 13px;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-family: var(--ritemark-ui-font-family);
         }
 
         .language-picker-search input:focus {

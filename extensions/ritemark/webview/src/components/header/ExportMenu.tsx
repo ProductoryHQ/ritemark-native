@@ -188,7 +188,7 @@ export function ExportMenu({
           background: transparent;
           color: var(--vscode-menu-foreground);
           font-size: 13px;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-family: var(--ritemark-ui-font-family);
           text-align: left;
           cursor: pointer;
           transition: background-color 0.15s ease;

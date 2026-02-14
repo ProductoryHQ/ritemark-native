@@ -167,7 +167,7 @@ function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
           type: 'smoothstep',
           style: {
             stroke: 'var(--vscode-editorWidget-border)',
-            strokeWidth: 2,
+            strokeWidth: 1,
           },
         }}
         style={{

@@ -10,6 +10,7 @@ export default defineConfig({
   build: {
     outDir: '../media',
     emptyOutDir: false,
+    assetsInlineLimit: 50000, // Inline fonts as base64 (avoids webview URL access issues)
     rollupOptions: {
       input: 'src/main.tsx',
       output: {

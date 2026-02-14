@@ -245,7 +245,7 @@ export function VoiceDictationButton() {
           border-radius: 6px 0 0 6px;
           cursor: pointer;
           font-size: 13px;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-family: var(--ritemark-ui-font-family);
           transition: background-color 0.15s ease;
         }
 

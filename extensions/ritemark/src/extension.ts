@@ -31,6 +31,15 @@ let settingsProvider: RitemarkSettingsProvider | null = null;
 let documentIndexer: DocumentIndexer | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
+  // Force Ritemark Light theme on fresh install or update
+  const currentVersion = context.extension.packageJSON.version as string;
+  const lastThemeVersion = context.globalState.get<string>('ritemark.themeAppliedVersion');
+  if (lastThemeVersion !== currentVersion) {
+    const config = vscode.workspace.getConfiguration('workbench');
+    config.update('colorTheme', 'Ritemark Light', vscode.ConfigurationTarget.Global);
+    context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
+  }
+
   // Initialize API key manager (must be first)
   initAPIKeyManager(context);
 

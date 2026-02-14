@@ -1,0 +1,188 @@
+diff --git a/src/vs/workbench/browser/media/part.css b/src/vs/workbench/browser/media/part.css
+index f17465a5e4a..6dbeda329ca 100644
+--- a/src/vs/workbench/browser/media/part.css
++++ b/src/vs/workbench/browser/media/part.css
+@@ -29,7 +29,7 @@
+ 
+ .monaco-workbench .part > .title,
+ .monaco-workbench .part > .header-or-footer {
+-	height: 35px;
++	height: 40px; /* Ritemark: taller tab bar */
+ 	display: flex;
+ 	box-sizing: border-box;
+ 	overflow: hidden;
+diff --git a/src/vs/workbench/browser/part.ts b/src/vs/workbench/browser/part.ts
+index e85aac5c3cf..08ff41ee187 100644
+--- a/src/vs/workbench/browser/part.ts
++++ b/src/vs/workbench/browser/part.ts
+@@ -227,8 +227,8 @@ export abstract class Part extends Component implements ISerializableView {
+ 
+ class PartLayout {
+ 
+-	private static readonly HEADER_HEIGHT = 35;
+-	private static readonly TITLE_HEIGHT = 35;
++	private static readonly HEADER_HEIGHT = 40; /* Ritemark: taller tab bar */
++	private static readonly TITLE_HEIGHT = 40; /* Ritemark: taller tab bar */
+ 	private static readonly Footer_HEIGHT = 35;
+ 
+ 	private headerVisible: boolean = false;
+diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
+index d03297e004f..8a84fdf5253 100644
+--- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
++++ b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
+@@ -102,7 +102,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+ 	protected readonly treeItemsTransfer = LocalSelectionTransfer.getInstance<DraggedTreeItemsIdentifier>();
+ 
+ 	private static readonly EDITOR_TAB_HEIGHT = {
+-		normal: 35 as const,
++		normal: 40 as const, /* Ritemark: taller tabs */
+ 		compact: 22 as const
+ 	};
+ 
+diff --git a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
+index 76c8a561b4e..585107b21aa 100644
+--- a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
++++ b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
+@@ -138,7 +138,7 @@
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .editor-group-container-toolbar {
+ 	display: none;
+-	height: 35px;
++	height: 40px; /* Ritemark: match tab bar height */
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container.empty.locked > .editor-group-container-toolbar,
+diff --git a/src/vs/workbench/browser/parts/media/paneCompositePart.css b/src/vs/workbench/browser/parts/media/paneCompositePart.css
+index 1f2bd9ee9d5..742326b3a6b 100644
+--- a/src/vs/workbench/browser/parts/media/paneCompositePart.css
++++ b/src/vs/workbench/browser/parts/media/paneCompositePart.css
+@@ -56,7 +56,7 @@
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar,
+ .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar {
+ 	line-height: 27px; /* matches panel titles in settings */
+-	height: 35px;
++	height: 40px; /* Ritemark: taller tab bar for better touch targets */
+ }
+ 
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item,
+@@ -72,8 +72,10 @@
+ 
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon,
+ .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon {
+-	height: 35px; /* matches height of composite container */
+-	padding: 0 3px;
++	height: 40px; /* Ritemark: matches container height */
++	padding: 0 5px;
++	display: flex;
++	align-items: center;
+ }
+ 
+ 
+@@ -163,7 +165,7 @@
+ 
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label,
+ .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label {
+-	border-radius: 0;
++	border-radius: 6px;
+ }
+ 
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item:not(.icon) .action-label,
+@@ -279,6 +281,7 @@
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon.checked,
+ .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon.checked {
+ 	background-color: var(--vscode-activityBarTop-activeBackground);
++	border-radius: 6px;
+ }
+ 
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked .active-item-indicator:before,
+@@ -291,7 +294,7 @@
+ 	bottom: 2px;
+ 	width: 100%;
+ 	height: 0;
+-	border-top-width: 1px;
++	border-top-width: 0; /* Ritemark: hide bottom border indicator, use background instead */
+ 	border-top-style: solid;
+ }
+ 
+diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
+index 9ec755c35c2..0448318c4e4 100644
+--- a/src/vs/workbench/browser/parts/paneCompositePart.ts
++++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
+@@ -431,9 +431,47 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+ 
+ 	protected override createHeaderArea(): HTMLElement {
+ 		const headerArea = super.createHeaderArea();
++		this.applyRitemarkTopTabStyles(headerArea);
+ 		return this.createHeaderFooterCompositeBarArea(headerArea);
+ 	}
+ 
++	private applyRitemarkTopTabStyles(headerArea: HTMLElement): void {
++		// Ritemark: sidebar top-tabs styling (Sprint 34, patch 016)
++		const style = headerArea.ownerDocument.createElement('style');
++		style.textContent = `
++			/* Tab bar container */
++			.pane-composite-part > .header-or-footer {
++				padding: 0 8px !important;
++			}
++			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar {
++				height: 40px !important;
++				align-items: center;
++			}
++			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .actions-container {
++				gap: 2px;
++				align-items: center;
++			}
++			/* Individual tab button */
++			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon {
++				height: 30px !important;
++				padding: 0 !important;
++				border-radius: 6px;
++				display: flex;
++				align-items: center;
++				justify-content: center;
++			}
++			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon .action-label {
++				padding: 5px 9px !important;
++				border-radius: 6px;
++			}
++			/* Active tab */
++			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked {
++				border-radius: 6px !important;
++			}
++		`;
++		headerArea.ownerDocument.head.appendChild(style);
++	}
++
+ 	protected override createFooterArea(): HTMLElement {
+ 		const footerArea = super.createFooterArea();
+ 		return this.createHeaderFooterCompositeBarArea(footerArea);
+diff --git a/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css b/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
+index 2c94078993b..80dcacd79fd 100644
+--- a/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
++++ b/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
+@@ -71,21 +71,21 @@
+ 
+ .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label,
+ .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label {
+-	border-radius: 0px;
++	border-radius: 6px;
+ 	outline-offset: 2px;
+ }
+ 
+ .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label::before,
+ .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label::before {
+-	position: absolute;
+-	left: 5px; /* place icon in center */
++	position: relative; /* Ritemark: use flex centering instead of absolute positioning */
++	left: auto;
+ }
+ 
+ .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked:not(:focus) .active-item-indicator:before,
+ .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked.clicked:focus .active-item-indicator:before,
+ .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked:not(:focus) .active-item-indicator:before,
+ .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked.clicked:focus .active-item-indicator:before {
+-	border-top-color: var(--vscode-activityBarTop-activeBorder) !important;
++	border-top-color: transparent !important; /* Ritemark: hide bottom border, active state uses background */
+ }
+ 
+ .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item:hover .action-label,

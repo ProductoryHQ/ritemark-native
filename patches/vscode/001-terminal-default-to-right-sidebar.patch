@@ -1,7 +1,8 @@
 # RiteMark Patch: Terminal Default Location
 #
 # Purpose: Make integrated terminal open in the right sidebar (Secondary Sidebar /
-#          Auxiliary Bar) by default instead of the bottom panel.
+#          Auxiliary Bar) by default instead of the bottom panel. Also set
+#          hideIfEmpty: false so terminal tab stays visible when switching views.
 #
 # Why: Better UX - keeps terminal alongside AI assistant in the same area
 #
@@ -9,12 +10,15 @@
 # Risk: Low - cosmetic change, users can still move terminal if preferred
 #
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-index f8703b7302b..a6cf84da191 100644
+index f8703b7302b..f7c618e0fc2 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-@@ -132,7 +132,7 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
+@@ -130,9 +130,9 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
+ 	icon: terminalViewIcon,
+ 	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [TERMINAL_VIEW_ID, { mergeViewWithContainerWhenSingleView: true }]),
  	storageId: TERMINAL_VIEW_ID,
- 	hideIfEmpty: true,
+-	hideIfEmpty: true,
++	hideIfEmpty: false, /* Ritemark: keep terminal tab visible alongside Ritemark AI */
  	order: 3,
 -}, ViewContainerLocation.Panel, { doNotRegisterOpenCommand: true, isDefault: true });
 +}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: true });
