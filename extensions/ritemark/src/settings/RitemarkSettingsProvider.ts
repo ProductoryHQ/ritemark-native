@@ -7,13 +7,30 @@
 
 import * as vscode from 'vscode';
 import { getAssistantModels, DEFAULT_MODELS } from '../ai/modelConfig';
+import { isEnabled } from '../features/featureGate';
+import { CodexAppServer, CodexAuth } from '../codex';
 
 export class RitemarkSettingsProvider {
   public static readonly viewType = 'ritemark.settings';
 
   private static panel: vscode.WebviewPanel | undefined;
+  private codexAppServer: CodexAppServer | null = null;
+  private codexAuth: CodexAuth | null = null;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) {
+    // Initialize Codex integration if feature is enabled
+    if (isEnabled('codex-integration')) {
+      this.codexAppServer = new CodexAppServer();
+      this.codexAuth = new CodexAuth(this.codexAppServer);
+
+      // Listen for auth status changes and update webview
+      this.codexAuth.on('statusChanged', (status) => {
+        if (RitemarkSettingsProvider.panel) {
+          this.sendCodexAuthStatus(RitemarkSettingsProvider.panel.webview);
+        }
+      });
+    }
+  }
 
   /**
    * Open the settings panel (singleton)
@@ -119,6 +136,21 @@ export class RitemarkSettingsProvider {
           await this.testAnthropicKey(webview);
         }
         break;
+
+      case 'codex:startLogin':
+        // Start Codex ChatGPT OAuth login
+        await this.startCodexLogin(webview);
+        break;
+
+      case 'codex:logout':
+        // Logout from Codex
+        await this.codexLogout(webview);
+        break;
+
+      case 'codex:refreshStatus':
+        // Refresh Codex auth status
+        await this.sendCodexAuthStatus(webview);
+        break;
     }
   }
 
@@ -147,6 +179,7 @@ export class RitemarkSettingsProvider {
         // Features
         voiceDictation: config.get('features.voice-dictation', false),
         ritemarkFlows: config.get('features.ritemark-flows', false),
+        codexIntegration: config.get('experimental.codexIntegration', false),
 
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
@@ -170,6 +203,9 @@ export class RitemarkSettingsProvider {
         anthropicKeyConfigured: !!anthropicKey,
       },
     });
+
+    // Also send Codex auth status
+    await this.sendCodexAuthStatus(webview);
   }
 
   /**
@@ -313,6 +349,101 @@ export class RitemarkSettingsProvider {
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
+  }
+
+  /**
+   * Start Codex ChatGPT OAuth login
+   */
+  private async startCodexLogin(webview: vscode.Webview): Promise<void> {
+    if (!this.codexAuth) {
+      webview.postMessage({
+        type: 'codex:authStatus',
+        data: { enabled: false, error: 'Codex integration not enabled' },
+      });
+      return;
+    }
+
+    try {
+      // Notify UI that login is starting
+      webview.postMessage({
+        type: 'codex:loginStarting',
+      });
+
+      // Start OAuth flow (opens browser)
+      await this.codexAuth.startLogin('browser');
+
+      // OAuth is async - status will be updated via 'statusChanged' event
+      vscode.window.showInformationMessage(
+        'ChatGPT login started. Complete authentication in your browser.'
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      webview.postMessage({
+        type: 'codex:authStatus',
+        data: {
+          enabled: true,
+          authenticated: false,
+          error: errorMessage,
+        },
+      });
+      vscode.window.showErrorMessage(`Codex login failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Logout from Codex
+   */
+  private async codexLogout(webview: vscode.Webview): Promise<void> {
+    if (!this.codexAuth) {
+      return;
+    }
+
+    try {
+      await this.codexAuth.logout();
+      await this.sendCodexAuthStatus(webview);
+      vscode.window.showInformationMessage('Signed out from ChatGPT');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Logout failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Send Codex auth status to webview
+   */
+  private async sendCodexAuthStatus(webview: vscode.Webview): Promise<void> {
+    // Check if feature is enabled
+    if (!isEnabled('codex-integration') || !this.codexAuth) {
+      webview.postMessage({
+        type: 'codex:authStatus',
+        data: { enabled: false },
+      });
+      return;
+    }
+
+    try {
+      const status = await this.codexAuth.getStatus();
+      webview.postMessage({
+        type: 'codex:authStatus',
+        data: {
+          enabled: true,
+          authenticated: status.authenticated,
+          email: status.email,
+          plan: status.plan,
+          credits: status.credits,
+        },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      webview.postMessage({
+        type: 'codex:authStatus',
+        data: {
+          enabled: true,
+          authenticated: false,
+          error: errorMessage,
+        },
+      });
+    }
   }
 
   private getNonce(): string {
