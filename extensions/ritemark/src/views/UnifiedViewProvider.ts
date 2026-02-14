@@ -23,6 +23,7 @@ import { searchDocuments, buildRAGContext, RAGSearchResult } from '../rag/search
 import { VectorStore, getDefaultDbPath } from '../rag/vectorStore';
 import { AgentSession, AGENTS, CLAUDE_MODELS, DEFAULT_MODEL, getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth, installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, type AgentId, type AgentProgress, type FileAttachment, type SetupStatus } from '../agent';
 import { isEnabled } from '../features';
+import { discoverAgents, discoverCommands } from '../agent/discovery';
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -299,6 +300,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       hasSeenWelcome = config.get<boolean>('hasSeenClaudeWelcome', false);
     }
 
+    // Discover dynamic agents and commands from .claude/ directory
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const discoveredAgents = workspacePath ? discoverAgents(workspacePath) : [];
+    const discoveredCommands = workspacePath ? discoverCommands(workspacePath) : [];
+
     this._view?.webview.postMessage({
       type: 'agent:config',
       agenticEnabled,
@@ -308,6 +314,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       models: CLAUDE_MODELS,
       setupStatus,
       hasSeenWelcome,
+      discoveredAgents,
+      discoveredCommands,
     });
   }
 

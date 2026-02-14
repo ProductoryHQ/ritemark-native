@@ -27,6 +27,8 @@ import type {
   WidgetData,
   AgentConversationTurn,
   FileAttachment,
+  DiscoveredAgent,
+  DiscoveredCommand,
   IndexStatus,
   IndexProgress,
   SetupStatus,
@@ -81,6 +83,10 @@ interface AISidebarState {
   indexStatus: IndexStatus;
   indexProgress: IndexProgress | null;
   isIndexing: boolean;
+
+  // ── Discovered agents/commands from .claude/ ──
+  discoveredAgents: DiscoveredAgent[];
+  discoveredCommands: DiscoveredCommand[];
 
   // ── Appearance ──
   chatFontSize: number;
@@ -153,6 +159,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   indexProgress: null,
   chatFontSize: 13,
   isIndexing: false,
+  discoveredAgents: [],
+  discoveredCommands: [],
 
   // ── Actions ──
 
@@ -499,6 +507,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           models: message.models || [],
           setupStatus: message.setupStatus ?? get().setupStatus,
           hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
+          discoveredAgents: message.discoveredAgents || [],
+          discoveredCommands: message.discoveredCommands || [],
         });
         break;
 
