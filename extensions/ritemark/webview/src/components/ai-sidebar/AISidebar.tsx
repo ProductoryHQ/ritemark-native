@@ -17,7 +17,9 @@ import { AgentView } from './AgentView';
 import { ChatInput } from './ChatInput';
 import { IndexFooter } from './IndexFooter';
 import { SelectionIndicator } from './SelectionIndicator';
+import { ChatHistoryPanel } from './ChatHistoryPanel';
 import { markdownStyles } from './RenderedMarkdown';
+import { History } from 'lucide-react';
 import type { ExtensionMessage } from './types';
 
 export function AISidebar() {
@@ -72,6 +74,20 @@ export function AISidebar() {
 
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
   const hasSeenWelcome = useAISidebarStore((s) => s.hasSeenWelcome);
+  const showHistoryPanel = useAISidebarStore((s) => s.showHistoryPanel);
+  const toggleHistoryPanel = useAISidebarStore((s) => s.toggleHistoryPanel);
+  const loadConversationList = useAISidebarStore((s) => s.loadConversationList);
+  const chatFontSize = useAISidebarStore((s) => s.chatFontSize);
+
+  // Initialize chat font size CSS variable
+  useEffect(() => {
+    document.documentElement.style.setProperty('--chat-font-size', `${chatFontSize}px`);
+  }, [chatFontSize]);
+
+  // Load conversation list on mount
+  useEffect(() => {
+    loadConversationList();
+  }, [loadConversationList]);
 
   const isClaudeCode = selectedAgent === 'claude-code';
   const needsOpenAIKey = !isClaudeCode && !hasApiKey;
@@ -85,8 +101,25 @@ export function AISidebar() {
       {/* Inject markdown styles once at root level */}
       <style dangerouslySetInnerHTML={{ __html: markdownStyles }} />
 
+      {/* Header with history toggle */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--vscode-panel-border)]">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--vscode-descriptionForeground)]">
+          AI Chat
+        </span>
+        <button
+          onClick={toggleHistoryPanel}
+          className="p-1 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] transition-colors"
+          title="Chat History"
+        >
+          <History size={14} />
+        </button>
+      </div>
+
       {/* Agent selector — only when agentic feature is enabled */}
       {agenticEnabled && <AgentSelector />}
+
+      {/* Chat History Panel (overlay) */}
+      {showHistoryPanel && <ChatHistoryPanel />}
 
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}

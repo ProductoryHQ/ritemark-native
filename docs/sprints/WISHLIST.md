@@ -56,12 +56,31 @@ In-app help system accessible from activity bar:
 ## AI Assistant
 
 - [x] Advanced Claude Code harness in AI sidebar → **Sprint 33** (multi-turn sessions, model selector, image paste, clickable file paths)
+- [ ] **Chat font size setting** - User-adjustable font size for AI chat interface (easier reading, accessibility)
 - [ ] Memories
 - [ ] Customization (CLAUDE.md, Agents.md support)
 - [ ] AI image generation via command palette - \[ \] Opens dialog to configure Google API key - \[ \] Uses Gemini API to generate images
 - [ ] On left sidebar - possibility to edit Agents and Skills/Tools of Claude Code
 - [ ] RAG to support pdf, word, ppt etc (finishing sprint-24 ideas, but we need to solve local-first dilemma)
 - [ ] RAG integration as agent tool (agent can search workspace documents)
+- [ ] **AI Subagent GUI** - Visual interface for AI agent operations
+  - [ ] See running subagents and their progress in real-time
+  - [ ] Agent task history / completion status
+  - [ ] **Callback system** — subagent can call back to parent agent when done, with result summary
+  - [ ] **Chat UI integration** — show subagent progress cards, results, and callbacks inline in the chat conversation
+- [ ] **Chat Histories** - Persistent AI conversation management
+  - [ ] Browse and search past conversations
+  - [ ] Resume previous sessions
+  - [ ] Delete / archive old chats
+- [ ] **@ Mentions** - Reference system for AI context
+  - [ ] `@file` to include file content in AI context
+  - [ ] `@folder` to reference entire directories
+  - [ ] `@workspace` for project-wide context
+  - [ ] `@agent` to invoke specific agent capabilities
+- [ ] **Skills & Slash Commands** - User-facing AI capabilities
+  - [ ] `/` command palette for AI actions (rewrite, summarize, translate, etc.)
+  - [ ] Custom user-defined skills
+  - [ ] Skill marketplace / sharing
 
 ## Export
 

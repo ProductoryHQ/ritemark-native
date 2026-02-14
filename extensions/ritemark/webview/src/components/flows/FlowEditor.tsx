@@ -37,6 +37,43 @@ export function FlowEditor() {
   );
   const selectedNodeId = useFlowEditorStore((state) => state.selectedNodeId);
 
+  // Local state for name/description inputs to avoid aggressive autosave during typing.
+  // Changes are committed to the store (triggering save) on blur or after a longer debounce.
+  const [localName, setLocalName] = useState(flowName);
+  const [localDescription, setLocalDescription] = useState(flowDescription);
+  const [isNameFocused, setIsNameFocused] = useState(false);
+  const [isDescFocused, setIsDescFocused] = useState(false);
+
+  // Sync local state when store changes externally (e.g., flow:load)
+  useEffect(() => {
+    if (!isNameFocused) {
+      setLocalName(flowName);
+    }
+  }, [flowName, isNameFocused]);
+
+  useEffect(() => {
+    if (!isDescFocused) {
+      setLocalDescription(flowDescription);
+    }
+  }, [flowDescription, isDescFocused]);
+
+  // Debounced commit for name/description (1.5s after last keystroke)
+  useEffect(() => {
+    if (!isNameFocused || localName === flowName) return;
+    const timer = setTimeout(() => {
+      setFlowName(localName);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [localName, isNameFocused, flowName, setFlowName]);
+
+  useEffect(() => {
+    if (!isDescFocused || localDescription === flowDescription) return;
+    const timer = setTimeout(() => {
+      setFlowDescription(localDescription);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [localDescription, isDescFocused, flowDescription, setFlowDescription]);
+
   const [error, setError] = useState<string | null>(null);
   const [showWarnings, setShowWarnings] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -172,14 +209,28 @@ export function FlowEditor() {
       {/* Header */}
       <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)]">
         <Input
-          value={flowName}
-          onChange={(e) => setFlowName(e.target.value)}
+          value={localName}
+          onChange={(e) => setLocalName(e.target.value)}
+          onFocus={() => setIsNameFocused(true)}
+          onBlur={() => {
+            setIsNameFocused(false);
+            if (localName !== flowName) {
+              setFlowName(localName);
+            }
+          }}
           className="max-w-[200px] font-semibold"
           placeholder="Flow name..."
         />
         <Input
-          value={flowDescription}
-          onChange={(e) => setFlowDescription(e.target.value)}
+          value={localDescription}
+          onChange={(e) => setLocalDescription(e.target.value)}
+          onFocus={() => setIsDescFocused(true)}
+          onBlur={() => {
+            setIsDescFocused(false);
+            if (localDescription !== flowDescription) {
+              setFlowDescription(localDescription);
+            }
+          }}
           className="flex-1 text-sm"
           placeholder="Description (optional)..."
         />

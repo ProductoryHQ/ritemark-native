@@ -31,13 +31,21 @@ let settingsProvider: RitemarkSettingsProvider | null = null;
 let documentIndexer: DocumentIndexer | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
-  // Force Ritemark Light theme on fresh install or update
+  // Force Ritemark branding on fresh install or version upgrade
   const currentVersion = context.extension.packageJSON.version as string;
   const lastThemeVersion = context.globalState.get<string>('ritemark.themeAppliedVersion');
   if (lastThemeVersion !== currentVersion) {
-    const config = vscode.workspace.getConfiguration('workbench');
-    config.update('colorTheme', 'Ritemark Light', vscode.ConfigurationTarget.Global);
-    context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
+    // Delay to ensure extension themes are registered before we try to apply them
+    setTimeout(async () => {
+      const wb = vscode.workspace.getConfiguration('workbench');
+      const win = vscode.workspace.getConfiguration('window');
+      await win.update('autoDetectColorScheme', false, vscode.ConfigurationTarget.Global);
+      await wb.update('colorTheme', 'Ritemark Light', vscode.ConfigurationTarget.Global);
+      await wb.update('iconTheme', 'ritemark-icons', vscode.ConfigurationTarget.Global);
+      await wb.update('preferredLightColorTheme', 'Ritemark Light', vscode.ConfigurationTarget.Global);
+      await wb.update('preferredDarkColorTheme', 'Ritemark Light', vscode.ConfigurationTarget.Global);
+      context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
+    }, 1500);
   }
 
   // Initialize API key manager (must be first)
