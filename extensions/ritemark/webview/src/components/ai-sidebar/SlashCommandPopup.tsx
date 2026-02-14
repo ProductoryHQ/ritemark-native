@@ -2,13 +2,14 @@
  * SlashCommandPopup — Autocomplete popup for / commands.
  *
  * Shows when user types `/` at the start of input, with keyboard navigation
- * and command filtering.
+ * and command filtering. Includes both built-in commands and custom commands
+ * discovered from .claude/commands/ and .claude/skills/.
  *
  * Keyboard handling is driven by the parent (ChatInput) via imperative ref,
  * not by window-level listeners — this avoids event ordering races.
  */
 
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   Trash2,
   Plus,
@@ -18,8 +19,11 @@ import {
   Settings,
   Square,
   DollarSign,
+  Sparkles,
+  Terminal,
 } from 'lucide-react';
-import { type SlashCommand, filterCommands, SLASH_COMMANDS } from './slashCommands';
+import { type SlashCommand, filterCommands, mergeCommands, BUILTIN_COMMANDS } from './slashCommands';
+import { useAISidebarStore } from './store';
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -31,6 +35,8 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   Settings,
   Square,
   DollarSign,
+  Sparkles,
+  Terminal,
 };
 
 export interface SlashCommandPopupHandle {
@@ -49,9 +55,20 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
   function SlashCommandPopup({ query, onSelect, onClose, position }, ref) {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const listRef = useRef<HTMLDivElement>(null);
+    const discoveredCommands = useAISidebarStore((s) => s.discoveredCommands);
+
+    // Merge built-in + discovered commands
+    const allCommands = useMemo(
+      () => mergeCommands(discoveredCommands),
+      [discoveredCommands]
+    );
 
     // Filter commands based on query
-    const commands = query ? filterCommands(query) : SLASH_COMMANDS;
+    const commands = query ? filterCommands(allCommands, query) : allCommands;
+
+    // Split into built-in and custom for display grouping
+    const builtinCommands = commands.filter((c) => c.action !== 'custom');
+    const customCommands = commands.filter((c) => c.action === 'custom');
 
     // Reset selection when commands list changes
     useEffect(() => {
@@ -61,8 +78,8 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
     // Scroll selected item into view
     useEffect(() => {
       if (listRef.current) {
-        // +1 to skip the "Commands" header div
-        const selectedEl = listRef.current.children[selectedIndex + 1] as HTMLElement;
+        const items = listRef.current.querySelectorAll('[data-cmd-item]');
+        const selectedEl = items[selectedIndex] as HTMLElement;
         selectedEl?.scrollIntoView({ block: 'nearest' });
       }
     }, [selectedIndex]);
@@ -109,41 +126,85 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
       );
     }
 
+    // Track the flat index for selection highlighting
+    let flatIndex = 0;
+
     return (
       <div
         className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 min-w-[280px] max-h-[280px] overflow-y-auto"
         style={{ bottom: '100%', left: position.left, marginBottom: 4 }}
         ref={listRef}
       >
-        <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-[var(--vscode-descriptionForeground)] border-b border-[var(--vscode-editorWidget-border)]">
-          Commands
-        </div>
-        {commands.map((cmd, index) => {
-          const IconComponent = ICON_MAP[cmd.icon] || HelpCircle;
-          return (
-            <button
-              key={cmd.id}
-              className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--vscode-list-hoverBackground)] ${
-                index === selectedIndex
-                  ? 'bg-[var(--vscode-list-activeSelectionBackground)] text-[var(--vscode-list-activeSelectionForeground)]'
-                  : ''
-              }`}
-              onClick={() => onSelect(cmd)}
-              onMouseEnter={() => setSelectedIndex(index)}
-            >
-              <IconComponent
-                size={16}
-                className="mt-0.5 shrink-0 text-[var(--vscode-symbolIcon-functionForeground)]"
-              />
-              <div className="flex-1 min-w-0">
-                <span className="text-sm font-medium">/{cmd.id}</span>
-                <div className="text-xs text-[var(--vscode-descriptionForeground)] truncate">
-                  {cmd.description}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+        {builtinCommands.length > 0 && (
+          <>
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-[var(--vscode-descriptionForeground)] border-b border-[var(--vscode-editorWidget-border)]">
+              Commands
+            </div>
+            {builtinCommands.map((cmd) => {
+              const idx = flatIndex++;
+              const IconComponent = ICON_MAP[cmd.icon] || HelpCircle;
+              return (
+                <button
+                  key={cmd.id}
+                  data-cmd-item
+                  className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--vscode-list-hoverBackground)] ${
+                    idx === selectedIndex
+                      ? 'bg-[var(--vscode-list-activeSelectionBackground)] text-[var(--vscode-list-activeSelectionForeground)]'
+                      : ''
+                  }`}
+                  onClick={() => onSelect(cmd)}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                >
+                  <IconComponent
+                    size={16}
+                    className="mt-0.5 shrink-0 text-[var(--vscode-symbolIcon-functionForeground)]"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium">/{cmd.id}</span>
+                    <div className="text-xs text-[var(--vscode-descriptionForeground)] truncate">
+                      {cmd.description}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </>
+        )}
+        {customCommands.length > 0 && (
+          <>
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-[var(--vscode-descriptionForeground)] border-b border-[var(--vscode-editorWidget-border)]">
+              Project Commands
+            </div>
+            {customCommands.map((cmd) => {
+              const idx = flatIndex++;
+              const IconComponent = ICON_MAP[cmd.icon] || Terminal;
+              return (
+                <button
+                  key={cmd.id}
+                  data-cmd-item
+                  className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--vscode-list-hoverBackground)] ${
+                    idx === selectedIndex
+                      ? 'bg-[var(--vscode-list-activeSelectionBackground)] text-[var(--vscode-list-activeSelectionForeground)]'
+                      : ''
+                  }`}
+                  onClick={() => onSelect(cmd)}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                >
+                  <IconComponent
+                    size={16}
+                    className="mt-0.5 shrink-0 text-[var(--vscode-symbolIcon-classForeground)]"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium">/{cmd.id}</span>
+                    <div className="text-xs text-[var(--vscode-descriptionForeground)] truncate">
+                      {cmd.description}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </>
+        )}
       </div>
     );
   }

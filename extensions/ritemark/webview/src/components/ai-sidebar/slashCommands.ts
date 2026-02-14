@@ -2,8 +2,11 @@
  * Slash Commands Registry
  *
  * `/` triggered command system — real commands that control the AI chat/agent.
- * These map to actual store actions, not prompt templates.
+ * Built-in commands map to store actions.
+ * Custom commands from .claude/commands/ and .claude/skills/ are sent as prompts to the agent.
  */
+
+import type { DiscoveredCommand } from './types';
 
 export type CommandAction =
   | 'clear'
@@ -13,7 +16,8 @@ export type CommandAction =
   | 'help'
   | 'settings'
   | 'cancel'
-  | 'cost';
+  | 'cost'
+  | 'custom';
 
 export interface SlashCommand {
   id: string;
@@ -21,18 +25,20 @@ export interface SlashCommand {
   description: string;
   icon: string; // lucide-react icon name
   action: CommandAction;
+  /** For custom commands, the source directory */
+  source?: 'commands' | 'skills';
 }
 
 /**
- * Available slash commands
+ * Built-in slash commands (always available)
  */
-export const SLASH_COMMANDS: SlashCommand[] = [
+export const BUILTIN_COMMANDS: SlashCommand[] = [
   {
     id: 'clear',
     name: 'Clear',
     description: 'Clear current conversation',
     icon: 'Trash2',
-  action: 'clear',
+    action: 'clear',
   },
   {
     id: 'new',
@@ -86,11 +92,30 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 ];
 
 /**
+ * Convert discovered commands to SlashCommand format
+ */
+export function mergeCommands(discoveredCommands: DiscoveredCommand[]): SlashCommand[] {
+  const builtinIds = new Set(BUILTIN_COMMANDS.map((c) => c.id));
+  const customCommands: SlashCommand[] = discoveredCommands
+    .filter((dc) => !builtinIds.has(dc.id)) // Don't override built-in commands
+    .map((dc) => ({
+      id: dc.id,
+      name: dc.name,
+      description: dc.description,
+      icon: dc.source === 'skills' ? 'Sparkles' : 'Terminal',
+      action: 'custom' as CommandAction,
+      source: dc.source,
+    }));
+
+  return [...BUILTIN_COMMANDS, ...customCommands];
+}
+
+/**
  * Filter commands by query (prefix match)
  */
-export function filterCommands(query: string): SlashCommand[] {
+export function filterCommands(allCommands: SlashCommand[], query: string): SlashCommand[] {
   const lowerQuery = query.toLowerCase();
-  return SLASH_COMMANDS.filter(
+  return allCommands.filter(
     (cmd) =>
       cmd.id.toLowerCase().startsWith(lowerQuery) ||
       cmd.name.toLowerCase().startsWith(lowerQuery)
@@ -100,9 +125,9 @@ export function filterCommands(query: string): SlashCommand[] {
 /**
  * Find a command by ID or name
  */
-export function findCommand(idOrName: string): SlashCommand | undefined {
+export function findCommand(allCommands: SlashCommand[], idOrName: string): SlashCommand | undefined {
   const lower = idOrName.toLowerCase();
-  return SLASH_COMMANDS.find(
+  return allCommands.find(
     (cmd) => cmd.id.toLowerCase() === lower || cmd.name.toLowerCase() === lower
   );
 }
@@ -116,7 +141,7 @@ export interface ParsedCommand {
   fullMatch: string;
 }
 
-export function parseCommand(input: string): ParsedCommand | null {
+export function parseCommand(allCommands: SlashCommand[], input: string): ParsedCommand | null {
   const trimmed = input.trim();
   if (!trimmed.startsWith('/')) return null;
 
@@ -126,7 +151,7 @@ export function parseCommand(input: string): ParsedCommand | null {
   const cmdName = match[1];
   const args = match[2] || '';
 
-  const command = findCommand(cmdName);
+  const command = findCommand(allCommands, cmdName);
   if (!command) return null;
 
   return {

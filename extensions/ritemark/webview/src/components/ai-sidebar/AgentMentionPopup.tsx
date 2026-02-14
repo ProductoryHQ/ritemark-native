@@ -10,7 +10,8 @@
 
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Bot } from 'lucide-react';
-import { type AgentDefinition, filterAgents, AVAILABLE_AGENTS } from './agentRegistry';
+import { type AgentDefinition, filterAgents } from './agentRegistry';
+import { useAISidebarStore } from './store';
 
 export interface AgentMentionPopupHandle {
   /** Returns true if the key was handled by the popup */
@@ -28,9 +29,10 @@ export const AgentMentionPopup = forwardRef<AgentMentionPopupHandle, AgentMentio
   function AgentMentionPopup({ query, onSelect, onClose, position }, ref) {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const listRef = useRef<HTMLDivElement>(null);
+    const discoveredAgents = useAISidebarStore((s) => s.discoveredAgents);
 
-    // Filter agents based on query
-    const agents = query ? filterAgents(query) : AVAILABLE_AGENTS;
+    // Filter agents based on query (using dynamically discovered agents)
+    const agents = query ? filterAgents(discoveredAgents, query) : discoveredAgents;
 
     // Reset selection when agents list changes
     useEffect(() => {

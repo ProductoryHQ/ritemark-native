@@ -4,13 +4,14 @@
  * Supports @ agent mentions with autocomplete, slash commands, and drag-and-drop file paths.
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Send, Square, X, Paperclip, FileText, FileImage, File, Bot } from 'lucide-react';
 import { useAISidebarStore } from './store';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
-import { type SlashCommand, type CommandAction, parseCommand } from './slashCommands';
+import type { DiscoveredCommand } from './types';
+import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
 import type { FileAttachment, AttachmentKind } from './types';
 
 let attachmentIdCounter = 0;
@@ -129,6 +130,11 @@ export function ChatInput() {
   const sendChatMessage = useAISidebarStore((s) => s.sendChatMessage);
   const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
   const cancelRequest = useAISidebarStore((s) => s.cancelRequest);
+  const discoveredAgents = useAISidebarStore((s) => s.discoveredAgents);
+  const discoveredCommands = useAISidebarStore((s) => s.discoveredCommands);
+
+  // Merge built-in + discovered commands
+  const allCommands = useMemo(() => mergeCommands(discoveredCommands), [discoveredCommands]);
 
   const isClaudeCode = selectedAgent === 'claude-code';
   const lastTurn = agentConversation[agentConversation.length - 1];
@@ -259,9 +265,21 @@ export function ChatInput() {
         e.preventDefault();
 
         // Check if this is a complete slash command
-        const parsed = parseCommand(value);
+        const parsed = parseCommand(allCommands, value);
         if (parsed) {
-          executeCommandAction(parsed.command.action);
+          if (parsed.command.action === 'custom') {
+            // Custom commands are sent as slash-command prompts to the agent
+            const prompt = `/${parsed.command.id}${parsed.args ? ' ' + parsed.args : ''}`;
+            if (isClaudeCode) {
+              sendAgentMessage(prompt);
+            } else {
+              sendChatMessage(prompt);
+            }
+            setValue('');
+            setShowCommandPopup(false);
+          } else {
+            executeCommandAction(parsed.command.action);
+          }
           return;
         }
 
@@ -369,9 +387,21 @@ export function ChatInput() {
   // Handle slash command selection from popup — execute immediately
   const handleCommandSelect = useCallback(
     (command: SlashCommand) => {
-      executeCommandAction(command.action);
+      if (command.action === 'custom') {
+        // Custom commands are sent as slash-command prompts to the agent
+        const prompt = `/${command.id}`;
+        if (isClaudeCode) {
+          sendAgentMessage(prompt);
+        } else {
+          sendChatMessage(prompt);
+        }
+        setValue('');
+        setShowCommandPopup(false);
+      } else {
+        executeCommandAction(command.action);
+      }
     },
-    [executeCommandAction]
+    [executeCommandAction, isClaudeCode, sendAgentMessage, sendChatMessage]
   );
 
   // Handle command popup close
@@ -549,7 +579,7 @@ export function ChatInput() {
   }
 
   // Parse @mentions in value for visual highlighting
-  const mentions = parseMentions(value);
+  const mentions = parseMentions(discoveredAgents, value);
 
   return (
     <div
@@ -661,7 +691,7 @@ export function ChatInput() {
       {mentions.length > 0 && (
         <div className="flex gap-1 mb-2 flex-wrap">
           {mentions.map((m) => {
-            const agent = findAgent(m.agentId);
+            const agent = findAgent(discoveredAgents, m.agentId);
             if (!agent) return null;
             return (
               <div

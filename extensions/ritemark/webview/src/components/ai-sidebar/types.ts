@@ -162,12 +162,27 @@ export interface IndexProgress {
   current: string;
 }
 
+// ── Discovered agents/commands from .claude/ directory ──
+
+export interface DiscoveredAgent {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface DiscoveredCommand {
+  id: string;
+  name: string;
+  description: string;
+  source: 'commands' | 'skills';
+}
+
 // ── Messages from extension → webview ──
 
 export type ExtensionMessage =
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
-  | { type: 'agent:config'; agenticEnabled: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; setupStatus?: SetupStatus; hasSeenWelcome?: boolean }
+  | { type: 'agent:config'; agenticEnabled: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; setupStatus?: SetupStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[] }
   | { type: 'selection-update'; selection: EditorSelection }
   | { type: 'ai-streaming'; content: string }
   | { type: 'ai-result'; success: boolean; message?: string; hasRagContext?: boolean }
@@ -184,4 +199,5 @@ export type ExtensionMessage =
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus }
   | { type: 'agent-setup:error'; error: string }
-  | { type: 'settings:chatFontSize'; fontSize: number };
+  | { type: 'settings:chatFontSize'; fontSize: number }
+  | { type: 'toggle-history-panel' };

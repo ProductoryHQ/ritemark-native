@@ -1,9 +1,8 @@
 /**
  * Agent Registry — Available agents for @mention routing.
  *
- * These agents map to system prompts in `.claude/agents/{agent-id}.md`.
- * When a user types `@agent-name`, the message is routed to Claude Code
- * with the corresponding agent's system prompt.
+ * Agents are dynamically discovered from `.claude/agents/` directory.
+ * The extension scans the filesystem and sends the list to the webview.
  */
 
 export interface AgentDefinition {
@@ -13,57 +12,11 @@ export interface AgentDefinition {
 }
 
 /**
- * Available agents that can be mentioned with @
+ * Filter agents by query (fuzzy match on id, name, description)
  */
-export const AVAILABLE_AGENTS: AgentDefinition[] = [
-  {
-    id: 'sprint-manager',
-    name: 'Sprint Manager',
-    description: 'Sprint workflow, approval gates',
-  },
-  {
-    id: 'vscode-expert',
-    name: 'VS Code Expert',
-    description: 'Builds, extensions, patches',
-  },
-  {
-    id: 'webview-expert',
-    name: 'Webview Expert',
-    description: 'TipTap, React, webview',
-  },
-  {
-    id: 'qa-validator',
-    name: 'QA Validator',
-    description: 'Quality checks, commit validation',
-  },
-  {
-    id: 'release-manager',
-    name: 'Release Manager',
-    description: 'Release process, notarization',
-  },
-  {
-    id: 'product-marketer',
-    name: 'Product Marketer',
-    description: 'Changelog, release notes',
-  },
-  {
-    id: 'ux-expert',
-    name: 'UX Expert',
-    description: 'UI/UX design, shadcn/ui',
-  },
-  {
-    id: 'knowledge-builder',
-    name: 'Knowledge Builder',
-    description: 'Create new skills/agents',
-  },
-];
-
-/**
- * Fuzzy filter agents by query
- */
-export function filterAgents(query: string): AgentDefinition[] {
+export function filterAgents(agents: AgentDefinition[], query: string): AgentDefinition[] {
   const lowerQuery = query.toLowerCase();
-  return AVAILABLE_AGENTS.filter(
+  return agents.filter(
     (agent) =>
       agent.id.toLowerCase().includes(lowerQuery) ||
       agent.name.toLowerCase().includes(lowerQuery) ||
@@ -74,8 +27,8 @@ export function filterAgents(query: string): AgentDefinition[] {
 /**
  * Find an agent by ID
  */
-export function findAgent(id: string): AgentDefinition | undefined {
-  return AVAILABLE_AGENTS.find((agent) => agent.id === id);
+export function findAgent(agents: AgentDefinition[], id: string): AgentDefinition | undefined {
+  return agents.find((agent) => agent.id === id);
 }
 
 /**
@@ -88,14 +41,14 @@ export interface ParsedMention {
   end: number;
 }
 
-export function parseMentions(text: string): ParsedMention[] {
+export function parseMentions(agents: AgentDefinition[], text: string): ParsedMention[] {
   const mentions: ParsedMention[] = [];
   const regex = /@([a-z0-9-]+)/gi;
   let match;
 
   while ((match = regex.exec(text)) !== null) {
     const agentId = match[1].toLowerCase();
-    const agent = findAgent(agentId);
+    const agent = findAgent(agents, agentId);
     if (agent) {
       mentions.push({
         agentId: agent.id,
