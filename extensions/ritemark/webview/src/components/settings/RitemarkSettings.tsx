@@ -16,6 +16,8 @@ import {
   EyeOff,
   ExternalLink,
   Bot,
+  Type,
+  Timer,
 } from 'lucide-react';
 import { vscode } from '../../lib/vscode';
 import { getDefaultAssistantModel } from '../../config/modelConfig';
@@ -33,12 +35,14 @@ interface SettingsData {
   updatesEnabled: boolean;
   aiModel: string;
   availableModels: ModelInfo[];
+  agentTimeout: number;
   openaiKey: string;
   openaiKeyConfigured: boolean;
   googleKey: string;
   googleKeyConfigured: boolean;
   anthropicKey: string;
   anthropicKeyConfigured: boolean;
+  chatFontSize: number;
 }
 
 interface TestResult {
@@ -413,6 +417,85 @@ export function RitemarkSettings() {
           <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
             GPT-5 models use the newer Responses API with enhanced reasoning.
             GPT-4 models use Chat Completions API with tool support.
+          </p>
+        </div>
+      </section>
+
+      {/* Agent Timeout Section */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Timer className="w-5 h-5 text-[var(--vscode-foreground)]" />
+          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
+            Agent Timeout
+          </h2>
+        </div>
+
+        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+          <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-2">
+            Inactivity Timeout
+          </label>
+
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min="5"
+              max="60"
+              step="5"
+              value={settings.agentTimeout || 15}
+              onChange={(e) => handleSettingChange('ai.agentTimeout', parseInt(e.target.value, 10))}
+              className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-[var(--vscode-input-background)]"
+            />
+            <span className="text-sm font-mono w-16 text-right text-[var(--vscode-foreground)]">
+              {settings.agentTimeout || 15} min
+            </span>
+          </div>
+
+          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+            The Claude Code agent will be stopped if it produces no activity for this duration.
+            Increase if the agent times out on complex tasks. Default: 15 minutes.
+          </p>
+        </div>
+      </section>
+
+      {/* Chat Appearance Section */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Type className="w-5 h-5 text-[var(--vscode-foreground)]" />
+          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
+            Chat Appearance
+          </h2>
+        </div>
+
+        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+          <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-2">
+            Chat Font Size
+          </label>
+
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min="10"
+              max="20"
+              value={settings.chatFontSize || 13}
+              onChange={(e) => handleSettingChange('chat.fontSize', parseInt(e.target.value, 10))}
+              className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-[var(--vscode-input-background)]"
+            />
+            <span className="text-sm font-mono w-12 text-right text-[var(--vscode-foreground)]">
+              {settings.chatFontSize || 13}px
+            </span>
+          </div>
+
+          <div className="mt-3 p-3 rounded bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)]">
+            <p
+              className="text-[var(--vscode-foreground)]"
+              style={{ fontSize: `${settings.chatFontSize || 13}px` }}
+            >
+              Preview: This is how text will appear in the AI chat interface.
+            </p>
+          </div>
+
+          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+            Adjust the font size for the AI chat messages (10-20px).
           </p>
         </div>
       </section>

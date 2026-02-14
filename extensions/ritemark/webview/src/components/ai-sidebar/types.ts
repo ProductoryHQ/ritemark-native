@@ -22,13 +22,32 @@ export interface ModelOption {
   description: string;
 }
 
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'subagent_start' | 'subagent_progress' | 'subagent_done';
 
 export interface AgentProgress {
   type: AgentProgressType;
   message: string;
   tool?: string;
   file?: string;
+  timestamp: number;
+  /** For subagent events, the unique ID of the subagent */
+  subagentId?: string;
+  /** For subagent events, the task description */
+  subagentTask?: string;
+  /** For subagent events, the parent tool_use_id for correlation */
+  parentToolUseId?: string;
+}
+
+/**
+ * Subagent progress tracking for nested agent execution
+ */
+export interface SubagentProgress {
+  id: string;
+  parentTurnId: string;
+  task: string;
+  status: 'running' | 'done' | 'error';
+  activities: AgentProgress[];
+  result?: string;
   timestamp: number;
 }
 
@@ -114,6 +133,8 @@ export interface AgentConversationTurn {
   userPrompt: string;
   attachments?: FileAttachment[];
   activities: AgentProgress[];
+  /** Subagents spawned during this turn */
+  subagents?: SubagentProgress[];
   result?: {
     text: string;
     filesModified: string[];
@@ -162,4 +183,5 @@ export type ExtensionMessage =
   | { type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string }
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus }
-  | { type: 'agent-setup:error'; error: string };
+  | { type: 'agent-setup:error'; error: string }
+  | { type: 'settings:chatFontSize'; fontSize: number };

@@ -7,6 +7,15 @@
 
 import { create } from 'zustand';
 import { vscode } from '../../lib/vscode';
+import {
+  listConversations,
+  loadConversation,
+  saveConversation,
+  deleteConversation as deleteConversationFromStorage,
+  generateId,
+  generateTitle,
+  type SavedConversation,
+} from './chatHistoryStorage';
 import type {
   AgentId,
   AgentInfo,
@@ -22,6 +31,8 @@ import type {
   IndexProgress,
   SetupStatus,
   ExtensionMessage,
+  SubagentProgress,
+  AgentProgress,
 } from './types';
 
 let msgCounter = 0;
@@ -55,6 +66,11 @@ interface AISidebarState {
   // ── Agent state (Claude Code) ──
   agentConversation: AgentConversationTurn[];
 
+  // ── Chat history state ──
+  currentConversationId: string | null;
+  savedConversations: SavedConversation[];
+  showHistoryPanel: boolean;
+
   // ── Setup state (Claude Code) ──
   setupStatus: SetupStatus | null;
   setupInProgress: boolean;
@@ -65,6 +81,9 @@ interface AISidebarState {
   indexStatus: IndexStatus;
   indexProgress: IndexProgress | null;
   isIndexing: boolean;
+
+  // ── Appearance ──
+  chatFontSize: number;
 
   // ── Actions ──
   selectAgent: (agentId: AgentId) => void;
@@ -86,6 +105,14 @@ interface AISidebarState {
   approvePlan: (turnId: string) => void;
   rejectPlan: (turnId: string, feedback?: string) => void;
   dismissWelcome: () => void;
+
+  // ── Chat history actions ──
+  loadConversationList: () => void;
+  saveCurrentConversation: () => void;
+  loadSavedConversation: (id: string) => void;
+  deleteSavedConversation: (id: string) => void;
+  startNewConversation: () => void;
+  toggleHistoryPanel: () => void;
 
   // ── Internal: message handler ──
   handleExtensionMessage: (message: ExtensionMessage) => void;
@@ -113,6 +140,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   agentConversation: [],
 
+  currentConversationId: null,
+  savedConversations: [],
+  showHistoryPanel: false,
+
   setupStatus: null,
   setupInProgress: false,
   setupError: null,
@@ -120,6 +151,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   indexStatus: { totalDocs: 0, totalChunks: 0 },
   indexProgress: null,
+  chatFontSize: 13,
   isIndexing: false,
 
   // ── Actions ──
@@ -329,6 +361,110 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
   },
 
+  // ── Chat history actions ──
+
+  loadConversationList: () => {
+    const list = listConversations();
+    set({ savedConversations: list });
+  },
+
+  saveCurrentConversation: () => {
+    const state = get();
+    const hasContent =
+      state.agentConversation.length > 0 || state.chatMessages.length > 0;
+
+    if (!hasContent) return;
+
+    const id = state.currentConversationId || generateId();
+    const title = generateTitle(state.agentConversation, state.chatMessages);
+    const now = Date.now();
+
+    const existingConv = state.savedConversations.find((c) => c.id === id);
+    const createdAt = existingConv?.createdAt || now;
+
+    saveConversation({
+      id,
+      title,
+      agentId: state.selectedAgent,
+      createdAt,
+      updatedAt: now,
+      agentConversation: state.agentConversation,
+      chatMessages: state.chatMessages,
+      conversationHistory: state.conversationHistory,
+    });
+
+    // Refresh the list
+    const list = listConversations();
+    set({ currentConversationId: id, savedConversations: list });
+  },
+
+  loadSavedConversation: (id) => {
+    const data = loadConversation(id);
+    if (!data) return;
+
+    set({
+      currentConversationId: id,
+      selectedAgent: data.agentId,
+      agentConversation: data.agentConversation,
+      chatMessages: data.chatMessages,
+      conversationHistory: data.conversationHistory,
+      showHistoryPanel: false,
+    });
+
+    // Update agent selection in extension
+    vscode.postMessage({ type: 'ai-select-agent', agentId: data.agentId });
+  },
+
+  deleteSavedConversation: (id) => {
+    const state = get();
+    deleteConversationFromStorage(id);
+
+    // If deleting current conversation, clear it
+    if (state.currentConversationId === id) {
+      set({
+        currentConversationId: null,
+        chatMessages: [],
+        conversationHistory: [],
+        agentConversation: [],
+      });
+    }
+
+    // Refresh the list
+    const list = listConversations();
+    set({ savedConversations: list });
+  },
+
+  startNewConversation: () => {
+    const state = get();
+    // Save current conversation first if it has content
+    const hasContent =
+      state.agentConversation.length > 0 || state.chatMessages.length > 0;
+    if (hasContent && state.currentConversationId) {
+      get().saveCurrentConversation();
+    }
+
+    // Clear and start fresh
+    set({
+      currentConversationId: null,
+      chatMessages: [],
+      conversationHistory: [],
+      streamingContent: '',
+      isStreaming: false,
+      pendingCitations: [],
+      agentConversation: [],
+      showHistoryPanel: false,
+    });
+  },
+
+  toggleHistoryPanel: () => {
+    const state = get();
+    if (!state.showHistoryPanel) {
+      // Load list when opening
+      get().loadConversationList();
+    }
+    set({ showHistoryPanel: !state.showHistoryPanel });
+  },
+
   clearChat: () => {
     set({
       chatMessages: [],
@@ -391,6 +527,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
             { role: 'assistant', content: message.message || '' },
           ],
         });
+
+        // Auto-save conversation after chat turn completes
+        setTimeout(() => get().saveCurrentConversation(), 100);
         break;
       }
 
@@ -483,10 +622,55 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         const conv = [...state.agentConversation];
         const lastTurn = conv[conv.length - 1];
         if (lastTurn?.isRunning) {
-          conv[conv.length - 1] = {
-            ...lastTurn,
-            activities: [...lastTurn.activities, message.progress],
-          };
+          const progress = message.progress as AgentProgress;
+
+          // Handle subagent events specially
+          if (progress.type === 'subagent_start' && progress.subagentId) {
+            // Create a new subagent entry
+            const newSubagent: SubagentProgress = {
+              id: progress.subagentId,
+              parentTurnId: lastTurn.id,
+              task: progress.subagentTask || progress.message,
+              status: 'running',
+              activities: [],
+              timestamp: progress.timestamp,
+            };
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              activities: [...lastTurn.activities, progress],
+              subagents: [...(lastTurn.subagents || []), newSubagent],
+            };
+          } else if (progress.type === 'subagent_progress' && progress.parentToolUseId) {
+            // Add activity to the matching subagent
+            const subagents = lastTurn.subagents?.map((sa) =>
+              sa.id === progress.parentToolUseId
+                ? { ...sa, activities: [...sa.activities, progress] }
+                : sa
+            );
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              activities: [...lastTurn.activities, progress],
+              subagents,
+            };
+          } else if (progress.type === 'subagent_done' && progress.subagentId) {
+            // Mark subagent as done
+            const subagents = lastTurn.subagents?.map((sa) =>
+              sa.id === progress.subagentId
+                ? { ...sa, status: 'done' as const, result: progress.message }
+                : sa
+            );
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              activities: [...lastTurn.activities, progress],
+              subagents,
+            };
+          } else {
+            // Regular activity
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              activities: [...lastTurn.activities, progress],
+            };
+          }
           set({ agentConversation: conv });
         }
         break;
@@ -510,6 +694,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
             },
           };
           set({ agentConversation: conv });
+
+          // Auto-save conversation after turn completes
+          setTimeout(() => get().saveCurrentConversation(), 100);
         }
         break;
       }
@@ -524,6 +711,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
       case 'agent-setup:error':
         set({ setupInProgress: false, setupError: message.error });
+        break;
+
+      case 'settings:chatFontSize':
+        set({ chatFontSize: message.fontSize });
+        // Apply CSS variable to document root
+        document.documentElement.style.setProperty('--chat-font-size', `${message.fontSize}px`);
         break;
     }
   },

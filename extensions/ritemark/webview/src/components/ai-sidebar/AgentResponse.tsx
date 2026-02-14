@@ -1,6 +1,7 @@
 /**
  * AgentResponse — rendered markdown result + files summary + collapsible activity.
  * Shows plan approval buttons when the turn is a plan awaiting review.
+ * Uses --chat-font-size CSS variable for dynamic font sizing.
  */
 
 import { useState } from 'react';
@@ -15,6 +16,9 @@ interface AgentResponseProps {
   turn: AgentConversationTurn;
 }
 
+/** Common font size style using CSS variable with fallback */
+const chatFontStyle = { fontSize: 'var(--chat-font-size, 13px)' };
+
 export function AgentResponse({ turn }: AgentResponseProps) {
   const { result, activities } = turn;
   const approvePlan = useAISidebarStore((s) => s.approvePlan);
@@ -27,8 +31,8 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   // Error result
   if (result.error) {
     return (
-      <div>
-        <div className="flex items-start gap-2 text-xs text-[var(--vscode-errorForeground)]">
+      <div style={chatFontStyle}>
+        <div className="flex items-start gap-2 text-[var(--vscode-errorForeground)]">
           <AlertCircle size={14} className="shrink-0 mt-0.5" />
           <span>{result.error}</span>
         </div>
@@ -41,7 +45,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
   // Success result
   return (
-    <div>
+    <div style={chatFontStyle}>
       {result.text && (
         <RenderedMarkdown content={result.text} />
       )}

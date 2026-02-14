@@ -78,6 +78,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._sendConnectivityStatus();
           this._sendIndexStatus();
           this._sendAgentConfig();
+          this._sendChatFontSize();
           break;
 
         case 'ai-configure-key':
@@ -186,6 +187,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // Listen for connectivity changes
     connectivityChanged.event(({ isOnline: online }) => {
       this._view?.webview.postMessage({ type: 'connectivity-status', isOnline: online });
+    });
+
+    // Listen for chat font size changes
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('ritemark.chat.fontSize')) {
+        this._sendChatFontSize();
+      }
     });
   }
 
@@ -352,12 +360,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // Get active file context — works for both TextEditor and custom editors (Ritemark)
     const activeFile = this._getActiveFileContext();
 
+    // Read agent timeout from settings (default 15 min)
+    const agentTimeout = vscode.workspace.getConfiguration('ritemark.ai').get<number>('agentTimeout', 15);
+
     try {
       const result = await this._agentSession.sendMessage({
         prompt,
         attachments: images as FileAttachment[] | undefined,
         activeFile,
-        timeoutMinutes: 10,
+        timeoutMinutes: agentTimeout,
         onProgress: (progress: AgentProgress) => {
           this._view?.webview.postMessage({
             type: 'agent-progress',
@@ -417,6 +428,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       type: 'agent-setup:complete',
       status: { cliInstalled: true, authenticated: false },
     });
+  }
+
+  private _sendChatFontSize() {
+    const fontSize = vscode.workspace.getConfiguration('ritemark.chat').get<number>('fontSize', 13);
+    this._view?.webview.postMessage({ type: 'settings:chatFontSize', fontSize });
   }
 
   private async _sendIndexStatus() {

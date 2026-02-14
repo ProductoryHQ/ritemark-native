@@ -93,6 +93,15 @@ Organized by mode. Features under each mode should show that mode's badge/tag.
 - **Description EN:** Use OpenAI to improve, expand, and translate your writing.
 - **Screenshot:** none
 
+### Claude Code Agent
+- **Icon:** Bot (from lucide-react)
+- **Title ET:** Claude Code Agent
+- **Title EN:** Claude Code Agent
+- **Description ET:** Autonoomne AI agent, mis loeb, kirjutab ja korraldab faile sinu toolaual. Mitmeastmelised vestlused, pildi kleepimine, klikkitavad failiteed.
+- **Description EN:** Autonomous AI agent that reads, writes, and organizes files in your workspace. Multi-turn conversations, image paste, clickable file paths.
+- **Screenshot:** none (needs screenshot showing Claude Code agent activity feed)
+- **Badge:** NEW
+
 ### Local-First Privacy
 - **Icon:** Shield (from lucide-react)
 - **Title ET:** Privaatsus esikohal
@@ -128,6 +137,9 @@ Organized by mode. Features under each mode should show that mode's badge/tag.
 - [ ] PDF Preview - show PDF viewer with multiple pages, zoom controls, page navigation
 - [ ] DOCX Preview - show Word document with formatted text, colors, and tables
 - [ ] CSV Sort - show column header with sort indicator (up/down arrows)
+- [ ] Claude Code Agent - show activity feed with tool_use cards, thinking indicator, agent response
+- [ ] Visual Refresh - show new Ritemark Light theme with Sofia Sans font, horizontal sidebar tabs
+- [ ] CSV Column Operations - show column header with add/rename/delete controls
 
 ---
 
@@ -138,15 +150,18 @@ For landing page, organize features under their primary mode:
 ### Text Mode Features
 - WYSIWYG Markdown Editor
 - AI Writing Assistant
+- Claude Code Agent (NEW in v1.4.0)
 - Voice Dictation
 - Copy as Markdown
 - Image Handling
 
 ### Data Mode Features
 - Document Preview (PDF/DOCX/CSV/Excel)
+- CSV Column Operations (NEW in v1.4.0)
 
 ### Flow Mode Features
 - Ritemark Flows
 
 ### Cross-Cutting Features
 - Local-First Privacy (applies to all modes)
+- Ritemark Light Theme (NEW in v1.4.0)

@@ -155,6 +155,9 @@ export class RitemarkSettingsProvider {
         aiModel: config.get('ai.model', DEFAULT_MODELS.assistant),
         availableModels,
 
+        // Agent
+        agentTimeout: config.get('ai.agentTimeout', 15),
+
         // API Keys (masked for display, full for input)
         openaiKey: openaiKey || '',
         openaiKeyConfigured: !!openaiKey,

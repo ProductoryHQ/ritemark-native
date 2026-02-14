@@ -7,6 +7,7 @@ import { useAISidebarStore } from './store';
 import { EmptyState } from './EmptyState';
 import { RunningIndicator } from './RunningIndicator';
 import { AgentResponse } from './AgentResponse';
+import { SubagentCard } from './SubagentCard';
 
 export function AgentView() {
   const agentConversation = useAISidebarStore((s) => s.agentConversation);
@@ -73,9 +74,18 @@ export function AgentView() {
             {turn.userPrompt}
           </div>
 
+          {/* Subagents (rendered during running and after) */}
+          {turn.subagents && turn.subagents.length > 0 && (
+            <div className="space-y-1">
+              {turn.subagents.map((subagent) => (
+                <SubagentCard key={subagent.id} subagent={subagent} />
+              ))}
+            </div>
+          )}
+
           {/* Running indicator */}
           {turn.isRunning && (
-            <RunningIndicator activities={turn.activities} />
+            <RunningIndicator activities={turn.activities} subagents={turn.subagents} />
           )}
 
           {/* Result */}

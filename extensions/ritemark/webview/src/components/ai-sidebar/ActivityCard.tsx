@@ -2,7 +2,7 @@
  * ActivityCard — compact activity entry with icon + one line.
  */
 
-import { Brain, Search, FileText, Terminal, Sparkles, AlertCircle, Play } from 'lucide-react';
+import { Brain, Search, FileText, Terminal, Sparkles, AlertCircle, Play, Bot, CheckCircle } from 'lucide-react';
 import type { AgentProgress } from './types';
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -14,6 +14,8 @@ const iconMap: Record<string, React.ReactNode> = {
   Bash: <Terminal size={13} />,
   WebSearch: <Search size={13} />,
   WebFetch: <Search size={13} />,
+  Agent: <Bot size={13} />,
+  Task: <Bot size={13} />,
 };
 
 function getActivityIcon(activity: AgentProgress) {
@@ -22,6 +24,9 @@ function getActivityIcon(activity: AgentProgress) {
   if (activity.type === 'error') return <AlertCircle size={13} />;
   if (activity.type === 'done') return <Sparkles size={13} />;
   if (activity.type === 'text') return <Sparkles size={13} />;
+  if (activity.type === 'subagent_start') return <Bot size={13} className="text-[var(--vscode-progressBar-background)]" />;
+  if (activity.type === 'subagent_progress') return <Bot size={13} className="text-[var(--vscode-progressBar-background)]" />;
+  if (activity.type === 'subagent_done') return <CheckCircle size={13} className="text-green-500" />;
   if (activity.tool && iconMap[activity.tool]) return iconMap[activity.tool];
   return <Terminal size={13} />;
 }
@@ -33,6 +38,9 @@ function getActivityLabel(activity: AgentProgress): string {
   if (activity.type === 'done') return 'Done';
   if (activity.type === 'error') return 'Error';
   if (activity.type === 'text') return 'Response';
+  if (activity.type === 'subagent_start') return 'Subagent';
+  if (activity.type === 'subagent_progress') return 'Subagent';
+  if (activity.type === 'subagent_done') return 'Subagent done';
   return activity.type;
 }
 

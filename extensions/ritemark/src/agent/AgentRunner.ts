@@ -21,6 +21,7 @@ import type {
   FileAttachment,
   QueryHandle,
   SDKMessage,
+  SubagentProgress,
 } from './types';
 
 // Dynamic import for ES Module SDK (VS Code extensions use CommonJS)
@@ -98,7 +99,7 @@ async function* asSingleMessage(msg: Record<string, unknown>) {
 // ── Constants ────────────────────────────────────────────────────────
 
 const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'];
-const DEFAULT_TIMEOUT_MINUTES = 5;
+const DEFAULT_TIMEOUT_MINUTES = 15;
 
 const DEFAULT_EXCLUDED_FOLDERS = [
   '.git',
@@ -143,13 +144,23 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     onProgress,
   } = options;
 
-  const emitProgress = (
-    type: AgentProgress['type'],
-    message: string,
-    tool?: string,
-    file?: string
+  const emitProgress: ExtendedProgressEmitter = (
+    type,
+    message,
+    tool?,
+    file?,
+    subagentInfo?
   ) => {
-    onProgress?.({ type, message, tool, file, timestamp: Date.now() });
+    onProgress?.({
+      type,
+      message,
+      tool,
+      file,
+      timestamp: Date.now(),
+      subagentId: subagentInfo?.subagentId,
+      subagentTask: subagentInfo?.subagentTask,
+      parentToolUseId: subagentInfo?.parentToolUseId,
+    });
   };
 
   if (!prompt || prompt.trim() === '') {
@@ -161,11 +172,18 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
 
   const abortController = new AbortController();
   const timeoutMs = timeoutMinutes * 60 * 1000;
-  const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+  // Inactivity timeout — resets on each agent activity
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const resetTimeout = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+  };
+  resetTimeout();
 
   if (abortSignal) {
     if (abortSignal.aborted) {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       return {
         text: '',
         filesModified: [],
@@ -202,15 +220,22 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       const message = rawMessage as SDKMessage;
 
       if (abortController.signal.aborted) {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
         return { text: '', filesModified: [], metrics, error: 'Execution cancelled' };
+      }
+
+      // Reset inactivity timeout on any activity
+      if (message.type !== 'result') {
+        resetTimeout();
       }
 
       if (message.type === 'system' && message.subtype === 'init') {
         metrics.model = message.model || null;
         emitProgress('init', `Starting Claude Code (${message.model || 'claude'})`);
       } else if (message.type === 'assistant') {
-        processAssistantMessage(message, filesModified, emitProgress);
+        processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
+      } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
+        processSystemMessage(message, emitProgress);
       } else if (message.type === 'result') {
         metrics.durationMs = message.duration_ms || 0;
         metrics.costUsd = message.total_cost_usd ?? null;
@@ -223,20 +248,20 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
           const errors = message.errors || [];
           const errorStr = errors.join('; ') || 'Execution failed';
           emitProgress('error', errorStr);
-          clearTimeout(timeoutId);
+          if (timeoutId) clearTimeout(timeoutId);
           return { text: '', filesModified: [], metrics, error: errorStr };
         }
       }
     }
 
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
     return {
       text: resultText,
-      filesModified: [...new Set(filesModified)],
+      filesModified: Array.from(new Set(filesModified)),
       metrics,
     };
   } catch (error) {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     if (abortController.signal.aborted) {
@@ -279,8 +304,9 @@ export class AgentSession {
   private _consumerTurnId = 0;   // Set by generator when it yields to SDK
   private _turnResolve: ((result: AgentResult) => void) | null = null;
   private _turnFilesModified: string[] = [];
-  private _emitProgress: ((type: AgentProgress['type'], msg: string, tool?: string, file?: string) => void) | null = null;
+  private _emitProgress: ExtendedProgressEmitter | null = null;
   private _turnTimeout: ReturnType<typeof setTimeout> | null = null;
+  private _turnTimeoutMs = 0;  // Stored so we can reset on activity
 
   // Config
   private readonly _workspacePath: string;
@@ -330,27 +356,26 @@ export class AgentSession {
 
     // Set per-turn state BEFORE starting/enqueueing
     this._turnFilesModified = [];
-    this._emitProgress = (type, message, tool?, file?) => {
-      onProgress?.({ type, message, tool, file, timestamp: Date.now() });
+    this._emitProgress = (type, message, tool?, file?, subagentInfo?) => {
+      onProgress?.({
+        type,
+        message,
+        tool,
+        file,
+        timestamp: Date.now(),
+        subagentId: subagentInfo?.subagentId,
+        subagentTask: subagentInfo?.subagentTask,
+        parentToolUseId: subagentInfo?.parentToolUseId,
+      });
     };
 
     const resultPromise = new Promise<AgentResult>((resolve) => {
       this._turnResolve = resolve;
     });
 
-    // Per-turn timeout
-    if (timeoutMinutes > 0) {
-      this._turnTimeout = setTimeout(() => {
-        this._emitProgress?.('error', 'Turn timed out');
-        this._forceResolveTurn(turnId, {
-          text: '',
-          filesModified: [],
-          metrics: { durationMs: 0, costUsd: null, model: this._model },
-          error: 'Turn timed out',
-        });
-        this._queryStream?.interrupt().catch(() => {});
-      }, timeoutMinutes * 60 * 1000);
-    }
+    // Per-turn inactivity timeout — resets on each agent activity
+    this._turnTimeoutMs = timeoutMinutes * 60 * 1000;
+    this._resetTurnTimeout();
 
     if (!this._queryStream) {
       // First turn — start session with warm process
@@ -398,6 +423,32 @@ export class AgentSession {
     this._inputWaiter?.({} as Record<string, unknown>);
     this._inputWaiter = null;
     this._inputQueue = [];
+  }
+
+  // ── Timeout management ──────────────────────────────────────────────
+
+  /**
+   * Reset the per-turn inactivity timeout. Called on each agent activity
+   * (tool calls, messages) so the agent only times out if truly idle.
+   */
+  private _resetTurnTimeout() {
+    if (this._turnTimeout) {
+      clearTimeout(this._turnTimeout);
+      this._turnTimeout = null;
+    }
+    if (this._turnTimeoutMs > 0) {
+      const turnId = this._turnId;
+      this._turnTimeout = setTimeout(() => {
+        this._emitProgress?.('error', 'Turn timed out');
+        this._forceResolveTurn(turnId, {
+          text: '',
+          filesModified: [],
+          metrics: { durationMs: 0, costUsd: null, model: this._model },
+          error: 'Turn timed out',
+        });
+        this._queryStream?.interrupt().catch(() => {});
+      }, this._turnTimeoutMs);
+    }
   }
 
   // ── Turn resolution ─────────────────────────────────────────────────
@@ -510,6 +561,11 @@ export class AgentSession {
         if (this._closed) break;
         const message = rawMessage as SDKMessage;
 
+        // Reset inactivity timeout on any activity from the agent
+        if (message.type !== 'result') {
+          this._resetTurnTimeout();
+        }
+
         if (message.type === 'system' && message.subtype === 'init') {
           this._model = message.model || null;
           this._emitProgress?.('init', `Starting Claude Code (${message.model || 'claude'})`);
@@ -517,8 +573,11 @@ export class AgentSession {
           processAssistantMessage(
             message,
             this._turnFilesModified,
-            this._emitProgress || (() => {})
+            this._emitProgress || (() => {}),
+            message.parent_tool_use_id
           );
+        } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
+          processSystemMessage(message, this._emitProgress || (() => {}));
         } else if (message.type === 'result') {
           // Only resolve if this result matches the current turn
           // (after interrupt + new turn, stale results are ignored)
@@ -534,7 +593,7 @@ export class AgentSession {
               this._emitProgress?.('done', `Completed in ${durationStr}s`);
               this._forceResolveTurn(this._turnId, {
                 text: message.result || '',
-                filesModified: [...new Set(this._turnFilesModified)],
+                filesModified: Array.from(new Set(this._turnFilesModified)),
                 metrics,
               });
             } else {
@@ -575,12 +634,24 @@ export class AgentSession {
 // ── Shared helpers ──────────────────────────────────────────────────
 
 /**
+ * Extended progress callback that can include subagent info
+ */
+type ExtendedProgressEmitter = (
+  type: AgentProgress['type'],
+  message: string,
+  tool?: string,
+  file?: string,
+  subagentInfo?: { subagentId?: string; subagentTask?: string; parentToolUseId?: string }
+) => void;
+
+/**
  * Parse assistant message content blocks for tool usage and thinking
  */
 function processAssistantMessage(
   message: SDKMessage,
   filesModified: string[],
-  emitProgress: (type: AgentProgress['type'], message: string, tool?: string, file?: string) => void
+  emitProgress: ExtendedProgressEmitter,
+  parentToolUseId?: string | null
 ) {
   const content = message.message?.content;
   if (!Array.isArray(content)) return;
@@ -590,7 +661,14 @@ function processAssistantMessage(
       const snippet = block.text.substring(0, 150);
       emitProgress('thinking', snippet.length < block.text.length ? snippet + '...' : snippet);
     } else if (block.type === 'tool_use') {
-      const input = block.input as { file_path?: string; command?: string; pattern?: string } | undefined;
+      const input = block.input as {
+        file_path?: string;
+        command?: string;
+        pattern?: string;
+        description?: string;
+        prompt?: string;
+        subagent_type?: string;
+      } | undefined;
       let toolMessage = `Using ${block.name}`;
 
       if (block.name === 'ExitPlanMode') {
@@ -598,6 +676,22 @@ function processAssistantMessage(
         continue;
       } else if (block.name === 'EnterPlanMode') {
         emitProgress('tool_use', 'Entering plan mode');
+        continue;
+      } else if (block.name === 'Agent' || block.name === 'Task') {
+        // Subagent spawned! Emit special event
+        const taskDesc = input?.description || input?.prompt?.substring(0, 100) || 'Running subagent';
+        const agentType = input?.subagent_type || 'subagent';
+        emitProgress(
+          'subagent_start',
+          taskDesc,
+          block.name,
+          undefined,
+          {
+            subagentId: block.id,
+            subagentTask: taskDesc,
+            parentToolUseId: block.id,
+          }
+        );
         continue;
       } else if (block.name === 'Write' && input?.file_path) {
         toolMessage = `Writing: ${input.file_path.split('/').pop()}`;
@@ -616,7 +710,48 @@ function processAssistantMessage(
         toolMessage = `Searching for: ${input.pattern}`;
       }
 
-      emitProgress('tool_use', toolMessage, block.name, input?.file_path);
+      // If this is a subagent activity (has parent_tool_use_id), tag it
+      if (parentToolUseId) {
+        emitProgress('subagent_progress', toolMessage, block.name, input?.file_path, {
+          parentToolUseId,
+        });
+      } else {
+        emitProgress('tool_use', toolMessage, block.name, input?.file_path);
+      }
     }
+  }
+}
+
+/**
+ * Process SDK messages that are not assistant messages but provide progress info.
+ * This includes tool_progress and task_notification messages for subagent tracking.
+ */
+function processSystemMessage(
+  message: SDKMessage,
+  emitProgress: ExtendedProgressEmitter
+) {
+  // Handle tool_progress messages (elapsed time for long-running tools)
+  if (message.type === 'tool_progress') {
+    const toolName = message.tool_name || 'Tool';
+    const elapsed = message.elapsed_time_seconds || 0;
+    const parentId = message.parent_tool_use_id;
+
+    if (parentId) {
+      // This is subagent activity
+      emitProgress('subagent_progress', `${toolName} running (${elapsed}s)`, toolName, undefined, {
+        parentToolUseId: parentId,
+      });
+    }
+  }
+
+  // Handle task_notification messages (subagent completion)
+  if (message.type === 'system' && message.subtype === 'task_notification') {
+    const taskId = message.task_id || '';
+    const status = message.status || 'completed';
+    const summary = message.summary || 'Task completed';
+
+    emitProgress('subagent_done', summary, 'Task', undefined, {
+      subagentId: taskId,
+    });
   }
 }

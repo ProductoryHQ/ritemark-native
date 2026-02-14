@@ -61,7 +61,7 @@ export const DEFAULT_MODEL = 'claude-sonnet-4-5';
 /**
  * Progress event types from agent execution
  */
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'subagent_start' | 'subagent_progress' | 'subagent_done';
 
 /**
  * Progress event emitted during agent execution
@@ -71,6 +71,25 @@ export interface AgentProgress {
   message: string;
   tool?: string;
   file?: string;
+  timestamp: number;
+  /** For subagent events, the unique ID of the subagent */
+  subagentId?: string;
+  /** For subagent events, the task description */
+  subagentTask?: string;
+  /** For subagent events, the parent tool_use_id for correlation */
+  parentToolUseId?: string;
+}
+
+/**
+ * Subagent progress tracking for nested agent execution
+ */
+export interface SubagentProgress {
+  id: string;
+  parentTurnId: string;
+  task: string;
+  status: 'running' | 'done' | 'error';
+  activities: AgentProgress[];
+  result?: string;
   timestamp: number;
 }
 
@@ -189,10 +208,22 @@ export interface SDKMessage {
   subtype?: string;
   model?: string;
   session_id?: string;
+  /** Links this message to a parent tool_use (e.g., for subagent activity) */
+  parent_tool_use_id?: string | null;
+  /** For tool_progress messages */
+  tool_use_id?: string;
+  tool_name?: string;
+  elapsed_time_seconds?: number;
+  /** For task_notification messages */
+  task_id?: string;
+  status?: string;
+  output_file?: string;
+  summary?: string;
   message?: {
     content?: Array<{
       type: string;
       name?: string;
+      id?: string;
       text?: string;
       input?: Record<string, unknown>;
     }>;
