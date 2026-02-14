@@ -8,6 +8,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        ui: ['var(--ritemark-ui-font-family)'],
+        editor: ['var(--ritemark-editor-font-family)'],
+      },
       colors: {
         background: 'var(--background)',
         foreground: 'var(--foreground)',

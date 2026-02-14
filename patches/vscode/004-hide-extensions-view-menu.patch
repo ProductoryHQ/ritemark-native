@@ -1,5 +1,5 @@
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-index f4d62c70da1..cdacf03b899 100644
+index 01999f16d61..a5bc871187b 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
 +++ b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
 @@ -4,7 +4,7 @@
@@ -11,7 +11,7 @@ index f4d62c70da1..cdacf03b899 100644
  import { Registry } from '../../../../platform/registry/common/platform.js';
  import { MenuRegistry, MenuId, registerAction2, Action2, IMenuItem, IAction2Options } from '../../../../platform/actions/common/actions.js';
  import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
-@@ -106,17 +106,19 @@ Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegis
+@@ -106,18 +106,18 @@ Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegis
  	{
  		id: VIEWLET_ID,
  		title: localize2('extensions', "Extensions"),
@@ -33,7 +33,7 @@ index f4d62c70da1..cdacf03b899 100644
  		order: 4,
  		rejectAddedViews: true,
  		alwaysUseContainerInfo: true,
-+		hideIfEmpty: true, // RiteMark: Hide when no extensions gallery
+-		hideIfEmpty: true, // RiteMark: Hide when no extensions gallery
  	}, ViewContainerLocation.Sidebar);
 
  Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration)
