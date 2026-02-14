@@ -1,4 +1,4 @@
-# Sprint 34 Workbench Iterative Workflow
+# Sprint 35 Workbench Iterative Workflow
 
 **Date:** 2026-02-13  
 **Scope:** VS Code workbench-level GUI customization in `vscode/` with patch workflow in `patches/vscode/`.
