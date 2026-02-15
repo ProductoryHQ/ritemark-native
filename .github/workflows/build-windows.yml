@@ -68,6 +68,7 @@ jobs:
           npm_config_runtime: electron
           npm_config_build_from_source: true
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           for i in 1 2 3; do
             echo "Attempt $i..."
