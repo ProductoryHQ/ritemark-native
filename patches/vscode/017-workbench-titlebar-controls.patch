@@ -1,5 +1,5 @@
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index 8121b989805..2d52d25556f 100644
+index 5d7b93cfd86..2d52d25556f 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
 @@ -38,9 +38,9 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
@@ -14,7 +14,29 @@ index 8121b989805..2d52d25556f 100644
  const panelIcon = registerIcon('panel-bottom', Codicon.layoutPanel, localize('panelBottom', "Represents the bottom panel"));
  const statusBarIcon = registerIcon('statusBar', Codicon.layoutStatusbar, localize('statusBarIcon', "Represents the status bar"));
  
-@@ -302,12 +302,13 @@ registerAction2(class extends Action2 {
+@@ -180,13 +180,14 @@ export class ToggleSidebarPositionAction extends Action2 {
+ registerAction2(ToggleSidebarPositionAction);
+ 
+ const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
+-MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
+-	submenu: MenuId.LayoutControlMenuSubmenu,
+-	title: localize('configureLayout', "Configure Layout"),
+-	icon: configureLayoutIcon,
+-	group: '1_workbench_layout',
+-	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
+-});
++// RiteMark: Hide Configure Layout menu - too complex for writing app users
++// MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++// 	submenu: MenuId.LayoutControlMenuSubmenu,
++// 	title: localize('configureLayout', "Configure Layout"),
++// 	icon: configureLayoutIcon,
++// 	group: '1_workbench_layout',
++// 	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
++// });
+ 
+ 
+ MenuRegistry.appendMenuItems([{
+@@ -301,12 +302,13 @@ registerAction2(class extends Action2 {
  	}
  });
  
@@ -34,7 +56,7 @@ index 8121b989805..2d52d25556f 100644
  
  // Toggle Sidebar Visibility
  
-@@ -377,31 +378,49 @@ MenuRegistry.appendMenuItems([
+@@ -376,31 +378,49 @@ MenuRegistry.appendMenuItems([
  			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
  			order: 2
  		}
@@ -151,43 +173,6 @@ index b2c7e5f01c7..89b23969d9d 100644
  		id: MenuId.ViewTitleContext,
  		item: {
  			group: '3_workbench_layout_move',
-diff --git a/src/vs/workbench/browser/parts/panel/panelActions.ts b/src/vs/workbench/browser/parts/panel/panelActions.ts
-index 58491e544de..f356f8264e4 100644
---- a/src/vs/workbench/browser/parts/panel/panelActions.ts
-+++ b/src/vs/workbench/browser/parts/panel/panelActions.ts
-@@ -24,8 +24,8 @@ import { KeybindingWeight } from '../../../../platform/keybinding/common/keybind
- const maximizeIcon = registerIcon('panel-maximize', Codicon.chevronUp, localize('maximizeIcon', 'Icon to maximize a panel.'));
- const restoreIcon = registerIcon('panel-restore', Codicon.chevronDown, localize('restoreIcon', 'Icon to restore a panel.'));
- const closeIcon = registerIcon('panel-close', Codicon.close, localize('closeIcon', 'Icon to close a panel.'));
--const panelIcon = registerIcon('panel-layout-icon', Codicon.layoutPanel, localize('togglePanelOffIcon', 'Icon to toggle the panel off when it is on.'));
--const panelOffIcon = registerIcon('panel-layout-icon-off', Codicon.layoutPanelOff, localize('togglePanelOnIcon', 'Icon to toggle the panel on when it is off.'));
-+registerIcon('panel-layout-icon', Codicon.layoutPanel, localize('togglePanelOffIcon', 'Icon to toggle the panel off when it is on.'));
-+registerIcon('panel-layout-icon-off', Codicon.layoutPanelOff, localize('togglePanelOnIcon', 'Icon to toggle the panel on when it is off.'));
- 
- export class TogglePanelAction extends Action2 {
- 
-@@ -364,20 +364,8 @@ registerAction2(class extends Action2 {
- });
- 
- MenuRegistry.appendMenuItems([
-+	// RiteMark: Removed panel LayoutControlMenu toggle — replaced with editor layout controls
- 	{
--		id: MenuId.LayoutControlMenu,
--		item: {
--			group: '0_workbench_toggles',
--			command: {
--				id: TogglePanelAction.ID,
--				title: localize('togglePanel', "Toggle Panel"),
--				icon: panelOffIcon,
--				toggled: { condition: PanelVisibleContext, icon: panelIcon }
--			},
--			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
--			order: 1
--		}
--	}, {
- 		id: MenuId.ViewTitleContext,
- 		item: {
- 			group: '3_workbench_layout_move',
 diff --git a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
 index 01360d53f36..61d55173281 100644
 --- a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
@@ -226,66 +211,19 @@ index 01360d53f36..61d55173281 100644
 +	background-color: #e2e8f0;
 +	margin: 0 2px;
 +}
-diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-index 73d5b24d46b..75b05444528 100644
---- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-+++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-@@ -36,7 +36,7 @@ import { CommandCenterControl } from './commandCenterControl.js';
- import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
- import { WorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
- import { ACCOUNTS_ACTIVITY_ID, GLOBAL_ACTIVITY_ID } from '../../../common/activity.js';
--import { AccountsActivityActionViewItem, isAccountsActionVisible, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
-+import { AccountsActivityActionViewItem, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
- import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
- import { IEditorGroupsContainer, IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
- import { ActionRunner, IAction } from '../../../../base/common/actions.js';
-@@ -50,7 +50,7 @@ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
- import { EditorCommandsContextActionRunner } from '../editor/editorTabsControl.js';
- import { IEditorCommandsContext, IEditorPartOptionsChangeEvent, IToolbarActions } from '../../../common/editor.js';
- import { CodeWindow, mainWindow } from '../../../../base/browser/window.js';
--import { ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION } from './titlebarActions.js';
-+// import { ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION } from './titlebarActions.js'; // Ritemark: commented out with usage
- import { IView } from '../../../../base/browser/ui/grid/grid.js';
- import { createInstantHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
- import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
-@@ -654,12 +654,13 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
- 			}
- 
- 			// --- Activity Actions
--			if (this.activityActionsEnabled) {
--				if (isAccountsActionVisible(this.storageService)) {
--					actions.primary.push(ACCOUNTS_ACTIVITY_TILE_ACTION);
--				}
--				actions.primary.push(GLOBAL_ACTIVITY_TITLE_ACTION);
--			}
-+			// RiteMark: Hide accounts & manage gear from titlebar — Ritemark settings gear handles this
-+			// if (this.activityActionsEnabled) {
-+			// 	if (isAccountsActionVisible(this.storageService)) {
-+			// 		actions.primary.push(ACCOUNTS_ACTIVITY_TILE_ACTION);
-+			// 	}
-+			// 	actions.primary.push(GLOBAL_ACTIVITY_TITLE_ACTION);
-+			// }
- 
- 			this.actionToolBar.setActions(prepareActions(actions.primary), prepareActions(actions.secondary));
- 		};
 diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
-index 81f20484f87..97711d2e09e 100644
+index 30699b39a33..97711d2e09e 100644
 --- a/src/vs/workbench/browser/workbench.contribution.ts
 +++ b/src/vs/workbench/browser/workbench.contribution.ts
-@@ -614,10 +614,10 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+@@ -614,6 +614,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  				tags: ['accessibility'],
  				enum: ['on', 'off', 'auto']
  			},
--			// RiteMark: Hide layout controls by default - cleaner title bar for writing
 +			// RiteMark: Enable layout controls for editor layout + settings buttons
  			[LayoutSettings.LAYOUT_ACTIONS]: {
  				'type': 'boolean',
--				'default': false,
-+				'default': true,
- 				'markdownDescription': isWeb ?
- 					localize('layoutControlEnabledWeb', "Controls whether the layout control in the title bar is shown.") :
- 					localize({ key: 'layoutControlEnabled', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Controls whether the layout control is shown in the custom title bar. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
-@@ -630,7 +630,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+ 				'default': true,
+@@ -629,7 +630,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  					localize('layoutcontrol.type.toggles', "Shows several buttons for toggling the visibility of the panels and side bar."),
  					localize('layoutcontrol.type.both', "Shows both the dropdown and toggle buttons."),
  				],
@@ -294,3 +232,15 @@ index 81f20484f87..97711d2e09e 100644
  				'description': localize('layoutControlType', "Controls whether the layout control in the custom title bar is displayed as a single menu button or with multiple UI toggles."),
  			},
  			'workbench.tips.enabled': {
+@@ -678,9 +679,10 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+ 				'default': defaultWindowTitleSeparator,
+ 				'markdownDescription': localize("window.titleSeparator", "Separator used by {0}.", '`#window.title#`')
+ 			},
++			// RiteMark: Hide Command Center by default - cleaner title bar for writing
+ 			[LayoutSettings.COMMAND_CENTER]: {
+ 				type: 'boolean',
+-				default: true,
++				default: false,
+ 				markdownDescription: isWeb ?
+ 					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
+ 					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')

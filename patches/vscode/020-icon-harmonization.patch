@@ -1,59 +1,103 @@
-# RiteMark Patch: icon-harmonization
-#
-# Purpose: Replace remaining VS Code codicons with Lucide icons in all view containers
-#          (Terminal, Output, Markers, Outline, Timeline)
-#
-# Why: Unified icon language across the entire UI using Lucide icon set
-#
-# File(s): iconRegistry.ts, terminalIcons.ts, output.contribution.ts,
-#          markers.contribution.ts, outline.contribution.ts, timeline.contribution.ts
-# Created: 2026-02-13
-#
 diff --git a/src/vs/platform/theme/common/iconRegistry.ts b/src/vs/platform/theme/common/iconRegistry.ts
-index c40afcf6bae..e8824d2ec9d 100644
+index 279b30ba113..e8824d2ec9d 100644
 --- a/src/vs/platform/theme/common/iconRegistry.ts
 +++ b/src/vs/platform/theme/common/iconRegistry.ts
-@@ -22,12 +22,17 @@ const LucideIcons = {
- 	files: 0xe0cf,
- 	file: 0xe0c0,
- 	fileText: 0xe0cc,
+@@ -15,6 +15,26 @@ import { localize } from '../../../nls.js';
+ import { Extensions as JSONExtensions, IJSONContributionRegistry } from '../../jsonschemas/common/jsonContributionRegistry.js';
+ import * as platform from '../../registry/common/platform.js';
+ 
++// RiteMark: Lucide icon codes (from lucide-static font)
++const LucideIcons = {
++	folder: 0xe0d7,
++	folderOpen: 0xe247,
++	files: 0xe0cf,
++	file: 0xe0c0,
++	fileText: 0xe0cc,
 +	fileOutput: 0xe0c8,
- 	search: 0xe151,
- 	gitBranch: 0xe0e2,
- 	settings: 0xe154,
- 	user: 0xe19f,
- 	sparkle: 0xe47e,
- 	bookOpen: 0xe05f,
++	search: 0xe151,
++	gitBranch: 0xe0e2,
++	settings: 0xe154,
++	user: 0xe19f,
++	sparkle: 0xe47e,
++	bookOpen: 0xe05f,
 +	terminal: 0xe181,
 +	triangleAlert: 0xe193,
 +	clock: 0xe087,
 +	list: 0xe106,
- } as const;
-
++} as const;
++
  //  ------ API types
-@@ -350,12 +355,17 @@ export const Lucide = {
- 	files: { id: 'lucide-files' } as ThemeIcon,
- 	file: { id: 'lucide-file' } as ThemeIcon,
- 	fileText: { id: 'lucide-fileText' } as ThemeIcon,
+ 
+ 
+@@ -303,9 +323,51 @@ function initialize() {
+ 		const fontCharacter = '\\' + codiconFontCharacters[icon].toString(16);
+ 		iconRegistry.registerIcon(icon, { fontCharacter });
+ 	}
++
++	// RiteMark: Register Lucide font and icons
++	// The font is loaded via CSS, but we need to register it here for the icon system
++	// Note: We use a placeholder URI since the font is loaded via CSS @font-face
++	const lucideFontDefinition: IconFontDefinition = {
++		src: [] // Empty src - font is loaded via CSS in codicon.css
++	};
++	iconRegistry.registerIconFont('lucide', lucideFontDefinition);
++
++	// Store the font contribution for Lucide icons
++	const lucideFont: IconFontContribution = {
++		id: 'lucide',
++		definition: lucideFontDefinition
++	};
++
++	// Register Lucide icons
++	for (const [name, code] of Object.entries(LucideIcons)) {
++		iconRegistry.registerIcon(`lucide-${name}`, {
++			font: lucideFont,
++			fontCharacter: '\\' + code.toString(16)
++		});
++	}
+ }
+ initialize();
+ 
++// RiteMark: Export Lucide icons as ThemeIcons for use in activity bar, etc.
++export const Lucide = {
++	folder: { id: 'lucide-folder' } as ThemeIcon,
++	folderOpen: { id: 'lucide-folderOpen' } as ThemeIcon,
++	files: { id: 'lucide-files' } as ThemeIcon,
++	file: { id: 'lucide-file' } as ThemeIcon,
++	fileText: { id: 'lucide-fileText' } as ThemeIcon,
 +	fileOutput: { id: 'lucide-fileOutput' } as ThemeIcon,
- 	search: { id: 'lucide-search' } as ThemeIcon,
- 	gitBranch: { id: 'lucide-gitBranch' } as ThemeIcon,
- 	settings: { id: 'lucide-settings' } as ThemeIcon,
- 	user: { id: 'lucide-user' } as ThemeIcon,
- 	sparkle: { id: 'lucide-sparkle' } as ThemeIcon,
- 	bookOpen: { id: 'lucide-bookOpen' } as ThemeIcon,
++	search: { id: 'lucide-search' } as ThemeIcon,
++	gitBranch: { id: 'lucide-gitBranch' } as ThemeIcon,
++	settings: { id: 'lucide-settings' } as ThemeIcon,
++	user: { id: 'lucide-user' } as ThemeIcon,
++	sparkle: { id: 'lucide-sparkle' } as ThemeIcon,
++	bookOpen: { id: 'lucide-bookOpen' } as ThemeIcon,
 +	terminal: { id: 'lucide-terminal' } as ThemeIcon,
 +	triangleAlert: { id: 'lucide-triangleAlert' } as ThemeIcon,
 +	clock: { id: 'lucide-clock' } as ThemeIcon,
 +	list: { id: 'lucide-list' } as ThemeIcon,
- } as const;
-
++} as const;
++
  export const iconsSchemaId = 'vscode://schemas/icons';
+ 
+ const schemaRegistry = platform.Registry.as<IJSONContributionRegistry>(JSONExtensions.JSONContribution);
 diff --git a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
-index 35c070a2eca..284ffe819b0 100644
+index 5c1b30c121a..284ffe819b0 100644
 --- a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
 +++ b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
-@@ -31,7 +31,7 @@ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContaine
+@@ -21,8 +21,9 @@ import { IMarkersView } from './markers.js';
+ import { LifecyclePhase } from '../../../services/lifecycle/common/lifecycle.js';
+ import { IClipboardService } from '../../../../platform/clipboard/common/clipboardService.js';
+ import { Disposable, IDisposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
+-import { IStatusbarEntryAccessor, IStatusbarService, StatusbarAlignment, IStatusbarEntry } from '../../../services/statusbar/browser/statusbar.js';
+-import { IMarkerService, MarkerStatistics } from '../../../../platform/markers/common/markers.js';
++// RiteMark: Status bar imports commented out - Problems status bar item hidden
++// import { IStatusbarEntryAccessor, IStatusbarService, StatusbarAlignment, IStatusbarEntry } from '../../../services/statusbar/browser/statusbar.js';
++import { IMarkerService } from '../../../../platform/markers/common/markers.js';
+ import { ViewContainer, IViewContainersRegistry, Extensions as ViewContainerExtensions, ViewContainerLocation, IViewsRegistry } from '../../../common/views.js';
+ import { IViewsService } from '../../../services/views/common/viewsService.js';
+ import { getVisbileViewContextKey, FocusedViewContext } from '../../../common/contextkeys.js';
+@@ -30,11 +31,12 @@ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContaine
  import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
  import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
  import { Codicon } from '../../../../base/common/codicons.js';
@@ -62,17 +106,120 @@ index 35c070a2eca..284ffe819b0 100644
  import { ViewAction } from '../../../browser/parts/views/viewPane.js';
  import { IActivityService, NumberBadge } from '../../../services/activity/common/activity.js';
  import { viewFilterSubmenu } from '../../../browser/parts/views/viewFilter.js';
-@@ -125,7 +125,7 @@ Registry.as<IConfigurationRegistry>(Extensions.Configuration).registerConfigurat
+-import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
++// RiteMark: IConfigurationService import commented out - Problems status bar item hidden
++// import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+ import { problemsConfigurationNodeBase } from '../../../common/configuration.js';
+ 
+ KeybindingsRegistry.registerCommandAndKeybindingRule({
+@@ -123,7 +125,7 @@ Registry.as<IConfigurationRegistry>(Extensions.Configuration).registerConfigurat
  	}
  });
-
+ 
 -const markersViewIcon = registerIcon('markers-view-icon', Codicon.warning, localize('markersViewIcon', 'View icon of the markers view.'));
 +const markersViewIcon = registerIcon('markers-view-icon', Lucide.triangleAlert, localize('markersViewIcon', 'View icon of the markers view.'));
-
+ 
  // markers view container
  const VIEW_CONTAINER: ViewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer({
+@@ -534,6 +536,8 @@ registerAction2(class extends Action2 {
+ 	}
+ });
+ 
++// RiteMark: Hide Problems status bar item - entire class commented out
++/*
+ class MarkersStatusBarContributions extends Disposable implements IWorkbenchContribution {
+ 
+ 	private markersStatusItem: IStatusbarEntryAccessor;
+@@ -545,13 +549,12 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
+ 		@IConfigurationService private readonly configurationService: IConfigurationService
+ 	) {
+ 		super();
+-		this.markersStatusItem = this._register(this.statusbarService.addEntry(this.getMarkersItem(), 'status.problems', StatusbarAlignment.LEFT, 50 /* Medium Priority */));
++		this.markersStatusItem = this._register(this.statusbarService.addEntry(this.getMarkersItem(), 'status.problems', StatusbarAlignment.LEFT, 50));
+ 
+ 		const addStatusBarEntry = () => {
+ 			this.markersStatusItemOff = this.statusbarService.addEntry(this.getMarkersItemTurnedOff(), 'status.problemsVisibility', StatusbarAlignment.LEFT, 49);
+ 		};
+ 
+-		// Add the status bar entry if the problems is not visible
+ 		let config = this.configurationService.getValue('problems.visibility');
+ 		if (!config) {
+ 			addStatusBarEntry();
+@@ -564,8 +567,6 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
+ 		this._register(this.configurationService.onDidChangeConfiguration(e => {
+ 			if (e.affectsConfiguration('problems.visibility')) {
+ 				this.markersStatusItem.update(this.getMarkersItem());
+-
+-				// Update based on what setting was changed to.
+ 				config = this.configurationService.getValue('problems.visibility');
+ 				if (!config && !this.markersStatusItemOff) {
+ 					addStatusBarEntry();
+@@ -590,7 +591,6 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
+ 	}
+ 
+ 	private getMarkersItemTurnedOff(): IStatusbarEntry {
+-		// Update to true, config checked before `getMarkersItemTurnedOff` is called.
+ 		this.statusbarService.updateEntryVisibility('status.problemsVisibility', true);
+ 		const openSettingsCommand = 'workbench.action.openSettings';
+ 		const configureSettingsLabel = '@id:problems.visibility';
+@@ -609,42 +609,19 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
+ 		const errorTitle = (n: number) => localize('totalErrors', "Errors: {0}", n);
+ 		const warningTitle = (n: number) => localize('totalWarnings', "Warnings: {0}", n);
+ 		const infoTitle = (n: number) => localize('totalInfos', "Infos: {0}", n);
+-
+ 		const titles: string[] = [];
+-
+-		if (stats.errors > 0) {
+-			titles.push(errorTitle(stats.errors));
+-		}
+-
+-		if (stats.warnings > 0) {
+-			titles.push(warningTitle(stats.warnings));
+-		}
+-
+-		if (stats.infos > 0) {
+-			titles.push(infoTitle(stats.infos));
+-		}
+-
+-		if (titles.length === 0) {
+-			return localize('noProblems', "No Problems");
+-		}
+-
++		if (stats.errors > 0) { titles.push(errorTitle(stats.errors)); }
++		if (stats.warnings > 0) { titles.push(warningTitle(stats.warnings)); }
++		if (stats.infos > 0) { titles.push(infoTitle(stats.infos)); }
++		if (titles.length === 0) { return localize('noProblems', "No Problems"); }
+ 		return titles.join(', ');
+ 	}
+ 
+ 	private getMarkersText(stats: MarkerStatistics): string {
+ 		const problemsText: string[] = [];
+-
+-		// Errors
+ 		problemsText.push('$(error) ' + this.packNumber(stats.errors));
+-
+-		// Warnings
+ 		problemsText.push('$(warning) ' + this.packNumber(stats.warnings));
+-
+-		// Info (only if any)
+-		if (stats.infos > 0) {
+-			problemsText.push('$(info) ' + this.packNumber(stats.infos));
+-		}
+-
++		if (stats.infos > 0) { problemsText.push('$(info) ' + this.packNumber(stats.infos)); }
+ 		return problemsText.join(' ');
+ 	}
+ 
+@@ -655,6 +632,7 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
+ }
+ 
+ workbenchRegistry.registerWorkbenchContribution(MarkersStatusBarContributions, LifecyclePhase.Restored);
++*/
+ 
+ class ActivityUpdater extends Disposable implements IWorkbenchContribution {
+ 
 diff --git a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
-index eef090cd9a4..abf16b64698 100644
+index bb8dd6560d4..abf16b64698 100644
 --- a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
 +++ b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
 @@ -10,8 +10,7 @@ import { Registry } from '../../../../platform/registry/common/platform.js';
@@ -84,16 +231,25 @@ index eef090cd9a4..abf16b64698 100644
 +import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
  import { OutlineConfigKeys } from '../../../services/outline/browser/outline.js';
  import { IOutlinePane } from './outline.js';
-
+ 
 @@ -21,7 +20,7 @@ import './outlineActions.js';
-
+ 
  // --- view
-
+ 
 -const outlineViewIcon = registerIcon('outline-view-icon', Codicon.symbolClass, localize('outlineViewIcon', 'View icon of the outline view.'));
 +const outlineViewIcon = registerIcon('outline-view-icon', Lucide.list, localize('outlineViewIcon', 'View icon of the outline view.'));
-
+ 
  Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
  	id: IOutlinePane.Id,
+@@ -30,7 +29,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
+ 	ctorDescriptor: new SyncDescriptor(OutlinePane),
+ 	canToggleVisibility: true,
+ 	canMoveView: true,
+-	hideByDefault: false,
++	hideByDefault: true,
+ 	collapsed: true,
+ 	order: 2,
+ 	weight: 30,
 diff --git a/src/vs/workbench/contrib/output/browser/output.contribution.ts b/src/vs/workbench/contrib/output/browser/output.contribution.ts
 index a06d596b9b0..93997d19b5b 100644
 --- a/src/vs/workbench/contrib/output/browser/output.contribution.ts
@@ -109,7 +265,7 @@ index a06d596b9b0..93997d19b5b 100644
  import { IFilesConfigurationService } from '../../../services/filesConfiguration/common/filesConfigurationService.js';
 @@ -56,7 +56,7 @@ ModesRegistry.registerLanguage({
  });
-
+ 
  // register output container
 -const outputViewIcon = registerIcon('output-view-icon', Codicon.output, nls.localize('outputViewIcon', 'View icon of the output view.'));
 +const outputViewIcon = registerIcon('output-view-icon', Lucide.fileOutput, nls.localize('outputViewIcon', 'View icon of the output view.'));
@@ -121,19 +277,19 @@ index 128ffba2e27..e17fa4adafe 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
 @@ -5,9 +5,9 @@
-
+ 
  import { Codicon } from '../../../../base/common/codicons.js';
  import { localize } from '../../../../nls.js';
 -import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 +import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
-
+ 
 -export const terminalViewIcon = registerIcon('terminal-view-icon', Codicon.terminal, localize('terminalViewIcon', 'View icon of the terminal view.'));
 +export const terminalViewIcon = registerIcon('terminal-view-icon', Lucide.terminal, localize('terminalViewIcon', 'View icon of the terminal view.'));
-
+ 
  export const renameTerminalIcon = registerIcon('terminal-rename', Codicon.edit, localize('renameTerminalIcon', 'Icon for rename in the terminal quick menu.'));
  export const killTerminalIcon = registerIcon('terminal-kill', Codicon.trash, localize('killTerminalIcon', 'Icon for killing a terminal instance.'));
 diff --git a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
-index 3574e11e5f9..e8a9451b2e2 100644
+index 5fffc20c8a0..e8a9451b2e2 100644
 --- a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
 +++ b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
 @@ -19,11 +19,11 @@ import { ICommandHandler, CommandsRegistry } from '../../../../platform/commands
@@ -143,11 +299,20 @@ index 3574e11e5f9..e8a9451b2e2 100644
 -import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 +import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
  import { ILocalizedString } from '../../../../platform/action/common/action.js';
-
+ 
 -const timelineViewIcon = registerIcon('timeline-view-icon', Codicon.history, localize('timelineViewIcon', 'View icon of the timeline view.'));
 -const timelineOpenIcon = registerIcon('timeline-open', Codicon.history, localize('timelineOpenIcon', 'Icon for the open timeline action.'));
 +const timelineViewIcon = registerIcon('timeline-view-icon', Lucide.clock, localize('timelineViewIcon', 'View icon of the timeline view.'));
 +const timelineOpenIcon = registerIcon('timeline-open', Lucide.clock, localize('timelineOpenIcon', 'Icon for the open timeline action.'));
-
+ 
  export class TimelinePaneDescriptor implements IViewDescriptor {
  	readonly id = TimelinePaneId;
+@@ -34,7 +34,7 @@ export class TimelinePaneDescriptor implements IViewDescriptor {
+ 	readonly weight = 30;
+ 	readonly collapsed = true;
+ 	readonly canToggleVisibility = true;
+-	readonly hideByDefault = false;
++	readonly hideByDefault = true;
+ 	readonly canMoveView = true;
+ 	readonly when = TimelineHasProviderContext;
+ 
