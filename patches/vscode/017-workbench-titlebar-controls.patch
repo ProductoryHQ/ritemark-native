@@ -1,7 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ritemark <ritemark@productory.co>
+Date: Sun, 15 Feb 2026 13:38:17 
+Subject: [PATCH] RiteMark: Workbench titlebar controls, layout, and UI customization
+
+---
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
-@@ -375,35 +375,51 @@
+@@ -180,13 +180,14 @@
+ registerAction2(ToggleSidebarPositionAction);
+ 
+ const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
+-MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
+-	submenu: MenuId.LayoutControlMenuSubmenu,
+-	title: localize('configureLayout', "Configure Layout"),
+-	icon: configureLayoutIcon,
+-	group: '1_workbench_layout',
+-	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
+-});
++// RiteMark: Hide Configure Layout menu - too complex for writing app users
++// MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++// 	submenu: MenuId.LayoutControlMenuSubmenu,
++// 	title: localize('configureLayout', "Configure Layout"),
++// 	icon: configureLayoutIcon,
++// 	group: '1_workbench_layout',
++// 	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
++// });
+ 
+ 
+ MenuRegistry.appendMenuItems([{
+@@ -374,34 +375,50 @@
  				id: ToggleSidebarVisibilityAction.ID,
  				title: localize('compositePart.hideSideBarLabel', "Hide Primary Side Bar"),
  			},
@@ -25,11 +53,12 @@ diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbenc
 -				title: localize('toggleSideBar', "Toggle Primary Side Bar"),
 -				icon: panelLeftOffIcon,
 -				toggled: { condition: SideBarVisibleContext, icon: panelLeftIcon }
+-			},
+-			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')),
 +				title: localize('toggleLeftSidebar', "Toggle Left Sidebar"),
 +				icon: panelLeftIcon,
 +				toggled: { condition: SideBarVisibleContext }
- 			},
--			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')),
++			},
 +			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
  			order: 0
  		}
@@ -52,7 +81,7 @@ diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbenc
 -			order: 2
 +			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
 +			order: 1
- 		}
++		}
 +	}, {
 +		id: MenuId.LayoutControlMenu,
 +		item: {
@@ -64,11 +93,9 @@ diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbenc
 +			},
 +			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
 +			order: 0
-+		}
+ 		}
  	}
  ]);
- 
-
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
@@ -107,7 +134,6 @@ diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts 
  		id: MenuId.ViewTitleContext,
  		item: {
  			group: '3_workbench_layout_move',
-
 diff --git a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
 --- a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
 +++ b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
@@ -146,19 +172,23 @@ diff --git a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css b/sr
 +	background-color: #e2e8f0;
 +	margin: 0 2px;
 +}
-
 diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
 --- a/src/vs/workbench/browser/workbench.contribution.ts
 +++ b/src/vs/workbench/browser/workbench.contribution.ts
-@@ -615,6 +615,7 @@
+@@ -614,9 +614,11 @@
+ 				tags: ['accessibility'],
  				enum: ['on', 'off', 'auto']
  			},
- 			// RiteMark: Hide layout controls by default - cleaner title bar for writing
++			// RiteMark: Hide layout controls by default - cleaner title bar for writing
 +			// RiteMark: Enable layout controls for editor layout + settings buttons
  			[LayoutSettings.LAYOUT_ACTIONS]: {
  				'type': 'boolean',
- 				'default': false,
-@@ -630,7 +631,7 @@
+-				'default': true,
++				'default': false,
+ 				'markdownDescription': isWeb ?
+ 					localize('layoutControlEnabledWeb', "Controls whether the layout control in the title bar is shown.") :
+ 					localize({ key: 'layoutControlEnabled', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Controls whether the layout control is shown in the custom title bar. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
+@@ -629,7 +631,7 @@
  					localize('layoutcontrol.type.toggles', "Shows several buttons for toggling the visibility of the panels and side bar."),
  					localize('layoutcontrol.type.both', "Shows both the dropdown and toggle buttons."),
  				],
@@ -167,3 +197,17 @@ diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workben
  				'description': localize('layoutControlType', "Controls whether the layout control in the custom title bar is displayed as a single menu button or with multiple UI toggles."),
  			},
  			'workbench.tips.enabled': {
+@@ -678,9 +680,10 @@
+ 				'default': defaultWindowTitleSeparator,
+ 				'markdownDescription': localize("window.titleSeparator", "Separator used by {0}.", '`#window.title#`')
+ 			},
++			// RiteMark: Hide Command Center by default - cleaner title bar for writing
+ 			[LayoutSettings.COMMAND_CENTER]: {
+ 				type: 'boolean',
+-				default: true,
++				default: false,
+ 				markdownDescription: isWeb ?
+ 					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
+ 					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
+--
+2.39.0
