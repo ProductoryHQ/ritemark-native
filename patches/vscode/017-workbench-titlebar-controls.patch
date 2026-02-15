@@ -1,47 +1,16 @@
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index 8121b989805..3e1219022d1 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
-@@ -187,7 +187,7 @@ const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout
- // 	icon: configureLayoutIcon,
- // 	group: '1_workbench_layout',
- // 	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
--// });
-+// // });
- 
- 
- MenuRegistry.appendMenuItems([{
-@@ -302,12 +302,13 @@ registerAction2(class extends Action2 {
- 	}
- });
- 
--MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
--	group: '2_appearance',
--	title: localize({ key: 'miAppearance', comment: ['&& denotes a mnemonic'] }, "&&Appearance"),
--	submenu: MenuId.MenubarAppearanceMenu,
--	order: 1
--});
-+// RiteMark: Appearance submenu removed - not relevant for markdown editing
-+// MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
-+// 	group: '2_appearance',
-+// 	title: localize({ key: 'miAppearance', comment: ['&& denotes a mnemonic'] }, "&&Appearance"),
-+// 	submenu: MenuId.MenubarAppearanceMenu,
-+// 	order: 1
-+// });
- 
- // Toggle Sidebar Visibility
- 
-@@ -374,37 +375,54 @@ MenuRegistry.appendMenuItems([
+@@ -375,35 +375,51 @@
  				id: ToggleSidebarVisibilityAction.ID,
  				title: localize('compositePart.hideSideBarLabel', "Hide Primary Side Bar"),
  			},
 -			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
 -			order: 2
--		}
+ 		}
 -	}, {
 +	}
-+	}
-+	// RiteMark: Removed sidebar LayoutControlMenu toggles - replaced with editor layout controls below
++	// RiteMark: Removed sidebar LayoutControlMenu toggles — replaced with editor layout controls below
 +]);
 +
 +// RiteMark: Custom titlebar controls — left sidebar, right sidebar, Ritemark settings gear
@@ -83,7 +52,7 @@ index 8121b989805..3e1219022d1 100644
 -			order: 2
 +			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
 +			order: 1
-+		}
+ 		}
 +	}, {
 +		id: MenuId.LayoutControlMenu,
 +		item: {
@@ -95,18 +64,15 @@ index 8121b989805..3e1219022d1 100644
 +			},
 +			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
 +			order: 0
- 		}
++		}
  	}
  ]);
-+]);
  
- // --- Toggle Statusbar Visibility
- 
+
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-index b2c7e5f01c7..3c9089428b0 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-@@ -97,33 +97,8 @@ registerAction2(class FocusAuxiliaryBarAction extends Action2 {
+@@ -97,33 +97,8 @@
  });
  
  MenuRegistry.appendMenuItems([
@@ -141,14 +107,15 @@ index b2c7e5f01c7..3c9089428b0 100644
  		id: MenuId.ViewTitleContext,
  		item: {
  			group: '3_workbench_layout_move',
+
 diff --git a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
-index 01360d53f36..61d55173281 100644
 --- a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
 +++ b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
-@@ -472,3 +472,33 @@
+@@ -471,4 +471,34 @@
+ 	padding: 0 2px;
  	border-radius: 16px;
  	text-align: center;
- }
++}
 +
 +/* RiteMark: Titlebar layout control button styling */
 +.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label {
@@ -165,7 +132,7 @@ index 01360d53f36..61d55173281 100644
 +
 +.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label:hover {
 +	background-color: #f1f5f9;
-+}
+ }
 +
 +.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label.checked {
 +	background-color: #eef2ff;
@@ -179,11 +146,11 @@ index 01360d53f36..61d55173281 100644
 +	background-color: #e2e8f0;
 +	margin: 0 2px;
 +}
+
 diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
-index 81f20484f87..cab3b42a2a3 100644
 --- a/src/vs/workbench/browser/workbench.contribution.ts
 +++ b/src/vs/workbench/browser/workbench.contribution.ts
-@@ -615,6 +615,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+@@ -615,6 +615,7 @@
  				enum: ['on', 'off', 'auto']
  			},
  			// RiteMark: Hide layout controls by default - cleaner title bar for writing
@@ -191,7 +158,7 @@ index 81f20484f87..cab3b42a2a3 100644
  			[LayoutSettings.LAYOUT_ACTIONS]: {
  				'type': 'boolean',
  				'default': false,
-@@ -630,7 +631,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+@@ -630,7 +631,7 @@
  					localize('layoutcontrol.type.toggles', "Shows several buttons for toggling the visibility of the panels and side bar."),
  					localize('layoutcontrol.type.both', "Shows both the dropdown and toggle buttons."),
  				],
