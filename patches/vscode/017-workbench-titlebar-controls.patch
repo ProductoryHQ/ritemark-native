@@ -1,42 +1,17 @@
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index 5d7b93cfd86..2d52d25556f 100644
+index 8121b989805..3e1219022d1 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
-@@ -38,9 +38,9 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
- const activityBarLeftIcon = registerIcon('activity-bar-left', Codicon.layoutActivitybarLeft, localize('activityBarLeft', "Represents the activity bar in the left position"));
- const activityBarRightIcon = registerIcon('activity-bar-right', Codicon.layoutActivitybarRight, localize('activityBarRight', "Represents the activity bar in the right position"));
- const panelLeftIcon = registerIcon('panel-left', Codicon.layoutSidebarLeft, localize('panelLeft', "Represents a side bar in the left position"));
--const panelLeftOffIcon = registerIcon('panel-left-off', Codicon.layoutSidebarLeftOff, localize('panelLeftOff', "Represents a side bar in the left position toggled off"));
-+registerIcon('panel-left-off', Codicon.layoutSidebarLeftOff, localize('panelLeftOff', "Represents a side bar in the left position toggled off"));
- const panelRightIcon = registerIcon('panel-right', Codicon.layoutSidebarRight, localize('panelRight', "Represents side bar in the right position"));
--const panelRightOffIcon = registerIcon('panel-right-off', Codicon.layoutSidebarRightOff, localize('panelRightOff', "Represents side bar in the right position toggled off"));
-+registerIcon('panel-right-off', Codicon.layoutSidebarRightOff, localize('panelRightOff', "Represents side bar in the right position toggled off"));
- const panelIcon = registerIcon('panel-bottom', Codicon.layoutPanel, localize('panelBottom', "Represents the bottom panel"));
- const statusBarIcon = registerIcon('statusBar', Codicon.layoutStatusbar, localize('statusBarIcon', "Represents the status bar"));
- 
-@@ -180,13 +180,14 @@ export class ToggleSidebarPositionAction extends Action2 {
- registerAction2(ToggleSidebarPositionAction);
- 
- const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
--MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
--	submenu: MenuId.LayoutControlMenuSubmenu,
--	title: localize('configureLayout', "Configure Layout"),
--	icon: configureLayoutIcon,
--	group: '1_workbench_layout',
--	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
--});
-+// RiteMark: Hide Configure Layout menu - too complex for writing app users
-+// MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
-+// 	submenu: MenuId.LayoutControlMenuSubmenu,
-+// 	title: localize('configureLayout', "Configure Layout"),
-+// 	icon: configureLayoutIcon,
-+// 	group: '1_workbench_layout',
-+// 	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
-+// });
+@@ -187,7 +187,7 @@ const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout
+ // 	icon: configureLayoutIcon,
+ // 	group: '1_workbench_layout',
+ // 	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
+-// });
++// // });
  
  
  MenuRegistry.appendMenuItems([{
-@@ -301,12 +302,13 @@ registerAction2(class extends Action2 {
+@@ -302,12 +302,13 @@ registerAction2(class extends Action2 {
  	}
  });
  
@@ -56,11 +31,15 @@ index 5d7b93cfd86..2d52d25556f 100644
  
  // Toggle Sidebar Visibility
  
-@@ -376,31 +378,49 @@ MenuRegistry.appendMenuItems([
- 			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
- 			order: 2
- 		}
+@@ -374,37 +375,54 @@ MenuRegistry.appendMenuItems([
+ 				id: ToggleSidebarVisibilityAction.ID,
+ 				title: localize('compositePart.hideSideBarLabel', "Hide Primary Side Bar"),
+ 			},
+-			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
+-			order: 2
+-		}
 -	}, {
++	}
 +	}
 +	// RiteMark: Removed sidebar LayoutControlMenu toggles - replaced with editor layout controls below
 +]);
@@ -119,25 +98,14 @@ index 5d7b93cfd86..2d52d25556f 100644
  		}
  	}
  ]);
++]);
+ 
+ // --- Toggle Statusbar Visibility
+ 
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-index b2c7e5f01c7..89b23969d9d 100644
+index b2c7e5f01c7..3c9089428b0 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-@@ -18,10 +18,10 @@ import { KeybindingWeight } from '../../../../platform/keybinding/common/keybind
- import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
- 
- 
--const auxiliaryBarRightIcon = registerIcon('auxiliarybar-right-layout-icon', Codicon.layoutSidebarRight, localize('toggleAuxiliaryIconRight', 'Icon to toggle the auxiliary bar off in its right position.'));
--const auxiliaryBarRightOffIcon = registerIcon('auxiliarybar-right-off-layout-icon', Codicon.layoutSidebarRightOff, localize('toggleAuxiliaryIconRightOn', 'Icon to toggle the auxiliary bar on in its right position.'));
--const auxiliaryBarLeftIcon = registerIcon('auxiliarybar-left-layout-icon', Codicon.layoutSidebarLeft, localize('toggleAuxiliaryIconLeft', 'Icon to toggle the auxiliary bar in its left position.'));
--const auxiliaryBarLeftOffIcon = registerIcon('auxiliarybar-left-off-layout-icon', Codicon.layoutSidebarLeftOff, localize('toggleAuxiliaryIconLeftOn', 'Icon to toggle the auxiliary bar on in its left position.'));
-+registerIcon('auxiliarybar-right-layout-icon', Codicon.layoutSidebarRight, localize('toggleAuxiliaryIconRight', 'Icon to toggle the auxiliary bar off in its right position.'));
-+registerIcon('auxiliarybar-right-off-layout-icon', Codicon.layoutSidebarRightOff, localize('toggleAuxiliaryIconRightOn', 'Icon to toggle the auxiliary bar on in its right position.'));
-+registerIcon('auxiliarybar-left-layout-icon', Codicon.layoutSidebarLeft, localize('toggleAuxiliaryIconLeft', 'Icon to toggle the auxiliary bar in its left position.'));
-+registerIcon('auxiliarybar-left-off-layout-icon', Codicon.layoutSidebarLeftOff, localize('toggleAuxiliaryIconLeftOn', 'Icon to toggle the auxiliary bar on in its left position.'));
- 
- export class ToggleAuxiliaryBarAction extends Action2 {
- 
 @@ -97,33 +97,8 @@ registerAction2(class FocusAuxiliaryBarAction extends Action2 {
  });
  
@@ -212,18 +180,18 @@ index 01360d53f36..61d55173281 100644
 +	margin: 0 2px;
 +}
 diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
-index 30699b39a33..97711d2e09e 100644
+index 81f20484f87..cab3b42a2a3 100644
 --- a/src/vs/workbench/browser/workbench.contribution.ts
 +++ b/src/vs/workbench/browser/workbench.contribution.ts
-@@ -614,6 +614,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
- 				tags: ['accessibility'],
+@@ -615,6 +615,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  				enum: ['on', 'off', 'auto']
  			},
+ 			// RiteMark: Hide layout controls by default - cleaner title bar for writing
 +			// RiteMark: Enable layout controls for editor layout + settings buttons
  			[LayoutSettings.LAYOUT_ACTIONS]: {
  				'type': 'boolean',
- 				'default': true,
-@@ -629,7 +630,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+ 				'default': false,
+@@ -630,7 +631,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  					localize('layoutcontrol.type.toggles', "Shows several buttons for toggling the visibility of the panels and side bar."),
  					localize('layoutcontrol.type.both', "Shows both the dropdown and toggle buttons."),
  				],
@@ -232,15 +200,3 @@ index 30699b39a33..97711d2e09e 100644
  				'description': localize('layoutControlType', "Controls whether the layout control in the custom title bar is displayed as a single menu button or with multiple UI toggles."),
  			},
  			'workbench.tips.enabled': {
-@@ -678,9 +679,10 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
- 				'default': defaultWindowTitleSeparator,
- 				'markdownDescription': localize("window.titleSeparator", "Separator used by {0}.", '`#window.title#`')
- 			},
-+			// RiteMark: Hide Command Center by default - cleaner title bar for writing
- 			[LayoutSettings.COMMAND_CENTER]: {
- 				type: 'boolean',
--				default: true,
-+				default: false,
- 				markdownDescription: isWeb ?
- 					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
- 					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
