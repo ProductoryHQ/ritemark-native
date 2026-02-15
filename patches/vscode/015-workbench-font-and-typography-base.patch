@@ -119,61 +119,6 @@ index 6c9dbb9a0c9..2e16ef317c4 100644
  
  .mac { --monaco-monospace-font: "SF Mono", Monaco, Menlo, Courier, monospace; }
  .windows { --monaco-monospace-font: Consolas, "Courier New", monospace; }
-diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css
-index 5cd35545863..304d96f946a 100644
---- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css
-+++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css
-@@ -3,11 +3,6 @@
-    Productory Brand Guidelines Applied
-    ============================================ */
- 
--/* ----------------------------------------
--   Brand Fonts Import
--   ---------------------------------------- */
--@import url('https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
--
- /* ----------------------------------------
-    Brand Color Variables
-    ---------------------------------------- */
-@@ -25,13 +20,13 @@
-    Base Typography
-    ---------------------------------------- */
- .monaco-workbench .part.editor > .content .gettingStartedContainer {
--	font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-+	font-family: var(--ritemark-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif) !important;
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer h1,
- .monaco-workbench .part.editor > .content .gettingStartedContainer h2,
- .monaco-workbench .part.editor > .content .gettingStartedContainer h3 {
--	font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif !important;
-+	font-family: var(--ritemark-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif) !important;
- }
- 
- /* ----------------------------------------
-@@ -140,7 +135,7 @@
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .getting-started-guide-step .step-number {
--	font-family: 'Space Grotesk', var(--monaco-monospace-font), sans-serif;
-+	font-family: var(--ritemark-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
- 	font-size: 36px;
- 	font-weight: bold;
- 	line-height: 1;
-@@ -309,7 +304,7 @@
-    ---------------------------------------- */
- .monaco-workbench .part.editor > .content .gettingStartedContainer .index-list h2,
- .monaco-workbench .part.editor > .content .gettingStartedContainer .getting-started-guide h2 {
--	font-family: 'Space Grotesk', sans-serif !important;
-+	font-family: var(--ritemark-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif) !important;
- 	color: var(--productory-slate-600, #475569) !important;
- }
- 
-@@ -342,4 +337,3 @@
- .monaco-workbench .part.editor > .content .gettingStartedContainer .icon-widget {
- 	color: var(--productory-indigo, #4338ca) !important;
- }
--
 diff --git a/src/vs/workbench/browser/media/fonts/SofiaSans-latin.woff2 b/src/vs/workbench/browser/media/fonts/SofiaSans-latin.woff2
 new file mode 100644
 index 0000000000000000000000000000000000000000..bd363d3f2a281c21f0b547bd5e9606d7af21a917

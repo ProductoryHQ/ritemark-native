@@ -1,36 +1,108 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ritemark <ritemark@productory.co>
+Date: Sun, 15 Feb 2026 13:40:03 
+Subject: [PATCH] RiteMark: Icon harmonization with Lucide icons for sidebar and panel
+
+---
 diff --git a/src/vs/platform/theme/common/iconRegistry.ts b/src/vs/platform/theme/common/iconRegistry.ts
-index c40afcf6bae..01f60ddc9b9 100644
 --- a/src/vs/platform/theme/common/iconRegistry.ts
 +++ b/src/vs/platform/theme/common/iconRegistry.ts
-@@ -28,6 +28,11 @@ const LucideIcons = {
- 	user: 0xe19f,
- 	sparkle: 0xe47e,
- 	bookOpen: 0xe05f,
+@@ -15,6 +15,26 @@
+ import { Extensions as JSONExtensions, IJSONContributionRegistry } from '../../jsonschemas/common/jsonContributionRegistry.js';
+ import * as platform from '../../registry/common/platform.js';
+ 
++// RiteMark: Lucide icon codes (from lucide-static font)
++const LucideIcons = {
++	folder: 0xe0d7,
++	folderOpen: 0xe247,
++	files: 0xe0cf,
++	file: 0xe0c0,
++	fileText: 0xe0cc,
++	search: 0xe151,
++	gitBranch: 0xe0e2,
++	settings: 0xe154,
++	user: 0xe19f,
++	sparkle: 0xe47e,
++	bookOpen: 0xe05f,
 +	fileOutput: 0xe0c8,
 +	terminal: 0xe181,
 +	triangleAlert: 0xe193,
 +	clock: 0xe087,
 +	list: 0xe106,
- } as const;
- 
++} as const;
++
  //  ------ API types
-@@ -356,6 +361,11 @@ export const Lucide = {
- 	user: { id: 'lucide-user' } as ThemeIcon,
- 	sparkle: { id: 'lucide-sparkle' } as ThemeIcon,
- 	bookOpen: { id: 'lucide-bookOpen' } as ThemeIcon,
+ 
+ 
+@@ -302,10 +322,52 @@
+ 	for (const icon in codiconFontCharacters) {
+ 		const fontCharacter = '\\' + codiconFontCharacters[icon].toString(16);
+ 		iconRegistry.registerIcon(icon, { fontCharacter });
++	}
++
++	// RiteMark: Register Lucide font and icons
++	// The font is loaded via CSS, but we need to register it here for the icon system
++	// Note: We use a placeholder URI since the font is loaded via CSS @font-face
++	const lucideFontDefinition: IconFontDefinition = {
++		src: [] // Empty src - font is loaded via CSS in codicon.css
++	};
++	iconRegistry.registerIconFont('lucide', lucideFontDefinition);
++
++	// Store the font contribution for Lucide icons
++	const lucideFont: IconFontContribution = {
++		id: 'lucide',
++		definition: lucideFontDefinition
++	};
++
++	// Register Lucide icons
++	for (const [name, code] of Object.entries(LucideIcons)) {
++		iconRegistry.registerIcon(`lucide-${name}`, {
++			font: lucideFont,
++			fontCharacter: '\\' + code.toString(16)
++		});
+ 	}
+ }
+ initialize();
+ 
++// RiteMark: Export Lucide icons as ThemeIcons for use in activity bar, etc.
++export const Lucide = {
++	folder: { id: 'lucide-folder' } as ThemeIcon,
++	folderOpen: { id: 'lucide-folderOpen' } as ThemeIcon,
++	files: { id: 'lucide-files' } as ThemeIcon,
++	file: { id: 'lucide-file' } as ThemeIcon,
++	fileText: { id: 'lucide-fileText' } as ThemeIcon,
++	search: { id: 'lucide-search' } as ThemeIcon,
++	gitBranch: { id: 'lucide-gitBranch' } as ThemeIcon,
++	settings: { id: 'lucide-settings' } as ThemeIcon,
++	user: { id: 'lucide-user' } as ThemeIcon,
++	sparkle: { id: 'lucide-sparkle' } as ThemeIcon,
++	bookOpen: { id: 'lucide-bookOpen' } as ThemeIcon,
 +	fileOutput: { id: 'lucide-fileOutput' } as ThemeIcon,
 +	terminal: { id: 'lucide-terminal' } as ThemeIcon,
 +	triangleAlert: { id: 'lucide-triangleAlert' } as ThemeIcon,
 +	clock: { id: 'lucide-clock' } as ThemeIcon,
 +	list: { id: 'lucide-list' } as ThemeIcon,
- } as const;
- 
++} as const;
++
  export const iconsSchemaId = 'vscode://schemas/icons';
+ 
+ const schemaRegistry = platform.Registry.as<IJSONContributionRegistry>(JSONExtensions.JSONContribution);
 diff --git a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
-index 35c070a2eca..284ffe819b0 100644
 --- a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
 +++ b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
-@@ -31,7 +31,7 @@ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContaine
+@@ -21,8 +21,9 @@
+ import { LifecyclePhase } from '../../../services/lifecycle/common/lifecycle.js';
+ import { IClipboardService } from '../../../../platform/clipboard/common/clipboardService.js';
+ import { Disposable, IDisposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
+-import { IStatusbarEntryAccessor, IStatusbarService, StatusbarAlignment, IStatusbarEntry } from '../../../services/statusbar/browser/statusbar.js';
+-import { IMarkerService, MarkerStatistics } from '../../../../platform/markers/common/markers.js';
++// RiteMark: Status bar imports commented out - Problems status bar item hidden
++// import { IStatusbarEntryAccessor, IStatusbarService, StatusbarAlignment, IStatusbarEntry } from '../../../services/statusbar/browser/statusbar.js';
++import { IMarkerService } from '../../../../platform/markers/common/markers.js';
+ import { ViewContainer, IViewContainersRegistry, Extensions as ViewContainerExtensions, ViewContainerLocation, IViewsRegistry } from '../../../common/views.js';
+ import { IViewsService } from '../../../services/views/common/viewsService.js';
+ import { getVisbileViewContextKey, FocusedViewContext } from '../../../common/contextkeys.js';
+@@ -30,11 +31,12 @@
  import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
  import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
  import { Codicon } from '../../../../base/common/codicons.js';
@@ -39,7 +111,13 @@ index 35c070a2eca..284ffe819b0 100644
  import { ViewAction } from '../../../browser/parts/views/viewPane.js';
  import { IActivityService, NumberBadge } from '../../../services/activity/common/activity.js';
  import { viewFilterSubmenu } from '../../../browser/parts/views/viewFilter.js';
-@@ -125,7 +125,7 @@ Registry.as<IConfigurationRegistry>(Extensions.Configuration).registerConfigurat
+-import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
++// RiteMark: IConfigurationService import commented out - Problems status bar item hidden
++// import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+ import { problemsConfigurationNodeBase } from '../../../common/configuration.js';
+ 
+ KeybindingsRegistry.registerCommandAndKeybindingRule({
+@@ -123,7 +125,7 @@
  	}
  });
  
@@ -48,11 +126,107 @@ index 35c070a2eca..284ffe819b0 100644
  
  // markers view container
  const VIEW_CONTAINER: ViewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer({
+@@ -534,6 +536,8 @@
+ 	}
+ });
+ 
++// RiteMark: Hide Problems status bar item - entire class commented out
++/*
+ class MarkersStatusBarContributions extends Disposable implements IWorkbenchContribution {
+ 
+ 	private markersStatusItem: IStatusbarEntryAccessor;
+@@ -545,13 +549,12 @@
+ 		@IConfigurationService private readonly configurationService: IConfigurationService
+ 	) {
+ 		super();
+-		this.markersStatusItem = this._register(this.statusbarService.addEntry(this.getMarkersItem(), 'status.problems', StatusbarAlignment.LEFT, 50 /* Medium Priority */));
++		this.markersStatusItem = this._register(this.statusbarService.addEntry(this.getMarkersItem(), 'status.problems', StatusbarAlignment.LEFT, 50));
+ 
+ 		const addStatusBarEntry = () => {
+ 			this.markersStatusItemOff = this.statusbarService.addEntry(this.getMarkersItemTurnedOff(), 'status.problemsVisibility', StatusbarAlignment.LEFT, 49);
+ 		};
+ 
+-		// Add the status bar entry if the problems is not visible
+ 		let config = this.configurationService.getValue('problems.visibility');
+ 		if (!config) {
+ 			addStatusBarEntry();
+@@ -564,8 +567,6 @@
+ 		this._register(this.configurationService.onDidChangeConfiguration(e => {
+ 			if (e.affectsConfiguration('problems.visibility')) {
+ 				this.markersStatusItem.update(this.getMarkersItem());
+-
+-				// Update based on what setting was changed to.
+ 				config = this.configurationService.getValue('problems.visibility');
+ 				if (!config && !this.markersStatusItemOff) {
+ 					addStatusBarEntry();
+@@ -590,7 +591,6 @@
+ 	}
+ 
+ 	private getMarkersItemTurnedOff(): IStatusbarEntry {
+-		// Update to true, config checked before `getMarkersItemTurnedOff` is called.
+ 		this.statusbarService.updateEntryVisibility('status.problemsVisibility', true);
+ 		const openSettingsCommand = 'workbench.action.openSettings';
+ 		const configureSettingsLabel = '@id:problems.visibility';
+@@ -609,42 +609,19 @@
+ 		const errorTitle = (n: number) => localize('totalErrors', "Errors: {0}", n);
+ 		const warningTitle = (n: number) => localize('totalWarnings', "Warnings: {0}", n);
+ 		const infoTitle = (n: number) => localize('totalInfos', "Infos: {0}", n);
+-
+ 		const titles: string[] = [];
+-
+-		if (stats.errors > 0) {
+-			titles.push(errorTitle(stats.errors));
+-		}
+-
+-		if (stats.warnings > 0) {
+-			titles.push(warningTitle(stats.warnings));
+-		}
+-
+-		if (stats.infos > 0) {
+-			titles.push(infoTitle(stats.infos));
+-		}
+-
+-		if (titles.length === 0) {
+-			return localize('noProblems', "No Problems");
+-		}
+-
++		if (stats.errors > 0) { titles.push(errorTitle(stats.errors)); }
++		if (stats.warnings > 0) { titles.push(warningTitle(stats.warnings)); }
++		if (stats.infos > 0) { titles.push(infoTitle(stats.infos)); }
++		if (titles.length === 0) { return localize('noProblems', "No Problems"); }
+ 		return titles.join(', ');
+ 	}
+ 
+ 	private getMarkersText(stats: MarkerStatistics): string {
+ 		const problemsText: string[] = [];
+-
+-		// Errors
+ 		problemsText.push('$(error) ' + this.packNumber(stats.errors));
+-
+-		// Warnings
+ 		problemsText.push('$(warning) ' + this.packNumber(stats.warnings));
+-
+-		// Info (only if any)
+-		if (stats.infos > 0) {
+-			problemsText.push('$(info) ' + this.packNumber(stats.infos));
+-		}
+-
++		if (stats.infos > 0) { problemsText.push('$(info) ' + this.packNumber(stats.infos)); }
+ 		return problemsText.join(' ');
+ 	}
+ 
+@@ -655,6 +632,7 @@
+ }
+ 
+ workbenchRegistry.registerWorkbenchContribution(MarkersStatusBarContributions, LifecyclePhase.Restored);
++*/
+ 
+ class ActivityUpdater extends Disposable implements IWorkbenchContribution {
+ 
 diff --git a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
-index eef090cd9a4..abf16b64698 100644
 --- a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
 +++ b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
-@@ -10,8 +10,7 @@ import { Registry } from '../../../../platform/registry/common/platform.js';
+@@ -10,8 +10,7 @@
  import { IConfigurationRegistry, Extensions as ConfigurationExtensions, ConfigurationScope } from '../../../../platform/configuration/common/configurationRegistry.js';
  import { VIEW_CONTAINER } from '../../files/browser/explorerViewlet.js';
  import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
@@ -62,7 +236,7 @@ index eef090cd9a4..abf16b64698 100644
  import { OutlineConfigKeys } from '../../../services/outline/browser/outline.js';
  import { IOutlinePane } from './outline.js';
  
-@@ -21,7 +20,7 @@ import './outlineActions.js';
+@@ -21,7 +20,7 @@
  
  // --- view
  
@@ -71,11 +245,19 @@ index eef090cd9a4..abf16b64698 100644
  
  Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
  	id: IOutlinePane.Id,
+@@ -30,7 +29,7 @@
+ 	ctorDescriptor: new SyncDescriptor(OutlinePane),
+ 	canToggleVisibility: true,
+ 	canMoveView: true,
+-	hideByDefault: false,
++	hideByDefault: true,
+ 	collapsed: true,
+ 	order: 2,
+ 	weight: 30,
 diff --git a/src/vs/workbench/contrib/output/browser/output.contribution.ts b/src/vs/workbench/contrib/output/browser/output.contribution.ts
-index a06d596b9b0..93997d19b5b 100644
 --- a/src/vs/workbench/contrib/output/browser/output.contribution.ts
 +++ b/src/vs/workbench/contrib/output/browser/output.contribution.ts
-@@ -25,7 +25,7 @@ import { AUX_WINDOW_GROUP, AUX_WINDOW_GROUP_TYPE, IEditorService } from '../../.
+@@ -25,7 +25,7 @@
  import { assertIsDefined } from '../../../../base/common/types.js';
  import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
  import { Codicon } from '../../../../base/common/codicons.js';
@@ -84,7 +266,7 @@ index a06d596b9b0..93997d19b5b 100644
  import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
  import { Disposable, dispose, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
  import { IFilesConfigurationService } from '../../../services/filesConfiguration/common/filesConfigurationService.js';
-@@ -56,7 +56,7 @@ ModesRegistry.registerLanguage({
+@@ -56,7 +56,7 @@
  });
  
  // register output container
@@ -94,7 +276,6 @@ index a06d596b9b0..93997d19b5b 100644
  	id: OUTPUT_VIEW_ID,
  	title: nls.localize2('output', "Output"),
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts b/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
-index 128ffba2e27..e17fa4adafe 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
 @@ -5,9 +5,9 @@
@@ -110,10 +291,9 @@ index 128ffba2e27..e17fa4adafe 100644
  export const renameTerminalIcon = registerIcon('terminal-rename', Codicon.edit, localize('renameTerminalIcon', 'Icon for rename in the terminal quick menu.'));
  export const killTerminalIcon = registerIcon('terminal-kill', Codicon.trash, localize('killTerminalIcon', 'Icon for killing a terminal instance.'));
 diff --git a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
-index 3574e11e5f9..e8a9451b2e2 100644
 --- a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
 +++ b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
-@@ -19,11 +19,11 @@ import { ICommandHandler, CommandsRegistry } from '../../../../platform/commands
+@@ -19,11 +19,11 @@
  import { ExplorerFolderContext } from '../../files/common/files.js';
  import { ResourceContextKey } from '../../../common/contextkeys.js';
  import { Codicon } from '../../../../base/common/codicons.js';
@@ -128,3 +308,14 @@ index 3574e11e5f9..e8a9451b2e2 100644
  
  export class TimelinePaneDescriptor implements IViewDescriptor {
  	readonly id = TimelinePaneId;
+@@ -34,7 +34,7 @@
+ 	readonly weight = 30;
+ 	readonly collapsed = true;
+ 	readonly canToggleVisibility = true;
+-	readonly hideByDefault = false;
++	readonly hideByDefault = true;
+ 	readonly canMoveView = true;
+ 	readonly when = TimelineHasProviderContext;
+ 
+--
+2.39.0
