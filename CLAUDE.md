@@ -71,11 +71,14 @@ We customize VS Code via **patch files** (not direct submodule edits). This allo
 4.  **Before updating VS Code**: Run `./scripts/update-vscode.sh --check` to test
     
 
-### Current Patches
+### Current Patches (4 consolidated)
 
 | Patch | Purpose |
 | --- | --- |
-| `001-terminal-default-to-right-sidebar.patch` | Terminal opens in right sidebar by default |
+| `001-ritemark-branding.patch` | Theme, fonts, icons, welcome page, about dialog, breadcrumbs |
+| `002-ritemark-ui-layout.patch` | Sidebar, titlebar, tabs, explorer, panels |
+| `003-ritemark-menu-cleanup.patch` | Hide VS Code developer features (chat, debug, go menu, etc.) |
+| `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
 
 * * *
 
