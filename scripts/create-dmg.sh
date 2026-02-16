@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# create-dmg.sh - Create macOS DMG installer for RiteMark Native
+# create-dmg.sh - Create macOS DMG installer for Ritemark Native
 #
 # Usage:
 #   ./scripts/create-dmg.sh       # Create DMG for Apple Silicon (default)
@@ -12,7 +12,7 @@
 #
 # Requirements:
 #   - brew install create-dmg
-#   - Built app at VSCode-darwin-{arch}/RiteMark.app
+#   - Built app at VSCode-darwin-{arch}/Ritemark.app
 #
 
 set -e
@@ -45,12 +45,12 @@ esac
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_PATH="$PROJECT_ROOT/VSCode-darwin-$ARCH/RiteMark.app"
+APP_PATH="$PROJECT_ROOT/VSCode-darwin-$ARCH/Ritemark.app"
 ICON_PATH="$PROJECT_ROOT/branding/icons/icon.icns"
 OUTPUT_DIR="$PROJECT_ROOT/dist"
 
 echo "========================================"
-echo "RiteMark Native - DMG Creator"
+echo "Ritemark Native - DMG Creator"
 echo "========================================"
 echo "Architecture: darwin-$ARCH"
 echo
@@ -81,7 +81,7 @@ if [ ! -f "$ICON_PATH" ]; then
 fi
 echo "  ✓ Icon found"
 
-# Extract ritemarkVersion from branding/product.json (RiteMark version, not VS Code)
+# Extract ritemarkVersion from branding/product.json (Ritemark version, not VS Code)
 echo
 echo "[2/5] Extracting version..."
 VERSION=$(grep '"ritemarkVersion"' "$PROJECT_ROOT/branding/product.json" | sed 's/.*"ritemarkVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
@@ -97,7 +97,7 @@ echo "[3/5] Preparing output directory..."
 mkdir -p "$OUTPUT_DIR"
 
 # DMG filename
-DMG_NAME="RiteMark-${VERSION}-darwin-$ARCH.dmg"
+DMG_NAME="Ritemark-${VERSION}-darwin-$ARCH.dmg"
 DMG_PATH="$OUTPUT_DIR/$DMG_NAME"
 
 # Remove existing DMG if present
@@ -112,13 +112,13 @@ echo "[4/5] Creating DMG..."
 echo "  This may take a minute..."
 
 create-dmg \
-    --volname "RiteMark" \
+    --volname "Ritemark" \
     --volicon "$ICON_PATH" \
     --window-pos 200 120 \
     --window-size 800 400 \
     --icon-size 100 \
-    --icon "RiteMark.app" 200 190 \
-    --hide-extension "RiteMark.app" \
+    --icon "Ritemark.app" 200 190 \
+    --hide-extension "Ritemark.app" \
     --app-drop-link 600 185 \
     --no-internet-enable \
     "$DMG_PATH" \

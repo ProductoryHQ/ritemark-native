@@ -6,7 +6,7 @@ Enhance the AI chat experience with advanced UX features: subagent visualization
 
 ## Feature Flag Check
 
-- [x] Does this sprint need a feature flag? -   YES for some features:      -   **Subagent GUI**: Extends existing Claude Code agent (already gated by `agentic-assistant` flag)      -   **Chat Histories**: No flag needed (non-destructive, always useful)      -   **@ Agent Mentions & Drag-Drop**: No flag needed (enhances existing chat input)      -   **Slash Commands**: No flag needed (enhances existing chat input)      -   **Chat Font Size**: No flag needed (settings feature)
+- [x] Does this sprint need a feature flag? - YES for some features: - **Subagent GUI**: Extends existing Claude Code agent (already gated by `agentic-assistant` flag) - **Chat Histories**: No flag needed (non-destructive, always useful) - **@ Agent Mentions & Drag-Drop**: No flag needed (enhances existing chat input) - **Slash Commands**: No flag needed (enhances existing chat input) - **Chat Font Size**: No flag needed (settings feature)
 
 **Result:** No NEW feature flag required. Subagent features inherit the existing `agentic-assistant` flag.
 
@@ -56,19 +56,20 @@ Enhance the AI chat experience with advanced UX features: subagent visualization
 
 **Research Summary:**
 
-1. **SDK Subagent Support:** The SDK provides `SDKTaskNotificationMessage`, `SDKToolProgressMessage` with `parent_tool_use_id`, `SubagentStart`/`SubagentStop` hooks, and `AgentInput` tool schema. Subagents are spawned via the `Agent` tool.
-
-2. **State Structure:** Zustand store with `agentConversation: AgentConversationTurn[]`. Each turn has `activities`, `result`, `isRunning`, etc. Need to add `subagents?: SubagentProgress[]`.
-
-3. **VS Code State:** `vscode.getState()`/`setState()` persists across hide/show. For chat histories, use localStorage with 5-10MB limit and cleanup strategy.
-
-4. **Drag & Drop:** Webviews cannot directly receive Explorer drops. Need extension-side handling via `vscode.DataTransfer` API, forward URIs to webview.
-
-5. **@ Mentions:** Custom autocomplete with trigger detection, cursor positioning, keyboard navigation. Can reference TipTap mention extension pattern.
-
-6. **Slash Commands:** `/` at line start triggers menu. SDK exposes `Query.supportedCommands()`. Custom commands for summarize, translate, rewrite, expand, fix.
-
-7. **Font Handling:** Currently hardcoded 12px/11px. Need CSS variable `--chat-font-size` applied from settings.
+1.  **SDK Subagent Support:** The SDK provides `SDKTaskNotificationMessage`, `SDKToolProgressMessage` with `parent_tool_use_id`, `SubagentStart`/`SubagentStop` hooks, and `AgentInput` tool schema. Subagents are spawned via the `Agent` tool.
+    
+2.  **State Structure:** Zustand store with `agentConversation: AgentConversationTurn[]`. Each turn has `activities`, `result`, `isRunning`, etc. Need to add `subagents?: SubagentProgress[]`.
+    
+3.  **VS Code State:** `vscode.getState()`/`setState()` persists across hide/show. For chat histories, use localStorage with 5-10MB limit and cleanup strategy.
+    
+4.  **Drag & Drop:** Webviews cannot directly receive Explorer drops. Need extension-side handling via `vscode.DataTransfer` API, forward URIs to webview.
+    
+5.  **@ Mentions:** Custom autocomplete with trigger detection, cursor positioning, keyboard navigation. Can reference TipTap mention extension pattern.
+    
+6.  **Slash Commands:** `/` at line start triggers menu. SDK exposes `Query.supportedCommands()`. Custom commands for summarize, translate, rewrite, expand, fix.
+    
+7.  **Font Handling:** Currently hardcoded 12px/11px. Need CSS variable `--chat-font-size` applied from settings.
+    
 
 ### Phase 2: Subagent GUI
 
@@ -107,8 +108,8 @@ Persistent conversation management so users can browse and resume past chats.
 
 #### 3.1 Storage Layer
 
-- [x] Create `chatHistoryStorage.ts` in webview: -   `saveConversation(id, data)`: Save to localStorage      -   `loadConversation(id)`: Load from localStorage      -   `listConversations()`: List all saved with metadata      -   `deleteConversation(id)`: Remove from storage      -   `generateId()`: Unique conversation ID
-- [x] Define storage schema: ```typescript interface SavedConversation {   id: string;   title: string;        // First user message or generated   agentId: AgentId;   createdAt: number;   updatedAt: number;   turns: AgentConversationTurn[] | ChatMessage[]; } ```
+- [x] Create `chatHistoryStorage.ts` in webview: - `saveConversation(id, data)`: Save to localStorage - `loadConversation(id)`: Load from localStorage - `listConversations()`: List all saved with metadata - `deleteConversation(id)`: Remove from storage - `generateId()`: Unique conversation ID
+- [x] Define storage schema: `typescript interface SavedConversation { id: string; title: string; // First user message or generated agentId: AgentId; createdAt: number; updatedAt: number; turns: AgentConversationTurn[] | ChatMessage[]; }`
 - [x] Handle localStorage limits (5-10MB typical) with cleanup strategy
 
 #### 3.2 Store Integration
@@ -124,7 +125,7 @@ Persistent conversation management so users can browse and resume past chats.
 
 #### 3.3 History Browser UI
 
-- [x] Create `ChatHistoryPanel.tsx`: -   List of saved conversations      -   Date grouping (Today, Yesterday, This Week, Older)      -   Title + timestamp + agent badge      -   Click to resume conversation      -   Delete button with confirmation      -   "New Chat" button at top
+- [x] Create `ChatHistoryPanel.tsx`: - List of saved conversations - Date grouping (Today, Yesterday, This Week, Older) - Title + timestamp + agent badge - Click to resume conversation - Delete button with confirmation - "New Chat" button at top
 - [x] Add history toggle button to `AISidebar.tsx` header
 - [x] Animate panel slide-in/out
 - [x] Empty state for no history
@@ -163,7 +164,9 @@ Two ways to add context to chat: `@agent` mentions for routing to specialized ag
 - [x] `parseMentions()` extracts `@agent` mentions from input
 - [x] Dropped file paths are prepended to the message as `[File: /path/to/file]` format
 - [x] Mentioned agents shown as visual badges above input
-- **Note:** Agent routing to specific system prompts is handled by Claude Code itself (agents are in `.claude/agents/`)
+
+-   **Note:** Agent routing to specific system prompts is handled by Claude Code itself (agents are in `.claude/agents/`)
+    
 
 ### Phase 5: Slash Commands
 
@@ -279,21 +282,33 @@ localStorage typically has 5-10MB limit. Conversation storage strategy:
 
 ### @ Agent Mention Resolution
 
-**`@agent` behavior:**
-- Message is sent to Claude Code with the agent's system prompt prepended
-- Agent system prompts live in `.claude/agents/{agent-id}.md`
-- Available agents: `sprint-manager`, `vscode-expert`, `webview-expert`, `qa-validator`, `release-manager`, `product-marketer`, `ux-expert`, `knowledge-builder`
-- Example: `@sprint-manager create sprint 38 for dark mode` → Claude Code receives the sprint-manager agent instructions + user message
-- Multiple `@agent` mentions in one message: each agent runs as a parallel subagent (visible in Subagent GUI)
+`@agent` **behavior:**
+
+-   Message is sent to Claude Code with the agent's system prompt prepended
+    
+-   Agent system prompts live in `.claude/agents/{agent-id}.md`
+    
+-   Available agents: `sprint-manager`, `vscode-expert`, `webview-expert`, `qa-validator`, `release-manager`, `product-marketer`, `ux-expert`, `knowledge-builder`
+    
+-   Example: `@sprint-manager create sprint 38 for dark mode` → Claude Code receives the sprint-manager agent instructions + user message
+    
+-   Multiple `@agent` mentions in one message: each agent runs as a parallel subagent (visible in Subagent GUI)
+    
 
 ### Drag & Drop File Context
 
 **How it works:**
-- User drags file/folder from VS Code Explorer into chat input area
-- Drop event extracts the VS Code URI → converts to workspace-relative path
-- Path is inserted into the message as a styled chip (e.g., `src/extension.ts`)
-- When sent, the path is included as plain text in the message — Claude Code uses its own Read/Glob tools to access the file
-- No file content is read or injected by Ritemark — keeps it simple and avoids size limits
+
+-   User drags file/folder from VS Code Explorer into chat input area
+    
+-   Drop event extracts the VS Code URI → converts to workspace-relative path
+    
+-   Path is inserted into the message as a styled chip (e.g., `src/extension.ts`)
+    
+-   When sent, the path is included as plain text in the message — Claude Code uses its own Read/Glob tools to access the file
+    
+-   No file content is read or injected by Ritemark — keeps it simple and avoids size limits
+    
 
 ### Slash Command Context
 
@@ -331,26 +346,39 @@ Commands have access to:
 
 ## Status
 
-**Current Phase:** 7 (TESTING & POLISH)
+**Current Phase:** 7 (TESTING & POLISH)  
 **Approval Required:** No (Jarmo approved full sprint)
 
 ### Implementation Summary (Phases 4-6 completed)
 
 **Phase 4 - @ Agent Mentions & Drag-and-Drop:**
-- Created `AgentMentionPopup.tsx` and `agentRegistry.ts`
-- Updated `ChatInput.tsx` with `@` detection, mention popup, drag-and-drop support
-- Path chips for dropped files, agent badges for mentions
+
+-   Created `AgentMentionPopup.tsx` and `agentRegistry.ts`
+    
+-   Updated `ChatInput.tsx` with `@` detection, mention popup, drag-and-drop support
+    
+-   Path chips for dropped files, agent badges for mentions
+    
 
 **Phase 5 - Slash Commands:**
-- Created `SlashCommandPopup.tsx` and `slashCommands.ts`
-- 8 built-in commands: summarize, translate, rewrite, expand, fix, explain, outline, simplify
-- Updated `ChatInput.tsx` with `/` detection and command execution
+
+-   Created `SlashCommandPopup.tsx` and `slashCommands.ts`
+    
+-   8 built-in commands: summarize, translate, rewrite, expand, fix, explain, outline, simplify
+    
+-   Updated `ChatInput.tsx` with `/` detection and command execution
+    
 
 **Phase 6 - Chat Font Size:**
-- Added `ritemark.chat.fontSize` setting to `package.json`
-- Added Chat Appearance section to `RitemarkSettings.tsx` with slider and preview
-- Updated `store.ts`, `ChatMessage.tsx`, `AgentResponse.tsx` to use `--chat-font-size` CSS variable
-- NOTE: Extension-side wiring (UnifiedViewProvider) still needed to send setting to webview
+
+-   Added `ritemark.chat.fontSize` setting to `package.json`
+    
+-   Added Chat Appearance section to `RitemarkSettings.tsx` with slider and preview
+    
+-   Updated `store.ts`, `ChatMessage.tsx`, `AgentResponse.tsx` to use `--chat-font-size` CSS variable
+    
+-   NOTE: Extension-side wiring (UnifiedViewProvider) still needed to send setting to webview
+    
 
 ## Approval
 

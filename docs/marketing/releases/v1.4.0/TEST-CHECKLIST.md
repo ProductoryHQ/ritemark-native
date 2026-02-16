@@ -3,61 +3,64 @@
 **Release:** Ritemark v1.4.0  
 **Date:** 2026-02-14
 
----
+* * *
 
 ## macOS Apple Silicon (darwin-arm64)
 
 ### New Features: Claude Code Agent
 
-- [ ] Enable feature: Settings > Ritemark Features > Agentic AI Assistant
-- [ ] Agent selector dropdown shows "Claude Code" option when enabled
-- [ ] Select Claude Code + Sonnet model
-- [ ] Send a message — activity feed shows progress cards
-- [ ] Multi-turn conversation — follow-up messages work (~2-3s response)
-- [ ] Paste screenshot with Cmd+V — thumbnail appears in chat
-- [ ] File paths in responses are clickable
-- [ ] Stop button interrupts running agent
-- [ ] "New Chat" clears conversation
+- [x] Enable feature: Settings > Ritemark Features > Agentic AI Assistant
+- [x] Agent selector dropdown shows "Claude Code" option when enabled
+- [x] Select Claude Code + Sonnet model
+- [x] Send a message — activity feed shows progress cards
+- [x] Multi-turn conversation — follow-up messages work (~2-3s response)
+- [x] Paste screenshot with Cmd+V — thumbnail appears in chat
+- [x] File paths in responses are clickable
+- [x] Stop button interrupts running agent
+- [x] "New Chat" clears conversation
 
 ### New Features: Visual Design
 
-- [ ] UI text uses Sofia Sans font (not system font)
-- [ ] Color theme: light gray sidebar, white editor, indigo accents
-- [ ] Sidebar tabs appear as horizontal bar at top of sidebar
-- [ ] Breadcrumbs ribbon is smaller/slimmer
-- [ ] Icons look consistent/harmonized
+- [x] UI text uses Sofia Sans font (not system font)
+- [x] Color theme: light gray sidebar, white editor, indigo accents
+- [x] Sidebar tabs appear as horizontal bar at top of sidebar
+- [x] Breadcrumbs ribbon is smaller/slimmer
+- [x] Icons look consistent/harmonized
 
 ### New Features: CSV Editing
 
-- [ ] Open a CSV file
-- [ ] Click cell to select — blue border appears
-- [ ] Double-click or type to edit — full cell content visible
-- [ ] Press Enter to commit, Esc to cancel
-- [ ] Press Tab to move to next cell
-- [ ] Cmd+C copies cell content
-- [ ] Cmd+V pastes into active cell
-- [ ] Add column: click + button in header row
-- [ ] Rename column: double-click column header
-- [ ] Delete column: click header, click red minus button
+- [x] Open a CSV file
+- [x] Click cell to select — blue border appears
+- [x] Double-click or type to edit — full cell content visible
+  - [ ] Double click not working - but that is not blocker!
+- [x] Press Enter to commit, Esc to cancel
+- [x] Press Tab to move to next cell
+- [x] Cmd+C copies cell content
+- [x] Cmd+V pastes into active cell
+- [x] Add column: click + button in header row
+- [x] Rename column: double-click column header
+- [x] Delete column: click header, click red minus button
 
 ### Bug Fixes
 
-- [ ] Cmd+B toggles Bold in editor (not sidebar)
+- [ ] Cmd+B toggles **Bold** in editor (not sidebar)
+  - [ ] Still not working - but that's not a blocker
 - [ ] Terminal does NOT auto-open on window launch
-- [ ] PDF export includes images correctly
-- [ ] Word export includes images with correct aspect ratio
+  - [ ] Still not working - not a blocker
+- [x] PDF export includes images correctly
+- [x] Word export includes images with correct aspect ratio
 
 ### Core Features (Regression)
 
-- [ ] Open .md file — TipTap editor loads
-- [ ] Type text, formatting works (bold, italic, headings)
-- [ ] Save file (Cmd+S)
-- [ ] Open PDF — preview loads with zoom controls
-- [ ] Open DOCX — preview shows with colors/formatting
-- [ ] Open Excel (.xlsx) — preview loads with sheet tabs
-- [ ] Ritemark Agent chat works (non-Claude Code)
-- [ ] Export PDF — file saves correctly
-- [ ] Export Word — file saves correctly
+- [x] Open .md file — TipTap editor loads
+- [x] Type text, formatting works (**bold**, *italic*, headings)
+- [x] Save file (Cmd+S)
+- [x] Open PDF — preview loads with zoom controls
+- [x] Open DOCX — preview shows with colors/formatting
+- [x] Open Excel (.xlsx) — preview loads with sheet tabs
+- [x] Ritemark Agent chat works (non-Claude Code)
+- [x] Export PDF — file saves correctly
+- [x] Export Word — file saves correctly
 
 ### Installation
 
@@ -65,7 +68,7 @@
 - [ ] App launches from /Applications
 - [ ] No crashes on startup
 
----
+* * *
 
 ## macOS Intel (darwin-x64)
 
@@ -109,7 +112,7 @@
 - [ ] App runs from /Applications
 - [ ] Rosetta NOT required (native Intel binary)
 
----
+* * *
 
 ## Windows (x64)
 
@@ -151,12 +154,12 @@
 - [ ] App launches from Start Menu
 - [ ] No crashes on startup
 
----
+* * *
 
 ## Sign-off
 
 | Platform | Tester | Date | Status |
-|----------|--------|------|--------|
-| macOS Apple Silicon | | | |
-| macOS Intel | | | |
-| Windows | | | |
+| --- | --- | --- | --- |
+| macOS Apple Silicon |  |  |  |
+| macOS Intel |  |  |  |
+| Windows |  |  |  |
