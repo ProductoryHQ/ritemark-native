@@ -292,6 +292,7 @@ export function Editor({
   const lastExternalValue = useRef(value)
   const lastOnChangeValue = useRef<string>('')
   const lastImageMappingsRef = useRef<Record<string, string>>({})
+  const pendingImagePosRef = useRef<number | null>(null)
 
   // State for external link editing (triggered by clicking links)
   const [externalLinkEdit, setExternalLinkEdit] = useState<{ url: string } | null>(null)
@@ -591,23 +592,29 @@ export function Editor({
     }
   }, [editorSelection, onSelectionChange])
 
+  // Listen for pending image position from slash command
+  useEffect(() => {
+    const handler = ((e: CustomEvent) => {
+      pendingImagePosRef.current = e.detail as number
+    }) as EventListener
+    window.addEventListener('image:pending-position', handler)
+    return () => window.removeEventListener('image:pending-position', handler)
+  }, [])
+
   // Listen for messages from extension (image upload, file changes)
   useEffect(() => {
     if (!editor) return
 
     const handleMessage = (message: { type: string; path?: string; displaySrc?: string; error?: string; filename?: string; isDirty?: boolean }) => {
       if (message.type === 'imageSaved' && message.displaySrc && message.path) {
-        // Check if current paragraph is empty - if so, delete it first
-        // This prevents empty lines when inserting images via /image command
-        const { $from } = editor.state.selection
-        const currentNode = $from.parent
-        const isEmptyParagraph = currentNode.type.name === 'paragraph' && currentNode.content.size === 0
+        const savedPos = pendingImagePosRef.current
+        pendingImagePosRef.current = null
 
-        if (isEmptyParagraph) {
-          // Delete empty paragraph, then insert image
+        if (savedPos !== null && savedPos <= editor.state.doc.content.size) {
+          // Insert at the saved slash command position
           editor.chain()
             .focus()
-            .deleteNode('paragraph')
+            .setTextSelection(savedPos)
             .setImage({
               src: message.displaySrc,
               alt: '',
@@ -615,7 +622,7 @@ export function Editor({
             })
             .run()
         } else {
-          // Just insert image at cursor
+          // Fallback: insert at current cursor
           editor.chain()
             .focus()
             .setImage({

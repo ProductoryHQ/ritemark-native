@@ -5,7 +5,7 @@ import tippy from 'tippy.js'
 import type { ComponentType } from 'react'
 import { CommandsList } from './CommandsList'
 import { Heading1, Heading2, Heading3, List, ListOrdered, Code, Table, Image, CheckSquare, Quote } from 'lucide-react'
-import { sendToExtension } from '../bridge'
+import { sendToExtension, emitInternalEvent } from '../bridge'
 
 export interface Command {
   title: string
@@ -157,10 +157,12 @@ export const SlashCommands = Extension.create({
               description: 'Insert an image from file',
               icon: Image,
               command: ({ editor, range }: any) => {
-                // Delete the /image text first
+                // Save cursor position BEFORE async file picker opens
+                const insertPos = range.from
                 editor.chain().focus().deleteRange(range).run()
+                // Tell Editor.tsx where to insert the image when it arrives
+                emitInternalEvent('image:pending-position', insertPos)
                 // Request file selection from VS Code extension
-                // Extension will handle file picker and save flow
                 sendToExtension('selectImageFile')
               },
             },
