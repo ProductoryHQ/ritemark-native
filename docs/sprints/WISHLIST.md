@@ -12,6 +12,7 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Data Editor
 
+- [ ] **BUG: Columns have no max-width — text never wraps** - Long cell content stretches columns infinitely with no line breaks (cells use `whitespace-nowrap` + `text-ellipsis`). Fix: add `max-width` (e.g. 300-400px) to columns and switch to `whitespace-normal` + `word-break: break-word` so text wraps within a bounded column. Consider `table-layout: fixed` for predictable column sizing. Affects both CSV and Excel preview. (`DataTable.tsx:516`, header `minWidth: 100` at line 271 but no max)
 - [ ] Rebrand current Excel viewer/CSV editor as "Data Editor"
 - [ ] CSV filter and column operations (add/delete/rename columns)
 - [ ] CSV cell in "editable" mode must be multi-line and extend to "full-height"
@@ -56,7 +57,7 @@ In-app help system accessible from activity bar:
 ## AI Assistant
 
 - [x] Advanced Claude Code harness in AI sidebar → **Sprint 33** (multi-turn sessions, model selector, image paste, clickable file paths)
-- [ ] **Chat font size setting** - User-adjustable font size for AI chat interface (easier reading, accessibility)
+- [x] **Chat font size setting** - User-adjustable font size for AI chat interface (easier reading, accessibility) → **Sprint 37**
 - [ ] Memories
 - [ ] Customization (CLAUDE.md, Agents.md support)
 - [ ] AI image generation via command palette - \[ \] Opens dialog to configure Google API key - \[ \] Uses Gemini API to generate images
@@ -81,6 +82,7 @@ In-app help system accessible from activity bar:
   - [ ] `/` command palette for AI actions (rewrite, summarize, translate, etc.)
   - [ ] Custom user-defined skills
   - [ ] Skill marketplace / sharing
+- [ ] **AskUserQuestion rendering in chat** - When AI agent uses AskUserQuestion tool, render it as an interactive question card (buttons/options) in the chat UI instead of showing the raw tool call. Essential for conversational AI flows where the agent needs user input to proceed.
 
 ## Export
 
