@@ -10,7 +10,7 @@
 #        src/vs/workbench/browser/media/fonts/SofiaSans-latin.woff2,
 #        src/vs/workbench/browser/media/fonts/SofiaSans-latin-ext.woff2,
 #        src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css,
-#        build/lib/optimize.ts,
+#        build/lib/optimize.ts, build/lib/optimize.js,
 #        build/gulpfile.vscode.js
 # Created: 2026-02-13
 #
@@ -38,6 +38,18 @@ index 9dfb6a3848c..c1772b612fc 100644
  	'out-build/vs/workbench/contrib/debug/**/*.json',
  	'out-build/vs/workbench/contrib/externalTerminal/**/*.scpt',
  	'out-build/vs/workbench/contrib/terminal/common/scripts/fish_xdg_data/fish/vendor_conf.d/*.fish',
+diff --git a/build/lib/optimize.js b/build/lib/optimize.js
+index 8003b5763c4..a0c2eb097c2 100644
+--- a/build/lib/optimize.js
++++ b/build/lib/optimize.js
+@@ -254,6 +254,7 @@ function optimizeESMTask(opts, cjsOpts) {
+                 target: ['es2022'],
+                 loader: {
+                     '.ttf': 'file',
++                    '.woff2': 'file',
+                     '.svg': 'file',
+                     '.png': 'file',
+                     '.sh': 'file',
 diff --git a/build/lib/optimize.ts b/build/lib/optimize.ts
 index 3cb778111ae..0ba3931d4a1 100644
 --- a/build/lib/optimize.ts
