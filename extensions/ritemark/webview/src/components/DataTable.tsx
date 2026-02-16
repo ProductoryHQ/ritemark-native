@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
+import { useMemo, useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -49,6 +49,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
   const cellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map())
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const editStartedByTyping = useRef(false)
+  const [editOverlayWidth, setEditOverlayWidth] = useState<number | null>(null)
 
   // Create column definitions from column names
   const columnHelper = createColumnHelper<Record<string, unknown>>()
@@ -173,14 +174,35 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
     const el = editorRef.current
     if (!el) return
     el.focus()
-    if (editStartedByTyping.current) {
-      // Cursor at end when user typed a character to start editing
-      el.selectionStart = el.selectionEnd = el.value.length
-    } else {
-      // Select all when entering edit via double-click / Enter / F2
-      el.select()
-    }
+    // Always place cursor at end of content
+    el.selectionStart = el.selectionEnd = el.value.length
   }, [editingCell])
+
+  // Calculate overlay width when editing starts (Google Sheets style)
+  useLayoutEffect(() => {
+    if (!editingCell) {
+      setEditOverlayWidth(null)
+      return
+    }
+    const cellKey = getCellKey(editingCell)
+    const cellEl = cellRefs.current.get(cellKey)
+    const container = parentRef.current
+    if (cellEl && container) {
+      const cellRect = cellEl.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      // Extend from cell left edge to container right edge
+      const availableWidth = containerRect.right - cellRect.left - 4
+      setEditOverlayWidth(Math.min(600, Math.max(cellRect.width, availableWidth)))
+    }
+  }, [editingCell, getCellKey])
+
+  // Auto-resize textarea height when content changes (capped at 200px)
+  useLayoutEffect(() => {
+    const el = editorRef.current
+    if (!el || !editingCell) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(200, Math.max(56, el.scrollHeight + 4)) + 'px'
+  }, [editValue, editingCell])
 
   useEffect(() => {
     if (!renamingColumn) return
@@ -248,7 +270,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
         setConfirmDeleteColumn(null)
       }}
     >
-      <table className="w-full border-collapse text-sm">
+      <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: '100%', minWidth: 'max-content' }}>
         <thead
           className="sticky z-10 bg-[var(--vscode-editor-background)]"
           style={{ top: 0 }}
@@ -268,7 +290,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 <th
                   key={header.id}
                   className="relative px-3 py-2 text-left font-semibold border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] select-none"
-                  style={{ minWidth: 100, cursor: 'pointer' }}
+                  style={{ minWidth: 120, maxWidth: 400, cursor: 'pointer' }}
                   onClick={(e) => {
                     if (isRenaming) return
                     if (isColConfirming || isColSelected) return
@@ -412,7 +434,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
               <tr
                 key={row.id}
                 data-index={virtualRow.index}
-                style={{ height: ROW_HEIGHT, minHeight: ROW_HEIGHT }}
+                style={{ minHeight: ROW_HEIGHT }}
               >
                 <td
                   className={`relative px-2 py-2 text-center text-xs border-b border-r border-[var(--vscode-panel-border)] whitespace-nowrap bg-[var(--vscode-sideBar-background)] text-[var(--vscode-descriptionForeground)]`}
@@ -513,16 +535,19 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                         }
                       }}
                       tabIndex={isActive ? 0 : -1}
-                      className={`relative px-3 py-2 border-b border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] cursor-cell focus:outline-none ${isEditing ? 'overflow-visible whitespace-normal' : 'overflow-hidden whitespace-nowrap text-ellipsis'}`}
+                      className={`relative px-3 py-2 border-b border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] cursor-cell focus:outline-none ${isEditing ? 'overflow-visible whitespace-normal' : 'overflow-hidden'}`}
                       style={{
-                        boxShadow: isActive
+                        minWidth: 120,
+                        maxWidth: 400,
+                        boxShadow: isActive && !isEditing
                           ? 'inset 0 0 0 2px var(--vscode-focusBorder, var(--vscode-textLink-foreground))'
                           : undefined,
-                        background: isActive
+                        background: isActive && !isEditing
                           ? 'var(--vscode-editor-selectionHighlightBackground, transparent)'
                           : undefined,
-                        zIndex: isEditing ? 30 : undefined,
+                        zIndex: isEditing ? 40 : undefined,
                       }}
+                      title={rawValue || ''}
                       onMouseDown={(e) => {
                         e.stopPropagation()
                         setSelectedRow(null)
@@ -531,6 +556,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                         // This is more reliable than onDoubleClick because the textarea
                         // appearing after the first click can intercept the second click
                         if (editable && e.detail >= 2) {
+                          e.preventDefault() // Prevent browser text selection
                           startEditing(cellCoord)
                           return
                         }
@@ -637,12 +663,14 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                               })
                             }
                           }}
-                          className="absolute left-[2px] top-[2px] z-10 w-[calc(100%-4px)] resize-none rounded-sm border border-[var(--vscode-focusBorder,var(--vscode-textLink-foreground))] bg-[var(--vscode-editor-background)] p-1 text-[var(--vscode-foreground)] outline-none"
-                          rows={Math.max(2, Math.min(8, editValue.split('\n').length))}
-                          style={{ minHeight: 56 }}
+                          className="absolute left-0 top-0 z-30 resize-none border-2 border-[#4338ca] bg-[var(--vscode-editor-background)] p-2 text-[var(--vscode-foreground)] outline-none shadow-lg"
+                          style={{
+                            width: editOverlayWidth || 'calc(100% - 4px)',
+                            minHeight: 56,
+                          }}
                         />
                       ) : (
-                        <span className="block w-full truncate" title={rawValue || ''}>
+                        <span className="block w-full pointer-events-none" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>
                           {rawValue || '\u00A0'}
                         </span>
                       )}
