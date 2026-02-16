@@ -35,5 +35,12 @@
     "recommendationsUrl": ""
   },
   "enableTelemetry": false,
-  "builtInExtensions": []
+  "builtInExtensions": [],
+  "configurationDefaults": {
+    "workbench.colorTheme": "ritemark-light",
+    "workbench.preferredLightColorTheme": "ritemark-light",
+    "workbench.preferredDarkColorTheme": "ritemark-light",
+    "workbench.layoutControl.enabled": true,
+    "workbench.layoutControl.type": "toggles"
+  }
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# RiteMark Native - Post-Build Output Validation
+# Ritemark Native - Post-Build Output Validation
 # =============================================================================
 # Run AFTER a production build to verify everything is correctly included.
 # This catches issues that would only appear at runtime.
@@ -36,7 +36,7 @@ echo "========================================"
 echo "Target: $TARGET"
 echo ""
 
-APP_PATH="VSCode-$TARGET/RiteMark.app"
+APP_PATH="VSCode-$TARGET/Ritemark.app"
 EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
 
 ERRORS=0
@@ -62,7 +62,7 @@ echo -n "Checking extension included... "
 
 if [[ ! -d "$EXT_PATH" ]]; then
   echo -e "${RED}FAIL${NC}"
-  echo "  RiteMark extension not found in production app."
+  echo "  Ritemark extension not found in production app."
   echo "  Path checked: $EXT_PATH"
   echo ""
   echo "  FIX: Copy extension to production app:"

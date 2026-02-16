@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# codesign-app.sh - Code sign RiteMark.app with Developer ID
+# codesign-app.sh - Code sign Ritemark.app with Developer ID
 #
 # SMART SIGNING: Discovers and signs ALL native binaries inside the app bundle.
 # Uses Mach-O detection to find executables that need signing.
@@ -43,7 +43,7 @@ esac
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_PATH="$PROJECT_ROOT/VSCode-$TARGET/RiteMark.app"
+APP_PATH="$PROJECT_ROOT/VSCode-$TARGET/Ritemark.app"
 ENTITLEMENTS_PATH="$PROJECT_ROOT/branding/entitlements.plist"
 
 # Counters (using temp files to persist across subshells)
@@ -72,7 +72,7 @@ get_failed() {
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}RiteMark Native - Smart Code Signing${NC}"
+echo -e "${BLUE}Ritemark Native - Smart Code Signing${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 echo "Target: $TARGET"

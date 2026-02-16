@@ -40,10 +40,21 @@ export function activate(context: vscode.ExtensionContext) {
       const wb = vscode.workspace.getConfiguration('workbench');
       const win = vscode.workspace.getConfiguration('window');
       await win.update('autoDetectColorScheme', false, vscode.ConfigurationTarget.Global);
-      await wb.update('colorTheme', 'Ritemark Light', vscode.ConfigurationTarget.Global);
+      await wb.update('colorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
       await wb.update('iconTheme', 'ritemark-icons', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredLightColorTheme', 'Ritemark Light', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredDarkColorTheme', 'Ritemark Light', vscode.ConfigurationTarget.Global);
+      await wb.update('preferredLightColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
+      await wb.update('preferredDarkColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
+
+      // Ensure titlebar layout controls are enabled (left/right sidebar toggles + settings gear)
+      await wb.update('layoutControl.enabled', true, vscode.ConfigurationTarget.Global);
+      await wb.update('layoutControl.type', 'toggles', vscode.ConfigurationTarget.Global);
+
+      // Reset view locations so AI sidebar appears in declared container (auxiliary bar)
+      // This fixes upgrade from v1.3.1 where cached state had AI view in explorer
+      try {
+        await vscode.commands.executeCommand('workbench.action.resetViewLocations');
+      } catch (_e) { /* command may not exist in all versions */ }
+
       context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
     }, 1500);
   }
