@@ -7013,19 +7013,6 @@ index 6c61a590324..21191ba120f 100644
  		if (this.productService.target) {
  			version = `${version} (${this.productService.target} setup)`;
  		} else if (this.productService.darwinUniversalAssetId) {
-diff --git a/src/vs/workbench/services/themes/browser/workbenchThemeService.ts b/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
-index 857cf6f5415..c32bc80e8ba 100644
---- a/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
-+++ b/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
-@@ -159,7 +159,7 @@ export class WorkbenchThemeService extends Disposable implements IWorkbenchTheme
- 			}
- 		}
- 		if (!themeData) {
--			themeData = ColorThemeData.createUnloadedThemeForThemeType(isWeb ? ColorScheme.LIGHT : ColorScheme.DARK, defaultColorMap);
-+			themeData = ColorThemeData.createUnloadedThemeForThemeType(ColorScheme.LIGHT, defaultColorMap);
- 		}
- 		themeData.setCustomizations(this.settings);
- 		this.applyTheme(themeData, undefined, true);
 diff --git a/src/vs/workbench/services/themes/common/themeConfiguration.ts b/src/vs/workbench/services/themes/common/themeConfiguration.ts
 index b4a84348fb7..8f653834930 100644
 --- a/src/vs/workbench/services/themes/common/themeConfiguration.ts
