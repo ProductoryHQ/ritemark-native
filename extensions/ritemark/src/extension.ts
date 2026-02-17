@@ -31,11 +31,10 @@ let settingsProvider: RitemarkSettingsProvider | null = null;
 let documentIndexer: DocumentIndexer | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
-  // Force Ritemark branding on fresh install or version upgrade
+  // === Theme & branding: only on fresh install or version upgrade ===
   const currentVersion = context.extension.packageJSON.version as string;
   const lastThemeVersion = context.globalState.get<string>('ritemark.themeAppliedVersion');
   if (lastThemeVersion !== currentVersion) {
-    // Delay to ensure extension themes are registered before we try to apply them
     setTimeout(async () => {
       const wb = vscode.workspace.getConfiguration('workbench');
       const win = vscode.workspace.getConfiguration('window');
@@ -44,20 +43,40 @@ export function activate(context: vscode.ExtensionContext) {
       await wb.update('iconTheme', 'ritemark-icons', vscode.ConfigurationTarget.Global);
       await wb.update('preferredLightColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
       await wb.update('preferredDarkColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
-
-      // Ensure titlebar layout controls are enabled (left/right sidebar toggles + settings gear)
-      await wb.update('layoutControl.enabled', true, vscode.ConfigurationTarget.Global);
-      await wb.update('layoutControl.type', 'toggles', vscode.ConfigurationTarget.Global);
-
-      // Reset view locations so AI sidebar appears in declared container (auxiliary bar)
-      // This fixes upgrade from v1.3.1 where cached state had AI view in explorer
-      try {
-        await vscode.commands.executeCommand('workbench.action.resetViewLocations');
-      } catch (_e) { /* command may not exist in all versions */ }
-
       context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
     }, 1500);
   }
+
+  // === Layout enforcement: EVERY startup ===
+  // Ensures AI panel is in right sidebar, terminal in right sidebar,
+  // and titlebar controls are correct. Runs on every activation.
+  setTimeout(async () => {
+    const wb = vscode.workspace.getConfiguration('workbench');
+
+    // Titlebar: sidebar toggles + settings gear
+    await wb.update('layoutControl.enabled', true, vscode.ConfigurationTarget.Global);
+    await wb.update('layoutControl.type', 'toggles', vscode.ConfigurationTarget.Global);
+
+    // Terminal: right sidebar (auxiliary bar)
+    const terminal = vscode.workspace.getConfiguration('terminal.integrated');
+    await terminal.update('defaultLocation', 'editor', vscode.ConfigurationTarget.Global);
+
+    // AI panel: move to auxiliary bar if not already there
+    try {
+      await vscode.commands.executeCommand('vscode.moveViews', {
+        viewIds: ['ritemark.unifiedView'],
+        destinationId: 'workbench.view.extension.ritemark-ai'
+      });
+    } catch (_e) { /* ignore if views not yet registered */ }
+
+    // Ensure auxiliary bar (right sidebar) is visible
+    try {
+      const auxiliaryBarVisible = wb.get('auxiliaryBar.visible');
+      if (!auxiliaryBarVisible) {
+        await vscode.commands.executeCommand('workbench.action.toggleAuxiliaryBar');
+      }
+    } catch (_e) { /* ignore */ }
+  }, 2000);
 
   // Initialize API key manager (must be first)
   initAPIKeyManager(context);
