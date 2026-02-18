@@ -47,9 +47,9 @@ export function activate(context: vscode.ExtensionContext) {
     }, 1500);
   }
 
-  // === Layout enforcement: EVERY startup ===
-  // Ensures AI panel is in right sidebar, terminal in right sidebar,
-  // and titlebar controls are correct. Runs on every activation.
+  // === Layout settings: EVERY startup ===
+  // Titlebar controls and terminal defaults.
+  // NOTE: AI panel location is enforced in VS Code core (viewDescriptorService.ts patch)
   setTimeout(async () => {
     const wb = vscode.workspace.getConfiguration('workbench');
 
@@ -60,22 +60,6 @@ export function activate(context: vscode.ExtensionContext) {
     // Terminal: right sidebar (auxiliary bar)
     const terminal = vscode.workspace.getConfiguration('terminal.integrated');
     await terminal.update('defaultLocation', 'editor', vscode.ConfigurationTarget.Global);
-
-    // AI panel: move to auxiliary bar if not already there
-    try {
-      await vscode.commands.executeCommand('vscode.moveViews', {
-        viewIds: ['ritemark.unifiedView'],
-        destinationId: 'workbench.view.extension.ritemark-ai'
-      });
-    } catch (_e) { /* ignore if views not yet registered */ }
-
-    // Ensure auxiliary bar (right sidebar) is visible
-    try {
-      const auxiliaryBarVisible = wb.get('auxiliaryBar.visible');
-      if (!auxiliaryBarVisible) {
-        await vscode.commands.executeCommand('workbench.action.toggleAuxiliaryBar');
-      }
-    } catch (_e) { /* ignore */ }
   }, 2000);
 
   // Initialize API key manager (must be first)

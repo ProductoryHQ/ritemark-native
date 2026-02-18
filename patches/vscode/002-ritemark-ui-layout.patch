@@ -1,12 +1,18 @@
-Ritemark UI Layout: sidebar, titlebar, tabs, explorer, panels
-Consolidates old patches: 001 (terminal right sidebar), 016 (tab/header heights),
-017 (titlebar controls), 018 (explorer UI), 019 (auxiliary bar)
----
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-index f5a0648d5d1..696abe25776 100644
+index f5a0648d5d1..d2231d4abd7 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 +++ b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-@@ -402,7 +402,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -312,6 +312,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+ 					case 'panel':
+ 						panelOrder = this.registerCustomViewContainers(value, description, panelOrder, existingViewContainers, ViewContainerLocation.Panel);
+ 						break;
++					case 'auxiliarybar':
++						this.registerCustomViewContainers(value, description, 1, existingViewContainers, ViewContainerLocation.AuxiliaryBar);
++						break;
+ 				}
+ 			});
+ 		}
+@@ -402,7 +405,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  					ViewPaneContainer,
  					[id, { mergeViewWithContainerWhenSingleView: true }]
  				),
@@ -232,31 +238,6 @@ index b2c7e5f01c7..938e1c5fa1d 100644
  		id: MenuId.ViewTitleContext,
  		item: {
  			group: '3_workbench_layout_move',
-diff --git a/src/vs/workbench/browser/parts/editor/editor.contribution.ts b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
-index 1c777faacaf..d425c4e3e9c 100644
---- a/src/vs/workbench/browser/parts/editor/editor.contribution.ts
-+++ b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
-@@ -670,13 +670,13 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
- 	order: 1,
- });
- 
--// Layout menu
--MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
--	group: '2_appearance',
--	title: localize({ key: 'miEditorLayout', comment: ['&& denotes a mnemonic'] }, "Editor &&Layout"),
--	submenu: MenuId.MenubarLayoutMenu,
--	order: 2
--});
-+// RiteMark: Editor Layout submenu removed - not relevant for markdown editing
-+// MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
-+// 	group: '2_appearance',
-+// 	title: localize({ key: 'miEditorLayout', comment: ['&& denotes a mnemonic'] }, "Editor &&Layout"),
-+// 	submenu: MenuId.MenubarLayoutMenu,
-+// 	order: 2
-+// });
- 
- MenuRegistry.appendMenuItem(MenuId.MenubarLayoutMenu, {
- 	group: '1_split',
 diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
 index d03297e004f..8a84fdf5253 100644
 --- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
@@ -387,6 +368,58 @@ index 9ec755c35c2..0448318c4e4 100644
  	protected override createFooterArea(): HTMLElement {
  		const footerArea = super.createFooterArea();
  		return this.createHeaderFooterCompositeBarArea(footerArea);
+diff --git a/src/vs/workbench/browser/parts/panel/panelActions.ts b/src/vs/workbench/browser/parts/panel/panelActions.ts
+index 77ac81eea44..4d5335d7727 100644
+--- a/src/vs/workbench/browser/parts/panel/panelActions.ts
++++ b/src/vs/workbench/browser/parts/panel/panelActions.ts
+@@ -24,8 +24,9 @@ import { KeybindingWeight } from '../../../../platform/keybinding/common/keybind
+ const maximizeIcon = registerIcon('panel-maximize', Codicon.chevronUp, localize('maximizeIcon', 'Icon to maximize a panel.'));
+ const restoreIcon = registerIcon('panel-restore', Codicon.chevronDown, localize('restoreIcon', 'Icon to restore a panel.'));
+ const closeIcon = registerIcon('panel-close', Codicon.close, localize('closeIcon', 'Icon to close a panel.'));
+-const panelIcon = registerIcon('panel-layout-icon', Codicon.layoutPanel, localize('togglePanelOffIcon', 'Icon to toggle the panel off when it is on.'));
+-const panelOffIcon = registerIcon('panel-layout-icon-off', Codicon.layoutPanelOff, localize('togglePanelOnIcon', 'Icon to toggle the panel on when it is off.'));
++// Ritemark: panelIcon/panelOffIcon removed — panel toggle hidden from titlebar
++// const panelIcon = registerIcon('panel-layout-icon', Codicon.layoutPanel, localize('togglePanelOffIcon', 'Icon to toggle the panel off when it is on.'));
++// const panelOffIcon = registerIcon('panel-layout-icon-off', Codicon.layoutPanelOff, localize('togglePanelOnIcon', 'Icon to toggle the panel on when it is off.'));
+ 
+ export class TogglePanelAction extends Action2 {
+ 
+@@ -362,20 +363,22 @@ registerAction2(class extends Action2 {
+ });
+ 
+ MenuRegistry.appendMenuItems([
++	// Ritemark: Panel toggle hidden from titlebar — not needed for writing app
++	// {
++	// 	id: MenuId.LayoutControlMenu,
++	// 	item: {
++	// 		group: '0_workbench_toggles',
++	// 		command: {
++	// 			id: TogglePanelAction.ID,
++	// 			title: localize('togglePanel', "Toggle Panel"),
++	// 			icon: panelOffIcon,
++	// 			toggled: { condition: PanelVisibleContext, icon: panelIcon }
++	// 		},
++	// 		when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
++	// 		order: 1
++	// 	}
++	// },
+ 	{
+-		id: MenuId.LayoutControlMenu,
+-		item: {
+-			group: '0_workbench_toggles',
+-			command: {
+-				id: TogglePanelAction.ID,
+-				title: localize('togglePanel', "Toggle Panel"),
+-				icon: panelOffIcon,
+-				toggled: { condition: PanelVisibleContext, icon: panelIcon }
+-			},
+-			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
+-			order: 1
+-		}
+-	}, {
+ 		id: MenuId.ViewTitleContext,
+ 		item: {
+ 			group: '3_workbench_layout_move',
 diff --git a/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css b/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
 index 2c94078993b..80dcacd79fd 100644
 --- a/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
@@ -455,6 +488,48 @@ index 01360d53f36..61d55173281 100644
 +	background-color: #e2e8f0;
 +	margin: 0 2px;
 +}
+diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+index e49557028f8..0558d831c95 100644
+--- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
++++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+@@ -36,7 +36,7 @@ import { CommandCenterControl } from './commandCenterControl.js';
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+ import { WorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
+ import { ACCOUNTS_ACTIVITY_ID, GLOBAL_ACTIVITY_ID } from '../../../common/activity.js';
+-import { AccountsActivityActionViewItem, isAccountsActionVisible, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
++import { AccountsActivityActionViewItem, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
+ import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
+ import { IEditorGroupsContainer, IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
+ import { ActionRunner, IAction } from '../../../../base/common/actions.js';
+@@ -50,7 +50,7 @@ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
+ import { EditorCommandsContextActionRunner } from '../editor/editorTabsControl.js';
+ import { IEditorCommandsContext, IEditorPartOptionsChangeEvent, IToolbarActions } from '../../../common/editor.js';
+ import { CodeWindow, mainWindow } from '../../../../base/browser/window.js';
+-import { ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION } from './titlebarActions.js';
++// Ritemark: ACCOUNTS_ACTIVITY_TILE_ACTION and GLOBAL_ACTIVITY_TITLE_ACTION removed (hidden from titlebar)
+ import { IView } from '../../../../base/browser/ui/grid/grid.js';
+ import { createInstantHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
+ import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
+@@ -654,12 +654,13 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+ 			}
+ 
+ 			// --- Activity Actions
+-			if (this.activityActionsEnabled) {
+-				if (isAccountsActionVisible(this.storageService)) {
+-					actions.primary.push(ACCOUNTS_ACTIVITY_TILE_ACTION);
+-				}
+-				actions.primary.push(GLOBAL_ACTIVITY_TITLE_ACTION);
+-			}
++			// Ritemark: Hide accounts and manage/settings gear from titlebar
++			// if (this.activityActionsEnabled) {
++			// 	if (isAccountsActionVisible(this.storageService)) {
++			// 		actions.primary.push(ACCOUNTS_ACTIVITY_TILE_ACTION);
++			// 	}
++			// 	actions.primary.push(GLOBAL_ACTIVITY_TITLE_ACTION);
++			// }
+ 
+ 			this.actionToolBar.setActions(prepareActions(actions.primary), prepareActions(actions.secondary));
+ 		};
 diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
 index 30699b39a33..130d608e9fd 100644
 --- a/src/vs/workbench/browser/workbench.contribution.ts
@@ -601,19 +676,19 @@ index f8703b7302b..f7c618e0fc2 100644
  Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
-diff --git a/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts b/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
-index 128ffba2e27..e17fa4adafe 100644
---- a/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
-+++ b/src/vs/workbench/contrib/terminal/browser/terminalIcons.ts
-@@ -5,9 +5,9 @@
+diff --git a/src/vs/workbench/services/views/browser/viewDescriptorService.ts b/src/vs/workbench/services/views/browser/viewDescriptorService.ts
+index aa1320d578b..36d8f6b8c9c 100644
+--- a/src/vs/workbench/services/views/browser/viewDescriptorService.ts
++++ b/src/vs/workbench/services/views/browser/viewDescriptorService.ts
+@@ -93,6 +93,11 @@ export class ViewDescriptorService extends Disposable implements IViewDescriptor
+ 		this.viewDescriptorsCustomLocations = new Map<string, string>(Object.entries(this.viewCustomizations.viewLocations));
+ 		this.viewContainerBadgeEnablementStates = new Map<string, boolean>(Object.entries(this.viewCustomizations.viewContainerBadgeEnablementStates));
  
- import { Codicon } from '../../../../base/common/codicons.js';
- import { localize } from '../../../../nls.js';
--import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
-+import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
++		// Ritemark: Force ritemark-ai container to auxiliarybar (right sidebar) on every startup.
++		// Prevents cached state from overriding the declared default location.
++		// Note: Extension containers get prefixed with 'workbench.view.extension.' (see viewsExtensionPoint.ts:372)
++		this.viewContainersCustomLocations.delete('workbench.view.extension.ritemark-ai');
++
+ 		// Register all containers that were registered before this ctor
+ 		this.viewContainers.forEach(viewContainer => this.onDidRegisterViewContainer(viewContainer));
  
--export const terminalViewIcon = registerIcon('terminal-view-icon', Codicon.terminal, localize('terminalViewIcon', 'View icon of the terminal view.'));
-+export const terminalViewIcon = registerIcon('terminal-view-icon', Lucide.terminal, localize('terminalViewIcon', 'View icon of the terminal view.'));
- 
- export const renameTerminalIcon = registerIcon('terminal-rename', Codicon.edit, localize('renameTerminalIcon', 'Icon for rename in the terminal quick menu.'));
- export const killTerminalIcon = registerIcon('terminal-kill', Codicon.trash, localize('killTerminalIcon', 'Icon for killing a terminal instance.'));

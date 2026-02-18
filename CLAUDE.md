@@ -94,6 +94,25 @@ These MUST always be true. If broken, the project won't work:
 | Patches applied | `./scripts/apply-patches.sh --dry-run` shows all "Already applied" | Run `./scripts/apply-patches.sh` |
 | Settings page | `RitemarkSettings.tsx` has full implementation (400+ lines, NOT a stub) | Restore from git history |
 
+### Layout Invariants (NEVER break these)
+
+The following layout rules are enforced by patch 002 and must remain true:
+
+| Element | Required Position | Enforced By |
+| --- | --- | --- |
+| Ritemark AI panel | Right sidebar (auxiliary bar) | `viewDescriptorService.ts`: deletes cached override for `workbench.view.extension.ritemark-ai` |
+| Terminal | Right sidebar (auxiliary bar) | `terminal.contribution.ts`: `ViewContainerLocation.AuxiliaryBar` |
+| Titlebar icons | Only: left sidebar toggle, right sidebar toggle, settings gear | `layoutActions.ts` (custom LayoutControlMenu), `titlebarPart.ts` (accounts/gear hidden), `panelActions.ts` (panel toggle hidden) |
+| Accounts icon | Hidden from titlebar | `titlebarPart.ts`: activity actions block commented out |
+| Panel toggle | Hidden from titlebar | `panelActions.ts`: LayoutControlMenu registration commented out |
+| `auxiliarybar` in package.json | Supported by core | `viewsExtensionPoint.ts`: `case 'auxiliarybar'` added |
+
+**Key technical facts for layout work:**
+- Extension container IDs get prefixed: `ritemark-ai` → `workbench.view.extension.ritemark-ai`
+- VS Code caches view positions in SQLite (`views.customizations`). Package.json is only the default.
+- Titlebar icons come from TWO sources: `LayoutControlMenu` (layout toggles) AND `titlebarPart.ts` (accounts/settings gear). Both must be patched.
+- When commenting out code in VS Code patches, **ALWAYS remove unused imports** — build fails after 22 min otherwise.
+
 ### NEVER Remove, Stub, or Disable Existing Features
 
 **HARD RULE #1:** You MUST NEVER replace a working component with a stub, placeholder, or "coming soon" message. This includes:
@@ -194,33 +213,37 @@ When user input contains trigger keywords → **INVOKE agent BEFORE responding.*
 
 Responding without invoking the required agent is a **VIOLATION** of project governance.
 
-### ⚠️ CRITICAL: Production Build Rule
+### ⚠️ CRITICAL: Production Build Instructions
 
-**NEVER run** `gulp vscode-darwin-arm64` **directly.** Running gulp directly will:
+**DO NOT delegate builds to `vscode-expert` agent** — it has reliability issues with output buffering.
 
--   Build VS Code without copying the Ritemark extension
-    
--   Result in a broken app that can't open .md files
-    
--   Waste 25+ minutes on a useless build
-    
+**Build it yourself with these exact steps:**
 
-**ALWAYS invoke** `vscode-expert` **agent for ANY production build.** The agent will:
+```bash
+# 1. Switch to arm64 Node v20 (MANDATORY)
+arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && node -p "process.arch"'
+# Must show: arm64 + v20.x
 
-1.  Validate source files are not corrupted (no 0-byte .ts files)
-    
-2.  Verify correct Node version (arm64 v20, NOT v23, NOT Rosetta)
-    
-3.  Ensure extension compiles successfully
-    
-4.  Check webview bundle exists and has correct size
-    
-5.  Run `./scripts/build-prod.sh` (NOT gulp directly)
-    
-6.  Copy extension to production app after build
-    
+# 2. Verify patches
+./scripts/apply-patches.sh --dry-run
+# Must show: all "Already applied"
 
-**This is a HARD rule. No exceptions.**
+# 3. Compile extension
+cd extensions/ritemark && npx tsc --noEmit && cd ../..
+
+# 4. Run production build (~25 min) — NEVER pipe through tail!
+arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && cd /Users/jarmotuisk/Projects/ritemark-native && ./scripts/build-prod.sh 2>&1'
+```
+
+**HARD RULES:**
+- **NEVER** use `| tail` or `| head` with build commands — causes output buffering hang in background mode
+- **NEVER** run `gulp vscode-darwin-arm64` directly — it skips extension copy, resulting in broken app
+- **ALWAYS** use `arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && ...'` wrapper — default shell has x64 Node v23
+- **ALWAYS** run as background task with `run_in_background: true` and `timeout: 600000` (10 min max)
+- **Extension-only changes** (no VS Code core edits) can be hot-copied without full rebuild:
+  ```bash
+  cp -R extensions/ritemark/out/* "VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extensions/ritemark/out/"
+  ```
 
 * * *
 
