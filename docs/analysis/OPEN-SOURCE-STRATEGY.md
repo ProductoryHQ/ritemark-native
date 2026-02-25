@@ -48,7 +48,7 @@ Your reasoning is spot-on. Let's be explicit about it:
 | No developer setup guide | Important | 2-3 hours |
 | "jarmo-productory" hardcoded in URLs | Moderate | 1 hour |
 | No architecture overview for contributors | Moderate | 2 hours |
-| Branding assets unclear license | Moderate | Decision needed |
+| ~~Branding assets unclear license~~ | ~~Moderate~~ | **DONE** — `TRADEMARK.md` + `branding/LICENSE` |
 | Code signing certs are personal | Expected | Not an issue — maintainer signs releases |
 | No CLA or DCO decision | Moderate | Decision needed |
 
@@ -191,12 +191,7 @@ Copyright (c) 2026 Jarmo Tuisk
 Permission is hereby granted, free of charge, to any person obtaining a copy...
 ```
 
-**Decision needed:** Copyright holder. Options:
-- `Jarmo Tuisk` (personal — simpler)
-- `Productory OÜ` (company — more formal)
-- `Ritemark Contributors` (community — most open, but you lose explicit copyright)
-
-Recommendation: `Jarmo Tuisk` initially. Can update later if you form a foundation or org.
+**Decision: Productory OÜ** — The Ritemark brand is owned by Productory and permitted for use only in this OSS project. See `TRADEMARK.md` and `branding/LICENSE` for enforcement.
 
 #### 1.2 Choose a contribution model
 
@@ -308,14 +303,12 @@ Search and update:
 - Any personal paths in scripts (`/Users/jarmotuisk/...`) → make relative
 - Email addresses that should be project-level
 
-#### 3.2 Audit branding assets
+#### 3.2 Audit branding assets — DONE
 
-Current branding/ directory contents need license clarification:
-- **Icons and logos:** If you created them, state that in a branding/LICENSE file
-- **Fonts:** If using custom fonts, ensure they're openly licensed
-- **Theme:** The ritemark-light theme — is it original or derived?
-
-Recommendation: Add `branding/LICENSE` stating the icons/logos are (c) Jarmo Tuisk, licensed under CC BY-SA 4.0 or similar. This allows others to use them with attribution but prevents direct competing products from using your exact branding.
+**Resolved:** Brand assets are owned by Productory OÜ, **all rights reserved** (not MIT, not CC).
+- `branding/LICENSE` — restricts use to official Ritemark project only
+- `TRADEMARK.md` — full trademark policy (forks must rebrand)
+- Fonts and theme still need audit for third-party licenses
 
 #### 3.3 Clean up internal documentation
 
@@ -594,7 +587,7 @@ Add a section in the README or a dedicated doc:
 
 | # | Action | Effort | Blocks |
 |---|--------|--------|--------|
-| 1 | Decide: copyright holder (personal vs company) | Decision | Everything |
+| 1 | ~~Decide: copyright holder~~ | **DONE** | Productory OÜ |
 | 2 | Decide: GitHub org vs personal account | Decision | Repo migration |
 | 3 | Add LICENSE file | 5 min | Going public |
 | 4 | Add CODE_OF_CONDUCT.md | 30 min | Going public |
@@ -604,7 +597,7 @@ Add a section in the README or a dedicated doc:
 | 8 | Create developer setup guide | 2 hours | Contributions |
 | 9 | Audit dependencies for license compatibility | 1 hour | Going public |
 | 10 | Audit for hardcoded personal paths/URLs | 1 hour | Going public |
-| 11 | Clarify branding asset license | 30 min | Going public |
+| 11 | ~~Clarify branding asset license~~ | **DONE** | `TRADEMARK.md` + `branding/LICENSE` |
 | 12 | Update README with open-source sections | 1 hour | Going public |
 | 13 | Add PR-triggered CI checks | 2 hours | Contributions |
 | 14 | Identify 5-10 good first issues | 1 hour | Community |
