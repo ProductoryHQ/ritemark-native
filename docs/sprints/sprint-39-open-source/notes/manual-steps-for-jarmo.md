@@ -4,7 +4,63 @@ Things that cannot be automated and need to be done by hand in GitHub after this
 
 ---
 
-## 1. Enable GitHub Discussions
+## 1. Add PR Checks Workflow
+
+**Why manual:** GitHub rejects workflow file pushes from apps without `workflows` permission.
+
+**Steps:**
+1. Create file `.github/workflows/pr-checks.yml` in the repo (via GitHub UI or local push)
+2. Paste this content:
+
+```yaml
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install extension dependencies
+        working-directory: extensions/ritemark
+        run: npm install --legacy-peer-deps
+
+      - name: TypeScript compile check
+        working-directory: extensions/ritemark
+        run: npx tsc --noEmit
+
+      - name: Verify patches exist
+        run: |
+          echo "Checking patch files exist..."
+          PATCH_COUNT=$(ls patches/vscode/*.patch 2>/dev/null | wc -l)
+          if [ "$PATCH_COUNT" -eq 0 ]; then
+            echo "WARNING: No patch files found in patches/vscode/"
+          else
+            echo "Found $PATCH_COUNT patch file(s)"
+            ls -la patches/vscode/*.patch
+          fi
+          echo "Patch validation passed"
+```
+
+3. Commit and push to `main`
+
+---
+
+## 2. Enable GitHub Discussions
 
 **Where:** Repository Settings > Features > Discussions
 
@@ -18,7 +74,7 @@ Things that cannot be automated and need to be done by hand in GitHub after this
 
 ---
 
-## 2. Set Up Branch Protection
+## 3. Set Up Branch Protection
 
 **Where:** Repository Settings > Branches > Add branch protection rule
 
@@ -32,7 +88,7 @@ Things that cannot be automated and need to be done by hand in GitHub after this
 
 ---
 
-## 3. File Good First Issues
+## 4. File Good First Issues
 
 See `docs/sprints/sprint-39-open-source/notes/good-first-issues.md` for 7 pre-written issues.
 
@@ -44,7 +100,7 @@ See `docs/sprints/sprint-39-open-source/notes/good-first-issues.md` for 7 pre-wr
 
 ---
 
-## 4. Flip Repository to Public
+## 5. Flip Repository to Public
 
 **Where:** Repository Settings > Danger Zone > Change repository visibility
 
@@ -60,7 +116,7 @@ See `docs/sprints/sprint-39-open-source/notes/good-first-issues.md` for 7 pre-wr
 
 ---
 
-## 5. GitHub Sponsors (Optional)
+## 6. GitHub Sponsors (Optional)
 
 **Where:** https://github.com/sponsors
 
@@ -74,7 +130,7 @@ This is optional but provides a way for the community to support development fin
 
 ---
 
-## 6. Update Download Links (When Ready)
+## 7. Update Download Links (When Ready)
 
 The README currently points to `jarmo-productory/ritemark-public` for downloads. When/if you migrate to a `ritemark` org or change the release repository, update these lines in `README.md`:
 
@@ -87,7 +143,7 @@ This is tracked separately from this sprint.
 
 ---
 
-## 7. Social Announcement (Optional)
+## 8. Social Announcement (Optional)
 
 Consider announcing the open-source launch on:
 - GitHub Discussions (first post in "General")
