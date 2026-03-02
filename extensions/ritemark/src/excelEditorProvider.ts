@@ -1,11 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { ExcelDocument } from './excelDocument';
-
-const execAsync = promisify(exec);
+import { isAppInstalled, openInExternalApp, getSpreadsheetAppName } from './utils/openExternal';
 
 /**
  * Custom editor provider for Excel files (.xlsx, .xls)
@@ -216,17 +213,9 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
 
   /**
    * Check if Microsoft Excel is installed
-   * Returns true if Excel is found, false otherwise
    */
   private async checkExcelInstalled(): Promise<boolean> {
-    try {
-      // macOS: Use 'open -Ra' to check if app exists without launching it
-      await execAsync('open -Ra "Microsoft Excel"');
-      return true;
-    } catch (error) {
-      // Excel not found
-      return false;
-    }
+    return isAppInstalled('Microsoft Excel');
   }
 
   /**
@@ -236,10 +225,10 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
    */
   private async openInExternalApp(filePath: string, app: string): Promise<void> {
     try {
-      const appName = app === 'excel' ? 'Microsoft Excel' : 'Numbers';
+      const hasExcel = app === 'excel';
+      const appName = getSpreadsheetAppName(hasExcel);
 
-      // macOS: Use 'open -a' to open file with specific app
-      await execAsync(`open -a "${appName}" "${filePath}"`);
+      await openInExternalApp(filePath, appName);
 
       vscode.window.showInformationMessage(`Opening in ${appName}...`);
     } catch (error) {

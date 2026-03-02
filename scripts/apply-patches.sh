@@ -162,6 +162,28 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
         echo -e "${GREEN}Done${NC}"
     fi
 
+    # Copy Windows tile PNGs if they exist
+    if [ -f "$BRANDING_DIR/win32/tile_150x150.png" ]; then
+        echo -n "Copying Windows tile icons... "
+        cp "$BRANDING_DIR/win32/tile_150x150.png" "$VSCODE_DIR/resources/win32/code_150x150.png"
+        cp "$BRANDING_DIR/win32/tile_70x70.png" "$VSCODE_DIR/resources/win32/code_70x70.png"
+        echo -e "${GREEN}Done${NC}"
+    fi
+
+    # Copy Windows VisualElementsManifest.xml if it exists (CRLF file, handled as copy)
+    if [ -f "$BRANDING_DIR/win32/VisualElementsManifest.xml" ]; then
+        echo -n "Copying VisualElementsManifest.xml... "
+        cp "$BRANDING_DIR/win32/VisualElementsManifest.xml" "$VSCODE_DIR/resources/win32/VisualElementsManifest.xml"
+        echo -e "${GREEN}Done${NC}"
+    fi
+
+    # Copy titlebar SVG icon if it exists
+    if [ -f "$BRANDING_DIR/icons/icon.svg" ]; then
+        echo -n "Copying titlebar icon... "
+        cp "$BRANDING_DIR/icons/icon.svg" "$VSCODE_DIR/src/vs/workbench/browser/media/code-icon.svg"
+        echo -e "${GREEN}Done${NC}"
+    fi
+
     # Copy product.json if it exists (for branding)
     if [ -f "$BRANDING_DIR/product.json" ]; then
         echo -n "Copying product.json... "

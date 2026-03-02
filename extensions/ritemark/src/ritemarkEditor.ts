@@ -1,16 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import matter from 'gray-matter';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
 import { exportToWordV2 } from './export/v2/wordHtmlExporter';
 import { DictationController } from './voiceDictation/controller';
 import { isEnabled } from './features';
-
-const execAsync = promisify(exec);
+import { isAppInstalled, openInExternalApp, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
 
 // Properties type for front-matter
 export interface DocumentProperties {
@@ -368,8 +365,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           // ===== End Voice Dictation =====
 
           case 'system:openMicSettings':
-            // Open macOS System Settings → Privacy → Microphone
-            require('child_process').exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"');
+            openMicrophoneSettings();
             return;
 
           case 'ai-configure-key':
@@ -1006,17 +1002,9 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
   /**
    * Check if Microsoft Excel is installed
-   * Returns true if Excel is found, false otherwise
    */
   private async checkExcelInstalled(): Promise<boolean> {
-    try {
-      // macOS: Use 'open -Ra' to check if app exists without launching it
-      await execAsync('open -Ra "Microsoft Excel"');
-      return true;
-    } catch (error) {
-      // Excel not found
-      return false;
-    }
+    return isAppInstalled('Microsoft Excel');
   }
 
   /**
@@ -1026,10 +1014,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
    */
   private async openInExternalApp(filePath: string, app: string): Promise<void> {
     try {
-      const appName = app === 'excel' ? 'Microsoft Excel' : 'Numbers';
+      const hasExcel = app === 'excel';
+      const appName = getSpreadsheetAppName(hasExcel);
 
-      // macOS: Use 'open -a' to open file with specific app
-      await execAsync(`open -a "${appName}" "${filePath}"`);
+      await openInExternalApp(filePath, appName);
 
       vscode.window.showInformationMessage(`Opening in ${appName}...`);
     } catch (error) {
