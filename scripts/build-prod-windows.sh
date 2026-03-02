@@ -88,12 +88,26 @@ npm run compile
 echo -e "${GREEN}  Extension compiled${NC}"
 echo ""
 
-# Step 5: Copy branding (product.json)
+# Step 5: Copy branding (product.json + Windows icons)
 echo -e "${YELLOW}Step 5: Copying branding...${NC}"
 cd "$ROOT_DIR"
 if [ -f "branding/product.json" ]; then
     cp "branding/product.json" "$VSCODE_DIR/product.json"
     echo "  Copied product.json"
+fi
+
+# Copy Windows icon resources (taskbar, Start menu tiles)
+if [ -f "branding/icons/icon.ico" ]; then
+    cp "branding/icons/icon.ico" "$VSCODE_DIR/resources/win32/code.ico"
+    echo "  Copied icon.ico → resources/win32/code.ico (taskbar icon)"
+fi
+if [ -f "branding/win32/tile_70x70.png" ]; then
+    cp "branding/win32/tile_70x70.png" "$VSCODE_DIR/resources/win32/code_70x70.png"
+    echo "  Copied tile_70x70.png → resources/win32/code_70x70.png"
+fi
+if [ -f "branding/win32/tile_150x150.png" ]; then
+    cp "branding/win32/tile_150x150.png" "$VSCODE_DIR/resources/win32/code_150x150.png"
+    echo "  Copied tile_150x150.png → resources/win32/code_150x150.png"
 fi
 echo ""
 
