@@ -1,5 +1,6 @@
 import React from 'react'
 import { ArrowUpRight, ChevronDown, Table2, Grid3X3, RotateCw } from 'lucide-react'
+import { defaultSpreadsheetApp, isMac } from '../../hooks/usePlatform'
 
 interface SpreadsheetToolbarProps {
   filename: string
@@ -34,10 +35,14 @@ export function SpreadsheetToolbar({
   const dropdownRef = React.useRef<HTMLDivElement>(null)
 
   // Determine primary and secondary actions based on Excel availability
+  const altAppLabel = `Open in ${defaultSpreadsheetApp}`
   const primaryAction = hasExcel && onOpenInExcel ? onOpenInExcel : onOpenInNumbers
-  const primaryLabel = hasExcel && onOpenInExcel ? 'Open in Excel' : 'Open in Numbers'
-  const secondaryAction = hasExcel && onOpenInExcel ? onOpenInNumbers : onOpenInExcel
-  const secondaryLabel = hasExcel && onOpenInExcel ? 'Open in Numbers' : 'Open in Excel'
+  const primaryLabel = hasExcel && onOpenInExcel ? 'Open in Excel' : altAppLabel
+  // On Windows, "Open in Spreadsheet App" is the same as Excel — no point showing both
+  const secondaryAction = hasExcel && onOpenInExcel
+    ? (isMac ? onOpenInNumbers : undefined)
+    : onOpenInExcel
+  const secondaryLabel = hasExcel && onOpenInExcel ? altAppLabel : 'Open in Excel'
   const hasSecondary = !!secondaryAction
 
   // Close dropdown when clicking outside

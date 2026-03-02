@@ -55,7 +55,7 @@
     "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-pdf": "^10.3.0",
+    "react-pdf": "^10.4.1",
     "tailwind-merge": "^2.0.0",
     "tippy.js": "^6.3.7",
     "tiptap-extension-auto-joiner": "^0.1.3",

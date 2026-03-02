@@ -43,12 +43,16 @@ export interface UpdateManifest {
   minimumAppVersion?: string;
   /** Files to download for extension updates */
   files?: UpdateFile[];
-  /** DMG download URL for full updates */
+  /** DMG download URL for full updates (macOS) */
   dmgUrl?: string;
   /** DMG SHA-256 checksum */
   dmgSha256?: string;
   /** DMG size in bytes */
   dmgSize?: number;
+  /** Installer download URL for full updates (Windows) */
+  installerUrl?: string;
+  /** Installer size in bytes */
+  installerSize?: number;
   /** Human-readable release notes */
   releaseNotes: string;
 }
@@ -121,8 +125,10 @@ export function validateManifest(manifest: unknown): ManifestValidation {
   }
 
   if (m.type === 'full') {
-    if (typeof m.dmgUrl !== 'string' || !m.dmgUrl) {
-      errors.push('Full update must have dmgUrl');
+    const hasDmgUrl = typeof m.dmgUrl === 'string' && m.dmgUrl;
+    const hasInstallerUrl = typeof m.installerUrl === 'string' && m.installerUrl;
+    if (!hasDmgUrl && !hasInstallerUrl) {
+      errors.push('Full update must have dmgUrl or installerUrl');
     }
   }
 
@@ -170,8 +176,8 @@ export function getTotalDownloadSize(manifest: UpdateManifest): number {
   if (manifest.type === 'extension' && manifest.files) {
     return manifest.files.reduce((sum, file) => sum + file.size, 0);
   }
-  if (manifest.type === 'full' && manifest.dmgSize) {
-    return manifest.dmgSize;
+  if (manifest.type === 'full') {
+    return manifest.installerSize || manifest.dmgSize || 0;
   }
   return 0;
 }

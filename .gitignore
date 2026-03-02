@@ -15,6 +15,8 @@ vscode/node_modules/
 
 # IDE
 .idea/
+.vs/
+*.slnx
 *.swp
 *.swo
 .vscode/settings.json
@@ -22,6 +24,7 @@ vscode/node_modules/
 # OS
 .DS_Store
 Thumbs.db
+nul
 
 # Logs
 *.log
@@ -47,12 +50,30 @@ temp/
 *.dmg
 *.exe
 *.app
+installer-output/
 VSCode-darwin-arm64/
 VSCode-darwin-x64/
 VSCode-linux-arm64/
 VSCode-linux-x64/
 VSCode-win32-arm64/
 VSCode-win32-x64/
+build-*/
+
+# Electron/Chromium runtime files (from Windows builds)
+icudtl.dat
+v8_context_snapshot.bin
+snapshot_blob.bin
+locales/*.pak
+*.dll
+*.pak
+
+# Visual Studio project files (root-anchored to avoid case-insensitive match on extensions/ritemark/)
+/Ritemark/
+*.sln
+*.vcxproj*
+
+# Temp files
+output.md
 
 # Claude Code local files (keep settings local, commit agents for governance)
 .claude/settings.local.json
