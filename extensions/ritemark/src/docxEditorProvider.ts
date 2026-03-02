@@ -1,11 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { DocxDocument } from './docxDocument';
-
-const execAsync = promisify(exec);
+import { isAppInstalled, openInExternalApp, getWordProcessorAppName } from './utils/openExternal';
 
 /**
  * Custom editor provider for DOCX files
@@ -161,18 +158,16 @@ export class DocxEditorProvider implements vscode.CustomReadonlyEditorProvider<D
   }
 
   private async checkWordInstalled(): Promise<boolean> {
-    try {
-      await execAsync('open -Ra "Microsoft Word"');
-      return true;
-    } catch {
-      return false;
-    }
+    return isAppInstalled('Microsoft Word');
   }
 
   private async openInExternalApp(filePath: string, app: string): Promise<void> {
     try {
-      const appName = app === 'word' ? 'Microsoft Word' : 'Pages';
-      await execAsync(`open -a "${appName}" "${filePath}"`);
+      const hasWord = app === 'word';
+      const appName = getWordProcessorAppName(hasWord);
+
+      await openInExternalApp(filePath, appName);
+
       vscode.window.showInformationMessage(`Opening in ${appName}...`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

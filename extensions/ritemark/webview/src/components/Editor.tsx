@@ -911,6 +911,7 @@ export function Editor({
           font-size: 18px !important;
           line-height: 1.7 !important;
           color: #374151 !important;
+          caret-color: #374151 !important;
           max-width: 100% !important;
           max-width: 900px !important;
           margin: 0 auto !important;

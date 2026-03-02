@@ -63,11 +63,11 @@ export class UpdateService {
       // Try to fetch update manifest
       let manifest = await fetchUpdateManifest(release.tag_name);
 
-      // Fall back to DMG-only manifest for older releases
+      // Fall back to platform-specific installer for older releases
       if (!manifest) {
         manifest = buildFallbackManifest(release);
         if (!manifest) {
-          console.log('No darwin-arm64 DMG found in release assets');
+          console.log('No platform-appropriate installer found in release assets');
           return;
         }
       }
@@ -84,8 +84,8 @@ export class UpdateService {
         // Extension-only update - can install in-place
         await showExtensionUpdateNotification(manifest, this.storage, this.installer);
       } else if (updateType === 'full' || manifest.type === 'full') {
-        // Full app update - open DMG download
-        const downloadUrl = manifest.dmgUrl || getDownloadUrl(release);
+        // Full app update - open installer download (DMG on macOS, exe on Windows)
+        const downloadUrl = manifest.installerUrl || manifest.dmgUrl || getDownloadUrl(release);
         if (downloadUrl) {
           await showUpdateNotification(latestVersion, downloadUrl, this.storage);
         }

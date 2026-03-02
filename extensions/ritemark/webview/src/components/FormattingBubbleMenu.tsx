@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link2, Check, X, List, ListOrdered, ListChecks, ExternalLink, Quote, Code } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
+import { modKey } from '@/hooks/usePlatform'
 import { openExternalUrl } from '../bridge'
 
 /**
@@ -335,7 +336,7 @@ export function FormattingBubbleMenu({
             className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
               editor.isActive('link') ? 'bg-gray-200' : ''
             }`}
-            title="Add/Edit Link (Cmd+K)"
+            title={`Add/Edit Link (${modKey}+K)`}
           >
             <Link2 size={16} />
           </button>
@@ -382,7 +383,7 @@ export function FormattingBubbleMenu({
                         openExternalUrl(url)
                       }}
                       className="px-3 py-2 border rounded text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-                      title="Open in browser (Cmd+click also works)"
+                      title={`Open in browser (${modKey}+click also works)`}
                     >
                       <ExternalLink size={16} />
                     </button>

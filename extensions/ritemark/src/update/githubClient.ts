@@ -116,14 +116,29 @@ export async function fetchReleaseByTag(tagName: string): Promise<GitHubRelease 
 }
 
 /**
- * Extract darwin-arm64 DMG download URL from release assets
+ * Extract platform-appropriate download URL from release assets
+ * - macOS: Ritemark-arm64.dmg (Apple Silicon) or Ritemark-x64.dmg (Intel)
+ * - Windows: Ritemark-setup.exe
  * @param release - GitHub release object
  * @returns Download URL or null if not found
  */
 export function getDownloadUrl(release: GitHubRelease): string | null {
-  const asset = release.assets.find(a =>
-    a.name.includes('darwin-arm64') && a.name.endsWith('.dmg')
-  );
+  const platform = process.platform;
+
+  let asset;
+  if (platform === 'win32') {
+    asset = release.assets.find(a =>
+      a.name.toLowerCase().includes('setup') && a.name.endsWith('.exe')
+    );
+  } else {
+    // macOS: prefer arm64, fall back to x64
+    asset = release.assets.find(a =>
+      a.name.includes('arm64') && a.name.endsWith('.dmg')
+    );
+    if (!asset) {
+      asset = release.assets.find(a => a.name.endsWith('.dmg'));
+    }
+  }
 
   return asset?.browser_download_url ?? null;
 }
@@ -161,12 +176,13 @@ export function parseVersionFromTag(tagName: string): string {
  * This allows backward compatibility with older releases
  */
 export function buildFallbackManifest(release: GitHubRelease): UpdateManifest | null {
-  const dmgUrl = getDownloadUrl(release);
-  if (!dmgUrl) {
+  const downloadUrl = getDownloadUrl(release);
+  if (!downloadUrl) {
     return null;
   }
 
   const version = parseVersionFromTag(release.tag_name);
+  const isWindows = process.platform === 'win32';
 
   return {
     version,
@@ -174,7 +190,7 @@ export function buildFallbackManifest(release: GitHubRelease): UpdateManifest | 
     extensionVersion: version,
     type: 'full',
     releaseDate: new Date().toISOString(),
-    dmgUrl,
+    ...(isWindows ? { installerUrl: downloadUrl } : { dmgUrl: downloadUrl }),
     releaseNotes: release.body || ''
   };
 }
