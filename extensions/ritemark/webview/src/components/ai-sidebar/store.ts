@@ -14,6 +14,7 @@ import {
   deleteConversation as deleteConversationFromStorage,
   generateId,
   generateTitle,
+  setWorkspaceContext,
   type SavedConversation,
 } from './chatHistoryStorage';
 import type {
@@ -50,6 +51,8 @@ const SYSTEM_OVERHEAD_TOKENS = 600;
 function estimateConversationTokens(turns: AgentConversationTurn[]): number {
   let tokens = SYSTEM_OVERHEAD_TOKENS;
   for (const turn of turns) {
+    // Per-turn framing overhead (role tokens, message structure)
+    tokens += 200;
     // User prompt
     tokens += Math.ceil((turn.userPrompt?.length || 0) / 4);
     // Attachments
@@ -57,18 +60,23 @@ function estimateConversationTokens(turns: AgentConversationTurn[]): number {
       for (const att of turn.attachments) {
         if (att.kind === 'text') {
           tokens += Math.ceil(att.data.length / 4);
+        } else if (att.kind === 'image') {
+          // Images use vision tokens — typically 1000-2000 tokens regardless of base64 size
+          // A high-res screenshot is ~1600 tokens, not base64_length/4
+          tokens += 1600;
         } else {
-          // base64 is ~33% larger than binary; decode then estimate
+          // PDFs: base64 → binary → tokens (rough estimate)
           tokens += Math.ceil(att.data.length * 0.75 / 4);
         }
       }
     }
-    // Agent response
+    // Agent response (only the final text — tool call internals are managed by SDK compaction)
     if (turn.result?.text) {
       tokens += Math.ceil(turn.result.text.length / 4);
     }
-    // Tool use overhead (~50 tokens per activity)
-    tokens += (turn.activities?.length || 0) * 50;
+    // Tool calls: count only tool_use activities (not thinking/init/subagent metadata)
+    const toolUseCount = (turn.activities || []).filter(a => a.type === 'tool_use').length;
+    tokens += toolUseCount * 300;
   }
   return tokens;
 }
@@ -633,6 +641,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
 
       case 'agent:config':
+        // Set workspace context for per-project history scoping
+        if (message.workspacePath) {
+          setWorkspaceContext(message.workspacePath);
+        }
         set({
           agenticEnabled: message.agenticEnabled,
           codexEnabled: message.codexEnabled ?? false,

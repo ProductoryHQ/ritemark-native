@@ -129,6 +129,14 @@ Consolidate UI components using shadcn/ui for consistency.
 
 - [ ] **Claude Code auto-launch** - Detect and auto-launch Claude Code in terminal on new window - Setting: `ritemark.claudeCode.autoLaunch` (default: false) - Setting: `ritemark.claudeCode.flags` (e.g., `--dangerously-skip-permissions`) - One-time prompt before enabling
 
+## Internationalisation (i18n)
+
+- [ ] **UI language support** — All user-facing strings should go through a translation system instead of hardcoded English
+- [ ] **Estonian** as first additional language (Jarmo's native)
+- [ ] Language picker in Settings (already have `LanguagePickerModal` for dictation — extend for full UI)
+- [ ] Consider VS Code's built-in `vscode.l10n` API for extension strings
+- [ ] Webview strings: lightweight i18n (e.g. `i18next` or simple key-value map)
+
 ## Distribution
 
 - [ ] **Homebrew Cask support** - `brew install --cask ritemark` - See `docs/sprints/sprint-16-auto-update/research/HOMEBREW-CASK-GUIDE.md`
@@ -182,4 +190,4 @@ Consolidate UI components using shadcn/ui for consistency.
 
 * * *
 
-*Last updated: 2026-02-10*
+*Last updated: 2026-03-03*
