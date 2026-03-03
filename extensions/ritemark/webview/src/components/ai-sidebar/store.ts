@@ -45,38 +45,61 @@ function nextId(): string {
 }
 
 // ── Context window estimation ─────────────────────────────────────────
+// Uses cost-based estimation (from SDK metrics) when available, falling back
+// to a conservative text-only heuristic. We intentionally do NOT try to estimate
+// tool call token usage — the SDK manages that via compaction internally.
+//
+// Pricing reference (per million tokens):
+//   Sonnet: $3 input / $15 output → ~$5 blended average
+//   Opus:   $15 input / $75 output → ~$30 blended average
+//   Haiku:  $0.25 input / $1.25 output → ~$0.5 blended average
+//
+// Image tokens: (width×height)/750, max ~1600 after resize
+// Source: https://platform.claude.com/docs/en/build-with-claude/vision
+
 const CONTEXT_WINDOW_TOKENS = 200_000;
-const SYSTEM_OVERHEAD_TOKENS = 600;
 
 function estimateConversationTokens(turns: AgentConversationTurn[]): number {
-  let tokens = SYSTEM_OVERHEAD_TOKENS;
+  // ── Strategy 1: Cost-based (most accurate) ──
+  // total_cost_usd from the SDK is real usage data. Derive token estimate from it.
+  let totalCost = 0;
+  let lastModel = '';
   for (const turn of turns) {
-    // Per-turn framing overhead (role tokens, message structure)
-    tokens += 200;
-    // User prompt
+    if (turn.result?.metrics?.costUsd) {
+      totalCost += turn.result.metrics.costUsd;
+      lastModel = turn.result.metrics.model || lastModel;
+    }
+  }
+  if (totalCost > 0) {
+    // Blended price per million tokens (weighted toward input-heavy agent workloads)
+    const pricePerMillion = lastModel.includes('opus') ? 25
+      : lastModel.includes('haiku') ? 0.4
+      : 4; // Sonnet default
+    return Math.round((totalCost / pricePerMillion) * 1_000_000);
+  }
+
+  // ── Strategy 2: Text-only heuristic (conservative fallback) ──
+  // Only counts what we can actually see. Intentionally underestimates because
+  // tool call internals are invisible to us and managed by SDK compaction.
+  let tokens = 4000; // Claude Code system prompt overhead
+  for (const turn of turns) {
+    tokens += 100; // per-turn message framing
     tokens += Math.ceil((turn.userPrompt?.length || 0) / 4);
-    // Attachments
     if (turn.attachments) {
       for (const att of turn.attachments) {
         if (att.kind === 'text') {
           tokens += Math.ceil(att.data.length / 4);
         } else if (att.kind === 'image') {
-          // Images use vision tokens — typically 1000-2000 tokens regardless of base64 size
-          // A high-res screenshot is ~1600 tokens, not base64_length/4
-          tokens += 1600;
+          tokens += 1600; // Anthropic vision: max ~1600 tokens per image
         } else {
-          // PDFs: base64 → binary → tokens (rough estimate)
-          tokens += Math.ceil(att.data.length * 0.75 / 4);
+          // PDFs: rough page-based estimate (~1500 tokens/page, assume ~5 pages)
+          tokens += 7500;
         }
       }
     }
-    // Agent response (only the final text — tool call internals are managed by SDK compaction)
     if (turn.result?.text) {
       tokens += Math.ceil(turn.result.text.length / 4);
     }
-    // Tool calls: count only tool_use activities (not thinking/init/subagent metadata)
-    const toolUseCount = (turn.activities || []).filter(a => a.type === 'tool_use').length;
-    tokens += toolUseCount * 300;
   }
   return tokens;
 }
