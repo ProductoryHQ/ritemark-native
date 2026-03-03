@@ -360,6 +360,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       hasSeenWelcome,
       discoveredAgents,
       discoveredCommands,
+      workspacePath: this._workspacePath,
     });
   }
 

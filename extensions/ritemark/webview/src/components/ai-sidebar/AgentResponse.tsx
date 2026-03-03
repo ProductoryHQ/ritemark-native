@@ -51,9 +51,9 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           <div className="flex items-start gap-2 text-[var(--vscode-editorWarning-foreground)]">
             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <div className="font-medium">Vestlus ületas kontekstiakna piiri</div>
+              <div className="font-medium">Conversation exceeded context window limit</div>
               <div className="text-[11px] opacity-80">
-                Pikad vestlused koguvad token-kasutust. Uue vestluse alustamine annab agendile täieliku konteksti.
+                Long conversations accumulate token usage. Starting a new chat gives the agent full context capacity.
               </div>
             </div>
           </div>
@@ -63,7 +63,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
             >
               <RotateCcw size={11} />
-              Alusta uut vestlust
+              Start new chat
             </button>
           </div>
         </div>

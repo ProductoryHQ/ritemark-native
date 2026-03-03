@@ -121,13 +121,13 @@ export function AgentView() {
         <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] text-[11px] text-[var(--vscode-editorWarning-foreground)]">
           <AlertTriangle size={12} className="shrink-0" />
           <span className="flex-1">
-            Vestlus hakkab pikaks minema (~{Math.round(contextUsagePercent)}%). Kasuta <code>/compact</code> või{' '}
+            Conversation getting long (~{Math.round(contextUsagePercent)}% context used). Use <code>/compact</code> or{' '}
             <button
               onClick={startNewConversation}
               className="underline hover:opacity-80 inline-flex items-center gap-0.5"
             >
               <RotateCcw size={9} />
-              alusta uut vestlust
+              start a new chat
             </button>
           </span>
         </div>
