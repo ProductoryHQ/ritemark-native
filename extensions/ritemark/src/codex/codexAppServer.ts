@@ -110,13 +110,18 @@ export class CodexAppServer extends EventEmitter {
   /**
    * Start an agent turn (send user message)
    */
-  async turnStart(threadId: string, message: string, model?: string): Promise<TurnStartResponse> {
+  async turnStart(threadId: string, message: string, model?: string, imageDataUrls?: string[]): Promise<TurnStartResponse> {
     await this.manager.ensureRunning();
     const input: UserInput[] = [{
       type: 'text',
       text: message,
       text_elements: [],
     }];
+    if (imageDataUrls) {
+      for (const url of imageDataUrls) {
+        input.push({ type: 'image', image_url: url });
+      }
+    }
     return this.rpc<TurnStartParams, TurnStartResponse>('turn/start', {
       threadId,
       input,

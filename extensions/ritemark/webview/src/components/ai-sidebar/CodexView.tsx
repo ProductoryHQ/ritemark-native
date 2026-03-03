@@ -69,7 +69,7 @@ function CodexTurn({
   return (
     <div className="space-y-2">
       {/* User message */}
-      <UserPromptBubble>
+      <UserPromptBubble attachments={turn.attachments}>
         {turn.userPrompt}
       </UserPromptBubble>
 

@@ -27,6 +27,15 @@ const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',
 /** Max text file size (500KB — larger files should be read by the agent from disk) */
 const MAX_TEXT_SIZE = 512 * 1024;
 
+/** Estimate tokens for an attachment */
+function estimateAttachmentTokens(att: FileAttachment): number {
+  if (att.kind === 'text') return Math.ceil(att.data.length / 4);
+  // base64 → binary (~75% of base64 length), then ÷ 4 for tokens
+  return Math.ceil(att.data.length * 0.75 / 4);
+}
+
+const TOKEN_WARNING_THRESHOLD = 10_000;
+
 /** Dropped file path chip */
 interface PathChip {
   id: string;
@@ -172,7 +181,7 @@ export function ChatInput() {
     if (!prompt || isLoading) return;
 
     if (isCodex) {
-      sendCodexMessage(prompt);
+      sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined);
     } else if (isClaudeCode) {
       sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile });
     } else {
@@ -449,7 +458,7 @@ export function ChatInput() {
   }, []);
 
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
-    if (!isClaudeCode) return;
+    if (!isClaudeCode && !isCodex) return;
 
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -469,7 +478,7 @@ export function ChatInput() {
         break;
       }
     }
-  }, [isClaudeCode, processFile]);
+  }, [isClaudeCode, isCodex, processFile]);
 
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
@@ -536,8 +545,8 @@ export function ChatInput() {
       }
     }
 
-    // Also check for dropped files (actual file objects) — attachments are Claude Code only
-    if (e.dataTransfer.files.length > 0 && paths.length === 0 && isClaudeCode) {
+    // Also check for dropped files (actual file objects) — agent modes only
+    if (e.dataTransfer.files.length > 0 && paths.length === 0 && isAgentMode) {
       for (const file of e.dataTransfer.files) {
         try {
           const att = await processFile(file);
@@ -562,7 +571,7 @@ export function ChatInput() {
         return [...prev, chip];
       });
     }
-  }, [isClaudeCode, processFile]);
+  }, [isAgentMode, processFile]);
 
   // Listen for file paths sent from extension (Explorer context menu → "Send to AI Chat")
   useEffect(() => {
@@ -709,40 +718,48 @@ export function ChatInput() {
       {/* Attachment thumbnail strip */}
       {attachments.length > 0 && (
         <div className="flex gap-1.5 mb-2 flex-wrap">
-          {attachments.map((att) => (
-            <div
-              key={att.id}
-              className="relative group rounded overflow-hidden border border-[var(--vscode-panel-border)] bg-[var(--vscode-input-background)]"
-            >
-              {att.kind === 'image' && att.thumbnail ? (
-                <div className="w-14 h-14">
-                  <img
-                    src={att.thumbnail}
-                    alt={att.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-2 py-1.5 max-w-[160px]">
-                  {att.kind === 'pdf' ? (
-                    <FileText size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+          {attachments.map((att) => {
+            const tokenCount = estimateAttachmentTokens(att);
+            const showTokenWarning = tokenCount > TOKEN_WARNING_THRESHOLD;
+            return (
+              <div key={att.id} className="flex flex-col">
+                <div className="relative group rounded overflow-hidden border border-[var(--vscode-panel-border)] bg-[var(--vscode-input-background)]">
+                  {att.kind === 'image' && att.thumbnail ? (
+                    <div className="w-14 h-14">
+                      <img
+                        src={att.thumbnail}
+                        alt={att.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   ) : (
-                    <FileImage size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+                    <div className="flex items-center gap-1.5 px-2 py-1.5 max-w-[160px]">
+                      {att.kind === 'pdf' ? (
+                        <FileText size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+                      ) : (
+                        <FileImage size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+                      )}
+                      <span className="text-[10px] text-[var(--vscode-descriptionForeground)] truncate">
+                        {att.name}
+                      </span>
+                    </div>
                   )}
-                  <span className="text-[10px] text-[var(--vscode-descriptionForeground)] truncate">
-                    {att.name}
-                  </span>
+                  <button
+                    onClick={() => removeAttachment(att.id)}
+                    className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-black/60 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove"
+                  >
+                    <X size={10} />
+                  </button>
                 </div>
-              )}
-              <button
-                onClick={() => removeAttachment(att.id)}
-                className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-black/60 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove"
-              >
-                <X size={10} />
-              </button>
-            </div>
-          ))}
+                {showTokenWarning && (
+                  <span className="text-[9px] text-[var(--vscode-editorWarning-foreground)] mt-0.5">
+                    ~{Math.round(tokenCount / 1000)}K tokenid ({Math.round(tokenCount / 2000)}%)
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -766,8 +783,8 @@ export function ChatInput() {
       )}
 
       <div className="flex gap-2 items-end">
-        {/* Attach button — Claude Code only */}
-        {isClaudeCode && (
+        {/* Attach button — agent modes (Claude Code + Codex) */}
+        {isAgentMode && (
           <>
             <input
               ref={fileInputRef}

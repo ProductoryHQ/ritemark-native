@@ -187,7 +187,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         // Codex messages
         case 'codex-execute':
-          await this._handleCodexExecution(message.prompt, message.model);
+          await this._handleCodexExecution(message.prompt, message.model, message.attachments);
           break;
 
         case 'codex-cancel':
@@ -456,7 +456,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /**
    * Execute a prompt using the Codex agent (persistent thread).
    */
-  private async _handleCodexExecution(prompt: string, model?: string) {
+  private async _handleCodexExecution(prompt: string, model?: string, attachments?: Array<{ kind: string; data: string; mediaType: string }>) {
     if (!isEnabled('codex-integration')) {
       this._view?.webview.postMessage({
         type: 'codex-result',
@@ -482,11 +482,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         this._codexThreadId = result.thread.id;
       }
 
+      // Convert image attachments to data URLs for Codex
+      const imageDataUrls = attachments
+        ?.filter(a => a.kind === 'image')
+        .map(a => `data:${a.mediaType};base64,${a.data}`);
+
       // Start turn (send user message)
       const turnResult = await this._codexAppServer.turnStart(
         this._codexThreadId,
         prompt,
         model,
+        imageDataUrls && imageDataUrls.length > 0 ? imageDataUrls : undefined,
       );
       this._codexTurnId = turnResult.turn.id;
 
