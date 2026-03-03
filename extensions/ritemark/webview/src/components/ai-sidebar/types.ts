@@ -6,7 +6,7 @@
 
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
-export type AgentId = 'ritemark-agent' | 'claude-code';
+export type AgentId = 'ritemark-agent' | 'claude-code' | 'codex';
 
 export interface AgentInfo {
   id: AgentId;
@@ -22,7 +22,7 @@ export interface ModelOption {
   description: string;
 }
 
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'subagent_start' | 'subagent_progress' | 'subagent_done';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
   type: AgentProgressType;
@@ -177,13 +177,38 @@ export interface DiscoveredCommand {
   source: 'commands' | 'skills';
 }
 
+// ── Codex types ──
+
+export interface CodexApprovalRequest {
+  approvalType: 'command' | 'fileChange';
+  requestId: string | number;
+  command?: string;
+  workingDir?: string;
+  fileChanges?: Record<string, unknown>;
+}
+
+export interface CodexConversationTurn {
+  id: string;
+  userPrompt: string;
+  streamingText: string;
+  activities: AgentProgress[];
+  approval?: CodexApprovalRequest;
+  result?: {
+    status: string;
+    error?: string;
+  };
+  isRunning: boolean;
+  timestamp: number;
+}
+
 // ── Messages from extension → webview ──
 
 export type ExtensionMessage =
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
-  | { type: 'agent:config'; agenticEnabled: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; setupStatus?: SetupStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[] }
-  | { type: 'selection-update'; selection: EditorSelection }
+  | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; setupStatus?: SetupStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[] }
+  | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
+  | { type: 'active-file-changed'; path: string | null }
   | { type: 'ai-streaming'; content: string }
   | { type: 'ai-result'; success: boolean; message?: string; hasRagContext?: boolean }
   | { type: 'rag-results'; results: RAGCitation[] }
@@ -200,4 +225,10 @@ export type ExtensionMessage =
   | { type: 'agent-setup:complete'; status: SetupStatus }
   | { type: 'agent-setup:error'; error: string }
   | { type: 'settings:chatFontSize'; fontSize: number }
-  | { type: 'toggle-history-panel' };
+  | { type: 'toggle-history-panel' }
+  | { type: 'files-dropped'; paths: string[] }
+  // Codex messages
+  | { type: 'codex-progress'; progress: AgentProgress }
+  | { type: 'codex-streaming'; delta: string }
+  | { type: 'codex-result'; status?: string; error?: string }
+  | { type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> };

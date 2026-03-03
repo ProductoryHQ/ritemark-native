@@ -16,6 +16,7 @@ function getStatusText(activities: AgentProgress[]): string {
 
   const last = activities[activities.length - 1];
 
+  if (last.type === 'compacting') return last.message;
   if (last.type === 'thinking') return 'Thinking...';
   if (last.type === 'init') return 'Starting...';
   if (last.type === 'subagent_start') return `Starting: ${last.subagentTask || 'subagent'}`;

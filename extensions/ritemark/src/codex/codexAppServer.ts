@@ -6,8 +6,8 @@
  * Handles:
  * - JSONL parsing (newline-delimited JSON)
  * - Request/response correlation (via id)
+ * - Server-initiated requests (approvals) — responded via sendResponse()
  * - Event dispatching (server → client notifications)
- * - Error handling
  */
 
 import { EventEmitter } from 'events';
@@ -18,16 +18,17 @@ import type {
   JsonRpcNotification,
   InitializeParams,
   InitializeResult,
-  AuthStatus,
-  StartLoginParams,
-  StartLoginResult,
-  CreateThreadParams,
-  CreateThreadResult,
-  StartTurnParams,
-  StartTurnResult,
-  ApproveCommandParams,
-  ApproveFileChangeParams,
-  CodexEvent,
+  GetAuthStatusParams,
+  GetAuthStatusResponse,
+  ThreadStartParams,
+  ThreadStartResponse,
+  TurnStartParams,
+  TurnStartResponse,
+  TurnInterruptParams,
+  UserInput,
+  ExecCommandApprovalResponse,
+  ApplyPatchApprovalResponse,
+  ReviewDecision,
 } from './codexProtocol';
 
 export class CodexAppServer extends EventEmitter {
@@ -55,15 +56,14 @@ export class CodexAppServer extends EventEmitter {
   async ensureInitialized(): Promise<InitializeResult> {
     await this.manager.ensureRunning();
 
-    // Send initialize RPC
     return this.rpc<InitializeParams, InitializeResult>('initialize', {
       clientInfo: {
         name: 'ritemark-native',
-        version: '1.3.1',
+        title: 'Ritemark Native',
+        version: '1.4.0',
       },
       capabilities: {
-        approvals: true,
-        streaming: true,
+        experimentalApi: false,
       },
     });
   }
@@ -71,65 +71,83 @@ export class CodexAppServer extends EventEmitter {
   /**
    * Get authentication status
    */
-  async getAuthStatus(): Promise<AuthStatus> {
+  async getAuthStatus(): Promise<GetAuthStatusResponse> {
     await this.manager.ensureRunning();
-    return this.rpc<void, AuthStatus>('auth/getStatus', undefined);
+    return this.rpc<GetAuthStatusParams, GetAuthStatusResponse>('getAuthStatus', {
+      includeToken: null,
+      refreshToken: null,
+    });
   }
 
   /**
-   * Start OAuth login flow
+   * Start ChatGPT OAuth login flow
    */
-  async startLogin(params: StartLoginParams = {}): Promise<StartLoginResult> {
+  async loginChatGpt(): Promise<void> {
     await this.manager.ensureRunning();
-    return this.rpc<StartLoginParams, StartLoginResult>('auth/startLogin', params);
+    await this.rpc<undefined, unknown>('loginChatGpt', undefined);
   }
 
   /**
-   * Logout (clear credentials)
+   * Logout from ChatGPT
    */
-  async logout(): Promise<void> {
+  async logoutChatGpt(): Promise<void> {
     await this.manager.ensureRunning();
-    return this.rpc<void, void>('auth/logout', undefined);
+    await this.rpc<undefined, unknown>('logoutChatGpt', undefined);
   }
 
   /**
-   * Create a new thread
+   * Start a new thread (conversation)
    */
-  async createThread(params: CreateThreadParams): Promise<CreateThreadResult> {
+  async threadStart(params: Partial<ThreadStartParams> & { cwd?: string | null }): Promise<ThreadStartResponse> {
     await this.manager.ensureRunning();
-    return this.rpc<CreateThreadParams, CreateThreadResult>('thread/create', params);
+    return this.rpc<ThreadStartParams, ThreadStartResponse>('thread/start', {
+      experimentalRawEvents: false,
+      persistExtendedHistory: false,
+      ...params,
+    });
   }
 
   /**
-   * Start an agent turn
+   * Start an agent turn (send user message)
    */
-  async startTurn(params: StartTurnParams): Promise<StartTurnResult> {
+  async turnStart(threadId: string, message: string, model?: string): Promise<TurnStartResponse> {
     await this.manager.ensureRunning();
-    return this.rpc<StartTurnParams, StartTurnResult>('turn/start', params);
+    const input: UserInput[] = [{
+      type: 'text',
+      text: message,
+      text_elements: [],
+    }];
+    return this.rpc<TurnStartParams, TurnStartResponse>('turn/start', {
+      threadId,
+      input,
+      model: model || null,
+    });
   }
 
   /**
    * Interrupt current turn
    */
-  async interruptTurn(threadId: string, turnId: string): Promise<void> {
+  async turnInterrupt(threadId: string, turnId: string): Promise<void> {
     await this.manager.ensureRunning();
-    return this.rpc<{ threadId: string; turnId: string }, void>('turn/interrupt', { threadId, turnId });
+    await this.rpc<TurnInterruptParams, unknown>('turn/interrupt', { threadId, turnId });
   }
 
   /**
-   * Approve/reject shell command
+   * Respond to a server-initiated approval request.
+   * The server sends a JSON-RPC request (with an id) for approval.
+   * We respond with our decision using that same id.
    */
-  async approveCommand(params: ApproveCommandParams): Promise<void> {
-    await this.manager.ensureRunning();
-    return this.rpc<ApproveCommandParams, void>('approve/command', params);
-  }
-
-  /**
-   * Approve/reject file change
-   */
-  async approveFileChange(params: ApproveFileChangeParams): Promise<void> {
-    await this.manager.ensureRunning();
-    return this.rpc<ApproveFileChangeParams, void>('approve/fileChange', params);
+  sendApprovalResponse(requestId: string | number, decision: ReviewDecision): void {
+    const response: JsonRpcResponse = {
+      jsonrpc: '2.0',
+      id: requestId,
+      result: { decision } as ExecCommandApprovalResponse | ApplyPatchApprovalResponse,
+    };
+    try {
+      this.manager.send(JSON.stringify(response));
+    } catch (error) {
+      console.error('Failed to send approval response:', error);
+    }
   }
 
   /**
@@ -145,7 +163,6 @@ export class CodexAppServer extends EventEmitter {
         params,
       };
 
-      // Timeout to prevent permanent leaks
       const timer = setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
@@ -153,13 +170,11 @@ export class CodexAppServer extends EventEmitter {
         }
       }, timeoutMs);
 
-      // Store pending request (clear timer on resolve/reject)
       this.pendingRequests.set(id, {
         resolve: (result: unknown) => { clearTimeout(timer); resolve(result as TResult); },
         reject: (error: Error) => { clearTimeout(timer); reject(error); },
       });
 
-      // Send request
       try {
         this.manager.send(JSON.stringify(request));
       } catch (error) {
@@ -176,13 +191,9 @@ export class CodexAppServer extends EventEmitter {
   private handleStdout(data: string): void {
     this.buffer += data;
 
-    // Split by newlines (JSONL format)
     const lines = this.buffer.split('\n');
-
-    // Keep last incomplete line in buffer
     this.buffer = lines.pop() || '';
 
-    // Process complete lines
     for (const line of lines) {
       if (line.trim()) {
         try {
@@ -195,21 +206,14 @@ export class CodexAppServer extends EventEmitter {
     }
   }
 
-  /**
-   * Handle stderr data (debug logs)
-   */
   private handleStderr(data: string): void {
     console.error('[codex stderr]', data);
   }
 
-  /**
-   * Handle process exit
-   */
   private handleExit(code: number | null): void {
     console.log(`Codex app-server exited with code ${code}`);
 
-    // Reject all pending requests
-    for (const [id, { reject }] of this.pendingRequests.entries()) {
+    for (const [, { reject }] of this.pendingRequests.entries()) {
       reject(new Error('Codex app-server exited unexpectedly'));
     }
     this.pendingRequests.clear();
@@ -218,56 +222,50 @@ export class CodexAppServer extends EventEmitter {
   }
 
   /**
-   * Handle incoming JSON-RPC message (response or notification)
+   * Handle incoming JSON-RPC message
+   *
+   * Messages can be:
+   * 1. Response to our request (has 'id' + 'result'/'error')
+   * 2. Server-initiated request (has 'id' + 'method') — approvals
+   * 3. Notification (no 'id', has 'method') — events
    */
-  private handleMessage(message: JsonRpcResponse | JsonRpcNotification): void {
-    // Check if it's a response (has 'id')
-    if ('id' in message) {
-      const response = message as JsonRpcResponse;
+  private handleMessage(message: Record<string, unknown>): void {
+    const hasId = 'id' in message && message.id !== undefined;
+    const hasMethod = 'method' in message;
+
+    if (hasId && !hasMethod) {
+      // Response to our request
+      const response = message as unknown as JsonRpcResponse;
       const pending = this.pendingRequests.get(response.id as number);
 
       if (pending) {
         this.pendingRequests.delete(response.id as number);
-
         if (response.error) {
           pending.reject(new Error(response.error.message));
         } else {
           pending.resolve(response.result);
         }
-      } else {
-        console.warn('Received response for unknown request id:', response.id);
       }
-    }
-    // Otherwise it's a notification (event)
-    else {
-      const notification = message as JsonRpcNotification;
-      this.handleEvent(notification);
+    } else if (hasId && hasMethod) {
+      // Server-initiated request (approval)
+      // Emit with method name so UnifiedViewProvider can handle & respond
+      this.emit('server-request', {
+        id: message.id,
+        method: message.method,
+        params: message.params,
+      });
+    } else if (hasMethod) {
+      // Notification (event)
+      const notification = message as unknown as JsonRpcNotification;
+      this.emit(notification.method as string, notification.params);
+      this.emit('notification', notification);
     }
   }
 
-  /**
-   * Handle server event (notification)
-   */
-  private handleEvent(notification: JsonRpcNotification): void {
-    const event = notification as CodexEvent;
-
-    // Emit event with method name
-    this.emit(event.method, event.params);
-
-    // Also emit generic 'event' for all events
-    this.emit('event', event);
-  }
-
-  /**
-   * Check if app-server is running
-   */
   isRunning(): boolean {
     return this.manager.isRunning();
   }
 
-  /**
-   * Cleanup
-   */
   dispose(): void {
     this.manager.dispose();
     this.removeAllListeners();

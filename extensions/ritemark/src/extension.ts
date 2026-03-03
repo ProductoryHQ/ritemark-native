@@ -161,6 +161,18 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Register "Send to AI Chat" — Explorer context menu
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.sendToChat', (uri: vscode.Uri, selectedUris?: vscode.Uri[]) => {
+      const uris = selectedUris ?? (uri ? [uri] : []);
+      const paths = uris.map(u => u.fsPath);
+      if (paths.length > 0) {
+        unifiedViewProvider.sendFilePaths(paths);
+        vscode.commands.executeCommand('ritemark.unifiedView.focus');
+      }
+    })
+  );
+
   // Register Flow Editor Provider (visual editor for .flow.json files)
   context.subscriptions.push(
     FlowEditorProvider.register(context)

@@ -42,6 +42,10 @@
         "title": "Ritemark: Re-index Documents"
       },
       {
+        "command": "ritemark.sendToChat",
+        "title": "Send to AI Chat"
+      },
+      {
         "command": "ritemark.newChat",
         "title": "New Chat",
         "icon": "$(add)"
@@ -119,11 +123,13 @@
             "default": "ritemark-agent",
             "enum": [
               "ritemark-agent",
-              "claude-code"
+              "claude-code",
+              "codex"
             ],
             "enumDescriptions": [
               "Ritemark Agent - Chat assistant with RAG search and image generation",
-              "Claude Code (experimental) - Autonomous agent that can read, write, and organize files"
+              "Claude Code (experimental) - Autonomous agent that can read, write, and organize files",
+              "Codex (experimental) - OpenAI coding agent with ChatGPT authentication"
             ],
             "description": "Select which AI agent to use in the sidebar",
             "scope": "application"
@@ -258,6 +264,12 @@
           "command": "ritemark.flows.settings",
           "when": "view == ritemark.flowsView",
           "group": "navigation@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "ritemark.sendToChat",
+          "group": "navigation"
         }
       ]
     },

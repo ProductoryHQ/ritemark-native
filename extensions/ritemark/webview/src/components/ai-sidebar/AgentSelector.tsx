@@ -21,28 +21,36 @@ import type { AgentId } from './types';
 export function AgentSelector() {
   const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
   const selectedModel = useAISidebarStore((s) => s.selectedModel);
+  const codexSelectedModel = useAISidebarStore((s) => s.codexSelectedModel);
   const agents = useAISidebarStore((s) => s.agents);
   const models = useAISidebarStore((s) => s.models);
+  const codexModels = useAISidebarStore((s) => s.codexModels);
   const agenticEnabled = useAISidebarStore((s) => s.agenticEnabled);
   const selectAgent = useAISidebarStore((s) => s.selectAgent);
   const selectModel = useAISidebarStore((s) => s.selectModel);
+  const selectCodexModel = useAISidebarStore((s) => s.selectCodexModel);
 
   const visibleAgents = agents.filter((a) => !a.experimental || agenticEnabled);
 
   if (visibleAgents.length <= 1 && models.length === 0) return null;
 
-  // Build the composite value: "ritemark-agent" or "claude-code:claude-sonnet-4-5"
+  // Build the composite value: "ritemark-agent", "claude-code:model", or "codex:model"
   const currentValue =
     selectedAgent === 'claude-code'
       ? `claude-code:${selectedModel}`
-      : selectedAgent;
+      : selectedAgent === 'codex'
+        ? `codex:${codexSelectedModel}`
+        : selectedAgent;
 
   // Build display label for the trigger
   const currentModelLabel = models.find((m) => m.id === selectedModel)?.label;
+  const currentCodexModelLabel = codexModels.find((m) => m.id === codexSelectedModel)?.label;
   const triggerLabel =
     selectedAgent === 'claude-code' && currentModelLabel
       ? `Claude Code · ${currentModelLabel}`
-      : agents.find((a) => a.id === selectedAgent)?.label || 'Select agent...';
+      : selectedAgent === 'codex' && currentCodexModelLabel
+        ? `Codex · ${currentCodexModelLabel}`
+        : agents.find((a) => a.id === selectedAgent)?.label || 'Select agent...';
 
   function handleChange(value: string) {
     if (value.startsWith('claude-code:')) {
@@ -51,6 +59,12 @@ export function AgentSelector() {
         selectAgent('claude-code' as AgentId);
       }
       selectModel(modelId);
+    } else if (value.startsWith('codex:')) {
+      const modelId = value.slice('codex:'.length);
+      if (selectedAgent !== 'codex') {
+        selectAgent('codex' as AgentId);
+      }
+      selectCodexModel(modelId);
     } else {
       selectAgent(value as AgentId);
     }
@@ -65,7 +79,7 @@ export function AgentSelector() {
         <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
           {/* Ritemark Agent — single item */}
           {visibleAgents
-            .filter((a) => a.id !== 'claude-code')
+            .filter((a) => a.id !== 'claude-code' && a.id !== 'codex')
             .map((agent) => (
               <SelectItem key={agent.id} value={agent.id} className="text-xs">
                 {agent.label}
@@ -82,6 +96,26 @@ export function AgentSelector() {
                   <SelectItem
                     key={model.id}
                     value={`claude-code:${model.id}`}
+                    className="text-xs"
+                  >
+                    {model.label}
+                    <span className="ml-1.5 text-[10px] opacity-50">{model.description}</span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </>
+          )}
+
+          {/* Codex — grouped by model */}
+          {visibleAgents.some((a) => a.id === 'codex') && codexModels.length > 0 && (
+            <>
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectLabel className="text-[10px]">Codex</SelectLabel>
+                {codexModels.map((model) => (
+                  <SelectItem
+                    key={model.id}
+                    value={`codex:${model.id}`}
                     className="text-xs"
                   >
                     {model.label}

@@ -370,7 +370,7 @@ export class RitemarkSettingsProvider {
       });
 
       // Start OAuth flow (opens browser)
-      await this.codexAuth.startLogin('browser');
+      await this.codexAuth.startLogin();
 
       // OAuth is async - status will be updated via 'statusChanged' event
       vscode.window.showInformationMessage(
@@ -445,10 +445,8 @@ export class RitemarkSettingsProvider {
         type: 'codex:authStatus',
         data: {
           enabled: true,
-          authenticated: status.authenticated,
-          email: status.email,
-          plan: status.plan,
-          credits: status.credits,
+          authenticated: status.authMethod !== null,
+          authMethod: status.authMethod,
         },
       });
     } catch (error) {

@@ -9,7 +9,7 @@
 export { runAgent, AgentSession } from './AgentRunner';
 export { getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth } from './setup';
 export { installClaude, openClaudeLoginTerminal, openAnthropicKeySettings } from './installer';
-export { AGENTS, CLAUDE_MODELS, DEFAULT_MODEL } from './types';
+export { AGENTS, CLAUDE_MODELS, CODEX_MODELS, DEFAULT_MODEL } from './types';
 export type {
   ModelOption,
   AgentId,

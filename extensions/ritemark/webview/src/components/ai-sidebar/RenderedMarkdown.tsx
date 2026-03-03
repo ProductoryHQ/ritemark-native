@@ -94,7 +94,10 @@ export const markdownStyles = `
 
 /* Paragraphs */
 .rendered-markdown p {
-  margin: 6px 0;
+  margin: 8px 0;
+}
+.rendered-markdown p + p {
+  margin-top: 10px;
 }
 
 /* Links */

@@ -8,7 +8,7 @@
 /**
  * Available agent identifiers
  */
-export type AgentId = 'ritemark-agent' | 'claude-code';
+export type AgentId = 'ritemark-agent' | 'claude-code' | 'codex';
 
 /**
  * Agent metadata for the selector dropdown
@@ -39,6 +39,13 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
     experimental: false,
     requiresApiKey: 'anthropic',
   },
+  'codex': {
+    id: 'codex',
+    label: 'Codex',
+    description: 'OpenAI coding agent with ChatGPT authentication',
+    experimental: true,
+    requiresApiKey: null, // Uses ChatGPT OAuth, not API key
+  },
 };
 
 /**
@@ -58,10 +65,16 @@ export const CLAUDE_MODELS: ModelOption[] = [
 
 export const DEFAULT_MODEL = 'claude-sonnet-4-5';
 
+export const CODEX_MODELS: ModelOption[] = [
+  { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', description: 'Most capable' },
+  { id: 'codex-spark', label: 'Codex Spark', description: 'Fast & light' },
+  { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex', description: 'Balanced' },
+];
+
 /**
  * Progress event types from agent execution
  */
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'subagent_start' | 'subagent_progress' | 'subagent_done';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
 
 /**
  * Progress event emitted during agent execution

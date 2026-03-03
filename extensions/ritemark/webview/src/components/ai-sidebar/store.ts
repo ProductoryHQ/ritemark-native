@@ -26,6 +26,7 @@ import type {
   RAGCitation,
   WidgetData,
   AgentConversationTurn,
+  CodexConversationTurn,
   FileAttachment,
   DiscoveredAgent,
   DiscoveredCommand,
@@ -57,6 +58,7 @@ interface AISidebarState {
 
   // ── Selection ──
   selection: EditorSelection;
+  activeFilePath: string | null;
 
   // ── Chat state (Ritemark Agent) ──
   chatMessages: ChatMessage[];
@@ -67,6 +69,12 @@ interface AISidebarState {
 
   // ── Agent state (Claude Code) ──
   agentConversation: AgentConversationTurn[];
+
+  // ── Codex state ──
+  codexEnabled: boolean;
+  codexModels: ModelOption[];
+  codexSelectedModel: string;
+  codexConversation: CodexConversationTurn[];
 
   // ── Chat history state ──
   currentConversationId: string | null;
@@ -95,7 +103,7 @@ interface AISidebarState {
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
   sendChatMessage: (prompt: string) => void;
-  sendAgentMessage: (prompt: string, attachments?: FileAttachment[]) => void;
+  sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean }) => void;
   cancelRequest: () => void;
   applyWidget: (widget: WidgetData) => void;
   discardWidget: (messageId: string) => void;
@@ -111,6 +119,9 @@ interface AISidebarState {
   approvePlan: (turnId: string) => void;
   rejectPlan: (turnId: string, feedback?: string) => void;
   dismissWelcome: () => void;
+  sendCodexMessage: (prompt: string) => void;
+  selectCodexModel: (modelId: string) => void;
+  handleCodexApproval: (requestId: string | number, approved: boolean) => void;
 
   // ── Chat history actions ──
   loadConversationList: () => void;
@@ -137,6 +148,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   models: [],
 
   selection: { text: '', isEmpty: true, from: 0, to: 0 },
+  activeFilePath: null,
 
   chatMessages: [],
   conversationHistory: [],
@@ -145,6 +157,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   pendingCitations: [],
 
   agentConversation: [],
+
+  codexEnabled: false,
+  codexModels: [],
+  codexSelectedModel: 'gpt-5.3-codex',
+  codexConversation: [],
 
   currentConversationId: null,
   savedConversations: [],
@@ -201,7 +218,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     });
   },
 
-  sendAgentMessage: (prompt, attachments?) => {
+  sendAgentMessage: (prompt, attachments?, options?) => {
     const state = get();
     const lastTurn = state.agentConversation[state.agentConversation.length - 1];
     if (lastTurn?.isRunning) return;
@@ -227,12 +244,20 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       data: att.data,
       mediaType: att.mediaType,
     }));
-    vscode.postMessage({ type: 'ai-execute-agent', prompt, images: attachmentPayload });
+    vscode.postMessage({ type: 'ai-execute-agent', prompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile });
   },
 
   cancelRequest: () => {
     const state = get();
-    if (state.selectedAgent === 'claude-code') {
+    if (state.selectedAgent === 'codex') {
+      vscode.postMessage({ type: 'codex-cancel' });
+      const conv = [...state.codexConversation];
+      const last = conv[conv.length - 1];
+      if (last?.isRunning) {
+        conv[conv.length - 1] = { ...last, isRunning: false, result: { status: 'interrupted', error: 'Cancelled by user' } };
+      }
+      set({ codexConversation: conv });
+    } else if (state.selectedAgent === 'claude-code') {
       vscode.postMessage({ type: 'ai-cancel-agent' });
       const conv = [...state.agentConversation];
       const last = conv[conv.length - 1];
@@ -369,6 +394,38 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
   },
 
+  sendCodexMessage: (prompt) => {
+    const state = get();
+    const lastTurn = state.codexConversation[state.codexConversation.length - 1];
+    if (lastTurn?.isRunning) return;
+
+    const turn: CodexConversationTurn = {
+      id: nextId(),
+      userPrompt: prompt,
+      streamingText: '',
+      activities: [],
+      isRunning: true,
+      timestamp: Date.now(),
+    };
+
+    set({ codexConversation: [...state.codexConversation, turn] });
+    vscode.postMessage({ type: 'codex-execute', prompt, model: state.codexSelectedModel });
+  },
+
+  selectCodexModel: (modelId) => {
+    set({ codexSelectedModel: modelId });
+  },
+
+  handleCodexApproval: (requestId, approved) => {
+    const state = get();
+    // Clear the approval from the current turn
+    const conv = state.codexConversation.map((t) =>
+      t.approval?.requestId === requestId ? { ...t, approval: undefined } : t
+    );
+    set({ codexConversation: conv });
+    vscode.postMessage({ type: 'codex-approve', requestId, approved });
+  },
+
   // ── Chat history actions ──
 
   loadConversationList: () => {
@@ -379,12 +436,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   saveCurrentConversation: () => {
     const state = get();
     const hasContent =
-      state.agentConversation.length > 0 || state.chatMessages.length > 0;
+      state.agentConversation.length > 0 ||
+      state.codexConversation.length > 0 ||
+      state.chatMessages.length > 0;
 
     if (!hasContent) return;
 
     const id = state.currentConversationId || generateId();
-    const title = generateTitle(state.agentConversation, state.chatMessages);
+    const title = generateTitle(state.agentConversation, state.chatMessages, state.codexConversation);
     const now = Date.now();
 
     const existingConv = state.savedConversations.find((c) => c.id === id);
@@ -397,6 +456,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       createdAt,
       updatedAt: now,
       agentConversation: state.agentConversation,
+      codexConversation: state.codexConversation,
       chatMessages: state.chatMessages,
       conversationHistory: state.conversationHistory,
     });
@@ -410,12 +470,22 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const data = loadConversation(id);
     if (!data) return;
 
+    // Handle legacy saves: Codex conversations were stored in agentConversation
+    // before the codexConversation field was added
+    let agentConv = data.agentConversation || [];
+    let codexConv = data.codexConversation || [];
+    if (data.agentId === 'codex' && codexConv.length === 0 && agentConv.length > 0) {
+      codexConv = agentConv as unknown as typeof codexConv;
+      agentConv = [];
+    }
+
     set({
       currentConversationId: id,
       selectedAgent: data.agentId,
-      agentConversation: data.agentConversation,
-      chatMessages: data.chatMessages,
-      conversationHistory: data.conversationHistory,
+      agentConversation: agentConv,
+      codexConversation: codexConv,
+      chatMessages: data.chatMessages || [],
+      conversationHistory: data.conversationHistory || [],
       showHistoryPanel: false,
     });
 
@@ -434,6 +504,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         chatMessages: [],
         conversationHistory: [],
         agentConversation: [],
+        codexConversation: [],
       });
     }
 
@@ -446,7 +517,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const state = get();
     // Save current conversation first if it has content
     const hasContent =
-      state.agentConversation.length > 0 || state.chatMessages.length > 0;
+      state.agentConversation.length > 0 ||
+      state.codexConversation.length > 0 ||
+      state.chatMessages.length > 0;
     if (hasContent && state.currentConversationId) {
       get().saveCurrentConversation();
     }
@@ -460,6 +533,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       isStreaming: false,
       pendingCitations: [],
       agentConversation: [],
+      codexConversation: [],
       showHistoryPanel: false,
     });
   },
@@ -501,10 +575,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       case 'agent:config':
         set({
           agenticEnabled: message.agenticEnabled,
+          codexEnabled: message.codexEnabled ?? false,
           selectedAgent: (message.selectedAgent as AgentId) || 'ritemark-agent',
           selectedModel: message.selectedModel || 'claude-sonnet-4-5',
           agents: message.agents,
           models: message.models || [],
+          codexModels: message.codexModels || [],
           setupStatus: message.setupStatus ?? get().setupStatus,
           hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
           discoveredAgents: message.discoveredAgents || [],
@@ -513,7 +589,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
 
       case 'selection-update':
-        set({ selection: message.selection });
+        set({
+          selection: message.selection,
+          ...(message.activeFilePath !== undefined ? { activeFilePath: message.activeFilePath ?? null } : {}),
+        });
+        break;
+
+      case 'active-file-changed':
+        set({ activeFilePath: message.path });
         break;
 
       case 'ai-streaming':
@@ -602,11 +685,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           isStreaming: false,
           pendingCitations: [],
           agentConversation: [],
+          codexConversation: [],
         });
         break;
 
       case 'toggle-history-panel':
         get().toggleHistoryPanel();
+        break;
+
+      case 'files-dropped':
+        // Dispatch to ChatInput via DOM event (ChatInput manages its own pathChips state)
+        window.dispatchEvent(new CustomEvent('ritemark:files-dropped', { detail: message.paths }));
         break;
 
       case 'index-status':
@@ -726,6 +815,68 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       case 'agent-setup:error':
         set({ setupInProgress: false, setupError: message.error });
         break;
+
+      // ── Codex messages ──
+
+      case 'codex-progress': {
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = {
+            ...lastTurn,
+            activities: [...lastTurn.activities, message.progress as AgentProgress],
+          };
+          set({ codexConversation: conv });
+        }
+        break;
+      }
+
+      case 'codex-streaming': {
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = {
+            ...lastTurn,
+            streamingText: lastTurn.streamingText + message.delta,
+          };
+          set({ codexConversation: conv });
+        }
+        break;
+      }
+
+      case 'codex-result': {
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn) {
+          conv[conv.length - 1] = {
+            ...lastTurn,
+            isRunning: false,
+            result: { status: message.status || 'success', error: message.error },
+          };
+          set({ codexConversation: conv });
+          setTimeout(() => get().saveCurrentConversation(), 100);
+        }
+        break;
+      }
+
+      case 'codex-approval': {
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = {
+            ...lastTurn,
+            approval: {
+              approvalType: message.approvalType,
+              requestId: message.requestId,
+              command: message.command,
+              workingDir: message.workingDir,
+              fileChanges: message.fileChanges,
+            },
+          };
+          set({ codexConversation: conv });
+        }
+        break;
+      }
 
       case 'settings:chatFontSize':
         set({ chatFontSize: message.fontSize });
