@@ -96,6 +96,24 @@ async function* asSingleMessage(msg: Record<string, unknown>) {
   yield msg;
 }
 
+// ── Context overflow detection ────────────────────────────────────────
+
+const CONTEXT_OVERFLOW_PATTERNS = [
+  'prompt is too long',
+  'prompt too long',
+  'context window',
+  'context_length_exceeded',
+  'too many tokens',
+  'maximum context length',
+  'exceeds the model',
+  'token limit',
+];
+
+function isContextOverflowError(str: string): boolean {
+  const lower = str.toLowerCase();
+  return CONTEXT_OVERFLOW_PATTERNS.some(p => lower.includes(p));
+}
+
 // ── Constants ────────────────────────────────────────────────────────
 
 const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'];
@@ -251,7 +269,8 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
         } else {
           const errors = message.errors || [];
           const errorStr = errors.join('; ') || 'Execution failed';
-          emitProgress('error', errorStr);
+          const progressType = isContextOverflowError(errorStr) ? 'context_overflow' : 'error';
+          emitProgress(progressType as AgentProgress['type'], errorStr);
           if (timeoutId) clearTimeout(timeoutId);
           return { text: '', filesModified: [], metrics, error: errorStr };
         }
@@ -272,7 +291,8 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       return { text: '', filesModified: [], metrics, error: 'Execution cancelled or timed out' };
     }
 
-    emitProgress('error', errorMessage);
+    const progressType = isContextOverflowError(errorMessage) ? 'context_overflow' : 'error';
+    emitProgress(progressType as AgentProgress['type'], errorMessage);
     return { text: '', filesModified: [], metrics, error: errorMessage };
   }
 }
@@ -617,7 +637,8 @@ export class AgentSession {
             } else {
               const errors = message.errors || [];
               const errorStr = errors.join('; ') || 'Execution failed';
-              this._emitProgress?.('error', errorStr);
+              const progressType = isContextOverflowError(errorStr) ? 'context_overflow' : 'error';
+              this._emitProgress?.(progressType as AgentProgress['type'], errorStr);
               this._forceResolveTurn(this._turnId, {
                 text: '',
                 filesModified: [],
@@ -632,7 +653,9 @@ export class AgentSession {
     } catch (error) {
       if (this._closed) return;
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const progressType = isContextOverflowError(errorMessage) ? 'context_overflow' : 'error';
       // Process died — resolve any pending turn
+      this._emitProgress?.(progressType as AgentProgress['type'], errorMessage);
       this._forceResolveTurn(this._turnId, {
         text: '',
         filesModified: [],

@@ -74,7 +74,7 @@ export const CODEX_MODELS: ModelOption[] = [
 /**
  * Progress event types from agent execution
  */
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
 
 /**
  * Progress event emitted during agent execution
