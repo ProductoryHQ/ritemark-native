@@ -23,6 +23,8 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 ## Flow editor
 
+- [ ] **Codex Flow node** - Add Codex as a node type in visual AI workflows (like existing Claude Code node). Enables using Codex agent in flow diagrams.
+
 ## Onboarding / Welcome Screen
 
 Redesign Welcome screen for total newbies

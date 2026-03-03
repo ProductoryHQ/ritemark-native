@@ -1,0 +1,82 @@
+From: Claude <noreply@anthropic.com>
+Date: Sat, 18 Jan 2026 00:00:00 +0000
+Subject: Enable microphone access in webviews for voice dictation
+
+Add 'media' permission to the allowed permissions list for VS Code webviews.
+This enables the RiteMark editor webview to access the microphone via
+navigator.mediaDevices.getUserMedia() for voice dictation functionality.
+
+The 'media' permission covers both audio and video capture. This is required
+for Sprint 23's Estonian voice-to-text feature using whisper.cpp.
+
+Additionally, this patch includes macOS-specific permission handling to properly
+request microphone access from the system, with appropriate logging for debugging.
+
+diff --git a/src/vs/code/electron-main/app.ts b/src/vs/code/electron-main/app.ts
+index 29429516496..b970c3062b8 100644
+--- a/src/vs/code/electron-main/app.ts
++++ b/src/vs/code/electron-main/app.ts
+@@ -168,13 +168,35 @@ export class CodeApplication extends Disposable {
+ 		const allowedPermissionsInWebview = new Set([
+ 			'clipboard-read',
+ 			'clipboard-sanitized-write',
++			'media', // Enable microphone access for voice dictation
+ 		]);
+ 
+-		session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
++		session.defaultSession.setPermissionRequestHandler(async (_webContents, permission, callback, details) => {
++			console.log('[Permission Request]', permission, 'from', details.requestingUrl);
+ 			if (isUrlFromWebview(details.requestingUrl)) {
+-				return callback(allowedPermissionsInWebview.has(permission));
++				const allowed = allowedPermissionsInWebview.has(permission);
++				console.log('[Permission Request] Webview permission', permission, 'allowed:', allowed);
++
++				// On macOS, we need to explicitly request microphone access from the system
++				if (allowed && permission === 'media' && isMacintosh) {
++					const micStatus = systemPreferences.getMediaAccessStatus('microphone');
++					console.log('[Permission Request] macOS microphone status:', micStatus);
++
++					if (micStatus === 'not-determined') {
++						console.log('[Permission Request] Requesting microphone access from macOS...');
++						const granted = await systemPreferences.askForMediaAccess('microphone');
++						console.log('[Permission Request] macOS microphone granted:', granted);
++						return callback(granted);
++					} else if (micStatus === 'denied' || micStatus === 'restricted') {
++						console.log('[Permission Request] Microphone access denied by macOS');
++						return callback(false);
++					}
++				}
++
++				return callback(allowed);
+ 			}
+ 
++			console.log('[Permission Request] Non-webview, denied');
+ 			return callback(false);
+ 		});
+ 
+@@ -557,6 +579,25 @@ export class CodeApplication extends Disposable {
+ 			this.logService.error(error);
+ 		}
+ 
++		// Request microphone permission on macOS for voice dictation
++		if (isMacintosh) {
++			const micStatus = systemPreferences.getMediaAccessStatus('microphone');
++			this.logService.info(`[Microphone] Current status: ${micStatus}`);
++			console.log(`[Microphone] Current status: ${micStatus}`);
++
++			if (micStatus === 'not-determined') {
++				this.logService.info('[Microphone] Requesting access...');
++				console.log('[Microphone] Requesting access...');
++				systemPreferences.askForMediaAccess('microphone').then(granted => {
++					this.logService.info(`[Microphone] Access granted: ${granted}`);
++					console.log(`[Microphone] Access granted: ${granted}`);
++				}).catch(err => {
++					this.logService.error('[Microphone] Failed to request access:', err);
++					console.error('[Microphone] Failed to request access:', err);
++				});
++			}
++		}
++
+ 		// Main process server (electron IPC based)
+ 		const mainProcessElectronServer = new ElectronIPCServer();
+ 		Event.once(this.lifecycleMainService.onWillShutdown)(e => {

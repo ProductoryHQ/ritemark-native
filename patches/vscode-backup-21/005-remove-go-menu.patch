@@ -1,0 +1,30 @@
+diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
+index f495bad700a..0461bbb4969 100644
+--- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
++++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
+@@ -85,15 +85,16 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+ 	order: 4
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+-	submenu: MenuId.MenubarGoMenu,
+-	title: {
+-		value: 'Go',
+-		original: 'Go',
+-		mnemonicTitle: localize({ key: 'mGoto', comment: ['&& denotes a mnemonic'] }, "&&Go")
+-	},
+-	order: 5
+-});
++// RiteMark: Go menu removed - code navigation not relevant for markdown editing
++// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
++// 	submenu: MenuId.MenubarGoMenu,
++// 	title: {
++// 		value: 'Go',
++// 		original: 'Go',
++// 		mnemonicTitle: localize({ key: 'mGoto', comment: ['&& denotes a mnemonic'] }, "&&Go")
++// 	},
++// 	order: 5
++// });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+ 	submenu: MenuId.MenubarTerminalMenu,

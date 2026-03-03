@@ -1,0 +1,107 @@
+# RiteMark Patch: Default Ritemark Light Theme
+#
+# Purpose: Default to Ritemark Light theme on all platforms at every level
+#
+# Why: VS Code defaults to Dark theme on desktop. Ritemark targets non-technical
+#      users who expect a Light theme. This patch changes defaults at 3 levels:
+#      1. Bootstrap (main process + renderer splash) - first render colors
+#      2. Workbench theme service - placeholder theme type before extensions load
+#      3. Configuration defaults - colorTheme setting defaults to 'Ritemark Light'
+#
+# File(s): src/vs/code/electron-sandbox/workbench/workbench.js
+#          src/vs/platform/theme/electron-main/themeMainService.ts
+#          src/vs/workbench/services/themes/browser/workbenchThemeService.ts
+#          src/vs/workbench/services/themes/common/themeConfiguration.ts
+# Created: 2025-02-07
+# Updated: 2026-02-16
+#
+diff --git a/src/vs/code/electron-sandbox/workbench/workbench.js b/src/vs/code/electron-sandbox/workbench/workbench.js
+index 0ddbcd49ba0..0281f3f04b5 100644
+--- a/src/vs/code/electron-sandbox/workbench/workbench.js
++++ b/src/vs/code/electron-sandbox/workbench/workbench.js
+@@ -157,6 +157,10 @@
+ 				shellBackground = '#FFFFFF';
+ 				shellForeground = '#000000';
+ 			}
++		} else {
++			baseTheme = 'vs';
++			shellBackground = '#FFFFFF';
++			shellForeground = '#15141A';
+ 		}
+
+ 		const style = document.createElement('style');
+@@ -182,7 +186,7 @@
+
+ 			const splash = document.createElement('div');
+ 			splash.id = 'monaco-parts-splash';
+-			splash.className = baseTheme ?? 'vs-dark';
++			splash.className = baseTheme ?? 'vs';
+
+ 			if (layoutInfo.windowBorder && colorInfo.windowBorder) {
+ 				splash.setAttribute('style', `
+diff --git a/src/vs/platform/theme/electron-main/themeMainService.ts b/src/vs/platform/theme/electron-main/themeMainService.ts
+index aea7ebbb82b..b1f576896d1 100644
+--- a/src/vs/platform/theme/electron-main/themeMainService.ts
++++ b/src/vs/platform/theme/electron-main/themeMainService.ts
+@@ -140,7 +140,7 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
+ 	}
+
+ 	private getBaseTheme(): 'vs' | 'vs-dark' | 'hc-black' | 'hc-light' {
+-		const baseTheme = this.stateService.getItem<string>(THEME_STORAGE_KEY, 'vs-dark').split(' ')[0];
++		const baseTheme = this.stateService.getItem<string>(THEME_STORAGE_KEY, 'vs').split(' ')[0];
+ 		switch (baseTheme) {
+ 			case 'vs': return 'vs';
+ 			case 'hc-black': return 'hc-black';
+diff --git a/src/vs/workbench/services/themes/browser/workbenchThemeService.ts b/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
+index 857cf6f5415..c32bc80e8ba 100644
+--- a/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
++++ b/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
+@@ -159,7 +159,7 @@ export class WorkbenchThemeService extends Disposable implements IWorkbenchTheme
+ 			}
+ 		}
+ 		if (!themeData) {
+-			themeData = ColorThemeData.createUnloadedThemeForThemeType(isWeb ? ColorScheme.LIGHT : ColorScheme.DARK, defaultColorMap);
++			themeData = ColorThemeData.createUnloadedThemeForThemeType(ColorScheme.LIGHT, defaultColorMap);
+ 		}
+ 		themeData.setCustomizations(this.settings);
+ 		this.applyTheme(themeData, undefined, true);
+diff --git a/src/vs/workbench/services/themes/common/themeConfiguration.ts b/src/vs/workbench/services/themes/common/themeConfiguration.ts
+index b4a84348fb7..3a23759df6a 100644
+--- a/src/vs/workbench/services/themes/common/themeConfiguration.ts
++++ b/src/vs/workbench/services/themes/common/themeConfiguration.ts
+@@ -14,7 +14,7 @@ import { workbenchColorsSchemaId } from '../../../../platform/theme/common/color
+ import { tokenStylingSchemaId } from '../../../../platform/theme/common/tokenClassificationRegistry.js';
+ import { ThemeSettings, IWorkbenchColorTheme, IWorkbenchFileIconTheme, IColorCustomizations, ITokenColorCustomizations, IWorkbenchProductIconTheme, ISemanticTokenColorCustomizations, ThemeSettingTarget, ThemeSettingDefaults } from './workbenchThemeService.js';
+ import { IConfigurationService, ConfigurationTarget } from '../../../../platform/configuration/common/configuration.js';
+-import { isWeb } from '../../../../base/common/platform.js';
++
+ import { ColorScheme } from '../../../../platform/theme/common/theme.js';
+ import { IHostColorSchemeService } from './hostColorSchemeService.js';
+
+@@ -34,7 +34,7 @@ export const COLOR_THEME_CONFIGURATION_SETTINGS_TAG = 'colorThemeConfiguration';
+ const colorThemeSettingSchema: IConfigurationPropertySchema = {
+ 	type: 'string',
+ 	markdownDescription: nls.localize({ key: 'colorTheme', comment: ['{0} will become a link to another setting.'] }, "Specifies the color theme used in the workbench when {0} is not enabled.", formatSettingAsLink(ThemeSettings.DETECT_COLOR_SCHEME)),
+-	default: isWeb ? ThemeSettingDefaults.COLOR_THEME_LIGHT : ThemeSettingDefaults.COLOR_THEME_DARK,
++	default: 'ritemark-light',
+ 	tags: [COLOR_THEME_CONFIGURATION_SETTINGS_TAG],
+ 	enum: colorThemeSettingEnum,
+ 	enumDescriptions: colorThemeSettingEnumDescriptions,
+@@ -44,7 +44,7 @@ const colorThemeSettingSchema: IConfigurationPropertySchema = {
+ const preferredDarkThemeSettingSchema: IConfigurationPropertySchema = {
+ 	type: 'string', //
+ 	markdownDescription: nls.localize({ key: 'preferredDarkColorTheme', comment: ['{0} will become a link to another setting.'] }, 'Specifies the color theme when system color mode is dark and {0} is enabled.', formatSettingAsLink(ThemeSettings.DETECT_COLOR_SCHEME)),
+-	default: ThemeSettingDefaults.COLOR_THEME_DARK,
++	default: 'ritemark-light',
+ 	tags: [COLOR_THEME_CONFIGURATION_SETTINGS_TAG],
+ 	enum: colorThemeSettingEnum,
+ 	enumDescriptions: colorThemeSettingEnumDescriptions,
+@@ -54,7 +54,7 @@ const preferredDarkThemeSettingSchema: IConfigurationPropertySchema = {
+ const preferredLightThemeSettingSchema: IConfigurationPropertySchema = {
+ 	type: 'string',
+ 	markdownDescription: nls.localize({ key: 'preferredLightColorTheme', comment: ['{0} will become a link to another setting.'] }, 'Specifies the color theme when system color mode is light and {0} is enabled.', formatSettingAsLink(ThemeSettings.DETECT_COLOR_SCHEME)),
+-	default: ThemeSettingDefaults.COLOR_THEME_LIGHT,
++	default: 'ritemark-light',
+ 	tags: [COLOR_THEME_CONFIGURATION_SETTINGS_TAG],
+ 	enum: colorThemeSettingEnum,
+ 	enumDescriptions: colorThemeSettingEnumDescriptions,

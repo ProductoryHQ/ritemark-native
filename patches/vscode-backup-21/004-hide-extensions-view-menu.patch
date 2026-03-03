@@ -1,0 +1,33 @@
+diff --git a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
+index f4d62c70da1..a5bc871187b 100644
+--- a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
++++ b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
+@@ -4,7 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { localize, localize2 } from '../../../../nls.js';
+-import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
++// RiteMark: KeyMod, KeyCode removed - unused after hiding Extensions menu item
+ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { MenuRegistry, MenuId, registerAction2, Action2, IMenuItem, IAction2Options } from '../../../../platform/actions/common/actions.js';
+ import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
+@@ -106,12 +106,13 @@ Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegis
+ 	{
+ 		id: VIEWLET_ID,
+ 		title: localize2('extensions', "Extensions"),
+-		openCommandActionDescriptor: {
+-			id: VIEWLET_ID,
+-			mnemonicTitle: localize({ key: 'miViewExtensions', comment: ['&& denotes a mnemonic'] }, "E&&xtensions"),
+-			keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyX },
+-			order: 4,
+-		},
++		// RiteMark: Remove Extensions from View menu - marketplace is hidden
++		// openCommandActionDescriptor: {
++		// 	id: VIEWLET_ID,
++		// 	mnemonicTitle: localize({ key: 'miViewExtensions', comment: ['&& denotes a mnemonic'] }, "E&&xtensions"),
++		// 	keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyX },
++		// 	order: 4,
++		// },
+ 		ctorDescriptor: new SyncDescriptor(ExtensionsViewPaneContainer),
+ 		icon: extensionsViewIcon,
+ 		order: 4,
