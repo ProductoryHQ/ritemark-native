@@ -5,13 +5,29 @@
  */
 
 import { useState } from 'react';
-import { AlertCircle, Check, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, X, RotateCcw } from 'lucide-react';
 import { useAISidebarStore } from './store';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
 import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
 import type { AgentConversationTurn } from './types';
+
+const OVERFLOW_PATTERNS = [
+  'prompt is too long',
+  'prompt too long',
+  'context window',
+  'context_length_exceeded',
+  'too many tokens',
+  'maximum context length',
+  'exceeds the model',
+  'token limit',
+];
+
+function isContextOverflowError(str: string): boolean {
+  const lower = str.toLowerCase();
+  return OVERFLOW_PATTERNS.some(p => lower.includes(p));
+}
 
 interface AgentResponseProps {
   turn: AgentConversationTurn;
@@ -21,12 +37,42 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   const { result, activities } = turn;
   const approvePlan = useAISidebarStore((s) => s.approvePlan);
   const rejectPlan = useAISidebarStore((s) => s.rejectPlan);
+  const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
   const [rejectInput, setRejectInput] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
   if (!result) return null;
 
-  // Error result
+  // Context overflow — friendly error with recovery actions
+  if (result.error && isContextOverflowError(result.error)) {
+    return (
+      <div style={chatFontStyle}>
+        <div className="rounded border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] p-3 space-y-2">
+          <div className="flex items-start gap-2 text-[var(--vscode-editorWarning-foreground)]">
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="font-medium">Vestlus ületas kontekstiakna piiri</div>
+              <div className="text-[11px] opacity-80">
+                Pikad vestlused koguvad token-kasutust. Uue vestluse alustamine annab agendile täieliku konteksti.
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 ml-[22px]">
+            <button
+              onClick={() => startNewConversation()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+            >
+              <RotateCcw size={11} />
+              Alusta uut vestlust
+            </button>
+          </div>
+        </div>
+        <ActivityDetails activities={activities} metrics={result.metrics} />
+      </div>
+    );
+  }
+
+  // Generic error result
   if (result.error) {
     return (
       <div style={chatFontStyle}>
