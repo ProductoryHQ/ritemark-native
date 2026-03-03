@@ -66,7 +66,7 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'codex-integration',
     label: 'Codex CLI Integration',
     description: 'ChatGPT-authenticated coding agent using OpenAI Codex CLI',
-    status: 'experimental',
+    status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
 };
