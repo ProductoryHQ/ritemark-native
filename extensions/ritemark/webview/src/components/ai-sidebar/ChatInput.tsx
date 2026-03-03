@@ -110,6 +110,7 @@ export function ChatInput() {
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [pathChips, setPathChips] = useState<PathChip[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [hideActiveFile, setHideActiveFile] = useState(false);
   const [showMentionPopup, setShowMentionPopup] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
@@ -132,14 +133,21 @@ export function ChatInput() {
   const cancelRequest = useAISidebarStore((s) => s.cancelRequest);
   const discoveredAgents = useAISidebarStore((s) => s.discoveredAgents);
   const discoveredCommands = useAISidebarStore((s) => s.discoveredCommands);
+  const activeFilePath = useAISidebarStore((s) => s.activeFilePath);
 
   // Merge built-in + discovered commands
   const allCommands = useMemo(() => mergeCommands(discoveredCommands), [discoveredCommands]);
 
+  const sendCodexMessage = useAISidebarStore((s) => s.sendCodexMessage);
+  const codexConversation = useAISidebarStore((s) => s.codexConversation);
+
   const isClaudeCode = selectedAgent === 'claude-code';
+  const isCodex = selectedAgent === 'codex';
+  const isAgentMode = isClaudeCode || isCodex;
   const lastTurn = agentConversation[agentConversation.length - 1];
-  const agentRunning = lastTurn?.isRunning ?? false;
-  const isLoading = isClaudeCode ? agentRunning : isStreaming;
+  const lastCodexTurn = codexConversation[codexConversation.length - 1];
+  const agentRunning = isCodex ? (lastCodexTurn?.isRunning ?? false) : (lastTurn?.isRunning ?? false);
+  const isLoading = isAgentMode ? agentRunning : isStreaming;
   const placeholder = isClaudeCode
     ? 'Ask Claude Code... (type @ to mention an agent, / for commands)'
     : 'Ask anything... (type / for commands)';
@@ -163,21 +171,24 @@ export function ChatInput() {
     const prompt = buildFinalPrompt();
     if (!prompt || isLoading) return;
 
-    if (isClaudeCode) {
-      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined);
+    if (isCodex) {
+      sendCodexMessage(prompt);
+    } else if (isClaudeCode) {
+      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile });
     } else {
       sendChatMessage(prompt);
     }
     setValue('');
     setAttachments([]);
     setPathChips([]);
+    setHideActiveFile(false);
     setShowMentionPopup(false);
     setShowCommandPopup(false);
 
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isLoading, isClaudeCode, sendAgentMessage, sendChatMessage]);
+  }, [buildFinalPrompt, attachments, isLoading, isClaudeCode, isCodex, hideActiveFile, sendAgentMessage, sendCodexMessage, sendChatMessage]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
   const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
@@ -487,9 +498,8 @@ export function ChatInput() {
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isClaudeCode) return;
     setIsDragOver(true);
-  }, [isClaudeCode]);
+  }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -501,8 +511,6 @@ export function ChatInput() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-
-    if (!isClaudeCode) return;
 
     // Check for VS Code file URIs in the drop data
     // VS Code sends file:// URIs in text/uri-list
@@ -519,16 +527,17 @@ export function ChatInput() {
         if (path) paths.push(path);
       }
     } else if (plainText) {
-      // Fall back to plain text (might be a path)
-      const trimmed = plainText.trim();
-      if (trimmed.startsWith('/') || trimmed.startsWith('file://')) {
-        paths.push(extractPath(trimmed));
+      // Fall back to plain text — Explorer sends newline-separated paths for multi-file drag
+      const lines = plainText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        if (line.startsWith('/') || line.startsWith('file://')) {
+          paths.push(extractPath(line));
+        }
       }
     }
 
-    // Also check for dropped files (actual file objects)
-    if (e.dataTransfer.files.length > 0 && paths.length === 0) {
-      // These are actual files dropped — process as attachments instead
+    // Also check for dropped files (actual file objects) — attachments are Claude Code only
+    if (e.dataTransfer.files.length > 0 && paths.length === 0 && isClaudeCode) {
       for (const file of e.dataTransfer.files) {
         try {
           const att = await processFile(file);
@@ -542,7 +551,6 @@ export function ChatInput() {
 
     // Add paths as chips
     for (const path of paths) {
-      // Simple heuristic: if it has an extension, it's a file; otherwise folder
       const hasExtension = /\.[a-zA-Z0-9]+$/.test(path);
       const chip: PathChip = {
         id: `path-${++pathChipIdCounter}`,
@@ -550,12 +558,44 @@ export function ChatInput() {
         isFolder: !hasExtension,
       };
       setPathChips((prev) => {
-        // Avoid duplicates
         if (prev.some((p) => p.path === path)) return prev;
         return [...prev, chip];
       });
     }
   }, [isClaudeCode, processFile]);
+
+  // Listen for file paths sent from extension (Explorer context menu → "Send to AI Chat")
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const paths = (e as CustomEvent<string[]>).detail;
+      if (!paths?.length) return;
+      for (const path of paths) {
+        const hasExtension = /\.[a-zA-Z0-9]+$/.test(path);
+        const chip: PathChip = {
+          id: `path-${++pathChipIdCounter}`,
+          path,
+          isFolder: !hasExtension,
+        };
+        setPathChips((prev) => {
+          if (prev.some((p) => p.path === path)) return prev;
+          return [...prev, chip];
+        });
+      }
+      textareaRef.current?.focus();
+    };
+    window.addEventListener('ritemark:files-dropped', handler);
+    return () => window.removeEventListener('ritemark:files-dropped', handler);
+  }, []);
+
+  // Reset "hide active file" when the active file changes
+  useEffect(() => {
+    setHideActiveFile(false);
+  }, [activeFilePath]);
+
+  // Determine if active file context chip should show
+  // Don't show if: no active file, user dismissed it, or it's already in manual path chips
+  const showActiveFileChip = activeFilePath && !hideActiveFile &&
+    !pathChips.some((p) => p.path === activeFilePath || p.path.endsWith('/' + activeFilePath));
 
   // Auto-resize textarea
   useEffect(() => {
@@ -623,9 +663,28 @@ export function ChatInput() {
         />
       )}
 
-      {/* Path chips strip */}
-      {pathChips.length > 0 && (
+      {/* Context chips: active file + manually added paths */}
+      {(showActiveFileChip || pathChips.length > 0) && (
         <div className="flex gap-1.5 mb-2 flex-wrap">
+          {/* Active file context chip (auto, dimmer style) */}
+          {showActiveFileChip && (
+            <div
+              className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] bg-[var(--vscode-badge-background)]/50 text-[var(--vscode-descriptionForeground)]"
+            >
+              <FileText size={10} className="shrink-0" />
+              <span className="truncate max-w-[120px]" title={activeFilePath!}>
+                {getDisplayPath(activeFilePath!)}
+              </span>
+              <button
+                onClick={() => setHideActiveFile(true)}
+                className="shrink-0 hover:text-[var(--vscode-errorForeground)]"
+                title="Remove from context"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          )}
+          {/* Manual path chips (brighter style) */}
           {pathChips.map((chip) => (
             <div
               key={chip.id}

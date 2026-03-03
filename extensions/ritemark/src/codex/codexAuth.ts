@@ -8,35 +8,44 @@
  */
 
 import { CodexAppServer } from './codexAppServer';
-import type { AuthStatus, AuthStatusChangedEvent } from './codexProtocol';
+import type { GetAuthStatusResponse, AuthStatusChangeNotification, LoginChatGptCompleteNotification } from './codexProtocol';
 import { EventEmitter } from 'events';
 
 export class CodexAuth extends EventEmitter {
   private appServer: CodexAppServer;
-  private currentStatus: AuthStatus = { authenticated: false };
+  private currentAuth: GetAuthStatusResponse = { authMethod: null, authToken: null, requiresOpenaiAuth: null };
 
   constructor(appServer: CodexAppServer) {
     super();
     this.appServer = appServer;
 
     // Listen for auth status changes from app-server
-    this.appServer.on('auth/statusChanged', (event: AuthStatusChangedEvent) => {
-      this.currentStatus = event.status;
-      this.emit('statusChanged', event.status);
+    this.appServer.on('authStatusChange', (event: AuthStatusChangeNotification) => {
+      this.currentAuth = { ...this.currentAuth, authMethod: event.authMethod };
+      this.emit('statusChanged', this.currentAuth);
+    });
+
+    // Listen for login completion
+    this.appServer.on('loginChatGptComplete', (event: LoginChatGptCompleteNotification) => {
+      if (event.success) {
+        this.currentAuth = { ...this.currentAuth, authMethod: 'chatgpt' };
+      }
+      this.emit('loginComplete', event.success);
+      this.emit('statusChanged', this.currentAuth);
     });
   }
 
   /**
    * Get current authentication status
    */
-  async getStatus(): Promise<AuthStatus> {
+  async getStatus(): Promise<GetAuthStatusResponse> {
     try {
       const status = await this.appServer.getAuthStatus();
-      this.currentStatus = status;
+      this.currentAuth = status;
       return status;
     } catch (error) {
       console.error('Failed to get auth status:', error);
-      return { authenticated: false };
+      return { authMethod: null, authToken: null, requiresOpenaiAuth: null };
     }
   }
 
@@ -44,50 +53,23 @@ export class CodexAuth extends EventEmitter {
    * Check if currently authenticated
    */
   isAuthenticated(): boolean {
-    return this.currentStatus.authenticated;
+    return this.currentAuth.authMethod !== null;
   }
 
   /**
-   * Get current user info (if authenticated)
+   * Get auth method (apikey, chatgpt, etc.)
    */
-  getUserInfo(): Pick<AuthStatus, 'email' | 'plan' | 'credits'> | null {
-    if (!this.currentStatus.authenticated) {
-      return null;
-    }
-
-    return {
-      email: this.currentStatus.email,
-      plan: this.currentStatus.plan,
-      credits: this.currentStatus.credits,
-    };
+  getAuthMethod(): string | null {
+    return this.currentAuth.authMethod;
   }
 
   /**
-   * Start OAuth login flow
-   *
-   * This opens the system browser and redirects to ChatGPT OAuth.
-   * The auth status will be updated via 'auth/statusChanged' event when complete.
+   * Start ChatGPT OAuth login flow
    */
-  async startLogin(method: 'browser' | 'device-code' = 'browser'): Promise<void> {
+  async startLogin(): Promise<void> {
     try {
-      const result = await this.appServer.startLogin({ method });
-
-      if (result.status === 'failed') {
-        throw new Error('OAuth login failed');
-      }
-
-      if (method === 'device-code' && result.deviceCode && result.userCode) {
-        // Emit device code info for UI to display
-        this.emit('deviceCode', {
-          deviceCode: result.deviceCode,
-          userCode: result.userCode,
-          authUrl: result.authUrl,
-        });
-      }
-
-      // For browser method, Codex handles everything (opens browser automatically)
-      // For device-code, user needs to visit authUrl and enter userCode
-
+      await this.appServer.loginChatGpt();
+      // Login completion comes via 'loginChatGptComplete' notification
     } catch (error) {
       console.error('Failed to start login:', error);
       throw error;
@@ -95,13 +77,13 @@ export class CodexAuth extends EventEmitter {
   }
 
   /**
-   * Logout (clear credentials)
+   * Logout
    */
   async logout(): Promise<void> {
     try {
-      await this.appServer.logout();
-      this.currentStatus = { authenticated: false };
-      this.emit('statusChanged', this.currentStatus);
+      await this.appServer.logoutChatGpt();
+      this.currentAuth = { authMethod: null, authToken: null, requiresOpenaiAuth: null };
+      this.emit('statusChanged', this.currentAuth);
     } catch (error) {
       console.error('Failed to logout:', error);
       throw error;
@@ -110,18 +92,16 @@ export class CodexAuth extends EventEmitter {
 
   /**
    * Wait for authentication to complete
-   *
-   * Useful after calling startLogin() to wait for the OAuth flow to finish.
    */
-  async waitForAuth(timeoutMs = 120000): Promise<AuthStatus> {
+  async waitForAuth(timeoutMs = 120000): Promise<GetAuthStatusResponse> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.off('statusChanged', handler);
         reject(new Error('Authentication timeout'));
       }, timeoutMs);
 
-      const handler = (status: AuthStatus) => {
-        if (status.authenticated) {
+      const handler = (status: GetAuthStatusResponse) => {
+        if (status.authMethod !== null) {
           clearTimeout(timeout);
           this.off('statusChanged', handler);
           resolve(status);
@@ -130,11 +110,11 @@ export class CodexAuth extends EventEmitter {
 
       this.on('statusChanged', handler);
 
-      // Also check current status immediately
-      if (this.currentStatus.authenticated) {
+      // Check current status immediately
+      if (this.currentAuth.authMethod !== null) {
         clearTimeout(timeout);
         this.off('statusChanged', handler);
-        resolve(this.currentStatus);
+        resolve(this.currentAuth);
       }
     });
   }

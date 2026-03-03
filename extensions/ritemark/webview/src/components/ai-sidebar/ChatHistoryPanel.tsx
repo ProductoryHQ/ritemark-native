@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react';
-import { MessageSquarePlus, Trash2, Bot, Sparkles, X, History } from 'lucide-react';
+import { MessageSquarePlus, Trash2, Bot, Sparkles, Terminal, X, History } from 'lucide-react';
 import { useAISidebarStore } from './store';
 import type { SavedConversation } from './chatHistoryStorage';
 import type { AgentId } from './types';
@@ -64,19 +64,19 @@ const groupLabels: Record<DateGroup, string> = {
 
 // ── Agent Badge ────────────────────────────────────────────────────────
 
+const agentBadgeConfig: Record<AgentId, { icon: typeof Bot; label: string }> = {
+  'claude-code': { icon: Bot, label: 'Claude' },
+  'codex': { icon: Terminal, label: 'Codex' },
+  'ritemark-agent': { icon: Sparkles, label: 'Agent' },
+};
+
 function AgentBadge({ agentId }: { agentId: AgentId }) {
-  if (agentId === 'claude-code') {
-    return (
-      <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
-        <Bot size={10} />
-        <span>Code</span>
-      </span>
-    );
-  }
+  const config = agentBadgeConfig[agentId] || agentBadgeConfig['ritemark-agent'];
+  const Icon = config.icon;
   return (
     <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
-      <Sparkles size={10} />
-      <span>Agent</span>
+      <Icon size={10} />
+      <span>{config.label}</span>
     </span>
   );
 }

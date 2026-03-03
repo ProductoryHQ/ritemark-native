@@ -21,9 +21,10 @@ import {
 } from '../ai/index';
 import { searchDocuments, buildRAGContext, RAGSearchResult } from '../rag/search';
 import { VectorStore, getDefaultDbPath } from '../rag/vectorStore';
-import { AgentSession, AGENTS, CLAUDE_MODELS, DEFAULT_MODEL, getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth, installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, type AgentId, type AgentProgress, type FileAttachment, type SetupStatus } from '../agent';
+import { AgentSession, AGENTS, CLAUDE_MODELS, CODEX_MODELS, DEFAULT_MODEL, getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth, installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, type AgentId, type AgentProgress, type FileAttachment, type SetupStatus } from '../agent';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
+import { CodexAppServer } from '../codex';
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -34,6 +35,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
   private _vectorStore: VectorStore | null = null;
+
+  // Codex state
+  private _codexAppServer: CodexAppServer | null = null;
+  private _codexThreadId: string | null = null;
+  private _codexTurnId: string | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -80,6 +86,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._sendIndexStatus();
           this._sendAgentConfig();
           this._sendChatFontSize();
+          this._sendActiveFile();
           break;
 
         case 'ai-configure-key':
@@ -148,7 +155,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'ai-execute-agent':
-          await this._handleAgentExecution(message.prompt, message.images);
+          await this._handleAgentExecution(message.prompt, message.images, message.skipActiveFile);
           break;
 
         case 'ai-cancel-agent':
@@ -177,6 +184,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'agent-setup:dismiss-welcome':
           vscode.workspace.getConfiguration('ritemark.ai').update('hasSeenClaudeWelcome', true, vscode.ConfigurationTarget.Global);
           break;
+
+        // Codex messages
+        case 'codex-execute':
+          await this._handleCodexExecution(message.prompt, message.model);
+          break;
+
+        case 'codex-cancel':
+          this._handleCodexCancel();
+          break;
+
+        case 'codex-approve':
+          this._handleCodexApproval(message.requestId, message.approved);
+          break;
       }
     });
 
@@ -196,6 +216,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         this._sendChatFontSize();
       }
     });
+
+    // Track active tab changes to update context chip in webview
+    vscode.window.tabGroups.onDidChangeTabs(() => {
+      this._sendActiveFile();
+    });
   }
 
   /**
@@ -204,7 +229,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public sendSelection(selection: EditorSelection, documentContent: string) {
     this._currentSelection = selection;
     this._documentContent = documentContent;
-    this._view?.webview.postMessage({ type: 'selection-update', selection });
+    const activeFile = this._getActiveFileContext();
+    this._view?.webview.postMessage({
+      type: 'selection-update',
+      selection,
+      activeFilePath: activeFile?.path,
+    });
   }
 
   /**
@@ -260,9 +290,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'toggle-history-panel' });
   }
 
+  public sendFilePaths(paths: string[]) {
+    this._view?.webview.postMessage({ type: 'files-dropped', paths });
+  }
+
   public dispose() {
     this._agentSession?.close();
     this._vectorStore?.close();
+    this._codexAppServer?.dispose();
   }
 
   private async _sendApiKeyStatus() {
@@ -284,6 +319,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   private async _sendAgentConfig() {
     const agenticEnabled = isEnabled('agentic-assistant');
+    const codexEnabled = isEnabled('codex-integration');
     const config = vscode.workspace.getConfiguration('ritemark.ai');
     const selectedAgent = config.get<string>('selectedAgent', 'ritemark-agent');
     const selectedModel = config.get<string>('selectedModel', DEFAULT_MODEL);
@@ -305,13 +341,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const discoveredAgents = workspacePath ? discoverAgents(workspacePath) : [];
     const discoveredCommands = workspacePath ? discoverCommands(workspacePath) : [];
 
+    // Filter agents based on feature flags
+    const visibleAgents = Object.values(AGENTS).filter(a => {
+      if (a.id === 'codex') return codexEnabled;
+      return true;
+    });
+
     this._view?.webview.postMessage({
       type: 'agent:config',
       agenticEnabled,
+      codexEnabled,
       selectedAgent,
       selectedModel,
-      agents: Object.values(AGENTS),
+      agents: visibleAgents,
       models: CLAUDE_MODELS,
+      codexModels: CODEX_MODELS,
       setupStatus,
       hasSeenWelcome,
       discoveredAgents,
@@ -323,7 +367,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Execute a prompt using the Claude Code agent (persistent session).
    * Reuses the same process across turns so the agent retains context.
    */
-  private async _handleAgentExecution(prompt: string, images?: Array<{ id: string; data: string; mediaType: string }>) {
+  private async _handleAgentExecution(prompt: string, images?: Array<{ id: string; data: string; mediaType: string }>, skipActiveFile?: boolean) {
     if (!isEnabled('agentic-assistant')) {
       this._view?.webview.postMessage({
         type: 'agent-result',
@@ -373,7 +417,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     // Get active file context — works for both TextEditor and custom editors (Ritemark)
-    const activeFile = this._getActiveFileContext();
+    // Skip if user explicitly dismissed the context chip in the UI
+    const activeFile = skipActiveFile ? undefined : this._getActiveFileContext();
 
     // Read agent timeout from settings (default 15 min)
     const agentTimeout = vscode.workspace.getConfiguration('ritemark.ai').get<number>('agentTimeout', 15);
@@ -406,6 +451,163 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         error: errorMessage,
       });
     }
+  }
+
+  /**
+   * Execute a prompt using the Codex agent (persistent thread).
+   */
+  private async _handleCodexExecution(prompt: string, model?: string) {
+    if (!isEnabled('codex-integration')) {
+      this._view?.webview.postMessage({
+        type: 'codex-result',
+        error: 'Codex integration is not enabled.',
+      });
+      return;
+    }
+
+    try {
+      // Lazy-init the app server
+      if (!this._codexAppServer) {
+        this._codexAppServer = new CodexAppServer();
+        this._setupCodexEventListeners();
+        await this._codexAppServer.ensureInitialized();
+      }
+
+      // Create thread if needed
+      if (!this._codexThreadId) {
+        const result = await this._codexAppServer.threadStart({
+          cwd: this._workspacePath || null,
+          model: model || null,
+        });
+        this._codexThreadId = result.thread.id;
+      }
+
+      // Start turn (send user message)
+      const turnResult = await this._codexAppServer.turnStart(
+        this._codexThreadId,
+        prompt,
+        model,
+      );
+      this._codexTurnId = turnResult.turn.id;
+
+      this._view?.webview.postMessage({
+        type: 'codex-progress',
+        progress: { type: 'init', message: 'Starting...', timestamp: Date.now() },
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this._view?.webview.postMessage({
+        type: 'codex-result',
+        error: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Cancel current Codex turn.
+   */
+  private _handleCodexCancel() {
+    if (this._codexAppServer && this._codexThreadId && this._codexTurnId) {
+      this._codexAppServer.turnInterrupt(this._codexThreadId, this._codexTurnId).catch(() => {});
+    }
+  }
+
+  /**
+   * Handle approval/rejection from webview for Codex tool execution.
+   * Approvals are bidirectional: the server sends a JSON-RPC request with an id,
+   * and we respond using that same id.
+   */
+  private _handleCodexApproval(requestId: string | number, approved: boolean) {
+    if (!this._codexAppServer) return;
+    this._codexAppServer.sendApprovalResponse(requestId, approved ? 'approved' : 'denied');
+  }
+
+  /**
+   * Set up event listeners on CodexAppServer to forward events to webview.
+   */
+  private _setupCodexEventListeners() {
+    if (!this._codexAppServer) return;
+
+    // Log ALL notifications for debugging
+    this._codexAppServer.on('notification', (notification: { method: string; params: unknown }) => {
+      console.log('[Codex] notification:', notification.method, JSON.stringify(notification.params).slice(0, 300));
+    });
+
+    // V2 notifications
+    this._codexAppServer.on('item/started', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
+      console.log('[Codex] item/started:', params.item?.type, params.item?.id);
+      // Only show activity for actual tool use, not userMessage/reasoning
+      const itemType = params.item?.type;
+      if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning') {
+        const label = itemType === 'agentMessage' ? 'Thinking...' : `Running: ${itemType}`;
+        this._view?.webview.postMessage({
+          type: 'codex-progress',
+          progress: { type: 'tool_use', message: label, tool: itemType, timestamp: Date.now() },
+        });
+      }
+    });
+
+    this._codexAppServer.on('item/agentMessage/delta', (params: { delta: string }) => {
+      this._view?.webview.postMessage({
+        type: 'codex-streaming',
+        delta: params.delta,
+      });
+    });
+
+    this._codexAppServer.on('item/completed', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
+      const itemType = params.item?.type;
+      console.log('[Codex] item/completed:', itemType, params.item?.id);
+      // Only show completion for tool items, not userMessage/reasoning/agentMessage
+      if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage') {
+        this._view?.webview.postMessage({
+          type: 'codex-progress',
+          progress: { type: 'done', message: `Done: ${itemType}`, tool: itemType, timestamp: Date.now() },
+        });
+      }
+    });
+
+    this._codexAppServer.on('turn/completed', (params: { threadId: string; turn: { id: string; status: string; error: unknown } }) => {
+      console.log('[Codex] turn/completed:', JSON.stringify(params).slice(0, 200));
+      this._codexTurnId = null;
+      this._view?.webview.postMessage({
+        type: 'codex-result',
+        status: params.turn.status,
+        error: params.turn.error ? String(params.turn.error) : undefined,
+      });
+    });
+
+    // Server-initiated requests (approvals are bidirectional RPC)
+    this._codexAppServer.on('server-request', (request: { id: string | number; method: string; params: Record<string, unknown> }) => {
+      console.log('[Codex] server-request:', request.method, JSON.stringify(request.params).slice(0, 200));
+      if (request.method === 'execCommandApproval') {
+        const p = request.params;
+        this._view?.webview.postMessage({
+          type: 'codex-approval',
+          approvalType: 'command',
+          requestId: request.id,
+          command: (p.command as string[]).join(' '),
+          workingDir: p.cwd as string,
+        });
+      } else if (request.method === 'applyPatchApproval') {
+        const p = request.params;
+        this._view?.webview.postMessage({
+          type: 'codex-approval',
+          approvalType: 'fileChange',
+          requestId: request.id,
+          fileChanges: p.fileChanges,
+        });
+      } else {
+        // Unknown server request — auto-deny to not block the agent
+        console.log('[Codex] auto-denying unknown server request:', request.method);
+        this._codexAppServer?.sendApprovalResponse(request.id, 'denied');
+      }
+    });
+
+    this._codexAppServer.on('exit', () => {
+      this._codexAppServer = null;
+      this._codexThreadId = null;
+      this._codexTurnId = null;
+    });
   }
 
   /**
@@ -448,6 +650,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _sendChatFontSize() {
     const fontSize = vscode.workspace.getConfiguration('ritemark.chat').get<number>('fontSize', 13);
     this._view?.webview.postMessage({ type: 'settings:chatFontSize', fontSize });
+  }
+
+  private _sendActiveFile() {
+    const activeFile = this._getActiveFileContext();
+    this._view?.webview.postMessage({
+      type: 'active-file-changed',
+      path: activeFile?.path ?? null,
+    });
   }
 
   private async _sendIndexStatus() {

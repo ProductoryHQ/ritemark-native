@@ -227,15 +227,29 @@ Key architectural findings:
 
 ## Status
 
-**Current Phase:** 1 (PLAN)
-**Approval Required:** Yes
-**Gate:** BLOCKED - Waiting for Jarmo approval
+**Current Phase:** COMPLETE (Phases 1-6, 8-9 done; Phase 7 Flow node deferred)
+**Approval:** Jarmo approved 2026-03-03
+**QA Fixes:** Applied (lifecycle leak, RPC timeout, cross-platform binary check, flag key mismatch, OAuth spinner timeout)
+
+### Completed
+- Phase 1: Feature Flag & Architecture
+- Phase 2: Binary Management (codexManager.ts)
+- Phase 3: App Server Protocol Client (codexAppServer.ts, JSON-RPC with 30s timeout)
+- Phase 4: Authentication Integration (Settings page ChatGPT login)
+- Phase 5: Agent Panel UI (CodexView.tsx in sidebar, model selector, streaming)
+- Phase 6: Approval Dialogs (inline shell command + file diff approval/reject)
+- Phase 8: Settings Page Updates (pre-flight binary check, install instructions)
+- Phase 9: Error Handling (RPC timeout, OAuth spinner timeout, cross-platform which/where)
+
+### Deferred
+- Phase 7: Flow Node Integration (separate sprint — requires flow editor palette work)
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-03-03)
 
 ---
 
 **Created:** 2026-02-14
+**Completed:** 2026-03-03
 **Based on:** `docs/analysis/2026-02-14-codex-cli-chatgpt-integration.md`

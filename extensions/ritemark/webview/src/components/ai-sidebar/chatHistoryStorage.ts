@@ -5,7 +5,7 @@
  * Stores metadata separately from full conversation data for efficient listing.
  */
 
-import type { AgentId, AgentConversationTurn, ChatMessage, ConversationEntry } from './types';
+import type { AgentId, AgentConversationTurn, CodexConversationTurn, ChatMessage, ConversationEntry } from './types';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -19,6 +19,7 @@ export interface SavedConversation {
 
 export interface SavedConversationData extends SavedConversation {
   agentConversation: AgentConversationTurn[];
+  codexConversation?: CodexConversationTurn[];
   chatMessages: ChatMessage[];
   conversationHistory: ConversationEntry[];
 }
@@ -180,11 +181,20 @@ function cleanupOldConversations(): void {
  */
 export function generateTitle(
   agentConversation: AgentConversationTurn[],
-  chatMessages: ChatMessage[]
+  chatMessages: ChatMessage[],
+  codexConversation?: CodexConversationTurn[]
 ): string {
   // For agent conversations, use first user prompt
   if (agentConversation.length > 0) {
     const firstPrompt = agentConversation[0].userPrompt;
+    if (firstPrompt) {
+      return firstPrompt.substring(0, 50) + (firstPrompt.length > 50 ? '...' : '');
+    }
+  }
+
+  // For Codex conversations, use first user prompt
+  if (codexConversation && codexConversation.length > 0) {
+    const firstPrompt = codexConversation[0].userPrompt;
     if (firstPrompt) {
       return firstPrompt.substring(0, 50) + (firstPrompt.length > 50 ? '...' : '');
     }

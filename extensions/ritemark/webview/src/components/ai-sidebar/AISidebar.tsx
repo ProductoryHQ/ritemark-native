@@ -14,6 +14,7 @@ import { NoApiKey } from './NoApiKey';
 import { SetupWizard } from './SetupWizard';
 import { ChatView } from './ChatView';
 import { AgentView } from './AgentView';
+import { CodexView } from './CodexView';
 import { ChatInput } from './ChatInput';
 import { IndexFooter } from './IndexFooter';
 import { SelectionIndicator } from './SelectionIndicator';
@@ -90,7 +91,9 @@ export function AISidebar() {
   }, [loadConversationList]);
 
   const isClaudeCode = selectedAgent === 'claude-code';
-  const needsOpenAIKey = !isClaudeCode && !hasApiKey;
+  const isCodex = selectedAgent === 'codex';
+  const isAgentMode = isClaudeCode || isCodex;
+  const needsOpenAIKey = !isAgentMode && !hasApiKey;
   const needsSetup = isClaudeCode && setupStatus !== null
     && (!setupStatus.cliInstalled || !setupStatus.authenticated);
   const showWelcome = isClaudeCode && setupStatus !== null
@@ -125,7 +128,7 @@ export function AISidebar() {
 
           {/* Main content area */}
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {isClaudeCode ? <AgentView /> : <ChatView />}
+            {isCodex ? <CodexView /> : isClaudeCode ? <AgentView /> : <ChatView />}
           </div>
 
           {/* Shared input */}
@@ -134,7 +137,7 @@ export function AISidebar() {
       )}
 
       {/* Index footer — only for Ritemark Agent (RAG) */}
-      {!isClaudeCode && <IndexFooter />}
+      {!isAgentMode && <IndexFooter />}
     </div>
   );
 }

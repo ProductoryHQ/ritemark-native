@@ -3,11 +3,14 @@
  */
 
 import { useRef, useEffect, useCallback } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useAISidebarStore } from './store';
 import { EmptyState } from './EmptyState';
 import { RunningIndicator } from './RunningIndicator';
 import { AgentResponse } from './AgentResponse';
 import { SubagentCard } from './SubagentCard';
+import { UserPromptBubble } from './ChatBubbles';
+import type { AgentProgress } from './types';
 
 export function AgentView() {
   const agentConversation = useAISidebarStore((s) => s.agentConversation);
@@ -46,52 +49,44 @@ export function AgentView() {
       onScroll={handleScroll}
       className="flex-1 overflow-y-auto px-3 py-3 space-y-4"
     >
-      {agentConversation.map((turn) => (
-        <div key={turn.id} className="space-y-2">
-          {/* User prompt */}
-          <div className="px-2.5 py-2 rounded bg-[var(--vscode-input-background)]" style={{ fontSize: 'var(--chat-font-size, 13px)' }}>
-            {turn.attachments && turn.attachments.length > 0 && (
-              <div className="flex gap-1.5 mb-1.5 flex-wrap">
-                {turn.attachments.map((att) =>
-                  att.kind === 'image' && att.thumbnail ? (
-                    <img
-                      key={att.id}
-                      src={att.thumbnail}
-                      alt={att.name}
-                      className="w-16 h-16 object-cover rounded border border-[var(--vscode-panel-border)]"
-                    />
-                  ) : (
-                    <span
-                      key={att.id}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border border-[var(--vscode-panel-border)] text-[var(--vscode-descriptionForeground)]"
-                    >
-                      {att.name}
-                    </span>
-                  )
-                )}
+      {agentConversation.map((turn) => {
+        const compactedEvent = turn.activities.find((a: AgentProgress) => a.type === 'compacted');
+        return (
+          <div key={turn.id} className="space-y-2">
+            {/* Compaction banner — shown above the turn where compaction happened */}
+            {compactedEvent && (
+              <div className="flex items-start gap-2 px-2.5 py-2 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)]" style={{ fontSize: 'var(--chat-font-size, 13px)' }}>
+                <RefreshCw size={13} className="shrink-0 mt-0.5 text-[var(--vscode-descriptionForeground)]" />
+                <span className="text-[var(--vscode-descriptionForeground)]">
+                  {compactedEvent.message}
+                </span>
               </div>
             )}
-            {turn.userPrompt}
+
+            {/* User prompt */}
+            <UserPromptBubble attachments={turn.attachments}>
+              {turn.userPrompt}
+            </UserPromptBubble>
+
+            {/* Subagents (rendered during running and after) */}
+            {turn.subagents && turn.subagents.length > 0 && (
+              <div className="space-y-1">
+                {turn.subagents.map((subagent) => (
+                  <SubagentCard key={subagent.id} subagent={subagent} />
+                ))}
+              </div>
+            )}
+
+            {/* Running indicator */}
+            {turn.isRunning && (
+              <RunningIndicator activities={turn.activities} subagents={turn.subagents} />
+            )}
+
+            {/* Result */}
+            {turn.result && <AgentResponse turn={turn} />}
           </div>
-
-          {/* Subagents (rendered during running and after) */}
-          {turn.subagents && turn.subagents.length > 0 && (
-            <div className="space-y-1">
-              {turn.subagents.map((subagent) => (
-                <SubagentCard key={subagent.id} subagent={subagent} />
-              ))}
-            </div>
-          )}
-
-          {/* Running indicator */}
-          {turn.isRunning && (
-            <RunningIndicator activities={turn.activities} subagents={turn.subagents} />
-          )}
-
-          {/* Result */}
-          {turn.result && <AgentResponse turn={turn} />}
-        </div>
-      ))}
+        );
+      })}
 
       <div ref={endRef} />
     </div>

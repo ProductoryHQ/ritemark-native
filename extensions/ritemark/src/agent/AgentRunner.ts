@@ -232,6 +232,10 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       if (message.type === 'system' && message.subtype === 'init') {
         metrics.model = message.model || null;
         emitProgress('init', `Starting Claude Code (${message.model || 'claude'})`);
+      } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
+        emitProgress('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
+      } else if (message.type === 'system' && message.subtype === 'compact_boundary') {
+        emitProgress('compacted', 'Varasem vestlus on kokku võetud. Kui midagi olulist puudu, maini seda uuesti.');
       } else if (message.type === 'assistant') {
         processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
       } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
@@ -338,17 +342,27 @@ export class AgentSession {
       throw new Error('Agent prompt is empty');
     }
 
-    // Build prompt with active file context
+    // Build prompt with active file context (skip if already referenced in path chips)
     let fullPrompt = prompt;
     if (activeFile) {
-      let fileContext = `[Currently editing: ${activeFile.path}]`;
-      if (activeFile.selection) {
+      const alreadyReferenced = prompt.includes(`[File: ${activeFile.path}]`) ||
+        prompt.match(new RegExp(`\\[File:.*/${activeFile.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`));
+      if (!alreadyReferenced) {
+        let fileContext = `[Currently editing: ${activeFile.path}]`;
+        if (activeFile.selection) {
+          const selSnippet = activeFile.selection.length > 500
+            ? activeFile.selection.substring(0, 500) + '...'
+            : activeFile.selection;
+          fileContext += `\n[Selected text: ${selSnippet}]`;
+        }
+        fullPrompt = fileContext + '\n\n' + prompt;
+      } else if (activeFile.selection) {
+        // File already referenced but selection still useful
         const selSnippet = activeFile.selection.length > 500
           ? activeFile.selection.substring(0, 500) + '...'
           : activeFile.selection;
-        fileContext += `\n[Selected text: ${selSnippet}]`;
+        fullPrompt = `[Selected text: ${selSnippet}]\n\n` + prompt;
       }
-      fullPrompt = fileContext + '\n\n' + prompt;
     }
 
     const userMsg = buildUserMessage(fullPrompt, attachments);
@@ -569,6 +583,10 @@ export class AgentSession {
         if (message.type === 'system' && message.subtype === 'init') {
           this._model = message.model || null;
           this._emitProgress?.('init', `Starting Claude Code (${message.model || 'claude'})`);
+        } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
+          this._emitProgress?.('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
+        } else if (message.type === 'system' && message.subtype === 'compact_boundary') {
+          this._emitProgress?.('compacted', 'Varasem vestlus on kokku võetud. Kui midagi olulist puudu, maini seda uuesti.');
         } else if (message.type === 'assistant') {
           processAssistantMessage(
             message,

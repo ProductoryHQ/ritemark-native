@@ -10,14 +10,12 @@ import { useAISidebarStore } from './store';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
 import { ActivityDetails } from './ActivityDetails';
+import { chatFontStyle } from './ChatBubbles';
 import type { AgentConversationTurn } from './types';
 
 interface AgentResponseProps {
   turn: AgentConversationTurn;
 }
-
-/** Common font size style using CSS variable with fallback */
-const chatFontStyle = { fontSize: 'var(--chat-font-size, 13px)' };
 
 export function AgentResponse({ turn }: AgentResponseProps) {
   const { result, activities } = turn;
