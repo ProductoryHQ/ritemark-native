@@ -133,9 +133,9 @@ export class CodexAppServer extends EventEmitter {
   }
 
   /**
-   * Generic JSON-RPC call
+   * Generic JSON-RPC call with timeout
    */
-  private rpc<TParams, TResult>(method: string, params: TParams): Promise<TResult> {
+  private rpc<TParams, TResult>(method: string, params: TParams, timeoutMs = 30_000): Promise<TResult> {
     return new Promise((resolve, reject) => {
       const id = this.nextId++;
       const request: JsonRpcRequest = {
@@ -145,13 +145,25 @@ export class CodexAppServer extends EventEmitter {
         params,
       };
 
-      // Store pending request
-      this.pendingRequests.set(id, { resolve: resolve as (result: unknown) => void, reject });
+      // Timeout to prevent permanent leaks
+      const timer = setTimeout(() => {
+        if (this.pendingRequests.has(id)) {
+          this.pendingRequests.delete(id);
+          reject(new Error(`RPC call '${method}' timed out after ${timeoutMs}ms`));
+        }
+      }, timeoutMs);
+
+      // Store pending request (clear timer on resolve/reject)
+      this.pendingRequests.set(id, {
+        resolve: (result: unknown) => { clearTimeout(timer); resolve(result as TResult); },
+        reject: (error: Error) => { clearTimeout(timer); reject(error); },
+      });
 
       // Send request
       try {
         this.manager.send(JSON.stringify(request));
       } catch (error) {
+        clearTimeout(timer);
         this.pendingRequests.delete(id);
         reject(error);
       }

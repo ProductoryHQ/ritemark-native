@@ -31,7 +31,8 @@ export class CodexManager {
    */
   async isInstalled(): Promise<boolean> {
     return new Promise((resolve) => {
-      const check = spawn('which', ['codex']);
+      const cmd = process.platform === 'win32' ? 'where' : 'which';
+      const check = spawn(cmd, ['codex']);
       check.on('exit', (code) => resolve(code === 0));
       check.on('error', () => resolve(false));
     });

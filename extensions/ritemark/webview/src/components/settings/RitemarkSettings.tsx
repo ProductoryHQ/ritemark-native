@@ -50,6 +50,7 @@ interface SettingsData {
 interface CodexAuthStatus {
   enabled: boolean;
   authenticated?: boolean;
+  binaryMissing?: boolean;
   email?: string;
   plan?: 'free' | 'plus' | 'pro' | 'team' | 'business';
   credits?: {
@@ -437,7 +438,19 @@ export function RitemarkSettings() {
               )}
             </div>
 
-            {!codexAuth.authenticated ? (
+            {codexAuth.binaryMissing ? (
+              <>
+                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                  Codex CLI binary not found. Install it first:
+                </p>
+                <code className="block text-xs p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-foreground)] font-mono">
+                  npm install -g @openai/codex
+                </code>
+                <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+                  After installing, close and reopen Settings to try again.
+                </p>
+              </>
+            ) : !codexAuth.authenticated ? (
               <>
                 <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
                   Sign in with your ChatGPT account to use Codex agents without an API key.
@@ -447,6 +460,8 @@ export function RitemarkSettings() {
                   onClick={() => {
                     setCodexLoading(true);
                     vscode.postMessage({ type: 'codex:startLogin' });
+                    // Reset spinner after 60s if no auth response arrives
+                    setTimeout(() => setCodexLoading(false), 60_000);
                   }}
                   disabled={codexLoading}
                   className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 flex items-center gap-2"
@@ -655,7 +670,7 @@ export function RitemarkSettings() {
             label="Codex Integration"
             description="ChatGPT-authenticated coding agents (experimental, requires codex binary)"
             checked={settings.codexIntegration}
-            onChange={(value) => handleToggle('experimental.codexIntegration', value)}
+            onChange={(value) => handleToggle('features.codex-integration', value)}
             badge="Experimental"
           />
         </div>

@@ -145,6 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize Settings Provider
   settingsProvider = new RitemarkSettingsProvider(context);
+  context.subscriptions.push({ dispose: () => settingsProvider?.dispose() });
 
   // Register chat history command (toggles history panel in webview)
   context.subscriptions.push(
