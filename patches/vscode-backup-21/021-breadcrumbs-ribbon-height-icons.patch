@@ -1,0 +1,70 @@
+diff --git a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
+index 8fa44fe2e1b..8ca471c4af1 100644
+--- a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
++++ b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
+@@ -155,7 +155,7 @@ const separatorIcon = registerIcon('breadcrumb-separator', Codicon.chevronRight,
+ 
+ export class BreadcrumbsControl {
+ 
+-	static readonly HEIGHT = 22;
++	static readonly HEIGHT = 40; /* Ritemark: match sidebar heading height */
+ 
+ 	private static readonly SCROLLBAR_SIZES = {
+ 		default: 3,
+diff --git a/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css b/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
+index a24f76131a8..40eaaf59921 100644
+--- a/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
++++ b/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
+@@ -4,26 +4,28 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ /* Breadcrumbs (below multiple editor tabs) */
++/* Ritemark: height 22→40 to match sidebar heading; icon styling unified */
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control {
+ 	flex: 1 100%;
+-	height: 22px;
++	height: 40px;
+ 	cursor: default;
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-icon-label {
+-	height: 22px;
+-	line-height: 22px;
++	height: 40px;
++	line-height: 40px;
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-icon-label::before {
+-	height: 22px; /* tweak the icon size of the editor labels when icons are enabled */
++	height: 40px; /* tweak the icon size of the editor labels when icons are enabled */
++	filter: grayscale(1) opacity(0.8); /* Ritemark: desaturate file icons to match sidebar heading */
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .outline-element-icon {
+ 	padding-right: 3px;
+-	height: 22px; /* tweak the icon size of the editor labels when icons are enabled */
+-	line-height: 22px;
++	height: 40px; /* tweak the icon size of the editor labels when icons are enabled */
++	line-height: 40px;
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item {
+@@ -32,7 +34,7 @@
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item::before {
+ 	width: 16px;
+-	height: 22px;
++	height: 40px;
+ 	display: flex;
+ 	align-items: center;
+ 	justify-content: center;
+@@ -45,3 +47,8 @@
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item:last-child .codicon:last-child {
+ 	display: none; /* hides chevrons when last item */
+ }
++
++/* Ritemark: Match breadcrumb separator/chevron icons to sidebar heading style */
++.monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .codicon {
++	opacity: 0.6;
++}

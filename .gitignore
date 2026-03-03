@@ -90,6 +90,11 @@ test-files/
 # Source maps (large, not needed in repo)
 extensions/ritemark/media/*.map
 
+# Marketing generated files (binary, reproducible)
+docs/marketing/**/*.docx
+docs/marketing/**/*.pdf
+docs/marketing/**/*.csv
+
 # RiteMark Flows - user-specific workflow files
 .flows/
 

@@ -1,0 +1,253 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ritemark <ritemark@productory.co>
+Date: Sun, 16 Feb 2026 00:00:00 
+Subject: [PATCH] RiteMark: Workbench titlebar controls, layout, and UI customization
+
+---
+diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
+--- a/src/vs/workbench/browser/actions/layoutActions.ts	2026-02-16 09:01:40
++++ b/src/vs/workbench/browser/actions/layoutActions.ts	2026-02-16 09:03:02
+@@ -38,9 +38,9 @@
+ const activityBarLeftIcon = registerIcon('activity-bar-left', Codicon.layoutActivitybarLeft, localize('activityBarLeft', "Represents the activity bar in the left position"));
+ const activityBarRightIcon = registerIcon('activity-bar-right', Codicon.layoutActivitybarRight, localize('activityBarRight', "Represents the activity bar in the right position"));
+ const panelLeftIcon = registerIcon('panel-left', Codicon.layoutSidebarLeft, localize('panelLeft', "Represents a side bar in the left position"));
+-const panelLeftOffIcon = registerIcon('panel-left-off', Codicon.layoutSidebarLeftOff, localize('panelLeftOff', "Represents a side bar in the left position toggled off"));
++// RiteMark: Removed panelLeftOffIcon (unused after LayoutControlMenu toggles replaced)
+ const panelRightIcon = registerIcon('panel-right', Codicon.layoutSidebarRight, localize('panelRight', "Represents side bar in the right position"));
+-const panelRightOffIcon = registerIcon('panel-right-off', Codicon.layoutSidebarRightOff, localize('panelRightOff', "Represents side bar in the right position toggled off"));
++// RiteMark: Removed panelRightOffIcon (unused after LayoutControlMenu toggles replaced)
+ const panelIcon = registerIcon('panel-bottom', Codicon.layoutPanel, localize('panelBottom', "Represents the bottom panel"));
+ const statusBarIcon = registerIcon('statusBar', Codicon.layoutStatusbar, localize('statusBarIcon', "Represents the status bar"));
+ 
+@@ -180,13 +180,14 @@
+ registerAction2(ToggleSidebarPositionAction);
+ 
+ const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
+-MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
+-	submenu: MenuId.LayoutControlMenuSubmenu,
+-	title: localize('configureLayout', "Configure Layout"),
+-	icon: configureLayoutIcon,
+-	group: '1_workbench_layout',
+-	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
+-});
++// RiteMark: Hide Configure Layout menu - too complex for writing app users
++// MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++// 	submenu: MenuId.LayoutControlMenuSubmenu,
++// 	title: localize('configureLayout', "Configure Layout"),
++// 	icon: configureLayoutIcon,
++// 	group: '1_workbench_layout',
++// 	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
++// });
+ 
+ 
+ MenuRegistry.appendMenuItems([{
+@@ -374,35 +375,51 @@
+ 				id: ToggleSidebarVisibilityAction.ID,
+ 				title: localize('compositePart.hideSideBarLabel', "Hide Primary Side Bar"),
+ 			},
+-			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
+-			order: 2
+ 		}
+-	}, {
++	}
++	// RiteMark: Removed sidebar LayoutControlMenu toggles — replaced with editor layout controls below
++]);
++
++// RiteMark: Custom titlebar controls — left sidebar, right sidebar, Ritemark settings gear
++MenuRegistry.appendMenuItems([
++	{
+ 		id: MenuId.LayoutControlMenu,
+ 		item: {
+-			group: '0_workbench_toggles',
++			group: '0_layout',
+ 			command: {
+ 				id: ToggleSidebarVisibilityAction.ID,
+-				title: localize('toggleSideBar', "Toggle Primary Side Bar"),
+-				icon: panelLeftOffIcon,
+-				toggled: { condition: SideBarVisibleContext, icon: panelLeftIcon }
+-			},
+-			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')),
++				title: localize('toggleLeftSidebar', "Toggle Left Sidebar"),
++				icon: panelLeftIcon,
++				toggled: { condition: SideBarVisibleContext }
++			},
++			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
+ 			order: 0
+ 		}
+ 	}, {
+ 		id: MenuId.LayoutControlMenu,
+ 		item: {
+-			group: '0_workbench_toggles',
++			group: '0_layout',
+ 			command: {
+-				id: ToggleSidebarVisibilityAction.ID,
+-				title: localize('toggleSideBar', "Toggle Primary Side Bar"),
+-				icon: panelRightOffIcon,
+-				toggled: { condition: SideBarVisibleContext, icon: panelRightIcon }
++				id: ToggleAuxiliaryBarAction.ID,
++				title: localize('toggleRightSidebar', "Toggle Right Sidebar"),
++				icon: panelRightIcon,
++				toggled: { condition: AuxiliaryBarVisibleContext }
+ 			},
+-			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'right')),
+-			order: 2
++			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
++			order: 1
+ 		}
++	}, {
++		id: MenuId.LayoutControlMenu,
++		item: {
++			group: '1_settings',
++			command: {
++				id: 'ritemark.aiSettings',
++				title: localize('ritemarkSettings', "Ritemark Settings"),
++				icon: Codicon.settingsGear,
++			},
++			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
++			order: 0
++		}
+ 	}
+ ]);
+ 
+diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
+--- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts	2026-02-16 09:01:40
++++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts	2026-02-16 09:02:18
+@@ -3,11 +3,11 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
+-import { Codicon } from '../../../../base/common/codicons.js';
++// RiteMark: Removed Codicon import (unused after icon declarations removed)
+ import { localize, localize2 } from '../../../../nls.js';
+ import { Action2, MenuId, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
+ import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+-import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
++// RiteMark: Removed registerIcon import (unused after icon declarations removed)
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+ import { AuxiliaryBarVisibleContext } from '../../../common/contextkeys.js';
+ import { ViewContainerLocation, ViewContainerLocationToString } from '../../../common/views.js';
+@@ -18,10 +18,7 @@
+ import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
+ 
+ 
+-const auxiliaryBarRightIcon = registerIcon('auxiliarybar-right-layout-icon', Codicon.layoutSidebarRight, localize('toggleAuxiliaryIconRight', 'Icon to toggle the auxiliary bar off in its right position.'));
+-const auxiliaryBarRightOffIcon = registerIcon('auxiliarybar-right-off-layout-icon', Codicon.layoutSidebarRightOff, localize('toggleAuxiliaryIconRightOn', 'Icon to toggle the auxiliary bar on in its right position.'));
+-const auxiliaryBarLeftIcon = registerIcon('auxiliarybar-left-layout-icon', Codicon.layoutSidebarLeft, localize('toggleAuxiliaryIconLeft', 'Icon to toggle the auxiliary bar in its left position.'));
+-const auxiliaryBarLeftOffIcon = registerIcon('auxiliarybar-left-off-layout-icon', Codicon.layoutSidebarLeftOff, localize('toggleAuxiliaryIconLeftOn', 'Icon to toggle the auxiliary bar on in its left position.'));
++// RiteMark: Removed unused auxiliary bar icon declarations (LayoutControlMenu toggles removed below)
+ 
+ export class ToggleAuxiliaryBarAction extends Action2 {
+ 
+@@ -97,33 +94,8 @@
+ });
+ 
+ MenuRegistry.appendMenuItems([
++	// RiteMark: Removed secondary sidebar LayoutControlMenu toggles — replaced with editor layout controls
+ 	{
+-		id: MenuId.LayoutControlMenu,
+-		item: {
+-			group: '0_workbench_toggles',
+-			command: {
+-				id: ToggleAuxiliaryBarAction.ID,
+-				title: localize('toggleSecondarySideBar', "Toggle Secondary Side Bar"),
+-				toggled: { condition: AuxiliaryBarVisibleContext, icon: auxiliaryBarLeftIcon },
+-				icon: auxiliaryBarLeftOffIcon,
+-			},
+-			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'right')),
+-			order: 0
+-		}
+-	}, {
+-		id: MenuId.LayoutControlMenu,
+-		item: {
+-			group: '0_workbench_toggles',
+-			command: {
+-				id: ToggleAuxiliaryBarAction.ID,
+-				title: localize('toggleSecondarySideBar', "Toggle Secondary Side Bar"),
+-				toggled: { condition: AuxiliaryBarVisibleContext, icon: auxiliaryBarRightIcon },
+-				icon: auxiliaryBarRightOffIcon,
+-			},
+-			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')),
+-			order: 2
+-		}
+-	}, {
+ 		id: MenuId.ViewTitleContext,
+ 		item: {
+ 			group: '3_workbench_layout_move',
+diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
+index 30699b3..cab3b42 100644
+--- a/src/vs/workbench/browser/workbench.contribution.ts
++++ b/src/vs/workbench/browser/workbench.contribution.ts
+@@ -614,9 +614,11 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+ 				tags: ['accessibility'],
+ 				enum: ['on', 'off', 'auto']
+ 			},
++			// RiteMark: Hide layout controls by default - cleaner title bar for writing
++			// RiteMark: Enable layout controls for editor layout + settings buttons
+ 			[LayoutSettings.LAYOUT_ACTIONS]: {
+ 				'type': 'boolean',
+-				'default': true,
++				'default': false,
+ 				'markdownDescription': isWeb ?
+ 					localize('layoutControlEnabledWeb', "Controls whether the layout control in the title bar is shown.") :
+ 					localize({ key: 'layoutControlEnabled', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Controls whether the layout control is shown in the custom title bar. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
+@@ -629,7 +631,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+ 					localize('layoutcontrol.type.toggles', "Shows several buttons for toggling the visibility of the panels and side bar."),
+ 					localize('layoutcontrol.type.both', "Shows both the dropdown and toggle buttons."),
+ 				],
+-				'default': 'both',
++				'default': 'toggles',
+ 				'description': localize('layoutControlType', "Controls whether the layout control in the custom title bar is displayed as a single menu button or with multiple UI toggles."),
+ 			},
+ 			'workbench.tips.enabled': {
+@@ -678,9 +680,10 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+ 				'default': defaultWindowTitleSeparator,
+ 				'markdownDescription': localize("window.titleSeparator", "Separator used by {0}.", '`#window.title#`')
+ 			},
++			// RiteMark: Hide Command Center by default - cleaner title bar for writing
+ 			[LayoutSettings.COMMAND_CENTER]: {
+ 				type: 'boolean',
+-				default: true,
++				default: false,
+ 				markdownDescription: isWeb ?
+ 					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
+ 					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
+diff --git a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
+index 01360d5..61d5517 100644
+--- a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
++++ b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
+@@ -472,3 +472,33 @@
+ 	border-radius: 16px;
+ 	text-align: center;
+ }
++
++/* RiteMark: Titlebar layout control button styling */
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label {
++	width: 26px;
++	height: 26px;
++	display: flex;
++	align-items: center;
++	justify-content: center;
++	border-radius: 4px;
++	font-size: 14px;
++	color: #64748b;
++	background: transparent;
++}
++
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label:hover {
++	background-color: #f1f5f9;
++}
++
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label.checked {
++	background-color: #eef2ff;
++	color: #4338ca;
++}
++
++/* RiteMark: Group separator between layout toggles and settings */
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item .action-label.separator {
++	width: 1px;
++	height: 16px;
++	background-color: #e2e8f0;
++	margin: 0 2px;
++}
+--
+2.39.0
