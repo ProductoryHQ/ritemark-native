@@ -179,7 +179,7 @@ export class RitemarkSettingsProvider {
         // Features
         voiceDictation: config.get('features.voice-dictation', false),
         ritemarkFlows: config.get('features.ritemark-flows', false),
-        codexIntegration: config.get('experimental.codexIntegration', false),
+        codexIntegration: config.get('features.codex-integration', false),
 
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
@@ -421,6 +421,24 @@ export class RitemarkSettingsProvider {
       return;
     }
 
+    // Pre-flight: check if codex binary is installed
+    const binaryInstalled = this.codexAppServer
+      ? await new (await import('../codex/codexManager')).CodexManager().isInstalled()
+      : false;
+
+    if (!binaryInstalled) {
+      webview.postMessage({
+        type: 'codex:authStatus',
+        data: {
+          enabled: true,
+          authenticated: false,
+          binaryMissing: true,
+          error: 'Codex CLI not found. Install with: npm install -g @openai/codex',
+        },
+      });
+      return;
+    }
+
     try {
       const status = await this.codexAuth.getStatus();
       webview.postMessage({
@@ -444,6 +462,17 @@ export class RitemarkSettingsProvider {
         },
       });
     }
+  }
+
+  /**
+   * Cleanup resources
+   */
+  dispose(): void {
+    this.codexAppServer?.dispose();
+    this.codexAuth?.removeAllListeners();
+    this.codexAuth = null;
+    this.codexAppServer = null;
+    RitemarkSettingsProvider.panel?.dispose();
   }
 
   private getNonce(): string {
