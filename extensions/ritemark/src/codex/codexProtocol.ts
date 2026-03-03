@@ -121,11 +121,10 @@ export interface ThreadInfo {
 // Turn Management (Client → Server)
 // ============================================================================
 
-export interface UserInput {
-  type: 'text';
-  text: string;
-  text_elements: unknown[];
-}
+export type UserInput =
+  | { type: 'text'; text: string; text_elements: unknown[] }
+  | { type: 'image'; image_url: string }
+  | { type: 'local_image'; path: string };
 
 export interface TurnStartParams {
   threadId: string;

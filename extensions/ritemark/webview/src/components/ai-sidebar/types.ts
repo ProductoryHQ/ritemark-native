@@ -22,7 +22,7 @@ export interface ModelOption {
   description: string;
 }
 
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
   type: AgentProgressType;
@@ -190,6 +190,7 @@ export interface CodexApprovalRequest {
 export interface CodexConversationTurn {
   id: string;
   userPrompt: string;
+  attachments?: FileAttachment[];
   streamingText: string;
   activities: AgentProgress[];
   approval?: CodexApprovalRequest;

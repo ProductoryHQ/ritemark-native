@@ -43,6 +43,43 @@ function nextId(): string {
   return `msg-${++msgCounter}-${Date.now()}`;
 }
 
+// ── Context window estimation ─────────────────────────────────────────
+const CONTEXT_WINDOW_TOKENS = 200_000;
+const SYSTEM_OVERHEAD_TOKENS = 600;
+
+function estimateConversationTokens(turns: AgentConversationTurn[]): number {
+  let tokens = SYSTEM_OVERHEAD_TOKENS;
+  for (const turn of turns) {
+    // User prompt
+    tokens += Math.ceil((turn.userPrompt?.length || 0) / 4);
+    // Attachments
+    if (turn.attachments) {
+      for (const att of turn.attachments) {
+        if (att.kind === 'text') {
+          tokens += Math.ceil(att.data.length / 4);
+        } else {
+          // base64 is ~33% larger than binary; decode then estimate
+          tokens += Math.ceil(att.data.length * 0.75 / 4);
+        }
+      }
+    }
+    // Agent response
+    if (turn.result?.text) {
+      tokens += Math.ceil(turn.result.text.length / 4);
+    }
+    // Tool use overhead (~50 tokens per activity)
+    tokens += (turn.activities?.length || 0) * 50;
+  }
+  return tokens;
+}
+
+function computeContextState(turns: AgentConversationTurn[]) {
+  const estimatedTokens = estimateConversationTokens(turns);
+  const contextUsagePercent = Math.min(100, (estimatedTokens / CONTEXT_WINDOW_TOKENS) * 100);
+  const showContextWarning = contextUsagePercent >= 70;
+  return { estimatedTokens, contextUsagePercent, showContextWarning };
+}
+
 interface AISidebarState {
   // ── Connection state ──
   hasApiKey: boolean;
@@ -99,6 +136,11 @@ interface AISidebarState {
   // ── Appearance ──
   chatFontSize: number;
 
+  // ── Context tracking ──
+  estimatedTokens: number;
+  contextUsagePercent: number;
+  showContextWarning: boolean;
+
   // ── Actions ──
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
@@ -119,7 +161,7 @@ interface AISidebarState {
   approvePlan: (turnId: string) => void;
   rejectPlan: (turnId: string, feedback?: string) => void;
   dismissWelcome: () => void;
-  sendCodexMessage: (prompt: string) => void;
+  sendCodexMessage: (prompt: string, attachments?: FileAttachment[]) => void;
   selectCodexModel: (modelId: string) => void;
   handleCodexApproval: (requestId: string | number, approved: boolean) => void;
 
@@ -178,6 +220,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   isIndexing: false,
   discoveredAgents: [],
   discoveredCommands: [],
+
+  estimatedTokens: 0,
+  contextUsagePercent: 0,
+  showContextWarning: false,
 
   // ── Actions ──
 
@@ -394,7 +440,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
   },
 
-  sendCodexMessage: (prompt) => {
+  sendCodexMessage: (prompt, attachments?) => {
     const state = get();
     const lastTurn = state.codexConversation[state.codexConversation.length - 1];
     if (lastTurn?.isRunning) return;
@@ -402,6 +448,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const turn: CodexConversationTurn = {
       id: nextId(),
       userPrompt: prompt,
+      attachments,
       streamingText: '',
       activities: [],
       isRunning: true,
@@ -409,7 +456,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     };
 
     set({ codexConversation: [...state.codexConversation, turn] });
-    vscode.postMessage({ type: 'codex-execute', prompt, model: state.codexSelectedModel });
+    vscode.postMessage({
+      type: 'codex-execute',
+      prompt,
+      model: state.codexSelectedModel,
+      attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
+    });
   },
 
   selectCodexModel: (modelId) => {
@@ -479,6 +531,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       agentConv = [];
     }
 
+    const contextState = computeContextState(agentConv);
     set({
       currentConversationId: id,
       selectedAgent: data.agentId,
@@ -487,6 +540,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       chatMessages: data.chatMessages || [],
       conversationHistory: data.conversationHistory || [],
       showHistoryPanel: false,
+      ...contextState,
     });
 
     // Update agent selection in extension
@@ -535,6 +589,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       agentConversation: [],
       codexConversation: [],
       showHistoryPanel: false,
+      estimatedTokens: 0,
+      contextUsagePercent: 0,
+      showContextWarning: false,
     });
   },
 
@@ -555,6 +612,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       isStreaming: false,
       pendingCitations: [],
       agentConversation: [],
+      estimatedTokens: 0,
+      contextUsagePercent: 0,
+      showContextWarning: false,
     });
   },
 
@@ -796,7 +856,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
               error: message.error,
             },
           };
-          set({ agentConversation: conv });
+          const contextState = computeContextState(conv);
+          set({ agentConversation: conv, ...contextState });
 
           // Auto-save conversation after turn completes
           setTimeout(() => get().saveCurrentConversation(), 100);
