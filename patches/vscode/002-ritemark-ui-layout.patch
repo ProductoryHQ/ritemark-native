@@ -677,17 +677,20 @@ index f8703b7302b..f7c618e0fc2 100644
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
 diff --git a/src/vs/workbench/services/views/browser/viewDescriptorService.ts b/src/vs/workbench/services/views/browser/viewDescriptorService.ts
-index aa1320d578b..36d8f6b8c9c 100644
+index aa1320d578b..baf5ed13264 100644
 --- a/src/vs/workbench/services/views/browser/viewDescriptorService.ts
 +++ b/src/vs/workbench/services/views/browser/viewDescriptorService.ts
-@@ -93,6 +93,11 @@ export class ViewDescriptorService extends Disposable implements IViewDescriptor
+@@ -93,6 +93,14 @@ export class ViewDescriptorService extends Disposable implements IViewDescriptor
  		this.viewDescriptorsCustomLocations = new Map<string, string>(Object.entries(this.viewCustomizations.viewLocations));
  		this.viewContainerBadgeEnablementStates = new Map<string, boolean>(Object.entries(this.viewCustomizations.viewContainerBadgeEnablementStates));
- 
+
 +		// Ritemark: Force ritemark-ai container to auxiliarybar (right sidebar) on every startup.
 +		// Prevents cached state from overriding the declared default location.
 +		// Note: Extension containers get prefixed with 'workbench.view.extension.' (see viewsExtensionPoint.ts:372)
 +		this.viewContainersCustomLocations.delete('workbench.view.extension.ritemark-ai');
++		// Ritemark: Also force terminal container to auxiliarybar.
++		// SQLite cache may have the old Panel location from before the patch.
++		this.viewContainersCustomLocations.delete('terminal');
 +
  		// Register all containers that were registered before this ctor
  		this.viewContainers.forEach(viewContainer => this.onDidRegisterViewContainer(viewContainer));
