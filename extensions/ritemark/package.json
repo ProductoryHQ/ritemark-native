@@ -10,6 +10,7 @@
   },
   "main": "./out/extension.js",
   "activationEvents": [
+    "onStartupFinished",
     "onCustomEditor:ritemark.editor",
     "onCustomEditor:ritemark.excelViewer",
     "onView:ritemark.unifiedView",
@@ -358,7 +359,8 @@
       },
       "github.copilot.editor.enableAutoCompletions": false,
       "github.copilot.editor.enableCodeActions": false,
-      "workbench.panel.defaultLocation": "right"
+      "workbench.panel.defaultLocation": "right",
+      "terminal.integrated.defaultLocation": "view"
     },
     "themes": [
       {

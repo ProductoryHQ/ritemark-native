@@ -45,70 +45,13 @@ function nextId(): string {
 }
 
 // ── Context window estimation ─────────────────────────────────────────
-// Uses cost-based estimation (from SDK metrics) when available, falling back
-// to a conservative text-only heuristic. We intentionally do NOT try to estimate
-// tool call token usage — the SDK manages that via compaction internally.
-//
-// Pricing reference (per million tokens):
-//   Sonnet: $3 input / $15 output → ~$5 blended average
-//   Opus:   $15 input / $75 output → ~$30 blended average
-//   Haiku:  $0.25 input / $1.25 output → ~$0.5 blended average
-//
-// Image tokens: (width×height)/750, max ~1600 after resize
-// Source: https://platform.claude.com/docs/en/build-with-claude/vision
+// Disabled: our heuristics were inaccurate and too aggressive.
+// AI agents (Claude Code, Codex) manage their own context via compaction.
+// Claude Code emits compact_boundary events which we already display.
+// TODO: revisit with per-turn input_tokens from SDK if needed.
 
-const CONTEXT_WINDOW_TOKENS = 200_000;
-
-function estimateConversationTokens(turns: AgentConversationTurn[]): number {
-  // ── Strategy 1: Cost-based (most accurate) ──
-  // total_cost_usd from the SDK is real usage data. Derive token estimate from it.
-  let totalCost = 0;
-  let lastModel = '';
-  for (const turn of turns) {
-    if (turn.result?.metrics?.costUsd) {
-      totalCost += turn.result.metrics.costUsd;
-      lastModel = turn.result.metrics.model || lastModel;
-    }
-  }
-  if (totalCost > 0) {
-    // Blended price per million tokens (weighted toward input-heavy agent workloads)
-    const pricePerMillion = lastModel.includes('opus') ? 25
-      : lastModel.includes('haiku') ? 0.4
-      : 4; // Sonnet default
-    return Math.round((totalCost / pricePerMillion) * 1_000_000);
-  }
-
-  // ── Strategy 2: Text-only heuristic (conservative fallback) ──
-  // Only counts what we can actually see. Intentionally underestimates because
-  // tool call internals are invisible to us and managed by SDK compaction.
-  let tokens = 4000; // Claude Code system prompt overhead
-  for (const turn of turns) {
-    tokens += 100; // per-turn message framing
-    tokens += Math.ceil((turn.userPrompt?.length || 0) / 4);
-    if (turn.attachments) {
-      for (const att of turn.attachments) {
-        if (att.kind === 'text') {
-          tokens += Math.ceil(att.data.length / 4);
-        } else if (att.kind === 'image') {
-          tokens += 1600; // Anthropic vision: max ~1600 tokens per image
-        } else {
-          // PDFs: rough page-based estimate (~1500 tokens/page, assume ~5 pages)
-          tokens += 7500;
-        }
-      }
-    }
-    if (turn.result?.text) {
-      tokens += Math.ceil(turn.result.text.length / 4);
-    }
-  }
-  return tokens;
-}
-
-function computeContextState(turns: AgentConversationTurn[]) {
-  const estimatedTokens = estimateConversationTokens(turns);
-  const contextUsagePercent = Math.min(100, (estimatedTokens / CONTEXT_WINDOW_TOKENS) * 100);
-  const showContextWarning = contextUsagePercent >= 70;
-  return { estimatedTokens, contextUsagePercent, showContextWarning };
+function computeContextState(_turns: AgentConversationTurn[]) {
+  return { estimatedTokens: 0, contextUsagePercent: 0, showContextWarning: false };
 }
 
 interface AISidebarState {
