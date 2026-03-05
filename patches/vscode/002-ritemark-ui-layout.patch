@@ -25,7 +25,7 @@ index 833787070f3..7cb8cf44871 100644
  				icon,
  			}, location);
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index fea736cad03..223fb73f5a0 100644
+index fea736cad03..29ded5e88fa 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
 @@ -41,9 +41,10 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
@@ -45,7 +45,8 @@ index fea736cad03..223fb73f5a0 100644
  
  registerAction2(ToggleSidebarPositionAction);
  
--const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
++// Ritemark: commented out Configure Layout menu (icon kept - used by CustomizeLayoutAction)
+ const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
 -MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 -	submenu: MenuId.LayoutControlMenuSubmenu,
 -	title: localize('configureLayout', "Configure Layout"),
@@ -56,8 +57,6 @@ index fea736cad03..223fb73f5a0 100644
 -		ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
 -	)
 -});
-+// Ritemark: commented out Configure Layout menu
-+// const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
 +// MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +// 	submenu: MenuId.LayoutControlMenuSubmenu,
 +// 	title: localize('configureLayout', "Configure Layout"),
