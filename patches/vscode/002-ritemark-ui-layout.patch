@@ -1,65 +1,77 @@
+Ritemark UI Layout: sidebar, titlebar, tabs, explorer, panels, auxiliary bar support
+Consolidates layout patches for Ritemark Native
+---
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-index f5a0648d5d1..d2231d4abd7 100644
+index 833787070f3..7cb8cf44871 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 +++ b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-@@ -312,6 +312,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
- 					case 'panel':
- 						panelOrder = this.registerCustomViewContainers(value, description, panelOrder, existingViewContainers, ViewContainerLocation.Panel);
+@@ -323,6 +323,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+ 					case 'secondarySidebar':
+ 						auxiliaryBarOrder = this.registerCustomViewContainers(value, description, auxiliaryBarOrder, existingViewContainers, ViewContainerLocation.AuxiliaryBar);
  						break;
-+					case 'auxiliarybar':
-+						this.registerCustomViewContainers(value, description, 1, existingViewContainers, ViewContainerLocation.AuxiliaryBar);
++					case 'auxiliarybar': // Ritemark: support auxiliarybar in package.json
++						auxiliaryBarOrder = this.registerCustomViewContainers(value, description, auxiliaryBarOrder, existingViewContainers, ViewContainerLocation.AuxiliaryBar);
 +						break;
  				}
  			});
  		}
-@@ -402,7 +405,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -413,7 +416,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  					ViewPaneContainer,
  					[id, { mergeViewWithContainerWhenSingleView: true }]
  				),
 -				hideIfEmpty: true,
-+				hideIfEmpty: location !== ViewContainerLocation.AuxiliaryBar, /* Ritemark: keep auxiliary bar containers always visible */
++				hideIfEmpty: location !== ViewContainerLocation.AuxiliaryBar, // Ritemark: keep auxiliary bar containers always visible
  				order,
  				icon,
  			}, location);
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index 5d7b93cfd86..d152e8815ce 100644
+index fea736cad03..223fb73f5a0 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
-@@ -38,9 +38,9 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
+@@ -41,9 +41,10 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
  const activityBarLeftIcon = registerIcon('activity-bar-left', Codicon.layoutActivitybarLeft, localize('activityBarLeft', "Represents the activity bar in the left position"));
  const activityBarRightIcon = registerIcon('activity-bar-right', Codicon.layoutActivitybarRight, localize('activityBarRight', "Represents the activity bar in the right position"));
  const panelLeftIcon = registerIcon('panel-left', Codicon.layoutSidebarLeft, localize('panelLeft', "Represents a side bar in the left position"));
 -const panelLeftOffIcon = registerIcon('panel-left-off', Codicon.layoutSidebarLeftOff, localize('panelLeftOff', "Represents a side bar in the left position toggled off"));
-+// RiteMark: Removed panelLeftOffIcon (unused after LayoutControlMenu toggles replaced)
++// Ritemark: commented out - not used in custom layout
++// const panelLeftOffIcon = registerIcon('panel-left-off', Codicon.layoutSidebarLeftOff, localize('panelLeftOff', "Represents a side bar in the left position toggled off"));
  const panelRightIcon = registerIcon('panel-right', Codicon.layoutSidebarRight, localize('panelRight', "Represents side bar in the right position"));
 -const panelRightOffIcon = registerIcon('panel-right-off', Codicon.layoutSidebarRightOff, localize('panelRightOff', "Represents side bar in the right position toggled off"));
-+// RiteMark: Removed panelRightOffIcon (unused after LayoutControlMenu toggles replaced)
++// const panelRightOffIcon = registerIcon('panel-right-off', Codicon.layoutSidebarRightOff, localize('panelRightOff', "Represents side bar in the right position toggled off"));
  const panelIcon = registerIcon('panel-bottom', Codicon.layoutPanel, localize('panelBottom', "Represents the bottom panel"));
  const statusBarIcon = registerIcon('statusBar', Codicon.layoutStatusbar, localize('statusBarIcon', "Represents the status bar"));
  
-@@ -180,13 +180,14 @@ export class ToggleSidebarPositionAction extends Action2 {
+@@ -168,17 +169,18 @@ export class ToggleSidebarPositionAction extends Action2 {
+ 
  registerAction2(ToggleSidebarPositionAction);
  
- const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
+-const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
 -MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 -	submenu: MenuId.LayoutControlMenuSubmenu,
 -	title: localize('configureLayout', "Configure Layout"),
 -	icon: configureLayoutIcon,
 -	group: '1_workbench_layout',
--	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
+-	when: ContextKeyExpr.and(
+-		IsAuxiliaryWindowContext.negate(),
+-		ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
+-	)
 -});
-+// RiteMark: Hide Configure Layout menu - too complex for writing app users
++// Ritemark: commented out Configure Layout menu
++// const configureLayoutIcon = registerIcon('configure-layout-icon', Codicon.layout, localize('cofigureLayoutIcon', 'Icon represents workbench layout configuration.'));
 +// MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +// 	submenu: MenuId.LayoutControlMenuSubmenu,
 +// 	title: localize('configureLayout', "Configure Layout"),
 +// 	icon: configureLayoutIcon,
 +// 	group: '1_workbench_layout',
-+// 	when: ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
++// 	when: ContextKeyExpr.and(
++// 		IsAuxiliaryWindowContext.negate(),
++// 		ContextKeyExpr.equals('config.workbench.layoutControl.type', 'menu')
++// 	)
 +// });
  
  
  MenuRegistry.appendMenuItems([{
-@@ -301,12 +302,13 @@ registerAction2(class extends Action2 {
+@@ -271,12 +273,13 @@ registerAction2(class extends Action2 {
  	}
  });
  
@@ -69,7 +81,7 @@ index 5d7b93cfd86..d152e8815ce 100644
 -	submenu: MenuId.MenubarAppearanceMenu,
 -	order: 1
 -});
-+// RiteMark: Appearance submenu removed - not relevant for markdown editing
++// Ritemark: commented out Appearance submenu
 +// MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
 +// 	group: '2_appearance',
 +// 	title: localize({ key: 'miAppearance', comment: ['&& denotes a mnemonic'] }, "&&Appearance"),
@@ -79,68 +91,70 @@ index 5d7b93cfd86..d152e8815ce 100644
  
  // Toggle Sidebar Visibility
  
-@@ -373,34 +375,50 @@ MenuRegistry.appendMenuItems([
- 				id: ToggleSidebarVisibilityAction.ID,
- 				title: localize('compositePart.hideSideBarLabel', "Hide Primary Side Bar"),
- 			},
--			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
--			order: 2
+@@ -346,23 +349,19 @@ MenuRegistry.appendMenuItems([
+ 			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewContainerLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
+ 			order: 2
  		}
 -	}, {
-+	}
-+	// RiteMark: Removed sidebar LayoutControlMenu toggles — replaced with editor layout controls below
-+]);
-+
-+// RiteMark: Custom titlebar controls — left sidebar, right sidebar, Ritemark settings gear
-+MenuRegistry.appendMenuItems([
++	},
++	// Ritemark: custom titlebar toggles - left sidebar, right sidebar (auxiliary bar), settings gear
 +	{
  		id: MenuId.LayoutControlMenu,
  		item: {
--			group: '0_workbench_toggles',
-+			group: '0_layout',
+ 			group: '2_pane_toggles',
  			command: {
  				id: ToggleSidebarVisibilityAction.ID,
--				title: localize('toggleSideBar', "Toggle Primary Side Bar"),
+ 				title: localize('toggleSideBar', "Toggle Primary Side Bar"),
 -				icon: panelLeftOffIcon,
 -				toggled: { condition: SideBarVisibleContext, icon: panelLeftIcon }
-+				title: localize('toggleLeftSidebar', "Toggle Left Sidebar"),
++				toggled: { condition: SideBarVisibleContext, icon: panelLeftIcon },
 +				icon: panelLeftIcon,
-+				toggled: { condition: SideBarVisibleContext }
  			},
--			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')),
-+			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
+-			when: ContextKeyExpr.and(
+-				IsAuxiliaryWindowContext.negate(),
+-				ContextKeyExpr.or(
+-					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'),
+-					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
+-				ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')
+-			),
++			when: IsAuxiliaryWindowContext.negate(),
  			order: 0
  		}
  	}, {
- 		id: MenuId.LayoutControlMenu,
+@@ -370,19 +369,25 @@ MenuRegistry.appendMenuItems([
  		item: {
--			group: '0_workbench_toggles',
-+			group: '0_layout',
+ 			group: '2_pane_toggles',
  			command: {
 -				id: ToggleSidebarVisibilityAction.ID,
 -				title: localize('toggleSideBar', "Toggle Primary Side Bar"),
 -				icon: panelRightOffIcon,
 -				toggled: { condition: SideBarVisibleContext, icon: panelRightIcon }
 +				id: ToggleAuxiliaryBarAction.ID,
-+				title: localize('toggleRightSidebar', "Toggle Right Sidebar"),
++				title: localize('toggleSecondarySideBar', "Toggle Secondary Side Bar"),
++				toggled: { condition: AuxiliaryBarVisibleContext, icon: panelRightIcon },
 +				icon: panelRightIcon,
-+				toggled: { condition: AuxiliaryBarVisibleContext }
  			},
--			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'right')),
+-			when: ContextKeyExpr.and(
+-				IsAuxiliaryWindowContext.negate(),
+-				ContextKeyExpr.or(
+-					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'),
+-					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
+-				ContextKeyExpr.equals('config.workbench.sideBar.location', 'right')
+-			),
 -			order: 2
-+			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
++			when: IsAuxiliaryWindowContext.negate(),
 +			order: 1
 +		}
 +	}, {
 +		id: MenuId.LayoutControlMenu,
 +		item: {
-+			group: '1_settings',
++			group: '3_settings',
 +			command: {
 +				id: 'ritemark.aiSettings',
-+				title: localize('ritemarkSettings', "Ritemark Settings"),
++				title: localize('ritemarkSettings', "Settings"),
 +				icon: Codicon.settingsGear,
 +			},
-+			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
++			when: IsAuxiliaryWindowContext.negate(),
 +			order: 0
  		}
  	}
@@ -159,482 +173,476 @@ index f17465a5e4a..6dbeda329ca 100644
  	box-sizing: border-box;
  	overflow: hidden;
 diff --git a/src/vs/workbench/browser/part.ts b/src/vs/workbench/browser/part.ts
-index e85aac5c3cf..08ff41ee187 100644
+index d66a8f5f0ee..65011fd204a 100644
 --- a/src/vs/workbench/browser/part.ts
 +++ b/src/vs/workbench/browser/part.ts
-@@ -227,8 +227,8 @@ export abstract class Part extends Component implements ISerializableView {
+@@ -201,8 +201,8 @@ export abstract class Part<MementoType extends object = object> extends Componen
  
  class PartLayout {
  
 -	private static readonly HEADER_HEIGHT = 35;
 -	private static readonly TITLE_HEIGHT = 35;
-+	private static readonly HEADER_HEIGHT = 40; /* Ritemark: taller tab bar */
-+	private static readonly TITLE_HEIGHT = 40; /* Ritemark: taller tab bar */
++	private static readonly HEADER_HEIGHT = 40; // Ritemark: taller tab bar
++	private static readonly TITLE_HEIGHT = 40; // Ritemark: taller tab bar
  	private static readonly Footer_HEIGHT = 35;
  
  	private headerVisible: boolean = false;
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-index b2c7e5f01c7..938e1c5fa1d 100644
+index 5abfb88dd9c..600c284e905 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-@@ -3,11 +3,11 @@
+@@ -3,6 +3,7 @@
   *  Licensed under the MIT License. See License.txt in the project root for license information.
   *--------------------------------------------------------------------------------------------*/
  
--import { Codicon } from '../../../../base/common/codicons.js';
-+// RiteMark: Removed Codicon import (unused after icon declarations removed)
++// Ritemark: Codicon import kept for close/maximize/restore icons
+ import { Codicon } from '../../../../base/common/codicons.js';
  import { localize, localize2 } from '../../../../nls.js';
  import { Action2, MenuId, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
- import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
--import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
-+// RiteMark: Removed registerIcon import (unused after icon declarations removed)
- import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
- import { AuxiliaryBarVisibleContext } from '../../../common/contextkeys.js';
- import { ViewContainerLocation, ViewContainerLocationToString } from '../../../common/views.js';
-@@ -18,10 +18,7 @@ import { KeybindingWeight } from '../../../../platform/keybinding/common/keybind
- import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
+@@ -23,10 +24,11 @@ const maximizeIcon = registerIcon('auxiliarybar-maximize', Codicon.screenFull, l
+ const restoreIcon = registerIcon('auxiliarybar-restore', Codicon.screenNormal, localize('restoreIcon', 'Icon to restore the secondary side bar.'));
+ const closeIcon = registerIcon('auxiliarybar-close', Codicon.close, localize('closeIcon', 'Icon to close the secondary side bar.'));
  
- 
--const auxiliaryBarRightIcon = registerIcon('auxiliarybar-right-layout-icon', Codicon.layoutSidebarRight, localize('toggleAuxiliaryIconRight', 'Icon to toggle the auxiliary bar off in its right position.'));
--const auxiliaryBarRightOffIcon = registerIcon('auxiliarybar-right-off-layout-icon', Codicon.layoutSidebarRightOff, localize('toggleAuxiliaryIconRightOn', 'Icon to toggle the auxiliary bar on in its right position.'));
--const auxiliaryBarLeftIcon = registerIcon('auxiliarybar-left-layout-icon', Codicon.layoutSidebarLeft, localize('toggleAuxiliaryIconLeft', 'Icon to toggle the auxiliary bar in its left position.'));
--const auxiliaryBarLeftOffIcon = registerIcon('auxiliarybar-left-off-layout-icon', Codicon.layoutSidebarLeftOff, localize('toggleAuxiliaryIconLeftOn', 'Icon to toggle the auxiliary bar on in its left position.'));
-+// RiteMark: Removed unused auxiliary bar icon declarations (LayoutControlMenu toggles removed below)
+-const auxiliaryBarRightIcon = registerIcon('auxiliarybar-right-layout-icon', Codicon.layoutSidebarRight, localize('toggleAuxiliaryIconRight', 'Icon to toggle the secondary side bar off in its right position.'));
+-const auxiliaryBarRightOffIcon = registerIcon('auxiliarybar-right-off-layout-icon', Codicon.layoutSidebarRightOff, localize('toggleAuxiliaryIconRightOn', 'Icon to toggle the secondary side bar on in its right position.'));
+-const auxiliaryBarLeftIcon = registerIcon('auxiliarybar-left-layout-icon', Codicon.layoutSidebarLeft, localize('toggleAuxiliaryIconLeft', 'Icon to toggle the secondary side bar in its left position.'));
+-const auxiliaryBarLeftOffIcon = registerIcon('auxiliarybar-left-off-layout-icon', Codicon.layoutSidebarLeftOff, localize('toggleAuxiliaryIconLeftOn', 'Icon to toggle the secondary side bar on in its left position.'));
++// Ritemark: commented out - not used in custom layout
++// const auxiliaryBarRightIcon = registerIcon('auxiliarybar-right-layout-icon', Codicon.layoutSidebarRight, localize('toggleAuxiliaryIconRight', 'Icon to toggle the secondary side bar off in its right position.'));
++// const auxiliaryBarRightOffIcon = registerIcon('auxiliarybar-right-off-layout-icon', Codicon.layoutSidebarRightOff, localize('toggleAuxiliaryIconRightOn', 'Icon to toggle the secondary side bar on in its right position.'));
++// const auxiliaryBarLeftIcon = registerIcon('auxiliarybar-left-layout-icon', Codicon.layoutSidebarLeft, localize('toggleAuxiliaryIconLeft', 'Icon to toggle the secondary side bar in its left position.'));
++// const auxiliaryBarLeftOffIcon = registerIcon('auxiliarybar-left-off-layout-icon', Codicon.layoutSidebarLeftOff, localize('toggleAuxiliaryIconLeftOn', 'Icon to toggle the secondary side bar on in its left position.'));
  
  export class ToggleAuxiliaryBarAction extends Action2 {
  
-@@ -97,33 +94,8 @@ registerAction2(class FocusAuxiliaryBarAction extends Action2 {
+@@ -140,45 +142,8 @@ registerAction2(class FocusAuxiliaryBarAction extends Action2 {
  });
  
  MenuRegistry.appendMenuItems([
-+	// RiteMark: Removed secondary sidebar LayoutControlMenu toggles — replaced with editor layout controls
++	// Ritemark: LayoutControlMenu toggles removed - handled by layoutActions.ts
  	{
 -		id: MenuId.LayoutControlMenu,
 -		item: {
--			group: '0_workbench_toggles',
+-			group: '2_pane_toggles',
 -			command: {
 -				id: ToggleAuxiliaryBarAction.ID,
 -				title: localize('toggleSecondarySideBar', "Toggle Secondary Side Bar"),
 -				toggled: { condition: AuxiliaryBarVisibleContext, icon: auxiliaryBarLeftIcon },
 -				icon: auxiliaryBarLeftOffIcon,
 -			},
--			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'right')),
+-			when: ContextKeyExpr.and(
+-				IsAuxiliaryWindowContext.negate(),
+-				ContextKeyExpr.or(
+-					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'),
+-					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
+-				ContextKeyExpr.equals('config.workbench.sideBar.location', 'right')
+-			),
 -			order: 0
 -		}
 -	}, {
 -		id: MenuId.LayoutControlMenu,
 -		item: {
--			group: '0_workbench_toggles',
+-			group: '2_pane_toggles',
 -			command: {
 -				id: ToggleAuxiliaryBarAction.ID,
 -				title: localize('toggleSecondarySideBar', "Toggle Secondary Side Bar"),
 -				toggled: { condition: AuxiliaryBarVisibleContext, icon: auxiliaryBarRightIcon },
 -				icon: auxiliaryBarRightOffIcon,
 -			},
--			when: ContextKeyExpr.and(ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')), ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')),
+-			when: ContextKeyExpr.and(
+-				IsAuxiliaryWindowContext.negate(),
+-				ContextKeyExpr.or(
+-					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'),
+-					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
+-				ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')
+-			),
 -			order: 2
 -		}
 -	}, {
- 		id: MenuId.ViewTitleContext,
+ 		id: MenuId.ViewContainerTitleContext,
  		item: {
  			group: '3_workbench_layout_move',
 diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-index d03297e004f..8a84fdf5253 100644
+index b0a44e2c23a..01070bb9145 100644
 --- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-@@ -102,7 +102,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+@@ -100,7 +100,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
  	protected readonly treeItemsTransfer = LocalSelectionTransfer.getInstance<DraggedTreeItemsIdentifier>();
  
  	private static readonly EDITOR_TAB_HEIGHT = {
 -		normal: 35 as const,
-+		normal: 40 as const, /* Ritemark: taller tabs */
++		normal: 40 as const, // Ritemark: taller tabs
  		compact: 22 as const
  	};
  
 diff --git a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
-index 76c8a561b4e..585107b21aa 100644
+index 8eff5df9389..92917d018b6 100644
 --- a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
 +++ b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
-@@ -138,7 +138,7 @@
+@@ -154,7 +154,7 @@
  
  .monaco-workbench .part.editor > .content .editor-group-container > .editor-group-container-toolbar {
  	display: none;
 -	height: 35px;
-+	height: 40px; /* Ritemark: match tab bar height */
++	height: 40px; /* Ritemark: taller tabs */
  }
  
  .monaco-workbench .part.editor > .content .editor-group-container.empty.locked > .editor-group-container-toolbar,
 diff --git a/src/vs/workbench/browser/parts/media/paneCompositePart.css b/src/vs/workbench/browser/parts/media/paneCompositePart.css
-index 1f2bd9ee9d5..742326b3a6b 100644
+index 8ec76362dd0..a9f89faa4f4 100644
 --- a/src/vs/workbench/browser/parts/media/paneCompositePart.css
 +++ b/src/vs/workbench/browser/parts/media/paneCompositePart.css
-@@ -56,7 +56,7 @@
- .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar,
- .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar {
- 	line-height: 27px; /* matches panel titles in settings */
--	height: 35px;
-+	height: 40px; /* Ritemark: taller tab bar for better touch targets */
- }
- 
- .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item,
-@@ -72,8 +72,10 @@
+@@ -75,8 +75,10 @@
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon,
  .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon {
 -	height: 35px; /* matches height of composite container */
--	padding: 0 3px;
-+	height: 40px; /* Ritemark: matches container height */
-+	padding: 0 5px;
-+	display: flex;
-+	align-items: center;
++	height: 40px; /* Ritemark: taller tab bar */
+ 	padding: 0 3px;
++	display: flex; /* Ritemark */
++	align-items: center; /* Ritemark */
  }
  
  
-@@ -163,7 +165,7 @@
+@@ -166,7 +168,7 @@
  
- .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label,
- .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label {
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label:not(.codicon-more),
+ .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label:not(.codicon-more) {
 -	border-radius: 0;
-+	border-radius: 6px;
++	border-radius: 6px; /* Ritemark: rounded tabs */
  }
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item:not(.icon) .action-label,
-@@ -279,6 +281,7 @@
- .monaco-workbench .pane-composite-part > .title > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon.checked,
- .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon.checked {
+@@ -280,6 +282,7 @@
+ .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked,
+ .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked {
  	background-color: var(--vscode-activityBarTop-activeBackground);
-+	border-radius: 6px;
++	border-radius: 6px; /* Ritemark: rounded tabs */
  }
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked .active-item-indicator:before,
-@@ -291,7 +294,7 @@
+@@ -292,7 +295,7 @@
  	bottom: 2px;
  	width: 100%;
  	height: 0;
 -	border-top-width: 1px;
-+	border-top-width: 0; /* Ritemark: hide bottom border indicator, use background instead */
++	border-top-width: 0; /* Ritemark: hide active indicator underline */
  	border-top-style: solid;
  }
  
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index 9ec755c35c2..0448318c4e4 100644
+index a452575cf9e..7dff19825ee 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
-@@ -431,9 +431,47 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
- 
+@@ -451,9 +451,34 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
  	protected override createHeaderArea(): HTMLElement {
  		const headerArea = super.createHeaderArea();
+ 
++		// Ritemark: apply custom tab bar styles
 +		this.applyRitemarkTopTabStyles(headerArea);
++
  		return this.createHeaderFooterCompositeBarArea(headerArea);
  	}
  
++	// Ritemark: inject CSS for tab bar styling
 +	private applyRitemarkTopTabStyles(headerArea: HTMLElement): void {
-+		// Ritemark: sidebar top-tabs styling (Sprint 34, patch 016)
-+		const style = headerArea.ownerDocument.createElement('style');
++		const style = document.createElement('style');
 +		style.textContent = `
-+			/* Tab bar container */
++			/* Ritemark: top tab bar styling */
 +			.pane-composite-part > .header-or-footer {
-+				padding: 0 8px !important;
++				height: 40px;
 +			}
-+			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar {
-+				height: 40px !important;
-+				align-items: center;
++			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon {
++				height: 30px;
++				padding: 0 3px;
++			}
++			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label:not(.codicon-more) {
++				border-radius: 6px;
 +			}
 +			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .actions-container {
 +				gap: 2px;
-+				align-items: center;
-+			}
-+			/* Individual tab button */
-+			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon {
-+				height: 30px !important;
-+				padding: 0 !important;
-+				border-radius: 6px;
-+				display: flex;
-+				align-items: center;
-+				justify-content: center;
-+			}
-+			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon .action-label {
-+				padding: 5px 9px !important;
-+				border-radius: 6px;
-+			}
-+			/* Active tab */
-+			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked {
-+				border-radius: 6px !important;
 +			}
 +		`;
-+		headerArea.ownerDocument.head.appendChild(style);
++		headerArea.appendChild(style);
 +	}
 +
  	protected override createFooterArea(): HTMLElement {
  		const footerArea = super.createFooterArea();
- 		return this.createHeaderFooterCompositeBarArea(footerArea);
+ 
 diff --git a/src/vs/workbench/browser/parts/panel/panelActions.ts b/src/vs/workbench/browser/parts/panel/panelActions.ts
-index 77ac81eea44..4d5335d7727 100644
+index 3432144229c..ad85dd0828c 100644
 --- a/src/vs/workbench/browser/parts/panel/panelActions.ts
 +++ b/src/vs/workbench/browser/parts/panel/panelActions.ts
-@@ -24,8 +24,9 @@ import { KeybindingWeight } from '../../../../platform/keybinding/common/keybind
- const maximizeIcon = registerIcon('panel-maximize', Codicon.chevronUp, localize('maximizeIcon', 'Icon to maximize a panel.'));
- const restoreIcon = registerIcon('panel-restore', Codicon.chevronDown, localize('restoreIcon', 'Icon to restore a panel.'));
+@@ -25,8 +25,9 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
+ const maximizeIcon = registerIcon('panel-maximize', Codicon.screenFull, localize('maximizeIcon', 'Icon to maximize a panel.'));
+ const restoreIcon = registerIcon('panel-restore', Codicon.screenNormal, localize('restoreIcon', 'Icon to restore a panel.'));
  const closeIcon = registerIcon('panel-close', Codicon.close, localize('closeIcon', 'Icon to close a panel.'));
 -const panelIcon = registerIcon('panel-layout-icon', Codicon.layoutPanel, localize('togglePanelOffIcon', 'Icon to toggle the panel off when it is on.'));
 -const panelOffIcon = registerIcon('panel-layout-icon-off', Codicon.layoutPanelOff, localize('togglePanelOnIcon', 'Icon to toggle the panel on when it is off.'));
-+// Ritemark: panelIcon/panelOffIcon removed — panel toggle hidden from titlebar
++// Ritemark: commented out - panel toggle hidden from titlebar
 +// const panelIcon = registerIcon('panel-layout-icon', Codicon.layoutPanel, localize('togglePanelOffIcon', 'Icon to toggle the panel off when it is on.'));
 +// const panelOffIcon = registerIcon('panel-layout-icon-off', Codicon.layoutPanelOff, localize('togglePanelOnIcon', 'Icon to toggle the panel on when it is off.'));
  
  export class TogglePanelAction extends Action2 {
  
-@@ -362,20 +363,22 @@ registerAction2(class extends Action2 {
+@@ -331,29 +332,30 @@ MenuRegistry.appendMenuItem(MenuId.PanelTitle, {
+ 	when: ContextKeyExpr.and(panelMaximizationSupportedWhen, PanelMaximizedContext)
  });
  
- MenuRegistry.appendMenuItems([
-+	// Ritemark: Panel toggle hidden from titlebar — not needed for writing app
-+	// {
-+	// 	id: MenuId.LayoutControlMenu,
-+	// 	item: {
-+	// 		group: '0_workbench_toggles',
-+	// 		command: {
-+	// 			id: TogglePanelAction.ID,
-+	// 			title: localize('togglePanel', "Toggle Panel"),
-+	// 			icon: panelOffIcon,
-+	// 			toggled: { condition: PanelVisibleContext, icon: panelIcon }
-+	// 		},
-+	// 		when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
-+	// 		order: 1
-+	// 	}
-+	// },
- 	{
+-MenuRegistry.appendMenuItems([
+-	{
 -		id: MenuId.LayoutControlMenu,
 -		item: {
--			group: '0_workbench_toggles',
+-			group: '2_pane_toggles',
 -			command: {
 -				id: TogglePanelAction.ID,
 -				title: localize('togglePanel', "Toggle Panel"),
 -				icon: panelOffIcon,
 -				toggled: { condition: PanelVisibleContext, icon: panelIcon }
 -			},
--			when: ContextKeyExpr.or(ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'), ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
+-			when:
+-				ContextKeyExpr.and(
+-					IsAuxiliaryWindowContext.negate(),
+-					ContextKeyExpr.or(
+-						ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'),
+-						ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')
+-					)
+-				),
 -			order: 1
 -		}
--	}, {
- 		id: MenuId.ViewTitleContext,
- 		item: {
- 			group: '3_workbench_layout_move',
+-	}
+-]);
++// Ritemark: commented out panel toggle from LayoutControlMenu
++// MenuRegistry.appendMenuItems([
++// 	{
++// 		id: MenuId.LayoutControlMenu,
++// 		item: {
++// 			group: '2_pane_toggles',
++// 			command: {
++// 				id: TogglePanelAction.ID,
++// 				title: localize('togglePanel', "Toggle Panel"),
++// 				icon: panelOffIcon,
++// 				toggled: { condition: PanelVisibleContext, icon: panelIcon }
++// 			},
++// 			when:
++// 				ContextKeyExpr.and(
++// 					IsAuxiliaryWindowContext.negate(),
++// 					ContextKeyExpr.or(
++// 						ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'),
++// 						ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')
++// 					)
++// 				),
++// 			order: 1
++// 		}
++// 	}
++// ]);
+ 
+ class MoveViewsBetweenPanelsAction extends Action2 {
+ 	constructor(private readonly source: ViewContainerLocation, private readonly destination: ViewContainerLocation, desc: Readonly<IAction2Options>) {
 diff --git a/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css b/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
-index 2c94078993b..80dcacd79fd 100644
+index decb51aba55..8329ebe6258 100644
 --- a/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
 +++ b/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
-@@ -71,21 +71,21 @@
- 
- .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label,
- .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label {
+@@ -78,20 +78,20 @@
+ .hc-black .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label,
+ .hc-light .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label,
+ .hc-light .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label {
 -	border-radius: 0px;
-+	border-radius: 6px;
- 	outline-offset: 2px;
++	border-radius: 6px; /* Ritemark: rounded tabs */
  }
  
  .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label::before,
  .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label::before {
 -	position: absolute;
 -	left: 5px; /* place icon in center */
-+	position: relative; /* Ritemark: use flex centering instead of absolute positioning */
-+	left: auto;
++	position: relative; /* Ritemark: changed from absolute */
++	left: auto; /* Ritemark: changed from 5px */
  }
  
- .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked:not(:focus) .active-item-indicator:before,
- .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked.clicked:focus .active-item-indicator:before,
+ .monaco-workbench .part.sidebar > .header-or-footer.header > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked:not(:focus) .active-item-indicator:before,
+ .monaco-workbench .part.sidebar > .header-or-footer.header > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked.clicked:focus .active-item-indicator:before,
  .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked:not(:focus) .active-item-indicator:before,
  .monaco-workbench .part.sidebar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked.clicked:focus .active-item-indicator:before {
 -	border-top-color: var(--vscode-activityBarTop-activeBorder) !important;
-+	border-top-color: transparent !important; /* Ritemark: hide bottom border, active state uses background */
++	border-top-color: transparent !important; /* Ritemark: hide active indicator */
  }
  
- .monaco-workbench .part.sidebar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item:hover .action-label,
+ .monaco-workbench .part.sidebar > .header-or-footer.footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked:not(:focus) .active-item-indicator:before,
 diff --git a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
-index 01360d53f36..61d55173281 100644
+index 982f5a620df..cc8137104a5 100644
 --- a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
 +++ b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
-@@ -472,3 +472,33 @@
+@@ -462,3 +462,40 @@
  	border-radius: 16px;
  	text-align: center;
  }
 +
-+/* RiteMark: Titlebar layout control button styling */
-+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label {
++/* Ritemark: titlebar layout control button styling */
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item .action-label {
 +	width: 26px;
 +	height: 26px;
++	border-radius: 4px;
 +	display: flex;
 +	align-items: center;
 +	justify-content: center;
-+	border-radius: 4px;
-+	font-size: 14px;
-+	color: #64748b;
-+	background: transparent;
 +}
 +
-+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label:hover {
-+	background-color: #f1f5f9;
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item .action-label:hover {
++	background-color: rgba(255, 255, 255, 0.1);
 +}
 +
-+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item > .action-label.checked {
-+	background-color: #eef2ff;
-+	color: #4338ca;
++.monaco-workbench .part.titlebar.light > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item .action-label:hover {
++	background-color: rgba(0, 0, 0, 0.06);
 +}
 +
-+/* RiteMark: Group separator between layout toggles and settings */
-+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item .action-label.separator {
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item .action-label.checked {
++	background-color: rgba(255, 255, 255, 0.15);
++}
++
++.monaco-workbench .part.titlebar.light > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item .action-label.checked {
++	background-color: rgba(0, 0, 0, 0.08);
++}
++
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item.separator {
 +	width: 1px;
 +	height: 16px;
-+	background-color: #e2e8f0;
-+	margin: 0 2px;
++	margin: 0 4px;
++	background-color: rgba(255, 255, 255, 0.2);
++}
++
++.monaco-workbench .part.titlebar.light > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .action-item.separator {
++	background-color: rgba(0, 0, 0, 0.15);
 +}
 diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-index e49557028f8..0558d831c95 100644
+index 743f9e6ee8b..e9656e1da21 100644
 --- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-@@ -36,7 +36,7 @@ import { CommandCenterControl } from './commandCenterControl.js';
+@@ -33,7 +33,8 @@ import { CommandCenterControl } from './commandCenterControl.js';
  import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
  import { WorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
  import { ACCOUNTS_ACTIVITY_ID, GLOBAL_ACTIVITY_ID } from '../../../common/activity.js';
 -import { AccountsActivityActionViewItem, isAccountsActionVisible, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
++// Ritemark: removed isAccountsActionVisible - activity actions hidden from titlebar
 +import { AccountsActivityActionViewItem, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
  import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
  import { IEditorGroupsContainer, IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
  import { ActionRunner, IAction } from '../../../../base/common/actions.js';
-@@ -50,7 +50,7 @@ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
+@@ -47,7 +48,8 @@ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
  import { EditorCommandsContextActionRunner } from '../editor/editorTabsControl.js';
  import { IEditorCommandsContext, IEditorPartOptionsChangeEvent, IToolbarActions } from '../../../common/editor.js';
  import { CodeWindow, mainWindow } from '../../../../base/browser/window.js';
 -import { ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION } from './titlebarActions.js';
-+// Ritemark: ACCOUNTS_ACTIVITY_TILE_ACTION and GLOBAL_ACTIVITY_TITLE_ACTION removed (hidden from titlebar)
++// Ritemark: removed ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION - activity actions hidden from titlebar
++// import { ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION } from './titlebarActions.js';
  import { IView } from '../../../../base/browser/ui/grid/grid.js';
  import { createInstantHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
  import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
-@@ -654,12 +654,13 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+@@ -680,13 +682,14 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
  			}
  
- 			// --- Activity Actions
+ 			// --- Activity Actions (always at the end)
 -			if (this.activityActionsEnabled) {
 -				if (isAccountsActionVisible(this.storageService)) {
 -					actions.primary.push(ACCOUNTS_ACTIVITY_TILE_ACTION);
 -				}
+-
 -				actions.primary.push(GLOBAL_ACTIVITY_TITLE_ACTION);
 -			}
-+			// Ritemark: Hide accounts and manage/settings gear from titlebar
++			// Ritemark: activity actions hidden from titlebar
 +			// if (this.activityActionsEnabled) {
 +			// 	if (isAccountsActionVisible(this.storageService)) {
 +			// 		actions.primary.push(ACCOUNTS_ACTIVITY_TILE_ACTION);
 +			// 	}
++			//
 +			// 	actions.primary.push(GLOBAL_ACTIVITY_TITLE_ACTION);
 +			// }
  
  			this.actionToolBar.setActions(prepareActions(actions.primary), prepareActions(actions.secondary));
  		};
 diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
-index 30699b39a33..130d608e9fd 100644
+index 5ea32fb1a11..009c95717d3 100644
 --- a/src/vs/workbench/browser/workbench.contribution.ts
 +++ b/src/vs/workbench/browser/workbench.contribution.ts
-@@ -614,6 +614,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
- 				tags: ['accessibility'],
- 				enum: ['on', 'off', 'auto']
- 			},
-+			// RiteMark: Enable layout controls for sidebar toggles + settings gear
- 			[LayoutSettings.LAYOUT_ACTIONS]: {
- 				'type': 'boolean',
- 				'default': true,
-@@ -629,7 +630,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+@@ -718,7 +718,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  					localize('layoutcontrol.type.toggles', "Shows several buttons for toggling the visibility of the panels and side bar."),
  					localize('layoutcontrol.type.both', "Shows both the dropdown and toggle buttons."),
  				],
 -				'default': 'both',
-+				'default': 'toggles',
++				'default': 'toggles', // Ritemark: default to toggles
  				'description': localize('layoutControlType', "Controls whether the layout control in the custom title bar is displayed as a single menu button or with multiple UI toggles."),
  			},
  			'workbench.tips.enabled': {
-@@ -678,9 +679,10 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
- 				'default': defaultWindowTitleSeparator,
- 				'markdownDescription': localize("window.titleSeparator", "Separator used by {0}.", '`#window.title#`')
+@@ -771,7 +771,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  			},
-+			// RiteMark: Hide Command Center by default - cleaner title bar for writing
  			[LayoutSettings.COMMAND_CENTER]: {
  				type: 'boolean',
 -				default: true,
-+				default: false,
++				default: false, // Ritemark: disable command center
  				markdownDescription: isWeb ?
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index 18b860dbafe..cc97ebff8f2 100644
+index ecc6af48668..1e1999b97ef 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-@@ -255,7 +255,7 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
+@@ -256,7 +256,7 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
   */
  export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewContainer({
  	id: VIEWLET_ID,
 -	title: localize2('explore', "Explorer"),
-+	title: localize2('explore', "Project"),
++	title: localize2('explore', "Project"), // Ritemark: renamed from Explorer
  	ctorDescriptor: new SyncDescriptor(ExplorerViewPaneContainer),
  	storageId: 'workbench.explorer.views.state',
  	icon: explorerViewIcon,
-@@ -264,8 +264,8 @@ export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewC
+@@ -265,8 +265,8 @@ export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewC
  	order: 0,
  	openCommandActionDescriptor: {
  		id: VIEWLET_ID,
 -		title: localize2('explore', "Explorer"),
 -		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Explorer"),
-+		title: localize2('explore', "Project"),
-+		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Project"),
++		title: localize2('explore', "Project"), // Ritemark: renamed from Explorer
++		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Project"), // Ritemark: renamed
  		keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyE },
  		order: 0
  	},
 diff --git a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-index 7a3237b22f5..a263a487cfb 100644
+index db5712fe9b0..199a2be595f 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 +++ b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-@@ -101,3 +101,38 @@
+@@ -106,3 +106,28 @@
  .monaco-workbench.context-menu-visible .explorer-folders-view.highlight .monaco-list-row {
  	outline: none !important;
  }
 +
-+/* --- Ritemark: Hide tree indent guide lines --- */
-+.explorer-folders-view .monaco-tl-indent > .indent-guide {
-+	border-color: transparent !important;
++/* Ritemark: explorer tree customizations */
++
++/* Hide tree indent guides */
++.explorer-folders-view .monaco-list .monaco-tl-indent > .indent-guide {
++	border-left-color: transparent !important;
 +}
 +
-+/* --- Ritemark: Kill ALL outer row backgrounds in explorer --- */
++/* Remove row backgrounds for cleaner look */
 +.explorer-folders-view .monaco-list .monaco-list-row {
-+	background-color: transparent !important;
-+	outline: none !important;
++	background: none !important;
 +}
 +
-+/* --- Ritemark: Inner row gets inset + rounded corners --- */
-+.explorer-folders-view .monaco-list .monaco-tl-row {
++/* Rounded corners with inset margins */
++.explorer-folders-view .monaco-list .monaco-list-row {
 +	border-radius: 6px;
-+	margin: 0 20px 0 4px;
++	margin-left: 4px;
++	margin-right: 4px;
 +}
 +
-+/* --- Ritemark: Rounded highlight on inner row for each state --- */
-+.explorer-folders-view .monaco-list:focus .monaco-list-row.selected .monaco-tl-row,
-+.explorer-folders-view .monaco-list:focus .monaco-list-row.selected.focused .monaco-tl-row {
-+	background-color: var(--vscode-list-activeSelectionBackground);
-+}
-+
-+.explorer-folders-view .monaco-list:focus .monaco-list-row.focused:not(.selected) .monaco-tl-row {
-+	background-color: var(--vscode-list-focusBackground);
-+}
-+
-+.explorer-folders-view .monaco-list .monaco-list-row.selected .monaco-tl-row {
-+	background-color: var(--vscode-list-inactiveSelectionBackground);
-+}
-+
-+.explorer-folders-view .monaco-list:not(.drop-target):not(.dragging) .monaco-list-row:hover .monaco-tl-row {
-+	background-color: var(--vscode-list-hoverBackground);
++/* Rounded selection highlights */
++.explorer-folders-view .monaco-list .monaco-list-row.selected,
++.explorer-folders-view .monaco-list .monaco-list-row.focused {
++	border-radius: 6px;
 +}
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
-index f42e1491142..5b7d3e3c8e0 100644
+index 5b115684ac0..9ca4a048788 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
-@@ -1139,12 +1139,6 @@ registerAction2(class extends Action2 {
+@@ -1066,12 +1066,7 @@ registerAction2(class extends Action2 {
  			title: nls.localize2('refreshExplorer', "Refresh Explorer"),
  			f1: true,
  			icon: Codicon.refresh,
@@ -642,12 +650,13 @@ index f42e1491142..5b7d3e3c8e0 100644
 -				id: MenuId.ViewTitle,
 -				group: 'navigation',
 -				when: ContextKeyExpr.equals('view', VIEW_ID),
--				order: 30
+-				order: 30,
 -			},
++			// Ritemark: removed menu to hide from explorer title bar
  			metadata: {
  				description: nls.localize2('refreshExplorerMetadata', "Forces a refresh of the Explorer.")
- 			}
-@@ -1166,12 +1160,6 @@ registerAction2(class extends Action2 {
+ 			},
+@@ -1094,12 +1089,7 @@ registerAction2(class extends Action2 {
  			title: nls.localize2('collapseExplorerFolders', "Collapse Folders in Explorer"),
  			f1: true,
  			icon: Codicon.collapseAll,
@@ -657,39 +666,36 @@ index f42e1491142..5b7d3e3c8e0 100644
 -				when: ContextKeyExpr.equals('view', VIEW_ID),
 -				order: 40
 -			},
++			// Ritemark: removed menu to hide from explorer title bar
  			metadata: {
  				description: nls.localize2('collapseExplorerFoldersMetadata', "Folds all folders in the Explorer.")
  			}
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-index f8703b7302b..f7c618e0fc2 100644
+index 40b580ef0f0..6a661275ea0 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-@@ -130,9 +130,9 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
+@@ -109,9 +109,9 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
  	icon: terminalViewIcon,
  	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [TERMINAL_VIEW_ID, { mergeViewWithContainerWhenSingleView: true }]),
  	storageId: TERMINAL_VIEW_ID,
 -	hideIfEmpty: true,
-+	hideIfEmpty: false, /* Ritemark: keep terminal tab visible alongside Ritemark AI */
++	hideIfEmpty: false, // Ritemark: keep terminal tab visible
  	order: 3,
 -}, ViewContainerLocation.Panel, { doNotRegisterOpenCommand: true, isDefault: true });
-+}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: true });
++}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: true }); // Ritemark: moved to auxiliary bar
  Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
 diff --git a/src/vs/workbench/services/views/browser/viewDescriptorService.ts b/src/vs/workbench/services/views/browser/viewDescriptorService.ts
-index aa1320d578b..baf5ed13264 100644
+index 2345f6dda14..3fbeba7ae3d 100644
 --- a/src/vs/workbench/services/views/browser/viewDescriptorService.ts
 +++ b/src/vs/workbench/services/views/browser/viewDescriptorService.ts
-@@ -93,6 +93,14 @@ export class ViewDescriptorService extends Disposable implements IViewDescriptor
+@@ -95,6 +95,10 @@ export class ViewDescriptorService extends Disposable implements IViewDescriptor
  		this.viewDescriptorsCustomLocations = new Map<string, string>(Object.entries(this.viewCustomizations.viewLocations));
  		this.viewContainerBadgeEnablementStates = new Map<string, boolean>(Object.entries(this.viewCustomizations.viewContainerBadgeEnablementStates));
-
-+		// Ritemark: Force ritemark-ai container to auxiliarybar (right sidebar) on every startup.
-+		// Prevents cached state from overriding the declared default location.
-+		// Note: Extension containers get prefixed with 'workbench.view.extension.' (see viewsExtensionPoint.ts:372)
+ 
++		// Ritemark: delete cached overrides to force views to auxiliary bar
 +		this.viewContainersCustomLocations.delete('workbench.view.extension.ritemark-ai');
-+		// Ritemark: Also force terminal container to auxiliarybar.
-+		// SQLite cache may have the old Panel location from before the patch.
 +		this.viewContainersCustomLocations.delete('terminal');
 +
  		// Register all containers that were registered before this ctor

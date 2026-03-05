@@ -1,39 +1,25 @@
 Ritemark Windows & OSS Fixes: Productory branding in build system, Windows manifests
 Sprint 39: Electron/rcedit company name, copyright, server manifest
 Note: VisualElementsManifest.xml is handled by apply-patches.sh (CRLF file)
+Note: gulpfile.vscode.ts company branding is in patch 001
 ---
-diff --git a/build/gulpfile.vscode.js b/build/gulpfile.vscode.js
---- a/build/gulpfile.vscode.js
-+++ b/build/gulpfile.vscode.js
-@@ -519,11 +519,11 @@
- 			await rcedit(path.join(cwd, dep), {
- 				'file-version': baseVersion,
- 				'version-string': {
--					'CompanyName': 'Microsoft Corporation',
-+					'CompanyName': 'Productory',
- 					'FileDescription': product.nameLong,
- 					'FileVersion': packageJson.version,
- 					'InternalName': basename,
--					'LegalCopyright': 'Copyright (C) 2022 Microsoft. All rights reserved',
-+					'LegalCopyright': 'Copyright (C) 2026 Productory. All rights reserved',
- 					'OriginalFilename': basename,
- 					'ProductName': product.nameLong,
- 					'ProductVersion': packageJson.version,
 diff --git a/build/lib/electron.ts b/build/lib/electron.ts
+index aadc9b5fbe7..30b4d7040c4 100644
 --- a/build/lib/electron.ts
 +++ b/build/lib/electron.ts
-@@ -103,8 +103,8 @@
+@@ -107,8 +107,8 @@ export const config = {
  	version: electronVersion,
  	tag: product.electronRepository ? `v${electronVersion}-${msBuildId}` : undefined,
  	productAppName: product.nameLong,
 -	companyName: 'Microsoft Corporation',
--	copyright: 'Copyright (C) 2024 Microsoft. All rights reserved',
+-	copyright: 'Copyright (C) 2026 Microsoft. All rights reserved',
 +	companyName: 'Productory',
-+	copyright: 'Copyright (C) 2026 Productory. All rights reserved',
++	copyright: 'Copyright (C) 2025 Productory. All rights reserved',
  	darwinIcon: 'resources/darwin/code.icns',
  	darwinBundleIdentifier: product.darwinBundleIdentifier,
  	darwinApplicationCategoryType: 'public.app-category.developer-tools',
 diff --git a/resources/server/manifest.json b/resources/server/manifest.json
+index 443e3fd1cb1..b1b0936098f 100644
 --- a/resources/server/manifest.json
 +++ b/resources/server/manifest.json
 @@ -1,6 +1,6 @@

@@ -3,54 +3,57 @@ Consolidates old patches: 002 (chat sidebar), 003 (toggle comment), 004 (extensi
 005 (go menu), 006 (view menu), 010 (accounts/gear), 011 (debug)
 ---
 diff --git a/src/vs/editor/contrib/comment/browser/comment.ts b/src/vs/editor/contrib/comment/browser/comment.ts
-index eafaa331b00..01858879c7d 100644
+index 4b2a1461b9a..9e032cfc481 100644
 --- a/src/vs/editor/contrib/comment/browser/comment.ts
 +++ b/src/vs/editor/contrib/comment/browser/comment.ts
-@@ -14,7 +14,7 @@ import { ILanguageConfigurationService } from '../../../common/languages/languag
- import { BlockCommentCommand } from './blockCommentCommand.js';
- import { LineCommentCommand, Type } from './lineCommentCommand.js';
+@@ -5,7 +5,8 @@
+ 
+ import { KeyChord, KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
  import * as nls from '../../../../nls.js';
 -import { MenuId } from '../../../../platform/actions/common/actions.js';
-+// RiteMark: MenuId import removed - menu items disabled
++// RiteMark: MenuId import removed
++// import { MenuId } from '../../../../platform/actions/common/actions.js';
  import { KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
- 
- abstract class CommentLineAction extends EditorAction {
-@@ -89,12 +89,6 @@ class ToggleCommentLineAction extends CommentLineAction {
- 				kbExpr: EditorContextKeys.editorTextFocus,
+ import { ICodeEditor } from '../../../browser/editorBrowser.js';
+ import { EditorAction, IActionOptions, registerEditorAction, ServicesAccessor } from '../../../browser/editorExtensions.js';
+@@ -89,12 +90,7 @@ class ToggleCommentLineAction extends CommentLineAction {
  				primary: KeyMod.CtrlCmd | KeyCode.Slash,
  				weight: KeybindingWeight.EditorContrib
--			},
+ 			},
 -			menuOpts: {
 -				menuId: MenuId.MenubarEditMenu,
 -				group: '5_insert',
 -				title: nls.localize({ key: 'miToggleLineComment', comment: ['&& denotes a mnemonic'] }, "&&Toggle Line Comment"),
 -				order: 1
- 			}
+-			},
++			// RiteMark: menuOpts removed to hide from Edit menu
+ 			canTriggerInlineEdits: true,
  		});
  	}
-@@ -145,12 +139,6 @@ class BlockCommentAction extends EditorAction {
- 				primary: KeyMod.Shift | KeyMod.Alt | KeyCode.KeyA,
+@@ -145,12 +141,7 @@ class BlockCommentAction extends EditorAction {
  				linux: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyA },
  				weight: KeybindingWeight.EditorContrib
--			},
+ 			},
 -			menuOpts: {
 -				menuId: MenuId.MenubarEditMenu,
 -				group: '5_insert',
 -				title: nls.localize({ key: 'miToggleBlockComment', comment: ['&& denotes a mnemonic'] }, "Toggle &&Block Comment"),
 -				order: 2
- 			}
+-			},
++			// RiteMark: menuOpts removed to hide from Edit menu
+ 			canTriggerInlineEdits: true,
  		});
  	}
 diff --git a/src/vs/workbench/browser/parts/globalCompositeBar.ts b/src/vs/workbench/browser/parts/globalCompositeBar.ts
-index 8c96ab3e461..c74a225aa37 100644
+index 48220d63dc3..2ed9ba74816 100644
 --- a/src/vs/workbench/browser/parts/globalCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/globalCompositeBar.ts
-@@ -47,13 +47,16 @@ import { ICommandService } from '../../../platform/commands/common/commands.js';
+@@ -47,13 +47,14 @@ import { ICommandService } from '../../../platform/commands/common/commands.js';
  
  export class GlobalCompositeBar extends Disposable {
  
 -	private static readonly ACCOUNTS_ACTION_INDEX = 0;
-+	// RiteMark: Commented out - Accounts icon hidden
++	// RiteMark: accounts and global activity actions commented out
 +	// private static readonly ACCOUNTS_ACTION_INDEX = 0;
  	static readonly ACCOUNTS_ICON = registerIcon('accounts-view-bar-icon', Codicon.account, localize('accountsViewBarIcon', "Accounts icon in the view bar."));
  
@@ -58,32 +61,29 @@ index 8c96ab3e461..c74a225aa37 100644
  
 -	private readonly globalActivityAction = this._register(new Action(GLOBAL_ACTIVITY_ID));
 -	private readonly accountAction = this._register(new Action(ACCOUNTS_ACTIVITY_ID));
-+	// RiteMark: Commented out - Settings gear hidden
 +	// private readonly globalActivityAction = this._register(new Action(GLOBAL_ACTIVITY_ID));
-+	// RiteMark: Commented out - Accounts icon hidden
 +	// private readonly accountAction = this._register(new Action(ACCOUNTS_ACTIVITY_ID));
  	private readonly globalActivityActionBar: ActionBar;
  
  	constructor(
-@@ -102,11 +105,13 @@ export class GlobalCompositeBar extends Disposable {
+@@ -102,11 +103,12 @@ export class GlobalCompositeBar extends Disposable {
  			preventLoopNavigation: true
  		}));
  
 -		if (this.accountsVisibilityPreference) {
 -			this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
 -		}
-+		// RiteMark: Hide Accounts icon - not needed for writing app
++		// RiteMark: account and global activity actions removed from action bar
 +		// if (this.accountsVisibilityPreference) {
 +		// 	this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
 +		// }
  
 -		this.globalActivityActionBar.push(this.globalActivityAction);
-+		// RiteMark: Hide Settings/Manage gear - access via menu instead
 +		// this.globalActivityActionBar.push(this.globalActivityAction);
  
  		this.registerListeners();
  	}
-@@ -136,14 +141,15 @@ export class GlobalCompositeBar extends Disposable {
+@@ -136,14 +138,15 @@ export class GlobalCompositeBar extends Disposable {
  	}
  
  	private toggleAccountsActivity() {
@@ -95,7 +95,7 @@ index 8c96ab3e461..c74a225aa37 100644
 -		} else {
 -			this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
 -		}
-+		// RiteMark: Accounts icon hidden - nothing to toggle
++		// RiteMark: toggleAccountsActivity body commented out
 +		// if (this.globalActivityActionBar.length() === 2 && this.accountsVisibilityPreference) {
 +		// 	return;
 +		// }
@@ -108,7 +108,7 @@ index 8c96ab3e461..c74a225aa37 100644
  
  	private get accountsVisibilityPreference(): boolean {
 diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-index f495bad700a..0461bbb4969 100644
+index 92fe6a17377..7c1559d7788 100644
 --- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 @@ -85,15 +85,16 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
@@ -124,7 +124,7 @@ index f495bad700a..0461bbb4969 100644
 -	},
 -	order: 5
 -});
-+// RiteMark: Go menu removed - code navigation not relevant for markdown editing
++// RiteMark: Go menu hidden
 +// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 +// 	submenu: MenuId.MenubarGoMenu,
 +// 	title: {
@@ -137,161 +137,87 @@ index f495bad700a..0461bbb4969 100644
  
  MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	submenu: MenuId.MenubarTerminalMenu,
-diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipantContributions.ts b/src/vs/workbench/contrib/chat/browser/chatParticipantContributions.ts
-index 05f89e7f972..d2f16e5b3a6 100644
---- a/src/vs/workbench/contrib/chat/browser/chatParticipantContributions.ts
-+++ b/src/vs/workbench/contrib/chat/browser/chatParticipantContributions.ts
-@@ -4,29 +4,34 @@
+diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
+index ddb5df41847..98fc70aee7c 100644
+--- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
++++ b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
+@@ -4,23 +4,33 @@
   *--------------------------------------------------------------------------------------------*/
  
  import { coalesce, isNonEmptyArray } from '../../../../base/common/arrays.js';
 -import { Codicon } from '../../../../base/common/codicons.js';
-+// RiteMark: Codicon removed - unused without Chat sidebar
++// RiteMark: Codicon import removed (chat view container disabled)
++// import { Codicon } from '../../../../base/common/codicons.js';
+ import { toErrorMessage } from '../../../../base/common/errorMessage.js';
  import { Event } from '../../../../base/common/event.js';
--import { Disposable, DisposableMap, DisposableStore, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
-+import { Disposable, DisposableMap, DisposableStore } from '../../../../base/common/lifecycle.js';
-+// RiteMark: IDisposable, toDisposable removed - unused without Chat sidebar
+ import { createCommandUri, MarkdownString } from '../../../../base/common/htmlContent.js';
+-import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
++// RiteMark: KeyCode, KeyMod imports removed (chat view container disabled)
++// import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
+ import { Disposable, DisposableMap, DisposableStore } from '../../../../base/common/lifecycle.js';
  import * as strings from '../../../../base/common/strings.js';
 -import { localize, localize2 } from '../../../../nls.js';
 -import { ContextKeyExpr, IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
 +import { localize } from '../../../../nls.js';
-+// RiteMark: localize2 removed - unused without Chat sidebar
++// RiteMark: localize2 removed (only used in disabled chat view container)
++// import { localize2 } from '../../../../nls.js';
++// RiteMark: ContextKeyExpr import removed (chat view container disabled)
++// import { ContextKeyExpr, IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
 +import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
-+// RiteMark: ContextKeyExpr removed - unused without Chat sidebar
- import { ExtensionIdentifier } from '../../../../platform/extensions/common/extensions.js';
--import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
-+// RiteMark: SyncDescriptor removed - unused without Chat sidebar
- import { ILogService } from '../../../../platform/log/common/log.js';
+ import { ExtensionIdentifier, IExtensionManifest } from '../../../../platform/extensions/common/extensions.js';
+ import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
  import { IProductService } from '../../../../platform/product/common/productService.js';
  import { Registry } from '../../../../platform/registry/common/platform.js';
+-import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 -import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
-+// RiteMark: ViewPaneContainer removed - unused without Chat sidebar
++// RiteMark: registerIcon import removed (chat view container disabled)
++// import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
++// RiteMark: ViewPaneContainer import removed (chat view container disabled)
++// import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
  import { IWorkbenchContribution } from '../../../common/contributions.js';
 -import { IViewContainersRegistry, IViewDescriptor, IViewsRegistry, ViewContainer, ViewContainerLocation, Extensions as ViewExtensions } from '../../../common/views.js';
-+import { IViewsRegistry, Extensions as ViewExtensions } from '../../../common/views.js';
-+// RiteMark: IViewContainersRegistry, IViewDescriptor, ViewContainer, ViewContainerLocation removed - unused without Chat sidebar
++// RiteMark: View container imports removed (chat view container disabled)
++// import { IViewContainersRegistry, IViewDescriptor, IViewsRegistry, ViewContainer, ViewContainerLocation, Extensions as ViewExtensions } from '../../../common/views.js';
++import { Extensions as ViewExtensions, IViewsRegistry } from '../../../common/views.js';
+ import { Extensions, IExtensionFeaturesRegistry, IExtensionFeatureTableRenderer, IRenderedData, IRowData, ITableData } from '../../../services/extensionManagement/common/extensionFeatures.js';
  import { isProposedApiEnabled } from '../../../services/extensions/common/extensions.js';
  import * as extensionsRegistry from '../../../services/extensions/common/extensionsRegistry.js';
- import { showExtensionsWithIdsCommandId } from '../../extensions/browser/extensionsActions.js';
- import { IExtension, IExtensionsWorkbenchService } from '../../extensions/common/extensions.js';
- import { ChatAgentLocation, IChatAgentData, IChatAgentService } from '../common/chatAgents.js';
--import { CONTEXT_CHAT_EXTENSION_INVALID, CONTEXT_CHAT_PANEL_PARTICIPANT_REGISTERED } from '../common/chatContextKeys.js';
-+import { CONTEXT_CHAT_EXTENSION_INVALID } from '../common/chatContextKeys.js';
-+// RiteMark: CONTEXT_CHAT_PANEL_PARTICIPANT_REGISTERED removed - unused without Chat sidebar
- import { IRawChatParticipantContribution } from '../common/chatParticipantContribTypes.js';
- import { CHAT_VIEW_ID } from './chat.js';
--import { CHAT_SIDEBAR_PANEL_ID, ChatViewPane } from './chatViewPane.js';
-+// RiteMark: CHAT_SIDEBAR_PANEL_ID, ChatViewPane removed - unused without Chat sidebar
+@@ -30,11 +40,15 @@ import { IChatAgentData, IChatAgentService } from '../common/participants/chatAg
+ import { ChatContextKeys } from '../common/actions/chatContextKeys.js';
+ import { IRawChatParticipantContribution } from '../common/participants/chatParticipantContribTypes.js';
+ import { ChatAgentLocation, ChatModeKind } from '../common/constants.js';
+-import { ChatViewId, ChatViewContainerId } from './chat.js';
+-import { ChatViewPane } from './widgetHosts/viewPane/chatViewPane.js';
++import { ChatViewId } from './chat.js';
++// RiteMark: ChatViewContainerId import removed (chat view container disabled)
++// import { ChatViewContainerId } from './chat.js';
++// RiteMark: ChatViewPane import removed (chat view container disabled)
++// import { ChatViewPane } from './widgetHosts/viewPane/chatViewPane.js';
+ 
+ // --- Chat Container &  View Registration
+-
++// RiteMark: Chat view container and view registration disabled
++/*
+ const chatViewIcon = registerIcon('chat-view-icon', Codicon.chatSparkle, localize('chatViewIcon', 'View icon of the chat view.'));
+ 
+ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer({
+@@ -78,6 +92,7 @@ const chatViewDescriptor: IViewDescriptor = {
+ 	)
+ };
+ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
++*/
  
  const chatParticipantExtensionPoint = extensionsRegistry.ExtensionsRegistry.registerExtensionPoint<IRawChatParticipantContribution[]>({
  	extensionPoint: 'chatParticipants',
-@@ -166,15 +171,16 @@ export class ChatExtensionPointHandler implements IWorkbenchContribution {
- 
- 	static readonly ID = 'workbench.contrib.chatExtensionPointHandler';
- 
--	private _viewContainer: ViewContainer;
-+	// RiteMark: _viewContainer removed - Chat sidebar disabled
- 	private _participantRegistrationDisposables = new DisposableMap<string>();
- 
- 	constructor(
- 		@IChatAgentService private readonly _chatAgentService: IChatAgentService,
- 		@ILogService private readonly logService: ILogService
- 	) {
--		this._viewContainer = this.registerViewContainer();
--		this.registerDefaultParticipantView();
-+		// RiteMark: Disable Chat sidebar - not needed without Copilot
-+		// this._viewContainer = this.registerViewContainer();
-+		// this.registerDefaultParticipantView();
- 		this.handleAndRegisterChatExtensions();
- 	}
- 
-@@ -278,44 +284,41 @@ export class ChatExtensionPointHandler implements IWorkbenchContribution {
- 		});
- 	}
- 
--	private registerViewContainer(): ViewContainer {
--		// Register View Container
--		const title = localize2('chat.viewContainer.label', "Chat");
--		const icon = Codicon.commentDiscussion;
--		const viewContainerId = CHAT_SIDEBAR_PANEL_ID;
--		const viewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer({
--			id: viewContainerId,
--			title,
--			icon,
--			ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [viewContainerId, { mergeViewWithContainerWhenSingleView: true }]),
--			storageId: viewContainerId,
--			hideIfEmpty: true,
--			order: 100,
--		}, ViewContainerLocation.Sidebar);
-+	// RiteMark: Methods commented out - Chat sidebar disabled
-+	// private registerViewContainer(): ViewContainer {
-+	// 	const title = localize2('chat.viewContainer.label', "Chat");
-+	// 	const icon = Codicon.commentDiscussion;
-+	// 	const viewContainerId = CHAT_SIDEBAR_PANEL_ID;
-+	// 	const viewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer({
-+	// 		id: viewContainerId,
-+	// 		title,
-+	// 		icon,
-+	// 		ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [viewContainerId, { mergeViewWithContainerWhenSingleView: true }]),
-+	// 		storageId: viewContainerId,
-+	// 		hideIfEmpty: true,
-+	// 		order: 100,
-+	// 	}, ViewContainerLocation.Sidebar);
-+	// 	return viewContainer;
-+	// }
- 
--		return viewContainer;
--	}
--
--	private registerDefaultParticipantView(): IDisposable {
--		// Register View. Name must be hardcoded because we want to show it even when the extension fails to load due to an API version incompatibility.
--		const name = 'GitHub Copilot';
--		const viewDescriptor: IViewDescriptor[] = [{
--			id: CHAT_VIEW_ID,
--			containerIcon: this._viewContainer.icon,
--			containerTitle: this._viewContainer.title.value,
--			singleViewPaneContainerTitle: this._viewContainer.title.value,
--			name: { value: name, original: name },
--			canToggleVisibility: false,
--			canMoveView: true,
--			ctorDescriptor: new SyncDescriptor(ChatViewPane),
--			when: ContextKeyExpr.or(CONTEXT_CHAT_PANEL_PARTICIPANT_REGISTERED, CONTEXT_CHAT_EXTENSION_INVALID)
--		}];
--		Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews(viewDescriptor, this._viewContainer);
--
--		return toDisposable(() => {
--			Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).deregisterViews(viewDescriptor, this._viewContainer);
--		});
--	}
-+	// private registerDefaultParticipantView(): IDisposable {
-+	// 	const name = 'GitHub Copilot';
-+	// 	const viewDescriptor: IViewDescriptor[] = [{
-+	// 		id: CHAT_VIEW_ID,
-+	// 		containerIcon: this._viewContainer.icon,
-+	// 		containerTitle: this._viewContainer.title.value,
-+	// 		singleViewPaneContainerTitle: this._viewContainer.title.value,
-+	// 		name: { value: name, original: name },
-+	// 		canToggleVisibility: false,
-+	// 		canMoveView: true,
-+	// 		ctorDescriptor: new SyncDescriptor(ChatViewPane),
-+	// 		when: ContextKeyExpr.or(CONTEXT_CHAT_PANEL_PARTICIPANT_REGISTERED, CONTEXT_CHAT_EXTENSION_INVALID)
-+	// 	}];
-+	// 	Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews(viewDescriptor, this._viewContainer);
-+	// 	return toDisposable(() => {
-+	// 		Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).deregisterViews(viewDescriptor, this._viewContainer);
-+	// 	});
-+	// }
- }
- 
- function getParticipantKey(extensionId: ExtensionIdentifier, participantName: string): string {
 diff --git a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
-index 49dc41dd76f..8f280a55e80 100644
+index 7b2cbce78b2..bd25cfb508d 100644
 --- a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
 +++ b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
-@@ -238,15 +238,15 @@ if (isMacintosh) {
- MenuRegistry.appendMenuItem(MenuId.EditorTitle, { submenu: MenuId.EditorTitleRun, rememberDefaultAction: true, title: nls.localize2('run', "Run or Debug..."), icon: icons.debugRun, group: 'navigation', order: -1 });
+@@ -257,16 +257,15 @@ if (isMacintosh) {
  
- // Debug menu
+ MenuRegistry.appendMenuItem(MenuId.EditorTitle, { submenu: MenuId.EditorTitleRun, isSplitButton: { togglePrimaryAction: true }, title: nls.localize2('run', "Run or Debug..."), icon: icons.debugRun, group: 'navigation', order: -1 });
+ 
+-// Debug menu
 -
 -MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 -	submenu: MenuId.MenubarDebugMenu,
@@ -301,7 +227,7 @@ index 49dc41dd76f..8f280a55e80 100644
 -	},
 -	order: 6
 -});
-+// RiteMark: Hide Run/Debug menu - not needed for writing app
++// RiteMark: Debug/Run menu hidden from menubar
 +// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 +// 	submenu: MenuId.MenubarDebugMenu,
 +// 	title: {
@@ -313,64 +239,66 @@ index 49dc41dd76f..8f280a55e80 100644
  
  MenuRegistry.appendMenuItem(MenuId.MenubarDebugMenu, {
  	group: '1_debug',
-@@ -421,6 +421,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
+@@ -462,6 +461,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
+ 	ctorDescriptor: new SyncDescriptor(DebugViewPaneContainer),
  	icon: icons.runViewIcon,
  	alwaysUseContainerInfo: true,
++	hideIfEmpty: true, // RiteMark: hide debug sidebar when empty
  	order: 3,
-+	hideIfEmpty: true, // RiteMark: Hide when not debugging
  }, ViewContainerLocation.Sidebar);
  
- // Register default debug views
-@@ -429,7 +430,8 @@ viewsRegistry.registerViews([{ id: VARIABLES_VIEW_ID, name: nls.localize2('varia
+@@ -471,7 +471,7 @@ viewsRegistry.registerViews([{ id: VARIABLES_VIEW_ID, name: nls.localize2('varia
  viewsRegistry.registerViews([{ id: WATCH_VIEW_ID, name: nls.localize2('watch', "Watch"), containerIcon: icons.watchViewIcon, ctorDescriptor: new SyncDescriptor(WatchExpressionsView), order: 20, weight: 10, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusWatchView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
  viewsRegistry.registerViews([{ id: CALLSTACK_VIEW_ID, name: nls.localize2('callStack', "Call Stack"), containerIcon: icons.callStackViewIcon, ctorDescriptor: new SyncDescriptor(CallStackView), order: 30, weight: 30, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusCallStackView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
  viewsRegistry.registerViews([{ id: BREAKPOINTS_VIEW_ID, name: nls.localize2('breakpoints', "Breakpoints"), containerIcon: icons.breakpointsViewIcon, ctorDescriptor: new SyncDescriptor(BreakpointsView), order: 40, weight: 20, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusBreakpointsView' }, when: ContextKeyExpr.or(CONTEXT_BREAKPOINTS_EXIST, CONTEXT_DEBUG_UX.isEqualTo('default'), CONTEXT_HAS_DEBUGGED) }], viewContainer);
 -viewsRegistry.registerViews([{ id: WelcomeView.ID, name: WelcomeView.LABEL, containerIcon: icons.runViewIcon, ctorDescriptor: new SyncDescriptor(WelcomeView), order: 1, weight: 40, canToggleVisibility: true, when: CONTEXT_DEBUG_UX.isEqualTo('simple') }], viewContainer);
-+// RiteMark: Hide debug welcome view - changed 'simple' to 'never-show' to hide Run and Debug from activity bar
-+viewsRegistry.registerViews([{ id: WelcomeView.ID, name: WelcomeView.LABEL, containerIcon: icons.runViewIcon, ctorDescriptor: new SyncDescriptor(WelcomeView), order: 1, weight: 40, canToggleVisibility: true, when: CONTEXT_DEBUG_UX.isEqualTo('never-show') }], viewContainer);
++viewsRegistry.registerViews([{ id: WelcomeView.ID, name: WelcomeView.LABEL, containerIcon: icons.runViewIcon, ctorDescriptor: new SyncDescriptor(WelcomeView), order: 1, weight: 40, canToggleVisibility: true, when: CONTEXT_DEBUG_UX.isEqualTo('never-show') /* RiteMark: changed from 'simple' to hide debug welcome */ }], viewContainer);
  viewsRegistry.registerViews([{ id: LOADED_SCRIPTS_VIEW_ID, name: nls.localize2('loadedScripts', "Loaded Scripts"), containerIcon: icons.loadedScriptsViewIcon, ctorDescriptor: new SyncDescriptor(LoadedScriptsView), order: 35, weight: 5, canToggleVisibility: true, canMoveView: true, collapsed: true, when: ContextKeyExpr.and(CONTEXT_LOADED_SCRIPTS_SUPPORTED, CONTEXT_DEBUG_UX.isEqualTo('default')) }], viewContainer);
  
  // Register disassembly view
 diff --git a/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts b/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
-index afd2c722adf..ae33e0b94a9 100644
+index 59e1c903fdd..318f0846264 100644
 --- a/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
 +++ b/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
-@@ -9,7 +9,7 @@ import { EditorContextKeys } from '../../../../../editor/common/editorContextKey
+@@ -9,7 +9,8 @@ import { EditorContextKeys } from '../../../../../editor/common/editorContextKey
  import { KeyCode } from '../../../../../base/common/keyCodes.js';
  import { ContextKeyExpr } from '../../../../../platform/contextkey/common/contextkey.js';
  import { KeybindingWeight } from '../../../../../platform/keybinding/common/keybindingsRegistry.js';
 -import { MenuId } from '../../../../../platform/actions/common/actions.js';
-+// RiteMark: MenuId import removed - menu item disabled
++// RiteMark: MenuId import removed
++// import { MenuId } from '../../../../../platform/actions/common/actions.js';
  
  class ExpandAbbreviationAction extends EmmetEditorAction {
  
-@@ -28,12 +28,6 @@ class ExpandAbbreviationAction extends EmmetEditorAction {
- 					ContextKeyExpr.has('config.emmet.triggerExpansionOnTab')
+@@ -28,12 +29,7 @@ class ExpandAbbreviationAction extends EmmetEditorAction {
  				),
  				weight: KeybindingWeight.EditorContrib
--			},
+ 			},
 -			menuOpts: {
 -				menuId: MenuId.MenubarEditMenu,
 -				group: '5_insert',
 -				title: nls.localize({ key: 'miEmmetExpandAbbreviation', comment: ['&& denotes a mnemonic'] }, "Emmet: E&&xpand Abbreviation"),
 -				order: 3
- 			}
+-			}
++			// RiteMark: menuOpts removed to hide from Edit menu
  		});
  
+ 	}
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-index f4d62c70da1..a5bc871187b 100644
+index 6956d7918b3..ffa2e3cbfe9 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
 +++ b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-@@ -4,7 +4,7 @@
-  *--------------------------------------------------------------------------------------------*/
- 
- import { localize, localize2 } from '../../../../nls.js';
--import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
-+// RiteMark: KeyMod, KeyCode removed - unused after hiding Extensions menu item
- import { Registry } from '../../../../platform/registry/common/platform.js';
- import { MenuRegistry, MenuId, registerAction2, Action2, IMenuItem, IAction2Options } from '../../../../platform/actions/common/actions.js';
- import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
-@@ -106,12 +106,13 @@ Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegis
+@@ -8,7 +8,8 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
+ import { IStringDictionary } from '../../../../base/common/collections.js';
+ import { onUnexpectedError } from '../../../../base/common/errors.js';
+ import { Event } from '../../../../base/common/event.js';
+-import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
++// RiteMark: KeyCode, KeyMod imports removed (openCommandActionDescriptor disabled)
++// import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
+ import { mnemonicButtonLabel } from '../../../../base/common/labels.js';
+ import { Disposable, DisposableStore, IDisposable, isDisposable } from '../../../../base/common/lifecycle.js';
+ import { Schemas } from '../../../../base/common/network.js';
+@@ -115,12 +116,13 @@ export const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainer
  	{
  		id: VIEWLET_ID,
  		title: localize2('extensions', "Extensions"),
@@ -380,7 +308,7 @@ index f4d62c70da1..a5bc871187b 100644
 -			keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyX },
 -			order: 4,
 -		},
-+		// RiteMark: Remove Extensions from View menu - marketplace is hidden
++		// RiteMark: openCommandActionDescriptor removed to hide Extensions from View menu
 +		// openCommandActionDescriptor: {
 +		// 	id: VIEWLET_ID,
 +		// 	mnemonicTitle: localize({ key: 'miViewExtensions', comment: ['&& denotes a mnemonic'] }, "E&&xtensions"),
@@ -391,7 +319,7 @@ index f4d62c70da1..a5bc871187b 100644
  		icon: extensionsViewIcon,
  		order: 4,
 diff --git a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
-index 5c1b30c121a..284ffe819b0 100644
+index b22f84b628a..9dd39b6be6d 100644
 --- a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
 +++ b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
 @@ -21,8 +21,9 @@ import { IMarkersView } from './markers.js';
@@ -400,7 +328,7 @@ index 5c1b30c121a..284ffe819b0 100644
  import { Disposable, IDisposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
 -import { IStatusbarEntryAccessor, IStatusbarService, StatusbarAlignment, IStatusbarEntry } from '../../../services/statusbar/browser/statusbar.js';
 -import { IMarkerService, MarkerStatistics } from '../../../../platform/markers/common/markers.js';
-+// RiteMark: Status bar imports commented out - Problems status bar item hidden
++// RiteMark: Status bar imports removed (MarkersStatusBarContributions disabled)
 +// import { IStatusbarEntryAccessor, IStatusbarService, StatusbarAlignment, IStatusbarEntry } from '../../../services/statusbar/browser/statusbar.js';
 +import { IMarkerService } from '../../../../platform/markers/common/markers.js';
  import { ViewContainer, IViewContainersRegistry, Extensions as ViewContainerExtensions, ViewContainerLocation, IViewsRegistry } from '../../../common/views.js';
@@ -416,12 +344,12 @@ index 5c1b30c121a..284ffe819b0 100644
  import { IActivityService, NumberBadge } from '../../../services/activity/common/activity.js';
  import { viewFilterSubmenu } from '../../../browser/parts/views/viewFilter.js';
 -import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
-+// RiteMark: IConfigurationService import commented out - Problems status bar item hidden
++// RiteMark: IConfigurationService import removed (MarkersStatusBarContributions disabled)
 +// import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
  import { problemsConfigurationNodeBase } from '../../../common/configuration.js';
+ import { MarkerChatContextContribution } from './markersChatContext.js';
  
- KeybindingsRegistry.registerCommandAndKeybindingRule({
-@@ -123,7 +125,7 @@ Registry.as<IConfigurationRegistry>(Extensions.Configuration).registerConfigurat
+@@ -124,7 +126,7 @@ Registry.as<IConfigurationRegistry>(Extensions.Configuration).registerConfigurat
  	}
  });
  
@@ -430,16 +358,16 @@ index 5c1b30c121a..284ffe819b0 100644
  
  // markers view container
  const VIEW_CONTAINER: ViewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer({
-@@ -534,6 +536,8 @@ registerAction2(class extends Action2 {
+@@ -565,6 +567,8 @@ registerAction2(class extends Action2 {
  	}
  });
  
-+// RiteMark: Hide Problems status bar item - entire class commented out
++// RiteMark: MarkersStatusBarContributions disabled - removes problem count from status bar
 +/*
  class MarkersStatusBarContributions extends Disposable implements IWorkbenchContribution {
  
  	private markersStatusItem: IStatusbarEntryAccessor;
-@@ -545,13 +549,12 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
+@@ -576,13 +580,12 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
  		@IConfigurationService private readonly configurationService: IConfigurationService
  	) {
  		super();
@@ -454,16 +382,15 @@ index 5c1b30c121a..284ffe819b0 100644
  		let config = this.configurationService.getValue('problems.visibility');
  		if (!config) {
  			addStatusBarEntry();
-@@ -564,8 +567,6 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
- 		this._register(this.configurationService.onDidChangeConfiguration(e => {
+@@ -596,7 +599,6 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
  			if (e.affectsConfiguration('problems.visibility')) {
  				this.markersStatusItem.update(this.getMarkersItem());
--
+ 
 -				// Update based on what setting was changed to.
  				config = this.configurationService.getValue('problems.visibility');
  				if (!config && !this.markersStatusItemOff) {
  					addStatusBarEntry();
-@@ -590,7 +591,6 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
+@@ -621,7 +623,6 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
  	}
  
  	private getMarkersItemTurnedOff(): IStatusbarEntry {
@@ -471,77 +398,42 @@ index 5c1b30c121a..284ffe819b0 100644
  		this.statusbarService.updateEntryVisibility('status.problemsVisibility', true);
  		const openSettingsCommand = 'workbench.action.openSettings';
  		const configureSettingsLabel = '@id:problems.visibility';
-@@ -609,42 +609,19 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
- 		const errorTitle = (n: number) => localize('totalErrors', "Errors: {0}", n);
- 		const warningTitle = (n: number) => localize('totalWarnings', "Warnings: {0}", n);
- 		const infoTitle = (n: number) => localize('totalInfos', "Infos: {0}", n);
--
- 		const titles: string[] = [];
--
--		if (stats.errors > 0) {
--			titles.push(errorTitle(stats.errors));
--		}
--
--		if (stats.warnings > 0) {
--			titles.push(warningTitle(stats.warnings));
--		}
--
--		if (stats.infos > 0) {
--			titles.push(infoTitle(stats.infos));
--		}
--
--		if (titles.length === 0) {
--			return localize('noProblems', "No Problems");
--		}
--
-+		if (stats.errors > 0) { titles.push(errorTitle(stats.errors)); }
-+		if (stats.warnings > 0) { titles.push(warningTitle(stats.warnings)); }
-+		if (stats.infos > 0) { titles.push(infoTitle(stats.infos)); }
-+		if (titles.length === 0) { return localize('noProblems', "No Problems"); }
- 		return titles.join(', ');
- 	}
- 
+@@ -665,13 +666,9 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
  	private getMarkersText(stats: MarkerStatistics): string {
  		const problemsText: string[] = [];
--
+ 
 -		// Errors
  		problemsText.push('$(error) ' + this.packNumber(stats.errors));
 -
 -		// Warnings
  		problemsText.push('$(warning) ' + this.packNumber(stats.warnings));
--
--		// Info (only if any)
--		if (stats.infos > 0) {
--			problemsText.push('$(info) ' + this.packNumber(stats.infos));
--		}
--
-+		if (stats.infos > 0) { problemsText.push('$(info) ' + this.packNumber(stats.infos)); }
- 		return problemsText.join(' ');
- 	}
  
-@@ -655,6 +632,7 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
+-		// Info (only if any)
+ 		if (stats.infos > 0) {
+ 			problemsText.push('$(info) ' + this.packNumber(stats.infos));
+ 		}
+@@ -686,6 +683,7 @@ class MarkersStatusBarContributions extends Disposable implements IWorkbenchCont
  }
  
  workbenchRegistry.registerWorkbenchContribution(MarkersStatusBarContributions, LifecyclePhase.Restored);
 +*/
  
- class ActivityUpdater extends Disposable implements IWorkbenchContribution {
+ registerWorkbenchContribution2(MarkerChatContextContribution.ID, MarkerChatContextContribution, WorkbenchPhase.AfterRestored);
  
 diff --git a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
-index bb8dd6560d4..abf16b64698 100644
+index bb8dd6560d4..ec966d27277 100644
 --- a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
 +++ b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
-@@ -10,8 +10,7 @@ import { Registry } from '../../../../platform/registry/common/platform.js';
- import { IConfigurationRegistry, Extensions as ConfigurationExtensions, ConfigurationScope } from '../../../../platform/configuration/common/configurationRegistry.js';
+@@ -11,7 +11,7 @@ import { IConfigurationRegistry, Extensions as ConfigurationExtensions, Configur
  import { VIEW_CONTAINER } from '../../files/browser/explorerViewlet.js';
  import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
--import { Codicon } from '../../../../base/common/codicons.js';
+ import { Codicon } from '../../../../base/common/codicons.js';
 -import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 +import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
  import { OutlineConfigKeys } from '../../../services/outline/browser/outline.js';
  import { IOutlinePane } from './outline.js';
  
-@@ -21,7 +20,7 @@ import './outlineActions.js';
+@@ -21,7 +21,7 @@ import './outlineActions.js';
  
  // --- view
  
@@ -550,29 +442,29 @@ index bb8dd6560d4..abf16b64698 100644
  
  Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
  	id: IOutlinePane.Id,
-@@ -30,7 +29,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
+@@ -30,7 +30,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
  	ctorDescriptor: new SyncDescriptor(OutlinePane),
  	canToggleVisibility: true,
  	canMoveView: true,
 -	hideByDefault: false,
-+	hideByDefault: true,
++	hideByDefault: true, // RiteMark: hide outline view by default
  	collapsed: true,
  	order: 2,
  	weight: 30,
 diff --git a/src/vs/workbench/contrib/output/browser/output.contribution.ts b/src/vs/workbench/contrib/output/browser/output.contribution.ts
-index a06d596b9b0..93997d19b5b 100644
+index daa2516d6ab..a5dbb51474e 100644
 --- a/src/vs/workbench/contrib/output/browser/output.contribution.ts
 +++ b/src/vs/workbench/contrib/output/browser/output.contribution.ts
-@@ -25,7 +25,7 @@ import { AUX_WINDOW_GROUP, AUX_WINDOW_GROUP_TYPE, IEditorService } from '../../.
- import { assertIsDefined } from '../../../../base/common/types.js';
- import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+@@ -24,7 +24,7 @@ import { IQuickPickItem, IQuickInputService, IQuickPickSeparator, QuickPickInput
+ import { AUX_WINDOW_GROUP, AUX_WINDOW_GROUP_TYPE, IEditorService } from '../../../services/editor/common/editorService.js';
+ import { ContextKeyExpr, ContextKeyExpression } from '../../../../platform/contextkey/common/contextkey.js';
  import { Codicon } from '../../../../base/common/codicons.js';
 -import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 +import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
  import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
  import { Disposable, dispose, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
- import { IFilesConfigurationService } from '../../../services/filesConfiguration/common/filesConfigurationService.js';
-@@ -56,7 +56,7 @@ ModesRegistry.registerLanguage({
+ import { AccessibilitySignal, IAccessibilitySignalService } from '../../../../platform/accessibilitySignal/browser/accessibilitySignalService.js';
+@@ -64,7 +64,7 @@ ModesRegistry.registerLanguage({
  });
  
  // register output container
@@ -582,16 +474,17 @@ index a06d596b9b0..93997d19b5b 100644
  	id: OUTPUT_VIEW_ID,
  	title: nls.localize2('output', "Output"),
 diff --git a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
-index 5fffc20c8a0..e8a9451b2e2 100644
+index acf3e73a07c..a06bbb2df16 100644
 --- a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
 +++ b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
-@@ -19,11 +19,11 @@ import { ICommandHandler, CommandsRegistry } from '../../../../platform/commands
+@@ -19,12 +19,12 @@ import { ICommandHandler, CommandsRegistry } from '../../../../platform/commands
  import { ExplorerFolderContext } from '../../files/common/files.js';
  import { ResourceContextKey } from '../../../common/contextkeys.js';
  import { Codicon } from '../../../../base/common/codicons.js';
 -import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 +import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
  import { ILocalizedString } from '../../../../platform/action/common/action.js';
+ import { URI } from '../../../../base/common/uri.js';
  
 -const timelineViewIcon = registerIcon('timeline-view-icon', Codicon.history, localize('timelineViewIcon', 'View icon of the timeline view.'));
 -const timelineOpenIcon = registerIcon('timeline-open', Codicon.history, localize('timelineOpenIcon', 'Icon for the open timeline action.'));
@@ -600,12 +493,12 @@ index 5fffc20c8a0..e8a9451b2e2 100644
  
  export class TimelinePaneDescriptor implements IViewDescriptor {
  	readonly id = TimelinePaneId;
-@@ -34,7 +34,7 @@ export class TimelinePaneDescriptor implements IViewDescriptor {
+@@ -35,7 +35,7 @@ export class TimelinePaneDescriptor implements IViewDescriptor {
  	readonly weight = 30;
  	readonly collapsed = true;
  	readonly canToggleVisibility = true;
 -	readonly hideByDefault = false;
-+	readonly hideByDefault = true;
++	readonly hideByDefault = true; // RiteMark: hide timeline view by default
  	readonly canMoveView = true;
  	readonly when = TimelineHasProviderContext;
  
