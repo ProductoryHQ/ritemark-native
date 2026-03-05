@@ -173,22 +173,64 @@ The rise of "vibe coding" with AI agents has created a new bottleneck: **plannin
 
 **Relevance to Ritemark:** This is what Claude Code already does. Ritemark's value-add would be providing a **visual layer** on top of this system, plus extending it to work with other agents.
 
+### 6. File-Based Markdown Task Systems
+
+Several lightweight tools take a markdown-first approach to task management:
+
+**[ai-todo](https://github.com/fxstein/ai-todo)** — Tasks in plain `TODO.md`, zero config, no API calls. Human-readable, version-controlled. The simplest possible approach — any agent can read/write it.
+
+**[Backlog.md](https://github.com/MrLesk/Backlog.md)** — Turns any git repo folder into a self-contained project board using plain markdown files. Built for spec-driven AI development.
+
+**The `tasks/todo.md` pattern** — Community convention: maintain a checklist with explicit "Verify" tasks for lint/tests/build, plus a working notes section tracking constraints and decisions.
+
+**Relevance to Ritemark:** These prove that file-based, git-native task storage works. Ritemark's `.tasks.json` approach is the structured evolution of this — same philosophy (local, git-friendly) but with enough structure for kanban semantics. Could also support import/export from markdown checklists.
+
+### 7. VS Code Kanban Extensions (Reference)
+
+| Extension | Key Feature | AI Integration |
+|-----------|-------------|----------------|
+| [Taskmaster AI VS Code](https://marketplace.visualstudio.com/items?itemName=Hamster.task-master-hamster) | Visual kanban for Task Master projects | Full (MCP, LLM-driven) |
+| [taskr: Task Master Kanban](https://marketplace.visualstudio.com/items?itemName=DavidMaliglowka.taskr-kanban) | Drag-and-drop kanban for Task Master | Via Task Master |
+| [Taskboard](https://github.com/ashleydavis/taskboard-vscode-extension) | Renders kanban from todo.md markdown | None (file-based) |
+| [Kanbn](https://marketplace.visualstudio.com/items?itemName=gordonlarrigan.vscode-kanbn) | Full kanban board in VS Code | None |
+
+**Key takeaway:** TaskMaster already has two VS Code extensions with kanban boards. These validate the demand for editor-integrated task boards but are TaskMaster-specific. Ritemark's approach should be standalone (works without TaskMaster) while being MCP-compatible.
+
+### 8. AGENTS.md Standard
+
+[AGENTS.md](https://agents.md/) is an open format (Linux Foundation / Agentic AI Foundation) for guiding coding agents. Originated at OpenAI for Codex, now supported by Copilot, Cursor, Gemini CLI, VS Code. 60,000+ open-source projects have adopted it.
+
+Claude Code uses `CLAUDE.md` instead. Both serve the same purpose — project-level AI agent instructions. Ritemark already uses CLAUDE.md.
+
+**Relevance:** A kanban task board combined with AGENTS.md/CLAUDE.md instructions creates a complete AI orchestration layer: the instructions tell agents *how* to work, the task board tells them *what* to work on.
+
+### 9. External PM Integrations (Linear, Jira)
+
+MCP servers exist for Linear and Jira, allowing AI agents to read/write issues directly:
+
+- **[Linear MCP](https://composio.dev/blog/how-to-set-up-linear-mcp-in-claude-code-to-automate-issue-tracking)** — First-party MCP server. Linear also has a native Claude integration (Cyrus agent).
+- **[Jira MCP](https://composio.dev/blog/jira-mcp-server)** — Official Atlassian MCP. Verbose ADF payloads waste context tokens.
+- **[Unified Jira + Linear MCP](https://playbooks.com/mcp/dxheroes-jira-linear)** — Single server supporting both.
+
+**Relevance to Ritemark:** These serve enterprise teams. Ritemark should focus on the local-first experience first, with optional export/sync to Linear/Jira/GitHub Issues as a future feature.
+
 ---
 
 ## Comparison Matrix
 
-| Feature | Vibe Kanban | TaskMaster | Kanban-MCP | Flux | CC Tasks |
-|---------|-------------|------------|------------|------|----------|
-| Visual board | Yes (web) | No | Yes (web) | Yes (web) | No |
-| Editor-integrated | No | Via MCP | No | No | Yes |
-| File-based storage | No (Postgres) | Yes (markdown) | No (SQLite) | Yes (JSON/SQLite) | Yes |
-| Git-friendly | No | Yes | No | Yes | Partial |
-| Multi-agent support | 10+ agents | MCP-compatible | MCP-compatible | MCP + CLI | Claude only |
-| Dependencies | No | Yes | No | Yes | Yes |
-| WIP limits | No | No | Yes | No | No |
-| Code review | Yes (inline) | No | No | No | No |
-| MCP server | Yes | Yes | Yes | Yes | No |
-| Local-first | Yes | Yes | Yes | Yes | Yes |
+| Feature | Vibe Kanban | TaskMaster | Kanban-MCP | Flux | CC Tasks | ai-todo / md |
+|---------|-------------|------------|------------|------|----------|--------------|
+| Visual board | Yes (web) | VS Code ext | Yes (web) | Yes (web) | No | No |
+| Editor-integrated | No | Yes (ext) | No | No | Yes | No |
+| File-based storage | No (SQLite) | Yes (JSON) | No (SQLite) | Yes (JSON/SQLite) | Yes | Yes (markdown) |
+| Git-friendly | No | Yes | No | Yes | Partial | Yes |
+| Multi-agent support | 10+ agents | MCP-compatible | MCP-compatible | MCP + CLI | Claude only | Any (plain text) |
+| Dependencies | No | Yes | No | Yes | Yes | No |
+| WIP limits | No | No | Yes | No | No | No |
+| Code review | Yes (inline) | No | No | No | No | No |
+| MCP server | Yes (bidir) | Yes | Yes | Yes | No | No |
+| Local-first | Yes | Yes | Yes | Yes | Yes | Yes |
+| Complexity | High | Medium | Low | Medium | Low | Very Low |
 
 ---
 
@@ -401,11 +443,29 @@ No existing tool combines all of these. Vibe Kanban is closest but is a standalo
 
 ## Sources
 
-- [Vibe Kanban (BloopAI)](https://github.com/BloopAI/vibe-kanban)
-- [TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)
-- [Kanban-MCP](https://github.com/eyalzh/kanban-mcp)
+**Primary tools analyzed:**
+- [Vibe Kanban (BloopAI)](https://github.com/BloopAI/vibe-kanban) — [vibekanban.com](https://www.vibekanban.com/)
+- [TaskMaster AI](https://github.com/eyaltoledano/claude-task-master) — [task-master.dev](https://www.task-master.dev/)
+- [Kanban-MCP (eyalzh)](https://github.com/eyalzh/kanban-mcp)
 - [Flux Kanban](https://paddo.dev/blog/flux-kanban-for-ai-agents/)
+- [Kanban MCP for Planka (bradrisse)](https://github.com/bradrisse/kanban-mcp)
+
+**File-based systems:**
+- [ai-todo](https://github.com/fxstein/ai-todo)
+- [Backlog.md](https://github.com/MrLesk/Backlog.md)
+- [ai-dev-tasks](https://github.com/snarktank/ai-dev-tasks)
+
+**Claude Code / AI agent coordination:**
 - [Claude Code Tasks (VentureBeat)](https://venturebeat.com/orchestration/claude-codes-tasks-update-lets-agents-work-longer-and-coordinate-across)
 - [Claude Code Docs](https://code.claude.com/docs/en/how-claude-code-works)
 - [Anthropic C Compiler Case Study](https://www.anthropic.com/engineering/building-c-compiler)
-- [Kanban MCP (bradrisse/Planka)](https://github.com/bradrisse/kanban-mcp)
+- [Claude Code Task Guide (dplooy)](https://www.dplooy.com/blog/claude-code-tasks-complete-guide-to-ai-agent-workflow)
+
+**Standards and integrations:**
+- [AGENTS.md (Agentic AI Foundation)](https://agents.md/)
+- [Linear MCP Setup](https://composio.dev/blog/how-to-set-up-linear-mcp-in-claude-code-to-automate-issue-tracking)
+- [Jira MCP Server](https://composio.dev/blog/jira-mcp-server)
+
+**VS Code extensions:**
+- [Taskmaster AI VS Code Extension](https://marketplace.visualstudio.com/items?itemName=Hamster.task-master-hamster)
+- [Taskboard (todo.md kanban)](https://github.com/ashleydavis/taskboard-vscode-extension)
