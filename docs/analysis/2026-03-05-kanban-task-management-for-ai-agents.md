@@ -10,227 +10,81 @@
 
 The rise of "vibe coding" with AI agents has created a new bottleneck: **planning and reviewing work**, not writing code. Several tools have emerged to solve this with kanban-style task boards that orchestrate AI agents. This analysis evaluates the landscape and recommends an approach for Ritemark Native.
 
-**Key finding:** The most promising path for Ritemark is a **built-in kanban board as a custom editor** (`.tasks.json` files) with **MCP server exposure**, letting any AI agent (Claude Code, Codex, etc.) read and update tasks. This leverages Ritemark's existing architecture (custom editors, XYFlow, Zustand) while being uniquely integrated into the markdown editing workflow.
+**Key finding:** The most promising path for Ritemark is a **built-in kanban board as a custom editor** (`.tasks.json` files) with **MCP server exposure**, letting AI agents read and update tasks. This leverages Ritemark's existing custom editor architecture (React + Zustand + Tailwind webviews) while being integrated into the markdown editing workflow.
+
+**Important caveat:** This analysis recommends an architecture, but the core product question — *how does a task on a board become work an agent is actually doing?* — has multiple possible answers. The "Agent Activation" section below explores these honestly, including what's proven vs. speculative.
+
+**Who is this for?** Primarily developers using Ritemark alongside AI coding agents (Claude Code, Cursor, Codex). Secondarily, any Ritemark user who wants a visual task board inside their editor. The feature should be useful *without* AI agents — the board stands alone as a project management tool; MCP integration is a power-user layer on top.
 
 ---
 
 ## Landscape Analysis
 
-### 1. Vibe Kanban (BloopAI)
+### The Three Tools That Matter Most
 
-**What:** Full orchestration platform for AI coding agents. Rust backend + TypeScript frontend. 22.4k GitHub stars.
+#### 1. Vibe Kanban (BloopAI) — The Orchestrator
 
-**How it works:**
-- Standalone web app launched via `npx vibe-kanban`
-- Kanban board for creating/prioritizing issues
-- Each task gets an isolated workspace (Git worktree, terminal, dev server)
-- Supports 10+ agents: Claude Code, Codex, Gemini CLI, Copilot, Cursor, Amp, etc.
-- Inline code review with comments, browser preview with DevTools
-- PR creation with AI-generated descriptions
-- GitHub integration for merge workflow
+Full orchestration platform. Rust + TypeScript, 22.4k stars. User clicks "Start" on a card → Vibe spawns a terminal with the agent CLI + an isolated git worktree. Supports 10+ agents. Inline code review. PR creation.
 
-**Architecture:** Rust (50%) + TypeScript (46%), PostgreSQL, Docker-deployable
+**What Ritemark should steal:** The activation UX — clicking a card launches an agent. The worktree-per-task isolation model for parallel agents.
 
-**Strengths:**
-- Multi-agent parallel execution (each agent gets own worktree)
-- Visual code review with inline commenting
-- Agent-agnostic (10+ supported agents)
-- Local-first, open source (Apache-2.0)
+**Why not just use it:** Standalone web app (not editor-integrated), heavyweight stack (Rust + PostgreSQL), no markdown/document integration. Wrong architecture for an editor-native feature.
 
-**Weaknesses:**
-- Heavyweight (Rust + PostgreSQL stack)
-- Standalone app — doesn't integrate into an editor
-- Overkill for single-developer workflows
-- No markdown/document integration
+#### 2. TaskMaster AI — The MCP Pioneer
 
-**Relevance to Ritemark:** Conceptual inspiration. The kanban → agent → review loop is the right UX pattern, but Ritemark should integrate this natively rather than being a separate app.
+File-based task management via MCP server. `.taskmaster/` directory with markdown task files. 36 MCP tools (selective loading: 7 core at ~5k tokens, all 36 at ~21k tokens). PRD-to-task decomposition. Two VS Code extensions already exist for visual kanban.
 
----
+**What Ritemark should steal:** MCP tool design patterns. The `get_next_task` pattern. Selective tool loading to manage token overhead.
 
-### 2. TaskMaster AI (claude-task-master)
+**Why not just integrate it:** Tasks stored in home directory (not project-local). Heavy token cost. Two separate extensions needed for visual board. Ritemark can offer a tighter, lighter experience by owning both sides.
 
-**What:** MCP server for AI-powered task management. File-based. Works with Cursor, Claude Code, Windsurf, VS Code.
+**Honest admission:** TaskMaster + its VS Code extensions is the closest competitor. The differentiation case depends on integration depth, not feature count.
 
-**How it works:**
-- Initializes `.taskmaster/` directory in project
-- Tasks stored as **markdown files** organized in tag-based directories (`backlog/`, `in-progress/`, `done/`)
-- PRD (Product Requirements Document) → AI generates tasks
-- 36 MCP tools with selective loading modes (core/standard/all)
-- Dependency tracking between tasks
-- Natural language interaction: "Can you help implement task 3?"
+#### 3. Claude Code Native Tasks — The Baseline
 
-**Task format:** Markdown files with metadata (ID, status, priority, dependencies, subtasks)
+Built-in to Claude Code 2.1+. Tasks in `~/.claude/tasks/`. Multi-session coordination via `CLAUDE_CODE_TASK_LIST_ID`. File-based locks for parallel agents. Proven at scale (Anthropic's C compiler: 16 agents, 2,000 sessions, 100k LOC).
 
-**MCP tool modes:**
-| Mode | Tools | Token Cost |
-|------|-------|------------|
-| Core | 7 | ~5,000 |
-| Standard | 15 | ~10,000 |
-| All | 36 | ~21,000 |
+**What Ritemark should steal:** File-based locking for concurrency. The proven coordination model.
 
-**Strengths:**
-- File-based (git-friendly, portable)
-- MCP native — works with any MCP-compatible editor
-- PRD → task decomposition is powerful
-- Dependency management
-- No UI needed (CLI + MCP)
+**Why not just visualize it:** Claude Code-only. No visual board. No kanban semantics. Ritemark could provide a visual layer on top AND extend the pattern to other agents.
 
-**Weaknesses:**
-- No visual kanban board
-- Heavy on token usage (up to 21k tokens for tool definitions)
-- Tasks in home directory (`~/.taskmaster/`), not project-local
-- No visual review workflow
+### Other Tools Surveyed (Brief)
 
-**Relevance to Ritemark:** The MCP tool approach is excellent. TaskMaster proves that file-based tasks + MCP = agent-accessible task management. Ritemark could provide the visual layer that TaskMaster lacks.
+| Tool | What | Key Takeaway |
+|------|------|-------------|
+| **Kanban-MCP** (eyalzh) | MCP server with WIP limits, SQLite, web UI | WIP limits are valuable kanban semantics worth adopting |
+| **Flux** | CLI-first kanban, git-native sync, P0/P1/P2 priorities | `flux ready` (show next unblocked task) = good agent pattern |
+| **ai-todo / Backlog.md** | Plain markdown task files in repo | Proves file-based, git-native storage works. Simplest possible approach. |
+| **Linear/Jira MCP** | Cloud PM tools with MCP servers | Enterprise play; not relevant for local-first MVP |
+| **AGENTS.md** | Open standard for AI agent instructions (Linux Foundation) | Ritemark uses CLAUDE.md; task board + instruction file = complete orchestration |
+
+### Existing VS Code Kanban Extensions
+
+| Extension | What | Install Count Signal |
+|-----------|------|---------------------|
+| TaskMaster AI (VS Code) | Visual kanban for TaskMaster projects | Validates demand but TaskMaster-specific |
+| taskr | Drag-and-drop kanban for TaskMaster | Same ecosystem |
+| Taskboard | Renders kanban from todo.md | File-based approach works |
+| Kanbn | Full kanban board | General-purpose; modest adoption |
+
+**Demand signal is weak but present.** These extensions exist, which means some developers want kanban in their editor. But none have breakout adoption.
 
 ---
 
-### 3. Kanban-MCP (eyalzh)
+## Comparison Matrix (Key Competitors Only)
 
-**What:** MCP server providing kanban-based task management with WIP limits, SQLite DB, and web UI.
-
-**How it works:**
-- Creates kanban boards with columns and WIP limits
-- Tasks stored in embedded SQLite database
-- Web UI on localhost:8221 for visual board management
-- MCP tools for board/task CRUD
-- Designed for multi-session AI workflows
-
-**MCP tools provided:**
-- Board: `create-kanban-board`, `list-boards`, `get-board-info`
-- Tasks: `add-task-to-board`, `move-task`, `delete-task`, `get-task-info`
-- Prompts: `create-kanban-based-project`, `make-progress-on-a-project`
-
-**Strengths:**
-- True kanban semantics (WIP limits, columns)
-- Visual web UI for human oversight
-- Lightweight (SQLite, no external deps)
-- Good MCP prompt design for agent workflows
-
-**Weaknesses:**
-- Small project (34 stars), early stage
-- Separate web UI (not editor-integrated)
-- SQLite not git-friendly (binary file)
-
-**Relevance to Ritemark:** The MCP tool design is a good reference. WIP limits and column semantics are valuable kanban features. But Ritemark should embed the board natively rather than as a separate web server.
-
----
-
-### 4. Flux
-
-**What:** CLI-first kanban board with MCP server, web dashboard, and git-native sync.
-
-**How it works:**
-- CLI commands: `flux ready` shows unblocked tasks sorted by priority
-- Local SQLite or JSON storage
-- Git-native sync via pull/push
-- MCP server for Claude Code integration
-- Web dashboard for visual board management
-- Task dependencies and priority levels (P0/P1/P2)
-
-**Strengths:**
-- CLI-first design (fast, scriptable)
-- Git sync is unique and valuable
-- Priority system (P0 first) guides agent behavior
-- Offline-capable
-
-**Weaknesses:**
-- Early project
-- No editor integration
-- Limited documentation
-
-**Relevance to Ritemark:** The priority-based "what should I work on next?" pattern is valuable. JSON storage with git sync aligns with Ritemark's local-first philosophy.
-
----
-
-### 5. Claude Code Native Tasks System
-
-**What:** Built-in to Claude Code 2.1+ (January 2026). Replaces the old Todos system.
-
-**How it works:**
-- Tasks persist in `~/.claude/tasks/` (file-based)
-- Broadcast updates across sessions via `CLAUDE_CODE_TASK_LIST_ID`
-- Dependency management (blocked/unblocked)
-- Multi-session coordination — Session A completes task, Session B sees it immediately
-- File-based synchronization for parallel agents
-
-**Key insight from Anthropic's C Compiler project:**
-- 16 agents, ~2,000 sessions, 100k lines of code
-- File-based lock system (`current_tasks/`) for coordination
-- Each agent clones to `/workspace`, takes lock on task
-
-**Strengths:**
-- Native to Claude Code (zero setup)
-- Multi-session coordination built-in
-- Dependency tracking
-- File-based (inspectable, portable)
-
-**Weaknesses:**
-- Claude Code only (not agent-agnostic)
-- No visual UI
-- No kanban board metaphor
-- Session-scoped by default (requires explicit coordination setup)
-
-**Relevance to Ritemark:** This is what Claude Code already does. Ritemark's value-add would be providing a **visual layer** on top of this system, plus extending it to work with other agents.
-
-### 6. File-Based Markdown Task Systems
-
-Several lightweight tools take a markdown-first approach to task management:
-
-**[ai-todo](https://github.com/fxstein/ai-todo)** — Tasks in plain `TODO.md`, zero config, no API calls. Human-readable, version-controlled. The simplest possible approach — any agent can read/write it.
-
-**[Backlog.md](https://github.com/MrLesk/Backlog.md)** — Turns any git repo folder into a self-contained project board using plain markdown files. Built for spec-driven AI development.
-
-**The `tasks/todo.md` pattern** — Community convention: maintain a checklist with explicit "Verify" tasks for lint/tests/build, plus a working notes section tracking constraints and decisions.
-
-**Relevance to Ritemark:** These prove that file-based, git-native task storage works. Ritemark's `.tasks.json` approach is the structured evolution of this — same philosophy (local, git-friendly) but with enough structure for kanban semantics. Could also support import/export from markdown checklists.
-
-### 7. VS Code Kanban Extensions (Reference)
-
-| Extension | Key Feature | AI Integration |
-|-----------|-------------|----------------|
-| [Taskmaster AI VS Code](https://marketplace.visualstudio.com/items?itemName=Hamster.task-master-hamster) | Visual kanban for Task Master projects | Full (MCP, LLM-driven) |
-| [taskr: Task Master Kanban](https://marketplace.visualstudio.com/items?itemName=DavidMaliglowka.taskr-kanban) | Drag-and-drop kanban for Task Master | Via Task Master |
-| [Taskboard](https://github.com/ashleydavis/taskboard-vscode-extension) | Renders kanban from todo.md markdown | None (file-based) |
-| [Kanbn](https://marketplace.visualstudio.com/items?itemName=gordonlarrigan.vscode-kanbn) | Full kanban board in VS Code | None |
-
-**Key takeaway:** TaskMaster already has two VS Code extensions with kanban boards. These validate the demand for editor-integrated task boards but are TaskMaster-specific. Ritemark's approach should be standalone (works without TaskMaster) while being MCP-compatible.
-
-### 8. AGENTS.md Standard
-
-[AGENTS.md](https://agents.md/) is an open format (Linux Foundation / Agentic AI Foundation) for guiding coding agents. Originated at OpenAI for Codex, now supported by Copilot, Cursor, Gemini CLI, VS Code. 60,000+ open-source projects have adopted it.
-
-Claude Code uses `CLAUDE.md` instead. Both serve the same purpose — project-level AI agent instructions. Ritemark already uses CLAUDE.md.
-
-**Relevance:** A kanban task board combined with AGENTS.md/CLAUDE.md instructions creates a complete AI orchestration layer: the instructions tell agents *how* to work, the task board tells them *what* to work on.
-
-### 9. External PM Integrations (Linear, Jira)
-
-MCP servers exist for Linear and Jira, allowing AI agents to read/write issues directly:
-
-- **[Linear MCP](https://composio.dev/blog/how-to-set-up-linear-mcp-in-claude-code-to-automate-issue-tracking)** — First-party MCP server. Linear also has a native Claude integration (Cyrus agent).
-- **[Jira MCP](https://composio.dev/blog/jira-mcp-server)** — Official Atlassian MCP. Verbose ADF payloads waste context tokens.
-- **[Unified Jira + Linear MCP](https://playbooks.com/mcp/dxheroes-jira-linear)** — Single server supporting both.
-
-**Relevance to Ritemark:** These serve enterprise teams. Ritemark should focus on the local-first experience first, with optional export/sync to Linear/Jira/GitHub Issues as a future feature.
-
----
-
-## Comparison Matrix
-
-| Feature | Vibe Kanban | TaskMaster | Kanban-MCP | Flux | CC Tasks | ai-todo / md |
-|---------|-------------|------------|------------|------|----------|--------------|
-| Visual board | Yes (web) | VS Code ext | Yes (web) | Yes (web) | No | No |
-| Editor-integrated | No | Yes (ext) | No | No | Yes | No |
-| File-based storage | No (SQLite) | Yes (JSON) | No (SQLite) | Yes (JSON/SQLite) | Yes | Yes (markdown) |
-| Git-friendly | No | Yes | No | Yes | Partial | Yes |
-| Multi-agent support | 10+ agents | MCP-compatible | MCP-compatible | MCP + CLI | Claude only | Any (plain text) |
-| Dependencies | No | Yes | No | Yes | Yes | No |
-| WIP limits | No | No | Yes | No | No | No |
-| Code review | Yes (inline) | No | No | No | No | No |
-| MCP server | Yes (bidir) | Yes | Yes | Yes | No | No |
-| Local-first | Yes | Yes | Yes | Yes | Yes | Yes |
-| Complexity | High | Medium | Low | Medium | Low | Very Low |
+| | Vibe Kanban | TaskMaster + ext | Ritemark (proposed) |
+|---|---|---|---|
+| **Visual board** | Web app | VS Code extension | Built-in custom editor |
+| **Storage** | PostgreSQL | `.taskmaster/` (markdown) | `.tasks.json` (project-local) |
+| **Git-friendly** | No | Yes | Yes |
+| **Agent activation** | Board spawns agent | Human-initiated | Human-initiated (Phase 1) |
+| **MCP tools** | Yes (bidirectional) | 36 tools (~21k tokens) | 7 tools (~3k tokens est.) |
+| **Agent support** | 10+ (subprocess) | MCP clients only | MCP clients only |
+| **Dependencies** | No | Yes | Yes (planned) |
+| **WIP limits** | No | No | Yes |
+| **Editor integration** | None (standalone) | Extension (third-party) | Native (first-party) |
+| **Maturity** | High (22k stars) | High (established) | Does not exist yet |
 
 ---
 
@@ -262,11 +116,81 @@ Ritemark should provide a **built-in kanban task board** that:
 │                        └──────────┬──────────┘   │
 │                                   │              │
 │  ┌──────────┐  ┌──────────┐  ┌───┴───────────┐  │
-│  │ Claude   │  │  Codex   │  │  Any MCP      │  │
-│  │  Code    │  │  CLI     │  │  Client       │  │
+│  │ Claude   │  │  Cursor  │  │  Any MCP      │  │
+│  │  Code    │  │ Windsurf │  │  Client       │  │
 │  └──────────┘  └──────────┘  └───────────────┘  │
 └─────────────────────────────────────────────────┘
 ```
+
+### How Agent-Task Activation Actually Works
+
+This is the hardest design question. A kanban board is just a picture until something connects it to an agent doing work. Here's how existing tools solve this, and what Ritemark could do:
+
+#### How Existing Tools Solve Activation
+
+| Tool | Who launches the agent? | How does the agent know about tasks? | Concurrency model |
+|------|------------------------|--------------------------------------|-------------------|
+| **Vibe Kanban** | User clicks "Start" on a card → Vibe spawns a terminal subprocess with the agent CLI | Vibe injects task context into the agent's system prompt + gives it a git worktree | One worktree per task, parallel agents |
+| **TaskMaster** | User manually runs agent (Claude Code, Cursor) and says "work on next task" | Agent has TaskMaster MCP tools; it calls `get_next_task` because MCP tools are in its tool list | No locking — relies on single-agent workflow |
+| **Claude Code Tasks** | User runs `claude code` with `CLAUDE_CODE_TASK_LIST_ID` env var | Built-in: Claude Code reads its own task list natively | File-based locks in `current_tasks/` directory |
+| **Flux** | User runs agent manually, tells it to use `flux ready` | CLI command or MCP tool returns next unblocked P0 task | `flux ready` filters already-claimed tasks |
+
+**Key insight:** There are two fundamentally different models:
+
+1. **Human-initiated** (TaskMaster, Flux): Human opens terminal, runs agent, tells it to check the board. The agent is a tool the human wields. Simple, proven, works today.
+2. **Board-initiated** (Vibe Kanban): Human clicks a button on the board, the board spawns the agent. The board is an orchestrator. More powerful, but requires process management.
+
+#### Ritemark's Activation Options
+
+**Option A: Human-initiated (low effort, works now)**
+- User opens terminal in Ritemark, runs `claude code` (or any agent)
+- Agent discovers `.tasks.json` via MCP tools (Ritemark's MCP server is in its config)
+- User tells agent: "Work on the next task" → agent calls `task_get_next`
+- Agent implements, calls `task_move` when done
+- Board updates in real-time via VS Code file watcher
+
+**This is how TaskMaster works today. It's proven and requires no process management.**
+
+**Option B: Board-initiated (higher effort, better UX)**
+- User clicks "Assign to Agent" on a kanban card
+- Ritemark opens a terminal panel and runs `claude code --task "Implement dark mode toggle" --context ./sprint.tasks.json`
+- The terminal shows the agent working; user can watch or switch tabs
+- Agent calls MCP tools to update task status as it works
+- When agent finishes, task auto-moves to "Review"
+
+**This is how Vibe Kanban works. Better UX but requires Ritemark to manage subprocesses, handle agent crashes, pipe context correctly.**
+
+**Option C: Hybrid (recommended)**
+- Phase 1: Human-initiated only. Board is passive — just a visual + MCP layer.
+- Phase 2: Add "Launch Agent" button that opens an integrated terminal with pre-filled command. Not full orchestration — just convenience.
+- Phase 3 (if validated): Full board-initiated orchestration with process management.
+
+#### Assignment Model
+
+The `assignee` field in `.tasks.json` serves different purposes depending on activation model:
+
+| Model | What "assignee" means | Set by |
+|-------|----------------------|--------|
+| Human-initiated | Informational label ("claude", "jarmo", "codex") | Human or agent (via MCP) |
+| Board-initiated | Determines which agent CLI to launch | Human (via UI dropdown) |
+| Multi-agent | Lock indicator — "this task is claimed by agent X" | Agent (via `task_claim` tool) |
+
+For Phase 1, `assignee` is just a label. It becomes functional only if/when board-initiated activation is built.
+
+#### Concurrency and Locking
+
+**Problem:** Two agents (or one agent + one human) edit `.tasks.json` simultaneously → data corruption or merge conflicts.
+
+**Solution — file-level locking via MCP:**
+- All MCP task tools read → modify → write the JSON file atomically
+- The MCP server holds an in-memory lock per `.tasks.json` file (mutex)
+- VS Code's `onDidChangeDocument` API notifies the webview when the file changes on disk
+- For git merge conflicts: JSON is inherently conflict-prone. Mitigation options:
+  - **Accept it:** Single `.tasks.json` per board means conflicts are rare in practice (tasks change frequently, but usually one person/agent at a time)
+  - **One-file-per-task** (TaskMaster approach): Better git merges, but loses the "open one file, see whole board" simplicity
+  - **Hybrid:** Store board config (columns, settings) in `.tasks.json`, individual tasks as separate files in `.tasks/` directory. Best merge behavior but more complex.
+
+**Recommendation:** Start with single `.tasks.json` (simplest). Move to hybrid if merge conflicts become a real problem in practice — don't pre-optimize.
 
 ### Implementation Layers
 
@@ -312,8 +236,10 @@ Ritemark should provide a **built-in kanban task board** that:
 Reuse existing Ritemark webview architecture:
 - **TaskEditorProvider** (like `FlowEditorProvider`) — registers for `.tasks.json`
 - **React kanban board** in webview using existing tech stack (React + Zustand + Tailwind)
-- **Drag-and-drop** columns and cards (could use `@dnd-kit` or similar)
-- **Card detail view** with markdown description editing (reuse TipTap)
+- **Drag-and-drop** via `@dnd-kit/core` + `@dnd-kit/sortable` (purpose-built for kanban/list DnD; XYFlow is not appropriate here — it's a node-graph library)
+- **Card detail view** with markdown description editing (could reuse TipTap for the description field)
+
+**Note:** The Flows editor uses XYFlow for its node-graph canvas. The Tasks editor needs a completely different UI — CSS grid columns with vertically sortable cards. These share the webview infrastructure (React, Zustand, Tailwind, message passing) but not the canvas library.
 
 UI components needed:
 - `KanbanBoard.tsx` — column layout with drag-and-drop
@@ -366,31 +292,65 @@ The `task_get_next` tool is critical — it enables the agent loop:
 
 ### Development Phases
 
-**Phase 1: File Format & Basic Editor**
-- Define `.tasks.json` schema
-- TaskEditorProvider (custom editor registration)
-- Basic kanban board UI (columns, cards, drag-and-drop)
-- Create/edit/delete tasks
-- CRUD via UI only
+**Phase 1: Visual Board (standalone value, no AI required)**
+- `.tasks.json` schema definition and validation
+- `TaskEditorProvider` custom editor (pattern: same as `FlowEditorProvider`)
+- Kanban board webview: columns, cards, drag-and-drop via `@dnd-kit`
+- Create/edit/move/delete tasks via UI
+- Card detail panel with title, description, priority, labels
+- File watcher: external changes to `.tasks.json` update the board live
+- **Exit criteria:** A user can create a `.tasks.json` file, see a kanban board, and manage tasks visually — no terminal, no AI, no MCP needed.
 
-**Phase 2: MCP Server**
-- MCP tool definitions for task CRUD
-- `task_get_next` for agent workflow
-- WIP limit enforcement
-- Dependency tracking
+**Phase 2: MCP Server (agent integration)**
+- 7 MCP tools: `task_list_boards`, `task_get_board`, `task_add`, `task_update`, `task_move`, `task_delete`, `task_get_next`
+- Estimated token cost: ~3,000 tokens for tool definitions (vs TaskMaster's 21k)
+- Atomic file operations with in-memory mutex (concurrency safety)
+- WIP limit enforcement on `task_move`
+- `task_get_next` returns highest-priority unblocked+unclaimed task
+- **Exit criteria:** An agent (Claude Code, Cursor) can call MCP tools to read the board, pick up a task, and move it through columns. Board updates live.
 
-**Phase 3: AI Integration**
-- AI sidebar task context
-- "Create tasks from document"
-- Agent-aware task management (auto-move tasks based on agent activity)
-- Task-driven agent loop
+**Phase 3: AI Sidebar Integration**
+- Task context injected into AI sidebar conversations
+- "Create tasks from document" — analyze markdown and generate board
+- Quick actions from sidebar: "Move to done", "Create subtask"
+- **Exit criteria:** The AI sidebar knows about the task board and can discuss/modify tasks conversationally.
 
-**Phase 4: Advanced Features**
-- Flow integration (task → flow triggers)
-- Multi-board views
-- Task templates
-- Sprint analytics/burndown
-- Team assignment (future multi-user)
+**Phase 4: Advanced (only if Phases 1-3 validated)**
+- Board-initiated agent launch ("Assign to Agent" button)
+- Dependency tracking and blocked-task visualization
+- Flow integration (task completion triggers Flows)
+- Task templates, multi-board views
+- **Note:** This phase is speculative. Build only if Phase 1-3 adoption justifies it.
+
+### User Journeys
+
+**Journey 1: Solo developer with Claude Code (primary persona)**
+1. Opens Ritemark, right-clicks in explorer → "New Task Board"
+2. A `sprint.tasks.json` file is created with default columns (Backlog, To Do, In Progress, Review, Done)
+3. Adds 5 tasks via the kanban board UI (drag, drop, type)
+4. Opens integrated terminal, runs `claude code`
+5. Tells Claude: "Check the task board and work on the highest priority item"
+6. Claude calls `task_get_next` via MCP → gets task-001
+7. Claude calls `task_move(task-001, "in-progress")` → board updates live
+8. Claude implements the feature, commits code
+9. Claude calls `task_move(task-001, "review")` → card slides to Review column
+10. Developer reviews code, drags card to Done
+
+**Journey 2: Non-developer using just the board (no AI agents)**
+1. Opens Ritemark, creates `project.tasks.json`
+2. Uses the kanban board to organize writing tasks, research items, etc.
+3. Drags cards between columns manually
+4. Board is saved as JSON — syncs via git, Dropbox, or whatever the user uses for files
+5. No MCP, no agents, no terminal — just a visual task board inside the editor
+
+**Journey 3: Multiple agents working in parallel (future/aspirational)**
+1. Developer has 10 tasks on the board
+2. Opens two terminal tabs, runs Claude Code in each
+3. Agent A calls `task_get_next` → gets task-001, claims it (assignee set)
+4. Agent B calls `task_get_next` → gets task-002 (task-001 is claimed, skipped)
+5. Both work in parallel, each in their own git branch
+6. As agents finish, cards move to Review automatically
+7. Developer reviews PRs, drags approved cards to Done
 
 ---
 
@@ -416,28 +376,96 @@ The `task_get_next` tool is critical — it enables the agent loop:
 
 ---
 
-## Competitive Advantage
+## Competitive Positioning
 
-What makes Ritemark's approach unique:
+### What Ritemark would offer:
 
 1. **Editor-native** — Board lives inside the editor, not a separate app/browser tab
 2. **File-based** — `.tasks.json` in project root, version-controlled, portable
-3. **Agent-agnostic via MCP** — Works with Claude Code, Codex, and any future MCP client
-4. **Document-linked** — Tasks can reference and be created from markdown documents
-5. **Flow-connected** — Task completion can trigger Ritemark Flows (automation)
-6. **Visual + programmatic** — Humans use the board; agents use MCP tools
+3. **MCP-accessible** — AI agents with MCP support can read/update tasks programmatically
+4. **Document-linked** (Phase 3) — Tasks can reference and be created from markdown documents
+5. **Visual + programmatic** — Humans use the board; agents use MCP tools
 
-No existing tool combines all of these. Vibe Kanban is closest but is a standalone app. TaskMaster has good MCP design but no visual board. Ritemark can be the first **editor-native kanban board for AI agent orchestration**.
+### Honest comparison with closest competitor:
+
+**TaskMaster + VS Code extension** already provides: file-based tasks, MCP tools, VS Code kanban board, dependency tracking, AI-generated task decomposition. It's a mature, well-adopted tool.
+
+**Where Ritemark would differ:**
+- Ritemark owns both the editor and the task system (no third-party extension dependency)
+- `.tasks.json` lives in the project (TaskMaster uses `.taskmaster/` in home directory)
+- Tighter integration with Ritemark-specific features (Flows, AI sidebar, document linking)
+- Simpler MCP tool surface (7 tools vs TaskMaster's 36 — lower token overhead)
+
+**Where TaskMaster is stronger:**
+- PRD → task decomposition (AI-generated tasks from requirements)
+- Mature MCP tool design (36 tools, battle-tested)
+- Multi-provider LLM support for task generation
+- Already has community adoption
+
+**The honest case:** Ritemark's advantage is integration depth, not feature breadth. A built-in task board that shares state with the AI sidebar, updates in real-time, and connects to Flows is a better experience than installing a third-party extension — but only if execution quality is high.
+
+### MCP Compatibility Reality Check
+
+"Agent-agnostic via MCP" is aspirational, not current reality:
+
+| Agent | MCP Client Support | Would work with Ritemark MCP? |
+|-------|-------------------|-------------------------------|
+| Claude Code | Yes (native) | Yes |
+| Cursor | Yes (native) | Yes |
+| Windsurf | Yes (native) | Yes |
+| Codex CLI (OpenAI) | Not yet confirmed | Unknown |
+| Copilot | Extensions, not MCP | No |
+| Gemini CLI | Partial | Uncertain |
+
+MCP adoption is growing but not universal. The feature should work well without MCP (the board is useful standalone) and MCP adds power-user agent integration on top.
 
 ---
 
-## Open Questions
+## Decision Required
 
-1. **Multi-board vs single board?** Should a project have one `.tasks.json` or multiple (e.g., per-sprint)?
-2. **Real-time sync** — If an agent updates a task via MCP while the board is open, how to sync? (VS Code file watcher + reload?)
-3. **Claude Code Tasks interop** — Should Ritemark read/write `~/.claude/tasks/` directly, or maintain its own format with optional sync?
-4. **Board templates** — Should we ship default board templates (e.g., "Sprint Board", "Bug Tracker", "Feature Pipeline")?
-5. **Offline-first** — File-based storage handles this naturally, but MCP server needs to handle agent disconnection gracefully.
+This analysis is research, not a green light. Before committing engineering time, Jarmo should decide:
+
+### Decision 1: Build, integrate, or wait?
+
+| Option | Effort | Risk | Signal gained |
+|--------|--------|------|--------------|
+| **A. Build Phase 1** (kanban board, no MCP yet) | ~2 sprints | Medium — may build something nobody uses | High — see if users actually use the board |
+| **B. Ship TaskMaster integration** (render their tasks in a Ritemark sidebar) | ~3 days | Low — minimal code, easy to remove | Medium — tests demand for task visibility, not our own board |
+| **C. Wait** — add to wishlist, revisit when users ask | Zero | Zero | None — but avoids premature building |
+
+**Recommendation:** Option B first (cheap demand validation), then Option A if signal is positive.
+
+### Decision 2: If building, who is the primary user?
+
+- **Developers using AI agents** → prioritize MCP integration, `task_get_next`, terminal workflow
+- **General Ritemark users** → prioritize standalone board UX, simplicity, no AI jargon
+- **Both** → Phase 1 serves general users (standalone board), Phase 2 adds developer/agent layer
+
+### Decision 3: File format
+
+- **Single `.tasks.json`** — simpler, merge-conflict-prone, good for solo use
+- **One-file-per-task** — git-merge-friendly, more complex, better for multi-agent
+- **Recommendation:** Start with single file. Migrate only if conflicts become a real problem.
+
+---
+
+## Unvalidated Assumptions
+
+These are things this analysis assumes but has not proven:
+
+1. **"Developers want a kanban board inside their editor"** — No user research or feature request data supports this. The existence of VS Code kanban extensions (with modest install counts) is weak signal, not proof.
+2. **"MCP tools will be reliably discovered and used by agents"** — MCP tool discovery varies by client. An agent may not call `task_get_next` unless explicitly prompted. This needs testing.
+3. **"A single `.tasks.json` file won't cause merge conflicts in practice"** — Plausible for solo developers, untested for multi-agent scenarios.
+4. **"The kanban metaphor fits Ritemark's user base"** — Ritemark targets markdown writers. Kanban is a developer/PM tool. These audiences may not overlap.
+
+## Remaining Open Questions
+
+(Decisions 1-3 above are the blockers. These are secondary design questions for if/when we build.)
+
+1. **Real-time sync UX:** Agent updates `.tasks.json` via MCP while board is open. `onDidChangeDocument` triggers webview reload — but does the UX feel smooth or jarring? Needs prototyping.
+2. **Claude Code interop:** Read/write `~/.claude/tasks/` directly, or maintain own format? Own format is cleaner, but loses Claude Code's built-in multi-session coordination.
+3. **Board templates:** Ship defaults (Sprint Board, Bug Tracker) or start with blank boards only?
+4. **MCP tool discovery:** Will agents reliably find and use Ritemark's MCP tools, or will users need to explicitly prompt "use the task board"? Needs testing with Claude Code and Cursor.
 
 ---
 
