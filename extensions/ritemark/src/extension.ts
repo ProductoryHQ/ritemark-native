@@ -48,19 +48,33 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // === Layout settings: EVERY startup ===
-  // Titlebar controls and terminal defaults.
-  // NOTE: AI panel location is enforced in VS Code core (viewDescriptorService.ts patch)
-  setTimeout(async () => {
-    const wb = vscode.workspace.getConfiguration('workbench');
+  // NOTE: terminal.integrated.defaultLocation defaults to 'view' in VS Code core +
+  // package.json configurationDefaults. Do NOT write it here — it was previously set
+  // to 'editor' by mistake, which overrode the correct default.
+  // AI panel location is enforced in VS Code core (viewDescriptorService.ts patch).
+  (async () => {
+    try {
+      const wb = vscode.workspace.getConfiguration('workbench');
+      await wb.update('layoutControl.enabled', true, vscode.ConfigurationTarget.Global);
+      await wb.update('layoutControl.type', 'toggles', vscode.ConfigurationTarget.Global);
 
-    // Titlebar: sidebar toggles + settings gear
-    await wb.update('layoutControl.enabled', true, vscode.ConfigurationTarget.Global);
-    await wb.update('layoutControl.type', 'toggles', vscode.ConfigurationTarget.Global);
+      // Fix for users who had the old 'editor' value written by previous versions
+      const terminal = vscode.workspace.getConfiguration('terminal.integrated');
+      const current = terminal.get<string>('defaultLocation');
+      if (current === 'editor') {
+        await terminal.update('defaultLocation', undefined, vscode.ConfigurationTarget.Global);
+      }
+    } catch (e) {
+      console.error('Ritemark: failed to set layout defaults', e);
+    }
+  })();
 
-    // Terminal: right sidebar (auxiliary bar)
-    const terminal = vscode.workspace.getConfiguration('terminal.integrated');
-    await terminal.update('defaultLocation', 'editor', vscode.ConfigurationTarget.Global);
-  }, 2000);
+  // Focus Ritemark AI tab in auxiliary bar (instead of terminal).
+  // Standalone timeout — terminal init steals focus, so we re-focus after it settles.
+  setTimeout(() => {
+    console.log('[Ritemark] Focusing AI view in auxiliary bar');
+    vscode.commands.executeCommand('ritemark.unifiedView.focus');
+  }, 4000);
 
   // Initialize API key manager (must be first)
   initAPIKeyManager(context);
