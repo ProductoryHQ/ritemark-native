@@ -2,10 +2,10 @@ Ritemark Build System: making the VS Code fork build and run correctly
 Consolidates old patches: 008 (jschardet), 009 (microphone), 013 (integrity check)
 ---
 diff --git a/build/.moduleignore b/build/.moduleignore
-index 3f573e06078..63073e3bc02 100644
+index ed36151130c..48344ab7aa4 100644
 --- a/build/.moduleignore
 +++ b/build/.moduleignore
-@@ -161,8 +161,9 @@ typescript/lib/tsserverlibrary.js
+@@ -168,8 +168,9 @@ typescript/lib/tsserverlibrary.js
  # We still need to include stdlib d.ts
  !typescript/lib/lib*.d.ts
  
@@ -14,82 +14,64 @@ index 3f573e06078..63073e3bc02 100644
 +# RiteMark fix: keep jschardet source files for Node.js require() in git extension
 +# jschardet/index.js
 +# jschardet/src/**
- # TODO@esm uncomment when we can use jschardet.min.js again jschardet/dist/jschardet.js
+ jschardet/dist/jschardet.js
  
  es6-promise/lib/**
 diff --git a/src/vs/code/electron-main/app.ts b/src/vs/code/electron-main/app.ts
-index 29429516496..b970c3062b8 100644
+index a3efce99744..8b453c11683 100644
 --- a/src/vs/code/electron-main/app.ts
 +++ b/src/vs/code/electron-main/app.ts
-@@ -168,13 +168,35 @@ export class CodeApplication extends Disposable {
- 		const allowedPermissionsInWebview = new Set([
+@@ -176,6 +176,7 @@ export class CodeApplication extends Disposable {
+ 			...alwaysAllowedPermissions,
  			'clipboard-read',
  			'clipboard-sanitized-write',
-+			'media', // Enable microphone access for voice dictation
++			'media',
+ 			// TODO(deepak1556): Should be removed once migration is complete
+ 			// https://github.com/microsoft/vscode/issues/239228
+ 			'deprecated-sync-clipboard-read',
+@@ -190,8 +191,15 @@ export class CodeApplication extends Disposable {
+ 			'deprecated-sync-clipboard-read',
  		]);
  
 -		session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
 +		session.defaultSession.setPermissionRequestHandler(async (_webContents, permission, callback, details) => {
-+			console.log('[Permission Request]', permission, 'from', details.requestingUrl);
  			if (isUrlFromWebview(details.requestingUrl)) {
--				return callback(allowedPermissionsInWebview.has(permission));
-+				const allowed = allowedPermissionsInWebview.has(permission);
-+				console.log('[Permission Request] Webview permission', permission, 'allowed:', allowed);
-+
-+				// On macOS, we need to explicitly request microphone access from the system
-+				if (allowed && permission === 'media' && isMacintosh) {
++				if (permission === 'media' && isMacintosh) {
 +					const micStatus = systemPreferences.getMediaAccessStatus('microphone');
-+					console.log('[Permission Request] macOS microphone status:', micStatus);
-+
-+					if (micStatus === 'not-determined') {
-+						console.log('[Permission Request] Requesting microphone access from macOS...');
++					if (micStatus !== 'granted') {
 +						const granted = await systemPreferences.askForMediaAccess('microphone');
-+						console.log('[Permission Request] macOS microphone granted:', granted);
 +						return callback(granted);
-+					} else if (micStatus === 'denied' || micStatus === 'restricted') {
-+						console.log('[Permission Request] Microphone access denied by macOS');
-+						return callback(false);
 +					}
 +				}
-+
-+				return callback(allowed);
+ 				return callback(allowedPermissionsInWebview.has(permission));
  			}
- 
-+			console.log('[Permission Request] Non-webview, denied');
- 			return callback(false);
- 		});
- 
-@@ -557,6 +579,25 @@ export class CodeApplication extends Disposable {
+ 			if (isUrlFromWindow(details.requestingUrl)) {
+@@ -557,6 +565,20 @@ export class CodeApplication extends Disposable {
  			this.logService.error(error);
  		}
  
-+		// Request microphone permission on macOS for voice dictation
++		// RiteMark: Request microphone permission on macOS at startup
 +		if (isMacintosh) {
-+			const micStatus = systemPreferences.getMediaAccessStatus('microphone');
-+			this.logService.info(`[Microphone] Current status: ${micStatus}`);
-+			console.log(`[Microphone] Current status: ${micStatus}`);
-+
-+			if (micStatus === 'not-determined') {
-+				this.logService.info('[Microphone] Requesting access...');
-+				console.log('[Microphone] Requesting access...');
-+				systemPreferences.askForMediaAccess('microphone').then(granted => {
-+					this.logService.info(`[Microphone] Access granted: ${granted}`);
-+					console.log(`[Microphone] Access granted: ${granted}`);
-+				}).catch(err => {
-+					this.logService.error('[Microphone] Failed to request access:', err);
-+					console.error('[Microphone] Failed to request access:', err);
-+				});
++			try {
++				const micStatus = systemPreferences.getMediaAccessStatus('microphone');
++				if (micStatus !== 'granted') {
++					systemPreferences.askForMediaAccess('microphone').then(granted => {
++						this.logService.info(`[RiteMark] Microphone access ${granted ? 'granted' : 'denied'}`);
++					});
++				}
++			} catch (error) {
++				this.logService.error('[RiteMark] Failed to request microphone access:', error);
 +			}
 +		}
 +
  		// Main process server (electron IPC based)
  		const mainProcessElectronServer = new ElectronIPCServer();
  		Event.once(this.lifecycleMainService.onWillShutdown)(e => {
-diff --git a/src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts b/src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts
-index 8050895e5f6..2660ccbd6d7 100644
---- a/src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts
-+++ b/src/vs/workbench/services/integrity/electron-sandbox/integrityService.ts
-@@ -6,14 +6,14 @@
+diff --git a/src/vs/workbench/services/integrity/electron-browser/integrityService.ts b/src/vs/workbench/services/integrity/electron-browser/integrityService.ts
+index a2466a691d2..0cd72fa8b2f 100644
+--- a/src/vs/workbench/services/integrity/electron-browser/integrityService.ts
++++ b/src/vs/workbench/services/integrity/electron-browser/integrityService.ts
+@@ -6,14 +6,13 @@
  import { localize } from '../../../../nls.js';
  import Severity from '../../../../base/common/severity.js';
  import { URI } from '../../../../base/common/uri.js';
@@ -103,26 +85,27 @@ index 8050895e5f6..2660ccbd6d7 100644
  import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
  import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 -import { FileAccess, AppResourcePath } from '../../../../base/common/network.js';
-+
  import { IChecksumService } from '../../../../platform/checksum/common/checksumService.js';
  import { ILogService } from '../../../../platform/log/common/log.js';
  
-@@ -69,10 +69,10 @@ export class IntegrityService implements IIntegrityService {
+@@ -67,10 +66,10 @@ export class IntegrityService implements IIntegrityService {
  	constructor(
  		@INotificationService private readonly notificationService: INotificationService,
- 		@IStorageService private readonly storageService: IStorageService,
+ 		@IStorageService storageService: IStorageService,
 -		@ILifecycleService private readonly lifecycleService: ILifecycleService,
-+		@ILifecycleService _lifecycleService: ILifecycleService,
++		@ILifecycleService private readonly _lifecycleService: ILifecycleService,
  		@IOpenerService private readonly openerService: IOpenerService,
  		@IProductService private readonly productService: IProductService,
 -		@IChecksumService private readonly checksumService: IChecksumService,
-+		@IChecksumService _checksumService: IChecksumService,
++		@IChecksumService private readonly _checksumService: IChecksumService,
  		@ILogService private readonly logService: ILogService
  	) {
- 		this._compute();
-@@ -101,45 +101,7 @@ export class IntegrityService implements IIntegrityService {
+ 		this.storage = new IntegrityStorage(storageService);
+@@ -101,46 +100,9 @@ export class IntegrityService implements IIntegrityService {
+ 		this._showNotification();
  	}
  
++	// RiteMark: Skip integrity check — we modify VS Code files via patches
  	private async _isPure(): Promise<IntegrityTestResult> {
 -		const expectedChecksums = this.productService.checksums || {};
 -
