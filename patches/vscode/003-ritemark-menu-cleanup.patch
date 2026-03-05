@@ -421,19 +421,20 @@ index b22f84b628a..9dd39b6be6d 100644
  registerWorkbenchContribution2(MarkerChatContextContribution.ID, MarkerChatContextContribution, WorkbenchPhase.AfterRestored);
  
 diff --git a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
-index bb8dd6560d4..ec966d27277 100644
+index bb8dd6560d4..8fd6ce867d9 100644
 --- a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
 +++ b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
-@@ -11,7 +11,7 @@ import { IConfigurationRegistry, Extensions as ConfigurationExtensions, Configur
+@@ -10,8 +10,7 @@ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { IConfigurationRegistry, Extensions as ConfigurationExtensions, ConfigurationScope } from '../../../../platform/configuration/common/configurationRegistry.js';
  import { VIEW_CONTAINER } from '../../files/browser/explorerViewlet.js';
  import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
- import { Codicon } from '../../../../base/common/codicons.js';
+-import { Codicon } from '../../../../base/common/codicons.js';
 -import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 +import { registerIcon, Lucide } from '../../../../platform/theme/common/iconRegistry.js';
  import { OutlineConfigKeys } from '../../../services/outline/browser/outline.js';
  import { IOutlinePane } from './outline.js';
  
-@@ -21,7 +21,7 @@ import './outlineActions.js';
+@@ -21,7 +20,7 @@ import './outlineActions.js';
  
  // --- view
  
@@ -442,7 +443,7 @@ index bb8dd6560d4..ec966d27277 100644
  
  Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
  	id: IOutlinePane.Id,
-@@ -30,7 +30,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
+@@ -30,7 +29,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
  	ctorDescriptor: new SyncDescriptor(OutlinePane),
  	canToggleVisibility: true,
  	canMoveView: true,
