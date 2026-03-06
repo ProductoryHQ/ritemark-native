@@ -496,10 +496,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         ?.filter(a => a.kind === 'image')
         .map(a => `data:${a.mediaType};base64,${a.data}`);
 
+      // Prepend active file context to prompt (same pattern as Claude Code agent)
+      const activeFile = this._getActiveFileContext();
+      const enrichedPrompt = activeFile
+        ? `[Currently editing: ${activeFile.path}]\n\n${prompt}`
+        : prompt;
+
       // Start turn (send user message)
       const turnResult = await this._codexAppServer.turnStart(
         this._codexThreadId,
-        prompt,
+        enrichedPrompt,
         model,
         imageDataUrls && imageDataUrls.length > 0 ? imageDataUrls : undefined,
       );

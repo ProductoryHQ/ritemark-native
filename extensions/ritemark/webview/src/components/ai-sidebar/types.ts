@@ -192,6 +192,8 @@ export interface CodexApprovalRequest {
 export interface CodexConversationTurn {
   id: string;
   userPrompt: string;
+  /** Active file path that was included as context */
+  activeFilePath?: string;
   attachments?: FileAttachment[];
   streamingText: string;
   activities: AgentProgress[];
