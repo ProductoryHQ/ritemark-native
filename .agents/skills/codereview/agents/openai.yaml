@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Review"
+  short_description: "Find bugs, regressions, and risky diffs fast"
+  default_prompt: "Use $codereview to review this branch for bugs, regressions, and missing tests."
