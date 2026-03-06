@@ -10,7 +10,7 @@
 
 The rise of "vibe coding" with AI agents has created a new bottleneck: **planning and reviewing work**, not writing code. Several tools have emerged to solve this with kanban-style task boards that orchestrate AI agents. This analysis evaluates the landscape and recommends an approach for Ritemark Native.
 
-**Key finding:** The most promising path for Ritemark is a **built-in kanban board as a custom editor** (`.tasks.json` files) with **MCP server exposure**, letting AI agents read and update tasks. This leverages Ritemark's existing custom editor architecture (React + Zustand + Tailwind webviews) while being integrated into the markdown editing workflow.
+**Key finding:** The most promising path for Ritemark is a **built-in kanban board as a custom editor** (`.tasks.json` files) with **MCP server exposure**, letting AI agents read and update tasks. This reuses the existing webview architecture (React + Zustand + Tailwind) but requires **two pieces of net-new infrastructure** that don't exist today: (1) an MCP server (Ritemark currently has no MCP infrastructure at all), and (2) live external-change detection (the existing `FlowEditorProvider` does not watch for outside file edits — it requires reopening). These are core architecture work, not incremental add-ons.
 
 **Important caveat:** This analysis recommends an architecture, but the core product question — *how does a task on a board become work an agent is actually doing?* — has multiple possible answers. The "Agent Activation" section below explores these honestly, including what's proven vs. speculative.
 
@@ -36,9 +36,9 @@ File-based task management via MCP server. `.taskmaster/` directory with markdow
 
 **What Ritemark should steal:** MCP tool design patterns. The `get_next_task` pattern. Selective tool loading to manage token overhead.
 
-**Why not just integrate it:** Tasks stored in home directory (not project-local). Heavy token cost. Two separate extensions needed for visual board. Ritemark can offer a tighter, lighter experience by owning both sides.
+**Why not just integrate it:** TaskMaster is already project-local (`.taskmaster/` in project root) and has VS Code extensions with kanban boards. The remaining differentiation case is: Ritemark owns both editor and task system (no third-party extension dependency), tighter integration with AI sidebar and Flows, and a simpler MCP tool surface (7 vs 36 tools). Whether that justifies building from scratch vs. integrating TaskMaster is a real question — see Decision section.
 
-**Honest admission:** TaskMaster + its VS Code extensions is the closest competitor. The differentiation case depends on integration depth, not feature count.
+**Honest admission:** TaskMaster + its VS Code extensions is the closest competitor. It's project-local, file-based, MCP-native, and already has visual kanban. The differentiation case for building our own is thinner than it first appears.
 
 #### 3. Claude Code Native Tasks — The Baseline
 
@@ -76,7 +76,7 @@ Built-in to Claude Code 2.1+. Tasks in `~/.claude/tasks/`. Multi-session coordin
 | | Vibe Kanban | TaskMaster + ext | Ritemark (proposed) |
 |---|---|---|---|
 | **Visual board** | Web app | VS Code extension | Built-in custom editor |
-| **Storage** | PostgreSQL | `.taskmaster/` (markdown) | `.tasks.json` (project-local) |
+| **Storage** | PostgreSQL | `.taskmaster/` (project-local, markdown) | `.tasks.json` (project-local, JSON) |
 | **Git-friendly** | No | Yes | Yes |
 | **Agent activation** | Board spawns agent | Human-initiated | Human-initiated (Phase 1) |
 | **MCP tools** | Yes (bidirectional) | 36 tools (~21k tokens) | 7 tools (~3k tokens est.) |
@@ -147,9 +147,11 @@ This is the hardest design question. A kanban board is just a picture until some
 - Agent discovers `.tasks.json` via MCP tools (Ritemark's MCP server is in its config)
 - User tells agent: "Work on the next task" → agent calls `task_get_next`
 - Agent implements, calls `task_move` when done
-- Board updates in real-time via VS Code file watcher
+- Board updates when the file changes (requires new file-watcher infrastructure — see note below)
 
 **This is how TaskMaster works today. It's proven and requires no process management.**
+
+> **Infrastructure note:** "Board updates live" sounds simple but is net-new work. The existing `FlowEditorProvider` does **not** watch for external file changes — if another process edits a `.flow.json`, the editor shows stale data until reopened. For Tasks to work with MCP agents, `TaskEditorProvider` must implement `workspace.onDidChangeTextDocument` or `FileSystemWatcher` to detect and merge external changes into the live webview. This is solvable but non-trivial — it needs conflict resolution when the user is also editing.
 
 **Option B: Board-initiated (higher effort, better UX)**
 - User clicks "Assign to Agent" on a kanban card
@@ -298,16 +300,17 @@ The `task_get_next` tool is critical — it enables the agent loop:
 - Kanban board webview: columns, cards, drag-and-drop via `@dnd-kit`
 - Create/edit/move/delete tasks via UI
 - Card detail panel with title, description, priority, labels
-- File watcher: external changes to `.tasks.json` update the board live
+- File watcher: external changes to `.tasks.json` update the board live (**net-new infrastructure** — `FlowEditorProvider` doesn't do this today; requires `FileSystemWatcher` + webview reload + conflict resolution)
 - **Exit criteria:** A user can create a `.tasks.json` file, see a kanban board, and manage tasks visually — no terminal, no AI, no MCP needed.
 
-**Phase 2: MCP Server (agent integration)**
+**Phase 2: MCP Server (agent integration) — ⚠️ core architecture work**
+- **Ritemark currently has zero MCP infrastructure.** This phase requires building an MCP server from scratch: transport layer, tool registration, JSON-RPC handling, and lifecycle management within the VS Code extension host.
 - 7 MCP tools: `task_list_boards`, `task_get_board`, `task_add`, `task_update`, `task_move`, `task_delete`, `task_get_next`
 - Estimated token cost: ~3,000 tokens for tool definitions (vs TaskMaster's 21k)
 - Atomic file operations with in-memory mutex (concurrency safety)
 - WIP limit enforcement on `task_move`
 - `task_get_next` returns highest-priority unblocked+unclaimed task
-- **Exit criteria:** An agent (Claude Code, Cursor) can call MCP tools to read the board, pick up a task, and move it through columns. Board updates live.
+- **Exit criteria:** An agent (Claude Code, Cursor, Codex) can call MCP tools to read the board, pick up a task, and move it through columns. Board updates live.
 
 **Phase 3: AI Sidebar Integration**
 - Task context injected into AI sidebar conversations
@@ -392,9 +395,10 @@ The `task_get_next` tool is critical — it enables the agent loop:
 
 **Where Ritemark would differ:**
 - Ritemark owns both the editor and the task system (no third-party extension dependency)
-- `.tasks.json` lives in the project (TaskMaster uses `.taskmaster/` in home directory)
+- ~~`.tasks.json` lives in the project (TaskMaster uses `.taskmaster/` in home directory)~~ **Correction:** TaskMaster is also project-local (`.taskmaster/` in project root). Storage location is not a differentiator.
 - Tighter integration with Ritemark-specific features (Flows, AI sidebar, document linking)
 - Simpler MCP tool surface (7 tools vs TaskMaster's 36 — lower token overhead)
+- Single JSON file vs. directory of markdown files (simpler for small projects, worse for git merges)
 
 **Where TaskMaster is stronger:**
 - PRD → task decomposition (AI-generated tasks from requirements)
@@ -413,11 +417,11 @@ The `task_get_next` tool is critical — it enables the agent loop:
 | Claude Code | Yes (native) | Yes |
 | Cursor | Yes (native) | Yes |
 | Windsurf | Yes (native) | Yes |
-| Codex CLI (OpenAI) | Not yet confirmed | Unknown |
+| Codex CLI (OpenAI) | Yes (via `~/.codex/config.toml` `mcp_servers`) | Yes |
 | Copilot | Extensions, not MCP | No |
 | Gemini CLI | Partial | Uncertain |
 
-MCP adoption is growing but not universal. The feature should work well without MCP (the board is useful standalone) and MCP adds power-user agent integration on top.
+MCP adoption is broader than initially assessed — Claude Code, Cursor, Windsurf, and Codex CLI all support it. Copilot and Gemini CLI are the notable gaps. The board should still work well standalone (no MCP required), with MCP as the integration layer for agents.
 
 ---
 
@@ -427,13 +431,16 @@ This analysis is research, not a green light. Before committing engineering time
 
 ### Decision 1: Build, integrate, or wait?
 
-| Option | Effort | Risk | Signal gained |
-|--------|--------|------|--------------|
-| **A. Build Phase 1** (kanban board, no MCP yet) | ~2 sprints | Medium — may build something nobody uses | High — see if users actually use the board |
-| **B. Ship TaskMaster integration** (render their tasks in a Ritemark sidebar) | ~3 days | Low — minimal code, easy to remove | Medium — tests demand for task visibility, not our own board |
-| **C. Wait** — add to wishlist, revisit when users ask | Zero | Zero | None — but avoids premature building |
+| Option | Effort | Risk | What it validates |
+|--------|--------|------|-------------------|
+| **A. Build Phase 1** (native kanban board, no MCP yet) | ~2 sprints | Medium — may build something nobody uses | Whether users want a kanban board inside Ritemark |
+| **B. Ship TaskMaster sidebar** (render `.taskmaster/` tasks in a Ritemark panel) | ~3 days | Low — minimal code, easy to remove | Whether users want task visibility in-editor (but NOT whether they want Ritemark's own board) |
+| **C. Wait** — add to wishlist, revisit when users ask | Zero | Zero | Nothing — but avoids premature building |
 
-**Recommendation:** Option B first (cheap demand validation), then Option A if signal is positive.
+**Important:** Options A and B test different hypotheses. Option B validates "do users want to see tasks in the editor?" but does NOT validate "should Ritemark build its own task system?" If the goal is to build a native board (the executive summary's recommendation), Option B may give a false signal — users might like TaskMaster visibility without wanting a Ritemark-native board.
+
+**If confidence is high** that a native board is the right product direction → go straight to Option A.
+**If uncertain** whether task management belongs in Ritemark at all → Option B or C is cheaper to learn from.
 
 ### Decision 2: If building, who is the primary user?
 
@@ -450,6 +457,8 @@ This analysis is research, not a green light. Before committing engineering time
 ---
 
 ## Unvalidated Assumptions
+
+**⚠️ Verification note:** An external review (Codex) found two factual errors in this document: TaskMaster's storage location and Codex CLI's MCP support. Both have been corrected. Other competitor claims have not been independently re-verified and should be treated as best-effort, not authoritative. Before making roadmap decisions, re-check any claim that materially affects the decision.
 
 These are things this analysis assumes but has not proven:
 
