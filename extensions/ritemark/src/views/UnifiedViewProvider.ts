@@ -21,10 +21,10 @@ import {
 } from '../ai/index';
 import { searchDocuments, buildRAGContext, RAGSearchResult } from '../rag/search';
 import { VectorStore, getDefaultDbPath } from '../rag/vectorStore';
-import { AgentSession, AGENTS, CLAUDE_MODELS, CODEX_MODELS, DEFAULT_MODEL, getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth, installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, type AgentId, type AgentProgress, type FileAttachment, type SetupStatus } from '../agent';
+import { AgentSession, AGENTS, CLAUDE_FALLBACK_MODELS, DEFAULT_MODEL, getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth, installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, type AgentId, type AgentProgress, type FileAttachment, type SetupStatus } from '../agent';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
-import { CodexAppServer } from '../codex';
+import { CodexAppServer, getCodexModels } from '../codex';
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -354,8 +354,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       selectedAgent,
       selectedModel,
       agents: visibleAgents,
-      models: CLAUDE_MODELS,
-      codexModels: CODEX_MODELS,
+      models: CLAUDE_FALLBACK_MODELS,
+      codexModels: getCodexModels(),
       setupStatus,
       hasSeenWelcome,
       discoveredAgents,
@@ -415,6 +415,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         ...(excludedFolders ? { excludedFolders } : {}),
         ...(anthropicApiKey ? { anthropicApiKey } : {}),
       });
+
+      // When SDK reports available models, update the webview dropdown
+      this._agentSession.onModelsDiscovered = (models) => {
+        this._view?.webview.postMessage({
+          type: 'agent:models-update',
+          models,
+        });
+      };
     }
 
     // Get active file context — works for both TextEditor and custom editors (Ritemark)

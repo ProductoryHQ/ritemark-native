@@ -119,7 +119,7 @@ export class CodexAppServer extends EventEmitter {
     }];
     if (imageDataUrls) {
       for (const url of imageDataUrls) {
-        input.push({ type: 'image', image_url: url });
+        input.push({ type: 'image', image_url: { url } });
       }
     }
     return this.rpc<TurnStartParams, TurnStartResponse>('turn/start', {

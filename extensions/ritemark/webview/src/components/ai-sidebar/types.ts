@@ -227,6 +227,7 @@ export type ExtensionMessage =
   | { type: 'agent-setup:error'; error: string }
   | { type: 'settings:chatFontSize'; fontSize: number }
   | { type: 'toggle-history-panel' }
+  | { type: 'agent:models-update'; models: ModelOption[] }
   | { type: 'files-dropped'; paths: string[] }
   // Codex messages
   | { type: 'codex-progress'; progress: AgentProgress }

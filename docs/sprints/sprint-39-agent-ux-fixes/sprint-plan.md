@@ -364,6 +364,73 @@ Previously restricted to Claude Code only. Path chip drops now work for Ritemark
 | `webview/src/components/ai-sidebar/store.ts` | `activeFilePath` state, message handlers, `skipActiveFile` option on `sendAgentMessage` |
 | `webview/src/components/ai-sidebar/ChatInput.tsx` | Context chip UI, `hideActiveFile`, multi-file drop parsing, all-agent drop support |
 
+## Ad-hoc: v1.4.1 Fixes (2026-03-06)
+
+Batch of fixes discovered during v1.4.1 release testing.
+
+### 1. Microphone Permissions in Webview (macOS)
+
+**Problem:** Voice dictation showed "Microphone Access Required" dialog even though macOS had granted microphone permission to Ritemark. The Electron permission handler correctly approved the request, but the webview iframe's Permissions Policy blocked `getUserMedia()`.
+
+**Root cause:** VS Code's webview iframes have an `allow` attribute listing permitted features (`cross-origin-isolated`, `autoplay`, `clipboard-read`, `clipboard-write`) but NOT `microphone`. The browser's Permissions Policy requires every iframe in the chain to explicitly allow a feature.
+
+**Fix:** Added `microphone` to the `allow` attribute on both iframe levels:
+- Outer iframe: `webviewElement.ts` line 403
+- Inner iframe: `index.html` line 1032 + `index-no-csp.html` line 997
+- Updated CSP hash in `index.html` (inline script content changed)
+
+**Patch:** `005-ritemark-webview-microphone.patch`
+
+**Files changed (VS Code core):**
+| File | Change |
+| --- | --- |
+| `src/vs/workbench/contrib/webview/browser/webviewElement.ts` | Added `'microphone'` to outer iframe allowRules |
+| `src/vs/workbench/contrib/webview/browser/pre/index.html` | Added `'microphone;'` to inner iframe allowRules + updated CSP hash |
+| `src/vs/workbench/contrib/webview/browser/pre/index-no-csp.html` | Added `'microphone;'` to inner iframe allowRules |
+
+### 2. Windows: "spawn node ENOENT" in Claude Code Agent
+
+**Problem:** On Windows, clicking "Claude Code" in AI sidebar and sending a message fails with `Failed to spawn Claude Code process: spawn node ENOENT`.
+
+**Root cause:** The `@anthropic-ai/claude-agent-sdk` spawns `node cli.js` to run the Claude CLI. On Windows, Ritemark ships as an Electron app — there is no system `node` on PATH. The SDK's `getDefaultExecutable()` returns `"node"` which doesn't exist.
+
+**Fix:** Pass `executable: process.execPath` in both `query()` call sites in `AgentRunner.ts`. `process.execPath` is the Electron binary, which can run Node.js scripts.
+
+**Files changed (extension):**
+| File | Change |
+| --- | --- |
+| `src/agent/AgentRunner.ts` | Added `executable: process.execPath` to both `runAgent()` and `AgentSession._startSession()` query options |
+
+### 3. Dynamic Model Lists
+
+**Problem:** Claude and Codex model dropdowns were hardcoded. When models change, a code update was needed.
+
+**Fix:** Models are now fetched dynamically. Claude models start with a fallback list and update when the SDK reports available models. Codex models are fetched from the Codex app-server.
+
+**Files changed:**
+| File | Change |
+| --- | --- |
+| `src/agent/claudeModels.ts` | NEW — fallback model list for Claude |
+| `src/codex/codexModels.ts` | NEW — dynamic Codex model fetching |
+| `src/agent/index.ts` | Export `CLAUDE_FALLBACK_MODELS` |
+| `src/agent/types.ts` | Deprecated `CODEX_MODELS` constant |
+| `src/codex/index.ts` | Export `getCodexModels` |
+| `src/views/UnifiedViewProvider.ts` | Use dynamic model lists, added `onModelsDiscovered` callback |
+| `webview/src/components/ai-sidebar/store.ts` | Handle `agent:models-update` message, smart model selection on list change |
+| `webview/src/components/ai-sidebar/types.ts` | Added `agent:models-update` message type |
+
+### 4. Codex Image URL Format Fix
+
+**Problem:** Image attachments sent to Codex app-server used wrong format (`image_url: url` instead of `image_url: { url }`).
+
+**Fix:** Corrected to match OpenAI API spec.
+
+**Files changed:**
+| File | Change |
+| --- | --- |
+| `src/codex/codexAppServer.ts` | `image_url: url` → `image_url: { url }` |
+| `src/codex/codexProtocol.ts` | Updated `UserInput` type to `image_url: { url: string }` |
+
 ## Status
 
 **Current Phase:** 4 (TEST & VALIDATE)

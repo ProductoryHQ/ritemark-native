@@ -123,7 +123,7 @@ export interface ThreadInfo {
 
 export type UserInput =
   | { type: 'text'; text: string; text_elements: unknown[] }
-  | { type: 'image'; image_url: string }
+  | { type: 'image'; image_url: { url: string } }
   | { type: 'local_image'; path: string };
 
 export interface TurnStartParams {

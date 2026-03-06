@@ -611,20 +611,44 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         if (message.workspacePath) {
           setWorkspaceContext(message.workspacePath);
         }
+        const newCodexModels = message.codexModels || [];
+        const newClaudeModels = message.models || [];
+        // If current selection isn't in the new model list, pick the first one
+        const currentCodex = get().codexSelectedModel;
+        const codexSelectedModel = newCodexModels.some((m: { id: string }) => m.id === currentCodex)
+          ? currentCodex
+          : (newCodexModels[0]?.id || currentCodex);
+        const currentClaude = message.selectedModel || get().selectedModel;
+        const selectedModel = newClaudeModels.some((m: { id: string }) => m.id === currentClaude)
+          ? currentClaude
+          : (newClaudeModels[0]?.id || currentClaude);
         set({
           agenticEnabled: message.agenticEnabled,
           codexEnabled: message.codexEnabled ?? false,
           selectedAgent: (message.selectedAgent as AgentId) || 'ritemark-agent',
-          selectedModel: message.selectedModel || 'claude-sonnet-4-5',
+          selectedModel,
           agents: message.agents,
-          models: message.models || [],
-          codexModels: message.codexModels || [],
+          models: newClaudeModels,
+          codexModels: newCodexModels,
+          codexSelectedModel,
           setupStatus: message.setupStatus ?? get().setupStatus,
           hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
           discoveredAgents: message.discoveredAgents || [],
           discoveredCommands: message.discoveredCommands || [],
         });
         break;
+
+      case 'agent:models-update': {
+        const newModels = message.models || [];
+        if (newModels.length > 0) {
+          const current = get().selectedModel;
+          const selectedModel = newModels.some((m: { id: string }) => m.id === current)
+            ? current
+            : (newModels[0]?.id || current);
+          set({ models: newModels, selectedModel });
+        }
+        break;
+      }
 
       case 'selection-update':
         set({

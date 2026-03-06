@@ -1,0 +1,48 @@
+diff --git a/src/vs/workbench/contrib/webview/browser/pre/index-no-csp.html b/src/vs/workbench/contrib/webview/browser/pre/index-no-csp.html
+index ae571f8c84d..5e369da8f8a 100644
+--- a/src/vs/workbench/contrib/webview/browser/pre/index-no-csp.html
++++ b/src/vs/workbench/contrib/webview/browser/pre/index-no-csp.html
+@@ -994,7 +994,7 @@
+ 				}
+ 				newFrame.setAttribute('sandbox', Array.from(sandboxRules).join(' '));
+ 
+-				const allowRules = ['cross-origin-isolated;', 'autoplay;'];
++				const allowRules = ['cross-origin-isolated;', 'autoplay;', 'microphone;'];
+ 				if (!isFirefox && options.allowScripts) {
+ 					allowRules.push('clipboard-read;', 'clipboard-write;');
+ 				}
+diff --git a/src/vs/workbench/contrib/webview/browser/pre/index.html b/src/vs/workbench/contrib/webview/browser/pre/index.html
+index 6a1f3d459ab..b5d925e166d 100644
+--- a/src/vs/workbench/contrib/webview/browser/pre/index.html
++++ b/src/vs/workbench/contrib/webview/browser/pre/index.html
+@@ -5,7 +5,7 @@
+ 	<meta charset="UTF-8">
+ 
+ 	<meta http-equiv="Content-Security-Policy"
+-		content="default-src 'none'; script-src 'sha256-DXeP32g8BdMsVuVabYTmznoTH59F7M7UtV0vXemEFqc=' 'self'; frame-src 'self'; style-src 'unsafe-inline';">
++		content="default-src 'none'; script-src 'sha256-JC3gTGKiGNeVDaXWsFQ3qfWxcbiJ0e7zjKn/6mNPpeE=' 'self'; frame-src 'self'; style-src 'unsafe-inline';">
+ 
+ 
+ 	<!-- Disable pinch zooming -->
+@@ -1029,7 +1029,7 @@
+ 				}
+ 				newFrame.setAttribute('sandbox', Array.from(sandboxRules).join(' '));
+ 
+-				const allowRules = ['cross-origin-isolated;', 'autoplay;'];
++				const allowRules = ['cross-origin-isolated;', 'autoplay;', 'microphone;'];
+ 				if (!isFirefox && options.allowScripts) {
+ 					allowRules.push('clipboard-read;', 'clipboard-write;');
+ 				}
+diff --git a/src/vs/workbench/contrib/webview/browser/webviewElement.ts b/src/vs/workbench/contrib/webview/browser/webviewElement.ts
+index 1b66babea28..6b444ac6a8b 100644
+--- a/src/vs/workbench/contrib/webview/browser/webviewElement.ts
++++ b/src/vs/workbench/contrib/webview/browser/webviewElement.ts
+@@ -400,7 +400,7 @@ export class WebviewElement extends Disposable implements IWebview, WebviewFindD
+ 		element.className = `webview ${options.customClasses || ''}`;
+ 		element.sandbox.add('allow-scripts', 'allow-same-origin', 'allow-forms', 'allow-pointer-lock', 'allow-downloads');
+ 
+-		const allowRules = ['cross-origin-isolated', 'autoplay'];
++		const allowRules = ['cross-origin-isolated', 'autoplay', 'microphone'];
+ 		if (!isFirefox) {
+ 			allowRules.push('clipboard-read', 'clipboard-write');
+ 		}
