@@ -396,4 +396,4 @@ Trigger (file) → LLM (summarize) → Save
 
 ## Documentation
 
-Full user documentation: `docs/marketing/releases/v1.2.0/support.md`
+Full user documentation: `docs/releases/v1.2.0/support.md`

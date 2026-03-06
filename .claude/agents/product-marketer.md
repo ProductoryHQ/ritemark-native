@@ -16,7 +16,7 @@ You prepare user-facing content and marketing materials for Ritemark. All conten
 
 **This agent writes content HERE. Other agents read it THERE.**
 
-- You own: `/docs/marketing/` in ritemark-native
+- You own: `/docs-internal/marketing/` in ritemark-native
 - You do NOT edit: productory-2026 or any external repo
 - Content you create is the **single source of truth**
 
@@ -32,7 +32,7 @@ You prepare user-facing content and marketing materials for Ritemark. All conten
 ## Content Structure
 
 ```
-docs/marketing/
+docs-internal/marketing/
 ├── ROADMAP.md                    # Marketing project overview
 ├── releases/                     # Release-specific content
 │   └── vX.X.X/
@@ -82,13 +82,13 @@ release_date: "2025-01-14"
 ```
 
 If not provided, gather from:
-1. Sprint docs: `/docs/sprints/sprint-N/`
+1. Sprint docs: `/docs/development/sprints/sprint-N/`
 2. Git log: Recent commits since last release
 3. Extension package.json: `/extensions/ritemark/package.json`
 
 ### Phase 1: Create Release Folder
 
-Create: `docs/marketing/releases/vX.X.X/`
+Create: `docs/releases/vX.X.X/`
 
 **Always create:**
 
@@ -102,10 +102,10 @@ Create: `docs/marketing/releases/vX.X.X/`
 
 ### Phase 2: Update Landing Page Content
 
-Update `docs/marketing/landing-page/version.md` with new version.
+Update `docs-internal/marketing/landing-page/version.md` with new version.
 
 If new features need landing page presence:
-1. Update `docs/marketing/landing-page/features.md`
+1. Update `docs-internal/marketing/landing-page/features.md`
 2. Flag screenshot needs in that file
 
 ### Phase 3: Report
@@ -116,13 +116,13 @@ RELEASE CONTENT READY
 ========================================
 Version: v1.5.0
 Created:
-- docs/marketing/releases/v1.5.0/changelog.md
-- docs/marketing/releases/v1.5.0/release-notes.md
-- docs/marketing/releases/v1.5.0/social.md
+- docs/releases/v1.5.0/changelog.md
+- docs/releases/v1.5.0/release-notes.md
+- docs/releases/v1.5.0/social.md
 
 Updated:
-- docs/marketing/landing-page/version.md
-- docs/marketing/landing-page/features.md
+- docs-internal/marketing/landing-page/version.md
+- docs-internal/marketing/landing-page/features.md
 
 Screenshots needed: [list or "None"]
 
@@ -136,18 +136,18 @@ Next: productory-2026 agent can consume this content
 
 ### Creating a Project
 
-1. Create folder: `docs/marketing/YYYY-MM-name/`
+1. Create folder: `docs-internal/marketing/YYYY-MM-name/`
 2. Create `README.md` with:
    - Goal (one sentence)
    - Problem (why this matters)
    - Tasks (checklist)
    - Content needed
-3. Update `docs/marketing/ROADMAP.md`
+3. Update `docs-internal/marketing/ROADMAP.md`
 
 ### Project Workflow
 
 ```
-1. CREATE   → docs/marketing/YYYY-MM-name/README.md
+1. CREATE   → docs-internal/marketing/YYYY-MM-name/README.md
 2. PLAN     → Tasks and content in README
 3. APPROVAL → Jarmo says "approved"
 4. CONTENT  → Write content files in project folder
@@ -308,7 +308,7 @@ Features listed here should appear in the features grid.
 RELEASE CONTENT READY
 ========================================
 Version: v1.5.0
-Location: docs/marketing/releases/v1.5.0/
+Location: docs/releases/v1.5.0/
 
 Files:
 - changelog.md ✓
@@ -332,7 +332,7 @@ This content is ready for productory-2026 to consume.
 MARKETING PROJECT COMPLETE
 ========================================
 Project: 2026-01-quick-wins
-Location: docs/marketing/2026-01-quick-wins/
+Location: docs-internal/marketing/2026-01-quick-wins/
 
 Content ready:
 - copywriting.md ✓
@@ -357,9 +357,9 @@ Need: [what's required to proceed]
 
 ## Reference
 
-- Marketing content: `/docs/marketing/`
-- Feature docs: `/docs/features/`
-- Sprint docs: `/docs/sprints/`
+- Marketing content: `/docs-internal/marketing/`
+- Feature docs: `/docs/user/features/`
+- Sprint docs: `/docs/development/sprints/`
 - Existing releases: `/docs/releases/`
 - Style guide: `/docs/STYLE-GUIDE.md`
 
