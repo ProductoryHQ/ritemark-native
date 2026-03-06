@@ -243,9 +243,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const lastTurn = state.agentConversation[state.agentConversation.length - 1];
     if (lastTurn?.isRunning) return;
 
+    const activeFile = (!options?.skipActiveFile && state.activeFilePath) ? state.activeFilePath : undefined;
     const turn: AgentConversationTurn = {
       id: nextId(),
       userPrompt: prompt,
+      activeFilePath: activeFile,
       attachments,
       activities: [],
       isRunning: true,

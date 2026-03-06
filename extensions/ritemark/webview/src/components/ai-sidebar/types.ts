@@ -131,6 +131,8 @@ export interface InstallProgress {
 export interface AgentConversationTurn {
   id: string;
   userPrompt: string;
+  /** Active file path that was included as context (when not skipped) */
+  activeFilePath?: string;
   attachments?: FileAttachment[];
   activities: AgentProgress[];
   /** Subagents spawned during this turn */
