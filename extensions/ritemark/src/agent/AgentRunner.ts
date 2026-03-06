@@ -224,6 +224,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       prompt: promptPayload,
       options: {
         cwd: workspacePath,
+        executable: process.execPath,
         settingSources: ['project'],
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
@@ -338,6 +339,9 @@ export class AgentSession {
   private readonly _allowedTools: string[];
   private readonly _modelId: string | undefined;
   private readonly _anthropicApiKey: string | undefined;
+
+  /** Called when SDK reports its available models (after session init) */
+  onModelsDiscovered: ((models: Array<{ id: string; label: string; description: string }>) => void) | null = null;
 
   constructor(config: AgentSessionConfig) {
     this._workspacePath = config.workspacePath;
@@ -459,6 +463,26 @@ export class AgentSession {
     this._inputQueue = [];
   }
 
+  // ── Model discovery ────────────────────────────────────────────────
+
+  private async _fetchSupportedModels() {
+    try {
+      const qs = this._queryStream as any;
+      if (qs && typeof qs.supportedModels === 'function') {
+        const models: Array<{ value: string; displayName: string; description: string }> = await qs.supportedModels();
+        if (models?.length && this.onModelsDiscovered) {
+          this.onModelsDiscovered(models.map(m => ({
+            id: m.value,
+            label: m.displayName,
+            description: m.description,
+          })));
+        }
+      }
+    } catch {
+      // Non-critical — fallback models remain in the UI
+    }
+  }
+
   // ── Timeout management ──────────────────────────────────────────────
 
   /**
@@ -552,6 +576,7 @@ export class AgentSession {
 
     const queryOptions: Record<string, unknown> = {
       cwd: this._workspacePath,
+      executable: process.execPath,
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
@@ -603,6 +628,8 @@ export class AgentSession {
         if (message.type === 'system' && message.subtype === 'init') {
           this._model = message.model || null;
           this._emitProgress?.('init', `Starting Claude Code (${message.model || 'claude'})`);
+          // Fetch supported models from the SDK session
+          this._fetchSupportedModels();
         } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
           this._emitProgress?.('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
         } else if (message.type === 'system' && message.subtype === 'compact_boundary') {

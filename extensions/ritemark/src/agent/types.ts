@@ -65,6 +65,7 @@ export const CLAUDE_MODELS: ModelOption[] = [
 
 export const DEFAULT_MODEL = 'claude-sonnet-4-5';
 
+/** @deprecated Use getCodexModels() from codex/codexModels for dynamic model list */
 export const CODEX_MODELS: ModelOption[] = [
   { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', description: 'Most capable' },
   { id: 'codex-spark', label: 'Codex Spark', description: 'Fast & light' },

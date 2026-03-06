@@ -14,4 +14,5 @@
 export { CodexManager } from './codexManager';
 export { CodexAppServer } from './codexAppServer';
 export { CodexAuth } from './codexAuth';
+export { getCodexModels } from './codexModels';
 export * from './codexProtocol';
