@@ -87,11 +87,29 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
   const needsApproval = turn.isPlan && !turn.planHandled;
 
+  // Extract plan content from thinking activities (plan text arrives as 'thinking' type)
+  const planText = needsApproval
+    ? activities
+        .filter(a => a.type === 'thinking' && a.message)
+        .map(a => a.message)
+        .join('\n\n')
+    : '';
+
   // Success result
   return (
     <div style={chatFontStyle}>
       {result.text && (
         <RenderedMarkdown content={result.text} />
+      )}
+
+      {/* Plan preview card */}
+      {needsApproval && planText && (
+        <div className="mt-2 px-3 py-2 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)] max-h-[300px] overflow-y-auto">
+          <div className="text-[10px] font-medium text-[var(--vscode-descriptionForeground)] uppercase tracking-wide mb-1.5">Plan</div>
+          <div className="text-[12px]">
+            <RenderedMarkdown content={planText} />
+          </div>
+        </div>
       )}
 
       {/* Plan approval buttons */}

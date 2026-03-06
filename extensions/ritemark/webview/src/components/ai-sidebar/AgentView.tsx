@@ -66,7 +66,7 @@ export function AgentView() {
             )}
 
             {/* User prompt */}
-            <UserPromptBubble attachments={turn.attachments}>
+            <UserPromptBubble attachments={turn.attachments} activeFilePath={turn.activeFilePath}>
               {turn.userPrompt}
             </UserPromptBubble>
 
