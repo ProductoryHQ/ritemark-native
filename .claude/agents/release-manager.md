@@ -146,7 +146,7 @@ On startup, create tasks for all steps using TaskCreate, then work through them 
 #### STEP 2: BUILD macOS arm64 (LOCAL)
 
 1. Build arm64: `./scripts/build-prod.sh`
-2. Generate TEST-CHECKLIST.md in `docs/marketing/releases/vX.Y.Z/`
+2. Generate TEST-CHECKLIST.md in `docs/releases/vX.Y.Z/`
 
 **Output:**
 - `VSCode-darwin-arm64/Ritemark.app`
@@ -305,7 +305,7 @@ Generate the checklist after Gate 1 passes, before asking Jarmo to test.
 ### Location
 
 ```plaintext
-docs/marketing/releases/vX.Y.Z/TEST-CHECKLIST.md
+docs/releases/vX.Y.Z/TEST-CHECKLIST.md
 ```
 
 ### Checklist Template
@@ -399,9 +399,9 @@ The checklist MUST include:
 
 To populate the "New Features" section:
 
-1.  Check the release notes: `docs/marketing/releases/vX.Y.Z/release-notes.md`
+1.  Check the release notes: `docs/releases/vX.Y.Z/release-notes.md`
     
-2.  Check recent sprints: `docs/sprints/`
+2.  Check recent sprints: `docs/development/sprints/`
     
 3.  Check git log since last release: `git log --oneline vPREVIOUS..HEAD`
     
@@ -410,7 +410,7 @@ To populate the "New Features" section:
 
 Tell Jarmo:
 
-> "Test checklist created at `docs/marketing/releases/vX.Y.Z/TEST-CHECKLIST.md`.  
+> "Test checklist created at `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.  
 > Please go through the checklist and say 'macOS approved' when testing is complete."
 
 ### Checking GH Actions Status
@@ -504,7 +504,7 @@ hdiutil detach "/Volumes/Ritemark" -quiet
 | --- | --- | --- |
 | DMG older than app build | Compare timestamps | WARN |
 | Uncommitted changes | `git status` | WARN |
-| Open/incomplete sprints | Check `docs/sprints/` for WIP | WARN |
+| Open/incomplete sprints | Check `docs/development/sprints/` for WIP | WARN |
 | Notarization pending | Check notarytool status | WARN (for beta: note it) |
 | Release notes missing | Check `docs/releases/vX.Y.Z.md` exists | WARN |
 | Release notes outdated | Compare features in release notes vs actual build | WARN |
@@ -869,11 +869,11 @@ Version: X.Y.Z[-ext.N]
 
 -   `docs/releases/` - Release notes (e.g., v1.0.0.md, v1.0.1.md)
     
--   `docs/release-process/NOTARIZATION.md` - Notarization commands & troubleshooting
+-   `docs/development/release-process/NOTARIZATION.md` - Notarization commands & troubleshooting
     
--   `docs/sprints/sprint-20-lightweight-updates/EXTENSION-RELEASE-GUIDE.md` - Extension release guide
+-   `docs/development/sprints/sprint-20-lightweight-updates/EXTENSION-RELEASE-GUIDE.md` - Extension release guide
     
--   `docs/sprints/sprint-16-auto-update/HANDOVER.md` - Current notarization status
+-   `docs/development/sprints/sprint-16-auto-update/HANDOVER.md` - Current notarization status
     
 
 ## Target Repository
@@ -931,9 +931,9 @@ Now invoking product-marketer for marketing updates:
 
 Product-marketer creates content in `docs/marketing/` (this repo only):
 
-1.  Creates `/docs/marketing/releases/vX.X.X/changelog.md`
+1.  Creates `/docs/releases/vX.X.X/changelog.md`
     
-2.  Creates `/docs/marketing/releases/vX.X.X/release-notes.md`
+2.  Creates `/docs/releases/vX.X.X/release-notes.md`
     
 3.  Creates social media copy if warranted
     

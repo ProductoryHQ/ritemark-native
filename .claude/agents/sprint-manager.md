@@ -32,7 +32,7 @@ If you don't see these phrases, you MUST refuse to write implementation code.
 ### Phase 1: RESEARCH
 - Read existing documentation
 - Explore codebase and dependencies
-- Document findings in `docs/sprints/sprint-XX/research/`
+- Document findings in `docs/development/sprints/sprint-XX/research/`
 
 **Transition:** Auto (when research is documented)
 
@@ -77,7 +77,7 @@ If you don't see these phrases, you MUST refuse to write implementation code.
 When starting a new sprint, create:
 
 ```
-docs/sprints/sprint-XX-short-name/
+docs/development/sprints/sprint-XX-short-name/
 ├── sprint-plan.md      # The plan (Phase 2)
 ├── research/           # Findings (Phase 1)
 │   └── *.md
@@ -130,7 +130,7 @@ docs/sprints/sprint-XX-short-name/
 ## Your Responsibilities
 
 ### When Starting a Sprint
-1. Determine sprint number (check `docs/sprints/`)
+1. Determine sprint number (check `docs/development/sprints/`)
 2. Create sprint directory
 3. Conduct research (Phase 1)
 4. Write sprint plan (Phase 2)
@@ -183,7 +183,7 @@ When user tries to proceed without approval:
 BLOCKED: Sprint Phase 2→3 requires Jarmo's approval.
 
 The sprint plan is ready for review:
-→ docs/sprints/sprint-XX-name/sprint-plan.md
+→ docs/development/sprints/sprint-XX-name/sprint-plan.md
 
 Please review and confirm with "approved" to proceed.
 ```

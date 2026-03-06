@@ -189,7 +189,7 @@ After gulp build completes, ALWAYS:
 
 ### Reference
 
-- Analysis document: `docs/analysis/2026-02-03-multi-platform-build.md`
+- Analysis document: `docs/development/analysis/2026-02-03-multi-platform-build.md`
 - Build script: `scripts/build-prod.sh`
 - DMG creation: `scripts/create-dmg.sh`
 - DMG notarization: `scripts/notarize-dmg.sh`

@@ -36,13 +36,18 @@ ritemark-native/
 ├── branding/                    # Icons, logos, product.json overrides
 ├── scripts/                     # Development and release scripts
 ├── VSCode-darwin-arm64/         # Production build output
-└── docs/
-    ├── analysis/                # Technical analysis documents
-    └── sprints/                 # Sprint documentation
-        └── WISHLIST.md          # Feature wishlist (add ideas here!)
+├── docs/
+│   ├── WISHLIST.md              # Feature wishlist (add ideas here!)
+│   ├── user/                    # User-facing docs (guides, features)
+│   ├── releases/                # Release notes per version
+│   └── development/             # Developer docs
+│       ├── analysis/            # Technical analysis documents
+│       ├── sprints/             # Sprint documentation
+│       └── release-process/     # Release & notarization docs
+└── docs-internal/               # Gitignored: marketing, product strategy
 ```
 
-**WISHLIST location:** `docs/sprints/WISHLIST.md` — All feature ideas go here (linked to sprint planning).
+**WISHLIST location:** `docs/WISHLIST.md` — All feature ideas go here (linked to sprint planning).
 
 * * *
 
@@ -175,7 +180,7 @@ When doing UI refactoring, use **shadcn/ui** components:
 - Tailwind-based (already in use)
 - Copy-paste pattern (code is ours, not dependency)
 - Radix UI primitives (accessible)
-- See `docs/sprints/WISHLIST.md` for full migration plan
+- See `docs/WISHLIST.md` for full migration plan
 
 **Invoke `ux-expert` when designing new UI components.**
 
