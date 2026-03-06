@@ -285,6 +285,17 @@ while IFS= read -r -d '' crashfile; do
     fi
 done < <(find "$APP_PATH" -name "chrome_crashpad_handler" -type f -print0 2>/dev/null)
 
+# whisper-cli (speech-to-text binary)
+while IFS= read -r -d '' whisperfile; do
+    if sign_item "$whisperfile" "true" > /dev/null 2>&1; then
+        echo "    ✓ Signed: whisper-cli"
+        increment_signed
+    else
+        echo -e "    ${RED}FAILED: whisper-cli${NC}"
+        increment_failed
+    fi
+done < <(find "$APP_PATH" -name "whisper-cli" -type f -print0 2>/dev/null)
+
 # ShipIt (in Squirrel.framework)
 SHIPIT="$APP_PATH/Contents/Frameworks/Squirrel.framework/Versions/A/Resources/ShipIt"
 if [ -f "$SHIPIT" ]; then
