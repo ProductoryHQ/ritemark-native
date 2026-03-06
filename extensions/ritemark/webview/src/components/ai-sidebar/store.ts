@@ -424,6 +424,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const turn: CodexConversationTurn = {
       id: nextId(),
       userPrompt: prompt,
+      activeFilePath: state.activeFilePath || undefined,
       attachments,
       streamingText: '',
       activities: [],
