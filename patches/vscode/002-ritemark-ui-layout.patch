@@ -703,3 +703,146 @@ index 40b580ef0f0..6a661275ea0 100644
  Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts b/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
+index 326d159c078..f91ee8d4973 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
+@@ -8,6 +8,7 @@ import { Disposable, toDisposable } from '../../../../base/common/lifecycle.js';
+ import { type IEditorOptions } from '../../../../editor/common/config/editorOptions.js';
+ import { EDITOR_FONT_DEFAULTS } from '../../../../editor/common/config/fontInfo.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
++import { IProductService } from '../../../../platform/product/common/productService.js';
+ import { ITerminalConfigurationService, LinuxDistro } from './terminal.js';
+ import type { IXtermCore } from './xterm-private.js';
+ import { DEFAULT_BOLD_FONT_WEIGHT, DEFAULT_FONT_WEIGHT, DEFAULT_LETTER_SPACING, DEFAULT_LINE_HEIGHT, FontWeight, ITerminalConfiguration, MAXIMUM_FONT_WEIGHT, MINIMUM_FONT_WEIGHT, MINIMUM_LETTER_SPACING, TERMINAL_CONFIG_SECTION, type ITerminalFont } from '../common/terminal.js';
+@@ -27,6 +28,9 @@ export class TerminalConfigurationService extends Disposable implements ITermina
+ 	get config() { return this._config; }
+ 
+ 	get defaultLocation(): TerminalLocation {
++		if (this._productService.applicationName === 'ritemark') {
++			return TerminalLocation.Panel;
++		}
+ 		if (this.config.defaultLocation === TerminalLocationConfigValue.Editor) {
+ 			return TerminalLocation.Editor;
+ 		}
+@@ -38,6 +42,7 @@ export class TerminalConfigurationService extends Disposable implements ITermina
+ 
+ 	constructor(
+ 		@IConfigurationService private readonly _configurationService: IConfigurationService,
++		@IProductService private readonly _productService: IProductService,
+ 	) {
+ 		super();
+ 
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalEditorSerializer.ts b/src/vs/workbench/contrib/terminal/browser/terminalEditorSerializer.ts
+index b0544972b48..5fa4969adc5 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalEditorSerializer.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalEditorSerializer.ts
+@@ -5,18 +5,22 @@
+ 
+ import { isNumber, isObject } from '../../../../base/common/types.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
++import { IProductService } from '../../../../platform/product/common/productService.js';
++import { TerminalLocation } from '../../../../platform/terminal/common/terminal.js';
+ import { IEditorSerializer } from '../../../common/editor.js';
+ import { EditorInput } from '../../../common/editor/editorInput.js';
+-import { ISerializedTerminalEditorInput, ITerminalEditorService, ITerminalInstance, type IDeserializedTerminalEditorInput } from './terminal.js';
++import { ISerializedTerminalEditorInput, ITerminalEditorService, ITerminalInstance, ITerminalService, type IDeserializedTerminalEditorInput } from './terminal.js';
+ import { TerminalEditorInput } from './terminalEditorInput.js';
+ 
+ export class TerminalInputSerializer implements IEditorSerializer {
+ 	constructor(
+-		@ITerminalEditorService private readonly _terminalEditorService: ITerminalEditorService
++		@IProductService private readonly _productService: IProductService,
++		@ITerminalEditorService private readonly _terminalEditorService: ITerminalEditorService,
++		@ITerminalService private readonly _terminalService: ITerminalService
+ 	) { }
+ 
+ 	public canSerialize(editorInput: TerminalEditorInput): editorInput is TerminalEditorInput & { readonly terminalInstance: ITerminalInstance } {
+-		return isNumber(editorInput.terminalInstance?.persistentProcessId) && editorInput.terminalInstance.shouldPersist;
++		return !this._shouldRestoreInTerminalView() && isNumber(editorInput.terminalInstance?.persistentProcessId) && editorInput.terminalInstance.shouldPersist;
+ 	}
+ 
+ 	public serialize(editorInput: TerminalEditorInput): string | undefined {
+@@ -31,6 +35,13 @@ export class TerminalInputSerializer implements IEditorSerializer {
+ 		if (!isDeserializedTerminalEditorInput(editorInput)) {
+ 			throw new Error(`Could not revive terminal editor input, ${editorInput}`);
+ 		}
++		if (this._shouldRestoreInTerminalView()) {
++			void this._terminalService.createTerminal({
++				config: { attachPersistentProcess: editorInput },
++				location: TerminalLocation.Panel
++			}).then(undefined, () => undefined);
++			return undefined;
++		}
+ 		return this._terminalEditorService.reviveInput(editorInput);
+ 	}
+ 
+@@ -50,6 +61,10 @@ export class TerminalInputSerializer implements IEditorSerializer {
+ 			shellIntegrationNonce: instance.shellIntegrationNonce
+ 		};
+ 	}
++
++	private _shouldRestoreInTerminalView(): boolean {
++		return this._productService.applicationName === 'ritemark';
++	}
+ }
+ 
+ function isDeserializedTerminalEditorInput(obj: unknown): obj is IDeserializedTerminalEditorInput {
+diff --git a/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts b/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
+index 206b113186c..ea5b8e7255c 100644
+--- a/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
++++ b/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
+@@ -11,7 +11,8 @@ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/tes
+ import { EDITOR_FONT_DEFAULTS } from '../../../../../editor/common/config/fontInfo.js';
+ import { ConfigurationTarget, IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
+ import { TestConfigurationService } from '../../../../../platform/configuration/test/common/testConfigurationService.js';
+-import { TestInstantiationService } from '../../../../../platform/instantiation/test/common/instantiationServiceMock.js';
++import { IProductService } from '../../../../../platform/product/common/productService.js';
++import { TerminalLocation } from '../../../../../platform/terminal/common/terminal.js';
+ import { ITerminalConfigurationService, LinuxDistro } from '../../browser/terminal.js';
+ import { TestTerminalConfigurationService, workbenchInstantiationService } from '../../../../test/browser/workbenchTestServices.js';
+ 
+@@ -54,9 +55,14 @@ suite('Workbench - TerminalConfigurationService', () => {
+ 		});
+ 	});
+ 
+-	function createTerminalConfigationService(config: any, linuxDistro?: LinuxDistro): ITerminalConfigurationService {
+-		const instantiationService = new TestInstantiationService();
+-		instantiationService.set(IConfigurationService, new TestConfigurationService(config));
++	function createTerminalConfigationService(config: any, linuxDistro?: LinuxDistro, applicationName?: string): ITerminalConfigurationService {
++		const instantiationService = workbenchInstantiationService({
++			configurationService: () => new TestConfigurationService(config)
++		}, store);
++		if (applicationName) {
++			const productService = instantiationService.get(IProductService);
++			instantiationService.stub(IProductService, { ...productService, applicationName });
++		}
+ 		const terminalConfigurationService = store.add(instantiationService.createInstance(TestTerminalConfigurationService));
+ 		instantiationService.set(ITerminalConfigurationService, terminalConfigurationService);
+ 		terminalConfigurationService.setPanelContainer(mainWindow.document.body);
+@@ -66,6 +72,24 @@ suite('Workbench - TerminalConfigurationService', () => {
+ 		return terminalConfigurationService;
+ 	}
+ 
++	suite('defaultLocation', () => {
++		test('honors editor default location for non-Ritemark products', () => {
++			const terminalConfigurationService = createTerminalConfigationService({
++				terminal: { integrated: { defaultLocation: 'editor' } }
++			}, undefined, 'code-oss');
++
++			strictEqual(terminalConfigurationService.defaultLocation, TerminalLocation.Editor);
++		});
++
++		test('forces terminal view location for Ritemark even when user config says editor', () => {
++			const terminalConfigurationService = createTerminalConfigationService({
++				terminal: { integrated: { defaultLocation: 'editor' } }
++			}, undefined, 'ritemark');
++
++			strictEqual(terminalConfigurationService.defaultLocation, TerminalLocation.Panel);
++		});
++	});
++
+ 	suite('getFont', () => {
+ 		test('fontFamily', () => {
+ 			const terminalConfigurationService = createTerminalConfigationService({
+ 

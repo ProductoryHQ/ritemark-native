@@ -86,7 +86,7 @@ index 767fbe08db3..1fab5250d26 100644
  			if (layoutInfo.windowBorder && colorInfo.windowBorder) {
  				const borderElement = document.createElement('div');
 diff --git a/src/vs/platform/dialogs/electron-browser/dialog.ts b/src/vs/platform/dialogs/electron-browser/dialog.ts
-index ec26804c300..3c2f76abd35 100644
+index ec26804c300..b6b44623d72 100644
 --- a/src/vs/platform/dialogs/electron-browser/dialog.ts
 +++ b/src/vs/platform/dialogs/electron-browser/dialog.ts
 @@ -5,13 +5,13 @@
@@ -105,7 +105,7 @@ index ec26804c300..3c2f76abd35 100644
  	if (productService.target) {
  		version = `${version} (${productService.target} setup)`;
  	} else if (productService.darwinUniversalAssetId) {
-@@ -19,25 +19,29 @@ export function createNativeAboutDialogDetails(productService: IProductService,
+@@ -19,25 +19,28 @@ export function createNativeAboutDialogDetails(productService: IProductService,
  	}
  
  	const getDetails = (useAgo: boolean): string => {
@@ -139,8 +139,7 @@ index ec26804c300..3c2f76abd35 100644
  	const details = getDetails(true);
  	const detailsToCopy = getDetails(false);
  
-+	// RiteMark: Use Ritemark branding in about dialog
-+	const title = 'Ritemark Native';
++	const title = productService.nameShort.replace(/ Dev$/, '');
 +
  	return {
 -		title: productService.nameLong,
