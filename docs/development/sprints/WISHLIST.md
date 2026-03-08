@@ -123,7 +123,7 @@ Consolidate UI components using shadcn/ui for consistency.
 
 ## VS Code Upstream
 
-- [ ] **Update base VS Code to 1.109+** - Investigate release notes, breaking changes, and patch compatibility. Current base: 1.94.0
+- [x] **Update base VS Code to 1.109.5** - Completed in **Sprint 41**. Upstream base moved from `1.94.0` to `1.109.5`, patch stack revalidated, and upgrade regressions fixed during smoke testing.
 
 ## Developer Experience
 
@@ -190,4 +190,4 @@ Consolidate UI components using shadcn/ui for consistency.
 
 * * *
 
-*Last updated: 2026-03-03*
+*Last updated: 2026-03-08*
