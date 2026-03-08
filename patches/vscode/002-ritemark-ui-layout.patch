@@ -187,7 +187,7 @@ index d66a8f5f0ee..65011fd204a 100644
  
  	private headerVisible: boolean = false;
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-index 5abfb88dd9c..600c284e905 100644
+index 5abfb88dd9c..704960be90f 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 @@ -3,6 +3,7 @@
@@ -198,6 +198,15 @@ index 5abfb88dd9c..600c284e905 100644
  import { Codicon } from '../../../../base/common/codicons.js';
  import { localize, localize2 } from '../../../../nls.js';
  import { Action2, MenuId, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
+@@ -10,7 +11,7 @@
+ import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+ import { alert } from '../../../../base/browser/ui/aria/aria.js';
+-import { AuxiliaryBarMaximizedContext, AuxiliaryBarVisibleContext, IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
++import { AuxiliaryBarMaximizedContext, AuxiliaryBarVisibleContext } from '../../../common/contextkeys.js';
+ import { ViewContainerLocation, ViewContainerLocationToString } from '../../../common/views.js';
+ import { ActivityBarPosition, IWorkbenchLayoutService, LayoutSettings, Parts } from '../../../services/layout/browser/layoutService.js';
+ import { IPaneCompositePartService } from '../../../services/panecomposite/browser/panecomposite.js';
 @@ -23,10 +24,11 @@ const maximizeIcon = registerIcon('auxiliarybar-maximize', Codicon.screenFull, l
  const restoreIcon = registerIcon('auxiliarybar-restore', Codicon.screenNormal, localize('restoreIcon', 'Icon to restore the secondary side bar.'));
  const closeIcon = registerIcon('auxiliarybar-close', Codicon.close, localize('closeIcon', 'Icon to close the secondary side bar.'));
@@ -369,9 +378,18 @@ index a452575cf9e..7dff19825ee 100644
  		const footerArea = super.createFooterArea();
  
 diff --git a/src/vs/workbench/browser/parts/panel/panelActions.ts b/src/vs/workbench/browser/parts/panel/panelActions.ts
-index 3432144229c..ad85dd0828c 100644
+index 3432144229c..d6a8bc39a99 100644
 --- a/src/vs/workbench/browser/parts/panel/panelActions.ts
 +++ b/src/vs/workbench/browser/parts/panel/panelActions.ts
+@@ -9,7 +9,7 @@
+ import { MenuId, MenuRegistry, registerAction2, Action2, IAction2Options } from '../../../../platform/actions/common/actions.js';
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+ import { isHorizontal, IWorkbenchLayoutService, PanelAlignment, Parts, Position, positionToString } from '../../../services/layout/browser/layoutService.js';
+-import { IsAuxiliaryWindowContext, PanelAlignmentContext, PanelMaximizedContext, PanelPositionContext, PanelVisibleContext } from '../../../common/contextkeys.js';
++import { PanelAlignmentContext, PanelMaximizedContext, PanelPositionContext, PanelVisibleContext } from '../../../common/contextkeys.js';
+ import { ContextKeyExpr, ContextKeyExpression } from '../../../../platform/contextkey/common/contextkey.js';
+ import { Codicon } from '../../../../base/common/codicons.js';
+ import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 @@ -25,8 +25,9 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
  const maximizeIcon = registerIcon('panel-maximize', Codicon.screenFull, localize('maximizeIcon', 'Icon to maximize a panel.'));
  const restoreIcon = registerIcon('panel-restore', Codicon.screenNormal, localize('restoreIcon', 'Icon to restore a panel.'));
@@ -685,18 +703,3 @@ index 40b580ef0f0..6a661275ea0 100644
  Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
-diff --git a/src/vs/workbench/services/views/browser/viewDescriptorService.ts b/src/vs/workbench/services/views/browser/viewDescriptorService.ts
-index 2345f6dda14..3fbeba7ae3d 100644
---- a/src/vs/workbench/services/views/browser/viewDescriptorService.ts
-+++ b/src/vs/workbench/services/views/browser/viewDescriptorService.ts
-@@ -95,6 +95,10 @@ export class ViewDescriptorService extends Disposable implements IViewDescriptor
- 		this.viewDescriptorsCustomLocations = new Map<string, string>(Object.entries(this.viewCustomizations.viewLocations));
- 		this.viewContainerBadgeEnablementStates = new Map<string, boolean>(Object.entries(this.viewCustomizations.viewContainerBadgeEnablementStates));
- 
-+		// Ritemark: delete cached overrides to force views to auxiliary bar
-+		this.viewContainersCustomLocations.delete('workbench.view.extension.ritemark-ai');
-+		this.viewContainersCustomLocations.delete('terminal');
-+
- 		// Register all containers that were registered before this ctor
- 		this.viewContainers.forEach(viewContainer => this.onDidRegisterViewContainer(viewContainer));
- 
