@@ -4,7 +4,7 @@ Note: VisualElementsManifest.xml is handled by apply-patches.sh (CRLF file)
 Note: gulpfile.vscode.ts company branding is in patch 001
 ---
 diff --git a/build/lib/electron.ts b/build/lib/electron.ts
-index aadc9b5fbe7..30b4d7040c4 100644
+index aadc9b5fbe7..bdb19d5060b 100644
 --- a/build/lib/electron.ts
 +++ b/build/lib/electron.ts
 @@ -107,8 +107,8 @@ export const config = {
@@ -18,6 +18,21 @@ index aadc9b5fbe7..30b4d7040c4 100644
  	darwinIcon: 'resources/darwin/code.icns',
  	darwinBundleIdentifier: product.darwinBundleIdentifier,
  	darwinApplicationCategoryType: 'public.app-category.developer-tools',
+@@ -231,7 +231,13 @@ async function main(arch: string = process.arch): Promise<void> {
+ 	const version = electronVersion;
+ 	const electronPath = path.join(root, '.build', 'electron');
+ 	const versionFile = path.join(electronPath, versionedResourcesFolder, 'version');
+-	const isUpToDate = fs.existsSync(versionFile) && fs.readFileSync(versionFile, 'utf8') === `${version}`;
++	const expectedBundlePath = process.platform === 'darwin'
++		? path.join(electronPath, `${product.nameLong}.app`)
++		: path.join(electronPath, product.applicationName);
++	const isUpToDate =
++		fs.existsSync(versionFile) &&
++		fs.readFileSync(versionFile, 'utf8') === `${version}` &&
++		fs.existsSync(expectedBundlePath);
+ 
+ 	if (!isUpToDate) {
+ 		await util.rimraf(electronPath)();
 diff --git a/resources/server/manifest.json b/resources/server/manifest.json
 index 443e3fd1cb1..b1b0936098f 100644
 --- a/resources/server/manifest.json
