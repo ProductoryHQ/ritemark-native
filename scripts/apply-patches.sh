@@ -192,4 +192,34 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
     fi
 
     echo "========================================"
+
+    echo ""
+    echo "========================================"
+    echo "Ensuring Extension Link"
+    echo "========================================"
+
+    EXTENSION_LINK="$VSCODE_DIR/extensions/ritemark"
+    EXTENSION_TARGET="../../extensions/ritemark"
+
+    mkdir -p "$VSCODE_DIR/extensions"
+
+    if [ ! -e "$EXTENSION_LINK" ]; then
+        echo -n "Creating extension symlink... "
+        ln -s "$EXTENSION_TARGET" "$EXTENSION_LINK"
+        echo -e "${GREEN}Done${NC}"
+    elif [ -L "$EXTENSION_LINK" ]; then
+        CURRENT_TARGET=$(readlink "$EXTENSION_LINK")
+        if [ "$CURRENT_TARGET" = "$EXTENSION_TARGET" ]; then
+            echo "Extension symlink already correct"
+        else
+            echo -n "Fixing extension symlink... "
+            rm "$EXTENSION_LINK"
+            ln -s "$EXTENSION_TARGET" "$EXTENSION_LINK"
+            echo -e "${GREEN}Done${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Extension path exists as directory; leaving in place${NC}"
+    fi
+
+    echo "========================================"
 fi
