@@ -18,7 +18,7 @@ index ed36151130c..48344ab7aa4 100644
  
  es6-promise/lib/**
 diff --git a/src/vs/code/electron-main/app.ts b/src/vs/code/electron-main/app.ts
-index a3efce99744..8b453c11683 100644
+index a3efce99744..232f76ea6a7 100644
 --- a/src/vs/code/electron-main/app.ts
 +++ b/src/vs/code/electron-main/app.ts
 @@ -176,6 +176,7 @@ export class CodeApplication extends Disposable {
@@ -46,29 +46,8 @@ index a3efce99744..8b453c11683 100644
  				return callback(allowedPermissionsInWebview.has(permission));
  			}
  			if (isUrlFromWindow(details.requestingUrl)) {
-@@ -557,6 +565,20 @@ export class CodeApplication extends Disposable {
- 			this.logService.error(error);
- 		}
- 
-+		// RiteMark: Request microphone permission on macOS at startup
-+		if (isMacintosh) {
-+			try {
-+				const micStatus = systemPreferences.getMediaAccessStatus('microphone');
-+				if (micStatus !== 'granted') {
-+					systemPreferences.askForMediaAccess('microphone').then(granted => {
-+						this.logService.info(`[RiteMark] Microphone access ${granted ? 'granted' : 'denied'}`);
-+					});
-+				}
-+			} catch (error) {
-+				this.logService.error('[RiteMark] Failed to request microphone access:', error);
-+			}
-+		}
-+
- 		// Main process server (electron IPC based)
- 		const mainProcessElectronServer = new ElectronIPCServer();
- 		Event.once(this.lifecycleMainService.onWillShutdown)(e => {
 diff --git a/src/vs/workbench/services/integrity/electron-browser/integrityService.ts b/src/vs/workbench/services/integrity/electron-browser/integrityService.ts
-index a2466a691d2..0cd72fa8b2f 100644
+index a2466a691d2..31aacbfa9eb 100644
 --- a/src/vs/workbench/services/integrity/electron-browser/integrityService.ts
 +++ b/src/vs/workbench/services/integrity/electron-browser/integrityService.ts
 @@ -6,14 +6,13 @@
@@ -93,11 +72,11 @@ index a2466a691d2..0cd72fa8b2f 100644
  		@INotificationService private readonly notificationService: INotificationService,
  		@IStorageService storageService: IStorageService,
 -		@ILifecycleService private readonly lifecycleService: ILifecycleService,
-+		@ILifecycleService private readonly _lifecycleService: ILifecycleService,
++		@ILifecycleService _lifecycleService: ILifecycleService,
  		@IOpenerService private readonly openerService: IOpenerService,
  		@IProductService private readonly productService: IProductService,
 -		@IChecksumService private readonly checksumService: IChecksumService,
-+		@IChecksumService private readonly _checksumService: IChecksumService,
++		@IChecksumService _checksumService: IChecksumService,
  		@ILogService private readonly logService: ILogService
  	) {
  		this.storage = new IntegrityStorage(storageService);
