@@ -127,5 +127,5 @@ index a2466a691d2..31aacbfa9eb 100644
 -		};
 +		return { isPure: true, proof: [] };
  	}
- 
+
  	private _showNotification(): void {

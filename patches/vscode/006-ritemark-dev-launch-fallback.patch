@@ -1,0 +1,70 @@
+diff --git a/scripts/code-cli.sh b/scripts/code-cli.sh
+index 220c34d1a7e..86ae2a4ad74 100755
+--- a/scripts/code-cli.sh
++++ b/scripts/code-cli.sh
+@@ -13,6 +13,9 @@ function code() {
+ 	if [[ "$OSTYPE" == "darwin"* ]]; then
+ 		NAME=`node -p "require('./product.json').nameLong"`
+ 		CODE="./.build/electron/$NAME.app/Contents/MacOS/Electron"
++		if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/Electron" ]]; then
++			CODE="./.build/electron/Code - OSS.app/Contents/MacOS/Electron"
++		fi
+ 	else
+ 		NAME=`node -p "require('./product.json').applicationName"`
+ 		CODE=".build/electron/$NAME"
+diff --git a/scripts/code.sh b/scripts/code.sh
+index 1ddbfce7d1a..fa24c4242d8 100755
+--- a/scripts/code.sh
++++ b/scripts/code.sh
+@@ -19,6 +19,9 @@ function code() {
+ 	if [[ "$OSTYPE" == "darwin"* ]]; then
+ 		NAME=`node -p "require('./product.json').nameLong"`
+ 		CODE="./.build/electron/$NAME.app/Contents/MacOS/Electron"
++		if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/Electron" ]]; then
++			CODE="./.build/electron/Code - OSS.app/Contents/MacOS/Electron"
++		fi
+ 	else
+ 		NAME=`node -p "require('./product.json').applicationName"`
+ 		CODE=".build/electron/$NAME"
+diff --git a/scripts/node-electron.sh b/scripts/node-electron.sh
+index 102fe073e4f..d6770e7dfbf 100755
+--- a/scripts/node-electron.sh
++++ b/scripts/node-electron.sh
+@@ -12,6 +12,9 @@ pushd $ROOT
+ if [[ "$OSTYPE" == "darwin"* ]]; then
+ 	NAME=`node -p "require('./product.json').nameLong"`
+ 	CODE="$ROOT/.build/electron/$NAME.app/Contents/MacOS/Electron"
++	if [[ ! -x "$CODE" && -x "$ROOT/.build/electron/Code - OSS.app/Contents/MacOS/Electron" ]]; then
++		CODE="$ROOT/.build/electron/Code - OSS.app/Contents/MacOS/Electron"
++	fi
+ else
+ 	NAME=`node -p "require('./product.json').applicationName"`
+ 	CODE="$ROOT/.build/electron/$NAME"
+diff --git a/scripts/test.sh b/scripts/test.sh
+index 9ba8dedee0f..2b8c1d96178 100755
+--- a/scripts/test.sh
++++ b/scripts/test.sh
+@@ -10,13 +10,16 @@ fi
+ 
+ cd $ROOT
+ 
+-if [[ "$OSTYPE" == "darwin"* ]]; then
+-	NAME=`node -p "require('./product.json').nameLong"`
+-	CODE="./.build/electron/$NAME.app/Contents/MacOS/Electron"
+-else
+-	NAME=`node -p "require('./product.json').applicationName"`
+-	CODE=".build/electron/$NAME"
+-fi
++	if [[ "$OSTYPE" == "darwin"* ]]; then
++		NAME=`node -p "require('./product.json').nameLong"`
++		CODE="./.build/electron/$NAME.app/Contents/MacOS/Electron"
++		if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/Electron" ]]; then
++			CODE="./.build/electron/Code - OSS.app/Contents/MacOS/Electron"
++		fi
++	else
++		NAME=`node -p "require('./product.json').applicationName"`
++		CODE=".build/electron/$NAME"
++	fi
+ 
+ VSCODECRASHDIR=$ROOT/.build/crashes
+ 
