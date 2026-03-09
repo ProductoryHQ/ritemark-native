@@ -16,3 +16,4 @@
 - removed misleading image token estimates from Codex attachment UI
 - Claude and Codex broken-install states no longer masquerade as healthy installs
 - Claude logout and auth-state propagation now stay in sync between Settings and sidebar
+- CSV editor column headers no longer block sorting with inline delete controls; destructive column actions now live behind a dedicated header action menu

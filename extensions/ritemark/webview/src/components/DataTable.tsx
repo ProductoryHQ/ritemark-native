@@ -8,7 +8,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table'
-import { ChevronUp, ChevronDown, ChevronsUpDown, Plus, Minus } from 'lucide-react'
+import { ChevronUp, ChevronDown, ChevronsUpDown, Plus, Minus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 
 export interface DataTableProps {
@@ -40,7 +40,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
   const [editingCell, setEditingCell] = useState<ActiveCell | null>(null)
   const [editValue, setEditValue] = useState('')
 
-  const [selectedColumn, setSelectedColumn] = useState<string | null>(null)
+  const [openColumnMenu, setOpenColumnMenu] = useState<string | null>(null)
   const [confirmDeleteColumn, setConfirmDeleteColumn] = useState<string | null>(null)
   const [renamingColumn, setRenamingColumn] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -266,7 +266,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
       onClick={() => {
         setSelectedRow(null)
         setConfirmDeleteRow(null)
-        setSelectedColumn(null)
+        setOpenColumnMenu(null)
         setConfirmDeleteColumn(null)
       }}
     >
@@ -284,30 +284,24 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
               {headerGroup.headers.map((header) => {
                 const colId = header.column.id
                 const isRenaming = renamingColumn === colId
-                const isColSelected = selectedColumn === colId
+                const isMenuOpen = openColumnMenu === colId
                 const isColConfirming = confirmDeleteColumn === colId
                 return (
                 <th
                   key={header.id}
-                  className="relative px-3 py-2 text-left font-semibold border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] select-none"
+                  className="group relative px-3 py-2 text-left font-semibold border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] select-none"
                   style={{ minWidth: 120, maxWidth: 400, cursor: 'pointer' }}
                   onClick={(e) => {
                     if (isRenaming) return
-                    if (isColConfirming || isColSelected) return
-                    // Toggle column selection on click when deletable
-                    if (editable && onDeleteColumn) {
-                      e.stopPropagation()
-                      setSelectedColumn(prev => prev === colId ? null : colId)
-                      setConfirmDeleteColumn(null)
-                      return
-                    }
+                    setOpenColumnMenu(null)
+                    setConfirmDeleteColumn(null)
                     header.column.getToggleSortingHandler()?.(e)
                   }}
                   onMouseDown={(e) => {
                     if (editable && onRenameColumn && e.detail >= 2) {
                       e.preventDefault()
                       e.stopPropagation()
-                      setSelectedColumn(null)
+                      setOpenColumnMenu(null)
                       setConfirmDeleteColumn(null)
                       setRenamingColumn(colId)
                       setRenameValue(colId)
@@ -339,63 +333,107 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                       onClick={(e) => e.stopPropagation()}
                       className="w-full bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-focusBorder)] rounded-sm px-1 py-0 text-sm font-semibold outline-none"
                     />
-                  ) : isColConfirming && onDeleteColumn ? (
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        className="rounded px-1 text-white"
-                        style={{ background: 'var(--vscode-errorForeground, #f44)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDeleteColumn(colId)
-                          setConfirmDeleteColumn(null)
-                          setSelectedColumn(null)
-                        }}
-                        title="Confirm delete"
-                      >
-                        Yes
-                      </button>
-                      <button
-                        className="rounded px-1"
-                        style={{ background: 'var(--vscode-button-secondaryBackground, #555)', color: 'var(--vscode-button-secondaryForeground, #fff)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setConfirmDeleteColumn(null)
-                          setSelectedColumn(null)
-                        }}
-                        title="Cancel"
-                      >
-                        No
-                      </button>
-                    </div>
-                  ) : isColSelected && onDeleteColumn ? (
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="truncate">{colId}</span>
-                      <div
-                        className="flex items-center justify-center rounded-full flex-shrink-0"
-                        style={{ width: 20, height: 20, background: 'var(--vscode-errorForeground, #f44)', cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setConfirmDeleteColumn(colId)
-                        }}
-                        title="Delete column"
-                      >
-                        <Minus size={12} className="text-white" />
-                      </div>
-                    </div>
                   ) : (
-                  <div className="flex items-center gap-1">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1">
+                      <span className="truncate">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </span>
+                      {header.column.getIsSorted() === 'asc' ? (
+                        <ChevronUp size={14} className="text-[var(--vscode-descriptionForeground)] flex-shrink-0" />
+                      ) : header.column.getIsSorted() === 'desc' ? (
+                        <ChevronDown size={14} className="text-[var(--vscode-descriptionForeground)] flex-shrink-0" />
+                      ) : (
+                        <ChevronsUpDown size={14} className="text-[var(--vscode-descriptionForeground)] opacity-30 flex-shrink-0" />
+                      )}
+                    </div>
+
+                    {editable && (onRenameColumn || onDeleteColumn) && (
+                      <div className="relative flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setConfirmDeleteColumn(null)
+                            setOpenColumnMenu((prev) => prev === colId ? null : colId)
+                          }}
+                          className={`inline-flex h-6 w-6 items-center justify-center rounded-sm text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)] ${
+                            isMenuOpen ? 'opacity-100 bg-[var(--vscode-toolbar-hoverBackground)]' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
+                          }`}
+                          title="Column actions"
+                        >
+                          <MoreHorizontal size={14} />
+                        </button>
+
+                        {isMenuOpen && (
+                          <div
+                            className="absolute right-0 top-full z-30 mt-1 min-w-[148px] overflow-hidden rounded-md border border-[var(--vscode-widget-border,var(--vscode-panel-border))] bg-[var(--vscode-menu-background,var(--vscode-editor-background))] shadow-lg"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {isColConfirming && onDeleteColumn ? (
+                              <div className="p-2">
+                                <div className="mb-2 text-xs text-[var(--vscode-descriptionForeground)]">
+                                  Delete this column?
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="rounded px-2 py-1 text-xs text-white"
+                                    style={{ background: 'var(--vscode-errorForeground, #f44)', border: 'none', cursor: 'pointer' }}
+                                    onClick={() => {
+                                      onDeleteColumn(colId)
+                                      setConfirmDeleteColumn(null)
+                                      setOpenColumnMenu(null)
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded px-2 py-1 text-xs"
+                                    style={{ background: 'var(--vscode-button-secondaryBackground, #555)', color: 'var(--vscode-button-secondaryForeground, #fff)', border: 'none', cursor: 'pointer' }}
+                                    onClick={() => setConfirmDeleteColumn(null)}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="py-1">
+                                {onRenameColumn && (
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--vscode-foreground)] hover:bg-[var(--vscode-list-hoverBackground)]"
+                                    onClick={() => {
+                                      setOpenColumnMenu(null)
+                                      setRenamingColumn(colId)
+                                      setRenameValue(colId)
+                                    }}
+                                  >
+                                    <Pencil size={14} />
+                                    Rename
+                                  </button>
+                                )}
+                                {onDeleteColumn && (
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--vscode-errorForeground,var(--vscode-foreground))] hover:bg-[var(--vscode-list-hoverBackground)]"
+                                    onClick={() => setConfirmDeleteColumn(colId)}
+                                  >
+                                    <Trash2 size={14} />
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
-                    {header.column.getIsSorted() === 'asc' ? (
-                      <ChevronUp size={14} className="text-[var(--vscode-descriptionForeground)] flex-shrink-0" />
-                    ) : header.column.getIsSorted() === 'desc' ? (
-                      <ChevronDown size={14} className="text-[var(--vscode-descriptionForeground)] flex-shrink-0" />
-                    ) : (
-                      <ChevronsUpDown size={14} className="text-[var(--vscode-descriptionForeground)] opacity-30 flex-shrink-0" />
+                      </div>
                     )}
                   </div>
                   )}
