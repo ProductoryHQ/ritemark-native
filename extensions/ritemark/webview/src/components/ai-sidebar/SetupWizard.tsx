@@ -1,197 +1,195 @@
-/**
- * SetupWizard — Guides users through installing Claude Code CLI and signing in.
- *
- * Shown when Claude Code agent is selected but the CLI is not installed
- * or not authenticated. Follows the layout pattern from NoApiKey.tsx.
- */
-
-import { Bot, Check, Circle, Loader2, ExternalLink, Terminal, Key, RefreshCw } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, Key, Loader2, LogIn, RefreshCw, Wrench } from 'lucide-react';
 import { useAISidebarStore } from './store';
-
-function ChecklistItem({
-  label,
-  detail,
-  status,
-}: {
-  label: string;
-  detail?: string;
-  status: 'done' | 'inProgress' | 'pending';
-}) {
-  return (
-    <div className="flex items-start gap-2.5 text-xs">
-      <div className="mt-0.5">
-        {status === 'done' && (
-          <Check size={14} className="text-green-400 shrink-0" />
-        )}
-        {status === 'inProgress' && (
-          <Loader2 size={14} className="animate-spin opacity-70 shrink-0" />
-        )}
-        {status === 'pending' && (
-          <Circle size={14} className="opacity-30 shrink-0" />
-        )}
-      </div>
-      <div>
-        <span className={status === 'done' ? 'line-through opacity-50' : ''}>
-          {label}
-        </span>
-        {detail && status !== 'done' && (
-          <div className="text-[10px] opacity-50 mt-0.5">{detail}</div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export function SetupWizard() {
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
   const setupInProgress = useAISidebarStore((s) => s.setupInProgress);
   const setupError = useAISidebarStore((s) => s.setupError);
+  const isOnline = useAISidebarStore((s) => s.isOnline);
   const startInstall = useAISidebarStore((s) => s.startInstall);
   const startLogin = useAISidebarStore((s) => s.startLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
-  const recheckSetup = useAISidebarStore((s) => s.recheckSetup);
   const configureApiKey = useAISidebarStore((s) => s.configureApiKey);
+  const reloadWindow = useAISidebarStore((s) => s.reloadWindow);
   const dismissWelcome = useAISidebarStore((s) => s.dismissWelcome);
 
   if (!setupStatus) return null;
 
-  const { cliInstalled, authenticated } = setupStatus;
-  const needsInstall = !cliInstalled;
-  const needsAuth = cliInstalled && !authenticated;
+  const isBroken = setupStatus.state === 'broken-install';
+  const needsInstall = setupStatus.state === 'not-installed';
+  const needsAuth = setupStatus.state === 'needs-auth';
+  const loginInProgress = setupStatus.state === 'auth-in-progress';
+  const isReady = setupStatus.state === 'ready';
+  const offlineBlocked = !isOnline && (needsAuth || loginInProgress);
 
-  // Determine checklist item statuses
-  const installStatus = cliInstalled
-    ? 'done'
-    : setupInProgress && needsInstall
-      ? 'inProgress'
-      : 'pending';
+  const title = needsInstall
+    ? 'Install Claude'
+    : isBroken
+      ? setupStatus.repairAction === 'reload'
+        ? 'Reload to finish Claude setup'
+        : 'Claude needs repair'
+      : loginInProgress
+        ? 'Finish sign-in in your browser'
+        : isReady
+          ? 'Claude is ready'
+          : offlineBlocked
+            ? 'Connect to the internet'
+            : 'Sign in with Claude.ai';
 
-  const authStatus = authenticated
-    ? 'done'
-    : setupInProgress && needsAuth
-      ? 'inProgress'
-      : cliInstalled
-        ? 'pending'
-        : 'pending';
+  const description = needsInstall
+    ? 'Install Claude to use file-aware agent mode in Ritemark.'
+    : isBroken
+      ? setupStatus.error ?? 'Claude was found, but it could not start correctly.'
+      : loginInProgress
+        ? 'Your terminal and browser were opened for Claude.ai sign-in. Ritemark will update automatically when sign-in completes.'
+        : isReady
+          ? 'Claude can now work with your files in this workspace.'
+          : offlineBlocked
+            ? 'Claude sign-in needs an internet connection.'
+            : 'To use Claude in Ritemark, sign in with Claude.ai or use an Anthropic API key.';
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-5 text-center">
-      {/* Icon */}
-      <div className="w-10 h-10 rounded-full bg-[var(--vscode-input-background)] flex items-center justify-center mb-3">
-        <Bot size={18} className="opacity-60" />
-      </div>
+    <div className="flex-1 overflow-y-auto px-3 py-4">
+      <div className="rounded-xl border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 shrink-0">
+            {setupInProgress && (needsInstall || isBroken) ? (
+              <Loader2 className="h-5 w-5 animate-spin opacity-60" />
+            ) : isBroken ? (
+              <AlertTriangle className="h-5 w-5 text-[var(--vscode-testing-iconFailed)]" />
+            ) : loginInProgress ? (
+              <Loader2 className="h-5 w-5 animate-spin text-[var(--vscode-textLink-foreground)]" />
+            ) : isReady ? (
+              <CheckCircle2 className="h-5 w-5 text-[var(--vscode-testing-iconPassed)]" />
+            ) : needsAuth ? (
+              <LogIn className="h-5 w-5 text-[var(--vscode-textLink-foreground)]" />
+            ) : (
+              <Wrench className="h-5 w-5 text-[var(--vscode-textLink-foreground)]" />
+            )}
+          </div>
 
-      {/* Title + description */}
-      <h3 className="text-[13px] font-medium mb-1.5">Set up Claude Code</h3>
-      <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-4 max-w-[220px]">
-        {needsInstall
-          ? "Claude Code helps you read, write and organize files. We'll install it for you in a few seconds."
-          : needsAuth
-            ? 'Claude Code is installed. Sign in to start using it.'
-            : 'All set! Claude Code is ready to use.'}
-      </p>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">{title}</div>
+            <p className="mt-1 text-xs leading-5 opacity-75">{description}</p>
 
-      {/* Checklist */}
-      <div className="flex flex-col gap-2 mb-4 text-left w-full max-w-[240px]">
-        <ChecklistItem
-          label="Claude Code CLI"
-          detail={cliInstalled ? undefined : 'Auto-installs in ~30 seconds'}
-          status={installStatus}
-        />
-        <ChecklistItem
-          label="Authentication"
-          detail={authenticated ? undefined : 'Sign in or use an API key'}
-          status={authStatus}
-        />
-      </div>
+            {setupError && (
+              <div className="mt-3 rounded-lg border border-[var(--vscode-inputValidation-errorBorder)]/40 bg-[var(--vscode-inputValidation-errorBackground)]/20 px-3 py-2 text-xs leading-5 text-[var(--vscode-errorForeground)] break-words">
+                {setupError}
+              </div>
+            )}
 
-      {/* Error message */}
-      {setupError && (
-        <div className="mb-3 px-3 py-2 rounded text-xs bg-[var(--vscode-inputValidation-errorBackground)] text-[var(--vscode-inputValidation-errorForeground)] max-w-[260px]">
-          {setupError}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {needsInstall && (
+                <PrimaryButton onClick={startInstall} disabled={setupInProgress}>
+                  {setupInProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+                  Install Claude
+                </PrimaryButton>
+              )}
+
+              {isBroken && setupStatus.repairAction !== 'reload' && (
+                <PrimaryButton onClick={startInstall} disabled={setupInProgress}>
+                  {setupInProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+                  Repair Claude
+                </PrimaryButton>
+              )}
+
+              {setupStatus.repairAction === 'reload' && (
+                <PrimaryButton onClick={reloadWindow}>
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Reload Window
+                </PrimaryButton>
+              )}
+
+              {needsAuth && (
+                <PrimaryButton onClick={startLogin} disabled={offlineBlocked}>
+                  <LogIn className="h-3.5 w-3.5" />
+                  Sign in with Claude.ai
+                </PrimaryButton>
+              )}
+
+              {needsAuth && (
+                <SecondaryButton onClick={openApiKeySettings}>
+                  <Key className="h-3.5 w-3.5" />
+                  Use API key instead
+                </SecondaryButton>
+              )}
+
+              {isReady && (
+                <PrimaryButton onClick={dismissWelcome}>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Get Started
+                </PrimaryButton>
+              )}
+            </div>
+
+            {(needsInstall || needsAuth) && (
+              <button
+                onClick={configureApiKey}
+                className="mt-3 text-xs text-[var(--vscode-textLink-foreground)] hover:underline"
+              >
+                Prefer using an Anthropic API key?
+              </button>
+            )}
+
+            {(setupStatus.binaryPath || setupStatus.cliVersion || setupStatus.diagnostics.length > 0) && (
+              <details className="mt-4">
+                <summary className="cursor-pointer list-none text-xs font-medium text-[var(--vscode-textLink-foreground)] hover:underline">
+                  Technical details
+                </summary>
+                <div className="mt-2 space-y-1.5 text-xs leading-5 opacity-75">
+                  {setupStatus.cliVersion && <div>Version: {setupStatus.cliVersion}</div>}
+                  {setupStatus.binaryPath && <div className="break-all">Binary: {setupStatus.binaryPath}</div>}
+                  {setupStatus.authMethod === 'api-key' && <div>Auth: Anthropic API key</div>}
+                  {setupStatus.authMethod === 'claude-oauth' && <div>Auth: Claude.ai</div>}
+                  {setupStatus.diagnostics.map((line) => (
+                    <div key={line} className="break-words">
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
         </div>
-      )}
-
-      {/* Install button — only when CLI is missing */}
-      {needsInstall && (
-        <button
-          onClick={startInstall}
-          disabled={setupInProgress}
-          className="px-4 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-        >
-          {setupInProgress ? (
-            <>
-              <Loader2 size={12} className="animate-spin" />
-              Installing...
-            </>
-          ) : (
-            'Install Claude Code'
-          )}
-        </button>
-      )}
-
-      {/* Auth buttons — when CLI is installed but no auth */}
-      {needsAuth && !setupInProgress && (
-        <div className="flex flex-col gap-2 w-full max-w-[220px]">
-          {/* Primary: Open terminal for OAuth login */}
-          <button
-            onClick={startLogin}
-            className="w-full px-4 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] flex items-center justify-center gap-1.5"
-          >
-            <Terminal size={12} />
-            Sign in with Claude.ai
-          </button>
-
-          {/* Secondary: Open settings for API key */}
-          <button
-            onClick={openApiKeySettings}
-            className="w-full px-4 py-1.5 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] flex items-center justify-center gap-1.5"
-          >
-            <Key size={12} />
-            Use API key instead
-          </button>
-
-          {/* Recheck button */}
-          <button
-            onClick={recheckSetup}
-            className="mt-1 text-[11px] text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-textLink-foreground)] flex items-center justify-center gap-1"
-          >
-            <RefreshCw size={10} />
-            Recheck status
-          </button>
-        </div>
-      )}
-
-      {/* Retry after error */}
-      {setupError && !setupInProgress && needsInstall && (
-        <button
-          onClick={recheckSetup}
-          className="mt-2 text-xs text-[var(--vscode-textLink-foreground)] hover:underline"
-        >
-          Retry
-        </button>
-      )}
-
-      {/* Ready state — everything is configured */}
-      {!needsInstall && !needsAuth && (
-        <button
-          onClick={dismissWelcome}
-          className="px-5 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] flex items-center gap-1.5"
-        >
-          Get Started
-        </button>
-      )}
-
-      {/* API key fallback (visible during install phase) */}
-      {needsInstall && !setupInProgress && (
-        <button
-          onClick={configureApiKey}
-          className="mt-4 text-[11px] text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-textLink-foreground)] flex items-center gap-1"
-        >
-          Have an API key? Use key instead
-          <ExternalLink size={10} />
-        </button>
-      )}
+      </div>
     </div>
+  );
+}
+
+function PrimaryButton({
+  children,
+  onClick,
+  disabled = false,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-2 rounded-md bg-[var(--vscode-button-background)] px-3 py-2 text-xs font-medium text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+function SecondaryButton({
+  children,
+  onClick,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-2 rounded-md bg-[var(--vscode-button-secondaryBackground)] px-3 py-2 text-xs font-medium text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+    >
+      {children}
+    </button>
   );
 }

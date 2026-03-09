@@ -7,8 +7,22 @@
  */
 
 export { runAgent, AgentSession } from './AgentRunner';
-export { getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth } from './setup';
-export { installClaude, openClaudeLoginTerminal, openAnthropicKeySettings } from './installer';
+export {
+  getSetupStatus,
+  clearSetupCache,
+  setAnthropicKeyAvailable,
+  hasCliOAuth,
+  setClaudeLoginInProgress,
+  setClaudePendingReload,
+  clearClaudePendingReload,
+} from './setup';
+export { installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude } from './installer';
+export {
+  emitClaudeStatusInvalidated,
+  onClaudeStatusInvalidated,
+  type ClaudeStatusInvalidationReason,
+  type ClaudeStatusInvalidationEvent,
+} from './claudeStatusEvents';
 export { AGENTS, CLAUDE_MODELS, CODEX_MODELS, DEFAULT_MODEL } from './types';
 export { CLAUDE_FALLBACK_MODELS } from './claudeModels';
 export type {
@@ -28,4 +42,8 @@ export type {
   AttachmentKind,
   SetupStatus,
   InstallProgress,
+  ClaudeInstallResult,
+  ClaudeAuthMethod,
+  ClaudeSetupState,
+  ClaudeRepairAction,
 } from './types';

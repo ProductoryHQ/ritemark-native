@@ -6,9 +6,23 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { getAssistantModels, DEFAULT_MODELS } from '../ai/modelConfig';
 import { isEnabled } from '../features/featureGate';
-import { CodexAppServer, CodexAuth } from '../codex';
+import { CodexAppServer, CodexAuth, emitCodexStatusInvalidated } from '../codex';
+import { UpdateService } from '../update';
+import { AVAILABLE_MODELS, getModelPath, isModelDownloaded } from '../voiceDictation/modelManager';
+import {
+  getSetupStatus,
+  installClaude,
+  openClaudeLoginTerminal,
+  logoutClaude,
+  emitClaudeStatusInvalidated,
+  onClaudeStatusInvalidated,
+  setAnthropicKeyAvailable,
+  setClaudeLoginInProgress,
+} from '../agent';
+import { CodexManager } from '../codex/codexManager';
 
 export class RitemarkSettingsProvider {
   public static readonly viewType = 'ritemark.settings';
@@ -16,8 +30,13 @@ export class RitemarkSettingsProvider {
   private static panel: vscode.WebviewPanel | undefined;
   private codexAppServer: CodexAppServer | null = null;
   private codexAuth: CodexAuth | null = null;
+  private disposeClaudeStatusListener: (() => void) | null = null;
+  private claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly updateService: UpdateService
+  ) {
     // Initialize Codex integration if feature is enabled
     if (isEnabled('codex-integration')) {
       this.codexAppServer = new CodexAppServer();
@@ -29,7 +48,24 @@ export class RitemarkSettingsProvider {
           this.sendCodexAuthStatus(RitemarkSettingsProvider.panel.webview);
         }
       });
+      this.codexAuth.on('loginComplete', (event: { success: boolean }) => {
+        if (event.success) {
+          emitCodexStatusInvalidated('login-finished');
+        }
+      });
     }
+
+    this.disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
+      if (event.reason === 'login-started') {
+        this.startClaudeLoginPolling();
+      } else if (event.reason === 'login-finished' || event.reason === 'install-finished' || event.reason === 'settings-updated') {
+        this.stopClaudeLoginPolling();
+      }
+      const panel = RitemarkSettingsProvider.panel;
+      if (panel) {
+        void this.sendCurrentSettings(panel.webview);
+      }
+    });
   }
 
   /**
@@ -77,6 +113,7 @@ export class RitemarkSettingsProvider {
     // Clean up on close
     panel.onDidDispose(() => {
       RitemarkSettingsProvider.panel = undefined;
+      this.stopClaudeLoginPolling();
     });
 
     // Send initial data
@@ -114,6 +151,10 @@ export class RitemarkSettingsProvider {
           } else {
             await this.context.secrets.delete(message.key);
           }
+          if (message.key === 'anthropic-api-key') {
+            setAnthropicKeyAvailable(Boolean(message.value.trim()));
+            emitClaudeStatusInvalidated('settings-updated');
+          }
           // Send updated settings back
           await this.sendCurrentSettings(webview);
 
@@ -137,6 +178,28 @@ export class RitemarkSettingsProvider {
         }
         break;
 
+      case 'claude:install':
+      case 'claude:repair':
+        await this.installClaudeFromSettings(webview);
+        break;
+
+      case 'claude:login':
+        await this.startClaudeLogin(webview);
+        break;
+
+      case 'claude:logout':
+        await this.logoutClaudeFromSettings(webview);
+        break;
+
+      case 'claude:reload':
+        await vscode.commands.executeCommand('workbench.action.reloadWindow');
+        break;
+
+      case 'claude:refreshStatus':
+        emitClaudeStatusInvalidated('status-refresh');
+        await this.sendCurrentSettings(webview);
+        break;
+
       case 'codex:startLogin':
         // Start Codex ChatGPT OAuth login
         await this.startCodexLogin(webview);
@@ -149,7 +212,42 @@ export class RitemarkSettingsProvider {
 
       case 'codex:refreshStatus':
         // Refresh Codex auth status
+        emitCodexStatusInvalidated('status-refresh');
         await this.sendCodexAuthStatus(webview);
+        break;
+
+      case 'codex:repair':
+        await this.openCodexRepairTerminal();
+        await this.sendCurrentSettings(webview);
+        break;
+
+      case 'updates:checkNow':
+        await this.updateService.checkForUpdates({ manual: true, notify: false });
+        await this.sendCurrentSettings(webview);
+        break;
+
+      case 'updates:install':
+        await this.updateService.installResolvedUpdate();
+        await this.sendCurrentSettings(webview);
+        break;
+
+      case 'updates:skipVersion':
+        await this.updateService.skipResolvedUpdate();
+        await this.sendCurrentSettings(webview);
+        break;
+
+      case 'updates:pause':
+        await this.updateService.pauseNotifications();
+        await this.sendCurrentSettings(webview);
+        break;
+
+      case 'updates:resume':
+        await this.updateService.resumeNotifications();
+        await this.sendCurrentSettings(webview);
+        break;
+
+      case 'updates:reload':
+        await vscode.commands.executeCommand('workbench.action.reloadWindow');
         break;
     }
   }
@@ -173,6 +271,63 @@ export class RitemarkSettingsProvider {
       api: m.api,
     }));
 
+    const initialUpdateSnapshot = await this.updateService.getStatusSnapshot();
+    const updateCenterPromise = initialUpdateSnapshot.lastCheckedAt === 0
+      ? this.updateService.checkForUpdates({ manual: false, notify: false })
+      : Promise.resolve(initialUpdateSnapshot);
+
+    const [updateCenterResult, componentStatusResult] = await Promise.allSettled([
+      updateCenterPromise,
+      this.getComponentStatus()
+    ]);
+
+    const updateCenter = updateCenterResult.status === 'fulfilled'
+      ? updateCenterResult.value
+      : {
+          ...initialUpdateSnapshot,
+          state: 'error' as const,
+          error: updateCenterResult.reason instanceof Error
+            ? updateCenterResult.reason.message
+            : 'Unknown update status error',
+        };
+
+    const componentStatus = componentStatusResult.status === 'fulfilled'
+      ? componentStatusResult.value
+      : {
+          voiceModel: {
+            installed: false,
+            modelName: 'large-v3-turbo',
+            filename: 'ggml-large-v3-turbo.bin',
+            managedBy: 'ritemark' as const,
+            sizeBytes: 0,
+            sizeDisplay: 'Unknown',
+          },
+          claudeCode: {
+            installed: false,
+            runnable: false,
+            authenticated: false,
+            version: null,
+            binaryPath: null,
+            authMethod: null,
+            managedBy: 'user' as const,
+            state: 'not-installed' as const,
+            error: null,
+            diagnostics: [],
+            repairAction: 'install' as const,
+          },
+          codex: {
+            installed: false,
+            version: null,
+            managedBy: 'user' as const,
+            state: 'broken' as const,
+            error: componentStatusResult.reason instanceof Error
+              ? componentStatusResult.reason.message
+              : 'Failed to inspect component status',
+            diagnostics: [],
+            repairCommand: null,
+          },
+        };
+
     webview.postMessage({
       type: 'settings',
       data: {
@@ -183,6 +338,7 @@ export class RitemarkSettingsProvider {
 
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
+        updateCenter,
 
         // AI Model
         aiModel: config.get('ai.model', DEFAULT_MODELS.assistant),
@@ -201,11 +357,194 @@ export class RitemarkSettingsProvider {
         googleKeyConfigured: !!googleKey,
         anthropicKey: anthropicKey || '',
         anthropicKeyConfigured: !!anthropicKey,
+
+        // Update-adjacent components
+        componentStatus,
       },
     });
 
     // Also send Codex auth status
-    await this.sendCodexAuthStatus(webview);
+    void this.sendCodexAuthStatus(webview);
+  }
+
+  private async getComponentStatus(): Promise<{
+    voiceModel: {
+      installed: boolean;
+      modelName: string;
+      filename: string;
+      managedBy: 'ritemark';
+      sizeBytes: number;
+      sizeDisplay: string;
+    };
+    claudeCode: {
+      installed: boolean;
+      runnable: boolean;
+      authenticated: boolean;
+      version: string | null;
+      binaryPath: string | null;
+      authMethod: 'claude-oauth' | 'api-key' | null;
+      managedBy: 'user';
+      state: 'ready' | 'needs-auth' | 'auth-in-progress' | 'not-installed' | 'broken';
+      error: string | null;
+      diagnostics: string[];
+      repairAction: 'install' | 'repair' | 'reload' | null;
+    };
+    codex: {
+      installed: boolean;
+      version: string | null;
+      managedBy: 'user';
+      state: 'ready' | 'broken' | 'not-installed';
+      error: string | null;
+      diagnostics: string[];
+      repairCommand: string | null;
+    };
+  }> {
+    const defaultModelFile = 'ggml-large-v3-turbo.bin';
+    const modelInfo = AVAILABLE_MODELS[defaultModelFile];
+    const modelPath = getModelPath(defaultModelFile);
+    const voiceInstalled = isModelDownloaded(defaultModelFile);
+    const sizeBytes = voiceInstalled && fs.existsSync(modelPath) ? fs.statSync(modelPath).size : 0;
+
+    const anthropicKey = await this.context.secrets.get('anthropic-api-key');
+    setAnthropicKeyAvailable(Boolean(anthropicKey));
+    const claudeStatus = await getSetupStatus();
+
+    const codexManager = new CodexManager();
+    const codexStatus = await codexManager.getBinaryStatus();
+
+    return {
+      voiceModel: {
+        installed: voiceInstalled,
+        modelName: modelInfo?.name ?? 'large-v3-turbo',
+        filename: defaultModelFile,
+        managedBy: 'ritemark',
+        sizeBytes,
+        sizeDisplay: voiceInstalled
+          ? this.formatBytes(sizeBytes)
+          : (modelInfo?.sizeDisplay ?? 'Unknown')
+      },
+      claudeCode: {
+        installed: claudeStatus.cliInstalled,
+        runnable: claudeStatus.runnable,
+        authenticated: claudeStatus.authenticated,
+        version: claudeStatus.cliVersion ?? null,
+        binaryPath: claudeStatus.binaryPath ?? null,
+        authMethod: claudeStatus.authMethod,
+        managedBy: 'user',
+        state: claudeStatus.state === 'broken-install'
+          ? 'broken'
+          : claudeStatus.state,
+        error: claudeStatus.error,
+        diagnostics: claudeStatus.diagnostics,
+        repairAction: claudeStatus.repairAction,
+      },
+      codex: {
+        installed: codexStatus.available,
+        version: codexStatus.version,
+        managedBy: 'user',
+        state: !codexStatus.available
+          ? 'not-installed'
+          : codexStatus.runnable
+            ? 'ready'
+            : 'broken',
+        error: codexStatus.runnable ? null : codexStatus.error,
+        diagnostics: codexStatus.diagnostics,
+        repairCommand: codexStatus.repairCommand,
+      }
+    };
+  }
+
+  private async installClaudeFromSettings(webview: vscode.Webview): Promise<void> {
+    emitClaudeStatusInvalidated('install-started');
+    const result = await installClaude(() => {});
+    await getSetupStatus({ refresh: true });
+
+    if (!result.success) {
+      vscode.window.showErrorMessage(result.error || 'Claude install failed.');
+    } else if (result.outcome === 'installed_needs_reload') {
+      vscode.window.showInformationMessage('Claude was installed. Reload the window to finish setup.');
+    } else if (result.outcome === 'installed') {
+      vscode.window.showInformationMessage('Claude is installed.');
+    }
+
+    emitClaudeStatusInvalidated('install-finished');
+    await this.sendCurrentSettings(webview);
+  }
+
+  private async startClaudeLogin(webview: vscode.Webview): Promise<void> {
+    const status = await getSetupStatus({ refresh: true });
+    if (!status.runnable || !status.binaryPath || status.state === 'not-installed' || status.state === 'broken-install') {
+      vscode.window.showErrorMessage(status.error || 'Claude is not ready yet. Install or repair it first.');
+      await this.sendCurrentSettings(webview);
+      return;
+    }
+
+    setClaudeLoginInProgress(true);
+    emitClaudeStatusInvalidated('login-started');
+    this.startClaudeLoginPolling();
+    openClaudeLoginTerminal(status.binaryPath);
+    vscode.window.showInformationMessage('Finish Claude.ai sign-in in the terminal and browser. Ritemark will refresh automatically.');
+    await this.sendCurrentSettings(webview);
+  }
+
+  private async logoutClaudeFromSettings(webview: vscode.Webview): Promise<void> {
+    const status = await getSetupStatus({ refresh: true });
+    if (status.authMethod !== 'claude-oauth' || !status.binaryPath) {
+      vscode.window.showWarningMessage('Claude.ai sign-out is only available when Claude CLI OAuth is active.');
+      await this.sendCurrentSettings(webview);
+      return;
+    }
+
+    try {
+      await logoutClaude(status.binaryPath);
+      setClaudeLoginInProgress(false);
+      emitClaudeStatusInvalidated('settings-updated');
+      vscode.window.showInformationMessage('Signed out from Claude.ai.');
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Claude sign-out failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    await this.sendCurrentSettings(webview);
+  }
+
+  private stopClaudeLoginPolling(): void {
+    if (this.claudeLoginPoll) {
+      clearInterval(this.claudeLoginPoll);
+      this.claudeLoginPoll = null;
+    }
+  }
+
+  private startClaudeLoginPolling(): void {
+    this.stopClaudeLoginPolling();
+
+    let attempts = 0;
+    this.claudeLoginPoll = setInterval(() => {
+      attempts += 1;
+      void (async () => {
+        const status = await getSetupStatus({ refresh: true });
+        const panel = RitemarkSettingsProvider.panel;
+        if (panel) {
+          await this.sendCurrentSettings(panel.webview);
+        }
+
+        if (status.state === 'ready') {
+          setClaudeLoginInProgress(false);
+          this.stopClaudeLoginPolling();
+          emitClaudeStatusInvalidated('login-finished');
+          return;
+        }
+
+        if (attempts >= 60) {
+          setClaudeLoginInProgress(false);
+          this.stopClaudeLoginPolling();
+          if (panel) {
+            await this.sendCurrentSettings(panel.webview);
+          }
+        }
+      })();
+    }, 2000);
   }
 
   /**
@@ -324,7 +663,7 @@ export class RitemarkSettingsProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:; connect-src https://api.openai.com https://api.anthropic.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource} data:; img-src ${webview.cspSource} data:; connect-src https://api.openai.com https://api.anthropic.com;">
   <title>Ritemark Settings</title>
   <style>
     * {
@@ -368,9 +707,11 @@ export class RitemarkSettingsProvider {
       webview.postMessage({
         type: 'codex:loginStarting',
       });
+      emitCodexStatusInvalidated('login-started');
 
-      // Start OAuth flow (opens browser)
-      await this.codexAuth.startLogin();
+      // Start OAuth flow and open the returned authorization URL.
+      const login = await this.codexAuth.startLogin();
+      await vscode.env.openExternal(vscode.Uri.parse(login.authUrl));
 
       // OAuth is async - status will be updated via 'statusChanged' event
       vscode.window.showInformationMessage(
@@ -400,12 +741,32 @@ export class RitemarkSettingsProvider {
 
     try {
       await this.codexAuth.logout();
+      emitCodexStatusInvalidated('logout');
       await this.sendCodexAuthStatus(webview);
       vscode.window.showInformationMessage('Signed out from ChatGPT');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       vscode.window.showErrorMessage(`Logout failed: ${errorMessage}`);
     }
+  }
+
+  private async openCodexRepairTerminal(): Promise<void> {
+    const codexManager = new CodexManager();
+    const status = await codexManager.getBinaryStatus();
+    const command = status.repairCommand ?? 'npm install -g @openai/codex@latest';
+
+    const terminal = vscode.window.createTerminal({
+      name: 'Codex Repair',
+      shellPath: process.platform === 'win32' ? 'powershell.exe' : undefined,
+    });
+
+    terminal.show();
+    terminal.sendText(command);
+    emitCodexStatusInvalidated('repair-started');
+
+    vscode.window.showInformationMessage(
+      'Opened Codex repair in terminal. After it finishes, reload the window and reopen Settings.'
+    );
   }
 
   /**
@@ -422,11 +783,27 @@ export class RitemarkSettingsProvider {
     }
 
     // Pre-flight: check if codex binary is installed
-    const binaryInstalled = this.codexAppServer
-      ? await new (await import('../codex/codexManager')).CodexManager().isInstalled()
-      : false;
+    const codexManager = this.codexAppServer
+      ? new (await import('../codex/codexManager')).CodexManager()
+      : null;
+    const binaryStatus = codexManager
+      ? await codexManager.getBinaryStatus()
+      : {
+          available: false,
+          runnable: false,
+          version: null,
+          error: null,
+          binaryPath: null,
+          installNodeVersion: null,
+          runtimeNodeVersion: process.version.replace(/^v/, ''),
+          diagnostics: [],
+          repairCommand: null,
+          installNodeArch: null,
+          runtimeNodeArch: process.arch,
+          machineArch: process.arch,
+        };
 
-    if (!binaryInstalled) {
+    if (!binaryStatus.available) {
       webview.postMessage({
         type: 'codex:authStatus',
         data: {
@@ -434,6 +811,23 @@ export class RitemarkSettingsProvider {
           authenticated: false,
           binaryMissing: true,
           error: 'Codex CLI not found. Install with: npm install -g @openai/codex',
+          diagnostics: binaryStatus.diagnostics,
+          repairCommand: binaryStatus.repairCommand,
+        },
+      });
+      return;
+    }
+
+    if (!binaryStatus.runnable) {
+      webview.postMessage({
+        type: 'codex:authStatus',
+        data: {
+          enabled: true,
+          authenticated: false,
+          binaryBroken: true,
+          error: binaryStatus.error ?? 'Codex CLI is installed but could not be started.',
+          diagnostics: binaryStatus.diagnostics,
+          repairCommand: binaryStatus.repairCommand,
         },
       });
       return;
@@ -445,8 +839,10 @@ export class RitemarkSettingsProvider {
         type: 'codex:authStatus',
         data: {
           enabled: true,
-          authenticated: status.authMethod !== null,
+          authenticated: status.authenticated,
           authMethod: status.authMethod,
+          email: status.email,
+          plan: status.plan,
         },
       });
     } catch (error) {
@@ -480,5 +876,18 @@ export class RitemarkSettingsProvider {
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
+  }
+
+  private formatBytes(bytes: number): string {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
   }
 }

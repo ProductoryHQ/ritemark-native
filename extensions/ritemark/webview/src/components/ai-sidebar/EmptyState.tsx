@@ -26,7 +26,7 @@ export function EmptyState({ variant, onPrompt }: EmptyStateProps) {
   const Icon = variant === 'agent' ? Bot : MessageSquare;
   const title =
     variant === 'agent'
-      ? 'Claude Code can work with your files'
+      ? 'Claude can work with your files'
       : 'Ask about your documents or edit text';
 
   return (

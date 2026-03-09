@@ -34,7 +34,7 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
   },
   'claude-code': {
     id: 'claude-code',
-    label: 'Claude Code',
+    label: 'Claude',
     description: 'Autonomous agent that can read, write, and organize your files',
     experimental: false,
     requiresApiKey: 'anthropic',
@@ -49,7 +49,7 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
 };
 
 /**
- * Available models for Claude Code agent
+ * Available models for Claude agent
  */
 export interface ModelOption {
   id: string;
@@ -127,16 +127,37 @@ export interface AgentResult {
 }
 
 /**
- * Setup status for Claude Code CLI
+ * Setup status for Claude bootstrap/auth state
  */
+export type ClaudeAuthMethod = 'claude-oauth' | 'api-key' | null;
+export type ClaudeSetupState = 'not-installed' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
+export type ClaudeRepairAction = 'install' | 'repair' | 'reload' | null;
+
 export interface SetupStatus {
   cliInstalled: boolean;
+  runnable: boolean;
   cliVersion?: string;
+  binaryPath?: string;
   authenticated: boolean;
+  authMethod: ClaudeAuthMethod;
+  state: ClaudeSetupState;
+  diagnostics: string[];
+  repairAction: ClaudeRepairAction;
+  error: string | null;
 }
 
 /**
- * Progress events during Claude Code installation/login
+ * Result of Claude installation / repair attempt
+ */
+export interface ClaudeInstallResult {
+  success: boolean;
+  outcome: 'installed' | 'installed_needs_reload' | 'verification_failed' | 'install_failed';
+  error?: string;
+  diagnostics?: string[];
+}
+
+/**
+ * Progress events during Claude installation/login
  */
 export interface InstallProgress {
   stage: 'downloading' | 'installing' | 'verifying' | 'login' | 'done' | 'error';
@@ -173,6 +194,7 @@ export interface AgentExecutionOptions {
   timeoutMinutes?: number;
   abortSignal?: AbortSignal;
   onProgress?: (progress: AgentProgress) => void;
+  pathToClaudeCodeExecutable?: string;
 }
 
 /**
@@ -184,6 +206,7 @@ export interface AgentSessionConfig {
   allowedTools?: string[];
   model?: string;
   anthropicApiKey?: string;
+  pathToClaudeCodeExecutable?: string;
 }
 
 /**

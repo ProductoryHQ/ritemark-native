@@ -6,7 +6,7 @@
  */
 
 import type { FlowNode, ExecutionContext, ProgressCallback } from '../types';
-import { runAgent } from '../../agent';
+import { getSetupStatus, runAgent } from '../../agent';
 
 /**
  * Claude Code Node configuration
@@ -104,11 +104,14 @@ export async function executeClaudeCodeNode(
   const interpolatedPrompt = interpolateVariables(data.prompt, context);
   console.log('[ClaudeCode] Interpolated prompt:', interpolatedPrompt.substring(0, 100) + '...');
 
+  const setupStatus = await getSetupStatus({ refresh: true });
+
   const result = await runAgent({
     prompt: interpolatedPrompt,
     workspacePath: context.workspacePath,
     timeoutMinutes: data.timeout || 5,
     abortSignal,
+    pathToClaudeCodeExecutable: setupStatus.binaryPath,
     onProgress: onProgress
       ? (progress) => {
           // Map unsupported types to 'done' since flow ProgressCallback has a limited set

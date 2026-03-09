@@ -66,7 +66,7 @@ echo ""
 # =============================================================================
 # Step 1: Find DMG (try both casings)
 # =============================================================================
-echo "[1/5] Locating DMG..."
+echo "[1/6] Locating DMG..."
 
 DMG_PATH=""
 # Try lowercase first
@@ -91,7 +91,7 @@ echo "  Found: $DMG_PATH"
 # Step 2: MANDATORY notarization verification
 # =============================================================================
 echo ""
-echo "[2/5] Running MANDATORY notarization verification..."
+echo "[2/6] Running MANDATORY notarization verification..."
 echo ""
 
 if ! "$SCRIPT_DIR/verify-notarization.sh" "$DMG_PATH"; then
@@ -114,7 +114,7 @@ echo -e "${GREEN}Notarization verification PASSED${NC}"
 # Step 3: Check release notes
 # =============================================================================
 echo ""
-echo "[3/5] Checking release notes..."
+echo "[3/6] Checking release notes..."
 
 NOTES_PATH="$PROJECT_ROOT/docs/releases/v${VERSION}.md"
 if [ ! -f "$NOTES_PATH" ]; then
@@ -130,17 +130,40 @@ fi
 # Step 4: Create stable DMG copy
 # =============================================================================
 echo ""
-echo "[4/5] Creating stable DMG filename..."
+echo "[4/6] Creating stable DMG filename..."
 
 STABLE_DMG="$PROJECT_ROOT/dist/Ritemark.dmg"
 cp "$DMG_PATH" "$STABLE_DMG"
 echo "  Created: $STABLE_DMG"
 
 # =============================================================================
-# Step 5: Upload to GitHub
+# Step 5: Generate canonical update feed
 # =============================================================================
 echo ""
-echo "[5/5] Uploading to GitHub..."
+echo "[5/6] Generating canonical update feed..."
+
+UPDATE_FEED="$PROJECT_ROOT/dist/update-feed.json"
+
+FEED_ARGS=(
+    --mode full
+    --version "$VERSION"
+    --output "$UPDATE_FEED"
+    --asset "$STABLE_DMG|darwin|arm64|Ritemark.dmg"
+)
+
+if [ -n "$NOTES_FLAG" ]; then
+    FEED_ARGS+=(--notes-file "$NOTES_PATH")
+fi
+
+node "$SCRIPT_DIR/generate-update-feed.mjs" "${FEED_ARGS[@]}"
+
+echo "  Created: $UPDATE_FEED"
+
+# =============================================================================
+# Step 6: Upload to GitHub
+# =============================================================================
+echo ""
+echo "[6/6] Uploading to GitHub..."
 
 REPO="jarmo-productory/ritemark-public"
 TAG="v$VERSION"
@@ -163,9 +186,11 @@ if [ -n "$DRY_RUN" ]; then
     if [ -n "$NOTES_FLAG" ]; then
         echo "    $NOTES_FLAG \\"
     fi
-    echo "    $STABLE_DMG"
+    echo "    $STABLE_DMG \\"
+    echo "    $UPDATE_FEED"
     echo ""
     rm -f "$STABLE_DMG"
+    rm -f "$UPDATE_FEED"
 else
     echo ""
     echo "Creating GitHub release..."
@@ -175,17 +200,20 @@ else
             --repo "$REPO" \
             --title "Ritemark v$VERSION" \
             $NOTES_FLAG \
-            "$STABLE_DMG"
+            "$STABLE_DMG" \
+            "$UPDATE_FEED"
     else
         gh release create "$TAG" \
             --repo "$REPO" \
             --title "Ritemark v$VERSION" \
             --notes "Release v$VERSION" \
-            "$STABLE_DMG"
+            "$STABLE_DMG" \
+            "$UPDATE_FEED"
     fi
     
     # Clean up stable copy (keep versioned DMG)
     rm -f "$STABLE_DMG"
+    rm -f "$UPDATE_FEED"
     
     echo ""
     echo -e "${GREEN}========================================${NC}"

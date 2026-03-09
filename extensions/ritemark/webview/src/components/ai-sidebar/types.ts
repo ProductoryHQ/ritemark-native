@@ -114,10 +114,21 @@ export type ImageAttachment = FileAttachment;
 
 // ── Setup types (mirrored from extension src/agent/types.ts) ──
 
+export type ClaudeAuthMethod = 'claude-oauth' | 'api-key' | null;
+export type ClaudeSetupState = 'not-installed' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
+export type ClaudeRepairAction = 'install' | 'repair' | 'reload' | null;
+
 export interface SetupStatus {
   cliInstalled: boolean;
+  runnable: boolean;
   cliVersion?: string;
+  binaryPath?: string;
   authenticated: boolean;
+  authMethod: ClaudeAuthMethod;
+  state: ClaudeSetupState;
+  diagnostics: string[];
+  repairAction: ClaudeRepairAction;
+  error: string | null;
 }
 
 export interface InstallProgress {
@@ -189,6 +200,27 @@ export interface CodexApprovalRequest {
   fileChanges?: Record<string, unknown>;
 }
 
+export type CodexSidebarState =
+  | 'disabled'
+  | 'checking'
+  | 'broken-install'
+  | 'needs-auth'
+  | 'auth-in-progress'
+  | 'ready';
+
+export interface CodexSidebarStatus {
+  enabled: boolean;
+  state: CodexSidebarState;
+  version: string | null;
+  authMethod: 'apiKey' | 'chatgpt' | null;
+  email: string | null;
+  plan: string | null;
+  error: string | null;
+  diagnostics: string[];
+  repairCommand: string | null;
+  binaryPath: string | null;
+}
+
 export interface CodexConversationTurn {
   id: string;
   userPrompt: string;
@@ -211,7 +243,7 @@ export interface CodexConversationTurn {
 export type ExtensionMessage =
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
-  | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; setupStatus?: SetupStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string }
+  | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
   | { type: 'ai-streaming'; content: string }
@@ -234,6 +266,7 @@ export type ExtensionMessage =
   | { type: 'agent:models-update'; models: ModelOption[] }
   | { type: 'files-dropped'; paths: string[] }
   // Codex messages
+  | { type: 'codex:status'; status: CodexSidebarStatus }
   | { type: 'codex-progress'; progress: AgentProgress }
   | { type: 'codex-streaming'; delta: string }
   | { type: 'codex-result'; status?: string; error?: string }

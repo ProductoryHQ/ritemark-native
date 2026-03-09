@@ -131,6 +131,8 @@ out/update/updateNotification.js
 out/update/versionService.js
 out/update/versionComparison.js
 out/update/githubClient.js
+out/update/updateFeed.js
+out/update/updateResolver.js
 out/update/updateManifest.js
 out/update/userExtensionInstaller.js
 media/webview.js
@@ -191,6 +193,16 @@ EOF
 echo ""
 echo -e "${GREEN}Release staging complete!${NC}"
 echo ""
+
+echo "Generating canonical update feed..."
+node "$SCRIPT_DIR/generate-update-feed.mjs" \
+  --mode extension \
+  --version "$VERSION" \
+  --manifest "$MANIFEST" \
+  --output "$OUTPUT_DIR/upload/update-feed.json"
+echo -e "${GREEN}Update feed written to $OUTPUT_DIR/upload/update-feed.json${NC}"
+echo ""
+
 echo "Files ready for upload in: $OUTPUT_DIR/upload/"
 ls -la "$OUTPUT_DIR/upload/" | head -20
 echo ""

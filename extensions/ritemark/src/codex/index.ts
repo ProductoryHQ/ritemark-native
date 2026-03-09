@@ -15,4 +15,10 @@ export { CodexManager } from './codexManager';
 export { CodexAppServer } from './codexAppServer';
 export { CodexAuth } from './codexAuth';
 export { getCodexModels } from './codexModels';
+export {
+  emitCodexStatusInvalidated,
+  onCodexStatusInvalidated,
+  type CodexStatusInvalidationEvent,
+  type CodexStatusInvalidationReason,
+} from './codexStatusEvents';
 export * from './codexProtocol';

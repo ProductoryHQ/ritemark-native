@@ -15,6 +15,7 @@ import { SetupWizard } from './SetupWizard';
 import { ChatView } from './ChatView';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
+import { CodexSetupView } from './CodexSetupView';
 import { ChatInput } from './ChatInput';
 import { IndexFooter } from './IndexFooter';
 import { SelectionIndicator } from './SelectionIndicator';
@@ -54,6 +55,11 @@ export function AISidebar() {
           agentConversation: savedState.agentConversation as typeof store.agentConversation,
         });
       }
+      if (savedState.codexConversation) {
+        useAISidebarStore.setState({
+          codexConversation: savedState.codexConversation as typeof store.codexConversation,
+        });
+      }
     }
 
     // Tell extension we're ready
@@ -69,12 +75,14 @@ export function AISidebar() {
         chatMessages: state.chatMessages,
         conversationHistory: state.conversationHistory,
         agentConversation: state.agentConversation,
+        codexConversation: state.codexConversation,
         currentConversationId: state.currentConversationId,
       });
     });
   }, []);
 
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
+  const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const hasSeenWelcome = useAISidebarStore((s) => s.hasSeenWelcome);
   const showHistoryPanel = useAISidebarStore((s) => s.showHistoryPanel);
   const loadConversationList = useAISidebarStore((s) => s.loadConversationList);
@@ -95,9 +103,10 @@ export function AISidebar() {
   const isAgentMode = isClaudeCode || isCodex;
   const needsOpenAIKey = !isAgentMode && !hasApiKey;
   const needsSetup = isClaudeCode && setupStatus !== null
-    && (!setupStatus.cliInstalled || !setupStatus.authenticated);
+    && setupStatus.state !== 'ready';
   const showWelcome = isClaudeCode && setupStatus !== null
-    && setupStatus.cliInstalled && setupStatus.authenticated && !hasSeenWelcome;
+    && setupStatus.state === 'ready' && !hasSeenWelcome;
+  const showCodexSetup = isCodex && codexStatus.state !== 'ready';
 
   return (
     <div className="flex flex-col h-screen overflow-hidden text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)]">
@@ -120,6 +129,13 @@ export function AISidebar() {
         <>
           <SelectionIndicator />
           <SetupWizard />
+        </>
+      ) : ready && showCodexSetup ? (
+        <>
+          <SelectionIndicator />
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <CodexSetupView />
+          </div>
         </>
       ) : (
         <>

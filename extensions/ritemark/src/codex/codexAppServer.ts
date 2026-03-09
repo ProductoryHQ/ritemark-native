@@ -18,13 +18,17 @@ import type {
   JsonRpcNotification,
   InitializeParams,
   InitializeResult,
-  GetAuthStatusParams,
-  GetAuthStatusResponse,
+  GetAccountParams,
+  GetAccountResponse,
+  GetAccountRateLimitsResponse,
   ThreadStartParams,
   ThreadStartResponse,
   TurnStartParams,
   TurnStartResponse,
   TurnInterruptParams,
+  LoginAccountChatGptParams,
+  LoginAccountChatGptResponse,
+  LogoutAccountResponse,
   UserInput,
   ExecCommandApprovalResponse,
   ApplyPatchApprovalResponse,
@@ -39,6 +43,9 @@ export class CodexAppServer extends EventEmitter {
     reject: (error: Error) => void;
   }>();
   private buffer = '';
+  private lastStderrMessage: string | null = null;
+  private sawStderrSinceStart = false;
+  private initializePromise: Promise<InitializeResult> | null = null;
 
   constructor() {
     super();
@@ -54,52 +61,70 @@ export class CodexAppServer extends EventEmitter {
    * Ensure app-server is running and initialized
    */
   async ensureInitialized(): Promise<InitializeResult> {
-    await this.manager.ensureRunning();
+    if (this.initializePromise) {
+      return this.initializePromise;
+    }
 
-    return this.rpc<InitializeParams, InitializeResult>('initialize', {
-      clientInfo: {
-        name: 'ritemark-native',
-        title: 'Ritemark Native',
-        version: '1.4.0',
-      },
-      capabilities: {
-        experimentalApi: false,
-      },
+    this.initializePromise = (async () => {
+      await this.manager.ensureRunning();
+
+      const result = await this.rpc<InitializeParams, InitializeResult>('initialize', {
+        clientInfo: {
+          name: 'ritemark-native',
+          title: 'Ritemark Native',
+          version: '1.4.0',
+        },
+        capabilities: {
+          experimentalApi: false,
+        },
+      });
+
+      this.sendNotification('initialized');
+      return result;
+    })();
+
+    return this.initializePromise;
+  }
+
+  /**
+   * Get current account/authentication status
+   */
+  async getAccount(): Promise<GetAccountResponse> {
+    await this.ensureInitialized();
+    return this.rpc<GetAccountParams, GetAccountResponse>('account/read', {
+      refreshToken: false,
     });
   }
 
   /**
-   * Get authentication status
+   * Get current account rate limits / plan usage snapshot.
    */
-  async getAuthStatus(): Promise<GetAuthStatusResponse> {
-    await this.manager.ensureRunning();
-    return this.rpc<GetAuthStatusParams, GetAuthStatusResponse>('getAuthStatus', {
-      includeToken: null,
-      refreshToken: null,
-    });
+  async getAccountRateLimits(): Promise<GetAccountRateLimitsResponse> {
+    await this.ensureInitialized();
+    return this.rpc<Record<string, never>, GetAccountRateLimitsResponse>('account/rateLimits/read', {});
   }
 
   /**
-   * Start ChatGPT OAuth login flow
+   * Start ChatGPT OAuth login flow.
    */
-  async loginChatGpt(): Promise<void> {
-    await this.manager.ensureRunning();
-    await this.rpc<undefined, unknown>('loginChatGpt', undefined);
+  async loginAccountChatGpt(): Promise<LoginAccountChatGptResponse> {
+    await this.ensureInitialized();
+    return this.rpc<LoginAccountChatGptParams, LoginAccountChatGptResponse>('account/login/start', { type: 'chatgpt' });
   }
 
   /**
-   * Logout from ChatGPT
+   * Logout from the current account.
    */
-  async logoutChatGpt(): Promise<void> {
-    await this.manager.ensureRunning();
-    await this.rpc<undefined, unknown>('logoutChatGpt', undefined);
+  async logoutAccount(): Promise<LogoutAccountResponse> {
+    await this.ensureInitialized();
+    return this.rpc<Record<string, never>, LogoutAccountResponse>('account/logout', {});
   }
 
   /**
    * Start a new thread (conversation)
    */
   async threadStart(params: Partial<ThreadStartParams> & { cwd?: string | null }): Promise<ThreadStartResponse> {
-    await this.manager.ensureRunning();
+    await this.ensureInitialized();
     return this.rpc<ThreadStartParams, ThreadStartResponse>('thread/start', {
       experimentalRawEvents: false,
       persistExtendedHistory: false,
@@ -111,7 +136,7 @@ export class CodexAppServer extends EventEmitter {
    * Start an agent turn (send user message)
    */
   async turnStart(threadId: string, message: string, model?: string, imageDataUrls?: string[]): Promise<TurnStartResponse> {
-    await this.manager.ensureRunning();
+    await this.ensureInitialized();
     const input: UserInput[] = [{
       type: 'text',
       text: message,
@@ -119,7 +144,7 @@ export class CodexAppServer extends EventEmitter {
     }];
     if (imageDataUrls) {
       for (const url of imageDataUrls) {
-        input.push({ type: 'image', image_url: { url } });
+        input.push({ type: 'image', url });
       }
     }
     return this.rpc<TurnStartParams, TurnStartResponse>('turn/start', {
@@ -133,7 +158,7 @@ export class CodexAppServer extends EventEmitter {
    * Interrupt current turn
    */
   async turnInterrupt(threadId: string, turnId: string): Promise<void> {
-    await this.manager.ensureRunning();
+    await this.ensureInitialized();
     await this.rpc<TurnInterruptParams, unknown>('turn/interrupt', { threadId, turnId });
   }
 
@@ -212,18 +237,36 @@ export class CodexAppServer extends EventEmitter {
   }
 
   private handleStderr(data: string): void {
-    console.error('[codex stderr]', data);
+    const normalized = data.trim();
+    if (!normalized || normalized === this.lastStderrMessage) {
+      return;
+    }
+
+    this.lastStderrMessage = normalized;
+    this.sawStderrSinceStart = true;
+    console.error('[codex stderr]', normalized);
   }
 
   private handleExit(code: number | null): void {
-    console.log(`Codex app-server exited with code ${code}`);
-
     for (const [, { reject }] of this.pendingRequests.entries()) {
       reject(new Error('Codex app-server exited unexpectedly'));
     }
     this.pendingRequests.clear();
+    this.lastStderrMessage = null;
+    this.sawStderrSinceStart = false;
+    this.initializePromise = null;
 
     this.emit('exit', code);
+  }
+
+  private sendNotification(method: string, params?: unknown): void {
+    const notification: JsonRpcNotification = {
+      jsonrpc: '2.0',
+      method,
+      params,
+    };
+
+    this.manager.send(JSON.stringify(notification));
   }
 
   /**

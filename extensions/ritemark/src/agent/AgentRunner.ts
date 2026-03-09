@@ -160,6 +160,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     timeoutMinutes = DEFAULT_TIMEOUT_MINUTES,
     abortSignal,
     onProgress,
+    pathToClaudeCodeExecutable,
   } = options;
 
   const emitProgress: ExtendedProgressEmitter = (
@@ -225,6 +226,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       options: {
         cwd: workspacePath,
         executable: process.execPath,
+        ...(pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable } : {}),
         settingSources: ['project'],
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
@@ -250,7 +252,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
 
       if (message.type === 'system' && message.subtype === 'init') {
         metrics.model = message.model || null;
-        emitProgress('init', `Starting Claude Code (${message.model || 'claude'})`);
+        emitProgress('init', `Starting Claude (${message.model || 'claude'})`);
       } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
         emitProgress('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
       } else if (message.type === 'system' && message.subtype === 'compact_boundary') {
@@ -339,6 +341,7 @@ export class AgentSession {
   private readonly _allowedTools: string[];
   private readonly _modelId: string | undefined;
   private readonly _anthropicApiKey: string | undefined;
+  private readonly _pathToClaudeCodeExecutable: string | undefined;
 
   /** Called when SDK reports its available models (after session init) */
   onModelsDiscovered: ((models: Array<{ id: string; label: string; description: string }>) => void) | null = null;
@@ -349,6 +352,7 @@ export class AgentSession {
     this._allowedTools = config.allowedTools || DEFAULT_TOOLS;
     this._modelId = config.model;
     this._anthropicApiKey = config.anthropicApiKey;
+    this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
   }
 
   get isActive(): boolean {
@@ -577,6 +581,7 @@ export class AgentSession {
     const queryOptions: Record<string, unknown> = {
       cwd: this._workspacePath,
       executable: process.execPath,
+      ...(this._pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable: this._pathToClaudeCodeExecutable } : {}),
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
@@ -627,7 +632,7 @@ export class AgentSession {
 
         if (message.type === 'system' && message.subtype === 'init') {
           this._model = message.model || null;
-          this._emitProgress?.('init', `Starting Claude Code (${message.model || 'claude'})`);
+          this._emitProgress?.('init', `Starting Claude (${message.model || 'claude'})`);
           // Fetch supported models from the SDK session
           this._fetchSupportedModels();
         } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {

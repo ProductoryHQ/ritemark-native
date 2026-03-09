@@ -4,7 +4,9 @@ description: >
   MANDATORY for releases and distribution. Invoke when user mentions: release,
   publish, ship, deploy, dmg, notarization, github release, extension update.
   Enforces TWO HARD quality gates. BLOCKS releases if either gate fails.
-  Supports BOTH full app releases (DMG) and extension-only releases.
+  Supports BOTH full app releases (DMG) and extension-only releases. A release
+  is NOT complete unless canonical update feed / metadata is regenerated and
+  published alongside the release assets.
 tools: 'Read, Bash, Glob, Grep'
 model: opus
 priority: high
@@ -39,6 +41,29 @@ Ritemark supports TWO release types:
 | Gate 2 (Human) | Jarmo | "tested locally", "approved for release", "ship it" |
 
 * * *
+
+## Update Feed Requirement (MANDATORY)
+
+Every release must update the canonical Ritemark update metadata, not only upload binaries.
+
+This requirement applies to BOTH:
+
+- full app releases (`X.Y.Z`)
+- extension-only releases (`X.Y.Z-ext.N`)
+
+Minimum rule:
+
+1. regenerate the canonical update feed / release metadata
+2. verify it matches the assets being published
+3. publish it together with the release
+
+If the binaries are uploaded but the feed/metadata is stale or missing, the release is BLOCKED.
+
+Use the current contract in:
+
+- `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`
+
+Until tooling is fully automated, you must treat feed generation and publication as an explicit checklist item, not an implied side effect.
 
 ## Supported Platforms
 
@@ -80,7 +105,7 @@ Ritemark Native supports THREE platforms:
    Task 4: Create and notarize DMGs
    Task 5: [GATE 2] Wait for DMG approval
    Task 6: [GATE 3] Wait for Windows approval
-   Task 7: Create GitHub release
+   Task 7: Create GitHub release + publish update feed
    ```
 
 2. Mark task as `in_progress` when starting it
@@ -227,14 +252,20 @@ Wait for GitHub Actions `build-macos-x64.yml` to complete, then:
 
 ---
 
-#### STEP 5: GITHUB RELEASE
+#### STEP 5: GITHUB RELEASE + UPDATE FEED
+
+**MANDATORY:** Release is incomplete unless the canonical update feed / metadata is regenerated and published with the exact assets for this release.
 
 1. Copy stable filenames:
    ```bash
    cp dist/Ritemark-X.Y.Z-darwin-arm64.dmg dist/Ritemark-arm64.dmg
    cp dist/Ritemark-X.Y.Z-darwin-x64.dmg dist/Ritemark-x64.dmg
    ```
-2. Create release:
+2. Regenerate / verify canonical update feed metadata:
+   - full releases must publish full-release metadata for all shipped platform assets
+   - extension-only releases must publish extension metadata with correct `minimumAppVersion`
+   - feed entries must include correct version, URLs, size, and checksum
+3. Create release:
    ```bash
    gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
      --title "Ritemark vX.Y.Z" \
@@ -243,6 +274,8 @@ Wait for GitHub Actions `build-macos-x64.yml` to complete, then:
      dist/Ritemark-x64.dmg \
      installer/windows/Ritemark-X.Y.Z-win32-x64-setup.exe
    ```
+4. Publish the regenerated update feed / metadata to its canonical location.
+5. Verify the published feed resolves to the assets from this release, not previous ones.
 
 ---
 
@@ -270,6 +303,7 @@ Wait for GitHub Actions `build-macos-x64.yml` to complete, then:
 | Windows build | **GH Actions** | Automatic on tag push (`build-windows.yml`) |
 | **GATE 3: Windows testing** | **Jarmo** | Install & test Windows app |
 | GitHub Release | Agent | `gh release create` with ALL THREE files |
+| Update Feed / Metadata | Agent | Regenerate, publish, and verify canonical update feed for this release |
 
 ### HARD RULES
 
@@ -290,6 +324,8 @@ Wait for GitHub Actions `build-macos-x64.yml` to complete, then:
 8.  **ALWAYS generate TEST-CHECKLIST.md** - before asking Jarmo to test
 
 9.  **arm64 local, x64 from CI** - Build arm64 locally, download x64 from GitHub Actions. Both code-signed locally. NEVER cross-compile x64 from arm64.
+
+10. **ALWAYS update canonical release metadata** - no release is complete until the update feed / metadata is regenerated, published, and verified against the shipped assets
     
 
 * * *
@@ -787,12 +823,16 @@ Use extension-only releases when changes are LIMITED to:
     ```
     
 4.  Verify manifest and files in `release-staging/upload/`
+    - verify extension metadata is correct for feed publication
+    - `minimumAppVersion` must match the supported base app
     
-5.  Declare Gate 1 PASS
+5.  Regenerate / publish canonical update feed entry for `X.Y.Z-ext.N`
     
-6.  Wait for Jarmo to test and confirm (Gate 2)
+6.  Declare Gate 1 PASS
     
-7.  Upload to GitHub:
+7.  Wait for Jarmo to test and confirm (Gate 2)
+    
+8.  Upload to GitHub:
     
     ```bash
     gh release create vX.Y.Z-ext.N --repo jarmo-productory/ritemark-public \
@@ -801,7 +841,9 @@ Use extension-only releases when changes are LIMITED to:
       release-staging/upload/*
     ```
     
-8.  Clean up: `rm -rf release-staging`
+9.  Verify published update feed points to this extension release and not stale assets
+    
+10.  Clean up: `rm -rf release-staging`
     
 
 ### What Gets Uploaded
@@ -822,8 +864,9 @@ The script creates these files:
 1.  Ritemark checks GitHub on startup (10-second delay)
     
 2.  Fetches `update-manifest.json` from latest release
+    or resolves via the canonical update feed / metadata layer
     
-3.  Detects extension-only update (version comparison)
+3.  Detects extension-only update (version comparison + compatibility)
     
 4.  Shows notification: "Extension update available (X MB)"
     

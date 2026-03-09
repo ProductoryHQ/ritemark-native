@@ -18,6 +18,11 @@ import {
   Bot,
   Type,
   Timer,
+  Download,
+  RotateCcw,
+  HardDrive,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { vscode } from '../../lib/vscode';
 import { getDefaultAssistantModel } from '../../config/modelConfig';
@@ -45,12 +50,69 @@ interface SettingsData {
   anthropicKey: string;
   anthropicKeyConfigured: boolean;
   chatFontSize: number;
+  updateCenter: {
+    state: 'idle' | 'checking' | 'up-to-date' | 'update-available' | 'paused' | 'restart-required' | 'blocked' | 'error';
+    currentAppVersion: string;
+    currentExtensionVersion: string;
+    updatesEnabled: boolean;
+    lastCheckedAt: number;
+    lastSuccessfulCheckAt: number;
+    lastFailedCheckAt: number;
+    skippedVersion: string;
+    snoozeUntil: number;
+    pendingRestartVersion: string;
+    availableUpdate?: {
+      action: 'full' | 'extension';
+      version: string;
+      summary: string;
+      releaseDate?: string;
+      downloadSize?: number;
+    };
+    feedSource: 'feed' | 'legacy' | 'none';
+    error?: string;
+    blockedReason?: string;
+  };
+  componentStatus: {
+    voiceModel: {
+      installed: boolean;
+      modelName: string;
+      filename: string;
+      managedBy: 'ritemark';
+      sizeBytes: number;
+      sizeDisplay: string;
+    };
+    claudeCode: {
+      installed: boolean;
+      runnable: boolean;
+      authenticated: boolean;
+      version: string | null;
+      binaryPath: string | null;
+      authMethod: 'claude-oauth' | 'api-key' | null;
+      managedBy: 'user';
+      state: 'ready' | 'needs-auth' | 'auth-in-progress' | 'not-installed' | 'broken';
+      error: string | null;
+      diagnostics: string[];
+      repairAction: 'install' | 'repair' | 'reload' | null;
+    };
+    codex: {
+      installed: boolean;
+      version: string | null;
+      managedBy: 'user';
+      state: 'ready' | 'broken' | 'not-installed';
+      error: string | null;
+      diagnostics: string[];
+      repairCommand: string | null;
+    };
+  };
 }
 
 interface CodexAuthStatus {
   enabled: boolean;
   authenticated?: boolean;
   binaryMissing?: boolean;
+  binaryBroken?: boolean;
+  diagnostics?: string[];
+  repairCommand?: string | null;
   email?: string;
   plan?: 'free' | 'plus' | 'pro' | 'team' | 'business';
   credits?: {
@@ -138,6 +200,18 @@ export function RitemarkSettings() {
     vscode.postMessage({ type: 'setSetting', key, value });
   };
 
+  const handleUpdateAction = (
+    type: 'updates:checkNow' | 'updates:install' | 'updates:skipVersion' | 'updates:pause' | 'updates:resume' | 'updates:reload'
+  ) => {
+    vscode.postMessage({ type });
+  };
+
+  const handleClaudeAction = (
+    type: 'claude:install' | 'claude:repair' | 'claude:login' | 'claude:logout' | 'claude:reload' | 'claude:refreshStatus'
+  ) => {
+    vscode.postMessage({ type });
+  };
+
   const handleSaveApiKey = (keyName: string, value: string) => {
     vscode.postMessage({ type: 'setApiKey', key: keyName, value });
     // Clear test result when key changes
@@ -188,6 +262,296 @@ export function RitemarkSettings() {
             API Keys
           </h2>
         </div>
+
+        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+                Claude Account
+              </label>
+              <span className="ml-2 text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+                Experimental
+              </span>
+            </div>
+            {(settings.componentStatus.claudeCode.state === 'ready'
+              || settings.componentStatus.claudeCode.authMethod === 'api-key') && (
+              <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
+                <Check size={12} />
+                Connected
+              </span>
+            )}
+          </div>
+
+          {settings.componentStatus.claudeCode.state === 'not-installed' ? (
+            <>
+              <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                Install Claude to use Claude agent mode in Ritemark.
+              </p>
+              <button
+                onClick={() => handleClaudeAction('claude:install')}
+                className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              >
+                Install Claude
+              </button>
+            </>
+          ) : settings.componentStatus.claudeCode.state === 'broken' ? (
+            <>
+              <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                {settings.componentStatus.claudeCode.error || 'Claude is installed, but it is not ready yet.'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
+                  <button
+                    onClick={() => handleClaudeAction('claude:reload')}
+                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                  >
+                    Reload Window
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleClaudeAction('claude:repair')}
+                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                  >
+                    Repair Claude
+                  </button>
+                )}
+              </div>
+            </>
+          ) : settings.componentStatus.claudeCode.state === 'needs-auth' ? (
+            <>
+              <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                Sign in with Claude.ai to use Claude without an API key, or use your Anthropic API key instead.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleClaudeAction('claude:login')}
+                  className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                >
+                  Sign in with Claude.ai
+                </button>
+              </div>
+            </>
+          ) : settings.componentStatus.claudeCode.state === 'auth-in-progress' ? (
+            <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+              Finish Claude.ai sign-in in your terminal and browser. Ritemark will refresh automatically when sign-in completes.
+            </p>
+          ) : (
+            <>
+              <div className="space-y-2 mb-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--vscode-descriptionForeground)]">Auth method:</span>
+                  <span className="text-[var(--vscode-foreground)] font-semibold">
+                    {settings.componentStatus.claudeCode.authMethod === 'api-key' ? 'Anthropic API key' : 'Claude.ai'}
+                  </span>
+                </div>
+                {settings.componentStatus.claudeCode.version && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--vscode-descriptionForeground)]">CLI version:</span>
+                    <span className="text-[var(--vscode-foreground)] font-mono">
+                      {settings.componentStatus.claudeCode.version}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--vscode-descriptionForeground)]">Billing source:</span>
+                  <span className="text-[var(--vscode-foreground)]">
+                    {settings.componentStatus.claudeCode.authMethod === 'api-key' ? 'Anthropic API' : 'Claude.ai'}
+                  </span>
+                </div>
+              </div>
+              {settings.componentStatus.claudeCode.authMethod === 'claude-oauth' && (
+                <button
+                  onClick={() => handleClaudeAction('claude:logout')}
+                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                >
+                  Sign Out
+                </button>
+              )}
+            </>
+          )}
+
+          {(settings.componentStatus.claudeCode.binaryPath
+            || settings.componentStatus.claudeCode.diagnostics.length > 0) && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs text-[var(--vscode-textLink-foreground)] hover:underline">
+                Technical details
+              </summary>
+              <div className="mt-2 space-y-2 text-xs text-[var(--vscode-descriptionForeground)]">
+                {settings.componentStatus.claudeCode.binaryPath && (
+                  <div className="break-words [overflow-wrap:anywhere]">
+                    Binary: {settings.componentStatus.claudeCode.binaryPath}
+                  </div>
+                )}
+                {settings.componentStatus.claudeCode.diagnostics.map((detail) => (
+                  <div key={detail} className="break-words [overflow-wrap:anywhere]">
+                    {detail}
+                  </div>
+                ))}
+                <button
+                  onClick={() => handleClaudeAction('claude:refreshStatus')}
+                  className="text-xs text-[var(--vscode-textLink-foreground)] hover:underline bg-transparent border-none p-0"
+                >
+                  Refresh Status
+                </button>
+              </div>
+            </details>
+          )}
+
+          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-3">
+            Used for: Claude agents (autonomous file work), Claude Flow nodes
+            <a
+              href="https://docs.anthropic.com/en/docs/claude-code/setup"
+              className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+            >
+              Learn more <ExternalLink size={10} />
+            </a>
+          </p>
+        </div>
+
+        {/* Codex ChatGPT Auth (experimental) */}
+        {settings.codexIntegration && codexAuth.enabled && (
+          <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+                  ChatGPT Account
+                </label>
+                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+                  Experimental
+                </span>
+              </div>
+              {codexAuth.authenticated && (
+                <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
+                  <Check size={12} />
+                  Connected
+                </span>
+              )}
+            </div>
+
+            {codexAuth.binaryMissing || codexAuth.binaryBroken ? (
+              <>
+                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                  {codexAuth.binaryMissing
+                    ? 'Codex CLI binary not found. Install it first:'
+                    : 'Codex CLI is installed but broken. Reinstall it first:'}
+                </p>
+                <code className="block text-xs p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-foreground)] font-mono break-all">
+                  {codexAuth.repairCommand || 'npm install -g @openai/codex@latest'}
+                </code>
+                {codexAuth.error && (
+                  <div className="text-xs p-2 mt-2 rounded bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]">
+                    <span className="flex items-center gap-1">
+                      <X size={12} /> {codexAuth.error}
+                    </span>
+                  </div>
+                )}
+                {codexAuth.diagnostics && codexAuth.diagnostics.length > 0 && (
+                  <div className="mt-2 space-y-1 text-xs text-[var(--vscode-descriptionForeground)]">
+                    {codexAuth.diagnostics.map((diagnostic) => (
+                      <div key={diagnostic}>{diagnostic}</div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => vscode.postMessage({ type: 'codex:repair' })}
+                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                  >
+                    Repair Codex
+                  </button>
+                  <button
+                    onClick={() => vscode.postMessage({ type: 'updates:reload' })}
+                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  >
+                    Reload Window
+                  </button>
+                  <button
+                    onClick={() => vscode.postMessage({ type: 'codex:refreshStatus' })}
+                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  >
+                    Refresh Status
+                  </button>
+                </div>
+                <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+                  After reinstalling, use Reload Window here and then reopen Settings.
+                </p>
+              </>
+            ) : !codexAuth.authenticated ? (
+              <>
+                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                  Sign in with your ChatGPT account to use Codex agents without an API key.
+                  Requires ChatGPT Plus ($20/mo) or Pro ($200/mo) subscription.
+                </p>
+                <button
+                  onClick={() => {
+                    setCodexLoading(true);
+                    vscode.postMessage({ type: 'codex:startLogin' });
+                    setTimeout(() => setCodexLoading(false), 60_000);
+                  }}
+                  disabled={codexLoading}
+                  className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 flex items-center gap-2"
+                >
+                  {codexLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Opening browser...
+                    </>
+                  ) : (
+                    'Sign in with ChatGPT'
+                  )}
+                </button>
+                {codexAuth.error && (
+                  <div className="text-xs p-2 mt-2 rounded bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]">
+                    <span className="flex items-center gap-1">
+                      <X size={12} /> {codexAuth.error}
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="space-y-2 mb-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--vscode-descriptionForeground)]">Email:</span>
+                    <span className="text-[var(--vscode-foreground)] font-mono">{codexAuth.email}</span>
+                  </div>
+                  {codexAuth.plan && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[var(--vscode-descriptionForeground)]">Plan:</span>
+                      <span className="text-[var(--vscode-foreground)] font-semibold">
+                        ChatGPT {codexAuth.plan.charAt(0).toUpperCase() + codexAuth.plan.slice(1)}
+                      </span>
+                    </div>
+                  )}
+                  {codexAuth.credits && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[var(--vscode-descriptionForeground)]">API Credits:</span>
+                      <span className="text-[var(--vscode-foreground)]">
+                        ${(codexAuth.credits.limit - codexAuth.credits.used).toFixed(2)} / ${codexAuth.credits.limit.toFixed(2)} remaining
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => vscode.postMessage({ type: 'codex:logout' })}
+                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                >
+                  Sign Out
+                </button>
+              </>
+            )}
+
+            <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-3">
+              Used for: Codex Agents (autonomous coding), Codex Flow nodes
+              <a
+                href="https://developers.openai.com/codex/cli"
+                className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+              >
+                Learn more <ExternalLink size={10} />
+              </a>
+            </p>
+          </div>
+        )}
 
         {/* OpenAI */}
         <div className="mb-6 p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
@@ -408,7 +772,7 @@ export function RitemarkSettings() {
           )}
 
           <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
-            Used for: Claude Code agent (alternative to signing in with Claude.ai)
+            Used for: Claude in Ritemark (alternative to signing in with Claude.ai)
             <a
               href="https://console.anthropic.com/settings/keys"
               className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
@@ -418,115 +782,6 @@ export function RitemarkSettings() {
           </p>
         </div>
 
-        {/* Codex ChatGPT Auth (experimental) */}
-        {settings.codexIntegration && codexAuth.enabled && (
-          <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] mt-6">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <label className="text-sm font-medium text-[var(--vscode-foreground)]">
-                  ChatGPT Account
-                </label>
-                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
-                  Experimental
-                </span>
-              </div>
-              {codexAuth.authenticated && (
-                <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
-                  <Check size={12} />
-                  Connected
-                </span>
-              )}
-            </div>
-
-            {codexAuth.binaryMissing ? (
-              <>
-                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
-                  Codex CLI binary not found. Install it first:
-                </p>
-                <code className="block text-xs p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-foreground)] font-mono">
-                  npm install -g @openai/codex
-                </code>
-                <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
-                  After installing, close and reopen Settings to try again.
-                </p>
-              </>
-            ) : !codexAuth.authenticated ? (
-              <>
-                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
-                  Sign in with your ChatGPT account to use Codex agents without an API key.
-                  Requires ChatGPT Plus ($20/mo) or Pro ($200/mo) subscription.
-                </p>
-                <button
-                  onClick={() => {
-                    setCodexLoading(true);
-                    vscode.postMessage({ type: 'codex:startLogin' });
-                    // Reset spinner after 60s if no auth response arrives
-                    setTimeout(() => setCodexLoading(false), 60_000);
-                  }}
-                  disabled={codexLoading}
-                  className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 flex items-center gap-2"
-                >
-                  {codexLoading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Opening browser...
-                    </>
-                  ) : (
-                    'Sign in with ChatGPT'
-                  )}
-                </button>
-                {codexAuth.error && (
-                  <div className="text-xs p-2 mt-2 rounded bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]">
-                    <span className="flex items-center gap-1">
-                      <X size={12} /> {codexAuth.error}
-                    </span>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="space-y-2 mb-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[var(--vscode-descriptionForeground)]">Email:</span>
-                    <span className="text-[var(--vscode-foreground)] font-mono">{codexAuth.email}</span>
-                  </div>
-                  {codexAuth.plan && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[var(--vscode-descriptionForeground)]">Plan:</span>
-                      <span className="text-[var(--vscode-foreground)] font-semibold">
-                        ChatGPT {codexAuth.plan.charAt(0).toUpperCase() + codexAuth.plan.slice(1)}
-                      </span>
-                    </div>
-                  )}
-                  {codexAuth.credits && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[var(--vscode-descriptionForeground)]">API Credits:</span>
-                      <span className="text-[var(--vscode-foreground)]">
-                        ${(codexAuth.credits.limit - codexAuth.credits.used).toFixed(2)} / ${codexAuth.credits.limit.toFixed(2)} remaining
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => vscode.postMessage({ type: 'codex:logout' })}
-                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
-                >
-                  Sign Out
-                </button>
-              </>
-            )}
-
-            <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-3">
-              Used for: Codex Agents (autonomous coding), Codex Flow nodes
-              <a
-                href="https://developers.openai.com/codex/cli"
-                className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
-              >
-                Learn more <ExternalLink size={10} />
-              </a>
-            </p>
-          </div>
-        )}
       </section>
 
       {/* AI Model Section */}
@@ -592,7 +847,7 @@ export function RitemarkSettings() {
           </div>
 
           <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
-            The Claude Code agent will be stopped if it produces no activity for this duration.
+            Claude will be stopped if it produces no activity for this duration.
             Increase if the agent times out on complex tasks. Default: 15 minutes.
           </p>
         </div>
@@ -691,9 +946,301 @@ export function RitemarkSettings() {
           checked={settings.updatesEnabled}
           onChange={(value) => handleToggle('updates.enabled', value)}
         />
+
+        <div className="mt-4 p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium text-[var(--vscode-foreground)] flex items-center gap-2">
+                Update Center
+                <StatusBadge state={settings.updateCenter.state} />
+              </div>
+              <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                App {settings.updateCenter.currentAppVersion} · Extension {settings.updateCenter.currentExtensionVersion}
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleUpdateAction('updates:checkNow')}
+              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] flex items-center gap-2"
+            >
+              <RefreshCw size={14} />
+              Check Now
+            </button>
+          </div>
+
+          <div className="grid gap-2 text-xs text-[var(--vscode-descriptionForeground)] sm:grid-cols-2">
+            <div>Last successful check: {formatTimestamp(settings.updateCenter.lastSuccessfulCheckAt)}</div>
+            <div>Last failed check: {formatTimestamp(settings.updateCenter.lastFailedCheckAt)}</div>
+            <div>Skipped version: {settings.updateCenter.skippedVersion || 'None'}</div>
+            <div>
+              Notifications paused until: {settings.updateCenter.snoozeUntil ? formatTimestamp(settings.updateCenter.snoozeUntil) : 'Not paused'}
+            </div>
+          </div>
+
+          <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+            Update source: {settings.updateCenter.feedSource === 'feed'
+              ? 'Canonical release feed'
+              : settings.updateCenter.feedSource === 'legacy'
+                ? 'Legacy release fallback'
+                : 'No release metadata available'}
+          </div>
+
+          {settings.updateCenter.pendingRestartVersion && (
+            <div className="p-3 rounded bg-[var(--vscode-inputValidation-infoBackground)] border border-[var(--vscode-focusBorder)]">
+              <div className="text-sm font-medium text-[var(--vscode-foreground)]">
+                Restart required
+              </div>
+              <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                Extension {settings.updateCenter.pendingRestartVersion} is installed and will activate after reload.
+              </div>
+              <button
+                onClick={() => handleUpdateAction('updates:reload')}
+                className="mt-3 px-3 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] flex items-center gap-2"
+              >
+                <RotateCcw size={14} />
+                Reload Window
+              </button>
+            </div>
+          )}
+
+          {settings.updateCenter.availableUpdate && (
+            <div className="p-4 rounded bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-medium text-[var(--vscode-foreground)]">
+                    {settings.updateCenter.availableUpdate.action === 'full' ? 'Full app update' : 'Extension update'} {settings.updateCenter.availableUpdate.version}
+                  </div>
+                  <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                    {settings.updateCenter.availableUpdate.summary || 'No release summary available.'}
+                  </div>
+                </div>
+                <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+                  {formatSize(settings.updateCenter.availableUpdate.downloadSize)}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-4">
+                <button
+                  onClick={() => handleUpdateAction('updates:install')}
+                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] flex items-center gap-2"
+                >
+                  <Download size={14} />
+                  {settings.updateCenter.availableUpdate.action === 'full' ? 'Download Installer' : 'Install Update'}
+                </button>
+                <button
+                  onClick={() => handleUpdateAction('updates:skipVersion')}
+                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                >
+                  Skip This Version
+                </button>
+                <button
+                  onClick={() => handleUpdateAction('updates:pause')}
+                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                >
+                  Pause 7 Days
+                </button>
+                {(settings.updateCenter.skippedVersion || settings.updateCenter.snoozeUntil) && (
+                  <button
+                    onClick={() => handleUpdateAction('updates:resume')}
+                    className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  >
+                    Re-enable Notifications
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {settings.updateCenter.state === 'up-to-date' && !settings.updateCenter.pendingRestartVersion && (
+            <div className="text-sm text-[var(--vscode-foreground)]">
+              Ritemark is up to date.
+            </div>
+          )}
+
+          {settings.updateCenter.state === 'blocked' && settings.updateCenter.blockedReason && (
+            <div className="p-3 rounded bg-[var(--vscode-inputValidation-warningBackground)] border border-[var(--vscode-inputValidation-warningBorder)] text-sm text-[var(--vscode-foreground)] flex items-start gap-2">
+              <AlertTriangle size={16} className="mt-0.5" />
+              <span>{settings.updateCenter.blockedReason}</span>
+            </div>
+          )}
+
+          {settings.updateCenter.state === 'error' && settings.updateCenter.error && (
+            <div className="p-3 rounded bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)] text-sm text-[var(--vscode-foreground)]">
+              Could not check for updates: {settings.updateCenter.error}
+            </div>
+          )}
+
+          <div>
+            <div className="text-sm font-medium text-[var(--vscode-foreground)] mb-3">
+              Component readiness
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <ComponentCard
+                icon={<HardDrive className="w-4 h-4" />}
+                title="Voice model"
+                status={settings.componentStatus.voiceModel.installed ? 'Installed' : 'Missing'}
+                details={[
+                  `${settings.componentStatus.voiceModel.modelName} (${settings.componentStatus.voiceModel.filename})`,
+                  settings.componentStatus.voiceModel.installed
+                    ? `On disk: ${settings.componentStatus.voiceModel.sizeDisplay}`
+                    : `Download size: ${settings.componentStatus.voiceModel.sizeDisplay}`,
+                  'Managed by Ritemark'
+                ]}
+              />
+
+              <ComponentCard
+                icon={<ShieldCheck className="w-4 h-4" />}
+                title="Claude"
+                status={
+                  settings.componentStatus.claudeCode.state === 'ready'
+                    ? 'Ready'
+                    : settings.componentStatus.claudeCode.state === 'broken'
+                      ? 'Broken'
+                      : settings.componentStatus.claudeCode.state === 'auth-in-progress'
+                        ? 'Signing in'
+                    : settings.componentStatus.claudeCode.state === 'needs-auth'
+                      ? 'Needs login'
+                      : 'Not installed'
+                }
+                details={[
+                  settings.componentStatus.claudeCode.version
+                    ? `Version: ${settings.componentStatus.claudeCode.version}`
+                    : settings.componentStatus.claudeCode.state === 'broken'
+                      ? 'CLI detected but not runnable'
+                      : 'CLI not detected',
+                  settings.componentStatus.claudeCode.state === 'ready'
+                    ? settings.componentStatus.claudeCode.authMethod === 'api-key'
+                      ? 'Connected with Anthropic API key'
+                      : 'Connected with Claude.ai'
+                    : settings.componentStatus.claudeCode.state === 'broken'
+                      ? (settings.componentStatus.claudeCode.error ?? 'Repair Claude to continue.')
+                      : settings.componentStatus.claudeCode.state === 'auth-in-progress'
+                        ? 'Finish Claude.ai sign-in in your terminal and browser.'
+                      : settings.componentStatus.claudeCode.state === 'needs-auth'
+                        ? 'Sign in with Claude.ai or use an Anthropic API key.'
+                        : 'Install Claude to use agent mode.',
+                  ...(settings.componentStatus.claudeCode.binaryPath
+                    ? [`Binary: ${settings.componentStatus.claudeCode.binaryPath}`]
+                    : []),
+                  'Managed by user'
+                ]}
+              >
+                <div className="flex flex-wrap gap-2">
+                  {(settings.componentStatus.claudeCode.repairAction === 'install'
+                    || settings.componentStatus.claudeCode.state === 'not-installed') && (
+                    <button
+                      onClick={() => handleClaudeAction('claude:install')}
+                      className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                    >
+                      Install Claude
+                    </button>
+                  )}
+                  {(settings.componentStatus.claudeCode.repairAction === 'repair'
+                    || settings.componentStatus.claudeCode.state === 'broken') && (
+                    <button
+                      onClick={() => handleClaudeAction('claude:repair')}
+                      className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                    >
+                      Repair Claude
+                    </button>
+                  )}
+                  {settings.componentStatus.claudeCode.repairAction === 'reload' && (
+                    <button
+                      onClick={() => handleClaudeAction('claude:reload')}
+                      className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                    >
+                      Reload Window
+                    </button>
+                  )}
+                  {(settings.componentStatus.claudeCode.state === 'needs-auth'
+                    || settings.componentStatus.claudeCode.state === 'auth-in-progress') && (
+                    <button
+                      onClick={() => handleClaudeAction(
+                        settings.componentStatus.claudeCode.state === 'auth-in-progress'
+                          ? 'claude:refreshStatus'
+                          : 'claude:login'
+                      )}
+                      className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                    >
+                      {settings.componentStatus.claudeCode.state === 'auth-in-progress'
+                        ? 'Refresh Status'
+                        : 'Sign in with Claude.ai'}
+                    </button>
+                  )}
+                </div>
+                {settings.componentStatus.claudeCode.diagnostics.length > 0 && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs text-[var(--vscode-textLink-foreground)] hover:underline">
+                      Technical details
+                    </summary>
+                    <div className="mt-2 space-y-1 text-xs text-[var(--vscode-descriptionForeground)]">
+                      {settings.componentStatus.claudeCode.diagnostics.map((detail) => (
+                        <div key={detail} className="break-words [overflow-wrap:anywhere]">
+                          {detail}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </ComponentCard>
+
+              <ComponentCard
+                icon={<Bot className="w-4 h-4" />}
+                title="Codex CLI"
+                status={
+                  settings.componentStatus.codex.state === 'ready'
+                    ? 'Ready'
+                    : settings.componentStatus.codex.state === 'broken'
+                      ? 'Broken'
+                      : 'Not installed'
+                }
+                details={[
+                  settings.componentStatus.codex.version
+                    ? `Version: ${settings.componentStatus.codex.version}`
+                    : settings.componentStatus.codex.state === 'broken'
+                      ? 'CLI failed to start'
+                      : settings.componentStatus.codex.installed
+                        ? 'Version unavailable'
+                        : 'CLI not detected',
+                  settings.componentStatus.codex.error
+                    ? settings.componentStatus.codex.error
+                    : settings.componentStatus.codex.installed
+                      ? 'Managed by user'
+                      : 'CLI not detected',
+                  ...settings.componentStatus.codex.diagnostics,
+                ]}
+              />
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   );
+}
+
+function formatTimestamp(timestamp: number): string {
+  if (!timestamp) {
+    return 'Never';
+  }
+
+  return new Date(timestamp).toLocaleString();
+}
+
+function formatSize(bytes?: number): string {
+  if (!bytes || bytes <= 0) {
+    return 'Size unknown';
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 interface ToggleRowProps {
@@ -702,6 +1249,62 @@ interface ToggleRowProps {
   checked: boolean;
   onChange: (value: boolean) => void;
   badge?: string;
+}
+
+function StatusBadge({ state }: { state: SettingsData['updateCenter']['state'] }) {
+  const label = state === 'update-available'
+    ? 'Update available'
+    : state === 'up-to-date'
+      ? 'Up to date'
+      : state === 'restart-required'
+        ? 'Restart required'
+        : state === 'paused'
+          ? 'Paused'
+          : state === 'blocked'
+            ? 'Blocked'
+            : state === 'error'
+              ? 'Error'
+              : state === 'checking'
+                ? 'Checking'
+                : 'Idle';
+
+  return (
+    <span className="text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+      {label}
+    </span>
+  );
+}
+
+function ComponentCard({
+  icon,
+  title,
+  status,
+  details,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  status: string;
+  details: string[];
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 p-3 rounded bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+      <div className="flex items-center gap-2 text-sm font-medium text-[var(--vscode-foreground)]">
+        {icon}
+        {title}
+      </div>
+      <div className="mt-2 text-sm text-[var(--vscode-foreground)]">{status}</div>
+      <div className="mt-2 space-y-1 text-xs text-[var(--vscode-descriptionForeground)]">
+        {details.map((detail) => (
+          <div key={detail} className="break-words [overflow-wrap:anywhere]">
+            {detail}
+          </div>
+        ))}
+      </div>
+      {children ? <div className="mt-3">{children}</div> : null}
+    </div>
+  );
 }
 
 function ToggleRow({ label, description, checked, onChange, badge }: ToggleRowProps) {

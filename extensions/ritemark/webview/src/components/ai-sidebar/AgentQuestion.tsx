@@ -260,7 +260,7 @@ export function AgentQuestion({ turnId, question, onAnswer }: AgentQuestionProps
       {/* Header */}
       <div className="flex items-center gap-2 text-[11px] text-[var(--vscode-descriptionForeground)]">
         <MessageCircle size={13} className="shrink-0" />
-        <span>Claude Code needs your input to continue</span>
+        <span>Claude needs your input to continue</span>
       </div>
 
       {/* Questions */}

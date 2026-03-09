@@ -58,7 +58,7 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   'agentic-assistant': {
     id: 'agentic-assistant',
     label: 'Agentic AI Assistant',
-    description: 'Enable Claude Code agent for autonomous file operations in the AI sidebar',
+    description: 'Enable Claude for autonomous file operations in the AI sidebar',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },

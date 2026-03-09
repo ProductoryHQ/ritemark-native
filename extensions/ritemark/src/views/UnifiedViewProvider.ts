@@ -21,10 +21,42 @@ import {
 } from '../ai/index';
 import { searchDocuments, buildRAGContext, RAGSearchResult } from '../rag/search';
 import { VectorStore, getDefaultDbPath } from '../rag/vectorStore';
-import { AgentSession, AGENTS, CLAUDE_FALLBACK_MODELS, DEFAULT_MODEL, getSetupStatus, clearSetupCache, setAnthropicKeyAvailable, hasCliOAuth, installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, type AgentId, type AgentProgress, type FileAttachment, type SetupStatus } from '../agent';
+import {
+  AgentSession,
+  AGENTS,
+  CLAUDE_FALLBACK_MODELS,
+  DEFAULT_MODEL,
+  getSetupStatus,
+  clearSetupCache,
+  setAnthropicKeyAvailable,
+  installClaude,
+  openClaudeLoginTerminal,
+  openAnthropicKeySettings,
+  setClaudeLoginInProgress,
+  clearClaudePendingReload,
+  emitClaudeStatusInvalidated,
+  onClaudeStatusInvalidated,
+  type AgentId,
+  type AgentProgress,
+  type FileAttachment,
+  type SetupStatus,
+} from '../agent';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
-import { CodexAppServer, getCodexModels } from '../codex';
+import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated } from '../codex';
+
+type CodexSidebarStatus = {
+  enabled: boolean;
+  state: 'disabled' | 'checking' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
+  version: string | null;
+  authMethod: 'apiKey' | 'chatgpt' | null;
+  email: string | null;
+  plan: string | null;
+  error: string | null;
+  diagnostics: string[];
+  repairCommand: string | null;
+  binaryPath: string | null;
+};
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -38,8 +70,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   // Codex state
   private _codexAppServer: CodexAppServer | null = null;
+  private _codexAuth: CodexAuth | null = null;
   private _codexThreadId: string | null = null;
   private _codexTurnId: string | null = null;
+  private _codexLoginInProgress = false;
+  private _codexLoginPoll: ReturnType<typeof setInterval> | null = null;
+  private _disposeCodexStatusListener: (() => void) | null = null;
+  private _claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
+  private _disposeClaudeStatusListener: (() => void) | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -50,6 +88,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     if (_workspacePath) {
       this._initVectorStore(_workspacePath);
     }
+
+    this._disposeCodexStatusListener = onCodexStatusInvalidated((event) => {
+      void this._handleExternalCodexStatusInvalidation(event.reason);
+    });
+    this._disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
+      void this._handleExternalClaudeStatusInvalidation(event.reason);
+    });
   }
 
   private async _initVectorStore(workspacePath: string): Promise<void> {
@@ -178,6 +223,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'agent-setup:check':
           clearSetupCache();
+          emitClaudeStatusInvalidated('status-refresh');
           this._sendAgentConfig();
           break;
 
@@ -188,6 +234,32 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // Codex messages
         case 'codex-execute':
           await this._handleCodexExecution(message.prompt, message.model, message.attachments);
+          break;
+
+        case 'codex:login':
+          await this._handleCodexLogin();
+          break;
+
+        case 'codex:logout':
+          await this._handleCodexLogout();
+          break;
+
+        case 'codex:refreshStatus':
+          emitCodexStatusInvalidated('status-refresh');
+          await this._sendCodexSidebarStatus();
+          break;
+
+        case 'codex:repair':
+          emitCodexStatusInvalidated('repair-started');
+          await this._openCodexRepairTerminal();
+          break;
+
+        case 'codex:reloadWindow':
+          await vscode.commands.executeCommand('workbench.action.reloadWindow');
+          break;
+
+        case 'codex:openSettings':
+          await vscode.commands.executeCommand('ritemark.aiSettings');
           break;
 
         case 'codex-cancel':
@@ -298,6 +370,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._agentSession?.close();
     this._vectorStore?.close();
     this._codexAppServer?.dispose();
+    this._stopCodexLoginPolling();
+    this._stopClaudeLoginPolling();
+    this._disposeCodexStatusListener?.();
+    this._disposeClaudeStatusListener?.();
   }
 
   private async _sendApiKeyStatus() {
@@ -340,6 +416,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const discoveredAgents = workspacePath ? discoverAgents(workspacePath) : [];
     const discoveredCommands = workspacePath ? discoverCommands(workspacePath) : [];
+    const codexStatus = await this._getCodexSidebarStatus();
 
     // Filter agents based on feature flags
     const visibleAgents = Object.values(AGENTS).filter(a => {
@@ -356,12 +433,315 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       agents: visibleAgents,
       models: CLAUDE_FALLBACK_MODELS,
       codexModels: getCodexModels(),
+      codexStatus,
       setupStatus,
       hasSeenWelcome,
       discoveredAgents,
       discoveredCommands,
       workspacePath: this._workspacePath,
     });
+  }
+
+  private async _handleExternalCodexStatusInvalidation(
+    reason: 'login-started' | 'login-finished' | 'logout' | 'repair-started' | 'repair-finished' | 'status-refresh'
+  ): Promise<void> {
+    if (!isEnabled('codex-integration')) {
+      return;
+    }
+
+    if (reason === 'login-started') {
+      this._codexLoginInProgress = true;
+      this._startCodexLoginPolling();
+    } else if (reason === 'logout') {
+      this._codexLoginInProgress = false;
+      this._stopCodexLoginPolling();
+      this._resetCodexSessionState();
+    } else if (reason === 'login-finished') {
+      this._codexLoginInProgress = false;
+      this._stopCodexLoginPolling();
+    }
+
+    await this._sendCodexSidebarStatus();
+  }
+
+  private async _handleExternalClaudeStatusInvalidation(
+    reason: 'install-started' | 'install-finished' | 'login-started' | 'login-finished' | 'status-refresh' | 'settings-updated'
+  ): Promise<void> {
+    if (reason === 'login-started') {
+      setClaudeLoginInProgress(true);
+      this._startClaudeLoginPolling();
+    } else if (reason === 'login-finished') {
+      setClaudeLoginInProgress(false);
+      this._stopClaudeLoginPolling();
+    } else if (reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
+      setClaudeLoginInProgress(false);
+      this._stopClaudeLoginPolling();
+    }
+
+    await this._sendAgentConfig();
+  }
+
+  private _stopClaudeLoginPolling(): void {
+    if (this._claudeLoginPoll) {
+      clearInterval(this._claudeLoginPoll);
+      this._claudeLoginPoll = null;
+    }
+  }
+
+  private _startClaudeLoginPolling(): void {
+    this._stopClaudeLoginPolling();
+
+    let attempts = 0;
+    this._claudeLoginPoll = setInterval(() => {
+      attempts += 1;
+
+      void (async () => {
+        const status = await getSetupStatus({ refresh: true });
+
+        if (status.state === 'ready') {
+          setClaudeLoginInProgress(false);
+          this._stopClaudeLoginPolling();
+          emitClaudeStatusInvalidated('login-finished');
+          return;
+        }
+
+        await this._sendAgentConfig();
+
+        if (attempts >= 60) {
+          setClaudeLoginInProgress(false);
+          this._stopClaudeLoginPolling();
+          await this._sendAgentConfig();
+        }
+      })();
+    }, 2000);
+  }
+
+  private _ensureCodexRuntime(): CodexAppServer {
+    if (this._codexAppServer) {
+      return this._codexAppServer;
+    }
+
+    this._codexAppServer = new CodexAppServer();
+    this._codexAuth = new CodexAuth(this._codexAppServer);
+
+    this._codexAuth.on('statusChanged', (status) => {
+      if (!status.authenticated) {
+        this._resetCodexSessionState();
+      }
+      void this._sendCodexSidebarStatus();
+    });
+
+    this._codexAuth.on('loginComplete', (event: { success: boolean }) => {
+      this._codexLoginInProgress = false;
+      this._stopCodexLoginPolling();
+      if (event.success) {
+        emitCodexStatusInvalidated('login-finished');
+      }
+      void this._sendCodexSidebarStatus();
+    });
+
+    this._setupCodexEventListeners();
+    return this._codexAppServer;
+  }
+
+  private _resetCodexSessionState(): void {
+    this._codexThreadId = null;
+    this._codexTurnId = null;
+  }
+
+  private _stopCodexLoginPolling(): void {
+    if (this._codexLoginPoll) {
+      clearInterval(this._codexLoginPoll);
+      this._codexLoginPoll = null;
+    }
+  }
+
+  private _startCodexLoginPolling(): void {
+    this._stopCodexLoginPolling();
+
+    let attempts = 0;
+    this._codexLoginPoll = setInterval(() => {
+      attempts += 1;
+
+      void (async () => {
+        const status = await this._getCodexSidebarStatus();
+        this._postCodexSidebarStatus(status);
+
+        if (status.state === 'ready') {
+          this._codexLoginInProgress = false;
+          this._stopCodexLoginPolling();
+          return;
+        }
+
+        if (attempts >= 60) {
+          this._codexLoginInProgress = false;
+          this._stopCodexLoginPolling();
+          await this._sendCodexSidebarStatus();
+        }
+      })();
+    }, 2000);
+  }
+
+  private _postCodexSidebarStatus(status: CodexSidebarStatus): void {
+    this._view?.webview.postMessage({
+      type: 'codex:status',
+      status,
+    });
+  }
+
+  private async _sendCodexSidebarStatus(): Promise<void> {
+    this._postCodexSidebarStatus(await this._getCodexSidebarStatus());
+  }
+
+  private async _getCodexSidebarStatus(): Promise<CodexSidebarStatus> {
+    if (!isEnabled('codex-integration')) {
+      return {
+        enabled: false,
+        state: 'disabled',
+        version: null,
+        authMethod: null,
+        email: null,
+        plan: null,
+        error: null,
+        diagnostics: [],
+        repairCommand: null,
+        binaryPath: null,
+      };
+    }
+
+    const codexManager = new CodexManager();
+    const binaryStatus = await codexManager.getBinaryStatus();
+
+    if (!binaryStatus.available || !binaryStatus.runnable) {
+      return {
+        enabled: true,
+        state: 'broken-install',
+        version: binaryStatus.version,
+        authMethod: null,
+        email: null,
+        plan: null,
+        error: binaryStatus.error ?? 'Codex CLI is not available.',
+        diagnostics: binaryStatus.diagnostics,
+        repairCommand: binaryStatus.repairCommand,
+        binaryPath: binaryStatus.binaryPath,
+      };
+    }
+
+    try {
+      this._ensureCodexRuntime();
+      const authStatus = await this._codexAuth!.getStatus();
+      const authenticated = authStatus.authenticated;
+
+      return {
+        enabled: true,
+        state: authenticated
+          ? 'ready'
+          : this._codexLoginInProgress
+            ? 'auth-in-progress'
+            : 'needs-auth',
+        version: binaryStatus.version,
+        authMethod: authStatus.authMethod,
+        email: authStatus.email,
+        plan: authStatus.plan,
+        error: null,
+        diagnostics: binaryStatus.diagnostics,
+        repairCommand: binaryStatus.repairCommand,
+        binaryPath: binaryStatus.binaryPath,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        enabled: true,
+        state: 'broken-install',
+        version: binaryStatus.version,
+        authMethod: null,
+        email: null,
+        plan: null,
+        error: message,
+        diagnostics: binaryStatus.diagnostics,
+        repairCommand: binaryStatus.repairCommand,
+        binaryPath: binaryStatus.binaryPath,
+      };
+    }
+  }
+
+  private async _handleCodexLogin(): Promise<void> {
+    try {
+      const status = await this._getCodexSidebarStatus();
+      if (status.state === 'broken-install') {
+        this._postCodexSidebarStatus(status);
+        return;
+      }
+
+      this._ensureCodexRuntime();
+      this._codexLoginInProgress = true;
+      this._postCodexSidebarStatus({
+        ...status,
+        state: 'auth-in-progress',
+        error: null,
+      });
+      this._startCodexLoginPolling();
+
+      const login = await this._codexAuth!.startLogin();
+      await vscode.env.openExternal(vscode.Uri.parse(login.authUrl));
+      emitCodexStatusInvalidated('login-started');
+    } catch (error) {
+      this._codexLoginInProgress = false;
+      this._stopCodexLoginPolling();
+      const message = error instanceof Error ? error.message : String(error);
+      this._postCodexSidebarStatus({
+        enabled: true,
+        state: 'needs-auth',
+        version: null,
+        authMethod: null,
+        email: null,
+        plan: null,
+        error: message,
+        diagnostics: [],
+        repairCommand: null,
+        binaryPath: null,
+      });
+    }
+  }
+
+  private async _handleCodexLogout(): Promise<void> {
+    try {
+      const status = await this._getCodexSidebarStatus();
+      if (status.state === 'broken-install') {
+        this._postCodexSidebarStatus(status);
+        return;
+      }
+
+      this._ensureCodexRuntime();
+      await this._codexAuth!.logout();
+      this._codexLoginInProgress = false;
+      this._stopCodexLoginPolling();
+      this._resetCodexSessionState();
+      emitCodexStatusInvalidated('logout');
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Codex sign-out failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+      await this._sendCodexSidebarStatus();
+    }
+  }
+
+  private async _openCodexRepairTerminal(): Promise<void> {
+    const codexManager = new CodexManager();
+    const status = await codexManager.getBinaryStatus();
+    const command = status.repairCommand ?? 'npm install -g @openai/codex@latest';
+
+    const terminal = vscode.window.createTerminal({
+      name: 'Codex Repair',
+      shellPath: process.platform === 'win32' ? 'powershell.exe' : undefined,
+    });
+
+    terminal.show();
+    terminal.sendText(command);
+
+    vscode.window.showInformationMessage(
+      'Opened Codex repair in terminal. After it finishes, reload the window.'
+    );
   }
 
   /**
@@ -378,12 +758,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     // Guard: check if Claude Code is set up
-    const status = await getSetupStatus();
-    if (!status.cliInstalled || !status.authenticated) {
+    const status = await getSetupStatus({ refresh: true });
+    if (status.state !== 'ready') {
       this._view?.webview.postMessage({
         type: 'agent-result',
-        error: 'Claude Code is not fully set up. Please complete the setup wizard first.',
+        error: status.error
+          ?? (status.state === 'broken-install'
+            ? 'Claude is installed but not ready. Repair it first.'
+            : status.state === 'needs-auth' || status.state === 'auth-in-progress'
+              ? 'Claude is not signed in yet. Finish Claude.ai sign-in first.'
+              : 'Claude is not installed yet. Complete setup first.'),
       });
+      await this._sendAgentConfig();
       return;
     }
 
@@ -401,17 +787,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       const excludedFolders = config.get<string[]>('excludedFolders');
       const model = config.get<string>('selectedModel', DEFAULT_MODEL);
 
-      // Only use the API key as fallback when user doesn't have CLI OAuth.
-      // CLI OAuth uses Claude.ai billing; API key uses Anthropic API billing.
-      // Injecting the API key when CLI OAuth exists would override their billing.
       let anthropicApiKey: string | undefined;
-      if (!hasCliOAuth() && this._secrets) {
+      if (status.authMethod === 'api-key' && this._secrets) {
         anthropicApiKey = await this._secrets.get('anthropic-api-key');
       }
 
       this._agentSession = new AgentSession({
         workspacePath: this._workspacePath,
         model,
+        pathToClaudeCodeExecutable: status.binaryPath,
         ...(excludedFolders ? { excludedFolders } : {}),
         ...(anthropicApiKey ? { anthropicApiKey } : {}),
       });
@@ -475,16 +859,31 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      // Lazy-init the app server
-      if (!this._codexAppServer) {
-        this._codexAppServer = new CodexAppServer();
-        this._setupCodexEventListeners();
-        await this._codexAppServer.ensureInitialized();
+      const status = await this._getCodexSidebarStatus();
+      this._postCodexSidebarStatus(status);
+      if (status.state === 'broken-install') {
+        this._view?.webview.postMessage({
+          type: 'codex-result',
+          error: status.error ?? 'Codex CLI is not ready.',
+        });
+        return;
       }
+      if (status.state === 'needs-auth' || status.state === 'auth-in-progress') {
+        this._view?.webview.postMessage({
+          type: 'codex-result',
+          error: status.state === 'auth-in-progress'
+            ? 'Finish ChatGPT sign-in first.'
+            : 'Sign in with ChatGPT before using Codex.',
+        });
+        return;
+      }
+
+      const appServer = this._ensureCodexRuntime();
+      await appServer.ensureInitialized();
 
       // Create thread if needed
       if (!this._codexThreadId) {
-        const result = await this._codexAppServer.threadStart({
+        const result = await appServer.threadStart({
           cwd: this._workspacePath || null,
           model: model || null,
         });
@@ -503,7 +902,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         : prompt;
 
       // Start turn (send user message)
-      const turnResult = await this._codexAppServer.turnStart(
+      const turnResult = await appServer.turnStart(
         this._codexThreadId,
         enrichedPrompt,
         model,
@@ -549,14 +948,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _setupCodexEventListeners() {
     if (!this._codexAppServer) return;
 
-    // Log ALL notifications for debugging
-    this._codexAppServer.on('notification', (notification: { method: string; params: unknown }) => {
-      console.log('[Codex] notification:', notification.method, JSON.stringify(notification.params).slice(0, 300));
-    });
-
     // V2 notifications
     this._codexAppServer.on('item/started', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
-      console.log('[Codex] item/started:', params.item?.type, params.item?.id);
       // Only show activity for actual tool use, not userMessage/reasoning
       const itemType = params.item?.type;
       if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning') {
@@ -577,7 +970,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     this._codexAppServer.on('item/completed', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
       const itemType = params.item?.type;
-      console.log('[Codex] item/completed:', itemType, params.item?.id);
       // Only show completion for tool items, not userMessage/reasoning/agentMessage
       if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage') {
         this._view?.webview.postMessage({
@@ -588,7 +980,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
 
     this._codexAppServer.on('turn/completed', (params: { threadId: string; turn: { id: string; status: string; error: unknown } }) => {
-      console.log('[Codex] turn/completed:', JSON.stringify(params).slice(0, 200));
       this._codexTurnId = null;
       this._view?.webview.postMessage({
         type: 'codex-result',
@@ -599,7 +990,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     // Server-initiated requests (approvals are bidirectional RPC)
     this._codexAppServer.on('server-request', (request: { id: string | number; method: string; params: Record<string, unknown> }) => {
-      console.log('[Codex] server-request:', request.method, JSON.stringify(request.params).slice(0, 200));
       if (request.method === 'execCommandApproval') {
         const p = request.params;
         this._view?.webview.postMessage({
@@ -619,15 +1009,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         });
       } else {
         // Unknown server request — auto-deny to not block the agent
-        console.log('[Codex] auto-denying unknown server request:', request.method);
         this._codexAppServer?.sendApprovalResponse(request.id, 'denied');
       }
     });
 
     this._codexAppServer.on('exit', () => {
       this._codexAppServer = null;
+      this._codexAuth = null;
       this._codexThreadId = null;
       this._codexTurnId = null;
+      this._codexLoginInProgress = false;
+      this._stopCodexLoginPolling();
+      void this._sendCodexSidebarStatus();
     });
   }
 
@@ -635,37 +1028,63 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Handle Claude Code CLI installation request from webview.
    */
   private async _handleClaudeInstall() {
+    emitClaudeStatusInvalidated('install-started');
     const result = await installClaude((progress) => {
       this._view?.webview.postMessage({ type: 'agent-setup:progress', progress });
     });
 
+    clearSetupCache();
+    const status = await getSetupStatus({ refresh: true });
+
     if (result.success) {
-      clearSetupCache();
-      const status = await getSetupStatus();
+      if (result.outcome === 'installed') {
+        clearClaudePendingReload();
+      }
+
       this._view?.webview.postMessage({ type: 'agent-setup:complete', status });
-    } else {
-      this._view?.webview.postMessage({ type: 'agent-setup:error', error: result.error || 'Installation failed' });
+      emitClaudeStatusInvalidated('install-finished');
+      return;
     }
+
+    this._view?.webview.postMessage({
+      type: 'agent-setup:error',
+      error: result.error || 'Claude install failed.',
+    });
+    this._view?.webview.postMessage({ type: 'agent-setup:complete', status });
+    emitClaudeStatusInvalidated('install-finished');
   }
 
   /**
-   * Handle Claude Code login request from webview.
-   * Opens a VS Code terminal with `claude` — the CLI prompts for login on first launch.
-   * User authenticates via browser, then clicks "Recheck" in the wizard.
+   * Handle Claude login request from webview.
    */
-  private _handleClaudeLogin() {
-    openClaudeLoginTerminal();
-    // Don't send complete — the user needs to finish login in the terminal,
-    // then click "Recheck" in the wizard which triggers agent-setup:check.
+  private async _handleClaudeLogin() {
+    const status = await getSetupStatus({ refresh: true });
+
+    if (status.state === 'not-installed' || status.state === 'broken-install' || !status.binaryPath || !status.runnable) {
+      this._view?.webview.postMessage({
+        type: 'agent-setup:error',
+        error: status.error ?? 'Claude is not ready yet. Install or repair it first.',
+      });
+      this._view?.webview.postMessage({ type: 'agent-setup:complete', status });
+      await this._sendAgentConfig();
+      return;
+    }
+
+    setClaudeLoginInProgress(true);
+    this._startClaudeLoginPolling();
+    emitClaudeStatusInvalidated('login-started');
+    openClaudeLoginTerminal(status.binaryPath);
+
     this._view?.webview.postMessage({
       type: 'agent-setup:progress',
-      progress: { stage: 'login', message: 'Complete login in the terminal, then click Recheck.' },
+      progress: {
+        stage: 'login',
+        message: 'Finish Claude.ai sign-in in the terminal and browser. Ritemark will update automatically.',
+      },
     });
-    // Reset inProgress so the wizard doesn't stay in loading state
-    this._view?.webview.postMessage({
-      type: 'agent-setup:complete',
-      status: { cliInstalled: true, authenticated: false },
-    });
+
+    const pendingStatus = await getSetupStatus({ refresh: true });
+    this._view?.webview.postMessage({ type: 'agent-setup:complete', status: pendingStatus });
   }
 
   private _sendChatFontSize() {

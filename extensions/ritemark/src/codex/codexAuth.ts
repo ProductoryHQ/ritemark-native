@@ -1,88 +1,134 @@
 /**
  * Codex Authentication Manager
  *
- * Manages ChatGPT OAuth authentication state:
- * - Trigger OAuth flow via app-server
- * - Listen for auth status changes
- * - Provide current auth state
+ * Uses the current Codex app-server account APIs:
+ * - account/read
+ * - account/rateLimits/read
+ * - account/login/start
+ * - account/logout
  */
 
-import { CodexAppServer } from './codexAppServer';
-import type { GetAuthStatusResponse, AuthStatusChangeNotification, LoginChatGptCompleteNotification } from './codexProtocol';
 import { EventEmitter } from 'events';
+import { CodexAppServer } from './codexAppServer';
+import type {
+  AccountLoginCompletedNotification,
+  AccountUpdatedNotification,
+  CodexPlanType,
+  GetAccountRateLimitsResponse,
+} from './codexProtocol';
+
+export interface CodexAuthStatus {
+  authenticated: boolean;
+  authMethod: 'apiKey' | 'chatgpt' | null;
+  email: string | null;
+  plan: CodexPlanType | null;
+  requiresOpenaiAuth: boolean;
+  rateLimits: GetAccountRateLimitsResponse | null;
+}
+
+export interface CodexLoginStartResult {
+  loginId: string;
+  authUrl: string;
+}
+
+const EMPTY_STATUS: CodexAuthStatus = {
+  authenticated: false,
+  authMethod: null,
+  email: null,
+  plan: null,
+  requiresOpenaiAuth: false,
+  rateLimits: null,
+};
 
 export class CodexAuth extends EventEmitter {
   private appServer: CodexAppServer;
-  private currentAuth: GetAuthStatusResponse = { authMethod: null, authToken: null, requiresOpenaiAuth: null };
+  private currentAuth: CodexAuthStatus = { ...EMPTY_STATUS };
+  private lastStatusError: string | null = null;
 
   constructor(appServer: CodexAppServer) {
     super();
     this.appServer = appServer;
 
-    // Listen for auth status changes from app-server
-    this.appServer.on('authStatusChange', (event: AuthStatusChangeNotification) => {
-      this.currentAuth = { ...this.currentAuth, authMethod: event.authMethod };
+    this.appServer.on('account/updated', (event: AccountUpdatedNotification) => {
+      this.currentAuth = {
+        ...this.currentAuth,
+        authenticated: event.authMode !== null,
+        authMethod: event.authMode === 'chatgpt'
+          ? 'chatgpt'
+          : event.authMode === 'apiKey'
+            ? 'apiKey'
+            : null,
+        plan: event.planType ?? this.currentAuth.plan,
+      };
       this.emit('statusChanged', this.currentAuth);
     });
 
-    // Listen for login completion
-    this.appServer.on('loginChatGptComplete', (event: LoginChatGptCompleteNotification) => {
+    this.appServer.on('account/login/completed', async (event: AccountLoginCompletedNotification) => {
       if (event.success) {
-        this.currentAuth = { ...this.currentAuth, authMethod: 'chatgpt' };
+        await this.getStatus();
       }
-      this.emit('loginComplete', event.success);
+      this.emit('loginComplete', event);
       this.emit('statusChanged', this.currentAuth);
     });
   }
 
-  /**
-   * Get current authentication status
-   */
-  async getStatus(): Promise<GetAuthStatusResponse> {
+  async getStatus(): Promise<CodexAuthStatus> {
     try {
-      const status = await this.appServer.getAuthStatus();
-      this.currentAuth = status;
-      return status;
+      const [account, rateLimits] = await Promise.all([
+        this.appServer.getAccount(),
+        this.appServer.getAccountRateLimits().catch(() => null),
+      ]);
+
+      this.currentAuth = {
+        authenticated: account.account !== null,
+        authMethod: account.account?.type === 'chatgpt'
+          ? 'chatgpt'
+          : account.account?.type === 'apiKey'
+            ? 'apiKey'
+            : null,
+        email: account.account?.type === 'chatgpt' ? account.account.email : null,
+        plan: account.account?.type === 'chatgpt' ? account.account.planType : null,
+        requiresOpenaiAuth: account.requiresOpenaiAuth,
+        rateLimits,
+      };
+      this.lastStatusError = null;
+      return this.currentAuth;
     } catch (error) {
-      console.error('Failed to get auth status:', error);
-      return { authMethod: null, authToken: null, requiresOpenaiAuth: null };
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== this.lastStatusError) {
+        console.error('Failed to get auth status:', error);
+        this.lastStatusError = message;
+      }
+      this.currentAuth = { ...EMPTY_STATUS };
+      return this.currentAuth;
     }
   }
 
-  /**
-   * Check if currently authenticated
-   */
   isAuthenticated(): boolean {
-    return this.currentAuth.authMethod !== null;
+    return this.currentAuth.authenticated;
   }
 
-  /**
-   * Get auth method (apikey, chatgpt, etc.)
-   */
   getAuthMethod(): string | null {
     return this.currentAuth.authMethod;
   }
 
-  /**
-   * Start ChatGPT OAuth login flow
-   */
-  async startLogin(): Promise<void> {
+  async startLogin(): Promise<CodexLoginStartResult> {
     try {
-      await this.appServer.loginChatGpt();
-      // Login completion comes via 'loginChatGptComplete' notification
+      const result = await this.appServer.loginAccountChatGpt();
+      return {
+        loginId: result.loginId,
+        authUrl: result.authUrl,
+      };
     } catch (error) {
       console.error('Failed to start login:', error);
       throw error;
     }
   }
 
-  /**
-   * Logout
-   */
   async logout(): Promise<void> {
     try {
-      await this.appServer.logoutChatGpt();
-      this.currentAuth = { authMethod: null, authToken: null, requiresOpenaiAuth: null };
+      await this.appServer.logoutAccount();
+      this.currentAuth = { ...EMPTY_STATUS };
       this.emit('statusChanged', this.currentAuth);
     } catch (error) {
       console.error('Failed to logout:', error);
@@ -90,18 +136,15 @@ export class CodexAuth extends EventEmitter {
     }
   }
 
-  /**
-   * Wait for authentication to complete
-   */
-  async waitForAuth(timeoutMs = 120000): Promise<GetAuthStatusResponse> {
+  async waitForAuth(timeoutMs = 120000): Promise<CodexAuthStatus> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.off('statusChanged', handler);
         reject(new Error('Authentication timeout'));
       }, timeoutMs);
 
-      const handler = (status: GetAuthStatusResponse) => {
-        if (status.authMethod !== null) {
+      const handler = (status: CodexAuthStatus) => {
+        if (status.authenticated) {
           clearTimeout(timeout);
           this.off('statusChanged', handler);
           resolve(status);
@@ -110,8 +153,7 @@ export class CodexAuth extends EventEmitter {
 
       this.on('statusChanged', handler);
 
-      // Check current status immediately
-      if (this.currentAuth.authMethod !== null) {
+      if (this.currentAuth.authenticated) {
         clearTimeout(timeout);
         this.off('statusChanged', handler);
         resolve(this.currentAuth);
