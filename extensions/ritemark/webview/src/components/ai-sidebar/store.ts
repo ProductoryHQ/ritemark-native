@@ -28,6 +28,7 @@ import type {
   WidgetData,
   AgentConversationTurn,
   CodexConversationTurn,
+  CodexSidebarStatus,
   FileAttachment,
   DiscoveredAgent,
   DiscoveredCommand,
@@ -43,6 +44,19 @@ let msgCounter = 0;
 function nextId(): string {
   return `msg-${++msgCounter}-${Date.now()}`;
 }
+
+const DEFAULT_CODEX_STATUS: CodexSidebarStatus = {
+  enabled: false,
+  state: 'disabled',
+  version: null,
+  authMethod: null,
+  email: null,
+  plan: null,
+  error: null,
+  diagnostics: [],
+  repairCommand: null,
+  binaryPath: null,
+};
 
 // ── Context window estimation ─────────────────────────────────────────
 // Disabled: our heuristics were inaccurate and too aggressive.
@@ -85,6 +99,7 @@ interface AISidebarState {
   codexEnabled: boolean;
   codexModels: ModelOption[];
   codexSelectedModel: string;
+  codexStatus: CodexSidebarStatus;
   codexConversation: CodexConversationTurn[];
 
   // ── Chat history state ──
@@ -138,6 +153,12 @@ interface AISidebarState {
   sendCodexMessage: (prompt: string, attachments?: FileAttachment[]) => void;
   selectCodexModel: (modelId: string) => void;
   handleCodexApproval: (requestId: string | number, approved: boolean) => void;
+  startCodexLogin: () => void;
+  logoutCodex: () => void;
+  refreshCodexStatus: () => void;
+  repairCodex: () => void;
+  reloadWindow: () => void;
+  openAgentSettings: () => void;
 
   // ── Chat history actions ──
   loadConversationList: () => void;
@@ -177,6 +198,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   codexEnabled: false,
   codexModels: [],
   codexSelectedModel: 'gpt-5.3-codex',
+  codexStatus: DEFAULT_CODEX_STATUS,
   codexConversation: [],
 
   currentConversationId: null,
@@ -455,6 +477,38 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'codex-approve', requestId, approved });
   },
 
+  startCodexLogin: () => {
+    const status = get().codexStatus;
+    set({
+      codexStatus: {
+        ...status,
+        state: 'auth-in-progress',
+        error: null,
+      },
+    });
+    vscode.postMessage({ type: 'codex:login' });
+  },
+
+  logoutCodex: () => {
+    vscode.postMessage({ type: 'codex:logout' });
+  },
+
+  refreshCodexStatus: () => {
+    vscode.postMessage({ type: 'codex:refreshStatus' });
+  },
+
+  repairCodex: () => {
+    vscode.postMessage({ type: 'codex:repair' });
+  },
+
+  reloadWindow: () => {
+    vscode.postMessage({ type: 'codex:reloadWindow' });
+  },
+
+  openAgentSettings: () => {
+    vscode.postMessage({ type: 'codex:openSettings' });
+  },
+
   // ── Chat history actions ──
 
   loadConversationList: () => {
@@ -589,6 +643,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       isStreaming: false,
       pendingCitations: [],
       agentConversation: [],
+      codexConversation: [],
       estimatedTokens: 0,
       contextUsagePercent: 0,
       showContextWarning: false,
@@ -634,12 +689,39 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           models: newClaudeModels,
           codexModels: newCodexModels,
           codexSelectedModel,
+          codexStatus: message.codexStatus ?? get().codexStatus,
           setupStatus: message.setupStatus ?? get().setupStatus,
           hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
           discoveredAgents: message.discoveredAgents || [],
           discoveredCommands: message.discoveredCommands || [],
         });
         break;
+
+      case 'codex:status': {
+        const updates: Partial<AISidebarState> = {
+          codexStatus: message.status,
+        };
+
+        if (message.status.state !== 'ready') {
+          const conv = [...state.codexConversation];
+          const lastTurn = conv[conv.length - 1];
+          if (lastTurn?.isRunning) {
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              approval: undefined,
+              isRunning: false,
+              result: {
+                status: 'blocked',
+                error: message.status.error || 'Codex is not ready.',
+              },
+            };
+            updates.codexConversation = conv;
+          }
+        }
+
+        set(updates);
+        break;
+      }
 
       case 'agent:models-update': {
         const newModels = message.models || [];

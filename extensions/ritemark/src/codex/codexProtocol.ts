@@ -57,28 +57,72 @@ export interface InitializeResult {
 }
 
 // ============================================================================
-// Auth (Client → Server)
+// Account / Auth (Client → Server)
 // ============================================================================
 
-/** getAuthStatus params */
-export interface GetAuthStatusParams {
-  includeToken: boolean | null;
-  refreshToken: boolean | null;
+export type CodexPlanType =
+  | 'free'
+  | 'go'
+  | 'plus'
+  | 'pro'
+  | 'team'
+  | 'business'
+  | 'enterprise'
+  | 'edu'
+  | 'unknown';
+
+export interface GetAccountParams {
+  refreshToken: boolean;
 }
 
-/** getAuthStatus response */
-export interface GetAuthStatusResponse {
-  authMethod: 'apikey' | 'chatgpt' | 'chatgptAuthTokens' | null;
-  authToken: string | null;
-  requiresOpenaiAuth: boolean | null;
+export type CodexAccount =
+  | { type: 'apiKey' }
+  | { type: 'chatgpt'; email: string; planType: CodexPlanType };
+
+export interface GetAccountResponse {
+  account: CodexAccount | null;
+  requiresOpenaiAuth: boolean;
 }
 
-// loginChatGpt: no params (undefined), response: LoginChatGptResponse
-export interface LoginChatGptResponse {
-  // empty response — auth completion comes via notification
+export interface RateLimitWindow {
+  usedPercent: number;
+  windowDurationMins: number;
+  resetsAt: number;
 }
 
-// logoutChatGpt: no params, no meaningful response
+export interface CreditsSnapshot {
+  hasCredits: boolean;
+  unlimited: boolean;
+  balance: string | null;
+}
+
+export interface RateLimitSnapshot {
+  limitId: string | null;
+  limitName: string | null;
+  primary: RateLimitWindow | null;
+  secondary: RateLimitWindow | null;
+  credits: CreditsSnapshot | null;
+  planType: CodexPlanType | null;
+}
+
+export interface GetAccountRateLimitsResponse {
+  rateLimits: RateLimitSnapshot;
+  rateLimitsByLimitId: Record<string, RateLimitSnapshot> | null;
+}
+
+export interface LoginAccountChatGptParams {
+  type: 'chatgpt';
+}
+
+export interface LoginAccountChatGptResponse {
+  type: 'chatgpt';
+  loginId: string;
+  authUrl: string;
+}
+
+export interface LogoutAccountResponse {
+  [key: string]: never;
+}
 
 // ============================================================================
 // Thread Management (Client → Server)
@@ -123,8 +167,8 @@ export interface ThreadInfo {
 
 export type UserInput =
   | { type: 'text'; text: string; text_elements: unknown[] }
-  | { type: 'image'; image_url: { url: string } }
-  | { type: 'local_image'; path: string };
+  | { type: 'image'; url: string }
+  | { type: 'localImage'; path: string };
 
 export interface TurnStartParams {
   threadId: string;
@@ -224,14 +268,17 @@ export interface ItemCompletedNotification {
   turnId: string;
 }
 
-/** authStatusChange notification */
-export interface AuthStatusChangeNotification {
-  authMethod: 'apikey' | 'chatgpt' | 'chatgptAuthTokens' | null;
+/** account/updated notification */
+export interface AccountUpdatedNotification {
+  authMode: 'apiKey' | 'chatgpt' | 'chatgptAuthTokens' | null;
+  planType: CodexPlanType | null;
 }
 
-/** loginChatGptComplete notification */
-export interface LoginChatGptCompleteNotification {
+/** account/login/completed notification */
+export interface AccountLoginCompletedNotification {
+  loginId: string | null;
   success: boolean;
+  error: string | null;
 }
 
 /** exec_approval_request event (legacy EventMsg) */
@@ -295,8 +342,8 @@ export type CodexServerNotification =
   | { method: 'item/started'; params: ItemStartedNotification }
   | { method: 'item/completed'; params: ItemCompletedNotification }
   | { method: 'item/agentMessage/delta'; params: AgentMessageDeltaNotification }
-  | { method: 'authStatusChange'; params: AuthStatusChangeNotification }
-  | { method: 'loginChatGptComplete'; params: LoginChatGptCompleteNotification };
+  | { method: 'account/updated'; params: AccountUpdatedNotification }
+  | { method: 'account/login/completed'; params: AccountLoginCompletedNotification };
 
 // Legacy event types are emitted when codex sends EventMsg as part of the
 // session event stream. These arrive as JSON-RPC notifications with method

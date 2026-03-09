@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { UpdateService } from './updateService';
-import { UpdateStorage } from './updateStorage';
 
 const STARTUP_DELAY_MS = 10_000; // 10 seconds after activation
 
@@ -9,8 +8,7 @@ const STARTUP_DELAY_MS = 10_000; // 10 seconds after activation
  * Respects user settings and preferences
  */
 export function scheduleStartupCheck(
-  updateService: UpdateService,
-  storage: UpdateStorage
+  updateService: UpdateService
 ): void {
   // Single delayed check on startup
   setTimeout(async () => {
@@ -20,11 +18,6 @@ export function scheduleStartupCheck(
     if (!enabled) {
       console.log('Update checks disabled via settings');
       return; // User disabled update checks
-    }
-
-    if (storage.getDontShowAgain()) {
-      console.log('Update notifications disabled by user preference');
-      return; // User clicked "Don't show again"
     }
 
     console.log('Running startup update check...');

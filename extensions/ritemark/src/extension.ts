@@ -91,7 +91,7 @@ export function activate(context: vscode.ExtensionContext) {
   const updateService = new UpdateService(updateStorage);
 
   // Schedule startup update check (10 second delay)
-  scheduleStartupCheck(updateService, updateStorage);
+  scheduleStartupCheck(updateService);
 
   // Register Unified View Provider (Primary Sidebar / left)
   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -158,7 +158,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // Initialize Settings Provider
-  settingsProvider = new RitemarkSettingsProvider(context);
+  settingsProvider = new RitemarkSettingsProvider(context, updateService);
   context.subscriptions.push({ dispose: () => settingsProvider?.dispose() });
 
   // Register chat history command (toggles history panel in webview)

@@ -9,9 +9,10 @@
 export { UpdateService } from './updateService';
 export { UpdateStorage } from './updateStorage';
 export { scheduleStartupCheck } from './updateScheduler';
+export type { UpdateStatusSnapshot, UpdateStatusState } from './updateService';
 
 // Version utilities
-export { getCurrentVersion, getVersionInfo, getExtensionFolderName, parseVersionFromFolderName } from './versionService';
+export { getCurrentVersion, getCurrentAppVersion, getVersionInfo, getExtensionFolderName, parseVersionFromFolderName } from './versionService';
 export type { VersionInfo } from './versionService';
 export {
   isNewerVersion,
@@ -39,6 +40,25 @@ export {
 } from './githubClient';
 export type { GitHubRelease, UpdateInfo } from './githubClient';
 
+// Feed and resolution
+export {
+  DEFAULT_UPDATE_FEED_URL,
+  fetchUpdateFeed,
+  parseUpdateFeed,
+  findPlatformAsset,
+  toExtensionManifest,
+  toFullManifest
+} from './updateFeed';
+export type {
+  UpdateFeed,
+  UpdateFeedFullRelease,
+  UpdateFeedExtensionRelease,
+  UpdateFeedPlatformAsset,
+  UpdateFeedExtensionFile
+} from './updateFeed';
+export { resolveUpdate } from './updateResolver';
+export type { ResolveUpdateInput, ResolvedUpdateResult, ResolvedUpdateAction } from './updateResolver';
+
 // Manifest types and utilities
 export {
   validateManifest,
@@ -64,4 +84,9 @@ export {
 export type { ProgressCallback, InstallResult } from './userExtensionInstaller';
 
 // Notifications
-export { showUpdateNotification, showExtensionUpdateNotification } from './updateNotification';
+export {
+  showFullUpdateNotification,
+  showExtensionUpdateNotification,
+  installExtensionUpdateWithProgress,
+  promptReloadWindow
+} from './updateNotification';

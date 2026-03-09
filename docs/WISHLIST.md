@@ -10,6 +10,7 @@ A collection of ideas for future development. No commitment, no order - just a p
 - [ ] Add Youtube (any other streaming) videos from / command palette
 - [ ] **Windows: save triggers "file updated" notification** - On Windows, every save triggers the stale file indicator as if the file was modified externally. Needs investigation — likely the file watcher is not distinguishing between internal saves and external changes on Windows
 
+
 ## Data Editor
 
 - [ ] **BUG: Columns have no max-width — text never wraps** - Long cell content stretches columns infinitely with no line breaks (cells use `whitespace-nowrap` + `text-ellipsis`). Fix: add `max-width` (e.g. 300-400px) to columns and switch to `whitespace-normal` + `word-break: break-word` so text wraps within a bounded column. Consider `table-layout: fixed` for predictable column sizing. Affects both CSV and Excel preview. (`DataTable.tsx:516`, header `minWidth: 100` at line 271 but no max)

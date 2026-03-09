@@ -105,7 +105,7 @@
           "ritemark.features.agentic-assistant": {
             "type": "boolean",
             "default": false,
-            "description": "Enable Claude Code agent in the AI sidebar (experimental). Allows autonomous file operations.",
+            "description": "Enable Claude in the AI sidebar (experimental). Allows autonomous file operations.",
             "scope": "application"
           },
           "ritemark.features.codex-integration": {
@@ -129,7 +129,7 @@
             ],
             "enumDescriptions": [
               "Ritemark Agent - Chat assistant with RAG search and image generation",
-              "Claude Code (experimental) - Autonomous agent that can read, write, and organize files",
+              "Claude (experimental) - Autonomous agent that can read, write, and organize files",
               "Codex (experimental) - OpenAI coding agent with ChatGPT authentication"
             ],
             "description": "Select which AI agent to use in the sidebar",
@@ -152,19 +152,19 @@
               "credentials*",
               "secrets*"
             ],
-            "description": "Folders and file patterns the Claude Code agent should not access. The agent is instructed to skip these paths.",
+            "description": "Folders and file patterns Claude should not access. The agent is instructed to skip these paths.",
             "scope": "resource"
           },
           "ritemark.ai.selectedModel": {
             "type": "string",
             "default": "claude-sonnet-4-5",
-            "description": "Claude Code model to use (e.g. claude-sonnet-4-5, claude-opus-4, haiku)",
+            "description": "Claude model to use (e.g. claude-sonnet-4-5, claude-opus-4, haiku)",
             "scope": "application"
           },
           "ritemark.ai.hasSeenClaudeWelcome": {
             "type": "boolean",
             "default": false,
-            "description": "Internal: tracks whether the Claude Code welcome wizard has been shown.",
+            "description": "Internal: tracks whether the Claude welcome wizard has been shown.",
             "scope": "application"
           },
           "ritemark.chat.fontSize": {
@@ -180,7 +180,7 @@
             "default": 15,
             "minimum": 5,
             "maximum": 60,
-            "description": "Inactivity timeout for the Claude Code agent in minutes (5-60). The agent will be stopped if it produces no activity for this duration.",
+            "description": "Inactivity timeout for Claude in minutes (5-60). The agent will be stopped if it produces no activity for this duration.",
             "scope": "application"
           }
         }
@@ -393,10 +393,11 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
+    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/LLMNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration:free": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts",
-    "test:all": "npm run test && npm run test:integration"
+    "test:all": "npm run test && npm run test:integration",
+    "test:update": "npx tsx src/update/updateResolver.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.29",

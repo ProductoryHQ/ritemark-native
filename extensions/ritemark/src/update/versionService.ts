@@ -6,6 +6,8 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { getBaseVersion, hasExtensionBuild, getExtensionBuild } from './versionComparison';
 
 /**
@@ -14,6 +16,8 @@ import { getBaseVersion, hasExtensionBuild, getExtensionBuild } from './versionC
 export interface VersionInfo {
   /** Full version string (e.g., "1.0.1-ext.5") */
   full: string;
+  /** App version embedded in product.json */
+  app: string;
   /** Base app version (e.g., "1.0.1") */
   base: string;
   /** Extension build number (0 if not an extension build) */
@@ -31,12 +35,37 @@ export function getCurrentVersion(): string {
 }
 
 /**
+ * Get the current Ritemark app version from product.json.
+ * Falls back to the extension base version when product metadata is unavailable.
+ */
+export function getCurrentAppVersion(): string {
+  try {
+    const productJsonPath = path.join(vscode.env.appRoot, 'product.json');
+    const raw = fs.readFileSync(productJsonPath, 'utf-8');
+    const product = JSON.parse(raw) as { ritemarkVersion?: string; version?: string };
+
+    if (product.ritemarkVersion) {
+      return product.ritemarkVersion;
+    }
+
+    if (product.version) {
+      return product.version;
+    }
+  } catch (error) {
+    console.warn('Failed to read current app version from product.json:', error);
+  }
+
+  return getBaseVersion(getCurrentVersion());
+}
+
+/**
  * Get detailed version info for the current installation
  */
 export function getVersionInfo(): VersionInfo {
   const full = getCurrentVersion();
   return {
     full,
+    app: getCurrentAppVersion(),
     base: getBaseVersion(full),
     extensionBuild: getExtensionBuild(full),
     isExtensionBuild: hasExtensionBuild(full)

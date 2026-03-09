@@ -1,9 +1,9 @@
 /**
  * AgentSelector — merged dropdown for agent + model selection.
  *
- * Ritemark Agent is a single option. Claude Code expands into
+ * Ritemark Agent is a single option. Claude expands into
  * model sub-options (Sonnet, Opus, Haiku) shown as grouped items.
- * The trigger displays "Claude Code · Sonnet" etc.
+ * The trigger displays "Claude · Sonnet" etc.
  */
 
 import { useAISidebarStore } from './store';
@@ -47,7 +47,7 @@ export function AgentSelector() {
   const currentCodexModelLabel = codexModels.find((m) => m.id === codexSelectedModel)?.label;
   const triggerLabel =
     selectedAgent === 'claude-code' && currentModelLabel
-      ? `Claude Code · ${currentModelLabel}`
+      ? `Claude · ${currentModelLabel}`
       : selectedAgent === 'codex' && currentCodexModelLabel
         ? `Codex · ${currentCodexModelLabel}`
         : agents.find((a) => a.id === selectedAgent)?.label || 'Select agent...';
@@ -86,12 +86,12 @@ export function AgentSelector() {
               </SelectItem>
             ))}
 
-          {/* Claude Code — grouped by model */}
+          {/* Claude — grouped by model */}
           {visibleAgents.some((a) => a.id === 'claude-code') && models.length > 0 && (
             <>
               <SelectSeparator />
               <SelectGroup>
-                <SelectLabel className="text-[10px]">Claude Code</SelectLabel>
+                <SelectLabel className="text-[10px]">Claude</SelectLabel>
                 {models.map((model) => (
                   <SelectItem
                     key={model.id}

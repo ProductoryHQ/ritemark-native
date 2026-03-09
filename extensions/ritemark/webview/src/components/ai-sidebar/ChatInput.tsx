@@ -27,15 +27,6 @@ const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',
 /** Max text file size (500KB — larger files should be read by the agent from disk) */
 const MAX_TEXT_SIZE = 512 * 1024;
 
-/** Estimate tokens for an attachment */
-function estimateAttachmentTokens(att: FileAttachment): number {
-  if (att.kind === 'text') return Math.ceil(att.data.length / 4);
-  // base64 → binary (~75% of base64 length), then ÷ 4 for tokens
-  return Math.ceil(att.data.length * 0.75 / 4);
-}
-
-const TOKEN_WARNING_THRESHOLD = 10_000;
-
 /** Dropped file path chip */
 interface PathChip {
   id: string;
@@ -149,6 +140,7 @@ export function ChatInput() {
 
   const sendCodexMessage = useAISidebarStore((s) => s.sendCodexMessage);
   const codexConversation = useAISidebarStore((s) => s.codexConversation);
+  const codexStatus = useAISidebarStore((s) => s.codexStatus);
 
   const isClaudeCode = selectedAgent === 'claude-code';
   const isCodex = selectedAgent === 'codex';
@@ -158,8 +150,10 @@ export function ChatInput() {
   const agentRunning = isCodex ? (lastCodexTurn?.isRunning ?? false) : (lastTurn?.isRunning ?? false);
   const isLoading = isAgentMode ? agentRunning : isStreaming;
   const placeholder = isClaudeCode
-    ? 'Ask Claude Code... (type @ to mention an agent, / for commands)'
-    : 'Ask anything... (type / for commands)';
+    ? 'Ask Claude... (type @ to mention an agent, / for commands)'
+    : isCodex
+      ? 'Ask Codex... (type / for commands)'
+      : 'Ask anything... (type / for commands)';
 
   // Build final message with path chips prepended
   const buildFinalPrompt = useCallback((): string => {
@@ -178,7 +172,7 @@ export function ChatInput() {
 
   const handleSend = useCallback(() => {
     const prompt = buildFinalPrompt();
-    if (!prompt || isLoading) return;
+    if (!prompt || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
 
     if (isCodex) {
       sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined);
@@ -197,7 +191,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isLoading, isClaudeCode, isCodex, hideActiveFile, sendAgentMessage, sendCodexMessage, sendChatMessage]);
+  }, [buildFinalPrompt, attachments, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, sendAgentMessage, sendCodexMessage, sendChatMessage]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
   const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
@@ -718,48 +712,37 @@ export function ChatInput() {
       {/* Attachment thumbnail strip */}
       {attachments.length > 0 && (
         <div className="flex gap-1.5 mb-2 flex-wrap">
-          {attachments.map((att) => {
-            const tokenCount = estimateAttachmentTokens(att);
-            const showTokenWarning = tokenCount > TOKEN_WARNING_THRESHOLD;
-            return (
-              <div key={att.id} className="flex flex-col">
-                <div className="relative group rounded overflow-hidden border border-[var(--vscode-panel-border)] bg-[var(--vscode-input-background)]">
-                  {att.kind === 'image' && att.thumbnail ? (
-                    <div className="w-14 h-14">
-                      <img
-                        src={att.thumbnail}
-                        alt={att.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 px-2 py-1.5 max-w-[160px]">
-                      {att.kind === 'pdf' ? (
-                        <FileText size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
-                      ) : (
-                        <FileImage size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
-                      )}
-                      <span className="text-[10px] text-[var(--vscode-descriptionForeground)] truncate">
-                        {att.name}
-                      </span>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => removeAttachment(att.id)}
-                    className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-black/60 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove"
-                  >
-                    <X size={10} />
-                  </button>
+          {attachments.map((att) => (
+            <div key={att.id} className="relative group rounded overflow-hidden border border-[var(--vscode-panel-border)] bg-[var(--vscode-input-background)]">
+              {att.kind === 'image' && att.thumbnail ? (
+                <div className="w-14 h-14">
+                  <img
+                    src={att.thumbnail}
+                    alt={att.name}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                {showTokenWarning && (
-                  <span className="text-[9px] text-[var(--vscode-editorWarning-foreground)] mt-0.5">
-                    ~{Math.round(tokenCount / 1000)}K tokenid ({Math.round(tokenCount / 2000)}%)
+              ) : (
+                <div className="flex items-center gap-1.5 px-2 py-1.5 max-w-[160px]">
+                  {att.kind === 'pdf' ? (
+                    <FileText size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+                  ) : (
+                    <FileImage size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+                  )}
+                  <span className="text-[10px] text-[var(--vscode-descriptionForeground)] truncate">
+                    {att.name}
                   </span>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              )}
+              <button
+                onClick={() => removeAttachment(att.id)}
+                className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-black/60 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
