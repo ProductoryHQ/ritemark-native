@@ -194,7 +194,10 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     # Copy custom font assets required by patched workbench CSS
     UI_FONT_SRC_DIR="$ROOT_DIR/extensions/ritemark/webview/src/assets/fonts"
-    LUCIDE_FONT_SRC="$ROOT_DIR/extensions/ritemark/node_modules/lucide-static/font/lucide.woff2"
+    LUCIDE_FONT_SRC="$VSCODE_DIR/extensions/ritemark/node_modules/lucide-static/font/lucide.woff2"
+    if [ ! -f "$LUCIDE_FONT_SRC" ]; then
+        LUCIDE_FONT_SRC="$ROOT_DIR/extensions/ritemark/node_modules/lucide-static/font/lucide.woff2"
+    fi
 
     if [ -f "$UI_FONT_SRC_DIR/SofiaSans-latin.woff2" ] && [ -f "$UI_FONT_SRC_DIR/SofiaSans-latin-ext.woff2" ]; then
         echo -n "Copying Sofia Sans workbench fonts... "
