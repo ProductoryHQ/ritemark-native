@@ -184,6 +184,14 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
         echo -e "${GREEN}Done${NC}"
     fi
 
+    # Copy Welcome media assets if they exist
+    if [ -d "$BRANDING_DIR/welcome" ]; then
+        echo -n "Copying Welcome media assets... "
+        mkdir -p "$VSCODE_DIR/src/vs/workbench/contrib/welcomeGettingStarted/browser/media"
+        cp "$BRANDING_DIR/welcome/"* "$VSCODE_DIR/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/"
+        echo -e "${GREEN}Done${NC}"
+    fi
+
     # Copy product.json if it exists (for branding)
     if [ -f "$BRANDING_DIR/product.json" ]; then
         echo -n "Copying product.json... "

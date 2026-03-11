@@ -159,6 +159,8 @@ export class FlowStorage {
     const now = new Date().toISOString();
     const sanitizedName = sanitizeForFilename(name) || 'flow';
     const id = `${sanitizedName}-${shortId()}`;
+    const triggerId = `node-${Date.now()}`;
+    const inputId = `input-${Date.now()}`;
 
     return {
       id,
@@ -167,8 +169,34 @@ export class FlowStorage {
       version: 1,
       created: now,
       modified: now,
-      inputs: [],
-      nodes: [],
+      inputs: [
+        {
+          id: inputId,
+          type: 'text',
+          label: 'Input',
+          required: true,
+          defaultValue: '',
+        },
+      ],
+      nodes: [
+        {
+          id: triggerId,
+          type: 'trigger',
+          position: { x: 250, y: 50 },
+          data: {
+            label: 'Trigger',
+            inputs: [
+              {
+                id: inputId,
+                type: 'text',
+                label: 'Input',
+                required: true,
+                defaultValue: '',
+              },
+            ],
+          },
+        },
+      ],
       edges: [],
     };
   }

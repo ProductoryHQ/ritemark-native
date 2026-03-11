@@ -4,7 +4,7 @@ How to set up a development environment for Ritemark Native.
 
 ## Prerequisites
 
-- **Node.js 20.x** (use [nvm](https://github.com/nvm-sh/nvm))
+- **Node.js 22.21.1** (match `vscode/.nvmrc`, use [nvm](https://github.com/nvm-sh/nvm))
 - **Yarn 1.x**
 - **Python 3.x** (required by VS Code build)
 - **macOS** (primary development platform)

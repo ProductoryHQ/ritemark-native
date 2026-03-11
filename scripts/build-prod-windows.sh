@@ -4,7 +4,7 @@
 #
 # This script builds a production version of RiteMark for Windows.
 # Prerequisites:
-#   - Node.js 20 LTS
+#   - Node.js matching vscode/.nvmrc
 #   - Python 3.11
 #   - Visual Studio 2022/2026 with C++ build tools
 #   - Yarn
@@ -16,6 +16,30 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 VSCODE_DIR="$ROOT_DIR/vscode"
 EXTENSION_DIR="$ROOT_DIR/extensions/ritemark"
 BUILD_OUTPUT="$ROOT_DIR/VSCode-win32-x64"
+REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$VSCODE_DIR/.nvmrc" 2>/dev/null || true)"
+WELCOME_SRC="$VSCODE_DIR/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
+WELCOME_DEST="$BUILD_OUTPUT/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
+
+use_repo_node() {
+    local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+
+    if [[ -z "$REQUIRED_NODE_VERSION" || ! -s "$nvm_sh" ]]; then
+        return
+    fi
+
+    local current_version
+    current_version=$(node -v 2>/dev/null || true)
+    if [[ "$current_version" == "v$REQUIRED_NODE_VERSION" ]]; then
+        return
+    fi
+
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    # shellcheck disable=SC1090
+    source "$nvm_sh"
+    nvm use "$REQUIRED_NODE_VERSION" >/dev/null
+}
+
+use_repo_node
 
 # Colors for output
 RED='\033[0;31m'
@@ -35,8 +59,8 @@ echo -e "${YELLOW}Step 1: Checking prerequisites...${NC}"
 # Check Node version
 NODE_VERSION=$(node -v)
 echo "  Node.js: $NODE_VERSION"
-if [[ ! "$NODE_VERSION" =~ ^v20\. ]]; then
-    echo -e "${YELLOW}  Warning: Node.js 20.x LTS recommended${NC}"
+if [[ -n "$REQUIRED_NODE_VERSION" && "$NODE_VERSION" != "v$REQUIRED_NODE_VERSION" ]]; then
+    echo -e "${YELLOW}  Warning: Node.js $REQUIRED_NODE_VERSION from vscode/.nvmrc is recommended${NC}"
 fi
 
 # Check yarn
@@ -127,6 +151,8 @@ echo ""
 # The vscode-file:// protocol doesn't serve SVGs correctly on Windows,
 # so we replace the FileAccess.asBrowserUri() call with an inline data URI.
 echo -e "${YELLOW}Step 8: Fixing welcome page logo for Windows...${NC}"
+mkdir -p "$WELCOME_DEST"
+cp -R "$WELCOME_SRC"/. "$WELCOME_DEST"/
 LOGO_SVG="$BUILD_OUTPUT/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg"
 WORKBENCH_JS="$BUILD_OUTPUT/resources/app/out/vs/workbench/workbench.desktop.main.js"
 if [ -f "$LOGO_SVG" ] && [ -f "$WORKBENCH_JS" ]; then
@@ -195,6 +221,12 @@ if [ -d "$BUILD_OUTPUT/resources/app/extensions/ritemark" ]; then
     fi
 else
     echo -e "${RED}  Extension folder missing in build!${NC}"
+fi
+
+if [ -f "$WELCOME_DEST/ritemark-welcome-logo-full.svg" ] && [ -f "$WELCOME_DEST/ritemark-welcome-hero-bg.png" ]; then
+    echo -e "${GREEN}  Welcome assets present${NC}"
+else
+    echo -e "${RED}  Welcome assets missing in build!${NC}"
 fi
 
 echo ""

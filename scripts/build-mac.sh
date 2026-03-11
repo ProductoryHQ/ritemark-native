@@ -6,6 +6,30 @@ echo ""
 
 cd "$(dirname "$0")/.."
 ROOT_DIR=$(pwd)
+NVMRC_PATH="$ROOT_DIR/vscode/.nvmrc"
+
+use_repo_node() {
+    local required_version
+    required_version="$(tr -d '[:space:]' < "$NVMRC_PATH" 2>/dev/null || true)"
+    local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+
+    if [[ -z "$required_version" || ! -s "$nvm_sh" ]]; then
+        return
+    fi
+
+    local current_version
+    current_version=$(node -v 2>/dev/null || true)
+    if [[ "$current_version" == "v$required_version" ]]; then
+        return
+    fi
+
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    # shellcheck disable=SC1090
+    source "$nvm_sh"
+    nvm use "$required_version" >/dev/null
+}
+
+use_repo_node
 
 # =============================================================================
 # PHASE 0: Pre-flight checks (fast validation before expensive build)
@@ -81,6 +105,9 @@ npm run gulp vscode-darwin-arm64
 # Verify build output exists
 echo "[5/5] Verifying build..."
 if [ -d "$ROOT_DIR/VSCode-darwin-arm64" ]; then
+    mkdir -p "$ROOT_DIR/VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
+    cp -R "$ROOT_DIR/vscode/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"/. \
+      "$ROOT_DIR/VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"/
     APP_NAME=$(ls "$ROOT_DIR/VSCode-darwin-arm64" | grep ".app" | head -1)
     if [ -n "$APP_NAME" ]; then
         echo "  ✓ Build successful: $APP_NAME"

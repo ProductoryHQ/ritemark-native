@@ -23,6 +23,28 @@ VSCODE_DIR="$PROJECT_ROOT/vscode"
 OUTPUT_DIR="$PROJECT_ROOT/VSCode-win32-x64"
 DIST_DIR="$PROJECT_ROOT/dist"
 ICON_ICO="$PROJECT_ROOT/branding/icons/icon.ico"
+REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$VSCODE_DIR/.nvmrc" 2>/dev/null || true)"
+
+use_repo_node() {
+    local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+
+    if [[ -z "$REQUIRED_NODE_VERSION" || ! -s "$nvm_sh" ]]; then
+        return
+    fi
+
+    local current_version
+    current_version=$(node -v 2>/dev/null || true)
+    if [[ "$current_version" == "v$REQUIRED_NODE_VERSION" ]]; then
+        return
+    fi
+
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    # shellcheck disable=SC1090
+    source "$nvm_sh"
+    nvm use "$REQUIRED_NODE_VERSION" >/dev/null
+}
+
+use_repo_node
 
 echo "========================================"
 echo "RiteMark Native - Windows x64 Builder"
@@ -34,8 +56,8 @@ echo "[1/6] Running pre-flight checks..."
 
 # Check Node version
 NODE_VERSION=$(node -v)
-if [[ ! "$NODE_VERSION" =~ ^v2[0-9]\. ]]; then
-    echo -e "${YELLOW}WARNING: Node $NODE_VERSION detected. VS Code requires Node 20.x${NC}"
+if [[ -n "$REQUIRED_NODE_VERSION" && "$NODE_VERSION" != "v$REQUIRED_NODE_VERSION" ]]; then
+    echo -e "${YELLOW}WARNING: Node $NODE_VERSION detected. VS Code expects $REQUIRED_NODE_VERSION from vscode/.nvmrc${NC}"
 fi
 echo "  ✓ Node.js: $NODE_VERSION"
 

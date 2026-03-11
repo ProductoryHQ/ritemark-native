@@ -2,7 +2,7 @@
   "nameShort": "Ritemark",
   "nameLong": "Ritemark",
   "applicationName": "ritemark",
-  "ritemarkVersion": "1.4.1",
+  "ritemarkVersion": "1.5.0",
   "dataFolderName": ".ritemark",
   "win32MutexName": "ritemarknative",
   "licenseName": "MIT",
@@ -35,6 +35,7 @@
     "recommendationsUrl": ""
   },
   "enableTelemetry": false,
+  "openToWelcomeMainPage": true,
   "builtInExtensions": [],
   "configurationDefaults": {
     "workbench.colorTheme": "ritemark-light",

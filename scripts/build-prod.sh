@@ -43,8 +43,31 @@ esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+NVMRC_PATH="$PROJECT_DIR/vscode/.nvmrc"
+
+use_repo_node() {
+  local required_version
+  required_version="$(tr -d '[:space:]' < "$NVMRC_PATH" 2>/dev/null || true)"
+  local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+
+  if [[ -z "$required_version" || ! -s "$nvm_sh" ]]; then
+    return
+  fi
+
+  local current_version
+  current_version=$(node -v 2>/dev/null || true)
+  if [[ "$current_version" == "v$required_version" ]]; then
+    return
+  fi
+
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  # shellcheck disable=SC1090
+  source "$nvm_sh"
+  nvm use "$required_version" >/dev/null
+}
 
 cd "$PROJECT_DIR"
+use_repo_node
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
@@ -150,8 +173,22 @@ rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
 echo -e "${GREEN}Extension copied successfully${NC}"
 echo ""
 
+echo "Copying Welcome media assets into app bundle..."
+WELCOME_SRC="$PROJECT_DIR/vscode/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
+WELCOME_DEST="$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
+
+if [[ -d "$WELCOME_SRC" ]]; then
+  mkdir -p "$WELCOME_DEST"
+  cp -R "$WELCOME_SRC"/. "$WELCOME_DEST"/
+  echo -e "${GREEN}Welcome media assets copied successfully${NC}"
+else
+  echo -e "${RED}ERROR: Welcome media source not found at $WELCOME_SRC${NC}"
+  exit 1
+fi
+echo ""
+
 # Add ritemarkVersion field to product.json from branding
-# NOTE: We keep VS Code's "version" field intact (1.94.0) for internal compatibility
+# NOTE: We keep VS Code's upstream "version" field intact for internal compatibility
 # RiteMark uses "ritemarkVersion" for update checking
 PRODUCT_JSON="$APP_PATH/Contents/Resources/app/product.json"
 RITEMARK_VERSION=$(grep '"ritemarkVersion"' branding/product.json | sed 's/.*"ritemarkVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
@@ -218,6 +255,16 @@ if [[ $ICON_COUNT -lt 10 ]]; then
   VALIDATION_FAILED=1
 else
   echo -e "${GREEN}OK${NC}: ${ICON_COUNT} icons"
+fi
+
+# Check Welcome assets are present in build output
+WELCOME_LOGO="$WELCOME_DEST/ritemark-welcome-logo-full.svg"
+WELCOME_BG="$WELCOME_DEST/ritemark-welcome-hero-bg.png"
+if [[ -f "$WELCOME_LOGO" ]] && [[ -f "$WELCOME_BG" ]]; then
+  echo -e "${GREEN}OK${NC}: Welcome assets copied"
+else
+  echo -e "${RED}FAIL: Welcome assets missing from build output${NC}"
+  VALIDATION_FAILED=1
 fi
 
 if [[ $VALIDATION_FAILED -eq 1 ]]; then

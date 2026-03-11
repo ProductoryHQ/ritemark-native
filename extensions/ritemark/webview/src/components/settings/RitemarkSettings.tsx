@@ -409,8 +409,7 @@ export function RitemarkSettings() {
         </div>
 
         {/* Codex ChatGPT Auth (experimental) */}
-        {settings.codexIntegration && codexAuth.enabled && (
-          <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] mb-6">
+        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] mb-6">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <label className="text-sm font-medium text-[var(--vscode-foreground)]">
@@ -420,7 +419,7 @@ export function RitemarkSettings() {
                   Experimental
                 </span>
               </div>
-              {codexAuth.authenticated && (
+              {settings.codexIntegration && codexAuth.authenticated && (
                 <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
                   <Check size={12} />
                   Connected
@@ -428,7 +427,16 @@ export function RitemarkSettings() {
               )}
             </div>
 
-            {codexAuth.binaryMissing || codexAuth.binaryBroken ? (
+            {!settings.codexIntegration ? (
+              <>
+                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                  Turn on Codex Integration in Features to connect your ChatGPT account and use Codex agents in Ritemark.
+                </p>
+                <div className="text-xs p-2 rounded bg-[var(--vscode-badge-background)]/35 text-[var(--vscode-descriptionForeground)]">
+                  The feature toggle is currently off.
+                </div>
+              </>
+            ) : codexAuth.binaryMissing || codexAuth.binaryBroken ? (
               <>
                 <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
                   {codexAuth.binaryMissing
@@ -542,7 +550,7 @@ export function RitemarkSettings() {
             )}
 
             <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-3">
-              Used for: Codex Agents (autonomous coding), Codex Flow nodes
+              Used for: Codex Agents (autonomous coding)
               <a
                 href="https://developers.openai.com/codex/cli"
                 className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
@@ -551,7 +559,6 @@ export function RitemarkSettings() {
               </a>
             </p>
           </div>
-        )}
 
         {/* OpenAI */}
         <div className="mb-6 p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">

@@ -269,6 +269,67 @@ function generateImageFilename(file: File): string {
   return `image-${timestamp}.${extension}`
 }
 
+function getClipboardImageFile(dataTransfer: DataTransfer | null): File | null {
+  if (!dataTransfer) {
+    return null
+  }
+
+  if (dataTransfer.items) {
+    for (const item of Array.from(dataTransfer.items)) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) {
+          return file
+        }
+      }
+    }
+  }
+
+  if (dataTransfer.files && dataTransfer.files.length > 0) {
+    for (const file of Array.from(dataTransfer.files)) {
+      if (file.type.startsWith('image/')) {
+        return file
+      }
+    }
+  }
+
+  return null
+}
+
+function extractPlainTextFromHtml(html: string): string {
+  if (!html.trim()) {
+    return ''
+  }
+
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    return doc.body.textContent?.trim() ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function shouldPreferTextPaste(dataTransfer: DataTransfer | null): boolean {
+  if (!dataTransfer) {
+    return false
+  }
+
+  const types = Array.from(dataTransfer.types ?? [])
+  const plainText = dataTransfer.getData('text/plain').trim()
+  const html = dataTransfer.getData('text/html')
+  const htmlText = extractPlainTextFromHtml(html)
+
+  if (plainText.length > 0) {
+    return true
+  }
+
+  if ((types.includes('text/html') || types.includes('text/rtf')) && htmlText.length > 0) {
+    return true
+  }
+
+  return false
+}
+
 interface EditorProps {
   value: string
   onChange: (value: string) => void
@@ -445,24 +506,21 @@ export function Editor({
         return false
       },
       handlePaste: (_view, event) => {
-        // If clipboard has HTML/text content (e.g., from Word), let TipTap handle it
+        const file = getClipboardImageFile(event.clipboardData)
+        if (file && !shouldPreferTextPaste(event.clipboardData)) {
+          event.preventDefault()
+          readFileAsBase64(file).then(dataUrl => {
+            const filename = file.name || generateImageFilename(file)
+            sendToExtension('saveImage', { dataUrl, filename })
+          })
+          return true
+        }
+
+        // Let TipTap handle rich HTML/text paste when there is no actual image file/item.
         if (event.clipboardData?.types?.includes('text/html')) {
           return false
         }
 
-        // Only handle as image if there's no HTML (pure image paste, e.g., screenshot)
-        if (event.clipboardData && event.clipboardData.files && event.clipboardData.files.length > 0) {
-          const file = event.clipboardData.files[0]
-          if (file.type.startsWith('image/')) {
-            event.preventDefault()
-            // Read file and send to extension
-            readFileAsBase64(file).then(dataUrl => {
-              const filename = generateImageFilename(file)
-              sendToExtension('saveImage', { dataUrl, filename })
-            })
-            return true
-          }
-        }
         return false
       },
       handleKeyDown: (view, event): boolean => {

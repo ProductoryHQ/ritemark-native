@@ -14,7 +14,15 @@ export interface DocumentProperties {
   [key: string]: unknown;
 }
 
+function buildCsvTemplate(columns = 10, rows = 20): string {
+  const headers = Array.from({ length: columns }, (_, index) => String.fromCharCode(65 + index)).join(',');
+  const emptyRows = Array.from({ length: rows }, () => ','.repeat(columns - 1));
+  return `${headers}\n${emptyRows.join('\n')}`;
+}
+
 export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
+  public static readonly viewType = 'ritemark.editor';
+
   // Track all active webview panels for broadcasting tool execution
   private static activeWebviews: Set<vscode.Webview> = new Set();
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
@@ -46,7 +54,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     context.subscriptions.push(RitemarkEditorProvider._wordCountStatusBar);
 
     return vscode.window.registerCustomEditorProvider(
-      'ritemark.editor',
+      RitemarkEditorProvider.viewType,
       new RitemarkEditorProvider(context),
       { webviewOptions: { retainContextWhenHidden: true } }
     );
@@ -193,6 +201,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    if (document.isUntitled && this.getFileType(document.uri.fsPath) === 'csv' && document.getText().trim().length === 0) {
+      await this.initializeUntitledCsv(document);
+    }
+
     // Get URI for the webview bundle
     const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js');
     const scriptUri = webviewPanel.webview.asWebviewUri(scriptPath);
@@ -506,6 +518,13 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       content
     );
     vscode.workspace.applyEdit(edit);
+  }
+
+  private async initializeUntitledCsv(document: vscode.TextDocument): Promise<void> {
+    const edit = new vscode.WorkspaceEdit();
+    const lastLine = document.lineAt(Math.max(0, document.lineCount - 1));
+    edit.replace(document.uri, new vscode.Range(new vscode.Position(0, 0), lastLine.range.end), buildCsvTemplate());
+    await vscode.workspace.applyEdit(edit);
   }
 
   /**

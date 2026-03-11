@@ -2,7 +2,7 @@
   "name": "ritemark",
   "displayName": "Ritemark Editor",
   "description": "WYSIWYG Markdown Editor",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "publisher": "ritemark",
   "license": "MIT",
   "engines": {
@@ -10,11 +10,14 @@
   },
   "main": "./out/extension.js",
   "activationEvents": [
+    "*",
     "onStartupFinished",
     "onCustomEditor:ritemark.editor",
     "onCustomEditor:ritemark.excelViewer",
     "onView:ritemark.unifiedView",
+    "onWebviewPanel:ritemark.settings",
     "onCommand:ritemark.configureApiKey",
+    "onCommand:ritemark.aiSettings",
     "onCommand:ritemark.showAIPanel",
     "onCommand:ritemark.openSearch",
     "onCustomEditor:ritemark.flowEditor",
@@ -50,6 +53,16 @@
         "command": "ritemark.newChat",
         "title": "New Chat",
         "icon": "$(add)"
+      },
+      {
+        "command": "ritemark.newDocument",
+        "title": "New Document",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "ritemark.newTable",
+        "title": "New Table",
+        "icon": "$(table)"
       },
       {
         "command": "ritemark.aiSettings",
@@ -110,7 +123,7 @@
           },
           "ritemark.features.codex-integration": {
             "type": "boolean",
-            "default": false,
+            "default": true,
             "description": "Enable Codex CLI integration with ChatGPT authentication (experimental). Requires codex binary installed.",
             "scope": "application"
           }

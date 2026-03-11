@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { RitemarkEditorProvider } from './ritemarkEditor';
 import { ExcelEditorProvider } from './excelEditorProvider';
 import { PdfEditorProvider } from './pdfEditorProvider';
@@ -29,6 +32,78 @@ let settingsProvider: RitemarkSettingsProvider | null = null;
 
 // RAG infrastructure
 let documentIndexer: DocumentIndexer | null = null;
+const DEFAULT_DRAFTS_DIR_NAME = 'Ritemark';
+
+function buildCsvTemplate(columns = 10, rows = 20): string {
+  const headers = Array.from({ length: columns }, (_, index) => String.fromCharCode(65 + index)).join(',');
+  const emptyRows = Array.from({ length: rows }, () => ','.repeat(columns - 1));
+  return `${headers}\n${emptyRows.join('\n')}`;
+}
+
+function getDraftsDirectory(): string {
+  const documentsDir = path.join(os.homedir(), 'Documents');
+  const parentDir = fs.existsSync(documentsDir) ? documentsDir : os.homedir();
+  const draftsDir = path.join(parentDir, DEFAULT_DRAFTS_DIR_NAME);
+  fs.mkdirSync(draftsDir, { recursive: true });
+  return draftsDir;
+}
+
+function getUniqueDraftPath(extension: string): string {
+  const draftsDir = getDraftsDirectory();
+  let index = 1;
+
+  while (true) {
+    const filename = index === 1 ? `Untitled.${extension}` : `Untitled ${index}.${extension}`;
+    const filePath = path.join(draftsDir, filename);
+    if (!fs.existsSync(filePath)) {
+      return filePath;
+    }
+    index += 1;
+  }
+}
+
+async function createDraftAndOpen(
+  extension: string,
+  viewType: string,
+  initialContent?: string
+): Promise<void> {
+  const filePath = getUniqueDraftPath(extension);
+  const uri = vscode.Uri.file(filePath);
+  await vscode.workspace.fs.writeFile(uri, Buffer.from(initialContent ?? '', 'utf8'));
+  await vscode.commands.executeCommand('vscode.openWith', uri, viewType, {
+    preview: false,
+    preserveFocus: false,
+  });
+}
+
+async function promptForFlowWorkspace(): Promise<boolean> {
+  const selection = await vscode.window.showInformationMessage(
+    'Create a Flow',
+    {
+      modal: true,
+      detail: 'Flows live inside a project folder so they can read files, write outputs, and stay with your workspace.\n\nOpen a folder first, then choose New -> New flow again.',
+    },
+    'Open Folder'
+  );
+
+  if (selection === 'Open Folder') {
+    await vscode.commands.executeCommand('vscode.openFolder');
+    return true;
+  }
+
+  return false;
+}
+
+async function createAndOpenWorkspaceFlow(workspacePath: string): Promise<void> {
+  const flowStorage = new FlowStorage(workspacePath);
+  const newFlow = flowStorage.createNewFlow('New Flow');
+  await flowStorage.saveFlow(newFlow);
+
+  const flowPath = flowStorage.getFlowPath(newFlow.id);
+  const uri = vscode.Uri.file(flowPath);
+  await vscode.commands.executeCommand('vscode.openWith', uri, FlowEditorProvider.viewType);
+  await flowsViewProvider?.refresh();
+}
 
 export function activate(context: vscode.ExtensionContext) {
   // === Theme & branding: only on fresh install or version upgrade ===
@@ -157,9 +232,24 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.newDocument', async () => {
+      await createDraftAndOpen('md', RitemarkEditorProvider.viewType);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.newTable', async () => {
+      await createDraftAndOpen('csv', RitemarkEditorProvider.viewType, buildCsvTemplate());
+    })
+  );
+
   // Initialize Settings Provider
   settingsProvider = new RitemarkSettingsProvider(context, updateService);
-  context.subscriptions.push({ dispose: () => settingsProvider?.dispose() });
+  context.subscriptions.push(
+    vscode.window.registerWebviewPanelSerializer(RitemarkSettingsProvider.viewType, settingsProvider),
+    { dispose: () => settingsProvider?.dispose() }
+  );
 
   // Register chat history command (toggles history panel in webview)
   context.subscriptions.push(
@@ -172,6 +262,25 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.aiSettings', () => {
       settingsProvider?.open();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.codexLogin', async () => {
+      await settingsProvider?.startCodexLoginFromCommand();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.claudeLogin', async () => {
+      await settingsProvider?.startClaudeLoginFromCommand();
+    })
+  );
+
+  // Register health status command (used by Welcome page health check)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.getHealthStatus', async () => {
+      return settingsProvider?.getHealthStatus() ?? null;
     })
   );
 
@@ -195,23 +304,13 @@ export function activate(context: vscode.ExtensionContext) {
   // Register Flows commands (always register - menu visibility controlled by when clauses in package.json)
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.flows.new', async () => {
-      if (!workspacePath) {
-        vscode.window.showWarningMessage('Open a folder first to create flows.');
+      const activeWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!activeWorkspacePath) {
+        await promptForFlowWorkspace();
         return;
       }
 
-      // Create a new flow with a unique ID
-      const flowStorage = new FlowStorage(workspacePath);
-      const newFlow = flowStorage.createNewFlow('New Flow');
-      await flowStorage.saveFlow(newFlow);
-
-      // Open the new flow in the editor
-      const flowPath = flowStorage.getFlowPath(newFlow.id);
-      const uri = vscode.Uri.file(flowPath);
-      await vscode.commands.executeCommand('vscode.openWith', uri, FlowEditorProvider.viewType);
-
-      // Refresh the flows list
-      await flowsViewProvider?.refresh();
+      await createAndOpenWorkspaceFlow(activeWorkspacePath);
     })
   );
 

@@ -8,6 +8,32 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+NVMRC_PATH="$PROJECT_ROOT/vscode/.nvmrc"
+REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$NVMRC_PATH" 2>/dev/null || true)"
+
+use_repo_node() {
+  local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+
+  if [[ -z "$REQUIRED_NODE_VERSION" || ! -s "$nvm_sh" ]]; then
+    return
+  fi
+
+  local current_version
+  current_version=$(node -v 2>/dev/null || true)
+  if [[ "$current_version" == "v$REQUIRED_NODE_VERSION" ]]; then
+    return
+  fi
+
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  # shellcheck disable=SC1090
+  source "$nvm_sh"
+  nvm use "$REQUIRED_NODE_VERSION" >/dev/null
+}
+
+use_repo_node
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -25,18 +51,17 @@ WARNINGS=0
 # Check 1: Node Version
 # -----------------------------------------------------------------------------
 echo -n "Checking Node version... "
-REQUIRED_NODE="v20"
 CURRENT_NODE=$(node -v 2>/dev/null || echo "not found")
 
 if [[ $CURRENT_NODE == "not found" ]]; then
   echo -e "${RED}FAIL${NC}"
-  echo "  Node.js not found. Install Node v20.x"
+  echo "  Node.js not found. Install Node $REQUIRED_NODE_VERSION"
   ERRORS=$((ERRORS + 1))
-elif [[ ! $CURRENT_NODE == $REQUIRED_NODE* ]]; then
+elif [[ "$CURRENT_NODE" != "v$REQUIRED_NODE_VERSION" ]]; then
   echo -e "${RED}FAIL${NC}"
-  echo "  Expected: ${REQUIRED_NODE}.x"
+  echo "  Expected: v${REQUIRED_NODE_VERSION}"
   echo "  Found: ${CURRENT_NODE}"
-  echo "  Fix: nvm use 20"
+  echo "  Fix: nvm use ${REQUIRED_NODE_VERSION}"
   ERRORS=$((ERRORS + 1))
 else
   echo -e "${GREEN}OK${NC} ($CURRENT_NODE)"
@@ -53,7 +78,7 @@ if [[ $ARCH != "arm64" ]]; then
   echo "  Expected: arm64"
   echo "  Found: ${ARCH}"
   echo "  This means Node is running under Rosetta (x86_64 emulation)."
-  echo "  Fix: Install arm64 Node: nvm install 20 --default"
+  echo "  Fix: Install arm64 Node: nvm install ${REQUIRED_NODE_VERSION} --default"
   ERRORS=$((ERRORS + 1))
 else
   echo -e "${GREEN}OK${NC} ($ARCH)"

@@ -12,6 +12,7 @@ Ritemark v1.5.0 is the next planned full release. It currently combines two majo
 
 - **Sprint 41:** VS Code foundation update from `1.94.0` to `1.109.5`
 - **Sprint 42:** update-platform and agent-bootstrap hardening, including Codex and Claude reliability work
+- **Sprint 43:** Welcome onboarding redesign so first-time users can understand Ritemark without prior VS Code knowledge
 
 ## Confirmed Scope So Far
 
@@ -36,6 +37,12 @@ Ritemark v1.5.0 is the next planned full release. It currently combines two majo
 - sidebar setup/recovery flows are simpler and action-first
 - fixed Codex screenshot/image delivery to the agent
 - removed per-image token estimation from Codex chat attachments
+
+### Welcome Onboarding (Sprint 43)
+
+- startup Welcome becomes a true Ritemark home instead of relying on inherited VS Code mental models
+- primary onboarding will focus on clear user actions such as starting a document, opening files, using AI, and viewing examples
+- `Recent files` stays as a first-class shortcut for returning users instead of being removed
 
 ## Open Items
 

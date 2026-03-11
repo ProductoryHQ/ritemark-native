@@ -19,18 +19,18 @@ jobs:
         with:
           path: r
 
-      - name: Clone VS Code OSS (1.94.0)
+      - name: Clone VS Code OSS (1.109.5)
         run: |
-          git clone --depth 1 --branch 1.94.0 https://github.com/microsoft/vscode.git r/vscode
-          echo "VS Code 1.94.0 cloned"
+          git clone --depth 1 --branch 1.109.5 https://github.com/microsoft/vscode.git r/vscode
+          echo "VS Code 1.109.5 cloned"
 
       # =========================================================================
       # Step 2: Setup toolchain
       # =========================================================================
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22.21.1
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.21.1'
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -118,6 +118,8 @@ jobs:
           BUILD_DIR="VSCode-darwin-x64"
           APP_PATH="$BUILD_DIR/Ritemark.app"
           EXT_DEST="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+          WELCOME_SRC="vscode/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
+          WELCOME_DEST="$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 
           if [ ! -d "$APP_PATH" ]; then
             echo "ERROR: App bundle not found at $APP_PATH"
@@ -129,6 +131,8 @@ jobs:
           # Remove dev dependencies only - keep runtime node_modules!
           rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
           rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
+          mkdir -p "$WELCOME_DEST"
+          cp -R "$WELCOME_SRC"/. "$WELCOME_DEST"/
           echo "Extension copied successfully"
 
       # =========================================================================
@@ -225,6 +229,15 @@ jobs:
             echo "OK: node_modules ($NODE_MODULES_COUNT packages)"
           else
             echo "FAIL: node_modules missing or incomplete ($NODE_MODULES_COUNT packages)"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Check welcome assets
+          if [ -f "$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-welcome-logo-full.svg" ] && \
+             [ -f "$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-welcome-hero-bg.png" ]; then
+            echo "OK: Welcome assets present"
+          else
+            echo "FAIL: Welcome assets missing"
             ERRORS=$((ERRORS + 1))
           fi
 
