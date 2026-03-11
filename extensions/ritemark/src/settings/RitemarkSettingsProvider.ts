@@ -24,7 +24,7 @@ import {
 } from '../agent';
 import { CodexManager } from '../codex/codexManager';
 
-export class RitemarkSettingsProvider {
+export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   public static readonly viewType = 'ritemark.settings';
 
   private static panel: vscode.WebviewPanel | undefined;
@@ -82,42 +82,18 @@ export class RitemarkSettingsProvider {
       return;
     }
 
-    // Create new panel
     const panel = vscode.window.createWebviewPanel(
       RitemarkSettingsProvider.viewType,
       'Ritemark Settings',
       column || vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(this.context.extensionUri, 'media'),
-        ],
-      }
+      this.getWebviewOptions()
     );
 
-    RitemarkSettingsProvider.panel = panel;
+    await this.resolvePanel(panel);
+  }
 
-    // Get webview content
-    panel.webview.html = await this.getHtmlContent(panel.webview);
-
-    // Handle messages from webview
-    panel.webview.onDidReceiveMessage(
-      async (message) => {
-        await this.handleMessage(message, panel.webview);
-      },
-      undefined,
-      this.context.subscriptions
-    );
-
-    // Clean up on close
-    panel.onDidDispose(() => {
-      RitemarkSettingsProvider.panel = undefined;
-      this.stopClaudeLoginPolling();
-    });
-
-    // Send initial data
-    await this.sendCurrentSettings(panel.webview);
+  public async deserializeWebviewPanel(panel: vscode.WebviewPanel): Promise<void> {
+    await this.resolvePanel(panel);
   }
 
   /**
@@ -252,6 +228,40 @@ export class RitemarkSettingsProvider {
     }
   }
 
+  private getWebviewOptions(): vscode.WebviewOptions & vscode.WebviewPanelOptions {
+    return {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.context.extensionUri, 'media'),
+      ],
+    };
+  }
+
+  private async resolvePanel(panel: vscode.WebviewPanel): Promise<void> {
+    RitemarkSettingsProvider.panel = panel;
+    panel.title = 'Ritemark Settings';
+    panel.webview.options = this.getWebviewOptions();
+    panel.webview.html = await this.getHtmlContent(panel.webview);
+
+    panel.webview.onDidReceiveMessage(
+      async (message) => {
+        await this.handleMessage(message, panel.webview);
+      },
+      undefined,
+      this.context.subscriptions
+    );
+
+    panel.onDidDispose(() => {
+      if (RitemarkSettingsProvider.panel === panel) {
+        RitemarkSettingsProvider.panel = undefined;
+      }
+      this.stopClaudeLoginPolling();
+    });
+
+    await this.sendCurrentSettings(panel.webview);
+  }
+
   /**
    * Send current settings to webview
    */
@@ -334,7 +344,7 @@ export class RitemarkSettingsProvider {
         // Features
         voiceDictation: config.get('features.voice-dictation', false),
         ritemarkFlows: config.get('features.ritemark-flows', false),
-        codexIntegration: config.get('features.codex-integration', false),
+        codexIntegration: config.get('features.codex-integration', true),
 
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
@@ -452,6 +462,86 @@ export class RitemarkSettingsProvider {
         repairCommand: codexStatus.repairCommand,
       }
     };
+  }
+
+  /**
+   * Public health status for the Welcome page.
+   * Reuses the same data sources as sendCurrentSettings().
+   */
+  async getHealthStatus(): Promise<{
+    codexAvailable: boolean;
+    codexAuthenticated: boolean;
+    claudeAvailable: boolean;
+    claudeAuthenticated: boolean;
+    nodeInstalled: boolean;
+    nodeVersion: string | null;
+    gitInstalled: boolean;
+    gitVersion: string | null;
+  }> {
+    const [claudeStatus, codexStatus, codexAuthStatus] = await Promise.all([
+      getSetupStatus({ refresh: true }),
+      new CodexManager().getBinaryStatus(),
+      this.codexAuth?.getStatus() ?? Promise.resolve(null),
+    ]);
+
+    // Check system dependencies
+    const { execSync } = require('child_process');
+    let nodeInstalled = false;
+    let nodeVersion: string | null = null;
+    let gitInstalled = false;
+    let gitVersion: string | null = null;
+
+    try {
+      nodeVersion = execSync('node --version', { timeout: 5000 }).toString().trim();
+      nodeInstalled = true;
+    } catch { /* not installed */ }
+
+    try {
+      gitVersion = execSync('git --version', { timeout: 5000 }).toString().trim().replace('git version ', '');
+      gitInstalled = true;
+    } catch { /* not installed */ }
+
+    return {
+      codexAvailable: codexStatus.available && codexStatus.runnable,
+      codexAuthenticated: codexAuthStatus?.authenticated ?? false,
+      claudeAvailable: claudeStatus.runnable,
+      claudeAuthenticated: claudeStatus.authenticated,
+      nodeInstalled,
+      nodeVersion,
+      gitInstalled,
+      gitVersion,
+    };
+  }
+
+  public async startClaudeLoginFromCommand(): Promise<void> {
+    const status = await getSetupStatus({ refresh: true });
+    if (!status.runnable || !status.binaryPath || status.state === 'not-installed' || status.state === 'broken-install') {
+      vscode.window.showErrorMessage(status.error || 'Claude is not ready yet. Install or repair it first.');
+      return;
+    }
+
+    setClaudeLoginInProgress(true);
+    emitClaudeStatusInvalidated('login-started');
+    this.startClaudeLoginPolling();
+    openClaudeLoginTerminal(status.binaryPath);
+    vscode.window.showInformationMessage('Finish Claude.ai sign-in in the terminal and browser. Ritemark will refresh automatically.');
+  }
+
+  public async startCodexLoginFromCommand(): Promise<void> {
+    if (!this.codexAuth) {
+      vscode.window.showErrorMessage('Codex integration not enabled.');
+      return;
+    }
+
+    try {
+      emitCodexStatusInvalidated('login-started');
+      const login = await this.codexAuth.startLogin();
+      await vscode.env.openExternal(vscode.Uri.parse(login.authUrl));
+      vscode.window.showInformationMessage('ChatGPT login started. Complete authentication in your browser.');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Codex login failed: ${errorMessage}`);
+    }
   }
 
   private async installClaudeFromSettings(webview: vscode.Webview): Promise<void> {

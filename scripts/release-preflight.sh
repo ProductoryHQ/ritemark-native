@@ -37,7 +37,9 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 EXTENSION_DIR="$PROJECT_ROOT/extensions/ritemark"
 WEBVIEW_DIR="$EXTENSION_DIR/webview"
 PATCHES_DIR="$PROJECT_ROOT/patches/vscode"
-VSCODE_TAG="1.94.0"
+VSCODE_TAG="1.109.5"
+NVMRC_PATH="$PROJECT_ROOT/vscode/.nvmrc"
+REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$NVMRC_PATH" 2>/dev/null || true)"
 
 # Parse arguments
 MODE="full"
@@ -68,6 +70,25 @@ check_fail() { echo -e "  ${RED}✗${NC} $1"; ((ERRORS++)) || true; }
 check_warn() { echo -e "  ${YELLOW}⚠${NC} $1"; ((WARNINGS++)) || true; }
 check_info() { echo -e "  ${BLUE}ℹ${NC} $1"; }
 check_skip() { echo -e "  ${YELLOW}○${NC} $1 (skipped)"; }
+
+use_repo_node() {
+    local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+
+    if [ -z "$REQUIRED_NODE_VERSION" ] || [ ! -s "$nvm_sh" ]; then
+        return
+    fi
+
+    local current_version
+    current_version=$(node -v 2>/dev/null || true)
+    if [ "$current_version" = "v$REQUIRED_NODE_VERSION" ]; then
+        return
+    fi
+
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    # shellcheck disable=SC1090
+    source "$nvm_sh"
+    nvm use "$REQUIRED_NODE_VERSION" >/dev/null
+}
 
 format_bytes() {
     local bytes=$1
@@ -155,6 +176,8 @@ for patch in "${PATCH_FILES[@]}"; do
         PATCH_FAIL=$((PATCH_FAIL + 1))
     fi
 done
+
+use_repo_node
 
 if [ $PATCH_FAIL -eq 0 ]; then
     check_pass "All $PATCH_OK/$PATCH_COUNT patches apply against vanilla VS Code $VSCODE_TAG"
@@ -307,11 +330,11 @@ echo ""
 echo -e "${BOLD}[4] Build Environment${NC}"
 echo "----------------------------------------"
 
-NODE_VERSION=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
-if [ "$NODE_VERSION" = "20" ]; then
-    check_pass "Node v20.x ($(node -v))"
+NODE_VERSION=$(node -v 2>/dev/null || echo "not found")
+if [ "$NODE_VERSION" = "v$REQUIRED_NODE_VERSION" ]; then
+    check_pass "Node $REQUIRED_NODE_VERSION ($NODE_VERSION)"
 else
-    check_fail "Node must be v20.x (found: $(node -v 2>/dev/null || echo 'not found'))"
+    check_fail "Node must match vscode/.nvmrc ($REQUIRED_NODE_VERSION, found: $NODE_VERSION)"
 fi
 
 NODE_ARCH=$(node -p "process.arch" 2>/dev/null)
@@ -319,7 +342,7 @@ if [ "$SKIP_MACOS_CHECKS" != "1" ]; then
     if [ "$NODE_ARCH" = "arm64" ]; then
         check_pass "Node architecture: arm64"
     elif [ "$NODE_ARCH" = "x64" ] && [ "$ARCH" = "arm64" ]; then
-        check_fail "Node architecture: x64 (Rosetta on ARM Mac — use nvm install 20)"
+        check_fail "Node architecture: x64 (Rosetta on ARM Mac — use nvm install $REQUIRED_NODE_VERSION)"
     else
         check_pass "Node architecture: $NODE_ARCH"
     fi
