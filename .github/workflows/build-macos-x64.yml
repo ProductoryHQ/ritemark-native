@@ -118,7 +118,6 @@ jobs:
           BUILD_DIR="VSCode-darwin-x64"
           APP_PATH="$BUILD_DIR/Ritemark.app"
           EXT_DEST="$APP_PATH/Contents/Resources/app/extensions/ritemark"
-          WELCOME_SRC="vscode/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
           WELCOME_DEST="$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 
           if [ ! -d "$APP_PATH" ]; then
@@ -131,8 +130,7 @@ jobs:
           # Remove dev dependencies only - keep runtime node_modules!
           rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
           rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
-          mkdir -p "$WELCOME_DEST"
-          cp -R "$WELCOME_SRC"/. "$WELCOME_DEST"/
+          ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
 
       # =========================================================================

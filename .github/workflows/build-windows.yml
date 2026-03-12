@@ -132,7 +132,6 @@ jobs:
         run: |
           BUILD_DIR="VSCode-win32-x64"
           EXT_DEST="$BUILD_DIR/resources/app/extensions/ritemark"
-          WELCOME_SRC="vscode/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
           WELCOME_DEST="$BUILD_DIR/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 
           if [ ! -d "$BUILD_DIR" ]; then
@@ -144,8 +143,7 @@ jobs:
           cp -R vscode/extensions/ritemark "$EXT_DEST"
           rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
           rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
-          mkdir -p "$WELCOME_DEST"
-          cp -R "$WELCOME_SRC"/. "$WELCOME_DEST"/
+          ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
 
       # =========================================================================

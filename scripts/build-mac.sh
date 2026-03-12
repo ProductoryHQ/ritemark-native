@@ -105,9 +105,8 @@ npm run gulp vscode-darwin-arm64
 # Verify build output exists
 echo "[5/5] Verifying build..."
 if [ -d "$ROOT_DIR/VSCode-darwin-arm64" ]; then
-    mkdir -p "$ROOT_DIR/VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
-    cp -R "$ROOT_DIR/vscode/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"/. \
-      "$ROOT_DIR/VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"/
+    "$ROOT_DIR/scripts/copy-welcome-assets.sh" \
+      "$ROOT_DIR/VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
     APP_NAME=$(ls "$ROOT_DIR/VSCode-darwin-arm64" | grep ".app" | head -1)
     if [ -n "$APP_NAME" ]; then
         echo "  ✓ Build successful: $APP_NAME"
