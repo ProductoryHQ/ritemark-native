@@ -17,7 +17,6 @@ VSCODE_DIR="$ROOT_DIR/vscode"
 EXTENSION_DIR="$ROOT_DIR/extensions/ritemark"
 BUILD_OUTPUT="$ROOT_DIR/VSCode-win32-x64"
 REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$VSCODE_DIR/.nvmrc" 2>/dev/null || true)"
-WELCOME_SRC="$VSCODE_DIR/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 WELCOME_DEST="$BUILD_OUTPUT/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 
 use_repo_node() {
@@ -151,8 +150,7 @@ echo ""
 # The vscode-file:// protocol doesn't serve SVGs correctly on Windows,
 # so we replace the FileAccess.asBrowserUri() call with an inline data URI.
 echo -e "${YELLOW}Step 8: Fixing welcome page logo for Windows...${NC}"
-mkdir -p "$WELCOME_DEST"
-cp -R "$WELCOME_SRC"/. "$WELCOME_DEST"/
+"$ROOT_DIR/scripts/copy-welcome-assets.sh" "$WELCOME_DEST"
 LOGO_SVG="$BUILD_OUTPUT/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg"
 WORKBENCH_JS="$BUILD_OUTPUT/resources/app/out/vs/workbench/workbench.desktop.main.js"
 if [ -f "$LOGO_SVG" ] && [ -f "$WORKBENCH_JS" ]; then

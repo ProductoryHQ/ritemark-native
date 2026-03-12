@@ -174,15 +174,12 @@ echo -e "${GREEN}Extension copied successfully${NC}"
 echo ""
 
 echo "Copying Welcome media assets into app bundle..."
-WELCOME_SRC="$PROJECT_DIR/vscode/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 WELCOME_DEST="$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 
-if [[ -d "$WELCOME_SRC" ]]; then
-  mkdir -p "$WELCOME_DEST"
-  cp -R "$WELCOME_SRC"/. "$WELCOME_DEST"/
+if "$PROJECT_DIR/scripts/copy-welcome-assets.sh" "$WELCOME_DEST"; then
   echo -e "${GREEN}Welcome media assets copied successfully${NC}"
 else
-  echo -e "${RED}ERROR: Welcome media source not found at $WELCOME_SRC${NC}"
+  echo -e "${RED}ERROR: Failed to copy Welcome media assets${NC}"
   exit 1
 fi
 echo ""
