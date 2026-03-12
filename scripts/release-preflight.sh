@@ -186,6 +186,14 @@ else
     echo "       Patches must work against fresh VS Code $VSCODE_TAG (what CI clones)"
 fi
 
+# Simulate CI asset copy paths that are not covered by patch apply alone
+if "$SCRIPT_DIR/test-ci-asset-parity.sh" >/tmp/ritemark-ci-asset-parity.log 2>&1; then
+    check_pass "CI asset parity check passed"
+else
+    check_fail "CI asset parity check failed"
+    sed 's/^/    /' /tmp/ritemark-ci-asset-parity.log | head -20
+fi
+
 # Also check patched TypeScript files for common issues
 PATCHED_TS_FILES=""
 for patch in "${PATCH_FILES[@]}"; do
