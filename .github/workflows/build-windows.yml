@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 180
 
     steps:
       # =========================================================================
@@ -120,7 +121,15 @@ jobs:
         working-directory: r/vscode
         run: |
           echo "Starting Windows build at $(date)"
-          npm run gulp vscode-win32-x64-min
+          npm run gulp vscode-win32-x64-min &
+          BUILD_PID=$!
+
+          while kill -0 "$BUILD_PID" 2>/dev/null; do
+            echo "Windows build still running at $(date)"
+            sleep 300
+          done
+
+          wait "$BUILD_PID"
           echo "Build completed at $(date)"
 
       # =========================================================================
