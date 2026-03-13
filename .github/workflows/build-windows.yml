@@ -120,17 +120,29 @@ jobs:
         shell: bash
         working-directory: r/vscode
         run: |
+          LOG_FILE="../windows-build.log"
+          : > "$LOG_FILE"
           echo "Starting Windows build at $(date)"
-          npm run gulp vscode-win32-x64-min &
+          npm run gulp vscode-win32-x64-min \
+            > >(tee -a "$LOG_FILE") \
+            2> >(tee -a "$LOG_FILE" >&2) &
           BUILD_PID=$!
 
           while kill -0 "$BUILD_PID" 2>/dev/null; do
-            echo "Windows build still running at $(date)"
+            echo "Windows build still running at $(date)" | tee -a "$LOG_FILE"
             sleep 300
           done
 
           wait "$BUILD_PID"
-          echo "Build completed at $(date)"
+          echo "Build completed at $(date)" | tee -a "$LOG_FILE"
+
+      - name: Upload Windows build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-log
+          path: r/windows-build.log
+          retention-days: 14
 
       # =========================================================================
       # Step 8: Copy extension to build output
