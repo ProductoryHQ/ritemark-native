@@ -999,11 +999,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     // Server-initiated requests (approvals are bidirectional RPC)
     this._codexAppServer.on('server-request', (request: { id: string | number; method: string; params: Record<string, unknown> }) => {
-      console.log(`[codex] Server request: method="${request.method}" id=${request.id} params=${JSON.stringify(request.params).slice(0, 200)}`);
-
       const routed = routeApprovalRequest(request);
       if (routed.type === 'command') {
-        console.log(`[codex] → Routing as COMMAND approval, posting to webview`);
         this._view?.webview.postMessage({
           type: 'codex-approval',
           approvalType: 'command',
@@ -1012,7 +1009,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           workingDir: routed.workingDir,
         });
       } else if (routed.type === 'fileChange') {
-        console.log(`[codex] → Routing as FILE CHANGE approval, posting to webview`);
         this._view?.webview.postMessage({
           type: 'codex-approval',
           approvalType: 'fileChange',
