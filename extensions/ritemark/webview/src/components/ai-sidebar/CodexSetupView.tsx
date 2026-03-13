@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, LogIn, RefreshCw, TerminalSquare, Wrench } from 'lucide-react';
+import { EnvironmentStatusNotice } from './EnvironmentStatusNotice';
 import { useAISidebarStore } from './store';
 
 export function CodexSetupView() {
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
+  const environmentStatus = useAISidebarStore((s) => s.environmentStatus);
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const startCodexLogin = useAISidebarStore((s) => s.startCodexLogin);
   const logoutCodex = useAISidebarStore((s) => s.logoutCodex);
@@ -18,6 +20,7 @@ export function CodexSetupView() {
   const isBroken = codexStatus.state === 'broken-install';
   const needsAuth = codexStatus.state === 'needs-auth';
   const loginInProgress = codexStatus.state === 'auth-in-progress';
+  const environmentReloadRequired = environmentStatus?.recommendedAction === 'reload';
   const offlineBlocked = !isOnline && (needsAuth || loginInProgress);
 
   const title = isChecking
@@ -73,6 +76,8 @@ export function CodexSetupView() {
               </div>
             )}
 
+            <EnvironmentStatusNotice environmentStatus={environmentStatus} />
+
             {codexStatus.repairCommand && isBroken && (
               <p className="mt-3 text-xs leading-5 opacity-75">
                 Ritemark can open the repair command for you in a terminal.
@@ -94,7 +99,7 @@ export function CodexSetupView() {
                 </ActionButton>
               )}
 
-              {(isBroken || loginInProgress) && (
+              {(isBroken || loginInProgress || environmentReloadRequired) && (
                 <SecondaryButton onClick={reloadWindow}>
                   <RefreshCw className="h-3.5 w-3.5" />
                   Reload Window

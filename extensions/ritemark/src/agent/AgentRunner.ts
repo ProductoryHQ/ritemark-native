@@ -225,7 +225,6 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       prompt: promptPayload,
       options: {
         cwd: workspacePath,
-        executable: process.execPath,
         ...(pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable } : {}),
         settingSources: ['project'],
         permissionMode: 'bypassPermissions',
@@ -580,7 +579,6 @@ export class AgentSession {
 
     const queryOptions: Record<string, unknown> = {
       cwd: this._workspacePath,
-      executable: process.execPath,
       ...(this._pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable: this._pathToClaudeCodeExecutable } : {}),
       systemPrompt: {
         type: 'preset',

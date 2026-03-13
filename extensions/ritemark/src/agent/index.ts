@@ -9,6 +9,7 @@
 export { runAgent, AgentSession } from './AgentRunner';
 export {
   getSetupStatus,
+  getAgentEnvironmentStatus,
   clearSetupCache,
   setAnthropicKeyAvailable,
   hasCliOAuth,
@@ -41,6 +42,8 @@ export type {
   ImageAttachment,
   AttachmentKind,
   SetupStatus,
+  AgentEnvironmentStatus,
+  AgentEnvironmentRecommendedAction,
   InstallProgress,
   ClaudeInstallResult,
   ClaudeAuthMethod,

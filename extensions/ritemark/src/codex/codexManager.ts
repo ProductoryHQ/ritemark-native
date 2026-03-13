@@ -50,7 +50,7 @@ export class CodexManager {
   }
 
   /**
-   * Resolve the codex executable path from PATH.
+   * Resolve the codex executable path from the current environment.
    */
   async findBinaryPath(): Promise<string | null> {
     return new Promise((resolve) => {
@@ -95,7 +95,7 @@ export class CodexManager {
         available: false,
         runnable: false,
         version: null,
-        error: 'Codex CLI not found in PATH.',
+        error: 'Codex CLI not found.',
         binaryPath: null,
         installNodeVersion: null,
         runtimeNodeVersion,
@@ -108,15 +108,15 @@ export class CodexManager {
     }
 
     return new Promise((resolve) => {
-      const versionProcess = spawn('codex', ['--version']);
+      const versionProcess = this.spawnResolvedBinary(binaryPath, ['--version']);
       let stdout = '';
       let stderr = '';
 
-      versionProcess.stdout.on('data', (data) => {
+      versionProcess.stdout?.on('data', (data) => {
         stdout += data.toString();
       });
 
-      versionProcess.stderr.on('data', (data) => {
+      versionProcess.stderr?.on('data', (data) => {
         stderr += data.toString();
       });
 
@@ -229,7 +229,7 @@ export class CodexManager {
     return new Promise((resolve, reject) => {
       this.isShuttingDown = false;
 
-      this.process = spawn('codex', ['app-server'], {
+      this.process = this.spawnResolvedBinary(status.binaryPath!, ['app-server'], {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
@@ -408,5 +408,17 @@ export class CodexManager {
 
     const firstLine = trimmed.split(/\r?\n/).map(line => line.trim()).find(Boolean);
     return firstLine ?? 'Codex CLI failed to start.';
+  }
+
+  private spawnResolvedBinary(
+    binaryPath: string,
+    args: string[],
+    options: Parameters<typeof spawn>[2] = {}
+  ): ChildProcess {
+    const isWindowsScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binaryPath);
+    return spawn(binaryPath, args, {
+      ...options,
+      shell: options.shell ?? isWindowsScript,
+    });
   }
 }
