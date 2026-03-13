@@ -46,7 +46,7 @@ jobs:
         run: |
           for i in 1 2 3; do
             echo "Attempt $i..."
-            npm install && break || echo "Attempt $i failed, retrying..."
+            npm ci && break || echo "Attempt $i failed, retrying..."
             sleep 10
           done
 
@@ -70,7 +70,9 @@ jobs:
         working-directory: r/vscode
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm exec -- npm-run-all2 -lp core-ci extensions-ci
+        run: |
+          npm run core-ci
+          npm run extensions-ci
 
       - name: Validate compilation folders
         shell: bash
@@ -160,7 +162,7 @@ jobs:
         run: |
           for i in 1 2 3; do
             echo "Attempt $i..."
-            npm install && break || echo "Attempt $i failed, retrying..."
+            npm ci && break || echo "Attempt $i failed, retrying..."
             sleep 10
           done
 
