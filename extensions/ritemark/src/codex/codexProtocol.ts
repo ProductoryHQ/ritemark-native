@@ -196,7 +196,7 @@ export interface TurnInterruptParams {
 // Approvals: server sends a request, client responds with a decision.
 // ============================================================================
 
-export type ReviewDecision = 'approved' | 'approved_for_session' | 'denied' | 'abort';
+export type ReviewDecision = 'accept' | 'acceptForSession' | 'decline' | 'cancel';
 
 /** Server asks client to approve a shell command */
 export interface ExecCommandApprovalParams {

@@ -43,7 +43,7 @@ import {
 } from '../agent';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
-import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated } from '../codex';
+import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest } from '../codex';
 
 type CodexSidebarStatus = {
   enabled: boolean;
@@ -286,6 +286,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('ritemark.chat.fontSize')) {
         this._sendChatFontSize();
+      }
+      // Reset Codex thread when approval/sandbox settings change so new values take effect
+      if (e.affectsConfiguration('ritemark.codex.approvalPolicy') || e.affectsConfiguration('ritemark.codex.sandboxMode')) {
+        this._codexThreadId = null;
       }
     });
 
@@ -883,9 +887,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
       // Create thread if needed
       if (!this._codexThreadId) {
+        const codexConfig = vscode.workspace.getConfiguration('ritemark.codex');
+        const approvalPolicy = codexConfig.get<string>('approvalPolicy', 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
+        const sandbox = codexConfig.get<string>('sandboxMode', 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
         const result = await appServer.threadStart({
           cwd: this._workspacePath || null,
           model: model || null,
+          approvalPolicy,
+          sandbox,
         });
         this._codexThreadId = result.thread.id;
       }
@@ -939,7 +948,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   private _handleCodexApproval(requestId: string | number, approved: boolean) {
     if (!this._codexAppServer) return;
-    this._codexAppServer.sendApprovalResponse(requestId, approved ? 'approved' : 'denied');
+    this._codexAppServer.sendApprovalResponse(requestId, approved ? 'accept' : 'decline');
   }
 
   /**
@@ -990,26 +999,30 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     // Server-initiated requests (approvals are bidirectional RPC)
     this._codexAppServer.on('server-request', (request: { id: string | number; method: string; params: Record<string, unknown> }) => {
-      if (request.method === 'execCommandApproval') {
-        const p = request.params;
+      console.log(`[codex] Server request: method="${request.method}" id=${request.id} params=${JSON.stringify(request.params).slice(0, 200)}`);
+
+      const routed = routeApprovalRequest(request);
+      if (routed.type === 'command') {
+        console.log(`[codex] → Routing as COMMAND approval, posting to webview`);
         this._view?.webview.postMessage({
           type: 'codex-approval',
           approvalType: 'command',
-          requestId: request.id,
-          command: (p.command as string[]).join(' '),
-          workingDir: p.cwd as string,
+          requestId: routed.requestId,
+          command: routed.command,
+          workingDir: routed.workingDir,
         });
-      } else if (request.method === 'applyPatchApproval') {
-        const p = request.params;
+      } else if (routed.type === 'fileChange') {
+        console.log(`[codex] → Routing as FILE CHANGE approval, posting to webview`);
         this._view?.webview.postMessage({
           type: 'codex-approval',
           approvalType: 'fileChange',
-          requestId: request.id,
-          fileChanges: p.fileChanges,
+          requestId: routed.requestId,
+          fileChanges: routed.fileChanges,
         });
       } else {
-        // Unknown server request — auto-deny to not block the agent
-        this._codexAppServer?.sendApprovalResponse(request.id, 'denied');
+        // Unknown server request — decline to be safe (log for debugging)
+        console.warn(`[codex] → UNKNOWN method "${routed.method}" — declining request ${routed.requestId}`);
+        this._codexAppServer?.sendApprovalResponse(routed.requestId, 'decline');
       }
     });
 

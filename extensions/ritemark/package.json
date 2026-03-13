@@ -130,6 +130,36 @@
         }
       },
       {
+        "title": "Codex",
+        "properties": {
+          "ritemark.codex.approvalPolicy": {
+            "type": "string",
+            "default": "untrusted",
+            "enum": ["untrusted", "on-request", "on-failure", "never"],
+            "enumDescriptions": [
+              "Ask before every command and file change (safest)",
+              "Ask only for operations outside workspace boundaries",
+              "Auto-approve everything, ask only when a command fails",
+              "Never ask — run everything automatically (use with caution)"
+            ],
+            "description": "When Codex should ask for your approval before running shell commands or modifying files.",
+            "scope": "application"
+          },
+          "ritemark.codex.sandboxMode": {
+            "type": "string",
+            "default": "workspace-write",
+            "enum": ["read-only", "workspace-write", "danger-full-access"],
+            "enumDescriptions": [
+              "Codex can only read files (no writing or command execution)",
+              "Codex can read and write files within the workspace (recommended)",
+              "Full system access including network — use with extreme caution"
+            ],
+            "description": "What Codex is allowed to do on your filesystem.",
+            "scope": "application"
+          }
+        }
+      },
+      {
         "title": "Ritemark AI",
         "properties": {
           "ritemark.ai.selectedAgent": {
