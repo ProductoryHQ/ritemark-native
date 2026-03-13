@@ -1,20 +1,110 @@
 name: Build Windows (x64)
 
 on:
-  workflow_dispatch:  # Manual trigger (backup)
+  workflow_dispatch:
   push:
     tags:
-      - 'v*'          # Triggers ONLY on version tags: v1.0.0, v1.2.0, etc.
+      - 'v*'
 
 jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout RiteMark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Clone VS Code OSS (1.109.5)
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 1.109.5 https://github.com/microsoft/vscode.git r/vscode
+          echo "VS Code 1.109.5 cloned"
+
+      - name: Setup Node.js 22.21.1
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.21.1'
+
+      - name: Copy extension (replace symlink)
+        shell: bash
+        working-directory: r
+        run: |
+          rm -rf vscode/extensions/ritemark 2>/dev/null || true
+          cp -R extensions/ritemark vscode/extensions/ritemark
+          echo "Extension copied to vscode/extensions/ritemark"
+
+      - name: Install VS Code dependencies
+        shell: bash
+        working-directory: r/vscode
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            npm install && break || echo "Attempt $i failed, retrying..."
+            sleep 10
+          done
+
+      - name: Install extension dependencies
+        shell: bash
+        working-directory: r/vscode/extensions/ritemark
+        run: npm install --legacy-peer-deps
+
+      - name: Apply patches
+        shell: bash
+        working-directory: r
+        run: ./scripts/apply-patches.sh
+
+      - name: Compile extension
+        shell: bash
+        working-directory: r/vscode/extensions/ritemark
+        run: npm run compile
+
+      - name: Build compilation artifact
+        shell: bash
+        working-directory: r/vscode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm exec -- npm-run-all2 -lp core-ci extensions-ci
+
+      - name: Validate compilation folders
+        shell: bash
+        working-directory: r/vscode
+        run: |
+          [ -d "out-build" ] || { echo "ERROR: out-build folder is missing" >&2; exit 1; }
+          [ -n "$(find out-build -mindepth 1 | head -1)" ] || { echo "ERROR: out-build folder is empty" >&2; exit 1; }
+          ls -d out-vscode-* >/dev/null 2>&1 || { echo "ERROR: No out-vscode-* folders found" >&2; exit 1; }
+          for folder in out-vscode-*; do
+            [ -d "$folder" ] || { echo "ERROR: $folder is missing" >&2; exit 1; }
+            [ -n "$(find "$folder" -mindepth 1 | head -1)" ] || { echo "ERROR: $folder is empty" >&2; exit 1; }
+          done
+          echo "Compilation folders look correct"
+
+      - name: Pack compilation artifact
+        shell: bash
+        working-directory: r/vscode
+        run: |
+          tar -czf ../compilation.tar.gz $(ls -d .build out-* 2>/dev/null)
+          ls -lh ../compilation.tar.gz
+
+      - name: Upload compilation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-compilation
+          path: r/compilation.tar.gz
+          retention-days: 7
+
   build:
+    needs: compile
     runs-on: windows-latest
     timeout-minutes: 180
 
     steps:
-      # =========================================================================
-      # Step 1: Checkout + clone VS Code
-      # =========================================================================
       - name: Configure Git for Windows
         shell: bash
         run: |
@@ -32,9 +122,6 @@ jobs:
           git clone --depth 1 --branch 1.109.5 https://github.com/microsoft/vscode.git r/vscode
           echo "VS Code 1.109.5 cloned"
 
-      # =========================================================================
-      # Step 2: Setup toolchain
-      # =========================================================================
       - name: Setup Node.js 22.21.1
         uses: actions/setup-node@v4
         with:
@@ -45,9 +132,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      # =========================================================================
-      # Step 3: Handle extension symlink (Windows has no symlinks)
-      # =========================================================================
+      - name: Download compilation artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-compilation
+          path: r
+
       - name: Copy extension (replace symlink)
         shell: bash
         working-directory: r
@@ -57,9 +147,6 @@ jobs:
           cp -R extensions/ritemark vscode/extensions/ritemark
           echo "Extension copied to vscode/extensions/ritemark"
 
-      # =========================================================================
-      # Step 4: Install dependencies
-      # =========================================================================
       - name: Install VS Code dependencies
         shell: bash
         working-directory: r/vscode
@@ -86,7 +173,6 @@ jobs:
         shell: bash
         working-directory: r/vscode/extensions/ritemark
         run: |
-          # rcedit.exe fails on Linux/Darwin binaries, remove them
           SDK_VENDOR="node_modules/@anthropic-ai/claude-agent-sdk/vendor"
           if [ -d "$SDK_VENDOR/ripgrep" ]; then
             echo "Removing non-Windows ripgrep binaries..."
@@ -97,25 +183,23 @@ jobs:
             echo "Kept only: $(ls $SDK_VENDOR/ripgrep/)"
           fi
 
-      # =========================================================================
-      # Step 5: Apply patches + branding
-      # =========================================================================
       - name: Apply patches
         shell: bash
         working-directory: r
         run: ./scripts/apply-patches.sh
 
-      # =========================================================================
-      # Step 6: Compile extension
-      # =========================================================================
+      - name: Extract compilation artifact
+        shell: bash
+        working-directory: r/vscode
+        run: |
+          [ -f ../compilation.tar.gz ] || { echo "ERROR: compilation artifact missing" >&2; exit 1; }
+          tar -xzf ../compilation.tar.gz
+
       - name: Compile extension
         shell: bash
         working-directory: r/vscode/extensions/ritemark
         run: npm run compile
 
-      # =========================================================================
-      # Step 7: Build VS Code for Windows x64
-      # =========================================================================
       - name: Build VS Code (win32-x64-min-ci)
         shell: bash
         working-directory: r/vscode
@@ -144,9 +228,6 @@ jobs:
           path: r/windows-build.log
           retention-days: 14
 
-      # =========================================================================
-      # Step 8: Copy extension to build output
-      # =========================================================================
       - name: Copy extension to build output
         shell: bash
         working-directory: r
@@ -167,9 +248,6 @@ jobs:
           ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
 
-      # =========================================================================
-      # Step 9: Validate build
-      # =========================================================================
       - name: Validate build
         shell: bash
         working-directory: r
@@ -178,7 +256,6 @@ jobs:
           EXT_PATH="$BUILD_DIR/resources/app/extensions/ritemark"
           ERRORS=0
 
-          # Check webview.js (must be >500KB)
           if [ -f "$EXT_PATH/media/webview.js" ]; then
             WEBVIEW_SIZE=$(wc -c < "$EXT_PATH/media/webview.js" | tr -d ' ')
             if [ "$WEBVIEW_SIZE" -lt 500000 ]; then
@@ -192,7 +269,6 @@ jobs:
             ERRORS=$((ERRORS + 1))
           fi
 
-          # Check extension.js (must be >1KB)
           if [ -f "$EXT_PATH/out/extension.js" ]; then
             EXTENSION_SIZE=$(wc -c < "$EXT_PATH/out/extension.js" | tr -d ' ')
             if [ "$EXTENSION_SIZE" -lt 1000 ]; then
@@ -220,11 +296,6 @@ jobs:
           fi
           echo "Validation PASSED"
 
-      # =========================================================================
-      # Step 10: Upload ZIP artifact
-      # =========================================================================
-      # NOTE: Installer is built locally on Windows machine
-      # See: docs/BUILD-WINDOWS-INSTALLER.md
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
@@ -232,9 +303,6 @@ jobs:
           path: r/VSCode-win32-x64/
           retention-days: 30
 
-      # =========================================================================
-      # Step 11: Build summary
-      # =========================================================================
       - name: Build summary
         shell: bash
         working-directory: r
