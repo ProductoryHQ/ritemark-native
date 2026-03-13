@@ -22,3 +22,4 @@ export {
   type CodexStatusInvalidationReason,
 } from './codexStatusEvents';
 export * from './codexProtocol';
+export { routeApprovalRequest } from './codexApproval';

@@ -39,6 +39,8 @@ interface SettingsData {
   voiceDictation: boolean;
   ritemarkFlows: boolean;
   codexIntegration: boolean;
+  codexApprovalPolicy: 'untrusted' | 'on-request' | 'on-failure' | 'never';
+  codexSandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
   updatesEnabled: boolean;
   aiModel: string;
   availableModels: ModelInfo[];
@@ -558,6 +560,48 @@ export function RitemarkSettings() {
                 Learn more <ExternalLink size={10} />
               </a>
             </p>
+
+            {/* Codex Approval & Sandbox settings — only show when Codex is enabled */}
+            {settings.codexIntegration && (
+              <div className="mt-4 pt-4 border-t border-[var(--vscode-panel-border)] space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-1">
+                    Approval Policy
+                  </label>
+                  <select
+                    value={settings.codexApprovalPolicy || 'untrusted'}
+                    onChange={(e) => handleSettingChange('codex.approvalPolicy', e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+                  >
+                    <option value="untrusted">Ask before every command and file change (safest)</option>
+                    <option value="on-request">Ask only for operations outside workspace</option>
+                    <option value="on-failure">Auto-approve, ask only on failure</option>
+                    <option value="never">Never ask — run everything automatically</option>
+                  </select>
+                  <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                    Controls when Codex asks for your approval before executing shell commands or modifying files.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-1">
+                    Sandbox Mode
+                  </label>
+                  <select
+                    value={settings.codexSandboxMode || 'workspace-write'}
+                    onChange={(e) => handleSettingChange('codex.sandboxMode', e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+                  >
+                    <option value="read-only">Read only — Codex can only read files</option>
+                    <option value="workspace-write">Workspace write — read and write within project (recommended)</option>
+                    <option value="danger-full-access">Full access — includes network and system (use with caution)</option>
+                  </select>
+                  <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                    Controls what Codex is allowed to do on your filesystem.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
         {/* OpenAI */}

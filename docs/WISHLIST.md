@@ -25,6 +25,7 @@ A collection of ideas for future development. No commitment, no order - just a p
 ## Flow editor
 
 - [ ] **Codex Flow node** - Add Codex as a node type in visual AI workflows (like existing Claude Code node). Enables using Codex agent in flow diagrams.
+- [ ] **Codex @ mention support** - Parse `@filename` from user messages, resolve to workspace files, and inline content before sending to app-server. Codex app-server doesn't parse `@` from text — the client must preprocess mentions into resolved file content (like TUI does) or structured `UserInput::Mention` items for plugins.
 
 ## Onboarding / Welcome Screen
 

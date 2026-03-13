@@ -345,6 +345,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         voiceDictation: config.get('features.voice-dictation', false),
         ritemarkFlows: config.get('features.ritemark-flows', false),
         codexIntegration: config.get('features.codex-integration', true),
+        codexApprovalPolicy: config.get('codex.approvalPolicy', 'on-request'),
+        codexSandboxMode: config.get('codex.sandboxMode', 'workspace-write'),
 
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
