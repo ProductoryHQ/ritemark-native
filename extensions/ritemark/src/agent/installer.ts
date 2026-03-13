@@ -22,12 +22,20 @@ function getVSCode(): typeof import('vscode') {
 }
 
 function checkWindowsGitAvailability(): boolean {
+  return checkWindowsCommandAvailability('git');
+}
+
+function checkWindowsPowerShellAvailability(): boolean {
+  return checkWindowsCommandAvailability('powershell.exe');
+}
+
+function checkWindowsCommandAvailability(command: string): boolean {
   if (process.platform !== 'win32') {
     return true;
   }
 
   try {
-    const result = spawnSync('where', ['git'], {
+    const result = spawnSync('where', [command], {
       timeout: 3000,
       encoding: 'utf-8',
       shell: false,
@@ -88,6 +96,16 @@ export async function installClaude(
         outcome: 'install_failed',
         error: 'Git for Windows is required before Claude can be installed on Windows 11.',
         diagnostics: ['Install Git for Windows, then try Claude install again.'],
+      });
+      return;
+    }
+
+    if (platform === 'win32' && !checkWindowsPowerShellAvailability()) {
+      resolve({
+        success: false,
+        outcome: 'install_failed',
+        error: 'PowerShell is required before Claude can be installed on Windows.',
+        diagnostics: ['Install or restore PowerShell, then try Claude install again.'],
       });
       return;
     }

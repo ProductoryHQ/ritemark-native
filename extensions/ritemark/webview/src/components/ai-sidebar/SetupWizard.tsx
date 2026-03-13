@@ -1,15 +1,18 @@
 import type { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Key, Loader2, LogIn, RefreshCw, Wrench } from 'lucide-react';
+import { EnvironmentStatusNotice } from './EnvironmentStatusNotice';
 import { useAISidebarStore } from './store';
 
 export function SetupWizard() {
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
+  const environmentStatus = useAISidebarStore((s) => s.environmentStatus);
   const setupInProgress = useAISidebarStore((s) => s.setupInProgress);
   const setupError = useAISidebarStore((s) => s.setupError);
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const startInstall = useAISidebarStore((s) => s.startInstall);
   const startLogin = useAISidebarStore((s) => s.startLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
+  const openGitDownload = useAISidebarStore((s) => s.openGitDownload);
   const configureApiKey = useAISidebarStore((s) => s.configureApiKey);
   const reloadWindow = useAISidebarStore((s) => s.reloadWindow);
   const dismissWelcome = useAISidebarStore((s) => s.dismissWelcome);
@@ -21,6 +24,11 @@ export function SetupWizard() {
   const needsAuth = setupStatus.state === 'needs-auth';
   const loginInProgress = setupStatus.state === 'auth-in-progress';
   const isReady = setupStatus.state === 'ready';
+  const missingGit = environmentStatus?.platform === 'win32' && !environmentStatus?.gitInstalled;
+  const missingPowerShell = environmentStatus?.platform === 'win32' && !environmentStatus?.powershellAvailable;
+  const installOrRepairStep = needsInstall || (isBroken && setupStatus.repairAction !== 'reload');
+  const installBlockedByEnvironment = installOrRepairStep && (missingGit || missingPowerShell);
+  const loginBlockedByEnvironment = needsAuth && missingPowerShell;
   const offlineBlocked = !isOnline && (needsAuth || loginInProgress);
 
   const title = needsInstall
@@ -79,15 +87,17 @@ export function SetupWizard() {
               </div>
             )}
 
+            <EnvironmentStatusNotice environmentStatus={environmentStatus} />
+
             <div className="mt-4 flex flex-wrap gap-2">
-              {needsInstall && (
+              {needsInstall && !installBlockedByEnvironment && (
                 <PrimaryButton onClick={startInstall} disabled={setupInProgress}>
                   {setupInProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
                   Install Claude
                 </PrimaryButton>
               )}
 
-              {isBroken && setupStatus.repairAction !== 'reload' && (
+              {isBroken && setupStatus.repairAction !== 'reload' && !installBlockedByEnvironment && (
                 <PrimaryButton onClick={startInstall} disabled={setupInProgress}>
                   {setupInProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
                   Repair Claude
@@ -101,11 +111,18 @@ export function SetupWizard() {
                 </PrimaryButton>
               )}
 
-              {needsAuth && (
+              {needsAuth && !loginBlockedByEnvironment && (
                 <PrimaryButton onClick={startLogin} disabled={offlineBlocked}>
                   <LogIn className="h-3.5 w-3.5" />
                   Sign in with Claude.ai
                 </PrimaryButton>
+              )}
+
+              {installOrRepairStep && missingGit && (
+                <SecondaryButton onClick={openGitDownload}>
+                  <Wrench className="h-3.5 w-3.5" />
+                  Get Git for Windows
+                </SecondaryButton>
               )}
 
               {needsAuth && (
@@ -122,6 +139,14 @@ export function SetupWizard() {
                 </PrimaryButton>
               )}
             </div>
+
+            {(installBlockedByEnvironment || loginBlockedByEnvironment) && missingPowerShell && (
+              <p className="mt-3 text-xs leading-5 opacity-75">
+                Claude install and Claude.ai sign-in use Windows PowerShell. Restore the
+                <code className="mx-1 rounded bg-[var(--vscode-textCodeBlock-background)] px-1 py-0.5">powershell.exe</code>
+                command, then reload Ritemark and retry.
+              </p>
+            )}
 
             {(needsInstall || needsAuth) && (
               <button

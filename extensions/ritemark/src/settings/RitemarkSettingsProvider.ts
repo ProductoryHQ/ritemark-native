@@ -13,6 +13,7 @@ import { CodexAppServer, CodexAuth, emitCodexStatusInvalidated } from '../codex'
 import { UpdateService } from '../update';
 import { AVAILABLE_MODELS, getModelPath, isModelDownloaded } from '../voiceDictation/modelManager';
 import {
+  getAgentEnvironmentStatus,
   getSetupStatus,
   installClaude,
   openClaudeLoginTerminal,
@@ -480,27 +481,26 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     gitInstalled: boolean;
     gitVersion: string | null;
   }> {
-    const [claudeStatus, codexStatus, codexAuthStatus] = await Promise.all([
+    const [claudeStatus, environmentStatus, codexStatus, codexAuthStatus] = await Promise.all([
       getSetupStatus({ refresh: true }),
+      getAgentEnvironmentStatus({ refresh: true }),
       new CodexManager().getBinaryStatus(),
       this.codexAuth?.getStatus() ?? Promise.resolve(null),
     ]);
 
     // Check system dependencies
     const { execSync } = require('child_process');
-    let nodeInstalled = false;
+    let nodeInstalled = environmentStatus.nodeInstalled;
     let nodeVersion: string | null = null;
-    let gitInstalled = false;
+    let gitInstalled = environmentStatus.gitInstalled;
     let gitVersion: string | null = null;
 
     try {
       nodeVersion = execSync('node --version', { timeout: 5000 }).toString().trim();
-      nodeInstalled = true;
     } catch { /* not installed */ }
 
     try {
       gitVersion = execSync('git --version', { timeout: 5000 }).toString().trim().replace('git version ', '');
-      gitInstalled = true;
     } catch { /* not installed */ }
 
     return {

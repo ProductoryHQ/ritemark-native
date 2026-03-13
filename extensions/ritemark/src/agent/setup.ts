@@ -12,6 +12,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
 import type {
+  AgentEnvironmentStatus,
   ClaudeAuthMethod,
   ClaudeRepairAction,
   ClaudeSetupState,
@@ -74,6 +75,22 @@ function checkCommandAvailable(command: string): boolean {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   return result.status === 0 && Boolean(result.stdout?.trim());
+}
+
+function recommendedEnvironmentAction(input: {
+  platform: NodeJS.Platform;
+  gitInstalled: boolean;
+  restartRequired: boolean;
+}): AgentEnvironmentStatus['recommendedAction'] {
+  if (input.restartRequired) {
+    return 'reload';
+  }
+
+  if (input.platform === 'win32' && !input.gitInstalled) {
+    return 'install-git';
+  }
+
+  return null;
 }
 
 function uniquePaths(paths: Array<string | null | undefined>): string[] {
@@ -343,6 +360,47 @@ export async function getSetupStatus(options?: { refresh?: boolean }): Promise<S
   return status;
 }
 
+export async function getAgentEnvironmentStatus(options?: {
+  refresh?: boolean;
+  setupStatus?: SetupStatus;
+}): Promise<AgentEnvironmentStatus> {
+  const platform = getCurrentPlatform();
+  const setupStatus = options?.setupStatus ?? await getSetupStatus({ refresh: options?.refresh });
+  const gitInstalled = checkCommandAvailable('git');
+  const nodeInstalled = checkCommandAvailable('node');
+  const powershellAvailable = platform === 'win32' ? checkCommandAvailable('powershell.exe') : true;
+  const restartRequired = setupStatus.repairAction === 'reload';
+  const diagnostics: string[] = [];
+
+  if (platform === 'win32' && !gitInstalled) {
+    diagnostics.push('Git for Windows not detected.');
+  }
+  if (platform === 'win32' && !powershellAvailable) {
+    diagnostics.push('PowerShell not detected.');
+  }
+  if (platform === 'win32' && !nodeInstalled) {
+    diagnostics.push('Node.js not detected.');
+  }
+  if (restartRequired) {
+    diagnostics.push('Reload Ritemark to refresh command paths after installation.');
+  }
+
+  return {
+    platform,
+    gitInstalled,
+    nodeInstalled,
+    powershellAvailable,
+    restartRequired,
+    diagnostics,
+    recommendedAction: recommendedEnvironmentAction({
+      platform,
+      gitInstalled,
+      restartRequired,
+    }),
+  };
+}
+
 export const __testOnly = {
   deriveClaudeSetupStatus,
+  recommendedEnvironmentAction,
 };
