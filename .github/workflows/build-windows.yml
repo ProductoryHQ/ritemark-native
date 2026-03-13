@@ -116,14 +116,14 @@ jobs:
       # =========================================================================
       # Step 7: Build VS Code for Windows x64
       # =========================================================================
-      - name: Build VS Code (win32-x64-min)
+      - name: Build VS Code (win32-x64-min-ci)
         shell: bash
         working-directory: r/vscode
         run: |
           LOG_FILE="../windows-build.log"
           : > "$LOG_FILE"
           echo "Starting Windows build at $(date)"
-          npm run gulp vscode-win32-x64-min \
+          npm run gulp vscode-win32-x64-min-ci \
             > >(tee -a "$LOG_FILE") \
             2> >(tee -a "$LOG_FILE" >&2) &
           BUILD_PID=$!
