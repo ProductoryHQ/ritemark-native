@@ -44,11 +44,20 @@ jobs:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          success=0
           for i in 1 2 3; do
             echo "Attempt $i..."
-            npm ci && break || echo "Attempt $i failed, retrying..."
+            if npm ci; then
+              success=1
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
             sleep 10
           done
+          if [ "$success" -ne 1 ]; then
+            echo "VS Code dependency install failed after 3 attempts" >&2
+            exit 1
+          fi
 
       - name: Install extension dependencies
         shell: bash
@@ -160,11 +169,20 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          success=0
           for i in 1 2 3; do
             echo "Attempt $i..."
-            npm ci && break || echo "Attempt $i failed, retrying..."
+            if npm ci; then
+              success=1
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
             sleep 10
           done
+          if [ "$success" -ne 1 ]; then
+            echo "VS Code dependency install failed after 3 attempts" >&2
+            exit 1
+          fi
 
       - name: Install extension dependencies
         shell: bash
