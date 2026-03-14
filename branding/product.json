@@ -26,6 +26,10 @@
   "licenseFileName": "LICENSE",
   "reportIssueUrl": "https://github.com/jarmo-productory/ritemark-native/issues/new",
   "urlProtocol": "ritemark",
+  "win32ContextMenu": {
+    "x64": { "clsid": "{633A4994-E129-4F03-ABF3-97D6595BACD5}" },
+    "arm64": { "clsid": "{AD4E33B5-32F9-4C02-A8E4-CAD8AE146101}" }
+  },
   "quality": "stable",
   "extensionsGallery": {
     "serviceUrl": "https://marketplace.visualstudio.com/_apis/public/gallery",
