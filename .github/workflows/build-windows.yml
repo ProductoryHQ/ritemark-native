@@ -6,6 +6,10 @@ on:
     tags:
       - 'v*'
 
+env:
+  VSCODE_VERSION: '1.109.5'
+  NODE_VERSION: '22.21.1'
+
 jobs:
   build:
     runs-on: windows-latest
@@ -23,22 +27,41 @@ jobs:
         with:
           path: r
 
-      - name: Clone VS Code OSS (1.109.5)
-        shell: bash
-        run: |
-          git clone --depth 1 --branch 1.109.5 https://github.com/microsoft/vscode.git r/vscode
-          echo "VS Code 1.109.5 cloned"
-
-      - name: Setup Node.js 22.21.1
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.21.1'
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      # --- VS Code source (cached shallow clone) ---
+      - name: Cache VS Code source
+        id: cache-vscode-src
+        uses: actions/cache@v4
+        with:
+          path: r/vscode
+          key: vscode-src-${{ env.VSCODE_VERSION }}
+
+      - name: Clone VS Code OSS
+        if: steps.cache-vscode-src.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          git clone --depth 1 --branch ${{ env.VSCODE_VERSION }} https://github.com/microsoft/vscode.git r/vscode
+          echo "VS Code ${{ env.VSCODE_VERSION }} cloned"
+
+      - name: Reset VS Code source (if cached)
+        if: steps.cache-vscode-src.outputs.cache-hit == 'true'
+        shell: bash
+        working-directory: r/vscode
+        run: |
+          git checkout -- . 2>/dev/null || true
+          git clean -fd 2>/dev/null || true
+          echo "VS Code source reset to clean state"
+
+      # --- Copy extension ---
       - name: Copy extension (replace symlink)
         shell: bash
         working-directory: r
@@ -48,7 +71,44 @@ jobs:
           cp -R extensions/ritemark vscode/extensions/ritemark
           echo "Extension copied to vscode/extensions/ritemark"
 
+      # --- Dependency caches ---
+      - name: Cache VS Code node_modules
+        id: cache-vscode-deps
+        uses: actions/cache@v4
+        with:
+          path: r/vscode/node_modules
+          key: vscode-deps-win-${{ env.VSCODE_VERSION }}-${{ hashFiles('r/vscode/package-lock.json', 'r/vscode/.npmrc') }}
+          restore-keys: |
+            vscode-deps-win-${{ env.VSCODE_VERSION }}-
+
+      - name: Cache VS Code build sub-dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            r/vscode/build/node_modules
+            r/vscode/remote/node_modules
+          key: vscode-subdeps-win-${{ env.VSCODE_VERSION }}-${{ hashFiles('r/vscode/build/package-lock.json', 'r/vscode/remote/package-lock.json') }}
+          restore-keys: |
+            vscode-subdeps-win-${{ env.VSCODE_VERSION }}-
+
+      - name: Cache Electron headers
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/node-gyp
+          key: electron-headers-win-${{ env.VSCODE_VERSION }}
+
+      - name: Cache extension node_modules
+        id: cache-ext-deps
+        uses: actions/cache@v4
+        with:
+          path: r/vscode/extensions/ritemark/node_modules
+          key: ext-deps-win-${{ hashFiles('r/extensions/ritemark/package-lock.json') }}
+          restore-keys: |
+            ext-deps-win-
+
+      # --- Install dependencies ---
       - name: Install VS Code dependencies
+        if: steps.cache-vscode-deps.outputs.cache-hit != 'true'
         shell: bash
         working-directory: r/vscode
         env:
@@ -71,7 +131,19 @@ jobs:
             exit 1
           fi
 
+      - name: Verify VS Code dependencies (cached)
+        if: steps.cache-vscode-deps.outputs.cache-hit == 'true'
+        shell: bash
+        working-directory: r/vscode
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+        run: |
+          echo "Using cached node_modules, running postinstall..."
+          npm run postinstall 2>/dev/null || true
+
       - name: Install extension dependencies
+        if: steps.cache-ext-deps.outputs.cache-hit != 'true'
         shell: bash
         working-directory: r/vscode/extensions/ritemark
         run: npm install --legacy-peer-deps
@@ -87,14 +159,14 @@ jobs:
             rm -rf "$SDK_VENDOR/ripgrep/arm64-linux"
             rm -rf "$SDK_VENDOR/ripgrep/x64-darwin"
             rm -rf "$SDK_VENDOR/ripgrep/x64-linux"
-            echo "Kept only: $(ls $SDK_VENDOR/ripgrep/)"
+            echo "Kept only: $(ls $SDK_VENDOR/ripgrep/ 2>/dev/null || echo 'none')"
           fi
 
+      # --- Patch and compile ---
       - name: Remove conflicting files before patching
         shell: bash
         working-directory: r/vscode
         run: |
-          # gettingStartedGuide.css exists in VS Code 1.109.5 but patch 001 creates it from scratch
           rm -f src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css 2>/dev/null || true
 
       - name: Apply patches
@@ -115,6 +187,7 @@ jobs:
           rm -rf webview/src 2>/dev/null || true
           echo "Cleaned webview dev files (prevents EMFILE during bundling)"
 
+      # --- Build ---
       - name: Build VS Code (win32-x64-min)
         shell: bash
         working-directory: r/vscode
@@ -145,6 +218,7 @@ jobs:
           path: r/windows-build.log
           retention-days: 14
 
+      # --- Package ---
       - name: Copy extension to build output
         shell: bash
         working-directory: r
