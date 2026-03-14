@@ -70,6 +70,51 @@ get_failed() {
     cat "$FAILED_FILE"
 }
 
+framework_sign_target() {
+    local framework_path="$1"
+    if [ -d "$framework_path/Versions/A" ]; then
+        echo "$framework_path/Versions/A"
+    else
+        echo "$framework_path"
+    fi
+}
+
+normalize_framework_bundle() {
+    local framework_path="$1"
+    local versions_dir="$framework_path/Versions"
+    local current_dir="$versions_dir/Current"
+
+    if [ ! -d "$versions_dir/A" ]; then
+        return
+    fi
+
+    if [ -d "$current_dir" ] && [ ! -L "$current_dir" ]; then
+        rm -rf "$current_dir"
+        ln -s "A" "$current_dir"
+    elif [ ! -e "$current_dir" ]; then
+        ln -s "A" "$current_dir"
+    fi
+
+    local entry
+    while IFS= read -r entry; do
+        local name
+        name="$(basename "$entry")"
+        local root_entry="$framework_path/$name"
+
+        if [ "$name" = "_CodeSignature" ]; then
+            continue
+        fi
+
+        if [ -e "$root_entry" ] && [ ! -L "$root_entry" ]; then
+            rm -rf "$root_entry"
+        fi
+
+        if [ ! -L "$root_entry" ]; then
+            ln -s "Versions/Current/$name" "$root_entry"
+        fi
+    done < <(find "$versions_dir/A" -mindepth 1 -maxdepth 1)
+}
+
 echo ""
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}Ritemark Native - Smart Code Signing${NC}"
@@ -143,6 +188,20 @@ fi
 xattr -cr "$APP_PATH" 2>/dev/null || true
 echo "  ✓ Cleared extended attributes"
 
+# GitHub artifact downloads can flatten framework symlinks into real files/directories.
+# Normalize them back before signing, otherwise embedded framework signing breaks.
+for fw in \
+    "$APP_PATH/Contents/Frameworks/Squirrel.framework" \
+    "$APP_PATH/Contents/Frameworks/Mantle.framework" \
+    "$APP_PATH/Contents/Frameworks/ReactiveObjC.framework" \
+    "$APP_PATH/Contents/Frameworks/Electron Framework.framework"
+do
+    if [ -d "$fw" ]; then
+        normalize_framework_bundle "$fw"
+    fi
+done
+echo "  ✓ Normalized framework bundle symlinks"
+
 # =============================================================================
 # Step 4: Discover ALL native binaries
 # =============================================================================
@@ -197,6 +256,15 @@ sign_item() {
         codesign --force --options runtime --timestamp \
             --sign "$SIGNING_IDENTITY" \
             "$item" 2>&1
+    fi
+}
+
+framework_sign_target() {
+    local framework_path="$1"
+    if [ -d "$framework_path/Versions/A" ]; then
+        echo "$framework_path/Versions/A"
+    else
+        echo "$framework_path"
     fi
 }
 
@@ -313,7 +381,8 @@ echo "  [5d] Signing frameworks..."
 for fw in Squirrel Mantle ReactiveObjC; do
     FW_PATH="$APP_PATH/Contents/Frameworks/${fw}.framework"
     if [ -d "$FW_PATH" ]; then
-        if sign_item "$FW_PATH" "false" > /dev/null 2>&1; then
+        FW_SIGN_TARGET="$(framework_sign_target "$FW_PATH")"
+        if sign_item "$FW_SIGN_TARGET" "false" > /dev/null 2>&1; then
             echo "    ✓ Signed: ${fw}.framework"
             increment_signed
         else
@@ -330,8 +399,9 @@ done
 # Solution: Re-sign libraries with our Developer ID AFTER framework signing.
 ELECTRON_FW="$APP_PATH/Contents/Frameworks/Electron Framework.framework"
 if [ -d "$ELECTRON_FW" ]; then
+    ELECTRON_FW_SIGN_TARGET="$(framework_sign_target "$ELECTRON_FW")"
     # Stage 1: Sign the framework (signs main executable and resources)
-    if sign_item "$ELECTRON_FW" "false" > /dev/null 2>&1; then
+    if sign_item "$ELECTRON_FW_SIGN_TARGET" "false" > /dev/null 2>&1; then
         echo "    ✓ Signed: Electron Framework.framework (stage 1)"
         increment_signed
     else
@@ -355,7 +425,7 @@ if [ -d "$ELECTRON_FW" ]; then
         done < <(find "$ELECTRON_LIBS" -name "*.dylib" -type f -print0 2>/dev/null)
         
         # Stage 3: Re-sign the framework to incorporate library signatures
-        if sign_item "$ELECTRON_FW" "false" > /dev/null 2>&1; then
+        if sign_item "$ELECTRON_FW_SIGN_TARGET" "false" > /dev/null 2>&1; then
             echo "    ✓ Signed: Electron Framework.framework (stage 2 - final)"
             increment_signed
         else
