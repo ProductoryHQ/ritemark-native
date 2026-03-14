@@ -52,11 +52,8 @@ jobs:
         shell: bash
         working-directory: r/vscode
         env:
-          npm_config_disturl: https://electronjs.org/headers
-          npm_config_target: 30.5.1
-          npm_config_runtime: electron
-          npm_config_build_from_source: true
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           success=0
@@ -93,6 +90,13 @@ jobs:
             echo "Kept only: $(ls $SDK_VENDOR/ripgrep/)"
           fi
 
+      - name: Remove conflicting files before patching
+        shell: bash
+        working-directory: r/vscode
+        run: |
+          # gettingStartedGuide.css exists in VS Code 1.109.5 but patch 001 creates it from scratch
+          rm -f src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css 2>/dev/null || true
+
       - name: Apply patches
         shell: bash
         working-directory: r
@@ -103,14 +107,24 @@ jobs:
         working-directory: r/vscode/extensions/ritemark
         run: npm run compile
 
+      - name: Clean webview dev files before build
+        shell: bash
+        working-directory: r/vscode/extensions/ritemark
+        run: |
+          rm -rf webview/node_modules 2>/dev/null || true
+          rm -rf webview/src 2>/dev/null || true
+          echo "Cleaned webview dev files (prevents EMFILE during bundling)"
+
       - name: Build VS Code (win32-x64-min)
         shell: bash
         working-directory: r/vscode
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
           LOG_FILE="../windows-build.log"
           : > "$LOG_FILE"
           echo "Starting Windows build at $(date)" | tee -a "$LOG_FILE"
-          npm run gulp vscode-win32-x64-min \
+          npx gulp vscode-win32-x64-min \
             > >(tee -a "$LOG_FILE") \
             2> >(tee -a "$LOG_FILE" >&2) &
           BUILD_PID=$!
