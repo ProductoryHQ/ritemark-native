@@ -98,3 +98,16 @@ docs-internal/
 
 # RiteMark local settings
 .ritemark/
+
+# Git worktrees (Claude Code agents)
+.worktrees/
+.claude/worktrees/
+
+# Test/binary files in release docs (keep locally, don't track)
+docs/releases/**/*.pdf
+docs/releases/**/*.docx
+docs/releases/**/*.csv
+docs/releases/**/*.xlsx
+
+# Apple certificate requests
+*.certSigningRequest

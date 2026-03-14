@@ -506,7 +506,7 @@ grep -E '"version"|"ritemarkVersion"' VSCode-darwin-arm64/Ritemark.app/Contents/
 
 # 3. Is the build properly code-signed (NOT adhoc)?
 codesign -dv VSCode-darwin-arm64/Ritemark.app 2>&1 | grep -E "Signature|Authority|TeamIdentifier"
-# MUST show: TeamIdentifier=JKBSC3ZDT5, NOT "adhoc" or "not set"
+# MUST show: TeamIdentifier=$APPLE_TEAM_ID, NOT "adhoc" or "not set"
 
 # 4. Does a DMG exist and when was it created?
 ls -la dist/Ritemark-*.dmg
@@ -575,7 +575,7 @@ grep "ritemarkVersion" "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/pr
 
 # HARD CHECK 6: Proper code signature
 codesign -dv "/Volumes/Ritemark/Ritemark.app" 2>&1 | grep TeamIdentifier
-# MUST show TeamIdentifier=JKBSC3ZDT5, NOT "not set"
+# MUST show TeamIdentifier=$APPLE_TEAM_ID, NOT "not set"
 
 # HARD CHECK 7: node_modules exists (CRITICAL - runtime dependencies!)
 ls "/Volumes/Ritemark/Ritemark.app/Contents/Resources/app/extensions/ritemark/node_modules" | wc -l
