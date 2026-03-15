@@ -5,7 +5,7 @@
 import assert from 'assert';
 import { __testOnly } from './setup';
 
-const { deriveClaudeSetupStatus } = __testOnly;
+const { deriveClaudeSetupStatus, recommendedEnvironmentAction } = __testOnly;
 
 {
   const status = deriveClaudeSetupStatus({
@@ -126,6 +126,26 @@ const { deriveClaudeSetupStatus } = __testOnly;
 
   assert.strictEqual(status.state, 'ready');
   assert.strictEqual(status.authMethod, 'api-key');
+}
+
+{
+  const action = recommendedEnvironmentAction({
+    platform: 'win32',
+    gitInstalled: false,
+    restartRequired: false,
+  });
+
+  assert.strictEqual(action, 'install-git');
+}
+
+{
+  const action = recommendedEnvironmentAction({
+    platform: 'win32',
+    gitInstalled: false,
+    restartRequired: true,
+  });
+
+  assert.strictEqual(action, 'reload');
 }
 
 console.log('setup.test.ts passed');
