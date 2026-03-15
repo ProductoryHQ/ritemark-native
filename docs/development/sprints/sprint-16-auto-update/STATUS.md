@@ -169,7 +169,7 @@ This is macOS Gatekeeper blocking unsigned apps downloaded from the internet.
 ## Solution Implemented
 
 1. **Apple Developer Account** - Enrolled ($99/year)
-   - Team ID: `JKBSC3ZDT5`
+   - Team ID: stored in `.signing-config`
    - Developer ID Application certificate installed
 
 2. **Code Signing Scripts Created**
