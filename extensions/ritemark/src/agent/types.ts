@@ -132,6 +132,17 @@ export interface AgentResult {
 export type ClaudeAuthMethod = 'claude-oauth' | 'api-key' | null;
 export type ClaudeSetupState = 'not-installed' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
 export type ClaudeRepairAction = 'install' | 'repair' | 'reload' | null;
+export type AgentEnvironmentRecommendedAction = 'install-git' | 'reload' | null;
+
+export interface AgentEnvironmentStatus {
+  platform: NodeJS.Platform;
+  gitInstalled: boolean;
+  nodeInstalled: boolean;
+  powershellAvailable: boolean;
+  restartRequired: boolean;
+  diagnostics: string[];
+  recommendedAction: AgentEnvironmentRecommendedAction;
+}
 
 export interface SetupStatus {
   cliInstalled: boolean;

@@ -34,6 +34,7 @@ import type {
   DiscoveredCommand,
   IndexStatus,
   IndexProgress,
+  AgentEnvironmentStatus,
   SetupStatus,
   ExtensionMessage,
   SubagentProgress,
@@ -109,6 +110,7 @@ interface AISidebarState {
 
   // ── Setup state (Claude Code) ──
   setupStatus: SetupStatus | null;
+  environmentStatus: AgentEnvironmentStatus | null;
   setupInProgress: boolean;
   setupError: string | null;
   hasSeenWelcome: boolean;
@@ -146,6 +148,7 @@ interface AISidebarState {
   startInstall: () => void;
   startLogin: () => void;
   openApiKeySettings: () => void;
+  openGitDownload: () => void;
   recheckSetup: () => void;
   approvePlan: (turnId: string) => void;
   rejectPlan: (turnId: string, feedback?: string) => void;
@@ -206,6 +209,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   showHistoryPanel: false,
 
   setupStatus: null,
+  environmentStatus: null,
   setupInProgress: false,
   setupError: null,
   hasSeenWelcome: false,
@@ -373,6 +377,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   openApiKeySettings: () => {
     vscode.postMessage({ type: 'agent-setup:apikey' });
+  },
+
+  openGitDownload: () => {
+    vscode.postMessage({ type: 'agent-setup:open-git-download' });
   },
 
   recheckSetup: () => {
@@ -691,6 +699,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           codexSelectedModel,
           codexStatus: message.codexStatus ?? get().codexStatus,
           setupStatus: message.setupStatus ?? get().setupStatus,
+          environmentStatus: message.environmentStatus ?? get().environmentStatus,
           hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
           discoveredAgents: message.discoveredAgents || [],
           discoveredCommands: message.discoveredCommands || [],
@@ -957,7 +966,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
 
       case 'agent-setup:complete':
-        set({ setupStatus: message.status, setupInProgress: false, setupError: null });
+        set({
+          setupStatus: message.status,
+          environmentStatus: message.environmentStatus ?? get().environmentStatus,
+          setupInProgress: false,
+          setupError: null,
+        });
         break;
 
       case 'agent-setup:error':

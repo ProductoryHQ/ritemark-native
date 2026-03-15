@@ -1,20 +1,16 @@
-# Set Up AI Assistant
+# Set Up AI
 
-> Enable AI-powered text editing with your OpenAI API key.
+> Configure Ritemark's built-in AI and optional terminal AI tools.
 
-Ritemark's AI assistant helps you rephrase text, make bulk replacements, and insert content. It requires an OpenAI API key to work.
-
----
-
-## What You Need
-
-- An OpenAI account
-- An API key with available credits
-- Internet connection
+Ritemark works great without any AI features. But if you want AI-powered editing, here's how to set everything up.
 
 ---
 
-## Step 1: Get an API Key
+## Built-in AI Assistant (OpenAI)
+
+Ritemark's built-in AI assistant helps you rephrase text, make bulk replacements, and insert content. It requires an OpenAI API key.
+
+### Step 1: Get an API Key
 
 1. Go to [platform.openai.com](https://platform.openai.com)
 2. Sign in or create an account
@@ -25,104 +21,116 @@ Ritemark's AI assistant helps you rephrase text, make bulk replacements, and ins
 
 **Important:** You can only see the key once. Save it somewhere safe.
 
-### API Credits
+#### API Credits
 
 OpenAI requires prepaid credits:
 - New accounts may include free credits
-- Add payment method and credits at Billing section
-- Ritemark uses GPT-4o-mini (cost-effective)
+- Add payment method and credits at the Billing section
+- Typical usage costs pennies per session
 
-Typical usage costs pennies per session.
-
----
-
-## Step 2: Add Key to Ritemark
+### Step 2: Add Key to Ritemark
 
 1. Open Ritemark
-2. Open Command Palette: **Cmd+Shift+P**
-3. Type "Configure OpenAI"
-4. Select **Ritemark: Configure OpenAI API Key**
-5. Paste your API key
-6. Press Enter
+2. Click the **gear icon** to open Settings
+3. Paste your API key in the OpenAI field
+4. Your key is stored securely in your system's credential store
 
-Your key is stored securely in macOS keychain.
-
----
-
-## Step 3: Verify It Works
+### Step 3: Verify It Works
 
 1. Open any markdown file
 2. Look at the status bar (bottom)
 3. You should see **AI Ready**
 
-If you see **AI Offline**:
-- Check your internet connection
-- Verify the API key was entered correctly
-- Make sure you have API credits
+If you see **AI Offline**, check your internet connection, verify the API key, and make sure you have API credits.
 
----
-
-## Using the AI Assistant
-
-Once set up:
-
-1. Select some text in your document
-2. Open the AI sidebar (right panel)
-3. Type a request like "make this shorter"
-4. AI modifies your selected text
-
-See [AI Assistant](../features/ai-assistant.md) for full documentation.
-
----
-
-## Troubleshooting
+### Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
 | "AI Offline" in status bar | Check internet connection |
 | No response from AI | Verify API key and credits |
-| "Invalid API key" error | Re-enter key via Command Palette |
+| "Invalid API key" error | Re-enter key in Settings |
 | Slow responses | Normal for longer text; wait for completion |
 
-### Re-enter Your API Key
+---
 
-If you need to update or fix your key:
-1. **Cmd+Shift+P** → "Configure OpenAI API Key"
-2. Enter the new key
-3. Old key is replaced
+## Claude Code (Terminal AI)
 
-### Check API Key Status
+Claude Code is Anthropic's CLI tool for AI-powered editing directly in the terminal. Ritemark v1.5+ can also install Claude automatically from Settings.
 
-1. **Cmd+Shift+P**
-2. Search for "Check API Key"
-3. Select **Ritemark: Check API Key**
-4. Shows whether key is valid
+### Install
+
+**Option A — From Ritemark Settings:**
+Open Settings (gear icon) and click **Install Claude**.
+
+**Option B — Manual install:**
+
+```bash
+# npm
+npm install -g @anthropic-ai/claude-code
+
+# Homebrew (macOS)
+brew install claude-code
+```
+
+Then authenticate:
+
+```bash
+claude auth
+```
+
+### Learn More
+
+For full usage instructions, see Anthropic's official documentation:
+**[Claude Code Documentation](https://docs.anthropic.com/en/docs/claude-code/overview)**
+
+---
+
+## OpenAI Codex (Terminal AI)
+
+Codex is OpenAI's CLI agent for terminal-based editing.
+
+### Install
+
+```bash
+npm install -g @openai/codex
+```
+
+Set your API key:
+
+```bash
+export OPENAI_API_KEY='your-key-here'
+```
+
+### Learn More
+
+For full usage instructions, see OpenAI's official documentation:
+**[Codex CLI Documentation](https://github.com/openai/codex)**
 
 ---
 
 ## Privacy Notes
 
-- Your API key is stored in macOS Secure Storage
-- Text is sent to OpenAI's servers for processing
+- API keys are stored in your system's secure credential store
+- Text is sent to the respective AI provider's servers for processing
 - Ritemark doesn't store or transmit your data elsewhere
-- See [OpenAI's usage policies](https://openai.com/policies/usage-policies)
+- See each provider's usage policies for details
 
 ---
 
-## Without an API Key
+## Without AI
 
-Ritemark works fine without AI:
+Ritemark works perfectly without any AI configured:
 - All editing features work
 - Export works
 - CSV/Excel viewing works
-- Only AI assistant is disabled
 
-You can always add a key later.
+You can always add AI later.
 
 ---
 
 ## Related
 
 - [AI Assistant](../features/ai-assistant.md) - How to use AI features
+- [AI Agents](../features/ai-agents.md) - Built-in Claude, Codex, and Ritemark Agent
 - [Getting Started](getting-started.md) - Basic setup
-- [Common Issues](../troubleshooting/common-issues.md) - Troubleshooting
