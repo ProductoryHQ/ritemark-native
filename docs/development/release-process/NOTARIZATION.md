@@ -148,9 +148,7 @@ xcrun stapler validate "dist/Ritemark-X.Y.Z-darwin-arm64.dmg"
 
 ## Apple Developer Account
 
-- **Team ID:** JKBSC3ZDT5
-- **Apple ID:** jarmo@productory.eu
-- **Certificate:** Developer ID Application: Jarmo Tuisk (JKBSC3ZDT5)
+Credentials are stored in `.signing-config` (gitignored). See `.signing-config.example` for the format.
 
 ## Release Checklist
 

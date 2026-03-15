@@ -211,21 +211,16 @@ fi
 echo ""
 echo "[4/6] Checking stapled notarization ticket..."
 
-# Also check codesign output for stapled ticket
-if echo "$CODESIGN_INFO" | grep -q "Notarization Ticket=stapled"; then
-    pass "Notarization ticket is stapled (codesign confirmed)"
+STAPLER_OUTPUT=$(xcrun stapler validate "$DMG_PATH" 2>&1 || true)
+
+if echo "$STAPLER_OUTPUT" | grep -q "The validate action worked"; then
+    pass "DMG notarization ticket is stapled"
+elif echo "$STAPLER_OUTPUT" | grep -q "worked"; then
+    pass "DMG stapler validation passed"
 else
-    STAPLER_OUTPUT=$(xcrun stapler validate "$APP_PATH" 2>&1 || true)
-    
-    if echo "$STAPLER_OUTPUT" | grep -q "The validate action worked"; then
-        pass "Notarization ticket is stapled"
-    elif echo "$STAPLER_OUTPUT" | grep -q "worked"; then
-        pass "Stapler validation passed"
-    else
-        fail "Notarization ticket is NOT stapled"
-        echo "       Run: xcrun stapler staple (on the source app, then recreate DMG)"
-        echo "       Stapler output: $STAPLER_OUTPUT"
-    fi
+    fail "DMG notarization ticket is NOT stapled"
+    echo "       Run: xcrun stapler staple \"$DMG_PATH\""
+    echo "       Stapler output: $STAPLER_OUTPUT"
 fi
 
 # =============================================================================
@@ -235,16 +230,13 @@ echo ""
 echo "[5/6] Verifying with Apple servers (online check)..."
 
 # The spctl check already validates online, but we can also use stapler
-# to explicitly check the ticket exists on Apple's servers
-ONLINE_CHECK=$(xcrun stapler validate --verbose "$APP_PATH" 2>&1 || true)
+# to explicitly check the ticket exists on Apple's servers for the DMG itself.
+ONLINE_CHECK=$(xcrun stapler validate --verbose "$DMG_PATH" 2>&1 || true)
 
 if echo "$ONLINE_CHECK" | grep -q "ticket"; then
     pass "Apple server confirms notarization ticket exists"
 else
-    # Even if verbose doesn't mention ticket, if codesign shows stapled, it's good
-    if echo "$CODESIGN_INFO" | grep -q "Notarization Ticket=stapled"; then
-        pass "Codesign confirms ticket is stapled"
-    elif echo "$SPCTL_OUTPUT" | grep -q "Notarized"; then
+    if echo "$SPCTL_OUTPUT" | grep -q "Notarized"; then
         pass "spctl confirms notarization (implicit server check)"
     else
         warn "Could not explicitly verify ticket with Apple servers"

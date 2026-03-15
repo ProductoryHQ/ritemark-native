@@ -16,19 +16,15 @@ Ritemark v1.0.1 has been:
 
 ---
 
-## Active Notarization Submission
+## Notarization
 
-```
-Submission ID: a8e1af43-4716-40ca-b2b8-8e433f9d87ad
-Submitted:     2026-01-12T09:38:28.241Z
-Status:        In Progress (as of last check)
-```
+**Status:** Resolved — first notarization completed successfully.
 
 ### Check Status Command
 
 ```bash
 cd /Users/jarmotuisk/Projects/ritemark-native
-source .signing-config && xcrun notarytool info a8e1af43-4716-40ca-b2b8-8e433f9d87ad --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
+source .signing-config && xcrun notarytool info <submission-id> --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
 ```
 
 ### Expected Status Values
@@ -75,7 +71,7 @@ source .signing-config && xcrun notarytool info a8e1af43-4716-40ca-b2b8-8e433f9d
 
 1. **Get the detailed log:**
    ```bash
-   source .signing-config && xcrun notarytool log a8e1af43-4716-40ca-b2b8-8e433f9d87ad --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
+   source .signing-config && xcrun notarytool log <submission-id> --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
    ```
 
 2. **Common issues and fixes:**
@@ -105,10 +101,7 @@ source .signing-config && xcrun notarytool info a8e1af43-4716-40ca-b2b8-8e433f9d
 
 ## Apple Developer Account Details
 
-- **Team ID:** JKBSC3ZDT5
-- **Apple ID:** jarmo@productory.eu
-- **Certificate:** Developer ID Application: Jarmo Tuisk (JKBSC3ZDT5)
-- **App-specific password:** Stored in `.signing-config` as APPLE_APP_PASSWORD
+Credentials are stored in `.signing-config` (gitignored). See `.signing-config.example` for the format.
 
 ---
 
@@ -124,11 +117,7 @@ After the first successful notarization, subsequent submissions typically comple
 
 ### Previous Failed Submissions
 
-These older submissions failed with "Invalid" due to unsigned nested binaries (before codesign script was fixed):
-- `d21e26b9-9f24-4fa8-8dd6-b78f95ea33bf` (Invalid)
-- `b5d4ccc1-e11f-4bd4-b0c2-f196b8a9f40c` (Invalid)
-
-The first submission `88630781-abdf-4c95-aa13-a85e2de14f34` was also stuck for hours and may still be processing.
+Earlier submissions failed with "Invalid" due to unsigned nested binaries (before codesign script was fixed). Issue was resolved by improving `codesign-app.sh` to sign all nested binaries.
 
 ---
 
@@ -145,7 +134,7 @@ The first submission `88630781-abdf-4c95-aa13-a85e2de14f34` was also stuck for h
 
 ```bash
 # Check notarization status
-source .signing-config && xcrun notarytool info a8e1af43-4716-40ca-b2b8-8e433f9d87ad --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
+source .signing-config && xcrun notarytool info <submission-id> --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
 
 # View all submissions
 source .signing-config && xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
