@@ -6,6 +6,9 @@
  */
 
 import { spawn, spawnSync } from 'child_process';
+import { existsSync, readdirSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
 import {
   clearClaudePendingReload,
@@ -16,9 +19,17 @@ import {
 import type { ClaudeInstallResult, InstallProgress } from './types';
 
 const INSTALL_TIMEOUT_MS = 5 * 60 * 1000;
+let installInProgress = false;
 
 function getVSCode(): typeof import('vscode') {
   return require('vscode') as typeof import('vscode');
+}
+
+/**
+ * Check if a Claude install or repair is currently in progress.
+ */
+export function isClaudeInstallInProgress(): boolean {
+  return installInProgress;
 }
 
 function checkWindowsGitAvailability(): boolean {
@@ -44,6 +55,59 @@ function checkWindowsCommandAvailability(command: string): boolean {
     return result.status === 0 && Boolean(result.stdout?.trim());
   } catch {
     return false;
+  }
+}
+
+/**
+ * Check whether any Claude-related processes are running that may lock download files.
+ * Returns process names if found, empty array if none.
+ */
+function detectRunningClaudeProcesses(): string[] {
+  if (process.platform !== 'win32') {
+    return [];
+  }
+
+  try {
+    const result = spawnSync('powershell.exe', [
+      '-NoProfile', '-Command',
+      "Get-Process | Where-Object { $_.ProcessName -match '^claude' } | Select-Object -ExpandProperty ProcessName -Unique",
+    ], {
+      timeout: 5000,
+      encoding: 'utf-8',
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    if (result.status !== 0 || !result.stdout?.trim()) {
+      return [];
+    }
+
+    return result.stdout.trim().split(/\r?\n/).map(n => n.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Clear stale download files in ~/.claude/downloads/ to prevent file-lock conflicts.
+ */
+function clearStaleDownloads(): void {
+  try {
+    const downloadsDir = join(homedir(), '.claude', 'downloads');
+    if (!existsSync(downloadsDir)) {
+      return;
+    }
+
+    const files = readdirSync(downloadsDir);
+    for (const file of files) {
+      try {
+        unlinkSync(join(downloadsDir, file));
+      } catch {
+        // File is locked — not critical, install.ps1 will handle or fail visibly
+      }
+    }
+  } catch {
+    // Downloads dir doesn't exist or isn't readable — OK
   }
 }
 
@@ -87,6 +151,26 @@ export function classifyClaudeInstallResult(input: {
 export async function installClaude(
   onProgress: (progress: InstallProgress) => void
 ): Promise<ClaudeInstallResult> {
+  if (installInProgress) {
+    return {
+      success: false,
+      outcome: 'install_failed',
+      error: 'A Claude install or repair is already in progress. Wait for it to finish.',
+    };
+  }
+
+  installInProgress = true;
+
+  try {
+    return await installClaudeInner(onProgress);
+  } finally {
+    installInProgress = false;
+  }
+}
+
+async function installClaudeInner(
+  onProgress: (progress: InstallProgress) => void
+): Promise<ClaudeInstallResult> {
   return new Promise((resolve) => {
     const platform = getCurrentPlatform();
 
@@ -108,6 +192,21 @@ export async function installClaude(
         diagnostics: ['Install or restore PowerShell, then try Claude install again.'],
       });
       return;
+    }
+
+    // On Windows, check for running Claude processes that may lock download files
+    if (platform === 'win32') {
+      const runningProcesses = detectRunningClaudeProcesses();
+      if (runningProcesses.length > 0) {
+        onProgress({
+          stage: 'installing',
+          message: 'Closing running Claude processes before install…',
+        });
+        // Try to clear stale downloads even if processes are running
+        clearStaleDownloads();
+      } else {
+        clearStaleDownloads();
+      }
     }
 
     onProgress({ stage: 'downloading', message: 'Downloading Claude…' });

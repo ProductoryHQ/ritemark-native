@@ -7,8 +7,8 @@
  */
 
 import { spawnSync } from 'child_process';
-import { existsSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
 import type {
@@ -65,6 +65,35 @@ function runBinary(binaryPath: string, args: string[], timeout: number) {
   });
 }
 
+/**
+ * On Windows, npm-installed CLIs are `.cmd` wrappers that invoke `node <script>`.
+ * The Claude SDK spawns `node <pathToClaudeCodeExecutable>`, so passing a `.cmd`
+ * causes EINVAL. This function extracts the actual JS entry point from the `.cmd`.
+ */
+function resolveJsEntryFromCmd(cmdPath: string): string | null {
+  if (process.platform !== 'win32' || !cmdPath.toLowerCase().endsWith('.cmd')) {
+    return null;
+  }
+
+  try {
+    const content = readFileSync(cmdPath, 'utf-8');
+    // npm .cmd wrappers contain a line like:
+    //   "%_prog%" "%dp0%\node_modules\@anthropic-ai\claude-code\cli.js" %*
+    const match = content.match(/%dp0%\\([^\s"]+\.js)/);
+    if (match) {
+      const jsRelative = match[1].replace(/\\/g, '/');
+      const jsAbsolute = join(dirname(cmdPath), jsRelative);
+      if (existsSync(jsAbsolute)) {
+        return jsAbsolute;
+      }
+    }
+  } catch {
+    // Can't read the .cmd — fall through
+  }
+
+  return null;
+}
+
 function checkCommandAvailable(command: string): boolean {
   const platform = process.platform;
   const lookup = platform === 'win32' ? 'where' : 'which';
@@ -109,7 +138,14 @@ function getCandidateClaudePaths(platform: SupportedPlatform): string[] {
   });
 
   if (lookup.status === 0 && lookup.stdout) {
-    candidates.push(...lookup.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+    let lookupLines = lookup.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (platform === 'win32') {
+      // On Windows, `where` returns extensionless Unix shell shims (e.g. %APPDATA%\npm\claude)
+      // alongside the usable .cmd/.exe variants. The extensionless files cannot be spawned by
+      // Node.js and cause ENOENT errors — filter them out.
+      lookupLines = lookupLines.filter(p => /\.(exe|cmd|bat)$/i.test(p));
+    }
+    candidates.push(...lookupLines);
   }
 
   if (platform === 'win32') {
@@ -179,23 +215,43 @@ function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): 
 
     const version = getClaudeVersion(candidate);
     if (version) {
+      // For the SDK's pathToClaudeCodeExecutable, we need the JS entry point,
+      // not the .cmd wrapper (the SDK runs `node <path>`, not `shell .cmd`).
+      const sdkPath = resolveJsEntryFromCmd(candidate) || candidate;
       return {
         installed: true,
         runnable: true,
-        path: candidate,
+        path: sdkPath,
         version,
-        diagnostics: candidatePaths[0] !== candidate
-          ? [...diagnostics, `Using detected Claude path: ${candidate}`]
+        diagnostics: candidatePaths[0] !== candidate || sdkPath !== candidate
+          ? [...diagnostics, `Using detected Claude path: ${sdkPath}`]
           : diagnostics,
       };
     }
 
     let error: string | undefined;
+    let isSpawnFailure = false;
     try {
       const result = runBinary(candidate, ['--version'], 5000);
-      error = result.stderr?.trim() || result.stdout?.trim() || 'Claude binary was detected but could not be started.';
+      if (result.error && 'code' in result.error && (result.error as NodeJS.ErrnoException).code === 'ENOENT') {
+        // Binary file exists but Node.js cannot spawn it (e.g. Unix shim on Windows).
+        // Skip and try the next candidate.
+        isSpawnFailure = true;
+      } else {
+        error = result.stderr?.trim() || result.stdout?.trim() || 'Claude binary was detected but could not be started.';
+      }
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err);
+      const errCode = err instanceof Error && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
+      if (errCode === 'ENOENT' || errCode === 'EINVAL') {
+        isSpawnFailure = true;
+      } else {
+        error = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    if (isSpawnFailure) {
+      diagnostics.push(`Skipped unspawnable path: ${candidate}`);
+      continue;
     }
 
     return {
