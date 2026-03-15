@@ -1,17 +1,12 @@
 # Ritemark v1.5.0
 
-**Status:** In progress  
-**Type:** Full release  
+**Released:** 2026-03-15
+**Type:** Full release
 **Download:** [GitHub Release](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.5.0)
 
 ## Highlights
 
-Ritemark v1.5.0 is shaping up as a foundation-and-reliability release:
-
-- VS Code base update from `1.94.0` to `1.109.5`
-- new compatibility-aware update platform in Settings
-- much stronger Claude and Codex install/auth recovery UX
-- Codex screenshot/image attachments now reach the agent correctly
+Ritemark v1.5.0 is a foundation-and-reliability release. It upgrades the VS Code base to `1.109.5`, adds a proper Update Center, redesigns the welcome experience, and makes AI agent setup much more reliable -- especially on Windows.
 
 ## What's New
 
@@ -23,21 +18,32 @@ Ritemark v1.5.0 is shaping up as a foundation-and-reliability release:
 
 ### Unified Update Platform (Sprint 42)
 
-- canonical update feed generation and feed-based update resolution
-- new `Update Center` in Settings with manual check, install/download, skip, pause, resume, and restart-required handling
-- full-release vs extension-update handling is now compatibility-aware instead of `latest`-only
-- component readiness cards for voice model, Claude, and Codex
+- Canonical update feed generation and feed-based update resolution
+- New `Update Center` in Settings with manual check, install/download, skip, pause, resume, and restart-required handling
+- Full-release vs extension-update handling is now compatibility-aware instead of `latest`-only
+- Component readiness cards for voice model, Claude, and Codex
+
+### Welcome Page and Onboarding (Sprint 43)
+
+- New branded Ritemark welcome page with quick-action buttons
+- Launch check panel showing Claude, ChatGPT, Git, and Node status at a glance
 
 ### Claude and Codex Reliability
 
-- dedicated `Claude Account` and `ChatGPT Account` boxes in Settings
-- broken install, needs-auth, auth-in-progress, and ready states are handled explicitly in the sidebar and Settings
+- Dedicated `Claude Account` and `ChatGPT Account` boxes in Settings
+- Broken install, needs-auth, auth-in-progress, and ready states are handled explicitly in the sidebar and Settings
 - Claude install/login/logout state now refreshes automatically across surfaces
-- Codex setup/auth state is clearer and less noisy for normal users
 - Codex pasted screenshots and image attachments are now delivered correctly to the agent
-- removed misleading image token estimation UI from Codex chat input
+- Removed misleading image token estimation UI from Codex chat input
+
+### Windows AI Bootstrap Hardening (Sprint 44)
+
+- Claude and Codex binaries detected reliably on Windows (resolves .cmd/.exe shims)
+- Claude chat "spawn EINVAL" fixed by resolving .cmd wrappers to their underlying cli.js
+- Install file lock prevention for concurrent install attempts
+- Environment prerequisite checks for Git, PowerShell, and Node.js
 
 ## Support
 
-**Issues:** [GitHub Issues](https://github.com/jarmo-productory/ritemark-native/issues)  
-**Documentation:** [docs/](https://github.com/jarmo-productory/ritemark-native/tree/main/docs)
+**Issues:** [GitHub Issues](https://github.com/jarmo-productory/ritemark-public/issues)
+**Documentation:** [docs/](https://github.com/jarmo-productory/ritemark-public)

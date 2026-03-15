@@ -117,6 +117,17 @@ export type ImageAttachment = FileAttachment;
 export type ClaudeAuthMethod = 'claude-oauth' | 'api-key' | null;
 export type ClaudeSetupState = 'not-installed' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
 export type ClaudeRepairAction = 'install' | 'repair' | 'reload' | null;
+export type AgentEnvironmentRecommendedAction = 'install-git' | 'reload' | null;
+
+export interface AgentEnvironmentStatus {
+  platform: string;
+  gitInstalled: boolean;
+  nodeInstalled: boolean;
+  powershellAvailable: boolean;
+  restartRequired: boolean;
+  diagnostics: string[];
+  recommendedAction: AgentEnvironmentRecommendedAction;
+}
 
 export interface SetupStatus {
   cliInstalled: boolean;
@@ -243,7 +254,7 @@ export interface CodexConversationTurn {
 export type ExtensionMessage =
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
-  | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string }
+  | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
   | { type: 'ai-streaming'; content: string }
@@ -259,7 +270,7 @@ export type ExtensionMessage =
   | { type: 'agent-progress'; progress: AgentProgress }
   | { type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string }
   | { type: 'agent-setup:progress'; progress: InstallProgress }
-  | { type: 'agent-setup:complete'; status: SetupStatus }
+  | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus }
   | { type: 'agent-setup:error'; error: string }
   | { type: 'settings:chatFontSize'; fontSize: number }
   | { type: 'toggle-history-panel' }

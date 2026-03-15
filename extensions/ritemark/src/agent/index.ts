@@ -9,6 +9,7 @@
 export { runAgent, AgentSession } from './AgentRunner';
 export {
   getSetupStatus,
+  getAgentEnvironmentStatus,
   clearSetupCache,
   setAnthropicKeyAvailable,
   hasCliOAuth,
@@ -16,7 +17,7 @@ export {
   setClaudePendingReload,
   clearClaudePendingReload,
 } from './setup';
-export { installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude } from './installer';
+export { installClaude, isClaudeInstallInProgress, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude } from './installer';
 export {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
@@ -41,6 +42,8 @@ export type {
   ImageAttachment,
   AttachmentKind,
   SetupStatus,
+  AgentEnvironmentStatus,
+  AgentEnvironmentRecommendedAction,
   InstallProgress,
   ClaudeInstallResult,
   ClaudeAuthMethod,
