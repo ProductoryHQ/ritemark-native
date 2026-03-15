@@ -27,6 +27,7 @@ import {
   CLAUDE_FALLBACK_MODELS,
   DEFAULT_MODEL,
   getSetupStatus,
+  getAgentEnvironmentStatus,
   clearSetupCache,
   setAnthropicKeyAvailable,
   installClaude,
@@ -40,6 +41,7 @@ import {
   type AgentProgress,
   type FileAttachment,
   type SetupStatus,
+  type AgentEnvironmentStatus,
 } from '../agent';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
@@ -219,6 +221,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'agent-setup:apikey':
           openAnthropicKeySettings();
+          break;
+
+        case 'agent-setup:open-git-download':
+          await vscode.env.openExternal(vscode.Uri.parse('https://git-scm.com/download/win'));
           break;
 
         case 'agent-setup:check':
@@ -405,6 +411,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const selectedModel = config.get<string>('selectedModel', DEFAULT_MODEL);
 
     let setupStatus: SetupStatus | undefined;
+    let environmentStatus: AgentEnvironmentStatus | undefined;
     let hasSeenWelcome = false;
     if (selectedAgent === 'claude-code') {
       // Check SecretStorage for Anthropic API key before setup status check
@@ -415,6 +422,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       setupStatus = await getSetupStatus();
       hasSeenWelcome = config.get<boolean>('hasSeenClaudeWelcome', false);
     }
+    environmentStatus = await getAgentEnvironmentStatus({ setupStatus });
 
     // Discover dynamic agents and commands from .claude/ directory
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -439,6 +447,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       codexModels: getCodexModels(),
       codexStatus,
       setupStatus,
+      environmentStatus,
       hasSeenWelcome,
       discoveredAgents,
       discoveredCommands,
@@ -1044,13 +1053,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     clearSetupCache();
     const status = await getSetupStatus({ refresh: true });
+    const environmentStatus = await getAgentEnvironmentStatus({ setupStatus: status });
 
     if (result.success) {
       if (result.outcome === 'installed') {
         clearClaudePendingReload();
       }
 
-      this._view?.webview.postMessage({ type: 'agent-setup:complete', status });
+      this._view?.webview.postMessage({ type: 'agent-setup:complete', status, environmentStatus });
       emitClaudeStatusInvalidated('install-finished');
       return;
     }
@@ -1059,7 +1069,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       type: 'agent-setup:error',
       error: result.error || 'Claude install failed.',
     });
-    this._view?.webview.postMessage({ type: 'agent-setup:complete', status });
+    this._view?.webview.postMessage({ type: 'agent-setup:complete', status, environmentStatus });
     emitClaudeStatusInvalidated('install-finished');
   }
 
@@ -1068,13 +1078,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   private async _handleClaudeLogin() {
     const status = await getSetupStatus({ refresh: true });
+    const environmentStatus = await getAgentEnvironmentStatus({ setupStatus: status });
 
     if (status.state === 'not-installed' || status.state === 'broken-install' || !status.binaryPath || !status.runnable) {
       this._view?.webview.postMessage({
         type: 'agent-setup:error',
         error: status.error ?? 'Claude is not ready yet. Install or repair it first.',
       });
-      this._view?.webview.postMessage({ type: 'agent-setup:complete', status });
+      this._view?.webview.postMessage({ type: 'agent-setup:complete', status, environmentStatus });
       await this._sendAgentConfig();
       return;
     }
@@ -1093,7 +1104,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
 
     const pendingStatus = await getSetupStatus({ refresh: true });
-    this._view?.webview.postMessage({ type: 'agent-setup:complete', status: pendingStatus });
+    const pendingEnvironmentStatus = await getAgentEnvironmentStatus({ setupStatus: pendingStatus });
+    this._view?.webview.postMessage({ type: 'agent-setup:complete', status: pendingStatus, environmentStatus: pendingEnvironmentStatus });
   }
 
   private _sendChatFontSize() {
