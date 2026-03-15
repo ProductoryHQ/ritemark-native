@@ -207,6 +207,7 @@ I MUST delegate to the appropriate expert agent.
 | Domain | Agent | Trigger Keywords |
 | --- | --- | --- |
 | Builds, Extensions, Errors, Patches | `vscode-expert` | build, compile, error, fail, not working, extension, patch, update vscode, **prod, production, gulp, run dev, start dev, launch, npm run, yarn** |
+| PR Reviews & Merging | `pr-reviewer` | review PR, merge PR, check PR, approve PR |
 | Sprint Workflow | `sprint-manager` | sprint, phase, plan, implement, feature |
 | Quality Gates | `qa-validator` | commit, push, done, merge, PR |
 | Releases & Distribution | `release-manager` | release, publish, ship, deploy, dmg, notarization, github release |
@@ -322,6 +323,7 @@ For detailed commands and troubleshooting, invoke the appropriate agent.
 ├── agents/
 │   ├── vscode-expert.md      # Builds, extensions, debugging
 │   ├── sprint-manager.md     # Sprint workflow, approval gates
+│   ├── pr-reviewer.md        # PR review, code quality, merge workflow
 │   ├── qa-validator.md       # Quality checks, commit validation
 │   ├── release-manager.md    # Release process, notarization, DMG
 │   ├── webview-expert.md     # TipTap, Vite, React, webview
