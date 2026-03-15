@@ -17,7 +17,7 @@ export {
   setClaudePendingReload,
   clearClaudePendingReload,
 } from './setup';
-export { installClaude, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude } from './installer';
+export { installClaude, isClaudeInstallInProgress, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude } from './installer';
 export {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,

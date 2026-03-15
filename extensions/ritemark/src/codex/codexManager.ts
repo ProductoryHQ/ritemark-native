@@ -51,6 +51,10 @@ export class CodexManager {
 
   /**
    * Resolve the codex executable path from the current environment.
+   *
+   * On Windows, `where codex` returns both an extensionless Unix shell script
+   * and a .cmd wrapper. The extensionless file cannot be spawned by Node.js
+   * (it's a bash shim), so we must prefer the .cmd or .exe variant.
    */
   async findBinaryPath(): Promise<string | null> {
     return new Promise((resolve) => {
@@ -68,12 +72,29 @@ export class CodexManager {
           return;
         }
 
-        const firstMatch = stdout
+        const lines = stdout
           .split(/\r?\n/)
           .map(line => line.trim())
-          .find(Boolean);
+          .filter(Boolean);
 
-        resolve(firstMatch ?? null);
+        if (process.platform === 'win32') {
+          // Prefer .exe, then .cmd, then .bat — never the extensionless bash shim
+          const exeMatch = lines.find(l => /\.exe$/i.test(l));
+          if (exeMatch) {
+            resolve(exeMatch);
+            return;
+          }
+          const cmdMatch = lines.find(l => /\.(cmd|bat)$/i.test(l));
+          if (cmdMatch) {
+            resolve(cmdMatch);
+            return;
+          }
+          // Fallback: if all entries are extensionless, they are Unix shims — unusable
+          resolve(null);
+          return;
+        }
+
+        resolve(lines[0] ?? null);
       });
       check.on('error', () => resolve(null));
     });

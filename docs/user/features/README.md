@@ -51,6 +51,17 @@ Build and run AI workflows.
 
 ---
 
+## AI Tools
+
+| Feature | Description |
+|---------|-------------|
+| [AI Agents](ai-agents.md) | Three built-in agents: Ritemark Agent, Claude, and Codex |
+| [AI Assistant](ai-assistant.md) | Ritemark Agent tools: rephrase, replace, insert |
+| [Ritemark Flows](flows.md) | Visual AI workflow automation |
+
+
+---
+
 ## Cross-Cutting Features
 
 These work across all modes.
@@ -58,7 +69,6 @@ These work across all modes.
 | Feature | Description |
 |---------|-------------|
 | [Export](export.md) | PDF and Word export |
-| [Terminal AI](terminal-ai.md) | Use Claude Code, Codex, or Gemini alongside Ritemark |
 
 ---
 

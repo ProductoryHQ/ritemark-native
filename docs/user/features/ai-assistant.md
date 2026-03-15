@@ -1,8 +1,10 @@
-# AI Assistant
+# AI Assistant (Ritemark Agent)
 
 > Rephrase, replace, and insert text with AI - right from your editor.
 
-Ritemark includes a built-in AI assistant that can help you rewrite text, make bulk changes, and add new content. It works with your selected text and understands your document context.
+Ritemark includes a built-in AI assistant (the **Ritemark Agent**) that can help you rewrite text, make bulk changes, and add new content. It works with your selected text and understands your document context.
+
+This is one of three AI agents available in Ritemark. See [AI Agents](ai-agents.md) for the full overview including Claude and Codex.
 
 ---
 
@@ -168,6 +170,7 @@ See [Common Issues](../troubleshooting/common-issues.md) for more help.
 
 ## Related
 
-- [Set Up AI](../guides/setup-ai.md) - Configure your API key
+- [AI Agents](ai-agents.md) - Overview of all three agents (Ritemark, Claude, Codex)
+- [Set Up AI](../setup-ai.md) - Configure your API key
 - [Core Editor](editor.md) - Basic editing
 - [Keyboard Shortcuts](keyboard-shortcuts.md) - All shortcuts
