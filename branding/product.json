@@ -2,7 +2,7 @@
   "nameShort": "Ritemark",
   "nameLong": "Ritemark",
   "applicationName": "ritemark",
-  "ritemarkVersion": "1.5.0",
+  "ritemarkVersion": "1.5.1",
   "dataFolderName": ".ritemark",
   "win32MutexName": "ritemarknative",
   "licenseName": "MIT",
@@ -24,6 +24,7 @@
   "darwinBundleIdentifier": "ai.productory.ritemark",
   "linuxIconName": "ritemark",
   "licenseFileName": "LICENSE",
+  "documentationUrl": "https://ritemark.app/en/support/",
   "reportIssueUrl": "https://github.com/jarmo-productory/ritemark-native/issues/new",
   "urlProtocol": "ritemark",
   "win32ContextMenu": {
