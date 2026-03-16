@@ -262,11 +262,17 @@ function readFileAsBase64(file: File): Promise<string> {
   })
 }
 
-// Generate a unique filename for pasted images
-function generateImageFilename(file: File): string {
-  const timestamp = Date.now()
+// Generate a unique filename for pasted/dropped images.
+// macOS screenshots always have file.name = "image.png", so we must
+// detect generic names and always generate a unique timestamp-based name.
+function getUniqueImageFilename(file: File): string {
   const extension = file.type.split('/')[1] || 'png'
-  return `image-${timestamp}.${extension}`
+  const baseName = file.name ? file.name.replace(/\.[^.]+$/, '') : ''
+  const isGeneric = !baseName || /^image$/i.test(baseName)
+  if (isGeneric) {
+    return `image-${Date.now()}.${extension}`
+  }
+  return file.name
 }
 
 function getClipboardImageFile(dataTransfer: DataTransfer | null): File | null {
@@ -497,7 +503,7 @@ export function Editor({
             event.preventDefault()
             // Read file and send to extension
             readFileAsBase64(file).then(dataUrl => {
-              const filename = file.name || generateImageFilename(file)
+              const filename = getUniqueImageFilename(file)
               sendToExtension('saveImage', { dataUrl, filename })
             })
             return true
@@ -510,7 +516,7 @@ export function Editor({
         if (file && !shouldPreferTextPaste(event.clipboardData)) {
           event.preventDefault()
           readFileAsBase64(file).then(dataUrl => {
-            const filename = file.name || generateImageFilename(file)
+            const filename = getUniqueImageFilename(file)
             sendToExtension('saveImage', { dataUrl, filename })
           })
           return true
