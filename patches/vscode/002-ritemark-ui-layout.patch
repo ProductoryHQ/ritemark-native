@@ -1,6 +1,3 @@
-Ritemark UI Layout: sidebar, titlebar, tabs, explorer, panels, auxiliary bar support
-Consolidates layout patches for Ritemark Native
----
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..7cb8cf44871 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -25,7 +22,7 @@ index 833787070f3..7cb8cf44871 100644
  				icon,
  			}, location);
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index fea736cad03..29ded5e88fa 100644
+index fea736cad03..c4bfb64deef 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
 @@ -41,9 +41,10 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
@@ -70,16 +67,10 @@ index fea736cad03..29ded5e88fa 100644
  
  
  MenuRegistry.appendMenuItems([{
-@@ -271,12 +273,13 @@ registerAction2(class extends Action2 {
+@@ -271,13 +273,40 @@ registerAction2(class extends Action2 {
  	}
  });
  
--MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
--	group: '2_appearance',
--	title: localize({ key: 'miAppearance', comment: ['&& denotes a mnemonic'] }, "&&Appearance"),
--	submenu: MenuId.MenubarAppearanceMenu,
--	order: 1
--});
 +// Ritemark: commented out Appearance submenu
 +// MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
 +// 	group: '2_appearance',
@@ -87,10 +78,40 @@ index fea736cad03..29ded5e88fa 100644
 +// 	submenu: MenuId.MenubarAppearanceMenu,
 +// 	order: 1
 +// });
++
++// RiteMark: View > Advanced submenu
+ MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
+-	group: '2_appearance',
+-	title: localize({ key: 'miAppearance', comment: ['&& denotes a mnemonic'] }, "&&Appearance"),
+-	submenu: MenuId.MenubarAppearanceMenu,
++	group: '9_advanced',
++	title: localize('miViewAdvanced', "Advanced"),
++	submenu: MenuId.MenubarViewMenuAdvanced,
++	order: 1
++});
++
++MenuRegistry.appendMenuItem(MenuId.MenubarViewMenuAdvanced, {
++	group: '1_views',
++	command: {
++		id: 'workbench.view.scm',
++		title: localize('miViewSCMAdvanced', "Source Control"),
++	},
+ 	order: 1
+ });
  
++MenuRegistry.appendMenuItem(MenuId.MenubarViewMenuAdvanced, {
++	group: '1_views',
++	command: {
++		id: 'workbench.action.terminal.toggleTerminal',
++		title: localize('miTerminalAdvanced', "Terminal"),
++	},
++	order: 2
++});
++
  // Toggle Sidebar Visibility
  
-@@ -346,23 +349,19 @@ MenuRegistry.appendMenuItems([
+ export class ToggleSidebarVisibilityAction extends Action2 {
+@@ -346,23 +375,19 @@ MenuRegistry.appendMenuItems([
  			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewContainerLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
  			order: 2
  		}
@@ -120,7 +141,7 @@ index fea736cad03..29ded5e88fa 100644
  			order: 0
  		}
  	}, {
-@@ -370,19 +369,25 @@ MenuRegistry.appendMenuItems([
+@@ -370,19 +395,25 @@ MenuRegistry.appendMenuItems([
  		item: {
  			group: '2_pane_toggles',
  			command: {
@@ -198,7 +219,7 @@ index 5abfb88dd9c..704960be90f 100644
  import { Codicon } from '../../../../base/common/codicons.js';
  import { localize, localize2 } from '../../../../nls.js';
  import { Action2, MenuId, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
-@@ -10,7 +11,7 @@
+@@ -10,7 +11,7 @@ import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextke
  import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
  import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
  import { alert } from '../../../../base/browser/ui/aria/aria.js';
@@ -381,7 +402,7 @@ diff --git a/src/vs/workbench/browser/parts/panel/panelActions.ts b/src/vs/workb
 index 3432144229c..d6a8bc39a99 100644
 --- a/src/vs/workbench/browser/parts/panel/panelActions.ts
 +++ b/src/vs/workbench/browser/parts/panel/panelActions.ts
-@@ -9,7 +9,7 @@
+@@ -9,7 +9,7 @@ import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
  import { MenuId, MenuRegistry, registerAction2, Action2, IAction2Options } from '../../../../platform/actions/common/actions.js';
  import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
  import { isHorizontal, IWorkbenchLayoutService, PanelAlignment, Parts, Position, positionToString } from '../../../services/layout/browser/layoutService.js';
@@ -599,7 +620,7 @@ index 5ea32fb1a11..009c95717d3 100644
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index ecc6af48668..1e1999b97ef 100644
+index ecc6af48668..a42a1bd4f31 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 @@ -256,7 +256,7 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
@@ -617,8 +638,8 @@ index ecc6af48668..1e1999b97ef 100644
  		id: VIEWLET_ID,
 -		title: localize2('explore', "Explorer"),
 -		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Explorer"),
-+		title: localize2('explore', "Project"), // Ritemark: renamed from Explorer
-+		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Project"), // Ritemark: renamed
++		title: localize2('explore', "File Browser"), // RiteMark: renamed from Explorer → Project → File Browser
++		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&File Browser"), // RiteMark: renamed
  		keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyE },
  		order: 0
  	},
@@ -688,10 +709,27 @@ index 5b115684ac0..9ca4a048788 100644
  				description: nls.localize2('collapseExplorerFoldersMetadata', "Folds all folders in the Explorer.")
  			}
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-index 40b580ef0f0..6a661275ea0 100644
+index 40b580ef0f0..61faac24cdc 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-@@ -109,9 +109,9 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
+@@ -4,7 +4,6 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { getFontSnippets } from '../../../../base/browser/fonts.js';
+-import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
+ import { Schemas } from '../../../../base/common/network.js';
+ import { URI } from '../../../../base/common/uri.js';
+ import * as nls from '../../../../nls.js';
+@@ -20,7 +19,7 @@ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContaine
+ import { WorkbenchPhase, registerWorkbenchContribution2 } from '../../../common/contributions.js';
+ import { EditorExtensions, IEditorFactoryRegistry } from '../../../common/editor.js';
+ import { IViewContainersRegistry, IViewsRegistry, Extensions as ViewContainerExtensions, ViewContainerLocation } from '../../../common/views.js';
+-import { ITerminalProfileService, TERMINAL_VIEW_ID, TerminalCommandId } from '../common/terminal.js';
++import { ITerminalProfileService, TERMINAL_VIEW_ID } from '../common/terminal.js';
+ import { TerminalEditingService } from './terminalEditingService.js';
+ import { registerColors } from '../common/terminalColorRegistry.js';
+ import { registerTerminalConfiguration } from '../common/terminalConfiguration.js';
+@@ -109,9 +108,9 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
  	icon: terminalViewIcon,
  	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [TERMINAL_VIEW_ID, { mergeViewWithContainerWhenSingleView: true }]),
  	storageId: TERMINAL_VIEW_ID,
@@ -703,6 +741,32 @@ index 40b580ef0f0..6a661275ea0 100644
  Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
+@@ -119,15 +118,16 @@ Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews
+ 	canToggleVisibility: true,
+ 	canMoveView: true,
+ 	ctorDescriptor: new SyncDescriptor(TerminalViewPane),
+-	openCommandActionDescriptor: {
+-		id: TerminalCommandId.Toggle,
+-		mnemonicTitle: nls.localize({ key: 'miToggleIntegratedTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal"),
+-		keybindings: {
+-			primary: KeyMod.CtrlCmd | KeyCode.Backquote,
+-			mac: { primary: KeyMod.WinCtrl | KeyCode.Backquote }
+-		},
+-		order: 3
+-	}
++	// RiteMark: Terminal hidden from View menu (moved to View > Advanced)
++	// openCommandActionDescriptor: {
++	// 	id: TerminalCommandId.Toggle,
++	// 	mnemonicTitle: nls.localize({ key: 'miToggleIntegratedTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal"),
++	// 	keybindings: {
++	// 		primary: KeyMod.CtrlCmd | KeyCode.Backquote,
++	// 		mac: { primary: KeyMod.WinCtrl | KeyCode.Backquote }
++	// 	},
++	// 	order: 3
++	// }
+ }], VIEW_CONTAINER);
+ 
+ registerTerminalActions();
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts b/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
 index 326d159c078..f91ee8d4973 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
@@ -845,4 +909,3 @@ index 206b113186c..ea5b8e7255c 100644
  	suite('getFont', () => {
  		test('fontFamily', () => {
  			const terminalConfigurationService = createTerminalConfigationService({
- 
