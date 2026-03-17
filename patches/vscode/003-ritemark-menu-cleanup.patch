@@ -1,7 +1,51 @@
-Ritemark Menu Cleanup: hiding VS Code developer features
-Consolidates old patches: 002 (chat sidebar), 003 (toggle comment), 004 (extensions),
-005 (go menu), 006 (view menu), 010 (accounts/gear), 011 (debug)
----
+diff --git a/src/vs/editor/contrib/codeAction/browser/codeActionCommands.ts b/src/vs/editor/contrib/codeAction/browser/codeActionCommands.ts
+index cce59aaa131..5d7b7d86801 100644
+--- a/src/vs/editor/contrib/codeAction/browser/codeActionCommands.ts
++++ b/src/vs/editor/contrib/codeAction/browser/codeActionCommands.ts
+@@ -145,13 +145,14 @@ export class RefactorAction extends EditorAction {
+ 				},
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			contextMenuOpts: {
+-				group: '1_modification',
+-				order: 2,
+-				when: ContextKeyExpr.and(
+-					EditorContextKeys.writable,
+-					contextKeyForSupportedActions(CodeActionKind.Refactor)),
+-			},
++			// RiteMark: Refactor hidden from editor context menu
++			// contextMenuOpts: {
++			// 	group: '1_modification',
++			// 	order: 2,
++			// 	when: ContextKeyExpr.and(
++			// 		EditorContextKeys.writable,
++			// 		contextKeyForSupportedActions(CodeActionKind.Refactor)),
++			// },
+ 			metadata: {
+ 				description: 'Refactor...',
+ 				args: [{ name: 'args', schema: argsSchema }]
+@@ -187,13 +188,14 @@ export class SourceAction extends EditorAction {
+ 			id: sourceActionCommandId,
+ 			label: nls.localize2('source.label', "Source Action..."),
+ 			precondition: ContextKeyExpr.and(EditorContextKeys.writable, EditorContextKeys.hasCodeActionsProvider),
+-			contextMenuOpts: {
+-				group: '1_modification',
+-				order: 2.1,
+-				when: ContextKeyExpr.and(
+-					EditorContextKeys.writable,
+-					contextKeyForSupportedActions(CodeActionKind.Source)),
+-			},
++			// RiteMark: Source Action hidden from editor context menu
++			// contextMenuOpts: {
++			// 	group: '1_modification',
++			// 	order: 2.1,
++			// 	when: ContextKeyExpr.and(
++			// 		EditorContextKeys.writable,
++			// 		contextKeyForSupportedActions(CodeActionKind.Source)),
++			// },
+ 			metadata: {
+ 				description: 'Source Action...',
+ 				args: [{ name: 'args', schema: argsSchema }]
 diff --git a/src/vs/editor/contrib/comment/browser/comment.ts b/src/vs/editor/contrib/comment/browser/comment.ts
 index 4b2a1461b9a..9e032cfc481 100644
 --- a/src/vs/editor/contrib/comment/browser/comment.ts
@@ -44,6 +88,597 @@ index 4b2a1461b9a..9e032cfc481 100644
  			canTriggerInlineEdits: true,
  		});
  	}
+diff --git a/src/vs/editor/contrib/format/browser/formatActions.ts b/src/vs/editor/contrib/format/browser/formatActions.ts
+index f170a3e5167..1a453fb5c23 100644
+--- a/src/vs/editor/contrib/format/browser/formatActions.ts
++++ b/src/vs/editor/contrib/format/browser/formatActions.ts
+@@ -222,10 +222,11 @@ class FormatDocumentAction extends EditorAction {
+ 				linux: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyI },
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			contextMenuOpts: {
+-				group: '1_modification',
+-				order: 1.3
+-			}
++			// RiteMark: Format Document hidden from editor context menu
++			// contextMenuOpts: {
++			// 	group: '1_modification',
++			// 	order: 1.3
++			// }
+ 		});
+ 	}
+ 
+@@ -253,11 +254,12 @@ class FormatSelectionAction extends EditorAction {
+ 				primary: KeyChord(KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyF),
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			contextMenuOpts: {
+-				when: EditorContextKeys.hasNonEmptySelection,
+-				group: '1_modification',
+-				order: 1.31
+-			}
++			// RiteMark: Format Selection hidden from editor context menu
++			// contextMenuOpts: {
++			// 	when: EditorContextKeys.hasNonEmptySelection,
++			// 	group: '1_modification',
++			// 	order: 1.31
++			// }
+ 		});
+ 	}
+ 
+diff --git a/src/vs/editor/contrib/gotoSymbol/browser/goToCommands.ts b/src/vs/editor/contrib/gotoSymbol/browser/goToCommands.ts
+index 15dc3bf04e6..4171d2ce7e5 100644
+--- a/src/vs/editor/contrib/gotoSymbol/browser/goToCommands.ts
++++ b/src/vs/editor/contrib/gotoSymbol/browser/goToCommands.ts
+@@ -27,7 +27,7 @@ import { ISymbolNavigationService } from './symbolNavigation.js';
+ import { MessageController } from '../../message/browser/messageController.js';
+ import { PeekContext } from '../../peekView/browser/peekView.js';
+ import * as nls from '../../../../nls.js';
+-import { IAction2F1RequiredOptions, IAction2Options, ISubmenuItem, MenuId, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { IAction2F1RequiredOptions, IAction2Options, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
+ import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
+ import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+ import { TextEditorSelectionRevealType, TextEditorSelectionSource } from '../../../../platform/editor/common/editor.js';
+@@ -41,12 +41,13 @@ import { ILanguageFeaturesService } from '../../../common/services/languageFeatu
+ import { Iterable } from '../../../../base/common/iterator.js';
+ import { IsWebContext } from '../../../../platform/contextkey/common/contextkeys.js';
+ 
+-MenuRegistry.appendMenuItem(MenuId.EditorContext, {
+-	submenu: MenuId.EditorContextPeek,
+-	title: nls.localize('peek.submenu', "Peek"),
+-	group: 'navigation',
+-	order: 100
+-} satisfies ISubmenuItem);
++// RiteMark: Peek submenu hidden from editor context menu
++// MenuRegistry.appendMenuItem(MenuId.EditorContext, {
++// 	submenu: MenuId.EditorContextPeek,
++// 	title: nls.localize('peek.submenu', "Peek"),
++// 	group: 'navigation',
++// 	order: 100
++// } satisfies ISubmenuItem);
+ 
+ export interface SymbolNavigationActionConfig {
+ 	openToSide: boolean;
+@@ -296,11 +297,9 @@ registerAction2(class GoToDefinitionAction extends DefinitionAction {
+ 				primary: KeyMod.CtrlCmd | KeyCode.F12,
+ 				weight: KeybindingWeight.EditorContrib
+ 			}],
+-			menu: [{
+-				id: MenuId.EditorContext,
+-				group: 'navigation',
+-				order: 1.1
+-			}, {
++			menu: [
++			// { id: MenuId.EditorContext, group: 'navigation', order: 1.1 }, // RiteMark: hidden from editor context
++			{
+ 				id: MenuId.MenubarGoMenu,
+ 				precondition: null,
+ 				group: '4_symbol_nav',
+@@ -417,11 +416,9 @@ registerAction2(class GoToDeclarationAction extends DeclarationAction {
+ 				EditorContextKeys.hasDeclarationProvider,
+ 				EditorContextKeys.isInEmbeddedEditor.toNegated()
+ 			),
+-			menu: [{
+-				id: MenuId.EditorContext,
+-				group: 'navigation',
+-				order: 1.3
+-			}, {
++			menu: [
++			// { id: MenuId.EditorContext, group: 'navigation', order: 1.3 }, // RiteMark: hidden from editor context
++			{
+ 				id: MenuId.MenubarGoMenu,
+ 				precondition: null,
+ 				group: '4_symbol_nav',
+@@ -506,11 +503,9 @@ registerAction2(class GoToTypeDefinitionAction extends TypeDefinitionAction {
+ 				primary: 0,
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			menu: [{
+-				id: MenuId.EditorContext,
+-				group: 'navigation',
+-				order: 1.4
+-			}, {
++			menu: [
++			// { id: MenuId.EditorContext, group: 'navigation', order: 1.4 }, // RiteMark: hidden from editor context
++			{
+ 				id: MenuId.MenubarGoMenu,
+ 				precondition: null,
+ 				group: '4_symbol_nav',
+@@ -592,11 +587,9 @@ registerAction2(class GoToImplementationAction extends ImplementationAction {
+ 				primary: KeyMod.CtrlCmd | KeyCode.F12,
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			menu: [{
+-				id: MenuId.EditorContext,
+-				group: 'navigation',
+-				order: 1.45
+-			}, {
++			menu: [
++			// { id: MenuId.EditorContext, group: 'navigation', order: 1.45 }, // RiteMark: hidden from editor context
++			{
+ 				id: MenuId.MenubarGoMenu,
+ 				precondition: null,
+ 				group: '4_symbol_nav',
+@@ -681,11 +674,9 @@ registerAction2(class GoToReferencesAction extends ReferencesAction {
+ 				primary: KeyMod.Shift | KeyCode.F12,
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			menu: [{
+-				id: MenuId.EditorContext,
+-				group: 'navigation',
+-				order: 1.45
+-			}, {
++			menu: [
++			// { id: MenuId.EditorContext, group: 'navigation', order: 1.45 }, // RiteMark: hidden from editor context
++			{
+ 				id: MenuId.MenubarGoMenu,
+ 				precondition: null,
+ 				group: '4_symbol_nav',
+diff --git a/src/vs/editor/contrib/multicursor/browser/multicursor.ts b/src/vs/editor/contrib/multicursor/browser/multicursor.ts
+index a144dce617f..d589b329d06 100644
+--- a/src/vs/editor/contrib/multicursor/browser/multicursor.ts
++++ b/src/vs/editor/contrib/multicursor/browser/multicursor.ts
+@@ -789,7 +789,7 @@ export class CompatChangeAll extends MultiCursorSelectionControllerAction {
+ 	constructor() {
+ 		super({
+ 			id: 'editor.action.changeAll',
+-			label: nls.localize2('changeAll.label', "Change All Occurrences"),
++			label: nls.localize2('changeAll.label', "Replace All in Document"), // RiteMark: renamed
+ 			precondition: ContextKeyExpr.and(EditorContextKeys.writable, EditorContextKeys.editorTextFocus),
+ 			kbOpts: {
+ 				kbExpr: EditorContextKeys.editorTextFocus,
+diff --git a/src/vs/editor/contrib/rename/browser/rename.ts b/src/vs/editor/contrib/rename/browser/rename.ts
+index cf675f54cf4..25e2c164d01 100644
+--- a/src/vs/editor/contrib/rename/browser/rename.ts
++++ b/src/vs/editor/contrib/rename/browser/rename.ts
+@@ -370,10 +370,11 @@ export class RenameAction extends EditorAction {
+ 				primary: KeyCode.F2,
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			contextMenuOpts: {
+-				group: '1_modification',
+-				order: 1.1
+-			},
++			// RiteMark: Rename Symbol hidden from editor context menu
++			// contextMenuOpts: {
++			// 	group: '1_modification',
++			// 	order: 1.1
++			// },
+ 			canTriggerInlineEdits: true,
+ 		});
+ 	}
+diff --git a/src/vs/editor/contrib/stickyScroll/browser/stickyScrollActions.ts b/src/vs/editor/contrib/stickyScroll/browser/stickyScrollActions.ts
+index ce50821ebf7..9734b85862b 100644
+--- a/src/vs/editor/contrib/stickyScroll/browser/stickyScrollActions.ts
++++ b/src/vs/editor/contrib/stickyScroll/browser/stickyScrollActions.ts
+@@ -35,7 +35,7 @@ export class ToggleStickyScroll extends EditorAction2 {
+ 			},
+ 			menu: [
+ 				{ id: MenuId.CommandPalette },
+-				{ id: MenuId.MenubarAppearanceMenu, group: '4_editor', order: 3 },
++				// { id: MenuId.MenubarAppearanceMenu, group: '4_editor', order: 3 }, // RiteMark: hidden from Appearance menu
+ 				{ id: MenuId.StickyScrollContext }
+ 			]
+ 		});
+diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
+index eb075cad63e..8435171dfaf 100644
+--- a/src/vs/platform/actions/common/actions.ts
++++ b/src/vs/platform/actions/common/actions.ts
+@@ -91,6 +91,7 @@ export class MenuId {
+ 	static readonly CompactWindowEditorTitle = new MenuId('CompactWindowEditorTitle');
+ 	static readonly EditorTitleRun = new MenuId('EditorTitleRun');
+ 	static readonly EditorTitleContext = new MenuId('EditorTitleContext');
++	static readonly EditorTitleContextAdvanced = new MenuId('EditorTitleContextAdvanced'); // RiteMark: Advanced submenu for tab context
+ 	static readonly EditorTitleContextShare = new MenuId('EditorTitleContextShare');
+ 	static readonly EmptyEditorGroup = new MenuId('EmptyEditorGroup');
+ 	static readonly EmptyEditorGroupContext = new MenuId('EmptyEditorGroupContext');
+@@ -100,6 +101,7 @@ export class MenuId {
+ 	static readonly EditorActionsPositionSubmenu = new MenuId('EditorActionsPositionSubmenu');
+ 	static readonly EditorSplitMoveSubmenu = new MenuId('EditorSplitMoveSubmenu');
+ 	static readonly ExplorerContext = new MenuId('ExplorerContext');
++	static readonly ExplorerContextAdvanced = new MenuId('ExplorerContextAdvanced'); // RiteMark: Advanced submenu for explorer context
+ 	static readonly ExplorerContextShare = new MenuId('ExplorerContextShare');
+ 	static readonly ExtensionContext = new MenuId('ExtensionContext');
+ 	static readonly ExtensionEditorContextMenu = new MenuId('ExtensionEditorContextMenu');
+@@ -114,8 +116,10 @@ export class MenuId {
+ 	static readonly MenubarEditMenu = new MenuId('MenubarEditMenu');
+ 	static readonly MenubarCopy = new MenuId('MenubarCopy');
+ 	static readonly MenubarFileMenu = new MenuId('MenubarFileMenu');
++	static readonly MenubarFileMenuAdvanced = new MenuId('MenubarFileMenuAdvanced'); // RiteMark: Advanced submenu
+ 	static readonly MenubarGoMenu = new MenuId('MenubarGoMenu');
+ 	static readonly MenubarHelpMenu = new MenuId('MenubarHelpMenu');
++	static readonly MenubarHelpMenuAdvanced = new MenuId('MenubarHelpMenuAdvanced'); // RiteMark: Advanced submenu
+ 	static readonly MenubarLayoutMenu = new MenuId('MenubarLayoutMenu');
+ 	static readonly MenubarNewBreakpointMenu = new MenuId('MenubarNewBreakpointMenu');
+ 	static readonly PanelAlignmentMenu = new MenuId('PanelAlignmentMenu');
+@@ -130,6 +134,7 @@ export class MenuId {
+ 	static readonly MenubarTerminalMenu = new MenuId('MenubarTerminalMenu');
+ 	static readonly MenubarTerminalSuggestStatusMenu = new MenuId('MenubarTerminalSuggestStatusMenu');
+ 	static readonly MenubarViewMenu = new MenuId('MenubarViewMenu');
++	static readonly MenubarViewMenuAdvanced = new MenuId('MenubarViewMenuAdvanced'); // RiteMark: Advanced submenu
+ 	static readonly MenubarHomeMenu = new MenuId('MenubarHomeMenu');
+ 	static readonly OpenEditorsContext = new MenuId('OpenEditorsContext');
+ 	static readonly OpenEditorsContextShare = new MenuId('OpenEditorsContextShare');
+diff --git a/src/vs/workbench/browser/actions/helpActions.ts b/src/vs/workbench/browser/actions/helpActions.ts
+index 2487213aa2d..40c549e4652 100644
+--- a/src/vs/workbench/browser/actions/helpActions.ts
++++ b/src/vs/workbench/browser/actions/helpActions.ts
+@@ -18,6 +18,8 @@ import { Categories } from '../../../platform/action/common/actionCommonCategori
+ import { ICommandService } from '../../../platform/commands/common/commands.js';
+ import { ContextKeyExpr } from '../../../platform/contextkey/common/contextkey.js';
+ 
++const RITEMARK_SUPPORT_URL = 'https://ritemark.app/en/support/';
++
+ class KeybindingsReferenceAction extends Action2 {
+ 
+ 	static readonly ID = 'workbench.action.keybindingsReference';
+@@ -36,11 +38,6 @@ class KeybindingsReferenceAction extends Action2 {
+ 				weight: KeybindingWeight.WorkbenchContrib,
+ 				when: null,
+ 				primary: KeyChord(KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyR)
+-			},
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '2_reference',
+-				order: 1
+ 			}
+ 		});
+ 	}
+@@ -70,11 +67,12 @@ class OpenIntroductoryVideosUrlAction extends Action2 {
+ 			},
+ 			category: Categories.Help,
+ 			f1: true,
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '2_reference',
+-				order: 2
+-			}
++			// RiteMark: Video Tutorials hidden from Help menu
++			// menu: {
++			// 	id: MenuId.MenubarHelpMenu,
++			// 	group: '2_reference',
++			// 	order: 2
++			// }
+ 		});
+ 	}
+ 
+@@ -102,11 +100,12 @@ class OpenTipsAndTricksUrlAction extends Action2 {
+ 			},
+ 			category: Categories.Help,
+ 			f1: true,
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '2_reference',
+-				order: 3
+-			}
++			// RiteMark: Tips and Tricks hidden from Help menu
++			// menu: {
++			// 	id: MenuId.MenubarHelpMenu,
++			// 	group: '2_reference',
++			// 	order: 3
++			// }
+ 		});
+ 	}
+ 
+@@ -122,34 +121,29 @@ class OpenTipsAndTricksUrlAction extends Action2 {
+ 
+ class OpenDocumentationUrlAction extends Action2 {
+ 
+-	static readonly ID = 'workbench.action.openDocumentationUrl';
+-	static readonly AVAILABLE = !!(isWeb ? product.serverDocumentationUrl : product.documentationUrl);
++	static readonly ID = 'workbench.action.openSupportUrl';
++	static readonly AVAILABLE = true;
+ 
+ 	constructor() {
+ 		super({
+ 			id: OpenDocumentationUrlAction.ID,
+ 			title: {
+-				...localize2('openDocumentationUrl', "Documentation"),
+-				mnemonicTitle: localize({ key: 'miDocumentation', comment: ['&& denotes a mnemonic'] }, "&&Documentation"),
++				...localize2('openSupportUrl', "Support"),
++				mnemonicTitle: localize({ key: 'miSupport', comment: ['&& denotes a mnemonic'] }, "&&Support"),
+ 			},
+ 			category: Categories.Help,
+ 			f1: true,
+ 			menu: {
+ 				id: MenuId.MenubarHelpMenu,
+-				group: '1_welcome',
+-				order: 3
++				group: '1_support',
++				order: 1
+ 			}
+ 		});
+ 	}
+ 
+ 	run(accessor: ServicesAccessor): void {
+-		const productService = accessor.get(IProductService);
+ 		const openerService = accessor.get(IOpenerService);
+-		const url = isWeb ? productService.serverDocumentationUrl : productService.documentationUrl;
+-
+-		if (url) {
+-			openerService.open(URI.parse(url));
+-		}
++		openerService.open(URI.parse(RITEMARK_SUPPORT_URL));
+ 	}
+ }
+ 
+@@ -189,11 +183,12 @@ class OpenYouTubeUrlAction extends Action2 {
+ 			},
+ 			category: Categories.Help,
+ 			f1: true,
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '3_feedback',
+-				order: 1
+-			}
++			// RiteMark: YouTube hidden from Help menu
++			// menu: {
++			// 	id: MenuId.MenubarHelpMenu,
++			// 	group: '3_feedback',
++			// 	order: 1
++			// }
+ 		});
+ 	}
+ 
+@@ -221,11 +216,12 @@ class OpenRequestFeatureUrlAction extends Action2 {
+ 			},
+ 			category: Categories.Help,
+ 			f1: true,
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '3_feedback',
+-				order: 2
+-			}
++			// RiteMark: Search Feature Requests hidden from Help menu
++			// menu: {
++			// 	id: MenuId.MenubarHelpMenu,
++			// 	group: '3_feedback',
++			// 	order: 2
++			// }
+ 		});
+ 	}
+ 
+@@ -290,12 +286,7 @@ class OpenPrivacyStatementUrlAction extends Action2 {
+ 				mnemonicTitle: localize({ key: 'miPrivacyStatement', comment: ['&& denotes a mnemonic'] }, "Privac&&y Statement"),
+ 			},
+ 			category: Categories.Help,
+-			f1: true,
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '4_legal',
+-				order: 2
+-			}
++			f1: true
+ 		});
+ 	}
+ 
+@@ -318,12 +309,7 @@ class GetStartedWithAccessibilityFeatures extends Action2 {
+ 			id: GetStartedWithAccessibilityFeatures.ID,
+ 			title: localize2('getStartedWithAccessibilityFeatures', 'Get Started with Accessibility Features'),
+ 			category: Categories.Help,
+-			f1: true,
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '1_welcome',
+-				order: 6
+-			}
++			f1: true
+ 		});
+ 	}
+ 	run(accessor: ServicesAccessor): void {
+@@ -351,14 +337,14 @@ class AskVSCodeCopilot extends Action2 {
+ 	}
+ }
+ 
++// RiteMark: Ask @vscode hidden from Help menu
++
++// RiteMark: Help > Advanced submenu
+ MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
+-	command: {
+-		id: AskVSCodeCopilot.ID,
+-		title: localize2('askVScode', 'Ask @vscode'),
+-	},
+-	order: 7,
+-	group: '1_welcome',
+-	when: ContextKeyExpr.equals('chatSetupHidden', false)
++	group: '6_advanced',
++	title: localize('miHelpAdvanced', "Advanced"),
++	submenu: MenuId.MenubarHelpMenuAdvanced,
++	order: 1
+ });
+ 
+ // --- Actions Registration
+diff --git a/src/vs/workbench/browser/actions/workspaceActions.ts b/src/vs/workbench/browser/actions/workspaceActions.ts
+index 96861a697c1..5b9d73427ec 100644
+--- a/src/vs/workbench/browser/actions/workspaceActions.ts
++++ b/src/vs/workbench/browser/actions/workspaceActions.ts
+@@ -376,45 +376,46 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	when: ContextKeyExpr.and(IsMacNativeContext, OpenFolderWorkspaceSupportContext)
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	group: '2_open',
+-	command: {
+-		id: OpenWorkspaceAction.ID,
+-		title: localize({ key: 'miOpenWorkspace', comment: ['&& denotes a mnemonic'] }, "Open Wor&&kspace from File...")
+-	},
+-	order: 3,
+-	when: EnterMultiRootWorkspaceSupportContext
+-});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	group: '3_workspace',
+-	command: {
+-		id: ADD_ROOT_FOLDER_COMMAND_ID,
+-		title: localize({ key: 'miAddFolderToWorkspace', comment: ['&& denotes a mnemonic'] }, "A&&dd Folder to Workspace...")
+-	},
+-	when: ContextKeyExpr.or(EnterMultiRootWorkspaceSupportContext, WorkbenchStateContext.isEqualTo('workspace')),
+-	order: 1
+-});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	group: '3_workspace',
+-	command: {
+-		id: SaveWorkspaceAsAction.ID,
+-		title: localize('miSaveWorkspaceAs', "Save Workspace As...")
+-	},
+-	order: 2,
+-	when: EnterMultiRootWorkspaceSupportContext
+-});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	group: '3_workspace',
+-	command: {
+-		id: DuplicateWorkspaceInNewWindowAction.ID,
+-		title: localize('duplicateWorkspace', "Duplicate Workspace")
+-	},
+-	order: 3,
+-	when: EnterMultiRootWorkspaceSupportContext
+-});
++// RiteMark: Workspace items hidden
++// MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
++// 	group: '2_open',
++// 	command: {
++// 		id: OpenWorkspaceAction.ID,
++// 		title: localize({ key: 'miOpenWorkspace', comment: ['&& denotes a mnemonic'] }, "Open Wor&&kspace from File...")
++// 	},
++// 	order: 3,
++// 	when: EnterMultiRootWorkspaceSupportContext
++// });
++
++// MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
++// 	group: '3_workspace',
++// 	command: {
++// 		id: ADD_ROOT_FOLDER_COMMAND_ID,
++// 		title: localize({ key: 'miAddFolderToWorkspace', comment: ['&& denotes a mnemonic'] }, "A&&dd Folder to Workspace...")
++// 	},
++// 	when: ContextKeyExpr.or(EnterMultiRootWorkspaceSupportContext, WorkbenchStateContext.isEqualTo('workspace')),
++// 	order: 1
++// });
++
++// MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
++// 	group: '3_workspace',
++// 	command: {
++// 		id: SaveWorkspaceAsAction.ID,
++// 		title: localize('miSaveWorkspaceAs', "Save Workspace As...")
++// 	},
++// 	order: 2,
++// 	when: EnterMultiRootWorkspaceSupportContext
++// });
++
++// MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
++// 	group: '3_workspace',
++// 	command: {
++// 		id: DuplicateWorkspaceInNewWindowAction.ID,
++// 		title: localize('duplicateWorkspace', "Duplicate Workspace")
++// 	},
++// 	order: 3,
++// 	when: EnterMultiRootWorkspaceSupportContext
++// });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	group: '6_close',
+diff --git a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
+index ba678499fec..2e3a5ea669d 100644
+--- a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
++++ b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
+@@ -217,7 +217,7 @@ const separatorIcon = registerIcon('breadcrumb-separator', Codicon.chevronRight,
+ 
+ export class BreadcrumbsControl {
+ 
+-	static readonly HEIGHT = 22;
++	static readonly HEIGHT = 40;
+ 
+ 	private static readonly SCROLLBAR_SIZES = {
+ 		default: 3,
+@@ -701,7 +701,7 @@ registerAction2(class ToggleBreadcrumb extends Action2 {
+ 			},
+ 			menu: [
+ 				{ id: MenuId.CommandPalette },
+-				{ id: MenuId.MenubarAppearanceMenu, group: '4_editor', order: 2 },
++				// { id: MenuId.MenubarAppearanceMenu, group: '4_editor', order: 2 }, // RiteMark: hidden from Appearance menu
+ 				{ id: MenuId.NotebookToolbar, group: 'notebookLayout', order: 2 },
+ 				{ id: MenuId.StickyScrollContext },
+ 				{ id: MenuId.NotebookStickyScrollContext, group: 'notebookView', order: 2 },
+diff --git a/src/vs/workbench/browser/parts/editor/editor.contribution.ts b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
+index 14235489654..4b08edd978a 100644
+--- a/src/vs/workbench/browser/parts/editor/editor.contribution.ts
++++ b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
+@@ -392,19 +392,26 @@ MenuRegistry.appendMenuItem(MenuId.EditorTabsBarContext, { command: { id: Config
+ // Editor Title Context Menu
+ MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: CLOSE_EDITOR_COMMAND_ID, title: localize('close', "Close") }, group: '1_close', order: 10 });
+ MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: CLOSE_OTHER_EDITORS_IN_GROUP_COMMAND_ID, title: localize('closeOthers', "Close Others"), precondition: EditorGroupEditorsCountContext.notEqualsTo('1') }, group: '1_close', order: 20 });
+-MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: CLOSE_EDITORS_TO_THE_RIGHT_COMMAND_ID, title: localize('closeRight', "Close to the Right"), precondition: ContextKeyExpr.and(ActiveEditorLastInGroupContext.toNegated(), MultipleEditorsSelectedInGroupContext.negate()) }, group: '1_close', order: 30, when: EditorTabsVisibleContext });
+-MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: CLOSE_SAVED_EDITORS_COMMAND_ID, title: localize('closeAllSaved', "Close Saved") }, group: '1_close', order: 40 });
++// RiteMark: Close to Right and Close Saved moved to tab context > Advanced
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContextAdvanced, { command: { id: CLOSE_EDITORS_TO_THE_RIGHT_COMMAND_ID, title: localize('closeRight', "Close to the Right"), precondition: ContextKeyExpr.and(ActiveEditorLastInGroupContext.toNegated(), MultipleEditorsSelectedInGroupContext.negate()) }, group: '1_close', order: 30, when: EditorTabsVisibleContext });
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContextAdvanced, { command: { id: CLOSE_SAVED_EDITORS_COMMAND_ID, title: localize('closeAllSaved', "Close Saved") }, group: '1_close', order: 40 });
+ MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: CLOSE_EDITORS_IN_GROUP_COMMAND_ID, title: localize('closeAll', "Close All") }, group: '1_close', order: 50 });
+-MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: REOPEN_WITH_COMMAND_ID, title: localize('reopenWith', "Reopen Editor With...") }, group: '1_open', order: 10, when: ActiveEditorAvailableEditorIdsContext });
+-MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: KEEP_EDITOR_COMMAND_ID, title: localize('keepOpen', "Keep Open"), precondition: ActiveEditorPinnedContext.toNegated() }, group: '3_preview', order: 10, when: ContextKeyExpr.has('config.workbench.editor.enablePreview') });
++// RiteMark: "Reopen With" hidden from tab context
++// MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: REOPEN_WITH_COMMAND_ID, title: localize('reopenWith', "Reopen Editor With...") }, group: '1_open', order: 10, when: ActiveEditorAvailableEditorIdsContext });
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: KEEP_EDITOR_COMMAND_ID, title: localize('keepOpen', "Pin Tab"), precondition: ActiveEditorPinnedContext.toNegated() }, group: '3_preview', order: 10, when: ContextKeyExpr.has('config.workbench.editor.enablePreview') }); // RiteMark: renamed Keep Open → Pin Tab
+ MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: PIN_EDITOR_COMMAND_ID, title: localize('pin', "Pin") }, group: '3_preview', order: 20, when: ActiveEditorStickyContext.toNegated() });
+ MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: UNPIN_EDITOR_COMMAND_ID, title: localize('unpin', "Unpin") }, group: '3_preview', order: 20, when: ActiveEditorStickyContext });
+-MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: SPLIT_EDITOR, title: localize('splitRight', "Split Right") }, group: '5_split', order: 10, when: SplitEditorsVertically.negate() });
+-MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: SPLIT_EDITOR, title: localize('splitDown', "Split Down") }, group: '5_split', order: 10, when: SplitEditorsVertically });
+-MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { submenu: MenuId.EditorSplitMoveSubmenu, title: localize('splitAndMoveEditor', "Split & Move"), group: '5_split', order: 15 });
++// RiteMark: Split items moved to tab context > Advanced
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContextAdvanced, { command: { id: SPLIT_EDITOR, title: localize('splitRight', "Split Right") }, group: '5_split', order: 10, when: SplitEditorsVertically.negate() });
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContextAdvanced, { command: { id: SPLIT_EDITOR, title: localize('splitDown', "Split Down") }, group: '5_split', order: 10, when: SplitEditorsVertically });
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContextAdvanced, { submenu: MenuId.EditorSplitMoveSubmenu, title: localize('splitAndMoveEditor', "Split & Move"), group: '5_split', order: 15 });
+ MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: MOVE_EDITOR_INTO_NEW_WINDOW_COMMAND_ID, title: localize('moveToNewWindow', "Move into New Window") }, group: '7_new_window', order: 10 });
+ MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { command: { id: COPY_EDITOR_INTO_NEW_WINDOW_COMMAND_ID, title: localize('copyToNewWindow', "Copy into New Window") }, group: '7_new_window', order: 20 });
+-MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { submenu: MenuId.EditorTitleContextShare, title: localize('share', "Share"), group: '11_share', order: -1, when: MultipleEditorsSelectedInGroupContext.negate() });
++// RiteMark: Share submenu hidden from tab context
++// MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { submenu: MenuId.EditorTitleContextShare, title: localize('share', "Share"), group: '11_share', order: -1, when: MultipleEditorsSelectedInGroupContext.negate() });
++
++// RiteMark: Tab context > Advanced submenu
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, { submenu: MenuId.EditorTitleContextAdvanced, title: localize('tabContextAdvanced', "Advanced"), group: '10_advanced', order: 1 });
+ 
+ // Editor Title Context Menu: Split & Move Editor Submenu
+ MenuRegistry.appendMenuItem(MenuId.EditorSplitMoveSubmenu, { command: { id: SPLIT_EDITOR_UP, title: localize('splitUp', "Split Up") }, group: '1_split', order: 10 });
+@@ -679,12 +686,13 @@ MenuRegistry.appendMenuItem(MenuId.MenubarRecentMenu, {
+ 	order: 1
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	title: localize('miShare', "Share"),
+-	submenu: MenuId.MenubarShare,
+-	group: '45_share',
+-	order: 1,
+-});
++// RiteMark: Share submenu hidden from File menu
++// MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
++// 	title: localize('miShare', "Share"),
++// 	submenu: MenuId.MenubarShare,
++// 	group: '45_share',
++// 	order: 1,
++// });
+ 
+ // Layout menu
+ MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
 diff --git a/src/vs/workbench/browser/parts/globalCompositeBar.ts b/src/vs/workbench/browser/parts/globalCompositeBar.ts
 index 48220d63dc3..2ed9ba74816 100644
 --- a/src/vs/workbench/browser/parts/globalCompositeBar.ts
@@ -108,10 +743,36 @@ index 48220d63dc3..2ed9ba74816 100644
  
  	private get accountsVisibilityPreference(): boolean {
 diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-index 92fe6a17377..7c1559d7788 100644
+index 92fe6a17377..a8a54186c29 100644
 --- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-@@ -85,15 +85,16 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+@@ -65,15 +65,16 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+ 	order: 2
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+-	submenu: MenuId.MenubarSelectionMenu,
+-	title: {
+-		value: 'Selection',
+-		original: 'Selection',
+-		mnemonicTitle: localize({ key: 'mSelection', comment: ['&& denotes a mnemonic'] }, "&&Selection")
+-	},
+-	order: 3
+-});
++// RiteMark: Selection menu hidden
++// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
++// 	submenu: MenuId.MenubarSelectionMenu,
++// 	title: {
++// 		value: 'Selection',
++// 		original: 'Selection',
++// 		mnemonicTitle: localize({ key: 'mSelection', comment: ['&& denotes a mnemonic'] }, "&&Selection")
++// 	},
++// 	order: 3
++// });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+ 	submenu: MenuId.MenubarViewMenu,
+@@ -85,25 +86,27 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	order: 4
  });
  
@@ -124,6 +785,16 @@ index 92fe6a17377..7c1559d7788 100644
 -	},
 -	order: 5
 -});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+-	submenu: MenuId.MenubarTerminalMenu,
+-	title: {
+-		value: 'Terminal',
+-		original: 'Terminal',
+-		mnemonicTitle: localize({ key: 'mTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal")
+-	},
+-	order: 7
+-});
 +// RiteMark: Go menu hidden
 +// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 +// 	submenu: MenuId.MenubarGoMenu,
@@ -134,9 +805,20 @@ index 92fe6a17377..7c1559d7788 100644
 +// 	},
 +// 	order: 5
 +// });
++
++// RiteMark: Terminal menu hidden (New/Split Terminal moved to File > Advanced)
++// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
++// 	submenu: MenuId.MenubarTerminalMenu,
++// 	title: {
++// 		value: 'Terminal',
++// 		original: 'Terminal',
++// 		mnemonicTitle: localize({ key: 'mTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal")
++// 	},
++// 	order: 7
++// });
  
  MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
- 	submenu: MenuId.MenubarTerminalMenu,
+ 	submenu: MenuId.MenubarHelpMenu,
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 index ddb5df41847..98fc70aee7c 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
@@ -209,6 +891,81 @@ index ddb5df41847..98fc70aee7c 100644
  
  const chatParticipantExtensionPoint = extensionsRegistry.ExtensionsRegistry.registerExtensionPoint<IRawChatParticipantContribution[]>({
  	extensionPoint: 'chatParticipants',
+diff --git a/src/vs/workbench/contrib/codeEditor/browser/toggleMinimap.ts b/src/vs/workbench/contrib/codeEditor/browser/toggleMinimap.ts
+index 0248d005a31..e3c2d18a4a0 100644
+--- a/src/vs/workbench/contrib/codeEditor/browser/toggleMinimap.ts
++++ b/src/vs/workbench/contrib/codeEditor/browser/toggleMinimap.ts
+@@ -25,7 +25,7 @@ export class ToggleMinimapAction extends Action2 {
+ 			f1: true,
+ 			toggled: ContextKeyExpr.equals('config.editor.minimap.enabled', true),
+ 			menu: {
+-				id: MenuId.MenubarAppearanceMenu,
++				id: MenuId.MenubarViewMenuAdvanced, // RiteMark: moved from Appearance to View > Advanced
+ 				group: '4_editor',
+ 				order: 1
+ 			}
+diff --git a/src/vs/workbench/contrib/codeEditor/browser/toggleRenderControlCharacter.ts b/src/vs/workbench/contrib/codeEditor/browser/toggleRenderControlCharacter.ts
+index 6209189b5d9..43fdd6f7cbe 100644
+--- a/src/vs/workbench/contrib/codeEditor/browser/toggleRenderControlCharacter.ts
++++ b/src/vs/workbench/contrib/codeEditor/browser/toggleRenderControlCharacter.ts
+@@ -4,7 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { localize, localize2 } from '../../../../nls.js';
+-import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { Action2, registerAction2 } from '../../../../platform/actions/common/actions.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+ import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+@@ -24,11 +24,12 @@ export class ToggleRenderControlCharacterAction extends Action2 {
+ 			category: Categories.View,
+ 			f1: true,
+ 			toggled: ContextKeyExpr.equals('config.editor.renderControlCharacters', true),
+-			menu: {
+-				id: MenuId.MenubarAppearanceMenu,
+-				group: '4_editor',
+-				order: 5
+-			}
++			// RiteMark: hidden from Appearance menu
++			// menu: {
++			// 	id: MenuId.MenubarAppearanceMenu,
++			// 	group: '4_editor',
++			// 	order: 5
++			// }
+ 		});
+ 	}
+ 
+diff --git a/src/vs/workbench/contrib/codeEditor/browser/toggleRenderWhitespace.ts b/src/vs/workbench/contrib/codeEditor/browser/toggleRenderWhitespace.ts
+index 9f61e2363ba..3da1f8e4f6e 100644
+--- a/src/vs/workbench/contrib/codeEditor/browser/toggleRenderWhitespace.ts
++++ b/src/vs/workbench/contrib/codeEditor/browser/toggleRenderWhitespace.ts
+@@ -4,7 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { localize, localize2 } from '../../../../nls.js';
+-import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { Action2, registerAction2 } from '../../../../platform/actions/common/actions.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+ import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+@@ -24,11 +24,12 @@ class ToggleRenderWhitespaceAction extends Action2 {
+ 			category: Categories.View,
+ 			f1: true,
+ 			toggled: ContextKeyExpr.notEquals('config.editor.renderWhitespace', 'none'),
+-			menu: {
+-				id: MenuId.MenubarAppearanceMenu,
+-				group: '4_editor',
+-				order: 4
+-			}
++			// RiteMark: hidden from Appearance menu
++			// menu: {
++			// 	id: MenuId.MenubarAppearanceMenu,
++			// 	group: '4_editor',
++			// 	order: 4
++			// }
+ 		});
+ 	}
+ 
 diff --git a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
 index 7b2cbce78b2..bd25cfb508d 100644
 --- a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
@@ -318,6 +1075,183 @@ index 6956d7918b3..ffa2e3cbfe9 100644
  		ctorDescriptor: new SyncDescriptor(ExtensionsViewPaneContainer),
  		icon: extensionsViewIcon,
  		order: 4,
+diff --git a/src/vs/workbench/contrib/externalTerminal/browser/externalTerminal.contribution.ts b/src/vs/workbench/contrib/externalTerminal/browser/externalTerminal.contribution.ts
+index da0388a5435..10d04a109b8 100644
+--- a/src/vs/workbench/contrib/externalTerminal/browser/externalTerminal.contribution.ts
++++ b/src/vs/workbench/contrib/externalTerminal/browser/externalTerminal.contribution.ts
+@@ -134,7 +134,7 @@ export class ExternalTerminalContribution extends Disposable implements IWorkben
+ 
+ 
+ 		MenuRegistry.appendMenuItem(MenuId.ExplorerContext, this._openInTerminalMenuItem);
+-		MenuRegistry.appendMenuItem(MenuId.ExplorerContext, this._openInIntegratedTerminalMenuItem);
++		MenuRegistry.appendMenuItem(MenuId.ExplorerContextAdvanced, this._openInIntegratedTerminalMenuItem); // RiteMark: moved to explorer context > Advanced
+ 
+ 		this._register(this._configurationService.onDidChangeConfiguration(e => {
+ 			if (e.affectsConfiguration('terminal.explorerKind') || e.affectsConfiguration('terminal.external')) {
+diff --git a/src/vs/workbench/contrib/files/browser/fileActions.contribution.ts b/src/vs/workbench/contrib/files/browser/fileActions.contribution.ts
+index 6cd04336cfb..513d0a9beec 100644
+--- a/src/vs/workbench/contrib/files/browser/fileActions.contribution.ts
++++ b/src/vs/workbench/contrib/files/browser/fileActions.contribution.ts
+@@ -10,11 +10,11 @@ import { MenuId, MenuRegistry, registerAction2 } from '../../../../platform/acti
+ import { ICommandAction } from '../../../../platform/action/common/action.js';
+ import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
+ import { openWindowCommand, newWindowCommand } from './fileCommands.js';
+-import { COPY_PATH_COMMAND_ID, REVEAL_IN_EXPLORER_COMMAND_ID, OPEN_TO_SIDE_COMMAND_ID, REVERT_FILE_COMMAND_ID, SAVE_FILE_COMMAND_ID, SAVE_FILE_LABEL, SAVE_FILE_AS_COMMAND_ID, SAVE_FILE_AS_LABEL, SAVE_ALL_IN_GROUP_COMMAND_ID, OpenEditorsGroupContext, COMPARE_WITH_SAVED_COMMAND_ID, COMPARE_RESOURCE_COMMAND_ID, SELECT_FOR_COMPARE_COMMAND_ID, ResourceSelectedForCompareContext, OpenEditorsDirtyEditorContext, COMPARE_SELECTED_COMMAND_ID, REMOVE_ROOT_FOLDER_COMMAND_ID, REMOVE_ROOT_FOLDER_LABEL, SAVE_FILES_COMMAND_ID, COPY_RELATIVE_PATH_COMMAND_ID, SAVE_FILE_WITHOUT_FORMATTING_COMMAND_ID, SAVE_FILE_WITHOUT_FORMATTING_LABEL, OpenEditorsReadonlyEditorContext, OPEN_WITH_EXPLORER_COMMAND_ID, NEW_UNTITLED_FILE_COMMAND_ID, NEW_UNTITLED_FILE_LABEL, SAVE_ALL_COMMAND_ID, OpenEditorsSelectedFileOrUntitledContext } from './fileConstants.js';
++import { COPY_PATH_COMMAND_ID, REVEAL_IN_EXPLORER_COMMAND_ID, OPEN_TO_SIDE_COMMAND_ID, REVERT_FILE_COMMAND_ID, SAVE_FILE_COMMAND_ID, SAVE_FILE_LABEL, SAVE_FILE_AS_COMMAND_ID, SAVE_FILE_AS_LABEL, SAVE_ALL_IN_GROUP_COMMAND_ID, OpenEditorsGroupContext, COMPARE_WITH_SAVED_COMMAND_ID, COMPARE_RESOURCE_COMMAND_ID, SELECT_FOR_COMPARE_COMMAND_ID, ResourceSelectedForCompareContext, OpenEditorsDirtyEditorContext, COMPARE_SELECTED_COMMAND_ID, REMOVE_ROOT_FOLDER_COMMAND_ID, REMOVE_ROOT_FOLDER_LABEL, SAVE_FILES_COMMAND_ID, COPY_RELATIVE_PATH_COMMAND_ID, SAVE_FILE_WITHOUT_FORMATTING_COMMAND_ID, SAVE_FILE_WITHOUT_FORMATTING_LABEL, OpenEditorsReadonlyEditorContext, NEW_UNTITLED_FILE_COMMAND_ID, NEW_UNTITLED_FILE_LABEL, SAVE_ALL_COMMAND_ID, OpenEditorsSelectedFileOrUntitledContext } from './fileConstants.js';
+ import { CommandsRegistry, ICommandHandler } from '../../../../platform/commands/common/commands.js';
+ import { ContextKeyExpr, ContextKeyExpression } from '../../../../platform/contextkey/common/contextkey.js';
+ import { KeybindingsRegistry, KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
+-import { FilesExplorerFocusCondition, ExplorerRootContext, ExplorerFolderContext, ExplorerResourceWritableContext, ExplorerResourceCut, ExplorerResourceMoveableToTrash, ExplorerResourceAvailableEditorIdsContext, FoldersViewVisibleContext } from '../common/files.js';
++import { FilesExplorerFocusCondition, ExplorerRootContext, ExplorerFolderContext, ExplorerResourceWritableContext, ExplorerResourceCut, ExplorerResourceMoveableToTrash, FoldersViewVisibleContext } from '../common/files.js';
+ import { ADD_ROOT_FOLDER_COMMAND_ID, ADD_ROOT_FOLDER_LABEL } from '../../../browser/actions/workspaceCommands.js';
+ import { CLOSE_SAVED_EDITORS_COMMAND_ID, CLOSE_EDITORS_IN_GROUP_COMMAND_ID, CLOSE_EDITOR_COMMAND_ID, CLOSE_OTHER_EDITORS_IN_GROUP_COMMAND_ID, REOPEN_WITH_COMMAND_ID } from '../../../browser/parts/editor/editorCommands.js';
+ import { AutoSaveAfterShortDelayContext } from '../../../services/filesConfiguration/common/filesConfigurationService.js';
+@@ -160,8 +160,17 @@ export const revealInSideBarCommand = {
+ };
+ 
+ // Editor Title Context Menu
+-appendEditorTitleContextMenuItem(COPY_PATH_COMMAND_ID, copyPathCommand.title, ResourceContextKey.IsFileSystemResource, '1_cutcopypaste', true);
+-appendEditorTitleContextMenuItem(COPY_RELATIVE_PATH_COMMAND_ID, copyRelativePathCommand.title, ResourceContextKey.IsFileSystemResource, '1_cutcopypaste', true);
++// RiteMark: Copy Path/Relative Path moved to tab context > Advanced
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContextAdvanced, {
++	command: { id: COPY_PATH_COMMAND_ID, title: copyPathCommand.title },
++	when: ResourceContextKey.IsFileSystemResource,
++	group: '1_cutcopypaste',
++});
++MenuRegistry.appendMenuItem(MenuId.EditorTitleContextAdvanced, {
++	command: { id: COPY_RELATIVE_PATH_COMMAND_ID, title: copyRelativePathCommand.title },
++	when: ResourceContextKey.IsFileSystemResource,
++	group: '1_cutcopypaste',
++});
+ appendEditorTitleContextMenuItem(revealInSideBarCommand.id, revealInSideBarCommand.title, ResourceContextKey.IsFileSystemResource, '2_files', false, 1);
+ 
+ export function appendEditorTitleContextMenuItem(id: string, title: string, when: ContextKeyExpression | undefined, group: string, supportsMultiSelect: boolean, order?: number): void {
+@@ -502,15 +511,16 @@ MenuRegistry.appendMenuItem(MenuId.ExplorerContext, {
+ 	when: ContextKeyExpr.and(ExplorerFolderContext.toNegated(), ResourceContextKey.HasResource)
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.ExplorerContext, {
+-	group: 'navigation',
+-	order: 20,
+-	command: {
+-		id: OPEN_WITH_EXPLORER_COMMAND_ID,
+-		title: nls.localize('explorerOpenWith', "Open With..."),
+-	},
+-	when: ContextKeyExpr.and(ExplorerFolderContext.toNegated(), ExplorerResourceAvailableEditorIdsContext),
+-});
++// RiteMark: "Open With" hidden from explorer context
++// MenuRegistry.appendMenuItem(MenuId.ExplorerContext, {
++// 	group: 'navigation',
++// 	order: 20,
++// 	command: {
++// 		id: OPEN_WITH_EXPLORER_COMMAND_ID,
++// 		title: nls.localize('explorerOpenWith', "Open With..."),
++// 	},
++// 	when: ContextKeyExpr.and(ExplorerFolderContext.toNegated(), ExplorerResourceAvailableEditorIdsContext),
++// });
+ 
+ MenuRegistry.appendMenuItem(MenuId.ExplorerContext, {
+ 	group: '3_compare',
+@@ -598,20 +608,29 @@ MenuRegistry.appendMenuItem(MenuId.ExplorerContext, ({
+ 	)
+ }));
+ 
+-MenuRegistry.appendMenuItem(MenuId.ExplorerContext, {
++// RiteMark: Copy Path/Relative Path moved to Explorer context > Advanced
++MenuRegistry.appendMenuItem(MenuId.ExplorerContextAdvanced, {
+ 	group: '6_copypath',
+ 	order: 10,
+ 	command: copyPathCommand,
+ 	when: ResourceContextKey.IsFileSystemResource
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.ExplorerContext, {
++MenuRegistry.appendMenuItem(MenuId.ExplorerContextAdvanced, {
+ 	group: '6_copypath',
+ 	order: 20,
+ 	command: copyRelativePathCommand,
+ 	when: ResourceContextKey.IsFileSystemResource
+ });
+ 
++// RiteMark: Explorer context > Advanced submenu
++MenuRegistry.appendMenuItem(MenuId.ExplorerContext, {
++	group: '8_advanced',
++	order: 1,
++	submenu: MenuId.ExplorerContextAdvanced,
++	title: nls.localize('explorerAdvanced', "Advanced"),
++});
++
+ MenuRegistry.appendMenuItem(MenuId.ExplorerContext, {
+ 	group: '2_workspace',
+ 	order: 10,
+@@ -679,7 +698,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	group: '1_new',
+ 	command: {
+ 		id: NEW_UNTITLED_FILE_COMMAND_ID,
+-		title: nls.localize({ key: 'miNewFile', comment: ['&& denotes a mnemonic'] }, "&&New Text File")
++		title: nls.localize({ key: 'miNewFile', comment: ['&& denotes a mnemonic'] }, "&&New Document") // RiteMark: renamed
+ 	},
+ 	order: 1
+ });
+@@ -724,7 +743,8 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	order: 1
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
++// RiteMark: Revert File moved to File > Advanced
++MenuRegistry.appendMenuItem(MenuId.MenubarFileMenuAdvanced, {
+ 	group: '6_close',
+ 	command: {
+ 		id: REVERT_FILE_COMMAND_ID,
+@@ -739,11 +759,19 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	order: 1
+ });
+ 
++// RiteMark: File > Advanced submenu
++MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
++	group: '9_advanced',
++	submenu: MenuId.MenubarFileMenuAdvanced,
++	title: nls.localize('miFileAdvanced', "Advanced"),
++	order: 1
++});
++
+ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	group: '6_close',
+ 	command: {
+ 		id: CLOSE_EDITOR_COMMAND_ID,
+-		title: nls.localize({ key: 'miCloseEditor', comment: ['&& denotes a mnemonic'] }, "&&Close Editor"),
++		title: nls.localize({ key: 'miCloseEditor', comment: ['&& denotes a mnemonic'] }, "&&Close Document"), // RiteMark: renamed
+ 		precondition: ContextKeyExpr.or(ActiveEditorContext, ContextKeyExpr.and(FoldersViewVisibleContext, SidebarFocusContext))
+ 	},
+ 	order: 2
+diff --git a/src/vs/workbench/contrib/issue/common/issue.contribution.ts b/src/vs/workbench/contrib/issue/common/issue.contribution.ts
+index 0c1effb4b15..d8f61b915bc 100644
+--- a/src/vs/workbench/contrib/issue/common/issue.contribution.ts
++++ b/src/vs/workbench/contrib/issue/common/issue.contribution.ts
+@@ -4,7 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { Disposable } from '../../../../base/common/lifecycle.js';
+-import { localize, localize2 } from '../../../../nls.js';
++import { localize2 } from '../../../../nls.js';
+ import { ICommandAction } from '../../../../platform/action/common/action.js';
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+ import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
+@@ -120,13 +120,6 @@ export class BaseIssueContribution extends Disposable implements IWorkbenchContr
+ 
+ 		this._register(MenuRegistry.appendMenuItem(MenuId.CommandPalette, { command: reportIssue }));
+ 
+-		this._register(MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
+-			group: '3_feedback',
+-			command: {
+-				id: OpenIssueReporterActionId,
+-				title: localize({ key: 'miReportIssue', comment: ['&& denotes a mnemonic', 'Translate this to "Report Issue in English" in all languages please!'] }, "Report &&Issue")
+-			},
+-			order: 3
+-		}));
++		// RiteMark: Send Feedback hidden from Help menu
+ 	}
+ }
 diff --git a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
 index b22f84b628a..9dd39b6be6d 100644
 --- a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
@@ -453,9 +1387,18 @@ index bb8dd6560d4..8fd6ce867d9 100644
  	order: 2,
  	weight: 30,
 diff --git a/src/vs/workbench/contrib/output/browser/output.contribution.ts b/src/vs/workbench/contrib/output/browser/output.contribution.ts
-index daa2516d6ab..a5dbb51474e 100644
+index daa2516d6ab..01e20a6395c 100644
 --- a/src/vs/workbench/contrib/output/browser/output.contribution.ts
 +++ b/src/vs/workbench/contrib/output/browser/output.contribution.ts
+@@ -4,7 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import * as nls from '../../../../nls.js';
+-import { KeyMod, KeyChord, KeyCode } from '../../../../base/common/keyCodes.js';
++import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
+ import { ModesRegistry } from '../../../../editor/common/languages/modesRegistry.js';
+ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { MenuId, registerAction2, Action2, MenuRegistry } from '../../../../platform/actions/common/actions.js';
 @@ -24,7 +24,7 @@ import { IQuickPickItem, IQuickInputService, IQuickPickSeparator, QuickPickInput
  import { AUX_WINDOW_GROUP, AUX_WINDOW_GROUP_TYPE, IEditorService } from '../../../services/editor/common/editorService.js';
  import { ContextKeyExpr, ContextKeyExpression } from '../../../../platform/contextkey/common/contextkey.js';
@@ -474,6 +1417,221 @@ index daa2516d6ab..a5dbb51474e 100644
  const VIEW_CONTAINER: ViewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer({
  	id: OUTPUT_VIEW_ID,
  	title: nls.localize2('output', "Output"),
+@@ -82,17 +82,18 @@ Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews
+ 	canMoveView: true,
+ 	canToggleVisibility: true,
+ 	ctorDescriptor: new SyncDescriptor(OutputViewPane),
+-	openCommandActionDescriptor: {
+-		id: 'workbench.action.output.toggleOutput',
+-		mnemonicTitle: nls.localize({ key: 'miToggleOutput', comment: ['&& denotes a mnemonic'] }, "&&Output"),
+-		keybindings: {
+-			primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyU,
+-			linux: {
+-				primary: KeyChord(KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyH)  // On Ubuntu Ctrl+Shift+U is taken by some global OS command
+-			}
+-		},
+-		order: 1,
+-	}
++	// RiteMark: Output hidden from View menu
++	// openCommandActionDescriptor: {
++	// 	id: 'workbench.action.output.toggleOutput',
++	// 	mnemonicTitle: nls.localize({ key: 'miToggleOutput', comment: ['&& denotes a mnemonic'] }, "&&Output"),
++	// 	keybindings: {
++	// 		primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyU,
++	// 		linux: {
++	// 			primary: KeyChord(KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyH)  // On Ubuntu Ctrl+Shift+U is taken by some global OS command
++	// 		}
++	// 	},
++	// 	order: 1,
++	// }
+ }], VIEW_CONTAINER);
+ 
+ class OutputContribution extends Disposable implements IWorkbenchContribution {
+diff --git a/src/vs/workbench/contrib/processExplorer/browser/processExplorer.contribution.ts b/src/vs/workbench/contrib/processExplorer/browser/processExplorer.contribution.ts
+index cab57086291..2e39674c541 100644
+--- a/src/vs/workbench/contrib/processExplorer/browser/processExplorer.contribution.ts
++++ b/src/vs/workbench/contrib/processExplorer/browser/processExplorer.contribution.ts
+@@ -11,7 +11,7 @@ import { IEditorSerializer, EditorExtensions, IEditorFactoryRegistry, GroupIdent
+ import { EditorInput } from '../../../common/editor/editorInput.js';
+ import { IEditorResolverService, RegisteredEditorPriority } from '../../../services/editor/common/editorResolverService.js';
+ import { ProcessExplorerEditorInput } from './processExplorerEditorInput.js';
+-import { Action2, MenuId, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { Action2, registerAction2 } from '../../../../platform/actions/common/actions.js';
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+ import { AUX_WINDOW_GROUP, IEditorService } from '../../../services/editor/common/editorService.js';
+ import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+@@ -160,14 +160,15 @@ class OpenProcessExplorer extends Action2 {
+ 
+ registerAction2(OpenProcessExplorer);
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
+-	group: '5_tools',
+-	command: {
+-		id: OpenProcessExplorer.ID,
+-		title: localize({ key: 'miOpenProcessExplorerer', comment: ['&& denotes a mnemonic'] }, "Open &&Process Explorer")
+-	},
+-	when: supported,
+-	order: 2
+-});
++// RiteMark: Process Explorer hidden from Help menu
++// MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
++// 	group: '5_tools',
++// 	command: {
++// 		id: OpenProcessExplorer.ID,
++// 		title: localize({ key: 'miOpenProcessExplorerer', comment: ['&& denotes a mnemonic'] }, "Open &&Process Explorer")
++// 	},
++// 	when: supported,
++// 	order: 2
++// });
+ 
+ //#endregion
+diff --git a/src/vs/workbench/contrib/quickaccess/browser/quickAccess.contribution.ts b/src/vs/workbench/contrib/quickaccess/browser/quickAccess.contribution.ts
+index 051836b9bcb..676cabe84a4 100644
+--- a/src/vs/workbench/contrib/quickaccess/browser/quickAccess.contribution.ts
++++ b/src/vs/workbench/contrib/quickaccess/browser/quickAccess.contribution.ts
+@@ -56,28 +56,30 @@ MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
+ 	group: '1_open',
+ 	command: {
+ 		id: ShowAllCommandsAction.ID,
+-		title: localize({ key: 'miCommandPalette', comment: ['&& denotes a mnemonic'] }, "&&Command Palette...")
++		title: localize({ key: 'miCommandPalette', comment: ['&& denotes a mnemonic'] }, "&&Command Menu...") // RiteMark: renamed
+ 	},
+ 	order: 1
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
+-	group: '1_welcome',
+-	command: {
+-		id: ShowAllCommandsAction.ID,
+-		title: localize({ key: 'miShowAllCommands', comment: ['&& denotes a mnemonic'] }, "Show All Commands")
+-	},
+-	order: 2
+-});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
+-	group: '1_open',
+-	command: {
+-		id: OpenViewPickerAction.ID,
+-		title: localize({ key: 'miOpenView', comment: ['&& denotes a mnemonic'] }, "&&Open View...")
+-	},
+-	order: 2
+-});
++// RiteMark: "Show All Commands" hidden from Help menu
++// MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
++// 	group: '1_welcome',
++// 	command: {
++// 		id: ShowAllCommandsAction.ID,
++// 		title: localize({ key: 'miShowAllCommands', comment: ['&& denotes a mnemonic'] }, "Show All Commands")
++// 	},
++// 	order: 2
++// });
++
++// RiteMark: "Open View" hidden from View menu
++// MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
++// 	group: '1_open',
++// 	command: {
++// 		id: OpenViewPickerAction.ID,
++// 		title: localize({ key: 'miOpenView', comment: ['&& denotes a mnemonic'] }, "&&Open View...")
++// 	},
++// 	order: 2
++// });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarGoMenu, {
+ 	group: '5_infile_nav',
+diff --git a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
+index c38dc40be06..a6c6220eecf 100644
+--- a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
++++ b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
+@@ -127,17 +127,18 @@ viewsRegistry.registerViews([{
+ 	weight: 40,
+ 	order: 1,
+ 	containerIcon: sourceControlViewIcon,
+-	openCommandActionDescriptor: {
+-		id: viewContainer.id,
+-		mnemonicTitle: localize({ key: 'miViewSCM', comment: ['&& denotes a mnemonic'] }, "Source &&Control"),
+-		keybindings: {
+-			primary: 0,
+-			win: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyG },
+-			linux: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyG },
+-			mac: { primary: KeyMod.WinCtrl | KeyMod.Shift | KeyCode.KeyG },
+-		},
+-		order: 2,
+-	}
++	// RiteMark: Source Control hidden from View menu (moved to View > Advanced)
++	// openCommandActionDescriptor: {
++	// 	id: viewContainer.id,
++	// 	mnemonicTitle: localize({ key: 'miViewSCM', comment: ['&& denotes a mnemonic'] }, "Source &&Control"),
++	// 	keybindings: {
++	// 		primary: 0,
++	// 		win: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyG },
++	// 		linux: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyG },
++	// 		mac: { primary: KeyMod.WinCtrl | KeyMod.Shift | KeyCode.KeyG },
++	// 	},
++	// 	order: 2,
++	// }
+ }], viewContainer);
+ 
+ viewsRegistry.registerViews([{
+diff --git a/src/vs/workbench/contrib/search/browser/searchActionsFind.ts b/src/vs/workbench/contrib/search/browser/searchActionsFind.ts
+index 2453e145843..79a8ee1db4b 100644
+--- a/src/vs/workbench/contrib/search/browser/searchActionsFind.ts
++++ b/src/vs/workbench/contrib/search/browser/searchActionsFind.ts
+@@ -227,8 +227,8 @@ registerAction2(class FindInFilesAction extends Action2 {
+ 		super({
+ 			id: Constants.SearchCommandIds.FindInFilesActionId,
+ 			title: {
+-				...nls.localize2('findInFiles', "Find in Files"),
+-				mnemonicTitle: nls.localize({ key: 'miFindInFiles', comment: ['&& denotes a mnemonic'] }, "Find &&in Files"),
++				...nls.localize2('findInFiles', "Search in All Documents"), // RiteMark: renamed
++				mnemonicTitle: nls.localize({ key: 'miFindInFiles', comment: ['&& denotes a mnemonic'] }, "&&Search in All Documents"), // RiteMark: renamed
+ 			},
+ 			metadata: {
+ 				description: nls.localize('findInFiles.description', "Open a workspace search"),
+diff --git a/src/vs/workbench/contrib/search/browser/searchActionsNav.ts b/src/vs/workbench/contrib/search/browser/searchActionsNav.ts
+index 97186a83988..8aea0a5eba5 100644
+--- a/src/vs/workbench/contrib/search/browser/searchActionsNav.ts
++++ b/src/vs/workbench/contrib/search/browser/searchActionsNav.ts
+@@ -396,7 +396,7 @@ registerAction2(class ReplaceInFilesAction extends Action2 {
+ 	constructor() {
+ 		super({
+ 			id: Constants.SearchCommandIds.ReplaceInFilesActionId,
+-			title: nls.localize2('replaceInFiles', "Replace in Files"),
++			title: nls.localize2('replaceInFiles', "Replace in All Documents"), // RiteMark: renamed
+ 			keybinding: [{
+ 				primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyH,
+ 				weight: KeybindingWeight.WorkbenchContrib,
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
+index b0860ecc69c..9e4ab59faca 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
+@@ -105,6 +105,27 @@ export function setupTerminalMenus(): void {
+ 		]
+ 	);
+ 
++	// RiteMark: Add New Terminal and Split Terminal to File > Advanced
++	MenuRegistry.appendMenuItem(MenuId.MenubarFileMenuAdvanced, {
++		group: '7_terminal',
++		command: {
++			id: TerminalCommandId.New,
++			title: localize('miNewTerminal', "New Terminal"),
++		},
++		order: 1,
++		when: TerminalContextKeys.processSupported
++	});
++
++	MenuRegistry.appendMenuItem(MenuId.MenubarFileMenuAdvanced, {
++		group: '7_terminal',
++		command: {
++			id: TerminalCommandId.Split,
++			title: localize('miSplitTerminal', "Split Terminal"),
++		},
++		order: 2,
++		when: TerminalContextKeys.processSupported
++	});
++
+ 	MenuRegistry.appendMenuItems(
+ 		[
+ 			{
 diff --git a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
 index acf3e73a07c..a06bbb2df16 100644
 --- a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
@@ -503,3 +1661,110 @@ index acf3e73a07c..a06bbb2df16 100644
  	readonly canMoveView = true;
  	readonly when = TimelineHasProviderContext;
  
+diff --git a/src/vs/workbench/contrib/update/browser/update.contribution.ts b/src/vs/workbench/contrib/update/browser/update.contribution.ts
+index dbc489922b2..3ebe38f3c01 100644
+--- a/src/vs/workbench/contrib/update/browser/update.contribution.ts
++++ b/src/vs/workbench/contrib/update/browser/update.contribution.ts
+@@ -45,12 +45,6 @@ export class ShowCurrentReleaseNotesAction extends Action2 {
+ 			category: { value: product.nameShort, original: product.nameShort },
+ 			f1: true,
+ 			precondition: RELEASE_NOTES_URL,
+-			menu: [{
+-				id: MenuId.MenubarHelpMenu,
+-				group: '1_welcome',
+-				order: 5,
+-				when: RELEASE_NOTES_URL,
+-			}]
+ 		});
+ 	}
+ 
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
+index 2b50e71fab8..369d4071d3d 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
+@@ -7,7 +7,7 @@ import { localize, localize2 } from '../../../../nls.js';
+ import { GettingStartedInputSerializer, GettingStartedPage, inWelcomeContext } from './gettingStarted.js';
+ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { EditorExtensions, IEditorFactoryRegistry } from '../../../common/editor.js';
+-import { MenuId, registerAction2, Action2 } from '../../../../platform/actions/common/actions.js';
++import { registerAction2, Action2 } from '../../../../platform/actions/common/actions.js';
+ import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
+ import { ContextKeyExpr, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
+ import { IEditorService, SIDE_GROUP } from '../../../services/editor/common/editorService.js';
+@@ -44,11 +44,6 @@ registerAction2(class extends Action2 {
+ 			title: localize2('miWelcome', 'Welcome'),
+ 			category: Categories.Help,
+ 			f1: true,
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '1_welcome',
+-				order: 1,
+-			},
+ 			metadata: {
+ 				description: localize2('minWelcomeDescription', 'Opens a Walkthrough to help you get started in VS Code.')
+ 			}
+@@ -204,11 +199,6 @@ registerAction2(class extends Action2 {
+ 			title: localize2('welcome.showAllWalkthroughs', 'Open Walkthrough...'),
+ 			category,
+ 			f1: true,
+-			menu: {
+-				id: MenuId.MenubarHelpMenu,
+-				group: '1_welcome',
+-				order: 3,
+-			},
+ 		});
+ 	}
+ 
+@@ -327,7 +317,7 @@ configurationRegistry.registerConfiguration({
+ 				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.terminal' }, "Open a new terminal in the editor area."),
+ 				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.agentSessionsWelcomePage' }, "Open the Agent Sessions Welcome page."),
+ 			],
+-			'default': 'welcomePage',
++			'default': 'welcomePageInEmptyWorkbench',
+ 			'description': localize('workbench.startupEditor', "Controls which editor is shown at startup, if none are restored from the previous session."),
+ 			'experiment': { mode: 'auto' }
+ 		},
+@@ -346,4 +336,3 @@ registerWorkbenchContribution2(StartupPageEditorResolverContribution.ID, Startup
+ registerWorkbenchContribution2(StartupPageRunnerContribution.ID, StartupPageRunnerContribution, WorkbenchPhase.AfterRestored);
+ 
+ AccessibleViewRegistry.register(new GettingStartedAccessibleView());
+-
+diff --git a/src/vs/workbench/contrib/welcomeWalkthrough/browser/walkThrough.contribution.ts b/src/vs/workbench/contrib/welcomeWalkthrough/browser/walkThrough.contribution.ts
+index 1a1f1e1d8dd..db40b13fe73 100644
+--- a/src/vs/workbench/contrib/welcomeWalkthrough/browser/walkThrough.contribution.ts
++++ b/src/vs/workbench/contrib/welcomeWalkthrough/browser/walkThrough.contribution.ts
+@@ -12,7 +12,7 @@ import { EditorWalkThroughAction, EditorWalkThroughInputSerializer } from './edi
+ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { EditorExtensions, IEditorFactoryRegistry } from '../../../common/editor.js';
+ import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
+-import { MenuRegistry, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { registerAction2 } from '../../../../platform/actions/common/actions.js';
+ import { registerWorkbenchContribution2 } from '../../../common/contributions.js';
+ import { IEditorPaneRegistry, EditorPaneDescriptor } from '../../../browser/editor.js';
+ import { KeybindingsRegistry } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
+@@ -39,11 +39,4 @@ KeybindingsRegistry.registerCommandAndKeybindingRule(WalkThroughPageUp);
+ 
+ KeybindingsRegistry.registerCommandAndKeybindingRule(WalkThroughPageDown);
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
+-	group: '1_welcome',
+-	command: {
+-		id: 'workbench.action.showInteractivePlayground',
+-		title: localize({ key: 'miPlayground', comment: ['&& denotes a mnemonic'] }, "Editor Playgrou&&nd")
+-	},
+-	order: 3
+-});
++// RiteMark: Editor Playground hidden from Help menu
+diff --git a/src/vs/workbench/electron-browser/actions/developerActions.ts b/src/vs/workbench/electron-browser/actions/developerActions.ts
+index 85d84a9debb..f6819716274 100644
+--- a/src/vs/workbench/electron-browser/actions/developerActions.ts
++++ b/src/vs/workbench/electron-browser/actions/developerActions.ts
+@@ -35,7 +35,7 @@ export class ToggleDevToolsAction extends Action2 {
+ 				mac: { primary: KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyI }
+ 			},
+ 			menu: {
+-				id: MenuId.MenubarHelpMenu,
++				id: MenuId.MenubarHelpMenuAdvanced, // RiteMark: moved to Help > Advanced
+ 				group: '5_tools',
+ 				order: 1
+ 			}

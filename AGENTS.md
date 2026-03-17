@@ -23,6 +23,7 @@ This file configures Codex behavior for `ritemark-native`. It is additive to the
 - Use `ritemark-flows` when creating or editing `.ritemark/flows/*.flow.json` or backend/frontend flow node integrations.
 - Use `feature-flags` when adding gated, experimental, platform-specific, premium, or kill-switch features.
 - Use `sprint-workflow` when the user is explicitly working inside the sprint process or asks for sprint plans/phases/docs.
+- Use `macos-screenshots` when you need a fresh screenshot of the full screen, an interactively selected window, or a specific macOS window for UI inspection.
 
 ### Reporting
 
