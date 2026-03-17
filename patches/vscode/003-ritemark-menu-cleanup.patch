@@ -1768,3 +1768,137 @@ index 85d84a9debb..f6819716274 100644
  				group: '5_tools',
  				order: 1
  			}
+diff --git a/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts b/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
+index a92f90bc9b0..daa9df42331 100644
+--- a/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
++++ b/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
+@@ -15,6 +15,7 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
+ import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+ import { KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
++import { IProductService } from '../../../../platform/product/common/productService.js';
+ import { IQuickInputService, IQuickPickItem, IQuickPickSeparator } from '../../../../platform/quickinput/common/quickInput.js';
+ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { Extensions as WorkbenchExtensions, IWorkbenchContributionsRegistry } from '../../../common/contributions.js';
+@@ -22,6 +23,20 @@ import { LifecyclePhase } from '../../../services/lifecycle/common/lifecycle.js'
+ 
+ const builtInSource = localize('Built-In', "Built-In");
+ const category: ILocalizedString = localize2('Create', 'Create');
++const ritemarkNewFileEntries = [
++	{
++		commandID: 'ritemark.newDocument',
++		title: localize('ritemarkNewFileMarkdown', "Markdown"),
++		description: localize('ritemarkNewFileMarkdownDescription', "Blank markdown document"),
++		group: 'file'
++	},
++	{
++		commandID: 'ritemark.newTable',
++		title: localize('ritemarkNewFileCsv', "CSV"),
++		description: localize('ritemarkNewFileCsvDescription', "CSV with 10 columns and 20 empty rows"),
++		group: 'file'
++	}
++] satisfies NewFileItem[];
+ 
+ registerAction2(class extends Action2 {
+ 	constructor() {
+@@ -47,11 +62,12 @@ registerAction2(class extends Action2 {
+ 	}
+ });
+ 
+-type NewFileItem = { commandID: string; title: string; from: string; group: string; commandArgs?: unknown };
++type NewFileItem = { commandID: string; title: string; from?: string; description?: string; group: string; commandArgs?: unknown };
+ class NewFileTemplatesManager extends Disposable {
+ 	static Instance: NewFileTemplatesManager | undefined;
+ 
+ 	private menu: IMenu;
++	private readonly isRitemark: boolean;
+ 
+ 	constructor(
+ 		@IQuickInputService private readonly quickInputService: IQuickInputService,
+@@ -59,6 +75,7 @@ class NewFileTemplatesManager extends Disposable {
+ 		@ICommandService private readonly commandService: ICommandService,
+ 		@IKeybindingService private readonly keybindingService: IKeybindingService,
+ 		@IMenuService menuService: IMenuService,
++		@IProductService productService: IProductService,
+ 	) {
+ 		super();
+ 
+@@ -67,9 +84,14 @@ class NewFileTemplatesManager extends Disposable {
+ 		this._register({ dispose() { if (NewFileTemplatesManager.Instance === this) { NewFileTemplatesManager.Instance = undefined; } } });
+ 
+ 		this.menu = menuService.createMenu(MenuId.NewFile, contextKeyService);
++		this.isRitemark = productService.applicationName === 'ritemark';
+ 	}
+ 
+ 	private allEntries(): NewFileItem[] {
++		if (this.isRitemark) {
++			return [...ritemarkNewFileEntries];
++		}
++
+ 		const items: NewFileItem[] = [];
+ 		for (const [groupName, group] of this.menu.getActions({ renderShortTitle: true })) {
+ 			for (const action of group) {
+@@ -101,7 +123,9 @@ class NewFileTemplatesManager extends Disposable {
+ 		const disposables = new DisposableStore();
+ 		const qp = this.quickInputService.createQuickPick({ useSeparators: true });
+ 		qp.title = localize('newFileTitle', "New File...");
+-		qp.placeholder = localize('newFilePlaceholder', "Select File Type or Enter File Name...");
++		qp.placeholder = this.isRitemark
++			? localize('newFilePlaceholderRitemark', "Choose Markdown or CSV...")
++			: localize('newFilePlaceholder', "Select File Type or Enter File Name...");
+ 		qp.sortByLabel = false;
+ 		qp.matchOnDetail = true;
+ 		qp.matchOnDescription = true;
+@@ -119,7 +143,7 @@ class NewFileTemplatesManager extends Disposable {
+ 			if (a.from === builtInSource) { return 1; }
+ 			if (b.from === builtInSource) { return -1; }
+ 
+-			return a.from.localeCompare(b.from);
++			return (a.from ?? builtInSource).localeCompare(b.from ?? builtInSource);
+ 		};
+ 
+ 		const displayCategory: Record<string, string> = {
+@@ -128,6 +152,22 @@ class NewFileTemplatesManager extends Disposable {
+ 		};
+ 
+ 		const refreshQp = (entries: NewFileItem[]) => {
++			if (this.isRitemark) {
++				qp.items = entries.map((entry) => {
++					const keybinding = this.keybindingService.lookupKeybinding(entry.commandID, this.contextKeyService);
++					return {
++						...entry,
++						label: entry.title,
++						type: 'item',
++						keybinding,
++						buttons: [],
++						detail: entry.description ?? '',
++						description: '',
++					};
++				});
++				return;
++			}
++
+ 			const items: (((IQuickPickItem & NewFileItem) | IQuickPickSeparator))[] = [];
+ 			let lastSeparator: string | undefined;
+ 			entries
+@@ -154,7 +194,7 @@ class NewFileTemplatesManager extends Disposable {
+ 							}
+ 						] : [],
+ 						detail: '',
+-						description: entry.from,
++						description: entry.description ?? entry.from,
+ 					});
+ 				});
+ 			qp.items = items;
+@@ -164,6 +204,11 @@ class NewFileTemplatesManager extends Disposable {
+ 		disposables.add(this.menu.onDidChange(() => refreshQp(this.allEntries())));
+ 
+ 		disposables.add(qp.onDidChangeValue((val: string) => {
++			if (this.isRitemark) {
++				refreshQp(entries);
++				return;
++			}
++
+ 			if (val === '') {
+ 				refreshQp(entries);
+ 				return;
