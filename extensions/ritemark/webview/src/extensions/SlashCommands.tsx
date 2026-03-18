@@ -4,7 +4,7 @@ import Suggestion from '@tiptap/suggestion'
 import tippy from 'tippy.js'
 import type { ComponentType } from 'react'
 import { CommandsList } from './CommandsList'
-import { Heading1, Heading2, Heading3, List, ListOrdered, Code, Table, Image, CheckSquare, Quote } from 'lucide-react'
+import { Heading1, Heading2, Heading3, List, ListOrdered, Code, Table, Image, CheckSquare, Quote, GitBranch } from 'lucide-react'
 import { sendToExtension, emitInternalEvent } from '../bridge'
 
 export interface Command {
@@ -149,6 +149,19 @@ export const SlashCommands = Extension.create({
                   .focus()
                   .deleteRange(range)
                   .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+                  .run()
+              },
+            },
+            {
+              title: 'Mermaid Diagram',
+              description: 'Insert a mermaid diagram',
+              icon: GitBranch,
+              command: ({ editor, range }: any) => {
+                editor
+                  .chain()
+                  .focus()
+                  .deleteRange(range)
+                  .setCodeBlock({ language: 'mermaid' })
                   .run()
               },
             },
