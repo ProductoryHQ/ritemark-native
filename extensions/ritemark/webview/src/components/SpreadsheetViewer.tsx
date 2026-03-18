@@ -2,9 +2,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { DataTable } from './DataTable'
-import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
+import { SpreadsheetToolbar, type SpreadsheetViewMode } from './header/SpreadsheetToolbar'
 import { ConflictDialog } from './dialogs/ConflictDialog'
-import { sendToExtension, onMessage } from '../bridge'
+import { sendToExtension, onMessage, saveState, getState } from '../bridge'
+import { parseCsvy, serializeCsvy } from './kanban/csvyParser'
+import { resolveKanbanConfig, canShowKanban } from './kanban/detectConfig'
+import { KanbanView } from './kanban/KanbanView'
 
 export interface SpreadsheetViewerProps {
   content: string
@@ -48,6 +51,11 @@ export function SpreadsheetViewer({
 
   // File change indicator (badge on refresh button)
   const [hasFileChanged, setHasFileChanged] = useState(false)
+
+  // Kanban view mode
+  const savedState = useMemo(() => getState<{ viewMode?: SpreadsheetViewMode }>(), [])
+  const [viewMode, setViewMode] = useState<SpreadsheetViewMode>(savedState?.viewMode || 'table')
+  const [rawFrontmatter, setRawFrontmatter] = useState<string | null>(null)
 
   // CSV is editable, Excel is read-only
   const isEditable = fileType === 'csv' && !!onChange
@@ -120,7 +128,16 @@ export function SpreadsheetViewer({
   }, [content, fileType, encoding, showSizeWarning, proceedWithLargeFile, selectedSheet])
 
   const parseCSV = (csvContent: string) => {
-    Papa.parse(csvContent, {
+    // Extract CSVY frontmatter before parsing CSV
+    const csvy = parseCsvy(csvContent)
+    setRawFrontmatter(csvy.rawFrontmatter)
+
+    // If frontmatter says view: kanban, switch to kanban on first load
+    if (csvy.config?.view === 'kanban' && !savedState?.viewMode) {
+      setViewMode('kanban')
+    }
+
+    Papa.parse(csvy.csvContent, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
@@ -201,6 +218,13 @@ export function SpreadsheetViewer({
     }
   }
 
+  // Serialize rows back to CSV (with frontmatter preservation)
+  const serializeAndNotify = useCallback((rows: Record<string, unknown>[], columns: string[]) => {
+    if (!onChange) return
+    const csvString = Papa.unparse(rows, { columns })
+    onChange(serializeCsvy(rawFrontmatter, csvString))
+  }, [onChange, rawFrontmatter])
+
   // Handle cell edits (CSV only)
   const handleCellChange = useCallback((rowIndex: number, columnId: string, value: string) => {
     if (!parsedData || !onChange) return
@@ -218,12 +242,8 @@ export function SpreadsheetViewer({
       rows: newRows,
     })
 
-    // Serialize back to CSV and notify parent
-    const csvString = Papa.unparse(newRows, {
-      columns: parsedData.columns,
-    })
-    onChange(csvString)
-  }, [parsedData, onChange])
+    serializeAndNotify(newRows, parsedData.columns)
+  }, [parsedData, onChange, serializeAndNotify])
 
   // Handle adding a new empty row at the end (CSV only)
   const handleAddRow = useCallback(() => {
@@ -236,10 +256,8 @@ export function SpreadsheetViewer({
 
     const newRows = [...parsedData.rows, emptyRow]
     setParsedData({ ...parsedData, rows: newRows })
-
-    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
-    onChange(csvString)
-  }, [parsedData, onChange])
+    serializeAndNotify(newRows, parsedData.columns)
+  }, [parsedData, onChange, serializeAndNotify])
 
   // Handle inserting a new empty row at a specific index (CSV only)
   const handleInsertRowAt = useCallback((index: number) => {
@@ -253,10 +271,8 @@ export function SpreadsheetViewer({
     const newRows = [...parsedData.rows]
     newRows.splice(index, 0, emptyRow)
     setParsedData({ ...parsedData, rows: newRows })
-
-    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
-    onChange(csvString)
-  }, [parsedData, onChange])
+    serializeAndNotify(newRows, parsedData.columns)
+  }, [parsedData, onChange, serializeAndNotify])
 
   // Handle adding a new column (CSV only)
   const handleAddColumn = useCallback(() => {
@@ -273,10 +289,8 @@ export function SpreadsheetViewer({
     const newColumns = [...parsedData.columns, colName]
     const newRows = parsedData.rows.map(row => ({ ...row, [colName]: '' }))
     setParsedData({ ...parsedData, columns: newColumns, rows: newRows })
-
-    const csvString = Papa.unparse(newRows, { columns: newColumns })
-    onChange(csvString)
-  }, [parsedData, onChange])
+    serializeAndNotify(newRows, newColumns)
+  }, [parsedData, onChange, serializeAndNotify])
 
   // Handle renaming a column (CSV only)
   const handleRenameColumn = useCallback((oldName: string, newName: string) => {
@@ -294,10 +308,8 @@ export function SpreadsheetViewer({
       return newRow
     })
     setParsedData({ ...parsedData, columns: newColumns, rows: newRows })
-
-    const csvString = Papa.unparse(newRows, { columns: newColumns })
-    onChange(csvString)
-  }, [parsedData, onChange])
+    serializeAndNotify(newRows, newColumns)
+  }, [parsedData, onChange, serializeAndNotify])
 
   // Handle deleting a column by name (CSV only)
   const handleDeleteColumn = useCallback((columnName: string) => {
@@ -313,10 +325,8 @@ export function SpreadsheetViewer({
       return newRow
     })
     setParsedData({ ...parsedData, columns: newColumns, rows: newRows })
-
-    const csvString = Papa.unparse(newRows, { columns: newColumns })
-    onChange(csvString)
-  }, [parsedData, onChange])
+    serializeAndNotify(newRows, newColumns)
+  }, [parsedData, onChange, serializeAndNotify])
 
   // Handle deleting a row at a specific index (CSV only)
   const handleDeleteRow = useCallback((index: number) => {
@@ -325,10 +335,8 @@ export function SpreadsheetViewer({
     const newRows = [...parsedData.rows]
     newRows.splice(index, 1)
     setParsedData({ ...parsedData, rows: newRows })
-
-    const csvString = Papa.unparse(newRows, { columns: parsedData.columns })
-    onChange(csvString)
-  }, [parsedData, onChange])
+    serializeAndNotify(newRows, parsedData.columns)
+  }, [parsedData, onChange, serializeAndNotify])
 
   // Handle conflict dialog actions
   const handleConfirmDiscard = useCallback(() => {
@@ -363,6 +371,40 @@ export function SpreadsheetViewer({
   const handleOpenInNumbers = useCallback(() => {
     sendToExtension('openInExternalApp', { app: 'numbers' })
   }, [])
+
+  // Handle kanban card move (drag-and-drop)
+  const handleCardMove = useCallback((rowIndex: number, newGroupValue: string) => {
+    if (!parsedData || !onChange) return
+
+    const newRows = [...parsedData.rows]
+    newRows[rowIndex] = {
+      ...newRows[rowIndex],
+      [kanbanConfig!.groupBy]: newGroupValue,
+    }
+
+    setParsedData({ ...parsedData, rows: newRows })
+    serializeAndNotify(newRows, parsedData.columns)
+  }, [parsedData, onChange, serializeAndNotify])
+
+  // Handle view mode change with persistence
+  const handleViewModeChange = useCallback((mode: SpreadsheetViewMode) => {
+    setViewMode(mode)
+    saveState({ viewMode: mode })
+  }, [])
+
+  // Resolve kanban config from CSVY frontmatter + smart defaults
+  const csvyConfig = useMemo(() => {
+    if (!parsedData) return null
+    const csvy = parseCsvy(content)
+    return csvy.config
+  }, [content, parsedData])
+
+  const kanbanConfig = useMemo(() => {
+    if (!parsedData) return null
+    return resolveKanbanConfig(parsedData.columns, parsedData.rows, csvyConfig)
+  }, [parsedData, csvyConfig])
+
+  const showKanbanToggle = isEditable && (canShowKanban(parsedData?.columns || []) || kanbanConfig !== null)
 
   // Status bar info
   const statusInfo = useMemo(() => {
@@ -456,6 +498,9 @@ export function SpreadsheetViewer({
           onOpenInNumbers={handleOpenInNumbers}
           hasExcel={hasExcel}
           hasFileChanged={hasFileChanged}
+          viewMode={viewMode}
+          onViewModeChange={handleViewModeChange}
+          canShowKanban={showKanbanToggle}
         />
 
       {/* Status bar */}
@@ -496,20 +541,29 @@ export function SpreadsheetViewer({
         </div>
       )}
 
-      {/* Table */}
+      {/* Table or Kanban view */}
       <div className="flex-1 overflow-hidden">
-        <DataTable
-          data={parsedData.rows}
-          columns={parsedData.columns}
-          editable={isEditable}
-          onCellChange={handleCellChange}
-          onAddRow={isEditable ? handleAddRow : undefined}
-          onAddColumn={isEditable ? handleAddColumn : undefined}
-          onRenameColumn={isEditable ? handleRenameColumn : undefined}
-          onDeleteColumn={isEditable ? handleDeleteColumn : undefined}
-          onInsertRowAt={isEditable ? handleInsertRowAt : undefined}
-          onDeleteRow={isEditable ? handleDeleteRow : undefined}
-        />
+        {viewMode === 'kanban' && kanbanConfig ? (
+          <KanbanView
+            rows={parsedData.rows}
+            columns={parsedData.columns}
+            config={kanbanConfig}
+            onCardMove={handleCardMove}
+          />
+        ) : (
+          <DataTable
+            data={parsedData.rows}
+            columns={parsedData.columns}
+            editable={isEditable}
+            onCellChange={handleCellChange}
+            onAddRow={isEditable ? handleAddRow : undefined}
+            onAddColumn={isEditable ? handleAddColumn : undefined}
+            onRenameColumn={isEditable ? handleRenameColumn : undefined}
+            onDeleteColumn={isEditable ? handleDeleteColumn : undefined}
+            onInsertRowAt={isEditable ? handleInsertRowAt : undefined}
+            onDeleteRow={isEditable ? handleDeleteRow : undefined}
+          />
+        )}
       </div>
     </div>
     </>

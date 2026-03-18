@@ -1,6 +1,8 @@
 import React from 'react'
-import { ArrowUpRight, ChevronDown, Table2, Grid3X3, RotateCw } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Table2, Grid3X3, RotateCw, KanbanSquare, List } from 'lucide-react'
 import { defaultSpreadsheetApp, isMac } from '../../hooks/usePlatform'
+
+export type SpreadsheetViewMode = 'table' | 'kanban'
 
 interface SpreadsheetToolbarProps {
   filename: string
@@ -10,6 +12,9 @@ interface SpreadsheetToolbarProps {
   onRefresh?: () => void
   refreshDisabled?: boolean
   hasFileChanged?: boolean // Show badge when file changed externally
+  viewMode?: SpreadsheetViewMode
+  onViewModeChange?: (mode: SpreadsheetViewMode) => void
+  canShowKanban?: boolean
 }
 
 /**
@@ -30,6 +35,9 @@ export function SpreadsheetToolbar({
   onRefresh,
   refreshDisabled = false,
   hasFileChanged = false,
+  viewMode = 'table',
+  onViewModeChange,
+  canShowKanban = false,
 }: SpreadsheetToolbarProps) {
   const [showDropdown, setShowDropdown] = React.useState(false)
   const dropdownRef = React.useRef<HTMLDivElement>(null)
@@ -64,6 +72,28 @@ export function SpreadsheetToolbar({
       <div className="toolbar-content">
         {/* Filename on the left */}
         <div className="toolbar-filename">{filename}</div>
+
+        {/* View mode toggle */}
+        {canShowKanban && onViewModeChange && (
+          <div className="view-toggle">
+            <button
+              className={`view-toggle-btn ${viewMode === 'table' ? 'view-toggle-active' : ''}`}
+              onClick={() => onViewModeChange('table')}
+              title="Table view"
+              aria-label="Table view"
+            >
+              <List size={16} />
+            </button>
+            <button
+              className={`view-toggle-btn ${viewMode === 'kanban' ? 'view-toggle-active' : ''}`}
+              onClick={() => onViewModeChange('kanban')}
+              title="Kanban view"
+              aria-label="Kanban view"
+            >
+              <KanbanSquare size={16} />
+            </button>
+          </div>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -155,6 +185,42 @@ export function SpreadsheetToolbar({
           font-size: 13px;
           color: var(--vscode-descriptionForeground);
           font-weight: 500;
+        }
+
+        /* View toggle */
+        .view-toggle {
+          display: flex;
+          align-items: stretch;
+          border-radius: 6px;
+          border: 1px solid var(--vscode-panel-border);
+          overflow: hidden;
+        }
+
+        .view-toggle-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 28px;
+          border: none;
+          background: transparent;
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .view-toggle-btn:not(:last-child) {
+          border-right: 1px solid var(--vscode-panel-border);
+        }
+
+        .view-toggle-btn:hover {
+          background: var(--vscode-toolbar-hoverBackground);
+          color: var(--vscode-foreground);
+        }
+
+        .view-toggle-active {
+          background: var(--vscode-toolbar-hoverBackground);
+          color: var(--vscode-foreground);
         }
 
         /* Split button container */

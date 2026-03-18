@@ -329,6 +329,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             this.resizeImage(document, message.relativePath, message.dataUrl);
             return;
 
+          case 'csv:openFile':
+            // Open a linked file from kanban card (relative to current document)
+            const csvDir = path.dirname(document.uri.fsPath);
+            const targetPath = path.resolve(csvDir, message.path as string);
+            const targetUri = vscode.Uri.file(targetPath);
+            vscode.commands.executeCommand('vscode.open', targetUri);
+            return;
+
           case 'selectionChanged':
             // Forward selection and document content to AI panel
             if (RitemarkEditorProvider._unifiedViewProvider) {
