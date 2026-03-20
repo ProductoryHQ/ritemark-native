@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
-import { AgentSession, DEFAULT_SETTING_SOURCES } from './AgentRunner';
+import {
+  AgentSession,
+  buildClaudeSystemAppend,
+  buildClaudeTurnPrompt,
+  DEFAULT_SETTING_SOURCES,
+} from './AgentRunner';
 
 async function testSynchronousPlanApprovalAnswer() {
   const session = new AgentSession({
@@ -88,8 +93,35 @@ function testDefaultSettingSources() {
   );
 }
 
+function testDefaultToolsIncludePlanAndQuestionLifecycle() {
+  const session = new AgentSession({
+    workspacePath: process.cwd(),
+  }) as AgentSession & Record<string, unknown>;
+
+  assert.ok(
+    Array.isArray(session._allowedTools) && session._allowedTools.includes('AskUserQuestion'),
+    'default tools should include AskUserQuestion'
+  );
+  assert.ok(
+    Array.isArray(session._allowedTools) && session._allowedTools.includes('ExitPlanMode'),
+    'default tools should include ExitPlanMode'
+  );
+}
+
+function testClaudeLifecycleInstructionsAreIncluded() {
+  const systemAppend = buildClaudeSystemAppend('/tmp/workspace', ['node_modules']);
+  assert.match(systemAppend, /AskUserQuestion/, 'system append should mention AskUserQuestion');
+  assert.match(systemAppend, /ExitPlanMode/, 'system append should mention ExitPlanMode');
+
+  const turnPrompt = buildClaudeTurnPrompt('User prompt');
+  assert.match(turnPrompt, /Ritemark lifecycle contract/, 'turn prompt should include lifecycle reminder');
+  assert.match(turnPrompt, /User prompt$/, 'turn prompt should preserve original prompt');
+}
+
 async function main() {
   testDefaultSettingSources();
+  testDefaultToolsIncludePlanAndQuestionLifecycle();
+  testClaudeLifecycleInstructionsAreIncluded();
   await testSynchronousPlanApprovalAnswer();
   await testSynchronousQuestionAnswer();
   console.log('AgentRunner lifecycle tests passed.');

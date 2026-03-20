@@ -21,7 +21,7 @@ import { IndexFooter } from './IndexFooter';
 import { SelectionIndicator } from './SelectionIndicator';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
 import { ActivePlanBanner } from './ActivePlanBanner';
-import { getActiveApprovedPlanForCodex } from './lifecycle';
+import { getActiveApprovedPlanForClaude, getActiveApprovedPlanForCodex } from './lifecycle';
 import { markdownStyles } from './RenderedMarkdown';
 import type { ExtensionMessage } from './types';
 
@@ -120,21 +120,7 @@ export function AISidebar() {
     && setupStatus.state === 'ready' && !hasSeenWelcome;
   const showCodexSetup = isCodex && codexStatus.state !== 'ready';
   const currentApprovedPlan = isClaudeCode
-    ? (() => {
-        const approvedTurn = [...agentConversation].reverse().find((turn) =>
-          turn.isPlan
-          && turn.planHandled
-          && turn.planDecision === 'approved'
-          && Boolean(turn.planText?.trim())
-        );
-        return approvedTurn
-          ? {
-              key: approvedTurn.id,
-              planText: approvedTurn.planText || '',
-              isRunning: approvedTurn.isRunning,
-            }
-          : null;
-      })()
+    ? getActiveApprovedPlanForClaude(agentConversation)
     : isCodex
       ? getActiveApprovedPlanForCodex(codexConversation)
       : null;
@@ -187,6 +173,7 @@ export function AISidebar() {
               planText={visibleCurrentPlan.planText}
               planSteps={'planSteps' in visibleCurrentPlan ? visibleCurrentPlan.planSteps : undefined}
               isRunning={visibleCurrentPlan.isRunning}
+              allCompleted={Boolean(visibleCurrentPlan.allCompleted)}
               onDismiss={() => dismissCurrentPlan(visibleCurrentPlan.key)}
             />
           )}

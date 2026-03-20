@@ -7,6 +7,7 @@
  */
 
 export { runAgent, AgentSession } from './AgentRunner';
+export { traceClaude, showClaudeTrace, getClaudeTraceLogPath } from './agentTrace';
 export {
   getSetupStatus,
   getAgentEnvironmentStatus,

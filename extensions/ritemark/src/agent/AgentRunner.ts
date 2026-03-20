@@ -26,6 +26,7 @@ import type {
   SDKMessage,
   SubagentProgress,
 } from './types';
+import { traceClaude } from './agentTrace';
 
 // Dynamic import for ES Module SDK (VS Code extensions use CommonJS)
 // Using Function constructor to bypass TypeScript's import() → require() transformation
@@ -119,9 +120,22 @@ function isContextOverflowError(str: string): boolean {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'AskUserQuestion'];
+const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'AskUserQuestion', 'ExitPlanMode'];
 export const DEFAULT_SETTING_SOURCES: AgentSettingSource[] = ['user', 'project', 'local'];
 const DEFAULT_TIMEOUT_MINUTES = 15;
+const CLAUDE_LIFECYCLE_APPEND = [
+  'LIFECYCLE RULES:',
+  '- If the user asks to work in plan mode, enter plan mode before execution.',
+  '- If you need clarification from the user and AskUserQuestion can represent it, use AskUserQuestion instead of asking in normal assistant text.',
+  '- If the user explicitly asked for multiple-choice questions, use AskUserQuestion for them.',
+  '- When your draft plan is ready, use ExitPlanMode to request plan review instead of presenting the plan as a final answer.',
+  '- After AskUserQuestion or ExitPlanMode, wait for the user response instead of continuing as if the tool had not paused execution.',
+].join('\n');
+const CLAUDE_TURN_REMINDER = [
+  'Follow the Ritemark lifecycle contract for this turn.',
+  'Use AskUserQuestion for multiple-choice clarification when needed.',
+  'Use ExitPlanMode when a reviewable draft plan is ready.',
+].join(' ');
 
 const DEFAULT_EXCLUDED_FOLDERS = [
   '.git',
@@ -146,6 +160,14 @@ function buildSafetyPrefix(workspacePath: string, excludedFolders: string[]): st
 Do NOT read, write, edit, or delete files matching these patterns:
 ${exclusions}
 If a user asks you to operate on these paths, explain that they are excluded for safety.\n\n`;
+}
+
+export function buildClaudeSystemAppend(workspacePath: string, excludedFolders: string[]): string {
+  return buildSafetyPrefix(workspacePath, excludedFolders) + CLAUDE_LIFECYCLE_APPEND;
+}
+
+export function buildClaudeTurnPrompt(prompt: string): string {
+  return `${CLAUDE_TURN_REMINDER}\n\n${prompt}`;
 }
 
 function normalizeAgentQuestion(input: Record<string, unknown>, toolUseId: string): AgentQuestion | null {
@@ -245,8 +267,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     throw new Error('Agent prompt is empty');
   }
 
-  const safetyPrefix = buildSafetyPrefix(workspacePath, excludedFolders);
-  const fullPrompt = safetyPrefix + prompt;
+  const fullPrompt = buildClaudeTurnPrompt(buildSafetyPrefix(workspacePath, excludedFolders) + prompt);
 
   const abortController = new AbortController();
   const timeoutMs = timeoutMinutes * 60 * 1000;
@@ -453,10 +474,10 @@ export class AgentSession {
     }
 
     // Build prompt with active file context (skip if already referenced in path chips)
-    let fullPrompt = prompt;
+    let fullPrompt = buildClaudeTurnPrompt(prompt);
     if (activeFile) {
-      const alreadyReferenced = prompt.includes(`[File: ${activeFile.path}]`) ||
-        prompt.match(new RegExp(`\\[File:.*/${activeFile.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`));
+      const alreadyReferenced = fullPrompt.includes(`[File: ${activeFile.path}]`) ||
+        fullPrompt.match(new RegExp(`\\[File:.*/${activeFile.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`));
       if (!alreadyReferenced) {
         let fileContext = `[Currently editing: ${activeFile.path}]`;
         if (activeFile.selection) {
@@ -465,18 +486,25 @@ export class AgentSession {
             : activeFile.selection;
           fileContext += `\n[Selected text: ${selSnippet}]`;
         }
-        fullPrompt = fileContext + '\n\n' + prompt;
+        fullPrompt = fileContext + '\n\n' + fullPrompt;
       } else if (activeFile.selection) {
         // File already referenced but selection still useful
         const selSnippet = activeFile.selection.length > 500
           ? activeFile.selection.substring(0, 500) + '...'
           : activeFile.selection;
-        fullPrompt = `[Selected text: ${selSnippet}]\n\n` + prompt;
+        fullPrompt = `[Selected text: ${selSnippet}]\n\n` + fullPrompt;
       }
     }
 
     const userMsg = buildUserMessage(fullPrompt, attachments);
     const turnId = ++this._turnId;
+    traceClaude('execution', 'sendMessage', {
+      turnId,
+      model: this._modelId ?? this._model,
+      promptPreview: prompt.slice(0, 200),
+      attachmentCount: attachments?.length ?? 0,
+      activeFile: activeFile?.path ?? null,
+    });
 
     // Set per-turn state BEFORE starting/enqueueing
     this._turnFilesModified = [];
@@ -525,6 +553,7 @@ export class AgentSession {
    */
   interrupt(): void {
     const turnId = this._turnId;
+    traceClaude('lifecycle', 'interrupt', { turnId });
     this._queryStream?.interrupt().catch(() => {});
     this._clearPendingQuestion('Execution cancelled');
     this._clearPendingPlanApproval('Execution cancelled');
@@ -540,6 +569,10 @@ export class AgentSession {
    * Close the session entirely. Kills the process and resets all state.
    */
   close(): void {
+    traceClaude('lifecycle', 'close', {
+      active: this.isActive,
+      currentTurnId: this._turnId,
+    });
     this._closed = true;
     try { this._queryStream?.close(); } catch {}
     this._queryStream = null;
@@ -628,7 +661,12 @@ export class AgentSession {
   }
 
   answerQuestion(toolUseId: string, answers: Record<string, string>): boolean {
+    traceClaude('lifecycle', 'answerQuestion', {
+      toolUseId,
+      answerKeys: Object.keys(answers),
+    });
     if (!this._pendingQuestion || this._pendingQuestion.toolUseId !== toolUseId) {
+      traceClaude('lifecycle', 'answerQuestion missed pending state', { toolUseId });
       return false;
     }
 
@@ -639,7 +677,13 @@ export class AgentSession {
   }
 
   answerPlanApproval(toolUseId: string, approved: boolean, feedback?: string): boolean {
+    traceClaude('lifecycle', 'answerPlanApproval', {
+      toolUseId,
+      approved,
+      hasFeedback: Boolean(feedback?.trim()),
+    });
     if (!this._pendingPlanApproval || this._pendingPlanApproval.toolUseId !== toolUseId) {
+      traceClaude('lifecycle', 'answerPlanApproval missed pending state', { toolUseId });
       return false;
     }
 
@@ -692,7 +736,7 @@ export class AgentSession {
 
   private async _startSession(firstMsg: Record<string, unknown>) {
     const query = await getQuery();
-    const safetyAppend = buildSafetyPrefix(this._workspacePath, this._excludedFolders);
+    const safetyAppend = buildClaudeSystemAppend(this._workspacePath, this._excludedFolders);
 
     const queryOptions: Record<string, unknown> = {
       cwd: this._workspacePath,
@@ -725,6 +769,12 @@ export class AgentSession {
       prompt: this._createMessageStream(firstMsg),
       options: queryOptions,
     }) as QueryHandle;
+    traceClaude('execution', 'session started', {
+      model: this._modelId ?? null,
+      settingSources: this._settingSources,
+      allowedTools: this._allowedTools,
+      workspacePath: this._workspacePath,
+    });
 
     // Start background consumer (runs for session lifetime)
     this._consumeLoop().catch(() => {});
@@ -747,15 +797,22 @@ export class AgentSession {
         }
 
         if (message.type === 'system' && message.subtype === 'init') {
+          traceClaude('sdk', 'system:init', {
+            model: message.model ?? null,
+            sessionId: message.session_id ?? null,
+          });
           this._model = message.model || null;
           this._emitProgress?.('init', `Starting Claude (${message.model || 'claude'})`);
           // Fetch supported models from the SDK session
           this._fetchSupportedModels();
         } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
+          traceClaude('sdk', 'system:status', { status: (message as any).status });
           this._emitProgress?.('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
         } else if (message.type === 'system' && message.subtype === 'compact_boundary') {
+          traceClaude('sdk', 'system:compact_boundary');
           this._emitProgress?.('compacted', 'Varasem vestlus on kokku võetud. Kui midagi olulist puudu, maini seda uuesti.');
         } else if (message.type === 'assistant') {
+          traceClaude('sdk', 'assistant message', summarizeAssistantMessage(message));
           processAssistantMessage(
             message,
             this._turnFilesModified,
@@ -765,8 +822,19 @@ export class AgentSession {
           );
           this._planModeActive = updatePlanModeState(message, this._planModeActive);
         } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
+          traceClaude('sdk', 'tool/system progress', {
+            type: message.type,
+            subtype: message.subtype,
+            toolName: message.tool_name ?? null,
+            status: message.status ?? null,
+          });
           processSystemMessage(message, this._emitProgress || (() => {}));
         } else if (message.type === 'result') {
+          traceClaude('sdk', 'result', {
+            subtype: message.subtype,
+            durationMs: message.duration_ms ?? null,
+            errors: message.errors ?? [],
+          });
           // Only resolve if this result matches the current turn
           // (after interrupt + new turn, stale results are ignored)
           if (this._consumerTurnId === this._turnId) {
@@ -803,6 +871,7 @@ export class AgentSession {
     } catch (error) {
       if (this._closed) return;
       const errorMessage = error instanceof Error ? error.message : String(error);
+      traceClaude('sdk', 'consumeLoop error', { error: errorMessage });
       const progressType = isContextOverflowError(errorMessage) ? 'context_overflow' : 'error';
       // Process died — resolve any pending turn
       this._emitProgress?.(progressType as AgentProgress['type'], errorMessage);
@@ -827,6 +896,10 @@ export class AgentSession {
     options: { signal: AbortSignal; toolUseID: string }
   ): Promise<{ behavior: 'allow'; updatedInput?: Record<string, unknown> } | { behavior: 'deny'; message: string; interrupt?: boolean }> {
     if (toolName === 'ExitPlanMode') {
+      traceClaude('tool', 'ExitPlanMode requested', {
+        toolUseId: options.toolUseID,
+        input,
+      });
       if (!this._emitPlanApproval) {
         return {
           behavior: 'deny',
@@ -844,6 +917,9 @@ export class AgentSession {
           };
 
           this._emitPlanApproval?.({ toolUseId: options.toolUseID });
+          traceClaude('tool', 'ExitPlanMode emitted approval request', {
+            toolUseId: options.toolUseID,
+          });
 
           options.signal.addEventListener('abort', () => {
             if (this._pendingPlanApproval?.toolUseId === options.toolUseID) {
@@ -854,6 +930,7 @@ export class AgentSession {
         });
 
         if (decision.approved) {
+          traceClaude('tool', 'ExitPlanMode approved', { toolUseId: options.toolUseID });
           this._planModeActive = false;
           return {
             behavior: 'allow',
@@ -866,6 +943,10 @@ export class AgentSession {
           message: decision.feedback?.trim() || 'Plan rejected by user.',
         };
       } catch (error) {
+        traceClaude('tool', 'ExitPlanMode failed', {
+          toolUseId: options.toolUseID,
+          error: error instanceof Error ? error.message : 'Plan approval failed',
+        });
         return {
           behavior: 'deny',
           message: error instanceof Error ? error.message : 'Plan approval failed',
@@ -879,6 +960,10 @@ export class AgentSession {
     }
 
     const question = normalizeAgentQuestion(input, options.toolUseID);
+    traceClaude('tool', 'AskUserQuestion requested', {
+      toolUseId: options.toolUseID,
+      questionCount: question?.questions.length ?? 0,
+    });
     if (!question) {
       return {
         behavior: 'deny',
@@ -903,6 +988,10 @@ export class AgentSession {
         };
 
         this._emitQuestion?.(question);
+        traceClaude('tool', 'AskUserQuestion emitted question', {
+          toolUseId: options.toolUseID,
+          questionHeaders: question.questions.map((item) => item.header),
+        });
 
         options.signal.addEventListener('abort', () => {
           if (this._pendingQuestion?.toolUseId === options.toolUseID) {
@@ -920,6 +1009,10 @@ export class AgentSession {
         },
       };
     } catch (error) {
+      traceClaude('tool', 'AskUserQuestion failed', {
+        toolUseId: options.toolUseID,
+        error: error instanceof Error ? error.message : 'AskUserQuestion failed',
+      });
       return {
         behavior: 'deny',
         message: error instanceof Error ? error.message : 'AskUserQuestion failed',
@@ -1043,6 +1136,18 @@ function processAssistantMessage(
       }
     }
   }
+}
+
+function summarizeAssistantMessage(message: SDKMessage): { blocks: Array<Record<string, unknown>> } {
+  const content = Array.isArray(message.message?.content) ? message.message?.content : [];
+  return {
+    blocks: content.map((block) => ({
+      type: block.type,
+      name: block.name,
+      id: block.id,
+      textPreview: typeof block.text === 'string' ? block.text.slice(0, 120) : undefined,
+    })),
+  };
 }
 
 function updatePlanModeState(message: SDKMessage, currentState: boolean): boolean {

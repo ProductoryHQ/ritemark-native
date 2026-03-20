@@ -1,4 +1,4 @@
-import type { CodexConversationTurn } from './types';
+import type { AgentConversationTurn, CodexConversationTurn } from './types';
 import { extractPlanDisplayText } from './planText';
 
 export interface ActiveApprovedPlan {
@@ -6,6 +6,7 @@ export interface ActiveApprovedPlan {
   planText: string;
   planSteps?: CodexConversationTurn['planSteps'];
   isRunning: boolean;
+  allCompleted?: boolean;
 }
 
 export function buildCodexApprovedPlanPrompt(originalPrompt: string, planText: string): string {
@@ -148,5 +149,29 @@ export function getActiveApprovedPlanForCodex(turns: CodexConversationTurn[]): A
       || '',
     planSteps: livePlanSource.planSteps || approvedTurn.planSteps,
     isRunning: Boolean(livePlanSource.isRunning),
+  };
+}
+
+export function getActiveApprovedPlanForClaude(turns: AgentConversationTurn[]): ActiveApprovedPlan | null {
+  const approvedTurn = [...turns].reverse().find((turn) =>
+    turn.isPlan
+    && turn.planHandled
+    && turn.planDecision === 'approved'
+    && Boolean(turn.planText?.trim())
+  );
+
+  if (!approvedTurn) {
+    return null;
+  }
+
+  const completedResultText = approvedTurn.result && !approvedTurn.result.error
+    ? approvedTurn.result.text.trim()
+    : '';
+
+  return {
+    key: approvedTurn.id,
+    planText: completedResultText || approvedTurn.planText || '',
+    isRunning: Boolean(approvedTurn.isRunning),
+    allCompleted: Boolean(completedResultText) && !approvedTurn.isRunning,
   };
 }
