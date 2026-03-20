@@ -974,6 +974,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           pendingCitations: [],
           agentConversation: [],
           codexConversation: [],
+          dismissedCurrentPlanKey: null,
         });
         break;
 

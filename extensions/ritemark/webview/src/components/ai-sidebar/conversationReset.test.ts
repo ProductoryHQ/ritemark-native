@@ -121,6 +121,27 @@ function testDismissedCurrentPlanKeyResetsForNewConversation() {
   }
 }
 
+function testDismissedCurrentPlanKeyResetsForClearChatMessage() {
+  try {
+    useAISidebarStore.setState({
+      ...useAISidebarStore.getState(),
+      dismissedCurrentPlanKey: 'plan-turn-1',
+      codexConversation: [makeCodexTurn()],
+      currentConversationId: 'conv-1',
+    });
+
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'clear-chat' });
+
+    assert.equal(
+      useAISidebarStore.getState().dismissedCurrentPlanKey,
+      null,
+      'extension-driven clear-chat must clear dismissed current plan state'
+    );
+  } finally {
+    resetStore();
+  }
+}
+
 function testDismissCurrentPlanStoresKey() {
   try {
     useAISidebarStore.setState({
@@ -144,6 +165,7 @@ function main() {
   testStartNewConversationResetsProviderSessions();
   testClearChatResetsProviderSessions();
   testDismissedCurrentPlanKeyResetsForNewConversation();
+  testDismissedCurrentPlanKeyResetsForClearChatMessage();
   testDismissCurrentPlanStoresKey();
   console.log('Conversation reset tests passed.');
 }
