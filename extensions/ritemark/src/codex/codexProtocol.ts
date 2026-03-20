@@ -174,6 +174,7 @@ export interface TurnStartParams {
   threadId: string;
   input: UserInput[];
   model?: string | null;
+  collaborationMode?: CollaborationMode | null;
 }
 
 export interface TurnStartResponse {
@@ -225,6 +226,36 @@ export interface ApplyPatchApprovalResponse {
   decision: ReviewDecision;
 }
 
+/** Server asks client to answer a request_user_input prompt */
+export interface ToolRequestUserInputOption {
+  label: string;
+  description: string;
+}
+
+export interface ToolRequestUserInputQuestion {
+  id: string;
+  header: string;
+  question: string;
+  isOther: boolean;
+  isSecret: boolean;
+  options: ToolRequestUserInputOption[] | null;
+}
+
+export interface ToolRequestUserInputParams {
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  questions: ToolRequestUserInputQuestion[];
+}
+
+export interface ToolRequestUserInputAnswer {
+  answers: string[];
+}
+
+export interface ToolRequestUserInputResponse {
+  answers: Record<string, ToolRequestUserInputAnswer>;
+}
+
 export type FileChange =
   | { type: 'add'; content: string }
   | { type: 'delete'; content: string }
@@ -238,6 +269,20 @@ export type FileChange =
 export interface TurnStartedNotification {
   threadId: string;
   turn: TurnInfo;
+  collaborationModeKind?: ModeKind;
+}
+
+export type ModeKind = 'plan' | 'default';
+
+export interface CollaborationModeSettings {
+  model: string;
+  reasoning_effort: string | null;
+  developer_instructions: string | null;
+}
+
+export interface CollaborationMode {
+  mode: ModeKind;
+  settings: CollaborationModeSettings;
 }
 
 /** turn/completed notification */
@@ -266,6 +311,29 @@ export interface ItemCompletedNotification {
   item: unknown;
   threadId: string;
   turnId: string;
+}
+
+export type TurnPlanStepStatus = 'pending' | 'inProgress' | 'completed';
+
+export interface TurnPlanStep {
+  step: string;
+  status: TurnPlanStepStatus;
+}
+
+/** turn/plan/updated notification */
+export interface TurnPlanUpdatedNotification {
+  threadId: string;
+  turnId: string;
+  explanation: string | null;
+  plan: TurnPlanStep[];
+}
+
+/** item/plan/delta notification */
+export interface PlanDeltaNotification {
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  delta: string;
 }
 
 /** account/updated notification */

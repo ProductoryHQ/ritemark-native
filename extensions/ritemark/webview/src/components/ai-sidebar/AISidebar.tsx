@@ -20,6 +20,8 @@ import { ChatInput } from './ChatInput';
 import { IndexFooter } from './IndexFooter';
 import { SelectionIndicator } from './SelectionIndicator';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
+import { ActivePlanBanner } from './ActivePlanBanner';
+import { getActiveApprovedPlanForCodex } from './lifecycle';
 import { markdownStyles } from './RenderedMarkdown';
 import type { ExtensionMessage } from './types';
 
@@ -30,6 +32,8 @@ export function AISidebar() {
   const ready = useAISidebarStore((s) => s.ready);
   const agenticEnabled = useAISidebarStore((s) => s.agenticEnabled);
   const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
+  const dismissCurrentPlan = useAISidebarStore((s) => s.dismissCurrentPlan);
+  const dismissedCurrentPlanKey = useAISidebarStore((s) => s.dismissedCurrentPlanKey);
 
   // Set up message listener + handshake
   useEffect(() => {
@@ -60,6 +64,11 @@ export function AISidebar() {
           codexConversation: savedState.codexConversation as typeof store.codexConversation,
         });
       }
+      if ('dismissedCurrentPlanKey' in savedState) {
+        useAISidebarStore.setState({
+          dismissedCurrentPlanKey: (savedState.dismissedCurrentPlanKey as string | null) ?? null,
+        });
+      }
     }
 
     // Tell extension we're ready
@@ -77,6 +86,7 @@ export function AISidebar() {
         agentConversation: state.agentConversation,
         codexConversation: state.codexConversation,
         currentConversationId: state.currentConversationId,
+        dismissedCurrentPlanKey: state.dismissedCurrentPlanKey,
       });
     });
   }, []);
@@ -87,6 +97,8 @@ export function AISidebar() {
   const showHistoryPanel = useAISidebarStore((s) => s.showHistoryPanel);
   const loadConversationList = useAISidebarStore((s) => s.loadConversationList);
   const chatFontSize = useAISidebarStore((s) => s.chatFontSize);
+  const agentConversation = useAISidebarStore((s) => s.agentConversation);
+  const codexConversation = useAISidebarStore((s) => s.codexConversation);
 
   // Initialize chat font size CSS variable
   useEffect(() => {
@@ -107,6 +119,28 @@ export function AISidebar() {
   const showWelcome = isClaudeCode && setupStatus !== null
     && setupStatus.state === 'ready' && !hasSeenWelcome;
   const showCodexSetup = isCodex && codexStatus.state !== 'ready';
+  const currentApprovedPlan = isClaudeCode
+    ? (() => {
+        const approvedTurn = [...agentConversation].reverse().find((turn) =>
+          turn.isPlan
+          && turn.planHandled
+          && turn.planDecision === 'approved'
+          && Boolean(turn.planText?.trim())
+        );
+        return approvedTurn
+          ? {
+              key: approvedTurn.id,
+              planText: approvedTurn.planText || '',
+              isRunning: approvedTurn.isRunning,
+            }
+          : null;
+      })()
+    : isCodex
+      ? getActiveApprovedPlanForCodex(codexConversation)
+      : null;
+  const visibleCurrentPlan = currentApprovedPlan && currentApprovedPlan.key !== dismissedCurrentPlanKey
+    ? currentApprovedPlan
+    : null;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)]">
@@ -148,6 +182,14 @@ export function AISidebar() {
           </div>
 
           {/* Shared input */}
+          {visibleCurrentPlan && (
+            <ActivePlanBanner
+              planText={visibleCurrentPlan.planText}
+              planSteps={'planSteps' in visibleCurrentPlan ? visibleCurrentPlan.planSteps : undefined}
+              isRunning={visibleCurrentPlan.isRunning}
+              onDismiss={() => dismissCurrentPlan(visibleCurrentPlan.key)}
+            />
+          )}
           <ChatInput />
         </>
       )}

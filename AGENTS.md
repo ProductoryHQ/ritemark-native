@@ -14,6 +14,16 @@ This file configures Codex behavior for `ritemark-native`. It is additive to the
 - For release work, also use the `release-process` skill and run `./scripts/release-preflight.sh` before version bumps, tags, or build/distribution steps.
 - Keep sprint documentation under `docs/development/sprints/` aligned with implementation when the task is part of an explicit sprint.
 
+### Hard Gates
+
+- Do not develop on `main`. `main` is not a development branch.
+- If the current branch is `main`, do not write implementation code until a dedicated feature branch exists for the sprint.
+- Do not start implementation work before there is an explicit sprint.
+- Use the `sprint-workflow` skill to create or update the sprint before writing code.
+- A sprint may require an audit or research pass before implementation starts. Do that first when the scope is unclear, cross-cutting, or recovery/debugging heavy.
+- Treat each sprint as one feature branch. Do not mix multiple sprint implementations on the same branch.
+- If no sprint exists yet, stop at sprint setup, audit, and planning. Do not proceed into code changes in the same step as if the sprint already existed.
+
 ### Skill Routing
 
 - Use `vscode-development` for VS Code OSS builds, extension activation/loading, patch application, upstream updates, Node/toolchain issues, and `scripts/code.sh` or production build problems.

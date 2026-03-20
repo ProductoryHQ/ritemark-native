@@ -11,10 +11,16 @@
  * Feature flag: 'codex-integration' (experimental)
  */
 
-export { CodexManager } from './codexManager';
+export {
+  CodexManager,
+  type CodexBinaryStatus,
+  type CodexCapabilityFlags,
+  type CodexCompatibilityStatus,
+} from './codexManager';
 export { CodexAppServer } from './codexAppServer';
 export { CodexAuth } from './codexAuth';
 export { getCodexModels } from './codexModels';
+export { traceCodex, showCodexTrace } from './codexTrace';
 export {
   emitCodexStatusInvalidated,
   onCodexStatusInvalidated,

@@ -13,6 +13,9 @@
 
 import type {
   AgentExecutionOptions,
+  AgentPlanApprovalRequest,
+  AgentQuestion,
+  AgentSettingSource,
   AgentSessionConfig,
   AgentTurnOptions,
   AgentProgress,
@@ -116,7 +119,8 @@ function isContextOverflowError(str: string): boolean {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'];
+const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'AskUserQuestion'];
+export const DEFAULT_SETTING_SOURCES: AgentSettingSource[] = ['user', 'project', 'local'];
 const DEFAULT_TIMEOUT_MINUTES = 15;
 
 const DEFAULT_EXCLUDED_FOLDERS = [
@@ -144,6 +148,60 @@ ${exclusions}
 If a user asks you to operate on these paths, explain that they are excluded for safety.\n\n`;
 }
 
+function normalizeAgentQuestion(input: Record<string, unknown>, toolUseId: string): AgentQuestion | null {
+  const rawQuestions = input.questions;
+  if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+    return null;
+  }
+
+  const questions = rawQuestions.flatMap((rawQuestion) => {
+    if (!rawQuestion || typeof rawQuestion !== 'object') {
+      return [];
+    }
+
+    const question = typeof rawQuestion.question === 'string' ? rawQuestion.question.trim() : '';
+    const header = typeof rawQuestion.header === 'string' ? rawQuestion.header.trim() : '';
+    const rawOptions = Array.isArray(rawQuestion.options) ? rawQuestion.options : [];
+    const options = rawOptions.flatMap((rawOption: unknown) => {
+      if (!rawOption || typeof rawOption !== 'object') {
+        return [];
+      }
+      const option = rawOption as { label?: unknown; description?: unknown };
+      const label = typeof option.label === 'string' ? option.label.trim() : '';
+      if (!label) {
+        return [];
+      }
+      return [{
+        label,
+        description: typeof option.description === 'string' ? option.description.trim() : '',
+      }];
+    });
+
+    if (!question || !header || options.length < 2) {
+      return [];
+    }
+
+    return [{
+      header,
+      question,
+      options,
+      multiSelect: rawQuestion.multiSelect === true,
+    }];
+  });
+
+  if (questions.length === 0) {
+    return null;
+  }
+
+  return { toolUseId, questions };
+}
+
+function resolveSettingSources(settingSources?: AgentSettingSource[]): AgentSettingSource[] {
+  return settingSources && settingSources.length > 0
+    ? settingSources
+    : DEFAULT_SETTING_SOURCES;
+}
+
 // ── One-shot execution (for Flows) ──────────────────────────────────
 
 /**
@@ -156,6 +214,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     workspacePath,
     attachments,
     allowedTools = DEFAULT_TOOLS,
+    settingSources,
     excludedFolders = DEFAULT_EXCLUDED_FOLDERS,
     timeoutMinutes = DEFAULT_TIMEOUT_MINUTES,
     abortSignal,
@@ -226,10 +285,19 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       options: {
         cwd: workspacePath,
         ...(pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable } : {}),
-        settingSources: ['project'],
+        settingSources: resolveSettingSources(settingSources),
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         allowedTools,
+        canUseTool: async (toolName: string) => {
+          if (toolName === 'AskUserQuestion') {
+            return {
+              behavior: 'deny',
+              message: 'AskUserQuestion is not available during flow execution.',
+            };
+          }
+          return { behavior: 'allow' };
+        },
         abortController,
       },
     });
@@ -331,13 +399,27 @@ export class AgentSession {
   private _turnResolve: ((result: AgentResult) => void) | null = null;
   private _turnFilesModified: string[] = [];
   private _emitProgress: ExtendedProgressEmitter | null = null;
+  private _emitQuestion: ((question: AgentQuestion) => void) | null = null;
+  private _emitPlanApproval: ((request: AgentPlanApprovalRequest) => void) | null = null;
   private _turnTimeout: ReturnType<typeof setTimeout> | null = null;
   private _turnTimeoutMs = 0;  // Stored so we can reset on activity
+  private _planModeActive = false;
+  private _pendingQuestion: {
+    toolUseId: string;
+    resolve: (answers: Record<string, string>) => void;
+    reject: (error: Error) => void;
+  } | null = null;
+  private _pendingPlanApproval: {
+    toolUseId: string;
+    resolve: (decision: { approved: boolean; feedback?: string }) => void;
+    reject: (error: Error) => void;
+  } | null = null;
 
   // Config
   private readonly _workspacePath: string;
   private readonly _excludedFolders: string[];
   private readonly _allowedTools: string[];
+  private readonly _settingSources: AgentSettingSource[];
   private readonly _modelId: string | undefined;
   private readonly _anthropicApiKey: string | undefined;
   private readonly _pathToClaudeCodeExecutable: string | undefined;
@@ -349,6 +431,7 @@ export class AgentSession {
     this._workspacePath = config.workspacePath;
     this._excludedFolders = config.excludedFolders || DEFAULT_EXCLUDED_FOLDERS;
     this._allowedTools = config.allowedTools || DEFAULT_TOOLS;
+    this._settingSources = resolveSettingSources(config.settingSources);
     this._modelId = config.model;
     this._anthropicApiKey = config.anthropicApiKey;
     this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
@@ -363,7 +446,7 @@ export class AgentSession {
    * subsequent calls feed into the existing warm process (~2-3s).
    */
   async sendMessage(options: AgentTurnOptions): Promise<AgentResult> {
-    const { prompt, attachments, activeFile, timeoutMinutes = DEFAULT_TIMEOUT_MINUTES, onProgress } = options;
+    const { prompt, attachments, activeFile, timeoutMinutes = DEFAULT_TIMEOUT_MINUTES, onProgress, onQuestion, onPlanApproval } = options;
 
     if (!prompt || prompt.trim() === '') {
       throw new Error('Agent prompt is empty');
@@ -397,6 +480,9 @@ export class AgentSession {
 
     // Set per-turn state BEFORE starting/enqueueing
     this._turnFilesModified = [];
+    this._planModeActive = false;
+    this._clearPendingQuestion();
+    this._clearPendingPlanApproval();
     this._emitProgress = (type, message, tool?, file?, subagentInfo?) => {
       onProgress?.({
         type,
@@ -409,6 +495,8 @@ export class AgentSession {
         parentToolUseId: subagentInfo?.parentToolUseId,
       });
     };
+    this._emitQuestion = onQuestion || null;
+    this._emitPlanApproval = onPlanApproval || null;
 
     const resultPromise = new Promise<AgentResult>((resolve) => {
       this._turnResolve = resolve;
@@ -438,6 +526,8 @@ export class AgentSession {
   interrupt(): void {
     const turnId = this._turnId;
     this._queryStream?.interrupt().catch(() => {});
+    this._clearPendingQuestion('Execution cancelled');
+    this._clearPendingPlanApproval('Execution cancelled');
     this._forceResolveTurn(turnId, {
       text: '',
       filesModified: [],
@@ -454,6 +544,8 @@ export class AgentSession {
     try { this._queryStream?.close(); } catch {}
     this._queryStream = null;
     this._model = null;
+    this._clearPendingQuestion('Session closed');
+    this._clearPendingPlanApproval('Session closed');
     this._forceResolveTurn(this._turnId, {
       text: '',
       filesModified: [],
@@ -523,13 +615,38 @@ export class AgentSession {
       const resolve = this._turnResolve;
       this._turnResolve = null;
       this._emitProgress = null;
+      this._emitQuestion = null;
+      this._emitPlanApproval = null;
       this._turnFilesModified = [];
+      this._planModeActive = false;
       if (this._turnTimeout) {
         clearTimeout(this._turnTimeout);
         this._turnTimeout = null;
       }
       resolve(result);
     }
+  }
+
+  answerQuestion(toolUseId: string, answers: Record<string, string>): boolean {
+    if (!this._pendingQuestion || this._pendingQuestion.toolUseId !== toolUseId) {
+      return false;
+    }
+
+    const { resolve } = this._pendingQuestion;
+    this._pendingQuestion = null;
+    resolve(answers);
+    return true;
+  }
+
+  answerPlanApproval(toolUseId: string, approved: boolean, feedback?: string): boolean {
+    if (!this._pendingPlanApproval || this._pendingPlanApproval.toolUseId !== toolUseId) {
+      return false;
+    }
+
+    const { resolve } = this._pendingPlanApproval;
+    this._pendingPlanApproval = null;
+    resolve({ approved, feedback });
+    return true;
   }
 
   // ── Input channel ───────────────────────────────────────────────────
@@ -585,10 +702,11 @@ export class AgentSession {
         preset: 'claude_code',
         append: safetyAppend,
       },
-      settingSources: ['project'],
+      settingSources: this._settingSources,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       allowedTools: this._allowedTools,
+      canUseTool: this._handleCanUseTool.bind(this),
     };
 
     if (this._modelId) {
@@ -642,8 +760,10 @@ export class AgentSession {
             message,
             this._turnFilesModified,
             this._emitProgress || (() => {}),
-            message.parent_tool_use_id
+            message.parent_tool_use_id,
+            this._planModeActive
           );
+          this._planModeActive = updatePlanModeState(message, this._planModeActive);
         } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
           processSystemMessage(message, this._emitProgress || (() => {}));
         } else if (message.type === 'result') {
@@ -700,6 +820,133 @@ export class AgentSession {
       }
     }
   }
+
+  private async _handleCanUseTool(
+    toolName: string,
+    input: Record<string, unknown>,
+    options: { signal: AbortSignal; toolUseID: string }
+  ): Promise<{ behavior: 'allow'; updatedInput?: Record<string, unknown> } | { behavior: 'deny'; message: string; interrupt?: boolean }> {
+    if (toolName === 'ExitPlanMode') {
+      if (!this._emitPlanApproval) {
+        return {
+          behavior: 'deny',
+          message: 'Plan approval UI is unavailable for this session.',
+          interrupt: true,
+        };
+      }
+
+      try {
+        const decision = await new Promise<{ approved: boolean; feedback?: string }>((resolve, reject) => {
+          this._pendingPlanApproval = {
+            toolUseId: options.toolUseID,
+            resolve,
+            reject,
+          };
+
+          this._emitPlanApproval?.({ toolUseId: options.toolUseID });
+
+          options.signal.addEventListener('abort', () => {
+            if (this._pendingPlanApproval?.toolUseId === options.toolUseID) {
+              this._pendingPlanApproval = null;
+            }
+            reject(new Error('Plan approval cancelled'));
+          }, { once: true });
+        });
+
+        if (decision.approved) {
+          this._planModeActive = false;
+          return {
+            behavior: 'allow',
+            updatedInput: input,
+          };
+        }
+
+        return {
+          behavior: 'deny',
+          message: decision.feedback?.trim() || 'Plan rejected by user.',
+        };
+      } catch (error) {
+        return {
+          behavior: 'deny',
+          message: error instanceof Error ? error.message : 'Plan approval failed',
+          interrupt: true,
+        };
+      }
+    }
+
+    if (toolName !== 'AskUserQuestion') {
+      return { behavior: 'allow' };
+    }
+
+    const question = normalizeAgentQuestion(input, options.toolUseID);
+    if (!question) {
+      return {
+        behavior: 'deny',
+        message: 'AskUserQuestion payload was invalid.',
+      };
+    }
+
+    if (!this._emitQuestion) {
+      return {
+        behavior: 'deny',
+        message: 'Question UI is unavailable for this session.',
+        interrupt: true,
+      };
+    }
+
+    try {
+      const answers = await new Promise<Record<string, string>>((resolve, reject) => {
+        this._pendingQuestion = {
+          toolUseId: options.toolUseID,
+          resolve,
+          reject,
+        };
+
+        this._emitQuestion?.(question);
+
+        options.signal.addEventListener('abort', () => {
+          if (this._pendingQuestion?.toolUseId === options.toolUseID) {
+            this._pendingQuestion = null;
+          }
+          reject(new Error('AskUserQuestion cancelled'));
+        }, { once: true });
+      });
+
+      return {
+        behavior: 'allow',
+        updatedInput: {
+          ...input,
+          answers,
+        },
+      };
+    } catch (error) {
+      return {
+        behavior: 'deny',
+        message: error instanceof Error ? error.message : 'AskUserQuestion failed',
+        interrupt: true,
+      };
+    }
+  }
+
+  private _clearPendingQuestion(message = 'Question cancelled') {
+    if (!this._pendingQuestion) {
+      return;
+    }
+
+    const { reject } = this._pendingQuestion;
+    this._pendingQuestion = null;
+    reject(new Error(message));
+  }
+
+  private _clearPendingPlanApproval(message = 'Plan approval cancelled') {
+    if (!this._pendingPlanApproval) {
+      return;
+    }
+
+    const { reject } = this._pendingPlanApproval;
+    this._pendingPlanApproval = null;
+    reject(new Error(message));
+  }
 }
 
 // ── Shared helpers ──────────────────────────────────────────────────
@@ -722,15 +969,20 @@ function processAssistantMessage(
   message: SDKMessage,
   filesModified: string[],
   emitProgress: ExtendedProgressEmitter,
-  parentToolUseId?: string | null
+  parentToolUseId?: string | null,
+  planModeActive = false
 ) {
   const content = message.message?.content;
   if (!Array.isArray(content)) return;
 
   for (const block of content) {
     if (block.type === 'text' && block.text) {
-      const snippet = block.text.substring(0, 150);
-      emitProgress('thinking', snippet.length < block.text.length ? snippet + '...' : snippet);
+      if (planModeActive && !parentToolUseId) {
+        emitProgress('plan_text', block.text);
+      } else {
+        const snippet = block.text.substring(0, 150);
+        emitProgress('thinking', snippet.length < block.text.length ? snippet + '...' : snippet);
+      }
     } else if (block.type === 'tool_use') {
       const input = block.input as {
         file_path?: string;
@@ -791,6 +1043,26 @@ function processAssistantMessage(
       }
     }
   }
+}
+
+function updatePlanModeState(message: SDKMessage, currentState: boolean): boolean {
+  const content = message.message?.content;
+  if (!Array.isArray(content)) {
+    return currentState;
+  }
+
+  let nextState = currentState;
+  for (const block of content) {
+    if (block.type !== 'tool_use') {
+      continue;
+    }
+
+    if (block.name === 'EnterPlanMode') {
+      nextState = true;
+    }
+  }
+
+  return nextState;
 }
 
 /**

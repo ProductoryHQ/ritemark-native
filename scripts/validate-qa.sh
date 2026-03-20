@@ -28,4 +28,15 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/flows/|e
   )
 fi
 
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/agent/|extensions/ritemark/src/codex/|extensions/ritemark/src/views/UnifiedViewProvider\.ts|extensions/ritemark/webview/src/components/ai-sidebar/)'; then
+  echo "Agent lifecycle changes detected; running targeted lifecycle tests..."
+  (
+    cd "$PROJECT_ROOT/extensions/ritemark"
+    npx tsx src/agent/AgentRunner.test.ts
+    npx tsx src/codex/codexApproval.test.ts
+    npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts
+    npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts
+  )
+fi
+
 echo "Codex QA validation passed"

@@ -17,6 +17,7 @@ import {
   setWorkspaceContext,
   type SavedConversation,
 } from './chatHistoryStorage';
+import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult, shouldRequestPlanMode } from './lifecycle';
 import type {
   AgentId,
   AgentInfo,
@@ -27,8 +28,11 @@ import type {
   RAGCitation,
   WidgetData,
   AgentConversationTurn,
+  AgentPlanApprovalRequest,
+  AgentQuestion,
   CodexConversationTurn,
   CodexSidebarStatus,
+  CodexQuestion,
   FileAttachment,
   DiscoveredAgent,
   DiscoveredCommand,
@@ -46,6 +50,10 @@ function nextId(): string {
   return `msg-${++msgCounter}-${Date.now()}`;
 }
 
+function resetProviderSessions(): void {
+  vscode.postMessage({ type: 'conversation:reset' });
+}
+
 const DEFAULT_CODEX_STATUS: CodexSidebarStatus = {
   enabled: false,
   state: 'disabled',
@@ -57,6 +65,7 @@ const DEFAULT_CODEX_STATUS: CodexSidebarStatus = {
   diagnostics: [],
   repairCommand: null,
   binaryPath: null,
+  compatibility: null,
 };
 
 // ── Context window estimation ─────────────────────────────────────────
@@ -67,6 +76,22 @@ const DEFAULT_CODEX_STATUS: CodexSidebarStatus = {
 
 function computeContextState(_turns: AgentConversationTurn[]) {
   return { estimatedTokens: 0, contextUsagePercent: 0, showContextWarning: false };
+}
+
+function getCodexCompatibilityNoticeKey(status: CodexSidebarStatus): string | null {
+  const compatibility = status.compatibility;
+  if (status.state !== 'ready' || !compatibility || compatibility.state === 'compatible') {
+    return null;
+  }
+
+  const caps = compatibility.capabilities;
+  return [
+    status.version ?? 'unknown',
+    compatibility.state,
+    caps.approvals ? 'approvals' : 'no-approvals',
+    caps.requestUserInput ? 'question' : 'no-question',
+    caps.planUpdates ? 'plan' : 'no-plan',
+  ].join(':');
 }
 
 interface AISidebarState {
@@ -102,6 +127,8 @@ interface AISidebarState {
   codexSelectedModel: string;
   codexStatus: CodexSidebarStatus;
   codexConversation: CodexConversationTurn[];
+  dismissedCodexNoticeKey: string | null;
+  dismissedCurrentPlanKey: string | null;
 
   // ── Chat history state ──
   currentConversationId: string | null;
@@ -152,14 +179,20 @@ interface AISidebarState {
   recheckSetup: () => void;
   approvePlan: (turnId: string) => void;
   rejectPlan: (turnId: string, feedback?: string) => void;
+  answerAgentQuestion: (turnId: string, question: AgentQuestion, answers: Record<string, string>) => void;
   dismissWelcome: () => void;
   sendCodexMessage: (prompt: string, attachments?: FileAttachment[]) => void;
   selectCodexModel: (modelId: string) => void;
   handleCodexApproval: (requestId: string | number, approved: boolean) => void;
+  answerCodexQuestion: (turnId: string, question: CodexQuestion, answers: Record<string, string>) => void;
+  approveCodexPlan: (turnId: string) => void;
+  discardCodexPlan: (turnId: string) => void;
   startCodexLogin: () => void;
   logoutCodex: () => void;
   refreshCodexStatus: () => void;
   repairCodex: () => void;
+  dismissCodexNotice: (key: string) => void;
+  dismissCurrentPlan: (key: string) => void;
   reloadWindow: () => void;
   openAgentSettings: () => void;
 
@@ -203,6 +236,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   codexSelectedModel: 'gpt-5.3-codex',
   codexStatus: DEFAULT_CODEX_STATUS,
   codexConversation: [],
+  dismissedCodexNoticeKey: null,
+  dismissedCurrentPlanKey: null,
 
   currentConversationId: null,
   savedConversations: [],
@@ -279,6 +314,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       isRunning: true,
       isPlan: false,
       planHandled: false,
+      planDecision: undefined,
+      planText: '',
+      pendingQuestion: undefined,
+      pendingPlanApproval: undefined,
       timestamp: Date.now(),
     };
 
@@ -390,55 +429,68 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   approvePlan: (turnId) => {
     const state = get();
+    const targetTurn = state.agentConversation.find((t) => t.id === turnId);
+    if (!targetTurn?.pendingPlanApproval) {
+      return;
+    }
+
     const conv = state.agentConversation.map((t) =>
-      t.id === turnId ? { ...t, planHandled: true } : t
+      t.id === turnId
+        ? {
+            ...t,
+            planHandled: true,
+            planDecision: 'approved' as const,
+            pendingPlanApproval: undefined,
+          }
+        : t
     );
     set({ agentConversation: conv });
-
-    // Send approval as a follow-up message to the agent
     vscode.postMessage({
-      type: 'ai-execute-agent',
-      prompt: 'Plan approved. Proceed with implementation.',
+      type: 'agent-answer-plan',
+      toolUseId: targetTurn.pendingPlanApproval.toolUseId,
+      approved: true,
     });
-
-    // Add a new running turn for the implementation
-    const implTurn: AgentConversationTurn = {
-      id: nextId(),
-      userPrompt: 'Plan approved. Proceed with implementation.',
-      activities: [],
-      isRunning: true,
-      isPlan: false,
-      planHandled: false,
-      timestamp: Date.now(),
-    };
-    set({ agentConversation: [...conv, implTurn] });
   },
 
   rejectPlan: (turnId, feedback?) => {
     const state = get();
+    const targetTurn = state.agentConversation.find((t) => t.id === turnId);
+    if (!targetTurn?.pendingPlanApproval) {
+      return;
+    }
+
     const conv = state.agentConversation.map((t) =>
-      t.id === turnId ? { ...t, planHandled: true } : t
+      t.id === turnId
+        ? {
+            ...t,
+            planHandled: true,
+            planDecision: 'rejected' as const,
+            pendingPlanApproval: undefined,
+          }
+        : t
     );
     set({ agentConversation: conv });
+    vscode.postMessage({
+      type: 'agent-answer-plan',
+      toolUseId: targetTurn.pendingPlanApproval.toolUseId,
+      approved: false,
+      feedback,
+    });
+  },
 
-    if (feedback) {
-      const rejectPrompt = `Plan rejected. ${feedback}`;
-      vscode.postMessage({
-        type: 'ai-execute-agent',
-        prompt: rejectPrompt,
-      });
-
-      const retryTurn: AgentConversationTurn = {
-        id: nextId(),
-        userPrompt: rejectPrompt,
-        activities: [],
-        isRunning: true,
-        isPlan: false,
-        planHandled: false,
-        timestamp: Date.now(),
-      };
-      set({ agentConversation: [...conv, retryTurn] });
-    }
+  answerAgentQuestion: (turnId, question, answers) => {
+    const state = get();
+    const conv = state.agentConversation.map((turn) =>
+      turn.id === turnId
+        ? { ...turn, pendingQuestion: undefined }
+        : turn
+    );
+    set({ agentConversation: conv });
+    vscode.postMessage({
+      type: 'agent-answer-question',
+      toolUseId: question.toolUseId,
+      answers,
+    });
   },
 
   dismissWelcome: () => {
@@ -454,10 +506,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const turn: CodexConversationTurn = {
       id: nextId(),
       userPrompt: prompt,
+      requestedPlanMode: shouldRequestPlanMode(prompt),
       activeFilePath: state.activeFilePath || undefined,
       attachments,
       streamingText: '',
       activities: [],
+      pendingQuestion: undefined,
+      executionContinuation: false,
+      requiresPlanReview: false,
+      planText: '',
+      planExplanation: undefined,
+      planSteps: [],
+      planHandled: false,
+      planDecision: undefined,
       isRunning: true,
       timestamp: Date.now(),
     };
@@ -485,6 +546,52 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'codex-approve', requestId, approved });
   },
 
+  answerCodexQuestion: (turnId, question, answers) => {
+    const state = get();
+    const answerMap = Object.fromEntries(
+      question.questions.map((item) => {
+        const value = answers[item.question] ?? '';
+        const normalizedAnswers = value
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+        return [item.id, { answers: normalizedAnswers }];
+      })
+    );
+    const conv = state.codexConversation.map((turn) =>
+      turn.id === turnId
+        ? { ...turn, pendingQuestion: undefined }
+        : turn
+    );
+    set({ codexConversation: conv });
+    vscode.postMessage({ type: 'codex-answer-question', requestId: question.requestId, answers: answerMap });
+  },
+
+  approveCodexPlan: (turnId) => {
+    const state = get();
+    const { conversation, prompt } = applyCodexPlanApproval(state.codexConversation, turnId, nextId);
+    if (!prompt) {
+      return;
+    }
+    set({ codexConversation: conversation });
+    vscode.postMessage({
+      type: 'codex-execute',
+      prompt,
+      model: state.codexSelectedModel,
+      mode: 'execute',
+    });
+  },
+
+  discardCodexPlan: (turnId) => {
+    const state = get();
+    const conv = state.codexConversation.map((turn) =>
+      turn.id === turnId
+        ? { ...turn, planHandled: true, planDecision: 'rejected' as const }
+        : turn
+    );
+    set({ codexConversation: conv });
+  },
+
   startCodexLogin: () => {
     const status = get().codexStatus;
     set({
@@ -507,6 +614,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   repairCodex: () => {
     vscode.postMessage({ type: 'codex:repair' });
+  },
+
+  dismissCodexNotice: (key) => {
+    set({ dismissedCodexNoticeKey: key });
+  },
+
+  dismissCurrentPlan: (key) => {
+    set({ dismissedCurrentPlanKey: key });
   },
 
   reloadWindow: () => {
@@ -561,6 +676,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const data = loadConversation(id);
     if (!data) return;
 
+    resetProviderSessions();
+
     // Handle legacy saves: Codex conversations were stored in agentConversation
     // before the codexConversation field was added
     let agentConv = data.agentConversation || [];
@@ -576,6 +693,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       selectedAgent: data.agentId,
       agentConversation: agentConv,
       codexConversation: codexConv,
+      dismissedCurrentPlanKey: null,
       chatMessages: data.chatMessages || [],
       conversationHistory: data.conversationHistory || [],
       showHistoryPanel: false,
@@ -598,6 +716,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         conversationHistory: [],
         agentConversation: [],
         codexConversation: [],
+        dismissedCurrentPlanKey: null,
       });
     }
 
@@ -617,6 +736,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       get().saveCurrentConversation();
     }
 
+    resetProviderSessions();
+
     // Clear and start fresh
     set({
       currentConversationId: null,
@@ -627,6 +748,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       pendingCitations: [],
       agentConversation: [],
       codexConversation: [],
+      dismissedCurrentPlanKey: null,
       showHistoryPanel: false,
       estimatedTokens: 0,
       contextUsagePercent: 0,
@@ -644,6 +766,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   },
 
   clearChat: () => {
+    resetProviderSessions();
     set({
       chatMessages: [],
       conversationHistory: [],
@@ -652,6 +775,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       pendingCitations: [],
       agentConversation: [],
       codexConversation: [],
+      dismissedCurrentPlanKey: null,
       estimatedTokens: 0,
       contextUsagePercent: 0,
       showContextWarning: false,
@@ -688,6 +812,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         const selectedModel = newClaudeModels.some((m: { id: string }) => m.id === currentClaude)
           ? currentClaude
           : (newClaudeModels[0]?.id || currentClaude);
+        const incomingCodexStatus = message.codexStatus ?? get().codexStatus;
         set({
           agenticEnabled: message.agenticEnabled,
           codexEnabled: message.codexEnabled ?? false,
@@ -697,7 +822,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           models: newClaudeModels,
           codexModels: newCodexModels,
           codexSelectedModel,
-          codexStatus: message.codexStatus ?? get().codexStatus,
+          codexStatus: incomingCodexStatus,
+          dismissedCodexNoticeKey: getCodexCompatibilityNoticeKey(incomingCodexStatus)
+            ? get().dismissedCodexNoticeKey
+            : null,
           setupStatus: message.setupStatus ?? get().setupStatus,
           environmentStatus: message.environmentStatus ?? get().environmentStatus,
           hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
@@ -710,6 +838,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         const updates: Partial<AISidebarState> = {
           codexStatus: message.status,
         };
+
+        if (!getCodexCompatibilityNoticeKey(message.status)) {
+          updates.dismissedCodexNoticeKey = null;
+        }
 
         if (message.status.state !== 'ready') {
           const conv = [...state.codexConversation];
@@ -883,6 +1015,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         if (lastTurn?.isRunning) {
           const progress = message.progress as AgentProgress;
 
+          if (progress.type === 'plan_text') {
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              planText: `${lastTurn.planText || ''}${lastTurn.planText ? '\n\n' : ''}${progress.message}`,
+            };
+            set({ agentConversation: conv });
+            break;
+          }
+
           // Handle subagent events specially
           if (progress.type === 'subagent_start' && progress.subagentId) {
             // Create a new subagent entry
@@ -935,6 +1076,36 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
       }
 
+      case 'agent-question': {
+        const conv = [...state.agentConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = {
+            ...lastTurn,
+            pendingQuestion: message.question,
+          };
+          set({ agentConversation: conv });
+        }
+        break;
+      }
+
+      case 'agent-plan-approval': {
+        const conv = [...state.agentConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          const pendingPlanApproval: AgentPlanApprovalRequest = message.request;
+          conv[conv.length - 1] = {
+            ...lastTurn,
+            isPlan: true,
+            planHandled: false,
+            planDecision: undefined,
+            pendingPlanApproval,
+          };
+          set({ agentConversation: conv });
+        }
+        break;
+      }
+
       case 'agent-result': {
         const conv = [...state.agentConversation];
         const lastTurn = conv[conv.length - 1];
@@ -945,6 +1116,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
             ...lastTurn,
             isRunning: false,
             isPlan: hasPlanActivity,
+            pendingQuestion: undefined,
+            pendingPlanApproval: undefined,
             result: {
               text: message.text || '',
               filesModified: message.filesModified || [],
@@ -1006,15 +1179,61 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
       }
 
+      case 'codex-question': {
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = {
+            ...lastTurn,
+            pendingQuestion: {
+              requestId: message.requestId,
+              questions: message.questions,
+            },
+            requiresPlanReview: false,
+            planHandled: false,
+            planDecision: undefined,
+          };
+          set({ codexConversation: conv });
+        }
+        break;
+      }
+
+      case 'codex-plan-text-delta': {
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = {
+            ...lastTurn,
+            planText: `${lastTurn.planText || ''}${message.delta}`,
+            planHandled: false,
+            planDecision: undefined,
+          };
+          set({ codexConversation: conv });
+        }
+        break;
+      }
+
+      case 'codex-plan-update': {
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = applyCodexPlanUpdate(lastTurn, {
+            explanation: message.explanation,
+            plan: message.plan,
+          });
+          set({ codexConversation: conv });
+        }
+        break;
+      }
+
       case 'codex-result': {
         const conv = [...state.codexConversation];
         const lastTurn = conv[conv.length - 1];
         if (lastTurn) {
-          conv[conv.length - 1] = {
-            ...lastTurn,
-            isRunning: false,
-            result: { status: message.status || 'success', error: message.error },
-          };
+          conv[conv.length - 1] = finalizeCodexTurnResult(lastTurn, {
+            status: message.status,
+            error: message.error,
+          });
           set({ codexConversation: conv });
           setTimeout(() => get().saveCurrentConversation(), 100);
         }
