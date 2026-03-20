@@ -11,6 +11,7 @@ import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
 import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
+import { extractPlanDisplayText } from './planText';
 import type { AgentConversationTurn } from './types';
 
 const OVERFLOW_PATTERNS = [
@@ -85,15 +86,16 @@ export function AgentResponse({ turn }: AgentResponseProps) {
     );
   }
 
-  const needsApproval = turn.isPlan && !turn.planHandled;
+  const needsApproval = turn.isPlan && !turn.planHandled && !turn.pendingPlanApproval;
 
   // Extract plan content from thinking activities (plan text arrives as 'thinking' type)
   const planText = needsApproval
-    ? activities
+    ? (turn.planText || activities
         .filter(a => a.type === 'thinking' && a.message)
         .map(a => a.message)
-        .join('\n\n')
+        .join('\n\n'))
     : '';
+  const displayPlanText = extractPlanDisplayText(planText);
 
   // Success result
   return (
@@ -103,11 +105,11 @@ export function AgentResponse({ turn }: AgentResponseProps) {
       )}
 
       {/* Plan preview card */}
-      {needsApproval && planText && (
+      {needsApproval && displayPlanText && (
         <div className="mt-2 px-3 py-2 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)] max-h-[300px] overflow-y-auto">
           <div className="text-[10px] font-medium text-[var(--vscode-descriptionForeground)] uppercase tracking-wide mb-1.5">Plan</div>
           <div className="text-[12px]">
-            <RenderedMarkdown content={planText} />
+            <RenderedMarkdown content={displayPlanText} />
           </div>
         </div>
       )}
@@ -158,7 +160,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
       {/* Approved/rejected label */}
       {turn.isPlan && turn.planHandled && (
         <div className="mt-2 text-[10px] text-[var(--vscode-descriptionForeground)] italic">
-          Plan approved
+          {turn.planDecision === 'rejected' ? 'Plan sent back for revision' : 'Plan approved'}
         </div>
       )}
 

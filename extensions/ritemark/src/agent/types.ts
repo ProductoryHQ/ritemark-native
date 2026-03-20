@@ -9,6 +9,7 @@
  * Available agent identifiers
  */
 export type AgentId = 'ritemark-agent' | 'claude-code' | 'codex';
+export type AgentSettingSource = 'user' | 'project' | 'local';
 
 /**
  * Agent metadata for the selector dropdown
@@ -75,7 +76,7 @@ export const CODEX_MODELS: ModelOption[] = [
 /**
  * Progress event types from agent execution
  */
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
 
 /**
  * Progress event emitted during agent execution
@@ -92,6 +93,27 @@ export interface AgentProgress {
   subagentTask?: string;
   /** For subagent events, the parent tool_use_id for correlation */
   parentToolUseId?: string;
+}
+
+export interface AgentQuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface AgentQuestionItem {
+  header: string;
+  question: string;
+  options: AgentQuestionOption[];
+  multiSelect: boolean;
+}
+
+export interface AgentQuestion {
+  toolUseId: string;
+  questions: AgentQuestionItem[];
+}
+
+export interface AgentPlanApprovalRequest {
+  toolUseId: string;
 }
 
 /**
@@ -201,6 +223,7 @@ export interface AgentExecutionOptions {
   workspacePath: string;
   attachments?: FileAttachment[];
   allowedTools?: string[];
+  settingSources?: AgentSettingSource[];
   excludedFolders?: string[];
   timeoutMinutes?: number;
   abortSignal?: AbortSignal;
@@ -215,6 +238,7 @@ export interface AgentSessionConfig {
   workspacePath: string;
   excludedFolders?: string[];
   allowedTools?: string[];
+  settingSources?: AgentSettingSource[];
   model?: string;
   anthropicApiKey?: string;
   pathToClaudeCodeExecutable?: string;
@@ -237,6 +261,8 @@ export interface AgentTurnOptions {
   activeFile?: ActiveFileContext;
   timeoutMinutes?: number;
   onProgress?: (progress: AgentProgress) => void;
+  onQuestion?: (question: AgentQuestion) => void;
+  onPlanApproval?: (request: AgentPlanApprovalRequest) => void;
 }
 
 /**

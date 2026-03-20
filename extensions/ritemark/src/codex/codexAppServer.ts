@@ -26,12 +26,15 @@ import type {
   TurnStartParams,
   TurnStartResponse,
   TurnInterruptParams,
+  CollaborationMode,
   LoginAccountChatGptParams,
   LoginAccountChatGptResponse,
   LogoutAccountResponse,
   UserInput,
   ExecCommandApprovalResponse,
   ApplyPatchApprovalResponse,
+  ToolRequestUserInputAnswer,
+  ToolRequestUserInputResponse,
   ReviewDecision,
 } from './codexProtocol';
 
@@ -46,9 +49,11 @@ export class CodexAppServer extends EventEmitter {
   private lastStderrMessage: string | null = null;
   private sawStderrSinceStart = false;
   private initializePromise: Promise<InitializeResult> | null = null;
+  private readonly trace?: (scope: string, message: string, payload?: unknown) => void;
 
-  constructor() {
+  constructor(config: { trace?: (scope: string, message: string, payload?: unknown) => void } = {}) {
     super();
+    this.trace = config.trace;
 
     this.manager = new CodexManager({
       onStdout: (data) => this.handleStdout(data),
@@ -75,11 +80,12 @@ export class CodexAppServer extends EventEmitter {
           version: '1.4.0',
         },
         capabilities: {
-          experimentalApi: false,
+          experimentalApi: true,
         },
       });
 
       this.sendNotification('initialized');
+      this.trace?.('app-server', 'initialized', result);
       return result;
     })();
 
@@ -135,7 +141,13 @@ export class CodexAppServer extends EventEmitter {
   /**
    * Start an agent turn (send user message)
    */
-  async turnStart(threadId: string, message: string, model?: string, imageDataUrls?: string[]): Promise<TurnStartResponse> {
+  async turnStart(
+    threadId: string,
+    message: string,
+    model?: string,
+    imageDataUrls?: string[],
+    collaborationMode?: CollaborationMode | null
+  ): Promise<TurnStartResponse> {
     await this.ensureInitialized();
     const input: UserInput[] = [{
       type: 'text',
@@ -151,6 +163,7 @@ export class CodexAppServer extends EventEmitter {
       threadId,
       input,
       model: model || null,
+      collaborationMode: collaborationMode ?? null,
     });
   }
 
@@ -168,15 +181,31 @@ export class CodexAppServer extends EventEmitter {
    * We respond with our decision using that same id.
    */
   sendApprovalResponse(requestId: string | number, decision: ReviewDecision): void {
+    this.sendServerRequestResponse(
+      requestId,
+      { decision } as ExecCommandApprovalResponse | ApplyPatchApprovalResponse,
+      'approval response'
+    );
+  }
+
+  sendToolRequestUserInputResponse(requestId: string | number, answers: Record<string, ToolRequestUserInputAnswer>): void {
+    this.sendServerRequestResponse(
+      requestId,
+      { answers } as ToolRequestUserInputResponse,
+      'request_user_input response'
+    );
+  }
+
+  private sendServerRequestResponse(requestId: string | number, result: unknown, label: string): void {
     const response: JsonRpcResponse = {
       jsonrpc: '2.0',
       id: requestId,
-      result: { decision } as ExecCommandApprovalResponse | ApplyPatchApprovalResponse,
+      result,
     };
     try {
       this.manager.send(JSON.stringify(response));
     } catch (error) {
-      console.error('Failed to send approval response:', error);
+      console.error(`Failed to send ${label}:`, error);
     }
   }
 
@@ -201,11 +230,20 @@ export class CodexAppServer extends EventEmitter {
       }, timeoutMs);
 
       this.pendingRequests.set(id, {
-        resolve: (result: unknown) => { clearTimeout(timer); resolve(result as TResult); },
-        reject: (error: Error) => { clearTimeout(timer); reject(error); },
+        resolve: (result: unknown) => {
+          clearTimeout(timer);
+          this.trace?.('rpc:result', method, { id, result });
+          resolve(result as TResult);
+        },
+        reject: (error: Error) => {
+          clearTimeout(timer);
+          this.trace?.('rpc:error', method, { id, error: error.message });
+          reject(error);
+        },
       });
 
       try {
+        this.trace?.('rpc:request', method, { id, params });
         this.manager.send(JSON.stringify(request));
       } catch (error) {
         clearTimeout(timer);
@@ -219,6 +257,7 @@ export class CodexAppServer extends EventEmitter {
    * Handle stdout data (JSONL parsing)
    */
   private handleStdout(data: string): void {
+    this.trace?.('stdio:stdout', 'chunk', data);
     this.buffer += data;
 
     const lines = this.buffer.split('\n');
@@ -244,10 +283,12 @@ export class CodexAppServer extends EventEmitter {
 
     this.lastStderrMessage = normalized;
     this.sawStderrSinceStart = true;
+    this.trace?.('stdio:stderr', 'message', normalized);
     console.error('[codex stderr]', normalized);
   }
 
   private handleExit(code: number | null): void {
+    this.trace?.('app-server', 'exit', { code });
     for (const [, { reject }] of this.pendingRequests.entries()) {
       reject(new Error('Codex app-server exited unexpectedly'));
     }
@@ -266,6 +307,7 @@ export class CodexAppServer extends EventEmitter {
       params,
     };
 
+    this.trace?.('rpc:notification', method, params);
     this.manager.send(JSON.stringify(notification));
   }
 
@@ -295,6 +337,10 @@ export class CodexAppServer extends EventEmitter {
         }
       }
     } else if (hasId && hasMethod) {
+      this.trace?.('rpc:server-request', String(message.method), {
+        id: message.id,
+        params: message.params,
+      });
       // Server-initiated request (approval)
       // Emit with method name so UnifiedViewProvider can handle & respond
       this.emit('server-request', {
@@ -305,6 +351,7 @@ export class CodexAppServer extends EventEmitter {
     } else if (hasMethod) {
       // Notification (event)
       const notification = message as unknown as JsonRpcNotification;
+      this.trace?.('rpc:event', String(notification.method), notification.params);
       this.emit(notification.method as string, notification.params);
       this.emit('notification', notification);
     }

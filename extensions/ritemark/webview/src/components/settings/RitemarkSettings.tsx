@@ -104,6 +104,18 @@ interface SettingsData {
       error: string | null;
       diagnostics: string[];
       repairCommand: string | null;
+      compatibility: {
+        state: 'compatible' | 'limited' | 'untested';
+        summary: string;
+        auditedRange: string;
+        versionInAuditedRange: boolean;
+        capabilities: {
+          approvals: boolean;
+          requestUserInput: boolean;
+          planUpdates: boolean;
+        };
+        limitations: string[];
+      } | null;
     };
   };
 }
@@ -1241,7 +1253,11 @@ export function RitemarkSettings() {
                 title="Codex CLI"
                 status={
                   settings.componentStatus.codex.state === 'ready'
-                    ? 'Ready'
+                    ? settings.componentStatus.codex.compatibility?.state === 'limited'
+                      ? 'Ready with limits'
+                      : settings.componentStatus.codex.compatibility?.state === 'untested'
+                        ? 'Ready (untested)'
+                        : 'Ready'
                     : settings.componentStatus.codex.state === 'broken'
                       ? 'Broken'
                       : 'Not installed'
@@ -1259,6 +1275,17 @@ export function RitemarkSettings() {
                     : settings.componentStatus.codex.installed
                       ? 'Managed by user'
                       : 'CLI not detected',
+                  settings.componentStatus.codex.compatibility?.summary ?? 'Compatibility not checked',
+                  settings.componentStatus.codex.compatibility
+                    ? `Approvals: ${settings.componentStatus.codex.compatibility.capabilities.approvals ? 'available' : 'not detected'}`
+                    : 'Approvals: unknown',
+                  settings.componentStatus.codex.compatibility
+                    ? `Ask questions: ${settings.componentStatus.codex.compatibility.capabilities.requestUserInput ? 'available' : 'not detected'}`
+                    : 'Ask questions: unknown',
+                  settings.componentStatus.codex.compatibility
+                    ? `Plan updates: ${settings.componentStatus.codex.compatibility.capabilities.planUpdates ? 'available' : 'not detected'}`
+                    : 'Plan updates: unknown',
+                  ...(settings.componentStatus.codex.compatibility?.limitations ?? []),
                   ...settings.componentStatus.codex.diagnostics,
                 ]}
               />
