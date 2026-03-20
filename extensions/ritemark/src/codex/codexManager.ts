@@ -8,6 +8,9 @@
  * - Graceful shutdown
  */
 
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { spawn, spawnSync, ChildProcess } from 'child_process';
 import { isEnabled } from '../features/featureGate';
 
@@ -30,9 +33,29 @@ export interface CodexBinaryStatus {
   installNodeArch: string | null;
   runtimeNodeArch: string;
   machineArch: string;
+  compatibility: CodexCompatibilityStatus | null;
+}
+
+export interface CodexCapabilityFlags {
+  approvals: boolean;
+  requestUserInput: boolean;
+  planUpdates: boolean;
+}
+
+export interface CodexCompatibilityStatus {
+  state: 'compatible' | 'limited' | 'untested';
+  summary: string;
+  auditedRange: string;
+  versionInAuditedRange: boolean;
+  capabilities: CodexCapabilityFlags;
+  limitations: string[];
 }
 
 export class CodexManager {
+  private static readonly MIN_AUDITED_VERSION = '0.111.0';
+  private static readonly MAX_AUDITED_VERSION_EXCLUSIVE = '0.115.0';
+  private static readonly AUDITED_RANGE_LABEL = '0.111.x - 0.114.x';
+  private static readonly compatibilityCache = new Map<string, CodexCompatibilityStatus>();
   private process: ChildProcess | null = null;
   private config: CodexManagerConfig;
   private isShuttingDown = false;
@@ -125,6 +148,7 @@ export class CodexManager {
         installNodeArch: null,
         runtimeNodeArch,
         machineArch,
+        compatibility: null,
       };
     }
 
@@ -157,6 +181,7 @@ export class CodexManager {
             installNodeArch,
             runtimeNodeArch,
             machineArch,
+            compatibility: this.inspectCompatibility(binaryPath, match ? match[1] : null),
           });
           return;
         }
@@ -175,6 +200,7 @@ export class CodexManager {
           installNodeArch,
           runtimeNodeArch,
           machineArch,
+          compatibility: null,
         });
       });
 
@@ -192,6 +218,7 @@ export class CodexManager {
           installNodeArch,
           runtimeNodeArch,
           machineArch,
+          compatibility: null,
         });
       });
     });
@@ -431,6 +458,156 @@ export class CodexManager {
     return firstLine ?? 'Codex CLI failed to start.';
   }
 
+  private inspectCompatibility(binaryPath: string, version: string | null): CodexCompatibilityStatus {
+    const cacheKey = `${binaryPath}:${version ?? 'unknown'}`;
+    const cached = CodexManager.compatibilityCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const defaultCapabilities: CodexCapabilityFlags = {
+      approvals: false,
+      requestUserInput: false,
+      planUpdates: false,
+    };
+    const versionInAuditedRange = version
+      ? this.isVersionInAuditedRange(version)
+      : false;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-codex-protocol-'));
+
+    try {
+      const result = this.spawnResolvedBinarySync(binaryPath, ['app-server', 'generate-ts', '--out', tempDir], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 8000,
+      });
+
+      if (result.status !== 0) {
+        const failure = this.summarizeFailure(String(result.stderr || result.stdout || 'Codex protocol probe failed.'));
+        const status = this.buildCompatibilityStatus(
+          version,
+          versionInAuditedRange,
+          defaultCapabilities,
+          [`Protocol probe failed: ${failure}`]
+        );
+        CodexManager.compatibilityCache.set(cacheKey, status);
+        return status;
+      }
+
+      const requestText = this.readGeneratedProtocolFile(tempDir, 'ServerRequest.ts');
+      const notificationText = this.readGeneratedProtocolFile(tempDir, 'ServerNotification.ts');
+      const capabilities: CodexCapabilityFlags = {
+        approvals: requestText.includes('item/commandExecution/requestApproval')
+          && requestText.includes('item/fileChange/requestApproval'),
+        requestUserInput: requestText.includes('item/tool/requestUserInput'),
+        planUpdates: notificationText.includes('turn/plan/updated')
+          || notificationText.includes('item/plan/delta'),
+      };
+
+      const limitations: string[] = [];
+      if (!capabilities.approvals) {
+        limitations.push('Approval requests were not detected in the current Codex app-server protocol.');
+      }
+      if (!capabilities.requestUserInput) {
+        limitations.push('Interactive question prompts were not detected in the current Codex app-server protocol.');
+      }
+      if (!capabilities.planUpdates) {
+        limitations.push('Structured plan update notifications were not detected in the current Codex app-server protocol.');
+      }
+
+      const status = this.buildCompatibilityStatus(version, versionInAuditedRange, capabilities, limitations);
+      CodexManager.compatibilityCache.set(cacheKey, status);
+      return status;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const status = this.buildCompatibilityStatus(
+        version,
+        versionInAuditedRange,
+        defaultCapabilities,
+        [`Protocol probe failed: ${message}`]
+      );
+      CodexManager.compatibilityCache.set(cacheKey, status);
+      return status;
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  private buildCompatibilityStatus(
+    version: string | null,
+    versionInAuditedRange: boolean,
+    capabilities: CodexCapabilityFlags,
+    limitations: string[]
+  ): CodexCompatibilityStatus {
+    if (!versionInAuditedRange) {
+      return {
+        state: 'untested',
+        summary: version
+          ? `Codex ${version} is outside Ritemark's audited range ${CodexManager.AUDITED_RANGE_LABEL}. Ritemark will only enable capabilities it can detect at runtime.`
+          : `Codex version could not be detected. Ritemark will only enable capabilities it can detect at runtime.`,
+        auditedRange: CodexManager.AUDITED_RANGE_LABEL,
+        versionInAuditedRange,
+        capabilities,
+        limitations,
+      };
+    }
+
+    if (limitations.length > 0) {
+      return {
+        state: 'limited',
+        summary: `Codex is runnable, but this version is missing one or more lifecycle capabilities that Ritemark expects in the audited range ${CodexManager.AUDITED_RANGE_LABEL}.`,
+        auditedRange: CodexManager.AUDITED_RANGE_LABEL,
+        versionInAuditedRange,
+        capabilities,
+        limitations,
+      };
+    }
+
+    return {
+      state: 'compatible',
+      summary: `Codex matches the audited lifecycle capability set for ${CodexManager.AUDITED_RANGE_LABEL}.`,
+      auditedRange: CodexManager.AUDITED_RANGE_LABEL,
+      versionInAuditedRange,
+      capabilities,
+      limitations: [],
+    };
+  }
+
+  private readGeneratedProtocolFile(outputDir: string, fileName: string): string {
+    const directPath = path.join(outputDir, fileName);
+    if (fs.existsSync(directPath)) {
+      return fs.readFileSync(directPath, 'utf8');
+    }
+
+    const nestedPath = path.join(outputDir, 'openai', 'codex', fileName);
+    if (fs.existsSync(nestedPath)) {
+      return fs.readFileSync(nestedPath, 'utf8');
+    }
+
+    return '';
+  }
+
+  private isVersionInAuditedRange(version: string): boolean {
+    return this.compareVersions(version, CodexManager.MIN_AUDITED_VERSION) >= 0
+      && this.compareVersions(version, CodexManager.MAX_AUDITED_VERSION_EXCLUSIVE) < 0;
+  }
+
+  private compareVersions(left: string, right: string): number {
+    const leftParts = left.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    const rightParts = right.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    const length = Math.max(leftParts.length, rightParts.length);
+
+    for (let index = 0; index < length; index += 1) {
+      const leftValue = leftParts[index] ?? 0;
+      const rightValue = rightParts[index] ?? 0;
+      if (leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+    }
+
+    return 0;
+  }
+
   private spawnResolvedBinary(
     binaryPath: string,
     args: string[],
@@ -438,6 +615,18 @@ export class CodexManager {
   ): ChildProcess {
     const isWindowsScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binaryPath);
     return spawn(binaryPath, args, {
+      ...options,
+      shell: options.shell ?? isWindowsScript,
+    });
+  }
+
+  private spawnResolvedBinarySync(
+    binaryPath: string,
+    args: string[],
+    options: Parameters<typeof spawnSync>[2] = {}
+  ): ReturnType<typeof spawnSync> {
+    const isWindowsScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binaryPath);
+    return spawnSync(binaryPath, args, {
       ...options,
       shell: options.shell ?? isWindowsScript,
     });

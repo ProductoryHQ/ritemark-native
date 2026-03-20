@@ -19,6 +19,7 @@ interface AgentQuestionProps {
   turnId: string;
   question: AgentQuestionData;
   onAnswer: (turnId: string, question: AgentQuestionData, answers: Record<string, string>) => void;
+  providerLabel?: string;
 }
 
 /** State for a single question's selected answers */
@@ -209,7 +210,7 @@ function SingleQuestion({
   );
 }
 
-export function AgentQuestion({ turnId, question, onAnswer }: AgentQuestionProps) {
+export function AgentQuestion({ turnId, question, onAnswer, providerLabel = 'Claude' }: AgentQuestionProps) {
   const [answers, setAnswers] = useState<QuestionAnswer[]>(
     question.questions.map(() => null)
   );
@@ -260,7 +261,7 @@ export function AgentQuestion({ turnId, question, onAnswer }: AgentQuestionProps
       {/* Header */}
       <div className="flex items-center gap-2 text-[11px] text-[var(--vscode-descriptionForeground)]">
         <MessageCircle size={13} className="shrink-0" />
-        <span>Claude needs your input to continue</span>
+        <span>{providerLabel} needs your input to continue</span>
       </div>
 
       {/* Questions */}
