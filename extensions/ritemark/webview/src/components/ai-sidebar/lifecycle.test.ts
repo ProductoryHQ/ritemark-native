@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { buildActivePlanViewModel } from './activePlan';
-import { applyCodexPlanApproval, applyCodexPlanUpdate, buildCodexApprovedPlanPrompt, finalizeCodexTurnResult, getActiveApprovedPlanForCodex, shouldRequestPlanMode } from './lifecycle';
-import type { CodexConversationTurn } from './types';
+import {
+  applyCodexPlanApproval,
+  applyCodexPlanUpdate,
+  buildCodexApprovedPlanPrompt,
+  finalizeCodexTurnResult,
+  getActiveApprovedPlanForClaude,
+  getActiveApprovedPlanForCodex,
+  shouldRequestPlanMode,
+} from './lifecycle';
+import type { AgentConversationTurn, CodexConversationTurn } from './types';
 
 function makeTurn(overrides: Partial<CodexConversationTurn>): CodexConversationTurn {
   return {
@@ -23,6 +31,26 @@ function makeTurn(overrides: Partial<CodexConversationTurn>): CodexConversationT
     planDecision: overrides.planDecision,
     result: overrides.result,
     isRunning: overrides.isRunning ?? false,
+    timestamp: overrides.timestamp ?? 1,
+  };
+}
+
+function makeAgentTurn(overrides: Partial<AgentConversationTurn>): AgentConversationTurn {
+  return {
+    id: overrides.id || 'agent-turn-1',
+    userPrompt: overrides.userPrompt || 'Improve the document',
+    activeFilePath: overrides.activeFilePath,
+    attachments: overrides.attachments,
+    activities: overrides.activities || [],
+    subagents: overrides.subagents,
+    result: overrides.result,
+    isRunning: overrides.isRunning ?? false,
+    isPlan: overrides.isPlan ?? false,
+    planHandled: overrides.planHandled ?? false,
+    planDecision: overrides.planDecision,
+    planText: overrides.planText,
+    pendingQuestion: overrides.pendingQuestion,
+    pendingPlanApproval: overrides.pendingPlanApproval,
     timestamp: overrides.timestamp ?? 1,
   };
 }
@@ -75,6 +103,24 @@ function testActivePlanParsesMarkdownChecklistStatuses() {
   assert.deepEqual(
     model?.steps.map((step) => step.status),
     ['completed', 'completed', 'pending']
+  );
+}
+
+function testActivePlanCanForceCompletedFallback() {
+  const model = buildActivePlanViewModel(
+    `1. Review structure
+2. Edit sections
+3. Final pass`,
+    undefined,
+    false,
+    true
+  );
+
+  assert.ok(model, 'forced-complete fallback should build a view model');
+  assert.equal(model?.summary, '3 done');
+  assert.deepEqual(
+    model?.steps.map((step) => step.status),
+    ['completed', 'completed', 'completed']
   );
 }
 
@@ -194,6 +240,39 @@ function testActiveApprovedPlanUsesLiveStreamingFallback() {
   );
 }
 
+function testClaudeApprovedPlanUsesCompletedResultOverlay() {
+  const approvedTurn = makeAgentTurn({
+    id: 'claude-plan-turn',
+    isPlan: true,
+    planHandled: true,
+    planDecision: 'approved',
+    planText: `1. Review structure
+2. Edit sections
+3. Final pass`,
+    result: {
+      text: `1. Fixed wording
+2. Adjusted structure
+3. Re-checked consistency`,
+      filesModified: [],
+      metrics: { durationMs: 1000, costUsd: null, model: null },
+    },
+    isRunning: false,
+    timestamp: 10,
+  });
+
+  const activePlan = getActiveApprovedPlanForClaude([approvedTurn]);
+
+  assert.ok(activePlan, 'approved Claude plan should be derivable');
+  assert.equal(activePlan?.allCompleted, true);
+  const model = buildActivePlanViewModel(
+    activePlan?.planText || '',
+    activePlan?.planSteps,
+    activePlan?.isRunning,
+    activePlan?.allCompleted
+  );
+  assert.equal(model?.summary, '3 done');
+}
+
 function testBuildCodexApprovedPlanPromptKeepsOriginalRequest() {
   const prompt = buildCodexApprovedPlanPrompt(
     'Update the policy document',
@@ -272,10 +351,12 @@ function main() {
   testActivePlanFallbackPromotesFirstItemToInProgress();
   testActivePlanUsesStructuredStatusesWhenAvailable();
   testActivePlanParsesMarkdownChecklistStatuses();
+  testActivePlanCanForceCompletedFallback();
   testActivePlanPrefersChecklistBlockOverLaterHeadings();
   testCodexPlanApprovalCreatesContinuationTurn();
   testActiveApprovedPlanPrefersLiveExecutionSteps();
   testActiveApprovedPlanUsesLiveStreamingFallback();
+  testClaudeApprovedPlanUsesCompletedResultOverlay();
   testBuildCodexApprovedPlanPromptKeepsOriginalRequest();
   testApprovedContinuationPlanUpdateDoesNotReenterReview();
   testPlanModeResultWithoutStructuredUpdateStillRequiresReview();

@@ -44,6 +44,7 @@ import {
   type FileAttachment,
   type SetupStatus,
   type AgentEnvironmentStatus,
+  traceClaude,
 } from '../agent';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
@@ -231,20 +232,35 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'ai-execute-agent':
+          traceClaude('webview->extension', 'ai-execute-agent', {
+            promptPreview: message.prompt?.slice(0, 200),
+            imageCount: Array.isArray(message.images) ? message.images.length : 0,
+            skipActiveFile: message.skipActiveFile === true,
+          });
           await this._handleAgentExecution(message.prompt, message.images, message.skipActiveFile);
           break;
 
         case 'ai-cancel-agent':
+          traceClaude('webview->extension', 'ai-cancel-agent');
           if (this._agentSession?.isActive) {
             this._agentSession.interrupt();
           }
           break;
 
         case 'agent-answer-question':
+          traceClaude('webview->extension', 'agent-answer-question', {
+            toolUseId: message.toolUseId,
+            answerKeys: Object.keys(message.answers || {}),
+          });
           this._handleAgentQuestionAnswer(message.toolUseId, message.answers || {});
           break;
 
         case 'agent-answer-plan':
+          traceClaude('webview->extension', 'agent-answer-plan', {
+            toolUseId: message.toolUseId,
+            approved: message.approved === true,
+            hasFeedback: Boolean(message.feedback?.trim()),
+          });
           this._handleAgentPlanAnswer(message.toolUseId, message.approved === true, message.feedback);
           break;
 
@@ -880,6 +896,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (!this._workspacePath) {
+      traceClaude('execution', 'blocked: no workspace');
       this._view?.webview.postMessage({
         type: 'agent-result',
         error: 'No workspace folder open. Please open a folder first.',
@@ -905,6 +922,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         ...(excludedFolders ? { excludedFolders } : {}),
         ...(anthropicApiKey ? { anthropicApiKey } : {}),
       });
+      traceClaude('execution', 'created AgentSession', {
+        model,
+        workspacePath: this._workspacePath,
+      });
 
       // When SDK reports available models, update the webview dropdown
       this._agentSession.onModelsDiscovered = (models) => {
@@ -929,18 +950,28 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         activeFile,
         timeoutMinutes: agentTimeout,
         onProgress: (progress: AgentProgress) => {
+          traceClaude('bridge', 'agent-progress', {
+            type: progress.type,
+            message: progress.message,
+            tool: progress.tool ?? null,
+          });
           this._view?.webview.postMessage({
             type: 'agent-progress',
             progress,
           });
         },
         onQuestion: (question: AgentQuestion) => {
+          traceClaude('bridge', 'agent-question', {
+            toolUseId: question.toolUseId,
+            questionHeaders: question.questions.map((item) => item.header),
+          });
           this._view?.webview.postMessage({
             type: 'agent-question',
             question,
           });
         },
         onPlanApproval: (request: AgentPlanApprovalRequest) => {
+          traceClaude('bridge', 'agent-plan-approval', request);
           this._view?.webview.postMessage({
             type: 'agent-plan-approval',
             request,
@@ -948,6 +979,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         },
       });
 
+      traceClaude('bridge', 'agent-result', {
+        hasText: Boolean(result.text),
+        filesModified: result.filesModified,
+        error: result.error ?? null,
+      });
       this._view?.webview.postMessage({
         type: 'agent-result',
         text: result.text,
@@ -957,6 +993,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      traceClaude('bridge', 'agent-result error', { error: errorMessage });
       this._view?.webview.postMessage({
         type: 'agent-result',
         error: errorMessage,
@@ -966,11 +1003,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   private _handleAgentQuestionAnswer(toolUseId: string, answers: Record<string, string>) {
     if (!this._agentSession) {
+      traceClaude('bridge', 'agent-answer-question without session', { toolUseId });
       return;
     }
 
     const answered = this._agentSession.answerQuestion(toolUseId, answers);
     if (!answered) {
+      traceClaude('bridge', 'agent-answer-question lost state', { toolUseId });
       this._view?.webview.postMessage({
         type: 'agent-result',
         error: 'Claude question state was lost. Please retry your last message.',
@@ -980,11 +1019,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   private _handleAgentPlanAnswer(toolUseId: string, approved: boolean, feedback?: string) {
     if (!this._agentSession) {
+      traceClaude('bridge', 'agent-answer-plan without session', { toolUseId });
       return;
     }
 
     const answered = this._agentSession.answerPlanApproval(toolUseId, approved, feedback);
     if (!answered) {
+      traceClaude('bridge', 'agent-answer-plan lost state', { toolUseId, approved });
       this._view?.webview.postMessage({
         type: 'agent-result',
         error: 'Claude plan approval state was lost. Please retry your last message.',

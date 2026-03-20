@@ -130,7 +130,8 @@ function summarizeSteps(steps: ActivePlanStep[]): string {
 export function buildActivePlanViewModel(
   planText: string,
   planSteps?: CodexPlanStep[],
-  isRunning = false
+  isRunning = false,
+  allCompleted = false
 ): ActivePlanViewModel | null {
   const normalizedSteps = (planSteps || [])
     .map((step) => ({
@@ -145,6 +146,12 @@ export function buildActivePlanViewModel(
   }
 
   const steps = fallbackSteps.map((step, index) => {
+    if (allCompleted && normalizedSteps.length === 0) {
+      return {
+        ...step,
+        status: 'completed' as const,
+      };
+    }
     if (isRunning && !fallbackSteps.some((candidate) => candidate.status === 'inProgress' || candidate.status === 'completed')) {
       return {
         ...step,

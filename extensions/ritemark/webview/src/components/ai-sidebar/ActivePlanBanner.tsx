@@ -7,12 +7,19 @@ interface ActivePlanBannerProps {
   planText: string;
   planSteps?: CodexPlanStep[];
   isRunning?: boolean;
+  allCompleted?: boolean;
   onDismiss?: () => void;
 }
 
-export function ActivePlanBanner({ planText, planSteps, isRunning = false, onDismiss }: ActivePlanBannerProps) {
+export function ActivePlanBanner({
+  planText,
+  planSteps,
+  isRunning = false,
+  allCompleted = false,
+  onDismiss,
+}: ActivePlanBannerProps) {
   const [expanded, setExpanded] = useState(isRunning);
-  const model = buildActivePlanViewModel(planText, planSteps, isRunning);
+  const model = buildActivePlanViewModel(planText, planSteps, isRunning, allCompleted);
 
   if (!model) {
     return null;
