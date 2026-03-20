@@ -38,14 +38,17 @@ import {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
   type AgentId,
+  type AgentPlanApprovalRequest,
   type AgentProgress,
+  type AgentQuestion,
   type FileAttachment,
   type SetupStatus,
   type AgentEnvironmentStatus,
+  traceClaude,
 } from '../agent';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
-import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest } from '../codex';
+import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
 
 type CodexSidebarStatus = {
   enabled: boolean;
@@ -58,7 +61,34 @@ type CodexSidebarStatus = {
   diagnostics: string[];
   repairCommand: string | null;
   binaryPath: string | null;
+  compatibility: CodexCompatibilityStatus | null;
 };
+
+const CODEX_BASE_INSTRUCTIONS = [
+  'You are running inside Ritemark.',
+  'Prefer structured protocol features over free-form text when the protocol supports them.',
+].join(' ');
+
+const CODEX_DEVELOPER_INSTRUCTIONS = [
+  'When you need the user to choose between options or provide required clarifications before continuing, you must use the request_user_input tool instead of asking in plain assistant text.',
+  'Do not present a question as normal chat text if request_user_input can express it.',
+  'When you produce a plan, prefer structured plan updates over embedding the whole plan only in prose.',
+  'If you already asked for user input via request_user_input, wait for the answer instead of ending the turn with the question rendered as plain text.',
+].join(' ');
+
+const CODEX_TURN_REMINDER = [
+  'Ritemark runtime reminder:',
+  '- If you need the user to answer a question or choose from options, you must call request_user_input.',
+  '- Do not ask the question in normal assistant text when request_user_input can represent it.',
+  '- If the user explicitly asked for multiple-choice questions, use request_user_input for them.',
+  '- After calling request_user_input, wait for the answer instead of finishing the turn with the question in prose.',
+].join('\n');
+
+function shouldStartCodexInPlanMode(prompt: string): boolean {
+  return /\bplan mode\b/i.test(prompt)
+    || /\bwork in plan\b/i.test(prompt)
+    || /\benter plan mode\b/i.test(prompt);
+}
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -202,13 +232,36 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'ai-execute-agent':
+          traceClaude('webview->extension', 'ai-execute-agent', {
+            promptPreview: message.prompt?.slice(0, 200),
+            imageCount: Array.isArray(message.images) ? message.images.length : 0,
+            skipActiveFile: message.skipActiveFile === true,
+          });
           await this._handleAgentExecution(message.prompt, message.images, message.skipActiveFile);
           break;
 
         case 'ai-cancel-agent':
+          traceClaude('webview->extension', 'ai-cancel-agent');
           if (this._agentSession?.isActive) {
             this._agentSession.interrupt();
           }
+          break;
+
+        case 'agent-answer-question':
+          traceClaude('webview->extension', 'agent-answer-question', {
+            toolUseId: message.toolUseId,
+            answerKeys: Object.keys(message.answers || {}),
+          });
+          this._handleAgentQuestionAnswer(message.toolUseId, message.answers || {});
+          break;
+
+        case 'agent-answer-plan':
+          traceClaude('webview->extension', 'agent-answer-plan', {
+            toolUseId: message.toolUseId,
+            approved: message.approved === true,
+            hasFeedback: Boolean(message.feedback?.trim()),
+          });
+          this._handleAgentPlanAnswer(message.toolUseId, message.approved === true, message.feedback);
           break;
 
         case 'agent-setup:install':
@@ -239,7 +292,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         // Codex messages
         case 'codex-execute':
-          await this._handleCodexExecution(message.prompt, message.model, message.attachments);
+          traceCodex('webview->extension', 'codex-execute', {
+            promptPreview: typeof message.prompt === 'string' ? message.prompt.slice(0, 200) : '',
+            model: message.model,
+            mode: message.mode,
+            attachmentCount: Array.isArray(message.attachments) ? message.attachments.length : 0,
+          });
+          await this._handleCodexExecution(message.prompt, message.model, message.attachments, message.mode);
           break;
 
         case 'codex:login':
@@ -269,11 +328,32 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'codex-cancel':
+          traceCodex('webview->extension', 'codex-cancel');
           this._handleCodexCancel();
           break;
 
         case 'codex-approve':
+          traceCodex('webview->extension', 'codex-approve', {
+            requestId: message.requestId,
+            approved: message.approved,
+          });
           this._handleCodexApproval(message.requestId, message.approved);
+          break;
+
+        case 'codex-answer-question':
+          traceCodex('webview->extension', 'codex-answer-question', {
+            requestId: message.requestId,
+            answers: message.answers,
+          });
+          this._handleCodexQuestionAnswer(
+            message.requestId,
+            message.answers && typeof message.answers === 'object' ? message.answers : {}
+          );
+          break;
+
+        case 'conversation:reset':
+          traceCodex('webview->extension', 'conversation:reset');
+          this._resetProviderSessions();
           break;
       }
     });
@@ -360,8 +440,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Clear chat history and start fresh conversation
    */
   public clearChat() {
-    this._agentSession?.close();
-    this._agentSession = null;
+    this._resetProviderSessions();
     this._view?.webview.postMessage({ type: 'clear-chat' });
   }
 
@@ -534,8 +613,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return this._codexAppServer;
     }
 
-    this._codexAppServer = new CodexAppServer();
+    this._codexAppServer = new CodexAppServer({ trace: traceCodex });
     this._codexAuth = new CodexAuth(this._codexAppServer);
+    traceCodex('runtime', 'created codex app-server runtime');
 
     this._codexAuth.on('statusChanged', (status) => {
       if (!status.authenticated) {
@@ -557,7 +637,31 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     return this._codexAppServer;
   }
 
+  private _disposeCodexRuntime(): void {
+    traceCodex('runtime', 'disposing codex runtime', {
+      hadThreadId: this._codexThreadId,
+      hadTurnId: this._codexTurnId,
+    });
+    this._codexAppServer?.dispose();
+    this._codexAppServer = null;
+    this._codexAuth = null;
+    this._codexLoginInProgress = false;
+    this._stopCodexLoginPolling();
+    this._resetCodexSessionState();
+  }
+
+  private _resetProviderSessions(): void {
+    traceCodex('runtime', 'reset provider sessions');
+    this._agentSession?.close();
+    this._agentSession = null;
+    this._disposeCodexRuntime();
+  }
+
   private _resetCodexSessionState(): void {
+    traceCodex('runtime', 'reset session state', {
+      threadId: this._codexThreadId,
+      turnId: this._codexTurnId,
+    });
     this._codexThreadId = null;
     this._codexTurnId = null;
   }
@@ -619,6 +723,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         diagnostics: [],
         repairCommand: null,
         binaryPath: null,
+        compatibility: null,
       };
     }
 
@@ -637,6 +742,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         diagnostics: binaryStatus.diagnostics,
         repairCommand: binaryStatus.repairCommand,
         binaryPath: binaryStatus.binaryPath,
+        compatibility: binaryStatus.compatibility,
       };
     }
 
@@ -660,6 +766,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         diagnostics: binaryStatus.diagnostics,
         repairCommand: binaryStatus.repairCommand,
         binaryPath: binaryStatus.binaryPath,
+        compatibility: binaryStatus.compatibility,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -674,6 +781,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         diagnostics: binaryStatus.diagnostics,
         repairCommand: binaryStatus.repairCommand,
         binaryPath: binaryStatus.binaryPath,
+        compatibility: binaryStatus.compatibility,
       };
     }
   }
@@ -713,6 +821,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         diagnostics: [],
         repairCommand: null,
         binaryPath: null,
+        compatibility: null,
       });
     }
   }
@@ -787,6 +896,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (!this._workspacePath) {
+      traceClaude('execution', 'blocked: no workspace');
       this._view?.webview.postMessage({
         type: 'agent-result',
         error: 'No workspace folder open. Please open a folder first.',
@@ -812,6 +922,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         ...(excludedFolders ? { excludedFolders } : {}),
         ...(anthropicApiKey ? { anthropicApiKey } : {}),
       });
+      traceClaude('execution', 'created AgentSession', {
+        model,
+        workspacePath: this._workspacePath,
+      });
 
       // When SDK reports available models, update the webview dropdown
       this._agentSession.onModelsDiscovered = (models) => {
@@ -836,13 +950,40 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         activeFile,
         timeoutMinutes: agentTimeout,
         onProgress: (progress: AgentProgress) => {
+          traceClaude('bridge', 'agent-progress', {
+            type: progress.type,
+            message: progress.message,
+            tool: progress.tool ?? null,
+          });
           this._view?.webview.postMessage({
             type: 'agent-progress',
             progress,
           });
         },
+        onQuestion: (question: AgentQuestion) => {
+          traceClaude('bridge', 'agent-question', {
+            toolUseId: question.toolUseId,
+            questionHeaders: question.questions.map((item) => item.header),
+          });
+          this._view?.webview.postMessage({
+            type: 'agent-question',
+            question,
+          });
+        },
+        onPlanApproval: (request: AgentPlanApprovalRequest) => {
+          traceClaude('bridge', 'agent-plan-approval', request);
+          this._view?.webview.postMessage({
+            type: 'agent-plan-approval',
+            request,
+          });
+        },
       });
 
+      traceClaude('bridge', 'agent-result', {
+        hasText: Boolean(result.text),
+        filesModified: result.filesModified,
+        error: result.error ?? null,
+      });
       this._view?.webview.postMessage({
         type: 'agent-result',
         text: result.text,
@@ -852,6 +993,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      traceClaude('bridge', 'agent-result error', { error: errorMessage });
       this._view?.webview.postMessage({
         type: 'agent-result',
         error: errorMessage,
@@ -859,10 +1001,47 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private _handleAgentQuestionAnswer(toolUseId: string, answers: Record<string, string>) {
+    if (!this._agentSession) {
+      traceClaude('bridge', 'agent-answer-question without session', { toolUseId });
+      return;
+    }
+
+    const answered = this._agentSession.answerQuestion(toolUseId, answers);
+    if (!answered) {
+      traceClaude('bridge', 'agent-answer-question lost state', { toolUseId });
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: 'Claude question state was lost. Please retry your last message.',
+      });
+    }
+  }
+
+  private _handleAgentPlanAnswer(toolUseId: string, approved: boolean, feedback?: string) {
+    if (!this._agentSession) {
+      traceClaude('bridge', 'agent-answer-plan without session', { toolUseId });
+      return;
+    }
+
+    const answered = this._agentSession.answerPlanApproval(toolUseId, approved, feedback);
+    if (!answered) {
+      traceClaude('bridge', 'agent-answer-plan lost state', { toolUseId, approved });
+      this._view?.webview.postMessage({
+        type: 'agent-result',
+        error: 'Claude plan approval state was lost. Please retry your last message.',
+      });
+    }
+  }
+
   /**
    * Execute a prompt using the Codex agent (persistent thread).
    */
-  private async _handleCodexExecution(prompt: string, model?: string, attachments?: Array<{ kind: string; data: string; mediaType: string }>) {
+  private async _handleCodexExecution(
+    prompt: string,
+    model?: string,
+    attachments?: Array<{ kind: string; data: string; mediaType: string }>,
+    mode?: 'plan' | 'execute'
+  ) {
     if (!isEnabled('codex-integration')) {
       this._view?.webview.postMessage({
         type: 'codex-result',
@@ -873,6 +1052,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     try {
       const status = await this._getCodexSidebarStatus();
+      traceCodex('execution', 'status before execute', status);
       this._postCodexSidebarStatus(status);
       if (status.state === 'broken-install') {
         this._view?.webview.postMessage({
@@ -904,8 +1084,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           model: model || null,
           approvalPolicy,
           sandbox,
+          baseInstructions: CODEX_BASE_INSTRUCTIONS,
+          developerInstructions: CODEX_DEVELOPER_INSTRUCTIONS,
         });
         this._codexThreadId = result.thread.id;
+        traceCodex('execution', 'thread started', {
+          threadId: result.thread.id,
+          model: result.model,
+          approvalPolicy,
+          sandbox,
+        });
       }
 
       // Convert image attachments to data URLs for Codex
@@ -913,20 +1101,47 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         ?.filter(a => a.kind === 'image')
         .map(a => `data:${a.mediaType};base64,${a.data}`);
 
+      const resolvedModel = model || getCodexModels()[0]?.id || 'gpt-5.3-codex';
+      const shouldUsePlanMode = mode === 'plan' || (mode !== 'execute' && shouldStartCodexInPlanMode(prompt));
+      const collaborationMode = shouldUsePlanMode
+        ? {
+            mode: 'plan' as const,
+            settings: {
+              model: resolvedModel,
+              reasoning_effort: null,
+              developer_instructions: CODEX_DEVELOPER_INSTRUCTIONS,
+            },
+          }
+        : null;
+      traceCodex('execution', 'prepared turn start', {
+        threadId: this._codexThreadId,
+        model: resolvedModel,
+        mode: mode ?? (shouldUsePlanMode ? 'plan' : 'execute'),
+        collaborationMode,
+        hasImages: Boolean(imageDataUrls && imageDataUrls.length > 0),
+      });
+
       // Prepend active file context to prompt (same pattern as Claude Code agent)
       const activeFile = this._getActiveFileContext();
-      const enrichedPrompt = activeFile
+      const promptBody = activeFile
         ? `[Currently editing: ${activeFile.path}]\n\n${prompt}`
         : prompt;
+      const enrichedPrompt = `${CODEX_TURN_REMINDER}\n\n${promptBody}`;
 
       // Start turn (send user message)
       const turnResult = await appServer.turnStart(
         this._codexThreadId,
         enrichedPrompt,
-        model,
+        resolvedModel,
         imageDataUrls && imageDataUrls.length > 0 ? imageDataUrls : undefined,
+        collaborationMode,
       );
       this._codexTurnId = turnResult.turn.id;
+      traceCodex('execution', 'turn start acknowledged', {
+        threadId: this._codexThreadId,
+        turnId: turnResult.turn.id,
+        status: turnResult.turn.status,
+      });
 
       this._view?.webview.postMessage({
         type: 'codex-progress',
@@ -934,6 +1149,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      traceCodex('execution', 'turn start failed', { error: errorMessage });
       this._view?.webview.postMessage({
         type: 'codex-result',
         error: errorMessage,
@@ -960,6 +1176,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._codexAppServer.sendApprovalResponse(requestId, approved ? 'accept' : 'decline');
   }
 
+  private _handleCodexQuestionAnswer(requestId: string | number, answers: Record<string, { answers: string[] }>) {
+    if (!this._codexAppServer) return;
+    this._codexAppServer.sendToolRequestUserInputResponse(requestId, answers);
+  }
+
   /**
    * Set up event listeners on CodexAppServer to forward events to webview.
    */
@@ -967,7 +1188,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     if (!this._codexAppServer) return;
 
     // V2 notifications
+    this._codexAppServer.on('turn/started', (params: { threadId: string; turn: { id: string }; collaborationModeKind?: 'plan' | 'default' }) => {
+      traceCodex('event', 'turn/started', params);
+      if (params.collaborationModeKind) {
+        console.log(`[codex] turn started in ${params.collaborationModeKind} mode`);
+      }
+    });
+
     this._codexAppServer.on('item/started', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
+      traceCodex('event', 'item/started', params);
       // Only show activity for actual tool use, not userMessage/reasoning
       const itemType = params.item?.type;
       if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning') {
@@ -980,13 +1209,41 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
 
     this._codexAppServer.on('item/agentMessage/delta', (params: { delta: string }) => {
+      traceCodex('event', 'item/agentMessage/delta', {
+        preview: params.delta.slice(0, 200),
+      });
       this._view?.webview.postMessage({
         type: 'codex-streaming',
         delta: params.delta,
       });
     });
 
+    this._codexAppServer.on('turn/plan/updated', (params: {
+      threadId: string;
+      turnId: string;
+      explanation: string | null;
+      plan: Array<{ step: string; status: 'pending' | 'inProgress' | 'completed' }>;
+    }) => {
+      traceCodex('event', 'turn/plan/updated', params);
+      this._view?.webview.postMessage({
+        type: 'codex-plan-update',
+        explanation: params.explanation,
+        plan: params.plan,
+      });
+    });
+
+    this._codexAppServer.on('item/plan/delta', (params: { delta: string }) => {
+      traceCodex('event', 'item/plan/delta', {
+        preview: params.delta.slice(0, 200),
+      });
+      this._view?.webview.postMessage({
+        type: 'codex-plan-text-delta',
+        delta: params.delta,
+      });
+    });
+
     this._codexAppServer.on('item/completed', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
+      traceCodex('event', 'item/completed', params);
       const itemType = params.item?.type;
       // Only show completion for tool items, not userMessage/reasoning/agentMessage
       if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage') {
@@ -998,6 +1255,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
 
     this._codexAppServer.on('turn/completed', (params: { threadId: string; turn: { id: string; status: string; error: unknown } }) => {
+      traceCodex('event', 'turn/completed', params);
       this._codexTurnId = null;
       this._view?.webview.postMessage({
         type: 'codex-result',
@@ -1008,8 +1266,58 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     // Server-initiated requests (approvals are bidirectional RPC)
     this._codexAppServer.on('server-request', (request: { id: string | number; method: string; params: Record<string, unknown> }) => {
+      traceCodex('event', 'server-request', {
+        requestId: request.id,
+        method: request.method,
+        params: request.params,
+      });
       const routed = routeApprovalRequest(request);
-      if (routed.type === 'command') {
+      if (request.method === 'item/tool/requestUserInput') {
+        console.log('[codex] request_user_input received');
+        const params = request.params;
+        const questions = Array.isArray(params.questions)
+          ? params.questions
+              .filter((question): question is {
+                id?: unknown;
+                header?: unknown;
+                question?: unknown;
+                options?: unknown;
+              } => Boolean(question) && typeof question === 'object')
+              .map((question) => ({
+                id: typeof question.id === 'string' && question.id.trim()
+                  ? question.id.trim()
+                  : crypto.randomUUID(),
+                header: typeof question.header === 'string' && question.header.trim()
+                  ? question.header.trim()
+                  : 'Input',
+                question: typeof question.question === 'string' ? question.question : '',
+                options: Array.isArray(question.options)
+                  ? question.options.flatMap((option: unknown) => {
+                      if (!option || typeof option !== 'object') {
+                        return [];
+                      }
+                      const normalizedOption = option as { label?: unknown; description?: unknown };
+                      const label = typeof normalizedOption.label === 'string' ? normalizedOption.label.trim() : '';
+                      if (!label) {
+                        return [];
+                      }
+                      return [{
+                        label,
+                        description: typeof normalizedOption.description === 'string' ? normalizedOption.description.trim() : '',
+                      }];
+                    })
+                  : [],
+                multiSelect: false,
+              }))
+              .filter((question) => question.question.trim().length > 0)
+          : [];
+
+        this._view?.webview.postMessage({
+          type: 'codex-question',
+          requestId: request.id,
+          questions,
+        });
+      } else if (routed.type === 'command') {
         this._view?.webview.postMessage({
           type: 'codex-approval',
           approvalType: 'command',
@@ -1032,6 +1340,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
 
     this._codexAppServer.on('exit', () => {
+      traceCodex('event', 'app-server exit');
       this._codexAppServer = null;
       this._codexAuth = null;
       this._codexThreadId = null;

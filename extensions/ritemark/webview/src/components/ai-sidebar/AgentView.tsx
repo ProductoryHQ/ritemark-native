@@ -8,6 +8,8 @@ import { useAISidebarStore } from './store';
 import { EmptyState } from './EmptyState';
 import { RunningIndicator } from './RunningIndicator';
 import { AgentResponse } from './AgentResponse';
+import { AgentQuestion } from './AgentQuestion';
+import { AgentPlanApproval } from './AgentPlanApproval';
 import { SubagentCard } from './SubagentCard';
 import { UserPromptBubble } from './ChatBubbles';
 import type { AgentProgress } from './types';
@@ -15,6 +17,9 @@ import type { AgentProgress } from './types';
 export function AgentView() {
   const agentConversation = useAISidebarStore((s) => s.agentConversation);
   const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
+  const answerAgentQuestion = useAISidebarStore((s) => s.answerAgentQuestion);
+  const approvePlan = useAISidebarStore((s) => s.approvePlan);
+  const rejectPlan = useAISidebarStore((s) => s.rejectPlan);
 
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -30,7 +35,7 @@ export function AgentView() {
   const lastTurn = agentConversation[agentConversation.length - 1];
   useEffect(() => {
     scrollToBottom();
-  }, [agentConversation.length, lastTurn?.activities.length, lastTurn?.result, scrollToBottom]);
+  }, [agentConversation.length, lastTurn?.activities.length, lastTurn?.pendingQuestion, lastTurn?.pendingPlanApproval, lastTurn?.result, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -80,7 +85,20 @@ export function AgentView() {
             )}
 
             {/* Running indicator */}
-            {turn.isRunning && (
+            {turn.pendingQuestion && (
+              <AgentQuestion turnId={turn.id} question={turn.pendingQuestion} onAnswer={answerAgentQuestion} />
+            )}
+
+            {turn.pendingPlanApproval && (
+              <AgentPlanApproval
+                turnId={turn.id}
+                planText={turn.planText || ''}
+                onApprove={approvePlan}
+                onReject={rejectPlan}
+              />
+            )}
+
+            {turn.isRunning && !turn.pendingQuestion && !turn.pendingPlanApproval && (
               <RunningIndicator activities={turn.activities} subagents={turn.subagents} />
             )}
 

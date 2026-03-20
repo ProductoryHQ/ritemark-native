@@ -23,7 +23,7 @@ import {
   setAnthropicKeyAvailable,
   setClaudeLoginInProgress,
 } from '../agent';
-import { CodexManager } from '../codex/codexManager';
+import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
 
 export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   public static readonly viewType = 'ritemark.settings';
@@ -336,6 +336,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
               : 'Failed to inspect component status',
             diagnostics: [],
             repairCommand: null,
+            compatibility: null,
           },
         };
 
@@ -410,6 +411,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       error: string | null;
       diagnostics: string[];
       repairCommand: string | null;
+      compatibility: CodexCompatibilityStatus | null;
     };
   }> {
     const defaultModelFile = 'ggml-large-v3-turbo.bin';
@@ -463,6 +465,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         error: codexStatus.runnable ? null : codexStatus.error,
         diagnostics: codexStatus.diagnostics,
         repairCommand: codexStatus.repairCommand,
+        compatibility: codexStatus.compatibility,
       }
     };
   }

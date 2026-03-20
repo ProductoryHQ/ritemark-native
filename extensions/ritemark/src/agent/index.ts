@@ -7,6 +7,7 @@
  */
 
 export { runAgent, AgentSession } from './AgentRunner';
+export { traceClaude, showClaudeTrace, getClaudeTraceLogPath } from './agentTrace';
 export {
   getSetupStatus,
   getAgentEnvironmentStatus,
@@ -29,6 +30,7 @@ export { CLAUDE_FALLBACK_MODELS } from './claudeModels';
 export type {
   ModelOption,
   AgentId,
+  AgentSettingSource,
   AgentInfo,
   AgentProgress,
   AgentProgressType,
@@ -38,6 +40,10 @@ export type {
   AgentSessionConfig,
   AgentTurnOptions,
   ActiveFileContext,
+  AgentQuestion,
+  AgentQuestionItem,
+  AgentQuestionOption,
+  AgentPlanApprovalRequest,
   FileAttachment,
   ImageAttachment,
   AttachmentKind,

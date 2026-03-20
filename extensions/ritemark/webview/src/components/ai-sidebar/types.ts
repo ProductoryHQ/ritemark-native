@@ -22,7 +22,7 @@ export interface ModelOption {
   description: string;
 }
 
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_ready' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
   type: AgentProgressType;
@@ -36,6 +36,27 @@ export interface AgentProgress {
   subagentTask?: string;
   /** For subagent events, the parent tool_use_id for correlation */
   parentToolUseId?: string;
+}
+
+export interface AgentQuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface AgentQuestionItem {
+  header: string;
+  question: string;
+  options: AgentQuestionOption[];
+  multiSelect: boolean;
+}
+
+export interface AgentQuestion {
+  toolUseId: string;
+  questions: AgentQuestionItem[];
+}
+
+export interface AgentPlanApprovalRequest {
+  toolUseId: string;
 }
 
 /**
@@ -170,6 +191,10 @@ export interface AgentConversationTurn {
   isPlan: boolean;
   /** User has approved/rejected this plan */
   planHandled: boolean;
+  planDecision?: 'approved' | 'rejected';
+  planText?: string;
+  pendingQuestion?: AgentQuestion;
+  pendingPlanApproval?: AgentPlanApprovalRequest;
   timestamp: number;
 }
 
@@ -211,6 +236,16 @@ export interface CodexApprovalRequest {
   fileChanges?: Record<string, unknown>;
 }
 
+export interface CodexQuestion {
+  requestId: string | number;
+  questions: Array<AgentQuestionItem & { id: string }>;
+}
+
+export interface CodexPlanStep {
+  step: string;
+  status: 'pending' | 'inProgress' | 'completed';
+}
+
 export type CodexSidebarState =
   | 'disabled'
   | 'checking'
@@ -218,6 +253,21 @@ export type CodexSidebarState =
   | 'needs-auth'
   | 'auth-in-progress'
   | 'ready';
+
+export interface CodexCapabilityFlags {
+  approvals: boolean;
+  requestUserInput: boolean;
+  planUpdates: boolean;
+}
+
+export interface CodexCompatibilityStatus {
+  state: 'compatible' | 'limited' | 'untested';
+  summary: string;
+  auditedRange: string;
+  versionInAuditedRange: boolean;
+  capabilities: CodexCapabilityFlags;
+  limitations: string[];
+}
 
 export interface CodexSidebarStatus {
   enabled: boolean;
@@ -230,17 +280,27 @@ export interface CodexSidebarStatus {
   diagnostics: string[];
   repairCommand: string | null;
   binaryPath: string | null;
+  compatibility: CodexCompatibilityStatus | null;
 }
 
 export interface CodexConversationTurn {
   id: string;
   userPrompt: string;
+  requestedPlanMode?: boolean;
   /** Active file path that was included as context */
   activeFilePath?: string;
   attachments?: FileAttachment[];
   streamingText: string;
   activities: AgentProgress[];
   approval?: CodexApprovalRequest;
+  pendingQuestion?: CodexQuestion;
+  executionContinuation?: boolean;
+  requiresPlanReview?: boolean;
+  planText?: string;
+  planExplanation?: string;
+  planSteps?: CodexPlanStep[];
+  planHandled?: boolean;
+  planDecision?: 'approved' | 'rejected';
   result?: {
     status: string;
     error?: string;
@@ -268,6 +328,8 @@ export type ExtensionMessage =
   | { type: 'index-progress'; processed: number; total: number; current: string }
   | { type: 'index-done' }
   | { type: 'agent-progress'; progress: AgentProgress }
+  | { type: 'agent-question'; question: AgentQuestion }
+  | { type: 'agent-plan-approval'; request: AgentPlanApprovalRequest }
   | { type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string }
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus }
@@ -280,5 +342,8 @@ export type ExtensionMessage =
   | { type: 'codex:status'; status: CodexSidebarStatus }
   | { type: 'codex-progress'; progress: AgentProgress }
   | { type: 'codex-streaming'; delta: string }
+  | { type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> }
+  | { type: 'codex-plan-text-delta'; delta: string }
+  | { type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] }
   | { type: 'codex-result'; status?: string; error?: string }
   | { type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> };
