@@ -118,9 +118,12 @@ export function applyCodexPlanUpdate(
     planText: turn.planText || '',
     planExplanation: update.explanation || undefined,
     planSteps: update.plan,
-    requiresPlanReview: turn.executionContinuation ? false : true,
-    planHandled: turn.executionContinuation ? turn.planHandled : false,
-    planDecision: turn.executionContinuation ? turn.planDecision : undefined,
+    // Only require plan review if the user explicitly requested plan mode.
+    // Codex may send plan updates autonomously — these should be shown as
+    // progress indicators, not as blocking approval gates.
+    requiresPlanReview: turn.executionContinuation ? false : turn.requestedPlanMode,
+    planHandled: turn.executionContinuation ? turn.planHandled : (turn.requestedPlanMode ? false : turn.planHandled),
+    planDecision: turn.executionContinuation ? turn.planDecision : (turn.requestedPlanMode ? undefined : turn.planDecision),
   };
 }
 
