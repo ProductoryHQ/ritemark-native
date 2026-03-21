@@ -90,9 +90,27 @@ index ddb5df41847..477ffe6990d 100644
  Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
  
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
-index 0e1160d71e4..aaeeb9e44e9 100644
+index 0e1160d71e4..1d3bc9e4d9d 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
+@@ -7,7 +7,7 @@ import './media/chatStatus.css';
+ import { Disposable, DisposableStore, MutableDisposable } from '../../../../../base/common/lifecycle.js';
+ import { localize } from '../../../../../nls.js';
+ import { IWorkbenchContribution } from '../../../../common/contributions.js';
+-import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, ShowTooltipCommand, StatusbarAlignment, StatusbarEntryKind } from '../../../../services/statusbar/browser/statusbar.js';
++import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, ShowTooltipCommand, StatusbarEntryKind } from '../../../../services/statusbar/browser/statusbar.js'; // RiteMark: StatusbarAlignment removed — unused
+ import { ChatEntitlement, ChatEntitlementService, IChatEntitlementService, isProUser } from '../../../../services/chat/common/chatEntitlementService.js';
+ import { CancellationToken } from '../../../../../base/common/cancellation.js';
+ import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
+@@ -36,7 +36,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+ 	constructor(
+ 		@IChatEntitlementService private readonly chatEntitlementService: ChatEntitlementService,
+ 		@IInstantiationService private readonly instantiationService: IInstantiationService,
+-		@IStatusbarService private readonly statusbarService: IStatusbarService,
++		@IStatusbarService private readonly _statusbarService: IStatusbarService, // RiteMark: prefixed — unused with Copilot status bar disabled
+ 		@IEditorService private readonly editorService: IEditorService,
+ 		@IConfigurationService private readonly configurationService: IConfigurationService,
+ 		@IInlineCompletionsService private readonly completionsService: IInlineCompletionsService,
 @@ -52,18 +52,9 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  	}
  
@@ -115,12 +133,13 @@ index 0e1160d71e4..aaeeb9e44e9 100644
  	}
  
  	private registerListeners(): void {
-@@ -104,7 +95,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+@@ -104,7 +95,8 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  		}
  	}
  
 -	private getEntryProps(): IStatusbarEntry {
-+	private _getEntryProps(): IStatusbarEntry {
++	// RiteMark: method retained to avoid cascading unused-import errors from strict build
++	private _getEntryProps(): IStatusbarEntry { void this._statusbarService;
  		let text = '$(copilot)';
  		let ariaLabel = localize('chatStatusAria', "Copilot status");
  		let kind: StatusbarEntryKind | undefined;
