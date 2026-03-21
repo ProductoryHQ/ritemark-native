@@ -10,11 +10,12 @@ export function tryLoadImageSource(imagePath: string, documentUri: DocumentUriLi
     let normalizedPath = imagePath.trim();
 
     if (normalizedPath.startsWith('data:image/')) {
-      const match = normalizedPath.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/);
+      // Only accept raster formats that pdfkit/docx can handle
+      const match = normalizedPath.match(/^data:image\/(png|jpeg|jpg|gif|bmp|tiff);base64,(.+)$/i);
       if (!match) {
         return null;
       }
-      return Buffer.from(match[1], 'base64');
+      return Buffer.from(match[2], 'base64');
     }
 
     if (normalizedPath.startsWith('vscode-file://')) normalizedPath = normalizedPath.replace('vscode-file://', '');
