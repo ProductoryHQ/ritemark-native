@@ -69,9 +69,18 @@ index 40349546ec8..f6a753e49df 100644
  		return { malicious, deprecated, search, autoUpdate };
  	}
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-index ddb5df41847..477ffe6990d 100644
+index ddb5df41847..79cc2586f93 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
+@@ -45,7 +45,7 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
+ 	storageId: ChatViewContainerId,
+ 	hideIfEmpty: true,
+ 	order: 1,
+-}, ViewContainerLocation.AuxiliaryBar, { isDefault: true, doNotRegisterOpenCommand: true });
++}, ViewContainerLocation.AuxiliaryBar, { isDefault: false, doNotRegisterOpenCommand: true }); // RiteMark: isDefault=false to prevent Chat icon in title bar
+ 
+ const chatViewDescriptor: IViewDescriptor = {
+ 	id: ChatViewId,
 @@ -68,14 +68,8 @@ const chatViewDescriptor: IViewDescriptor = {
  		order: 1
  	},
