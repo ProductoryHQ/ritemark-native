@@ -1247,10 +1247,13 @@ export function Editor({
 
         /* Mermaid diagram styles */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block {
-          background: var(--vscode-editor-background, #1e1e1e) !important;
-          border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1)) !important;
-          border-radius: 6px !important;
           padding-top: 36px !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram {
+          background: #f5f7fb !important;
+          border: 1px solid var(--vscode-panel-border, rgba(0, 0, 0, 0.12)) !important;
+          color: var(--vscode-editor-foreground, #111827) !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .mermaid-toolbar {
@@ -1268,20 +1271,52 @@ export function Editor({
           opacity: 1 !important;
         }
 
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .mermaid-toolbar .code-copy-btn {
+          position: static !important;
+          top: auto !important;
+          right: auto !important;
+          opacity: 1 !important;
+        }
+
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .mermaid-toggle-btn {
           opacity: 1 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn {
+          background: rgba(255, 255, 255, 0.9) !important;
+          border: 1px solid rgba(100, 116, 139, 0.24) !important;
+          color: #64748b !important;
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn:hover {
+          background: rgba(255, 255, 255, 1) !important;
+          color: #334155 !important;
+          border-color: rgba(67, 56, 202, 0.28) !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn:active {
+          background: rgba(238, 242, 255, 1) !important;
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-rendered-diagram {
           display: flex !important;
           justify-content: center !important;
+          align-items: flex-start !important;
           padding: 16px !important;
           min-height: 60px !important;
+          max-height: 1024px !important;
+          overflow: auto !important;
+          background: #f5f7fb !important;
+          border-radius: 12px !important;
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-rendered-diagram svg {
           max-width: 100% !important;
+          width: min(100%, 680px) !important;
+          max-height: calc(1024px - 32px) !important;
           height: auto !important;
+          flex-shrink: 0 !important;
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-error {

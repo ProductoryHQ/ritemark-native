@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import PDFDocument from 'pdfkit';
 import { parse, HTMLElement, type Node as HtmlNode, TextNode } from 'node-html-parser';
 import { buildNormalizedExportHtml, type ExportTemplateStyle } from './htmlPipeline';
+import { tryLoadImageSource } from './imageSource';
 import type { ExportV2Request } from './types';
 
 const PAGE_MARGIN = 72;
@@ -36,26 +37,6 @@ function compactText(text: string): string {
 function getImmediateChildren(node: HTMLElement, tagNames: string[]): HTMLElement[] {
   const wanted = new Set(tagNames.map(tag => tag.toUpperCase()));
   return node.childNodes.filter(child => isElement(child) && wanted.has(child.tagName)) as HTMLElement[];
-}
-
-function tryLoadImage(imagePath: string, documentUri: vscode.Uri): Buffer | null {
-  try {
-    let normalizedPath = imagePath.trim();
-    if (normalizedPath.startsWith('vscode-file://')) normalizedPath = normalizedPath.replace('vscode-file://', '');
-    if (normalizedPath.startsWith('file://')) normalizedPath = normalizedPath.replace('file://', '');
-    if (normalizedPath.startsWith('http://') || normalizedPath.startsWith('https://')) return null;
-
-    const absolutePath = path.isAbsolute(normalizedPath)
-      ? normalizedPath
-      : path.resolve(path.dirname(documentUri.fsPath), normalizedPath);
-
-    if (!fs.existsSync(absolutePath)) {
-      return null;
-    }
-    return fs.readFileSync(absolutePath);
-  } catch {
-    return null;
-  }
 }
 
 function ensurePageRoom(doc: PDFKit.PDFDocument, minimumHeight: number): void {
@@ -199,7 +180,7 @@ function renderNode(doc: PDFKit.PDFDocument, node: HtmlNode, documentUri: vscode
   const tag = node.tagName;
   const text = compactText(getNodeText(node));
 
-  if (!text && tag !== 'HR' && tag !== 'IMG' && tag !== 'TABLE') return;
+  if (!text && tag !== 'HR' && tag !== 'IMG' && tag !== 'TABLE' && tag !== 'FIGURE') return;
 
   switch (tag) {
     case 'H1':
@@ -285,15 +266,18 @@ function renderNode(doc: PDFKit.PDFDocument, node: HtmlNode, documentUri: vscode
       const src = node.getAttribute('src');
       const imagePath = title || src;
       if (!imagePath) return;
-      const imgBuffer = tryLoadImage(imagePath, documentUri);
+      const imgBuffer = tryLoadImageSource(imagePath, documentUri);
       if (!imgBuffer) return;
 
-      const maxWidth = doc.page.width - PAGE_MARGIN * 2;
-      const maxHeight = 400;
+      const usableWidth = doc.page.width - PAGE_MARGIN * 2;
+      const usableHeight = doc.page.height - PAGE_MARGIN * 2 - RESERVED_FOOTER_SPACE;
+      // Cap images to ~50% of page height so they don't dominate the layout.
+      // Wide/landscape images get full width; tall/portrait images get constrained.
+      const maxHeight = Math.min(usableHeight * 0.55, 400);
       // Get actual image dimensions for proper scaling
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pdfImage = (doc as any).openImage(imgBuffer);
-      const scale = Math.min(maxWidth / pdfImage.width, maxHeight / pdfImage.height, 1);
+      const scale = Math.min(usableWidth / pdfImage.width, maxHeight / pdfImage.height, 1);
       const renderWidth = pdfImage.width * scale;
       const renderHeight = pdfImage.height * scale;
 

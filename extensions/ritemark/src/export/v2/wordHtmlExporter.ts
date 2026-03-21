@@ -19,29 +19,10 @@ import {
 } from 'docx';
 import { parse, HTMLElement, type Node as HtmlNode, TextNode } from 'node-html-parser';
 import { buildNormalizedExportHtml, type ExportTemplateStyle } from './htmlPipeline';
+import { tryLoadImageSource } from './imageSource';
 import type { ExportV2Request } from './types';
 
 type DocChild = Paragraph | Table;
-
-function tryLoadImage(imagePath: string, documentUri: vscode.Uri): Buffer | null {
-  try {
-    let normalizedPath = imagePath.trim();
-    if (normalizedPath.startsWith('vscode-file://')) normalizedPath = normalizedPath.replace('vscode-file://', '');
-    if (normalizedPath.startsWith('file://')) normalizedPath = normalizedPath.replace('file://', '');
-    if (normalizedPath.startsWith('http://') || normalizedPath.startsWith('https://')) return null;
-
-    const absolutePath = path.isAbsolute(normalizedPath)
-      ? normalizedPath
-      : path.resolve(path.dirname(documentUri.fsPath), normalizedPath);
-
-    if (!fs.existsSync(absolutePath)) {
-      return null;
-    }
-    return fs.readFileSync(absolutePath);
-  } catch {
-    return null;
-  }
-}
 
 function getImageDimensions(data: Buffer): { width: number; height: number } | null {
   try {
@@ -279,17 +260,24 @@ function parseBlocks(node: HtmlNode, style: ExportTemplateStyle, documentUri: vs
       const src = node.getAttribute('src');
       const imagePath = title || src;
       if (!imagePath) return [];
-      const imgData = tryLoadImage(imagePath, documentUri);
+      const imgData = tryLoadImageSource(imagePath, documentUri);
       if (!imgData) return [];
 
       const dims = getImageDimensions(imgData);
-      const maxWidth = 580; // ~6 inches at 96 DPI
-      let imgWidth = dims?.width || 580;
+      // docx library converts pixels to EMU via: px * 9525
+      // A4 usable width: 8.27" - 2*1" margins = 6.27" ≈ 602px at 96 DPI
+      // Letter usable width: 8.5" - 2*1" margins = 6.5" ≈ 624px at 96 DPI
+      // Use 600px as safe max that fits both page sizes
+      const maxWidth = 600;
+      // Cap height to ~50% of page so diagrams don't dominate layout
+      // Letter: 11" - 2*1" margins = 9" usable, 55% ≈ 5" ≈ 480px at 96 DPI
+      const maxHeight = 480;
+      let imgWidth = dims?.width || maxWidth;
       let imgHeight = dims?.height || 400;
-      if (imgWidth > maxWidth) {
-        const scale = maxWidth / imgWidth;
-        imgHeight = Math.round(imgHeight * scale);
-        imgWidth = maxWidth;
+      const scaleFactor = Math.min(maxWidth / imgWidth, maxHeight / imgHeight, 1);
+      if (scaleFactor < 1) {
+        imgWidth = Math.round(imgWidth * scaleFactor);
+        imgHeight = Math.round(imgHeight * scaleFactor);
       }
 
       return [new Paragraph({
