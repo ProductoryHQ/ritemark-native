@@ -76,7 +76,7 @@ We customize VS Code via **patch files** (not direct submodule edits). This allo
 4.  **Before updating VS Code**: Run `./scripts/update-vscode.sh --check` to test
     
 
-### Current Patches (4 consolidated)
+### Current Patches (6)
 
 | Patch | Purpose |
 | --- | --- |
@@ -84,6 +84,8 @@ We customize VS Code via **patch files** (not direct submodule edits). This allo
 | `002-ritemark-ui-layout.patch` | Sidebar, titlebar, tabs, explorer, panels |
 | `003-ritemark-menu-cleanup.patch` | Hide VS Code developer features (chat, debug, go menu, etc.) |
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
+| `005-ritemark-windows-and-oss-fixes.patch` | Windows builds, OSS compatibility fixes, account service |
+| `006-ritemark-dev-launch-fallback.patch` | Dev mode scripts, product.json dev launch fallback |
 
 * * *
 
