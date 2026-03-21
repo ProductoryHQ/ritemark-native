@@ -90,20 +90,40 @@ index ddb5df41847..477ffe6990d 100644
  Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
  
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
-index 0e1160d71e4..a3a4b664fc4 100644
+index 0e1160d71e4..aaeeb9e44e9 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
-@@ -52,6 +52,10 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+@@ -52,18 +52,9 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  	}
  
  	private update(): void {
+-		const sentiment = this.chatEntitlementService.sentiment;
+-		if (!sentiment.hidden) {
+-			const props = this.getEntryProps();
+-			if (this.entry) {
+-				this.entry.update(props);
+-			} else {
+-				this.entry = this.statusbarService.addEntry(props, 'chat.statusBarEntry', StatusbarAlignment.RIGHT, { location: { id: 'status.editor.mode', priority: 100.1 }, alignment: StatusbarAlignment.RIGHT });
+-			}
+-		} else {
+-			this.entry?.dispose();
+-			this.entry = undefined;
+-		}
 +		// RiteMark: Hide Copilot status bar entry — Ritemark uses its own AI integration
 +		this.entry?.dispose();
 +		this.entry = undefined;
-+		return;
- 		const sentiment = this.chatEntitlementService.sentiment;
- 		if (!sentiment.hidden) {
- 			const props = this.getEntryProps();
+ 	}
+ 
+ 	private registerListeners(): void {
+@@ -104,7 +95,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+ 		}
+ 	}
+ 
+-	private getEntryProps(): IStatusbarEntry {
++	private _getEntryProps(): IStatusbarEntry {
+ 		let text = '$(copilot)';
+ 		let ariaLabel = localize('chatStatusAria', "Copilot status");
+ 		let kind: StatusbarEntryKind | undefined;
 diff --git a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
 index 7b2cbce78b2..dea3adcac13 100644
 --- a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
