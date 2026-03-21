@@ -141,9 +141,14 @@ function CodexTurn({
   const lastActivity = hasActivities ? turn.activities[turn.activities.length - 1] : null;
   const rawPlanText = turn.planText || ((turn.result && !turn.result.error) ? turn.streamingText : '');
   const displayPlanText = extractPlanDisplayText(rawPlanText);
-  const showPlanCard = Boolean((turn.planSteps && turn.planSteps.length > 0) || displayPlanText);
+  // Only show plan cards when the user explicitly requested plan mode.
+  // Codex sends plan updates autonomously — these clutter the conversation.
+  const showPlanCard = Boolean(
+    turn.requestedPlanMode
+    && ((turn.planSteps && turn.planSteps.length > 0) || displayPlanText)
+  );
   const needsPlanReview = Boolean(showPlanCard && turn.result && !turn.result.error && turn.requiresPlanReview && !turn.planHandled);
-  const shouldHideStreamingBubble = Boolean(displayPlanText)
+  const shouldHideStreamingBubble = Boolean(showPlanCard && displayPlanText)
     && turn.streamingText.trim().length > 0
     && rawPlanText.trim() === turn.streamingText.trim();
 
@@ -217,19 +222,11 @@ function CodexTurn({
         </div>
       )}
 
-      {/* Success */}
-      {turn.result && !turn.result.error && turn.result.status === 'completed' && (
+      {/* Plan-specific status (only when plan mode was explicitly requested) */}
+      {turn.result && !turn.result.error && needsPlanReview && (
         <div className="flex items-center gap-2 text-xs text-[var(--vscode-testing-iconPassed)] pl-2">
           <Check size={12} />
-          <span>
-            {needsPlanReview
-              ? 'Waiting for plan review'
-              : turn.planHandled
-              ? turn.planDecision === 'approved'
-                ? 'Plan approved; continuation started below'
-                : 'Plan discarded'
-              : 'Done'}
-          </span>
+          <span>Waiting for plan review</span>
         </div>
       )}
     </div>
