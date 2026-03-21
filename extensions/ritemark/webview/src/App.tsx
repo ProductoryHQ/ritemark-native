@@ -5,6 +5,7 @@ import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
 import { DOCXViewer } from './components/viewers/DOCXViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
+import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
@@ -320,8 +321,9 @@ function App() {
   }, [])
 
   // Export handlers
-  const handleExportPDF = useCallback((templateId = 'default') => {
-    const html = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
+  const handleExportPDF = useCallback(async (templateId = 'default') => {
+    const rawHtml = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
+    const html = await inlineMermaidDiagramsForExport(rawHtml)
 
     sendToExtension('exportPDF', {
       content, // markdown fallback (V1 compatibility)
@@ -331,8 +333,9 @@ function App() {
     })
   }, [content, properties])
 
-  const handleExportWord = useCallback((templateId = 'default') => {
-    const html = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
+  const handleExportWord = useCallback(async (templateId = 'default') => {
+    const rawHtml = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
+    const html = await inlineMermaidDiagramsForExport(rawHtml)
 
     sendToExtension('exportWord', {
       markdown: content, // markdown fallback (V1 compatibility)
