@@ -5,7 +5,7 @@
  * For mermaid code blocks, renders the diagram as SVG with a code/diagram toggle.
  *
  * @see Sprint 14: Block Interactions
- * @see Sprint 30: Mermaid Diagram Rendering
+ * @see Sprint 46: Mermaid Diagram Rendering
  */
 
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
@@ -87,7 +87,7 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
     return (
       <NodeViewWrapper
         as="pre"
-        className="tiptap-code-block mermaid-block"
+        className={`tiptap-code-block mermaid-block ${showDiagram ? 'mermaid-block--diagram' : 'mermaid-block--code'}`}
         style={{ position: 'relative' }}
       >
         {/* Toolbar buttons */}
