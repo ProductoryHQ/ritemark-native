@@ -90,7 +90,7 @@ index ddb5df41847..477ffe6990d 100644
  Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
  
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
-index 0e1160d71e4..1d3bc9e4d9d 100644
+index 0e1160d71e4..4c05008524e 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 @@ -7,7 +7,7 @@ import './media/chatStatus.css';
@@ -111,7 +111,7 @@ index 0e1160d71e4..1d3bc9e4d9d 100644
  		@IEditorService private readonly editorService: IEditorService,
  		@IConfigurationService private readonly configurationService: IConfigurationService,
  		@IInlineCompletionsService private readonly completionsService: IInlineCompletionsService,
-@@ -52,18 +52,9 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+@@ -52,18 +52,10 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  	}
  
  	private update(): void {
@@ -130,10 +130,11 @@ index 0e1160d71e4..1d3bc9e4d9d 100644
 +		// RiteMark: Hide Copilot status bar entry — Ritemark uses its own AI integration
 +		this.entry?.dispose();
 +		this.entry = undefined;
++		void this._getEntryProps; // suppress unused-private-method build error
  	}
  
  	private registerListeners(): void {
-@@ -104,7 +95,8 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+@@ -104,7 +96,8 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  		}
  	}
  
