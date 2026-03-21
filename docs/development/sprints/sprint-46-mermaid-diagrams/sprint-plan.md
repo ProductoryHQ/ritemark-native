@@ -1,8 +1,8 @@
-# Sprint 30: Mermaid Diagram Rendering
+# Sprint 46: Mermaid Diagram Rendering
 
 ## Goal
 
-Render `mermaid` code blocks as visual SVG diagrams inline in the TipTap editor, with a toggle between rendered and source views and graceful error handling.
+Render `mermaid` code blocks as visual SVG diagrams inline in the TipTap editor, with a toggle between rendered and source views, graceful error handling, and export behavior that matches user expectations in Word/PDF.
 
 ## Feature Flag Check
 
@@ -19,6 +19,7 @@ Render `mermaid` code blocks as visual SVG diagrams inline in the TipTap editor,
 - [ ] Theme matches the VS Code editor (dark/light)
 - [ ] A `/Mermaid Diagram` slash command inserts a pre-configured mermaid code block
 - [ ] Markdown roundtrip is preserved: save and reopen yields identical ` ```mermaid ` fenced block
+- [ ] Export expectation is handled explicitly: either Mermaid diagrams render as diagrams in Word/PDF export, or the UI/export flow makes the limitation unambiguous before users assume parity
 - [ ] Webview bundle builds without error (`vite build`)
 
 ## Deliverables
@@ -30,6 +31,7 @@ Render `mermaid` code blocks as visual SVG diagrams inline in the TipTap editor,
 | Mermaid initializer | One-time `mermaid.initialize()` call with VS Code theme detection at module level |
 | Slash command entry | "Mermaid Diagram" in `SlashCommands.tsx` |
 | CSS styles | Diagram container, toggle button, error state |
+| Export decision | Mermaid behavior for Word/PDF is explicitly implemented or documented in-product |
 
 ## Implementation Checklist
 
@@ -69,6 +71,14 @@ Render `mermaid` code blocks as visual SVG diagrams inline in the TipTap editor,
 - [ ] Note the new bundle size (expected to grow significantly due to mermaid.js)
 - [ ] Verify the bundle size does not exceed a sensible threshold (document final size)
 
+### Phase 6: Export Parity / Expectation Management
+- [ ] Audit current Word/PDF export behavior for ` ```mermaid ` fenced blocks
+- [ ] Decide product behavior:
+  - [ ] Option A: export Mermaid as rendered diagram in Word/PDF
+  - [ ] Option B: keep source-code export for now, but add explicit user-facing limitation so preview does not imply export parity
+- [ ] If Option A: implement Mermaid rendering in export pipeline and verify Word/PDF outputs
+- [ ] If Option B: add a visible note in the relevant UI/export flow and document the limitation in release/sprint notes
+
 ## Technical Constraints (from Research)
 
 - `NodeViewContent` MUST remain in the DOM even in rendered mode — use CSS to hide it, not conditional rendering or `display: none`. TipTap loses the editable node reference otherwise.
@@ -86,12 +96,13 @@ Render `mermaid` code blocks as visual SVG diagrams inline in the TipTap editor,
 | NodeViewContent hidden incorrectly | Use `position: absolute; height: 0; overflow: hidden` not `display: none` |
 | Theme mismatch after system theme switch | Re-initialize on `vscode-dark` class change (stretch goal) |
 | Mermaid render errors crash component | Wrap `render()` in try/catch, show error UI |
+| Users assume editor preview means Word/PDF export parity | Treat export as in-scope decision, not a follow-up surprise |
 
 ## Status
 
-**Current Phase:** 2 (PLAN)
-**Approval Required:** Yes — Jarmo must approve before Phase 3 (DEVELOP) begins
+**Current Phase:** 6 (DEVELOP / VERIFY)
+**Approval Required:** No — implementation is in progress on the approved sprint branch
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan
