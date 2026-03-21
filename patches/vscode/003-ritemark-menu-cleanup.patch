@@ -24,19 +24,23 @@ index e9595bd406a..e1d2c008227 100644
  		}
  		checked.push(extension);
 diff --git a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
-index 40349546ec8..2ba275317b1 100644
+index 40349546ec8..f6a753e49df 100644
 --- a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
 +++ b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
-@@ -1163,7 +1163,7 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+@@ -1160,10 +1160,11 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+ 
+ 			const result: IGalleryExtension[] = [];
+ 			let defaultChatAgentExtension: IGalleryExtension | undefined;
++			const defaultChatAgentId = this.productService.defaultChatAgent?.extensionId;
  			for (let index = 0; index < extensions.length; index++) {
  				const extension = extensions[index];
  				setTelemetry(extension, ((query.pageNumber - 1) * query.pageSize) + index, options.source);
 -				if (areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent.extensionId, })) {
-+				if (areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent?.extensionId, })) {
++				if (defaultChatAgentId && areSameExtensions(extension.identifier, { id: defaultChatAgentId })) {
  					defaultChatAgentExtension = extension;
  				} else {
  					result.push(extension);
-@@ -1991,15 +1991,18 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+@@ -1991,15 +1992,18 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
  			}
  		}
  
