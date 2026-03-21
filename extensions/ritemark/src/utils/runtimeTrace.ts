@@ -54,7 +54,7 @@ export function createRuntimeTrace(outputChannelName: string, logFileName: strin
   let channel: OutputChannelLike | null = null;
   const traceLogPath = path.join(os.tmpdir(), logFileName);
   let enabled: boolean | null = null;
-  let rotationChecked = false;
+  let writesSinceRotationCheck = 0;
 
   function tryCreateOutputChannel(): OutputChannelLike | null {
     try {
@@ -83,9 +83,9 @@ export function createRuntimeTrace(outputChannelName: string, logFileName: strin
       return;
     }
 
-    // Rotate on first write per session
-    if (!rotationChecked) {
-      rotationChecked = true;
+    // Check rotation periodically (every 500 writes) to keep cap effective
+    if (++writesSinceRotationCheck >= 500) {
+      writesSinceRotationCheck = 0;
       rotateIfNeeded(traceLogPath);
     }
 
