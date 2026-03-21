@@ -12,7 +12,7 @@ index e9595bd406a..e1d2c008227 100644
  		}
  		checked.push(extension);
 diff --git a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
-index 40349546ec8..93f16b8653c 100644
+index 40349546ec8..2ba275317b1 100644
 --- a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
 +++ b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
 @@ -1163,7 +1163,7 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
@@ -24,19 +24,34 @@ index 40349546ec8..93f16b8653c 100644
  					defaultChatAgentExtension = extension;
  				} else {
  					result.push(extension);
-@@ -1991,10 +1991,10 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+@@ -1991,15 +1991,18 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
  			}
  		}
  
 -		deprecated[this.productService.defaultChatAgent.extensionId.toLowerCase()] = {
-+		deprecated[this.productService.defaultChatAgent?.extensionId.toLowerCase()] = {
- 			disallowInstall: true,
- 			extension: {
+-			disallowInstall: true,
+-			extension: {
 -				id: this.productService.defaultChatAgent.chatExtensionId,
-+				id: this.productService.defaultChatAgent?.chatExtensionId,
- 				displayName: 'GitHub Copilot Chat',
- 				autoMigrate: { storage: false, donotDisable: true },
- 				preRelease: this.productService.quality !== 'stable'
+-				displayName: 'GitHub Copilot Chat',
+-				autoMigrate: { storage: false, donotDisable: true },
+-				preRelease: this.productService.quality !== 'stable'
+-			}
+-		};
++		const _deprecatedId = this.productService.defaultChatAgent?.extensionId?.toLowerCase();
++		if (_deprecatedId) {
++			deprecated[_deprecatedId] = {
++				disallowInstall: true,
++				extension: {
++					id: this.productService.defaultChatAgent?.chatExtensionId,
++					displayName: 'GitHub Copilot Chat',
++					autoMigrate: { storage: false, donotDisable: true },
++					preRelease: this.productService.quality !== 'stable'
++				}
++			};
++		}
+ 
+ 		return { malicious, deprecated, search, autoUpdate };
+ 	}
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
 index 23ea0f7354a..b717811344e 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
@@ -50,3 +65,33 @@ index 23ea0f7354a..b717811344e 100644
  			for (const packExtension of this.getAllPackedExtensions(extension, this.local)) {
  				if (packExtension.local && !extensionsToUninstall.some(e => areSameExtensions(e.extension.identifier, packExtension.identifier))) {
  					extensionsToUninstall.push({ extension: packExtension.local });
+diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+index d4c780d04ea..731b1f3828a 100644
+--- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
++++ b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+@@ -99,8 +99,8 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
+ 		this._register(allowedExtensionsService.onDidChangeAllowedExtensionsConfigValue(() => this._onDidChangeExtensions([], [], false)));
+ 
+ 		// Extension unification
+-		this._completionsExtensionId = productService.defaultChatAgent?.extensionId.toLowerCase();
+-		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId.toLowerCase();
++		this._completionsExtensionId = productService.defaultChatAgent?.extensionId?.toLowerCase();
++		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId?.toLowerCase();
+ 		const unificationExtensions = [this._completionsExtensionId, this._chatExtensionId].filter(id => !!id);
+ 
+ 		// Disabling extension unification should immediately disable the unified extension flow
+diff --git a/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts b/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
+index 16802452df2..be2ca64f668 100644
+--- a/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
++++ b/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
+@@ -69,8 +69,8 @@ export class InlineCompletionsUnificationImpl extends Disposable implements IInl
+ 		@IProductService productService: IProductService
+ 	) {
+ 		super();
+-		this._completionsExtensionId = productService.defaultChatAgent?.extensionId.toLowerCase();
+-		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId.toLowerCase();
++		this._completionsExtensionId = productService.defaultChatAgent?.extensionId?.toLowerCase();
++		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId?.toLowerCase();
+ 		const relevantExtensions = [this._completionsExtensionId, this._chatExtensionId].filter((id): id is string => !!id);
+ 
+ 		this.isRunningUnificationExperiment = isRunningUnificationExperiment.bindTo(this._contextKeyService);
