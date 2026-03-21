@@ -1,3 +1,15 @@
+diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
+index eb075cad63e..78384a113eb 100644
+--- a/src/vs/platform/actions/common/actions.ts
++++ b/src/vs/platform/actions/common/actions.ts
+@@ -130,6 +130,7 @@ export class MenuId {
+ 	static readonly MenubarTerminalMenu = new MenuId('MenubarTerminalMenu');
+ 	static readonly MenubarTerminalSuggestStatusMenu = new MenuId('MenubarTerminalSuggestStatusMenu');
+ 	static readonly MenubarViewMenu = new MenuId('MenubarViewMenu');
++	static readonly MenubarViewMenuAdvanced = new MenuId('MenubarViewMenuAdvanced'); // Ritemark: Advanced submenu
+ 	static readonly MenubarHomeMenu = new MenuId('MenubarHomeMenu');
+ 	static readonly OpenEditorsContext = new MenuId('OpenEditorsContext');
+ 	static readonly OpenEditorsContextShare = new MenuId('OpenEditorsContextShare');
 diff --git a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts b/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
 index e9595bd406a..e1d2c008227 100644
 --- a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
