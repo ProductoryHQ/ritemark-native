@@ -1,4 +1,4 @@
-# Sprint 30: Mermaid Diagrams — Research Findings
+# Sprint 46: Mermaid Diagrams — Research Findings
 
 ## 1. How Code Blocks Currently Work
 
