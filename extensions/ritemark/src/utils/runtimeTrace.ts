@@ -7,6 +7,8 @@ type OutputChannelLike = {
   show: (preserveFocus?: boolean) => void;
 };
 
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB
+
 function safeSerialize(value: unknown): string {
   try {
     const text = JSON.stringify(value);
@@ -19,13 +21,43 @@ function safeSerialize(value: unknown): string {
   }
 }
 
+function isTraceEnabled(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const dynamicRequire = new Function('name', 'return require(name)') as (name: string) => { workspace?: { getConfiguration?: (section: string) => { get?: (key: string, defaultValue?: unknown) => unknown } } };
+    const vscode = dynamicRequire('vscode');
+    return vscode?.workspace?.getConfiguration?.('ritemark.ai')?.get?.('debugTrace', false) === true;
+  } catch {
+    return false;
+  }
+}
+
+function rotateIfNeeded(logPath: string): void {
+  try {
+    const stat = fs.statSync(logPath);
+    if (stat.size > MAX_LOG_SIZE) {
+      // Keep last ~1MB, discard the rest
+      const content = fs.readFileSync(logPath, 'utf8');
+      const keepFrom = content.length - 1024 * 1024;
+      const newlineAfterCut = content.indexOf('\n', keepFrom);
+      const trimmed = newlineAfterCut >= 0
+        ? `[... log rotated at ${new Date().toISOString()} ...]\n${content.slice(newlineAfterCut + 1)}`
+        : `[... log rotated at ${new Date().toISOString()} ...]\n`;
+      fs.writeFileSync(logPath, trimmed, 'utf8');
+    }
+  } catch {
+    // File doesn't exist yet or can't stat — that's fine.
+  }
+}
+
 export function createRuntimeTrace(outputChannelName: string, logFileName: string) {
   let channel: OutputChannelLike | null = null;
   const traceLogPath = path.join(os.tmpdir(), logFileName);
+  let enabled: boolean | null = null;
+  let writesSinceRotationCheck = 0;
 
   function tryCreateOutputChannel(): OutputChannelLike | null {
     try {
-      // Avoid hard dependency on the vscode module in plain node test runs.
       // eslint-disable-next-line @typescript-eslint/no-implied-eval
       const dynamicRequire = new Function('name', 'return require(name)') as (name: string) => { window?: { createOutputChannel?: (name: string) => OutputChannelLike } };
       const vscode = dynamicRequire('vscode');
@@ -43,6 +75,20 @@ export function createRuntimeTrace(outputChannelName: string, logFileName: strin
   }
 
   function trace(scope: string, message: string, payload?: unknown): void {
+    // Check setting once, then cache (re-checked on show())
+    if (enabled === null) {
+      enabled = isTraceEnabled();
+    }
+    if (!enabled) {
+      return;
+    }
+
+    // Check rotation periodically (every 500 writes) to keep cap effective
+    if (++writesSinceRotationCheck >= 500) {
+      writesSinceRotationCheck = 0;
+      rotateIfNeeded(traceLogPath);
+    }
+
     const timestamp = new Date().toISOString();
     const suffix = payload === undefined ? '' : ` ${safeSerialize(payload)}`;
     const line = `[${timestamp}] [${scope}] ${message}${suffix}`;
@@ -55,6 +101,8 @@ export function createRuntimeTrace(outputChannelName: string, logFileName: strin
   }
 
   function show(): void {
+    // Re-check setting when explicitly showing trace
+    enabled = isTraceEnabled();
     getTraceChannel()?.show(true);
   }
 

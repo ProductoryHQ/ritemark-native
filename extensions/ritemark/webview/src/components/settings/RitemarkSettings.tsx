@@ -45,6 +45,7 @@ interface SettingsData {
   aiModel: string;
   availableModels: ModelInfo[];
   agentTimeout: number;
+  debugTrace: boolean;
   openaiKey: string;
   openaiKeyConfigured: boolean;
   googleKey: string;
@@ -913,6 +914,15 @@ export function RitemarkSettings() {
             Claude will be stopped if it produces no activity for this duration.
             Increase if the agent times out on complex tasks. Default: 15 minutes.
           </p>
+
+          <div className="mt-4 pt-4 border-t border-[var(--vscode-panel-border)]">
+            <ToggleRow
+              label="Debug Trace Logging"
+              description="Log AI agent activity to a temporary file for troubleshooting. Reload window after changing."
+              checked={settings?.debugTrace ?? false}
+              onChange={(v) => handleToggle('ai.debugTrace', v)}
+            />
+          </div>
         </div>
       </section>
 

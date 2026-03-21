@@ -360,6 +360,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
         // Agent
         agentTimeout: config.get('ai.agentTimeout', 15),
+        debugTrace: config.get('ai.debugTrace', false),
 
         // Chat appearance
         chatFontSize: config.get('chat.fontSize', 13),

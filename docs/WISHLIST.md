@@ -62,6 +62,11 @@ In-app help system accessible from activity bar:
 
 - [x] Advanced Claude Code harness in AI sidebar → **Sprint 33** (multi-turn sessions, model selector, image paste, clickable file paths)
 - [x] **Chat font size setting** - User-adjustable font size for AI chat interface (easier reading, accessibility) → **Sprint 37**
+- [ ] **Agent Mode Picker** (Cursor-style) - Dropdown next to input to select agent behavior mode
+  - [ ] Write (default) — agent executes directly, no plan approval gate
+  - [ ] Plan — agent plans first, waits for user approval before executing
+  - [ ] Ask — conversational only, no file edits
+  - [ ] Mode persists per session, resets on new chat
 - [ ] Memories
 - [ ] Customization (CLAUDE.md, Agents.md support)
 - [ ] AI image generation via command palette - \[ \] Opens dialog to configure Google API key - \[ \] Uses Gemini API to generate images
