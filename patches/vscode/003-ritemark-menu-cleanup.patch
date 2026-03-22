@@ -69,7 +69,7 @@ index 40349546ec8..f6a753e49df 100644
  		return { malicious, deprecated, search, autoUpdate };
  	}
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-index ddb5df41847..79cc2586f93 100644
+index ddb5df41847..ca596842a6d 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 @@ -45,7 +45,7 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
@@ -81,7 +81,7 @@ index ddb5df41847..79cc2586f93 100644
  
  const chatViewDescriptor: IViewDescriptor = {
  	id: ChatViewId,
-@@ -68,14 +68,8 @@ const chatViewDescriptor: IViewDescriptor = {
+@@ -68,16 +68,11 @@ const chatViewDescriptor: IViewDescriptor = {
  		order: 1
  	},
  	ctorDescriptor: new SyncDescriptor(ChatViewPane),
@@ -96,8 +96,12 @@ index ddb5df41847..79cc2586f93 100644
 +	// RiteMark: Hide Chat view — Ritemark uses its own AI sidebar
 +	when: ContextKeyExpr.equals('ritemark.chatDisabled', 'true')
  };
- Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
+-Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
++// RiteMark: Don't register Chat view — prevents the Chat icon from appearing in title bar
++// Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
  
+ const chatParticipantExtensionPoint = extensionsRegistry.ExtensionsRegistry.registerExtensionPoint<IRawChatParticipantContribution[]>({
+ 	extensionPoint: 'chatParticipants',
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 index 0e1160d71e4..4c05008524e 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
