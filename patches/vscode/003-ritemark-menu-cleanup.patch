@@ -1,3 +1,42 @@
+diff --git a/src/vs/editor/contrib/comment/browser/comment.ts b/src/vs/editor/contrib/comment/browser/comment.ts
+index 4b2a1461b9a..ff2978436f6 100644
+--- a/src/vs/editor/contrib/comment/browser/comment.ts
++++ b/src/vs/editor/contrib/comment/browser/comment.ts
+@@ -5,7 +5,7 @@
+ 
+ import { KeyChord, KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
+ import * as nls from '../../../../nls.js';
+-import { MenuId } from '../../../../platform/actions/common/actions.js';
++// RiteMark: MenuId import removed - menu items disabled
+ import { KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
+ import { ICodeEditor } from '../../../browser/editorBrowser.js';
+ import { EditorAction, IActionOptions, registerEditorAction, ServicesAccessor } from '../../../browser/editorExtensions.js';
+@@ -89,12 +89,6 @@ class ToggleCommentLineAction extends CommentLineAction {
+ 				primary: KeyMod.CtrlCmd | KeyCode.Slash,
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			menuOpts: {
+-				menuId: MenuId.MenubarEditMenu,
+-				group: '5_insert',
+-				title: nls.localize({ key: 'miToggleLineComment', comment: ['&& denotes a mnemonic'] }, "&&Toggle Line Comment"),
+-				order: 1
+-			},
+ 			canTriggerInlineEdits: true,
+ 		});
+ 	}
+@@ -145,12 +139,6 @@ class BlockCommentAction extends EditorAction {
+ 				linux: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyA },
+ 				weight: KeybindingWeight.EditorContrib
+ 			},
+-			menuOpts: {
+-				menuId: MenuId.MenubarEditMenu,
+-				group: '5_insert',
+-				title: nls.localize({ key: 'miToggleBlockComment', comment: ['&& denotes a mnemonic'] }, "Toggle &&Block Comment"),
+-				order: 2
+-			},
+ 			canTriggerInlineEdits: true,
+ 		});
+ 	}
 diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
 index eb075cad63e..78384a113eb 100644
 --- a/src/vs/platform/actions/common/actions.ts
@@ -68,6 +107,82 @@ index 40349546ec8..f6a753e49df 100644
  
  		return { malicious, deprecated, search, autoUpdate };
  	}
+diff --git a/src/vs/workbench/browser/parts/editor/editor.contribution.ts b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
+index 14235489654..be6bcf0164b 100644
+--- a/src/vs/workbench/browser/parts/editor/editor.contribution.ts
++++ b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
+@@ -686,13 +686,13 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	order: 1,
+ });
+ 
+-// Layout menu
+-MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
+-	group: '2_appearance',
+-	title: localize({ key: 'miEditorLayout', comment: ['&& denotes a mnemonic'] }, "Editor &&Layout"),
+-	submenu: MenuId.MenubarLayoutMenu,
+-	order: 2
+-});
++// RiteMark: Editor Layout submenu removed - not relevant for markdown editing
++// MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
++// 	group: '2_appearance',
++// 	title: localize({ key: 'miEditorLayout', comment: ['&& denotes a mnemonic'] }, "Editor &&Layout"),
++// 	submenu: MenuId.MenubarLayoutMenu,
++// 	order: 2
++// });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarLayoutMenu, {
+ 	group: '1_split',
+diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
+index 92fe6a17377..43193d7dcc5 100644
+--- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
++++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
+@@ -85,25 +85,27 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+ 	order: 4
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+-	submenu: MenuId.MenubarGoMenu,
+-	title: {
+-		value: 'Go',
+-		original: 'Go',
+-		mnemonicTitle: localize({ key: 'mGoto', comment: ['&& denotes a mnemonic'] }, "&&Go")
+-	},
+-	order: 5
+-});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+-	submenu: MenuId.MenubarTerminalMenu,
+-	title: {
+-		value: 'Terminal',
+-		original: 'Terminal',
+-		mnemonicTitle: localize({ key: 'mTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal")
+-	},
+-	order: 7
+-});
++// RiteMark: Go menu removed - code navigation not relevant for markdown editing
++// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
++// 	submenu: MenuId.MenubarGoMenu,
++// 	title: {
++// 		value: 'Go',
++// 		original: 'Go',
++// 		mnemonicTitle: localize({ key: 'mGoto', comment: ['&& denotes a mnemonic'] }, "&&Go")
++// 	},
++// 	order: 5
++// });
++
++// RiteMark: Terminal menu removed - terminal is accessible from sidebar
++// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
++// 	submenu: MenuId.MenubarTerminalMenu,
++// 	title: {
++// 		value: 'Terminal',
++// 		original: 'Terminal',
++// 		mnemonicTitle: localize({ key: 'mTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal")
++// 	},
++// 	order: 7
++// });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+ 	submenu: MenuId.MenubarHelpMenu,
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 index ddb5df41847..7364dd113b7 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
@@ -208,6 +323,65 @@ index 7b2cbce78b2..dea3adcac13 100644
  viewsRegistry.registerViews([{ id: LOADED_SCRIPTS_VIEW_ID, name: nls.localize2('loadedScripts', "Loaded Scripts"), containerIcon: icons.loadedScriptsViewIcon, ctorDescriptor: new SyncDescriptor(LoadedScriptsView), order: 35, weight: 5, canToggleVisibility: true, canMoveView: true, collapsed: true, when: ContextKeyExpr.and(CONTEXT_LOADED_SCRIPTS_SUPPORTED, CONTEXT_DEBUG_UX.isEqualTo('default')) }], viewContainer);
  
  // Register disassembly view
+diff --git a/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts b/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
+index 59e1c903fdd..033df2f485a 100644
+--- a/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
++++ b/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
+@@ -9,7 +9,7 @@ import { EditorContextKeys } from '../../../../../editor/common/editorContextKey
+ import { KeyCode } from '../../../../../base/common/keyCodes.js';
+ import { ContextKeyExpr } from '../../../../../platform/contextkey/common/contextkey.js';
+ import { KeybindingWeight } from '../../../../../platform/keybinding/common/keybindingsRegistry.js';
+-import { MenuId } from '../../../../../platform/actions/common/actions.js';
++// RiteMark: MenuId import removed - menu item disabled
+ 
+ class ExpandAbbreviationAction extends EmmetEditorAction {
+ 
+@@ -27,12 +27,6 @@ class ExpandAbbreviationAction extends EmmetEditorAction {
+ 					ContextKeyExpr.has('config.emmet.triggerExpansionOnTab')
+ 				),
+ 				weight: KeybindingWeight.EditorContrib
+-			},
+-			menuOpts: {
+-				menuId: MenuId.MenubarEditMenu,
+-				group: '5_insert',
+-				title: nls.localize({ key: 'miEmmetExpandAbbreviation', comment: ['&& denotes a mnemonic'] }, "Emmet: E&&xpand Abbreviation"),
+-				order: 3
+ 			}
+ 		});
+ 
+diff --git a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
+index 6956d7918b3..84f6834ee2d 100644
+--- a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
++++ b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
+@@ -8,7 +8,7 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
+ import { IStringDictionary } from '../../../../base/common/collections.js';
+ import { onUnexpectedError } from '../../../../base/common/errors.js';
+ import { Event } from '../../../../base/common/event.js';
+-import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
++// RiteMark: KeyMod, KeyCode removed - unused after hiding Extensions menu item
+ import { mnemonicButtonLabel } from '../../../../base/common/labels.js';
+ import { Disposable, DisposableStore, IDisposable, isDisposable } from '../../../../base/common/lifecycle.js';
+ import { Schemas } from '../../../../base/common/network.js';
+@@ -115,12 +115,13 @@ export const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainer
+ 	{
+ 		id: VIEWLET_ID,
+ 		title: localize2('extensions', "Extensions"),
+-		openCommandActionDescriptor: {
+-			id: VIEWLET_ID,
+-			mnemonicTitle: localize({ key: 'miViewExtensions', comment: ['&& denotes a mnemonic'] }, "E&&xtensions"),
+-			keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyX },
+-			order: 4,
+-		},
++		// RiteMark: Remove Extensions from View menu - marketplace is hidden
++		// openCommandActionDescriptor: {
++		// 	id: VIEWLET_ID,
++		// 	mnemonicTitle: localize({ key: 'miViewExtensions', comment: ['&& denotes a mnemonic'] }, "E&&xtensions"),
++		// 	keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyX },
++		// 	order: 4,
++		// },
+ 		ctorDescriptor: new SyncDescriptor(ExtensionsViewPaneContainer),
+ 		icon: extensionsViewIcon,
+ 		order: 4,
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
 index 23ea0f7354a..b717811344e 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
