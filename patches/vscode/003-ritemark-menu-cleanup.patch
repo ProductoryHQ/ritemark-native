@@ -69,9 +69,18 @@ index 40349546ec8..f6a753e49df 100644
  		return { malicious, deprecated, search, autoUpdate };
  	}
 diff --git a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentTitleBarStatusWidget.ts b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentTitleBarStatusWidget.ts
-index b4d2442497f..8af82dfe7bc 100644
+index b4d2442497f..bf4acbef050 100644
 --- a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentTitleBarStatusWidget.ts
 +++ b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentTitleBarStatusWidget.ts
+@@ -31,7 +31,7 @@ import { Schemas } from '../../../../../../base/common/network.js';
+ import { renderAsPlaintext } from '../../../../../../base/browser/markdownRenderer.js';
+ import { openSession } from '../agentSessionsOpener.js';
+ import { IInstantiationService } from '../../../../../../platform/instantiation/common/instantiation.js';
+-import { IMenuService, MenuId, MenuItemAction, SubmenuItemAction } from '../../../../../../platform/actions/common/actions.js';
++import { IMenuService, MenuId, MenuItemAction } from '../../../../../../platform/actions/common/actions.js'; // RiteMark: SubmenuItemAction removed — unused
+ import { IContextKeyService } from '../../../../../../platform/contextkey/common/contextkey.js';
+ import { HiddenItemStrategy, WorkbenchToolBar } from '../../../../../../platform/actions/browser/toolbar.js';
+ import { DropdownWithPrimaryActionViewItem } from '../../../../../../platform/actions/browser/dropdownWithPrimaryActionViewItem.js';
 @@ -1240,18 +1240,19 @@ export class AgentTitleBarStatusRendering extends Disposable implements IWorkben
  	static readonly ID = 'workbench.contrib.agentStatus.rendering';
  
