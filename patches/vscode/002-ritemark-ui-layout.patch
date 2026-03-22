@@ -22,7 +22,7 @@ index 833787070f3..7cb8cf44871 100644
  				icon,
  			}, location);
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index fea736cad03..c4bfb64deef 100644
+index fea736cad03..f7206021786 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
 @@ -41,9 +41,10 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
@@ -111,7 +111,20 @@ index fea736cad03..c4bfb64deef 100644
  // Toggle Sidebar Visibility
  
  export class ToggleSidebarVisibilityAction extends Action2 {
-@@ -346,23 +375,19 @@ MenuRegistry.appendMenuItems([
+@@ -299,9 +328,10 @@ export class ToggleSidebarVisibilityAction extends Action2 {
+ 			},
+ 			category: Categories.View,
+ 			f1: true,
+-			keybinding: {
++			// RiteMark: Cmd+B removed — conflicts with Bold in editor
++		keybinding: {
+ 				weight: KeybindingWeight.WorkbenchContrib,
+-				primary: KeyMod.CtrlCmd | KeyCode.KeyB
++				// primary: KeyMod.CtrlCmd | KeyCode.KeyB
+ 			},
+ 			menu: [
+ 				{
+@@ -346,23 +376,19 @@ MenuRegistry.appendMenuItems([
  			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewContainerLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
  			order: 2
  		}
@@ -141,7 +154,7 @@ index fea736cad03..c4bfb64deef 100644
  			order: 0
  		}
  	}, {
-@@ -370,19 +395,25 @@ MenuRegistry.appendMenuItems([
+@@ -370,19 +396,25 @@ MenuRegistry.appendMenuItems([
  		item: {
  			group: '2_pane_toggles',
  			command: {
