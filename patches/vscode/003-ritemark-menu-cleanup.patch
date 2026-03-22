@@ -69,19 +69,22 @@ index 40349546ec8..f6a753e49df 100644
  		return { malicious, deprecated, search, autoUpdate };
  	}
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-index ddb5df41847..ca596842a6d 100644
+index ddb5df41847..7364dd113b7 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-@@ -45,7 +45,7 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
+@@ -45,8 +45,10 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
  	storageId: ChatViewContainerId,
  	hideIfEmpty: true,
  	order: 1,
 -}, ViewContainerLocation.AuxiliaryBar, { isDefault: true, doNotRegisterOpenCommand: true });
 +}, ViewContainerLocation.AuxiliaryBar, { isDefault: false, doNotRegisterOpenCommand: true }); // RiteMark: isDefault=false to prevent Chat icon in title bar
  
++// RiteMark: Chat view fully disabled — descriptor and registration commented out
++void chatViewContainer;
  const chatViewDescriptor: IViewDescriptor = {
  	id: ChatViewId,
-@@ -68,16 +68,11 @@ const chatViewDescriptor: IViewDescriptor = {
+ 	containerIcon: chatViewContainer.icon,
+@@ -68,16 +70,12 @@ const chatViewDescriptor: IViewDescriptor = {
  		order: 1
  	},
  	ctorDescriptor: new SyncDescriptor(ChatViewPane),
@@ -99,6 +102,7 @@ index ddb5df41847..ca596842a6d 100644
 -Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
 +// RiteMark: Don't register Chat view — prevents the Chat icon from appearing in title bar
 +// Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
++void chatViewDescriptor;
  
  const chatParticipantExtensionPoint = extensionsRegistry.ExtensionsRegistry.registerExtensionPoint<IRawChatParticipantContribution[]>({
  	extensionPoint: 'chatParticipants',
