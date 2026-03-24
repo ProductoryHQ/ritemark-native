@@ -164,6 +164,17 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
             // Show folder picker dialog for Save File node
             this.showFolderPicker(message.field, workspacePath, webview);
             return;
+
+          case 'codex:getModels':
+            // Return available Codex models
+            try {
+              const { getCodexModels } = require('../codex');
+              const models = getCodexModels();
+              webview.postMessage({ type: 'codex:modelsResult', models });
+            } catch {
+              webview.postMessage({ type: 'codex:modelsResult', models: [] });
+            }
+            return;
         }
       },
       undefined,

@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { Sparkles, Image, Save, Zap, Bot } from 'lucide-react';
+import { Sparkles, Image, Save, Zap, Bot, Terminal } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface NodeTemplate {
@@ -54,6 +54,12 @@ const nodeCategories: NodeCategory[] = [
         label: 'Claude Code',
         icon: <Bot size={18} />,
         description: 'Run autonomous coding tasks with Claude Code',
+      },
+      {
+        type: 'codexNode',
+        label: 'Codex',
+        icon: <Terminal size={18} />,
+        description: 'Run autonomous coding tasks with OpenAI Codex',
       },
     ],
   },

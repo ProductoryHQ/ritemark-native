@@ -5,7 +5,7 @@
  * Shows different fields based on node type.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trash2, Plus, X, FolderOpen } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -24,6 +24,7 @@ import type {
   ImageNodeData,
   SaveFileNodeData,
   ClaudeCodeNodeData,
+  CodexNodeData,
   FlowInput,
 } from './stores/flowEditorStore';
 import { cn } from '../../lib/utils';
@@ -124,6 +125,14 @@ export function NodeConfigPanel() {
           <ClaudeCodeNodeConfig
             nodeId={selectedNode.id}
             data={selectedNode.data as ClaudeCodeNodeData}
+            onUpdate={(data) => updateNodeData(selectedNode.id, data)}
+          />
+        )}
+
+        {selectedNode.type === 'codexNode' && (
+          <CodexNodeConfig
+            nodeId={selectedNode.id}
+            data={selectedNode.data as CodexNodeData}
             onUpdate={(data) => updateNodeData(selectedNode.id, data)}
           />
         )}
@@ -904,6 +913,109 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
           Claude Code CLI must be installed and authenticated. Run{' '}
           <code className="px-1 bg-[var(--vscode-editor-background)] rounded">claude</code>{' '}
           in your terminal to set up.
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Codex Node Configuration
+interface CodexNodeConfigProps {
+  nodeId: string;
+  data: CodexNodeData;
+  onUpdate: (data: Partial<CodexNodeData>) => void;
+}
+
+function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
+  const [codexModels, setCodexModels] = useState<Array<{ id: string; label: string }>>([]);
+
+  const handleModelsMessage = useCallback((event: MessageEvent) => {
+    const message = event.data;
+    if (message.type === 'codex:modelsResult') {
+      setCodexModels(message.models || []);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('message', handleModelsMessage);
+    vscode.postMessage({ type: 'codex:getModels' });
+    return () => window.removeEventListener('message', handleModelsMessage);
+  }, [handleModelsMessage]);
+
+  return (
+    <>
+      <Field label="Label">
+        <Input
+          value={data.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          placeholder="Enter label..."
+        />
+      </Field>
+
+      <Field
+        label="Prompt"
+        description="Type / to insert variables. Describe the coding task for Codex."
+      >
+        <PromptTextArea
+          value={data.prompt || ''}
+          onChange={(val) => onUpdate({ prompt: val })}
+          placeholder="Create a README.md file for this project..."
+          nodeId={nodeId}
+          className="min-h-[150px]"
+        />
+      </Field>
+
+      <Field
+        label="Model"
+        description="Select the Codex model to use."
+      >
+        <Select
+          value={data.model || ''}
+          onValueChange={(value) => onUpdate({ model: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Default model" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Default</SelectItem>
+            {codexModels.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                {model.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+
+      <Field
+        label="Timeout (minutes)"
+        description="1-60 minutes. Increase for complex tasks."
+      >
+        <Input
+          type="number"
+          min={1}
+          max={60}
+          value={data.timeout ?? 5}
+          onChange={(e) =>
+            onUpdate({ timeout: parseInt(e.target.value) || 5 })
+          }
+        />
+      </Field>
+
+      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
+        <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+          <strong className="text-[var(--vscode-foreground)]">Tip:</strong>{' '}
+          Reference upstream file outputs using{' '}
+          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Node Label}'}</code>.
+          Example: "Process the file at{' '}
+          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Save File}'}</code>"
+        </div>
+      </div>
+
+      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
+        <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+          <strong className="text-[var(--vscode-foreground)]">Note:</strong>{' '}
+          Codex CLI must be installed and authenticated via ChatGPT. Actions are auto-approved during flow execution.
         </div>
       </div>
     </>
