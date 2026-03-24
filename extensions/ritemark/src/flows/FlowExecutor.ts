@@ -16,6 +16,7 @@ import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
+import { executeCodexNode } from './nodes/CodexNodeExecutor';
 
 /**
  * Progress callback
@@ -105,6 +106,9 @@ async function executeNode(
 
     case 'claude-code':
       return await executeClaudeCodeNode(node, context, abortSignal);
+
+    case 'codex':
+      return await executeCodexNode(node, context, abortSignal);
 
     default:
       console.error('[FlowExecutor] Unknown node type! Full node:', JSON.stringify(node, null, 2));

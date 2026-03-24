@@ -13,6 +13,7 @@ import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
+import { executeCodexNode } from './nodes/CodexNodeExecutor';
 import { isValidFlowSchedule } from './flowSchedule';
 import { FlowScheduleState } from './FlowScheduleState';
 import { getAPIKeyManager } from '../ai/apiKeyManager';
@@ -171,6 +172,16 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'flow:getScheduleStatus':
             void this.sendScheduleStatus(document, webview);
+
+          case 'codex:getModels':
+            // Return available Codex models
+            try {
+              const { getCodexModels } = require('../codex');
+              const models = getCodexModels();
+              webview.postMessage({ type: 'codex:modelsResult', models });
+            } catch {
+              webview.postMessage({ type: 'codex:modelsResult', models: [] });
+            }
             return;
         }
       },
@@ -584,6 +595,20 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           : undefined;
 
         return await executeClaudeCodeNode(node, context, undefined, onProgress);
+      }
+
+      case 'codex': {
+        const onProgress = webview
+          ? (progress: ClaudeCodeProgress) => {
+              webview.postMessage({
+                type: 'flow:codexProgress',
+                nodeId: node.id,
+                progress,
+              });
+            }
+          : undefined;
+
+        return await executeCodexNode(node, context, undefined, onProgress);
       }
 
       default:
