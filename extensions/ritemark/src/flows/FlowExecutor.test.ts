@@ -7,7 +7,7 @@
 import * as assert from 'assert';
 
 // Simulate the executeNode switch statement logic
-type NodeType = 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
+type NodeType = 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code' | 'codex';
 
 interface MockNode {
   id: string;
@@ -28,6 +28,8 @@ function getNodeHandler(nodeType: NodeType): string {
       return 'executeSaveFileNode';
     case 'claude-code':
       return 'executeClaudeCodeNode';
+    case 'codex':
+      return 'executeCodexNode';
     default:
       // This should never happen with proper types
       throw new Error(`Unknown node type: ${nodeType}`);
@@ -37,7 +39,7 @@ function getNodeHandler(nodeType: NodeType): string {
 console.log('Testing FlowExecutor node type handling...');
 
 // Test 1: All node types have handlers
-const allNodeTypes: NodeType[] = ['trigger', 'llm-prompt', 'image-prompt', 'save-file', 'claude-code'];
+const allNodeTypes: NodeType[] = ['trigger', 'llm-prompt', 'image-prompt', 'save-file', 'claude-code', 'codex'];
 
 for (const nodeType of allNodeTypes) {
   const handler = getNodeHandler(nodeType);
@@ -53,7 +55,7 @@ assert.strictEqual(
 );
 
 // Test 3: Verify node types match expected list
-const expectedTypes = new Set(['trigger', 'llm-prompt', 'image-prompt', 'save-file', 'claude-code']);
+const expectedTypes = new Set(['trigger', 'llm-prompt', 'image-prompt', 'save-file', 'claude-code', 'codex']);
 const actualTypes = new Set(allNodeTypes);
 assert.deepStrictEqual(actualTypes, expectedTypes, 'All expected node types should be present');
 
@@ -84,5 +86,26 @@ const mockSaveFileNode: MockNode = {
 
 assert.strictEqual(mockSaveFileNode.type, 'save-file', 'Mock Save File node should have correct type');
 assert.strictEqual(getNodeHandler(mockSaveFileNode.type), 'executeSaveFileNode', 'Save File should route to correct handler');
+
+// Test 6: Codex specifically returns the correct handler
+assert.strictEqual(
+  getNodeHandler('codex'),
+  'executeCodexNode',
+  'codex should be handled by executeCodexNode'
+);
+
+const mockCodexNode: MockNode = {
+  id: 'test-node-3',
+  type: 'codex',
+  data: {
+    label: 'Codex',
+    prompt: 'Refactor this module',
+    model: 'gpt-5.3-codex',
+    timeout: 5,
+  },
+};
+
+assert.strictEqual(mockCodexNode.type, 'codex', 'Mock Codex node should have correct type');
+assert.strictEqual(getNodeHandler(mockCodexNode.type), 'executeCodexNode', 'Mock Codex node should route to correct handler');
 
 console.log('\n✅ All FlowExecutor tests passed!');

@@ -19,7 +19,7 @@ interface FlowInput {
 
 interface FlowNode {
   id: string;
-  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
+  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code' | 'codex';
   position: { x: number; y: number };
   data: Record<string, unknown>;
 }
@@ -74,7 +74,7 @@ function validateFlow(flow: Flow): string[] {
 
   // Check for processing nodes
   const hasProcessing = flow.nodes.some(n =>
-    ['llm-prompt', 'image-prompt', 'save-file', 'claude-code'].includes(n.type)
+    ['llm-prompt', 'image-prompt', 'save-file', 'claude-code', 'codex'].includes(n.type)
   );
   if (!hasProcessing) errors.push('Flow has no processing nodes');
 
@@ -223,6 +223,14 @@ function mockExecuteNode(node: FlowNode, context: ExecutionContext): unknown {
       const prompt = interpolateVariables(data.prompt as string || '', context);
       return {
         text: `[Claude Code executed: ${prompt.substring(0, 50)}...]`,
+        files: ['/mock/file1.ts', '/mock/file2.ts'],
+      };
+    }
+
+    case 'codex': {
+      const prompt = interpolateVariables(data.prompt as string || '', context);
+      return {
+        text: `[Codex executed: ${prompt.substring(0, 50)}...]`,
         files: ['/mock/file1.ts', '/mock/file2.ts'],
       };
     }

@@ -30,6 +30,11 @@ import type {
 import { cn } from '../../lib/utils';
 import { vscode } from '../../lib/vscode';
 import { PromptTextArea } from './PromptTextArea';
+import {
+  CODEX_DEFAULT_MODEL_SENTINEL,
+  getCodexModelFromSelectValue,
+  getCodexModelSelectValue,
+} from './codexModelSelect';
 
 export function NodeConfigPanel() {
   const selectedNode = useSelectedNode();
@@ -970,14 +975,14 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
         description="Select the Codex model to use."
       >
         <Select
-          value={data.model || ''}
-          onValueChange={(value) => onUpdate({ model: value })}
+          value={getCodexModelSelectValue(data.model)}
+          onValueChange={(value) => onUpdate({ model: getCodexModelFromSelectValue(value) })}
         >
           <SelectTrigger>
             <SelectValue placeholder="Default model" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Default</SelectItem>
+            <SelectItem value={CODEX_DEFAULT_MODEL_SENTINEL}>Default</SelectItem>
             {codexModels.map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 {model.label}
