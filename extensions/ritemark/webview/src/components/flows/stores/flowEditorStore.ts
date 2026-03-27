@@ -74,7 +74,14 @@ export interface ClaudeCodeNodeData extends Record<string, unknown> {
   timeout: number;
 }
 
-export type FlowNodeData = TriggerNodeData | LLMNodeData | ImageNodeData | SaveFileNodeData | ClaudeCodeNodeData;
+export interface CodexNodeData extends Record<string, unknown> {
+  label: string;
+  prompt: string;
+  model: string;
+  timeout: number;
+}
+
+export type FlowNodeData = TriggerNodeData | LLMNodeData | ImageNodeData | SaveFileNodeData | ClaudeCodeNodeData | CodexNodeData;
 
 // Flow types from extension
 export interface Flow {
@@ -87,7 +94,7 @@ export interface Flow {
   inputs: FlowInput[];
   nodes: Array<{
     id: string;
-    type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
+    type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code' | 'codex';
     position: { x: number; y: number };
     data: Record<string, unknown>;
   }>;
@@ -105,6 +112,7 @@ const flowTypeToReactFlowType: Record<string, string> = {
   'image-prompt': 'imageNode',
   'save-file': 'saveFileNode',
   'claude-code': 'claudeCodeNode',
+  'codex': 'codexNode',
 };
 
 const reactFlowTypeToFlowType: Record<string, string> = {
@@ -113,6 +121,7 @@ const reactFlowTypeToFlowType: Record<string, string> = {
   'imageNode': 'image-prompt',
   'saveFileNode': 'save-file',
   'claudeCodeNode': 'claude-code',
+  'codexNode': 'codex',
 };
 
 // Helper to escape special regex characters
@@ -267,6 +276,13 @@ function getDefaultNodeData(type: string): FlowNodeData {
       return {
         label: 'Claude Code',
         prompt: '',
+        timeout: 5,
+      };
+    case 'codexNode':
+      return {
+        label: 'Codex',
+        prompt: '',
+        model: '',
         timeout: 5,
       };
     default:
@@ -516,6 +532,23 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
             }
           }
 
+          // Check Claude Code and Codex node prompts
+          if (node.type === 'claudeCodeNode' || node.type === 'codexNode') {
+            let prompt = (nodeData as { prompt?: string }).prompt || '';
+
+            for (const { oldLabel, newLabel } of labelChanges) {
+              const pattern = new RegExp(`\\{${escapeRegex(oldLabel)}\\}`, 'g');
+              if (pattern.test(prompt)) {
+                prompt = prompt.replace(pattern, `{${newLabel}}`);
+                updated = true;
+              }
+            }
+
+            if (updated) {
+              newData.prompt = prompt;
+            }
+          }
+
           if (updated) {
             return { ...node, data: newData as FlowNodeData };
           }
@@ -632,7 +665,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
           | 'llm-prompt'
           | 'image-prompt'
           | 'save-file'
-          | 'claude-code',
+          | 'claude-code'
+          | 'codex',
         position: node.position,
         data: node.data as Record<string, unknown>,
       })),

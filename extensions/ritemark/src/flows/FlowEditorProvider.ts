@@ -13,6 +13,7 @@ import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
+import { executeCodexNode } from './nodes/CodexNodeExecutor';
 import { getAPIKeyManager } from '../ai/apiKeyManager';
 import {
   OPENAI_LLM_MODELS,
@@ -163,6 +164,17 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           case 'flow:pickFolder':
             // Show folder picker dialog for Save File node
             this.showFolderPicker(message.field, workspacePath, webview);
+            return;
+
+          case 'codex:getModels':
+            // Return available Codex models
+            try {
+              const { getCodexModels } = require('../codex');
+              const models = getCodexModels();
+              webview.postMessage({ type: 'codex:modelsResult', models });
+            } catch {
+              webview.postMessage({ type: 'codex:modelsResult', models: [] });
+            }
             return;
         }
       },
@@ -359,6 +371,14 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           warnings.push(`Save File node "${(node.data as { label?: string }).label || node.id}" has no source node or content`);
         }
       }
+
+      // Check coding nodes missing prompts
+      if (node.type === 'claude-code' || node.type === 'codex') {
+        const data = node.data as { prompt?: string };
+        if (!data.prompt?.trim()) {
+          warnings.push(`${node.type === 'claude-code' ? 'Claude Code' : 'Codex'} node "${(node.data as { label?: string }).label || node.id}" has no prompt`);
+        }
+      }
     }
 
     return warnings;
@@ -546,6 +566,20 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           : undefined;
 
         return await executeClaudeCodeNode(node, context, undefined, onProgress);
+      }
+
+      case 'codex': {
+        const onProgress = webview
+          ? (progress: ClaudeCodeProgress) => {
+              webview.postMessage({
+                type: 'flow:codexProgress',
+                nodeId: node.id,
+                progress,
+              });
+            }
+          : undefined;
+
+        return await executeCodexNode(node, context, undefined, onProgress);
       }
 
       default:

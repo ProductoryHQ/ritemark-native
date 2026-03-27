@@ -32,11 +32,11 @@ import { vscode } from '../../lib/vscode';
 interface ExecutionStep {
   nodeId: string;
   label: string;
-  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
+  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code' | 'codex';
   status: 'pending' | 'running' | 'complete' | 'error';
   output?: string;
   error?: string;
-  /** Claude Code progress messages */
+  /** Autonomous coding node progress messages */
   progress?: Array<{ type: string; message: string; tool?: string }>;
 }
 
@@ -52,6 +52,7 @@ const nodeIcons: Record<string, typeof Sparkles> = {
   'image-prompt': Image,
   'save-file': Save,
   'claude-code': Terminal,
+  'codex': Terminal,
 };
 
 // Validate flow can run
@@ -66,7 +67,7 @@ function validateFlow(flow: Flow): string[] {
 
   // Check if there's at least one processing node (LLM, Image, Claude Code, or Save)
   const hasProcessingNode = flow.nodes.some(
-    (n) => n.type === 'llm-prompt' || n.type === 'image-prompt' || n.type === 'save-file' || n.type === 'claude-code'
+    (n) => n.type === 'llm-prompt' || n.type === 'image-prompt' || n.type === 'save-file' || n.type === 'claude-code' || n.type === 'codex'
   );
   if (!hasProcessingNode && flow.nodes.length > 0) {
     errors.push('Flow needs at least one AI or Output node');
@@ -170,7 +171,8 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
           break;
 
         case 'flow:claudeCodeProgress':
-          // Claude Code progress update - add to step's progress array
+        case 'flow:codexProgress':
+          // Autonomous coding node progress update - add to step's progress array
           setSteps((prev) =>
             prev.map((step) =>
               step.nodeId === message.nodeId

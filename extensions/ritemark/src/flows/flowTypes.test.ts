@@ -7,10 +7,10 @@
 import * as assert from 'assert';
 
 // Backend flow types (from types.ts)
-type BackendNodeType = 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
+type BackendNodeType = 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code' | 'codex';
 
 // Webview React Flow types
-type ReactFlowNodeType = 'triggerNode' | 'llmNode' | 'imageNode' | 'saveFileNode' | 'claudeCodeNode';
+type ReactFlowNodeType = 'triggerNode' | 'llmNode' | 'imageNode' | 'saveFileNode' | 'claudeCodeNode' | 'codexNode';
 
 // Mapping from backend type to React Flow type (from flowEditorStore.ts)
 const flowTypeToReactFlowType: Record<BackendNodeType, ReactFlowNodeType> = {
@@ -19,6 +19,7 @@ const flowTypeToReactFlowType: Record<BackendNodeType, ReactFlowNodeType> = {
   'image-prompt': 'imageNode',
   'save-file': 'saveFileNode',
   'claude-code': 'claudeCodeNode',
+  'codex': 'codexNode',
 };
 
 // Reverse mapping (from flowEditorStore.ts)
@@ -28,12 +29,13 @@ const reactFlowTypeToFlowType: Record<ReactFlowNodeType, BackendNodeType> = {
   'imageNode': 'image-prompt',
   'saveFileNode': 'save-file',
   'claudeCodeNode': 'claude-code',
+  'codexNode': 'codex',
 };
 
 console.log('Testing flow type mappings...');
 
 // Test 1: All backend types have a React Flow mapping
-const backendTypes: BackendNodeType[] = ['trigger', 'llm-prompt', 'image-prompt', 'save-file', 'claude-code'];
+const backendTypes: BackendNodeType[] = ['trigger', 'llm-prompt', 'image-prompt', 'save-file', 'claude-code', 'codex'];
 for (const type of backendTypes) {
   assert.ok(
     flowTypeToReactFlowType[type],
@@ -43,7 +45,7 @@ for (const type of backendTypes) {
 console.log('  ✓ All backend types have React Flow mappings');
 
 // Test 2: All React Flow types have a backend mapping
-const reactFlowTypes: ReactFlowNodeType[] = ['triggerNode', 'llmNode', 'imageNode', 'saveFileNode', 'claudeCodeNode'];
+const reactFlowTypes: ReactFlowNodeType[] = ['triggerNode', 'llmNode', 'imageNode', 'saveFileNode', 'claudeCodeNode', 'codexNode'];
 for (const type of reactFlowTypes) {
   assert.ok(
     reactFlowTypeToFlowType[type],
@@ -84,5 +86,18 @@ assert.strictEqual(
   'save-file should map to saveFileNode'
 );
 console.log('  ✓ Save File mappings are correct');
+
+// Test 6: Codex specifically
+assert.strictEqual(
+  flowTypeToReactFlowType['codex'],
+  'codexNode',
+  'codex should map to codexNode'
+);
+assert.strictEqual(
+  reactFlowTypeToFlowType['codexNode'],
+  'codex',
+  'codexNode should map to codex'
+);
+console.log('  ✓ Codex mappings are correct');
 
 console.log('\n✅ All flow type mapping tests passed!');
