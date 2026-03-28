@@ -147,12 +147,12 @@ Kirjutajad hoolivad oma töökeskkonna välimusest. Teemad töötavad alati kuna
 
 Nimekirjas **esimesed** on need, mis annavad kohe väärtust ja töötavad kindlalt:
 
-1. **Draw.io Integration** — diagrammid, oma editor, väga poleeritud
-2. **Pencil.dev** — joonistamine, visuaalne mõtlemine
-3. **Rainbow CSV** — CSV failide parem kogemus
-4. **Data Preview** — andmete visualiseerimine
-5. **GitLens** — versiooniajalugu visuaalselt
-6. **Mermaid Preview** — täiendab sisseehitatud Mermaid tuge
+1. **Pencil.dev** — disain + MCP agendi-integratsioon, JSON-põhine `.pen` formaat, Figma-sarnane canvas. Parim "Office for Agents" showcase.
+2. **Draw.io Integration** — diagrammid, oma editor, XML-põhine, agent saab luua/muuta
+3. **Rainbow CSV** — CSV failide parem kogemus, oma editor
+4. **Mermaid Preview** — täiendab sisseehitatud Mermaid tuge, plaintext formaat
+5. **Data Preview** — andmete visualiseerimine graafikutena
+6. **GitLens** — versiooniajalugu visuaalselt
 
 ---
 
@@ -173,8 +173,8 @@ Nimekirjas **esimesed** on need, mis annavad kohe väärtust ja töötavad kindl
 ### Kolmanda osapoole partnerlused
 
 Extensionite autorid, kellega koostöö võiks sobida:
-- **Pencil.dev** — visuaalsed tööriistad kirjutajatele
-- **Draw.io** — diagrammid ja vooskeemid
+- **Pencil.dev** (`highagency.pencildev`) — Figma-sarnane disainitööriist otse editoris. `.pen` failid on puhas JSON, MCP server annab agentidele täieliku lugemis- ja kirjutamisõiguse. Ideaalne "Office for Agents" näide: kasutaja disainib, agent genereerib koodi, või vastupidi.
+- **Draw.io** — diagrammid ja vooskeemid, `.drawio` on XML
 - **Zotero** (kui VS Code extension tuleb) — akadeemiline tsiteerimine
 
 ---
@@ -215,7 +215,7 @@ Kui agent ei saa failiformaadiga midagi teha, siis on see "tavaline tööriist",
 | Extension | Failiformaat | Agent saab lugeda? | Agent saab luua? | Agent saab muuta? | Hinnang |
 |-----------|-------------|-------------------|-----------------|------------------|---------|
 | Draw.io | `.drawio` (XML) | Jah — XML on loetav | Jah — agent saab XML-i genereerida | Jah — XML node'ide lisamine/muutmine | Suurepärane |
-| Pencil.dev | TBD | TBD — vajab uurimist | TBD | TBD | Uurida |
+| Pencil.dev (`highagency.pencildev`) | `.pen` (JSON) | Jah — puhas JSON, loetav | Jah — agent genereerib JSON struktuurid | Jah — MCP server (`read_canvas`, `get_style_guide`, write tools) | Suurepärane |
 | Rainbow CSV | `.csv` | Jah — plaintext | Jah | Jah | Suurepärane |
 | Data Preview | `.csv`/`.json` | Jah | Jah | Jah | Suurepärane |
 | GitLens | Git repo | Jah — git commands | N/A | N/A | OK (readonly) |
