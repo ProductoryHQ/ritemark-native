@@ -19,6 +19,8 @@ import { registerFlowTestCommand } from './flows/FlowTestRunner';
 import { DocumentIndexer } from './rag/indexer';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
+import { initAnalytics, shutdownAnalytics } from './analytics/posthog';
+import { registerReactionCommand } from './analytics/reactions';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
@@ -160,6 +162,10 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize connectivity monitoring (status bar + online detection)
   initConnectivity(context);
+
+  // Initialize analytics (anonymous usage tracking + reactions)
+  initAnalytics(context);
+  registerReactionCommand(context);
 
   // Initialize update service
   const updateStorage = new UpdateStorage(context.globalState);
@@ -429,6 +435,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 }
 
-export function deactivate() {
+export async function deactivate() {
+  await shutdownAnalytics();
   documentIndexer?.dispose();
 }
