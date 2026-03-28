@@ -28,7 +28,8 @@ export type FlagId =
   | 'ritemark-flows'
   | 'agentic-assistant'
   | 'codex-integration'
-  | 'scheduled-flow-runs';
+  | 'scheduled-flow-runs'
+  | 'analytics';
 
 /**
  * Feature flag registry
@@ -81,6 +82,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     label: 'Scheduled Flow Runs',
     description: 'Run eligible flows automatically on a local schedule while Ritemark is open',
     status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  'analytics': {
+    id: 'analytics',
+    label: 'Analytics',
+    description: 'Anonymous usage analytics and reaction feedback via PostHog',
+    status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
 };
