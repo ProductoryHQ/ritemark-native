@@ -1,4 +1,4 @@
-# Sprint 30: Extension Recommendations - Research Findings
+# Sprint 47: Extension Recommendations - Research Findings
 
 **Branch:** `claude/custom-extensions-marketplace-ctho5`
 **Date:** 2026-03-28
@@ -194,6 +194,7 @@ Jarmo will make final curation decisions in the sprint plan.
 | `dbaeumer.vscode-eslint` | ESLint | Code |
 | `bradlc.vscode-tailwindcss` | Tailwind CSS IntelliSense | Code |
 | `humao.rest-client` | REST Client | HTTP |
+| TBD | Pencil.dev | Design/Drawing |
 
 ---
 

@@ -1,4 +1,4 @@
-# Sprint 30: Curated Extension Recommendations
+# Sprint 47: Curated Extension Recommendations
 
 ## Goal
 
@@ -78,6 +78,7 @@ extensions to users, with one-click install via the existing marketplace integra
   - Code Spell Checker (`streetsidesoftware.code-spell-checker`)
   - Prettier (`esbenp.prettier-vscode`)
   - GitLens (`eamodio.gitlens`)
+  - Pencil.dev (`nicepkg.aide-pro` or TBD — confirm exact marketplace ID)
   - Additional extensions per Jarmo's direction
 
 ## Status
