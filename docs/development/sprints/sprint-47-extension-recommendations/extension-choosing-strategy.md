@@ -97,22 +97,17 @@ Ritemark'il on juba **sisseehitatud**:
 
 Rainbow CSV, Data Preview, vscode-pdf **konkureerivad** meie enda funktsioonidega ja tekitavad segadust (kumb editor avaneb?). Ei soovita.
 
-### Koostöö ja versioonihaldus (Collaboration)
+### ~~Koostöö ja versioonihaldus~~ — EEMALDATUD
 
-"Office" tähendab ka meeskonnatööd.
+GitLens ja Live Share ei paku piisavat väärtust kirjutaja sihtrühmale. Git on liialt tehniline ja Live Share vajab Microsoft kontot.
 
-| Extension | Miks sobib | Tüüp | Prioriteet |
-|-----------|-----------|------|------------|
-| GitLens | Git ajaloo visuaalne vaade — kes mida muutis, blame, graph | Oma panels/views | Keskmine |
-| Live Share | Reaalajas koostöö | Taustateenus | Madal |
+### ~~Teemad~~ — EEMALDATUD
 
-### Teemad ja isikupärastamine (Themes)
+Teemad võivad segamini ajada Ritemark'i enda brändingut. Jätame praegu välja.
 
-Kirjutajad hoolivad oma töökeskkonna välimusest. Teemad töötavad alati kuna need muudavad VS Code'i üldist välimust, mitte ainult editorit.
+### ~~Task Management~~ — EEMALDATUD
 
-| Extension | Miks sobib | Tüüp | Prioriteet |
-|-----------|-----------|------|------------|
-| 1-2 kureeritud teemat | Ritemark'i esteetikaga sobivad kirjutaja-sõbralikud teemad | Teema | Madal |
+Ritemark'il on oma kanban tahvli disain olemas (`docs/development/analysis/2026-03-05-kanban-task-management-for-ai-agents.md`). Ehitame ise, ei soovita kolmanda osapoole lahendust.
 
 ---
 
@@ -158,7 +153,6 @@ Nimekirjas **esimesed** on need, mis annavad kohe väärtust ja töötavad kindl
 1. **Pencil.dev** — disain + MCP agendi-integratsioon, JSON-põhine `.pen` formaat, Figma-sarnane canvas. Parim "Office for Agents" showcase.
 2. **Draw.io Integration** — diagrammid, oma editor, XML-põhine, agent saab luua/muuta
 3. **Mermaid Preview** — täiendab sisseehitatud Mermaid tuge, plaintext formaat
-4. **GitLens** — versiooniajalugu visuaalselt
 
 ---
 
@@ -224,7 +218,7 @@ Kui agent ei saa failiformaadiga midagi teha, siis on see "tavaline tööriist",
 | Pencil.dev (`highagency.pencildev`) | `.pen` (JSON) | Jah — puhas JSON, loetav | Jah — agent genereerib JSON struktuurid | Jah — MCP server (`read_canvas`, `get_style_guide`, write tools) | Suurepärane |
 | ~~Rainbow CSV~~ | `.csv` | Jah | Jah | Jah | EEMALDATUD — Ritemark'il oma CSV editor |
 | ~~Data Preview~~ | `.csv`/`.json` | Jah | Jah | Jah | EEMALDATUD — Ritemark'il oma CSV editor |
-| GitLens | Git repo | Jah — git commands | N/A | N/A | OK (readonly) |
+| ~~GitLens~~ | Git repo | Jah | N/A | N/A | EEMALDATUD — liiga tehniline kirjutajale |
 | Mermaid Preview | `.mmd` (plaintext) | Jah | Jah | Jah | Suurepärane |
 
 ### Agendiühilduvuse tasemed
