@@ -16,6 +16,27 @@ Extensionite valik peab tugevdama seda identiteeti, mitte lahjendama seda VS Cod
 
 ---
 
+## Tehniline piirang: Ritemark'i editor on webview
+
+**KRIITILINE:** Ritemark'i markdown editor on TipTap-põhine **custom webview**, MITTE VS Code'i tavaline teksteditor. See tähendab:
+
+- **Spell check extensionid EI TÖÖTA** — Code Spell Checker, LTeX jne näevad ainult VS Code'i tavalisi teksteditoreid, mitte meie webview'd
+- **Linting extensionid EI TÖÖTA** — markdownlint, Prettier jne ei näe Ritemark'i editori sisu
+- **Formatting extensionid EI TÖÖTA** — Markdown All in One kiirkäsud ei rakendu webview'ile
+- **Mis TÖÖTAB:** Extensionid mis avavad **oma eraldi vaate/editori** oma failiformaadile
+
+### "Standalone" reegel
+
+Extension peab vastama ühele neist:
+1. **Oma custom editor** — avab kindlat failiformaati omas editoris (nt Draw.io → `.drawio` failid)
+2. **Oma panel/vaade** — pakub iseseisvat funktsionaalsust sidebar'is või eraldi paneelis
+3. **Oma failiformaat** — lisab uue failiformaadi toe mida Ritemark ise ei toeta
+4. **Taustateenus** — töötab taustal ilma editori integratsioonita (nt Git, sync)
+
+**EI SOBI:** Extension mis eeldab ligipääsu aktiivsele teksteditorile (spell check, autocomplete, inline suggestions, diagnostics).
+
+---
+
 ## Valikuprintsiibid
 
 ### 1. Kasutaja on kirjutaja, mitte arendaja
@@ -27,21 +48,27 @@ Sihtrühm: kirjutajad, uurijad, turundajad, analüütikud. Nad **ei kasuta termi
 ### 2. Office Suite, mitte IDE
 
 Mõtle extensionidest kui **rakendustest kontoripaketis**:
-- Word → teksti tööriistad (spell check, grammatika, vormindamine)
-- Excel → andmete tööriistad (CSV, visualiseerimine)
-- PowerPoint → visuaalsed tööriistad (diagrammid, joonistamine)
-- Outlook → suhtlus (Git, koostöö)
+- Word → teksti tööriistad (oma editoriga)
+- Excel → andmete tööriistad (oma editoriga)
+- PowerPoint → visuaalsed tööriistad (oma editoriga)
+- Finder/Explorer → failihaldus
 
 **Reegel:** Extension peab sobituma "Office" metafoori, mitte "IDE" metafoori.
 
-### 3. AI-first, mitte AI-optional
+### 3. Standalone — avab oma ukse
+
+Extension peab töötama **iseseisvalt**, mitte integreeruma Ritemark'i editoriga. See on "rakendus kontoripaketis", mitte "plugin editorile".
+
+**Reegel:** Extension peab avama oma custom editor, paneel, või vaade. Mitte süstima sisu olemasolevasse editorisse.
+
+### 4. AI-first, mitte AI-optional
 
 Ritemark'i tugevus on multi-provider AI integratsioon. Extensionid peaksid:
 - Täiendama AI töövoogusid (mitte konkureerima nendega)
 - Pakkuma andmeid/konteksti mida agendid saavad kasutada
 - Olema kasulikud ka ilma AI-ta (offline-first)
 
-### 4. Kvaliteet > kvantiteet
+### 5. Kvaliteet > kvantiteet
 
 Parem 8 head extensioni kui 40 keskpärast. Iga extension nimekirjas on **Ritemark'i meeskonna soovitus** — see on brändi lubadus.
 
@@ -51,64 +78,59 @@ Parem 8 head extensioni kui 40 keskpärast. Iga extension nimekirjas on **Ritema
 
 ## Kategooriad
 
-### Kirjutamine (Writing Tools)
-
-Ritemark'i tuumkasutus. Need extensionid teevad kirjutamiskogemuse paremaks.
-
-| Extension | Miks sobib | Prioriteet |
-|-----------|-----------|------------|
-| Code Spell Checker | Õigekirjakontroll — iga kirjutaja vajab seda | Kõrge |
-| Markdown All in One | Kiirkäsud, TOC genereerimine, listi automaatjätkamine | Kõrge |
-| markdownlint | Markdown'i kvaliteedikontroll, hoiab dokumendid puhtad | Keskmine |
-
 ### Visuaalsed tööriistad (Visual Tools)
 
-"Office for agents" vajab rohkemat kui teksti — diagrammid, joonistused, visuaalid.
+"Office for agents" vajab rohkemat kui teksti — diagrammid, joonistused, visuaalid. Need on **kõige tugevamad kandidaadid** kuna neil on oma editor.
 
-| Extension | Miks sobib | Prioriteet |
-|-----------|-----------|------------|
-| Pencil.dev | Joonistamine ja visuaalne mõtlemine otse editoris | Kõrge |
-| Draw.io Integration | Diagrammid, vooskeemid — täiendab Flows režiimi | Keskmine |
+| Extension | Miks sobib | Tüüp | Prioriteet |
+|-----------|-----------|------|------------|
+| Draw.io Integration | Diagrammid, vooskeemid — avab `.drawio` failid omas editoris | Custom editor | Kõrge |
+| Pencil.dev | Joonistamine ja visuaalne mõtlemine | Custom editor | Kõrge |
+| Mermaid Preview | Mermaid diagrammide eelvaade (täiendab Ritemark'i sisseehitatud Mermaid tuge) | Preview panel | Keskmine |
 
 ### Andmed ja analüüs (Data & Analysis)
 
-Täiendab Data režiimi ja aitab struktureeritud infoga töötamisel.
+Täiendab Data režiimi uute failiformaatide ja visualiseerimisega.
 
-| Extension | Miks sobib | Prioriteet |
-|-----------|-----------|------------|
-| Rainbow CSV | CSV failide värvikodeerimine, päringud | Kõrge |
-| Data Preview | Andmete visualiseerimine graafikutena | Keskmine |
+| Extension | Miks sobib | Tüüp | Prioriteet |
+|-----------|-----------|------|------------|
+| Rainbow CSV | CSV failide värvikodeerimine, RBQL päringud omas editoris | Custom editor | Kõrge |
+| Data Preview | Andmete visualiseerimine graafikutena — avab CSV/JSON graafikuna | Custom editor | Keskmine |
+| vscode-pdf | PDF failide vaatamine (täiendab Ritemark'i PDF export'i) | Custom editor | Keskmine |
 
-### Vormindamine (Formatting)
-
-Dokumendi kvaliteet ja järjepidevus.
-
-| Extension | Miks sobib | Prioriteet |
-|-----------|-----------|------------|
-| Prettier | Automaatne vormindamine — hoiab markdown'i puhtana | Keskmine |
-
-### Koostöö (Collaboration)
+### Koostöö ja versioonihaldus (Collaboration)
 
 "Office" tähendab ka meeskonnatööd.
 
-| Extension | Miks sobib | Prioriteet |
-|-----------|-----------|------------|
-| GitLens | Git ajaloo visualiseerimine — kes mida muutis | Keskmine |
-| Live Share | Reaalajas koostöö dokumentidel | Madal |
+| Extension | Miks sobib | Tüüp | Prioriteet |
+|-----------|-----------|------|------------|
+| GitLens | Git ajaloo visuaalne vaade — kes mida muutis, blame, graph | Oma panels/views | Keskmine |
+| Live Share | Reaalajas koostöö | Taustateenus | Madal |
 
 ### Teemad ja isikupärastamine (Themes)
 
-Kirjutajad hoolivad oma töökeskkonna välimusest.
+Kirjutajad hoolivad oma töökeskkonna välimusest. Teemad töötavad alati kuna need muudavad VS Code'i üldist välimust, mitte ainult editorit.
 
-| Extension | Miks sobib | Prioriteet |
-|-----------|-----------|------------|
-| 1-2 kureeritud teemat | Ritemark'i esteetikaga sobivad teemad | Madal |
+| Extension | Miks sobib | Tüüp | Prioriteet |
+|-----------|-----------|------|------------|
+| 1-2 kureeritud teemat | Ritemark'i esteetikaga sobivad kirjutaja-sõbralikud teemad | Teema | Madal |
 
 ---
 
 ## Mida MITTE soovitada
 
-Need extensionid on populaarsed VS Code's, aga **ei sobi** "Office for agents" konteksti:
+### Tehnilistel põhjustel (ei tööta Ritemark'i webview editoriga)
+
+| Extension | Miks EI TÖÖTA |
+|-----------|---------------|
+| Code Spell Checker | Näeb ainult VS Code'i tavalisi teksteditoreid, mitte TipTap webview'd |
+| markdownlint | Diagnostikad ei ilmu Ritemark'i editoris |
+| Markdown All in One | Kiirkäsud ei rakendu webview'ile |
+| Prettier | Formatting ei ulatu webview'i sisuni |
+| Grammarly | Sama probleem — ei näe webview sisu |
+| LTeX (LanguageTool) | Spell/grammar check ei tööta webview's |
+
+### Positsioneerimise põhjustel (vale sihtrühm)
 
 | Extension | Miks EI sobi |
 |-----------|-------------|
@@ -123,17 +145,14 @@ Need extensionid on populaarsed VS Code's, aga **ei sobi** "Office for agents" k
 
 ## Soovituste järjekord
 
-Nimekirjas **esimesed** on need, mis annavad kohe väärtust tavakasutajale:
+Nimekirjas **esimesed** on need, mis annavad kohe väärtust ja töötavad kindlalt:
 
-1. **Code Spell Checker** — universaalselt kasulik
-2. **Pencil.dev** — visuaalne mõtlemine, unikaalne väärtus
-3. **Markdown All in One** — kirjutamise kiirustamine
-4. **Rainbow CSV** — Data režiimi täiendus
-5. **markdownlint** — dokumendi kvaliteet
-6. **Draw.io Integration** — diagrammid
-7. **Prettier** — automaatne vormindamine
-8. **GitLens** — versiooniajalugu
-9. **Data Preview** — andmete visualiseerimine
+1. **Draw.io Integration** — diagrammid, oma editor, väga poleeritud
+2. **Pencil.dev** — joonistamine, visuaalne mõtlemine
+3. **Rainbow CSV** — CSV failide parem kogemus
+4. **Data Preview** — andmete visualiseerimine
+5. **GitLens** — versiooniajalugu visuaalselt
+6. **Mermaid Preview** — täiendab sisseehitatud Mermaid tuge
 
 ---
 
@@ -149,12 +168,13 @@ Nimekirjas **esimesed** on need, mis annavad kohe väärtust tavakasutajale:
 | Ritemark Tasks | Kanban tahvel agentide ülesannete haldamiseks |
 | Ritemark Knowledge | RAG laiendus — PDF, DOCX, PPT kui teadmusbaas |
 | Ritemark Publish | Otse avaldamine (blog, newsletter, CMS) |
+| Ritemark Spell Check | Oma spell check mis töötab TipTap webview'is (mitte VS Code API kaudu) |
 
 ### Kolmanda osapoole partnerlused
 
 Extensionite autorid, kellega koostöö võiks sobida:
 - **Pencil.dev** — visuaalsed tööriistad kirjutajatele
-- **Grammarly** (kui VS Code extension tuleb) — professionaalne keeleabi
+- **Draw.io** — diagrammid ja vooskeemid
 - **Zotero** (kui VS Code extension tuleb) — akadeemiline tsiteerimine
 
 ---
@@ -163,11 +183,49 @@ Extensionite autorid, kellega koostöö võiks sobida:
 
 Enne extensioni lisamist soovituste nimekirja, vasta:
 
-1. **Kas tavakasutaja saab sellest aru?** (Jah/Ei)
-2. **Kas see töötab out-of-the-box?** Ilma konfiguratsioonifailideta? (Jah/Ei)
-3. **Kas see täiendab Text/Data/Flow režiimi?** (Jah/Ei)
-4. **Kas see konkureerib Ritemark'i sisseehitatud funktsioonidega?** (Ei = OK)
-5. **Kas see on aktiivselt hooldatud?** (>100k allalaadimist, viimane update <6 kuud)
-6. **Kas see töötab offline?** (Eelistatud, mitte nõutud)
+1. **Kas see on standalone?** Oma editor, panel, või vaade? (Jah/Ei) — **BLOKEERIV**
+2. **Kas see nõuab ligipääsu aktiivsele teksteditorile?** (Ei = OK) — **BLOKEERIV**
+3. **Kas tavakasutaja saab sellest aru?** (Jah/Ei)
+4. **Kas see töötab out-of-the-box?** Ilma konfiguratsioonifailideta? (Jah/Ei)
+5. **Kas see täiendab Text/Data/Flow režiimi?** (Jah/Ei)
+6. **Kas see konkureerib Ritemark'i sisseehitatud funktsioonidega?** (Ei = OK)
+7. **Kas AI agent saab selle failiformaadiga töötada?** (Jah = boonus) — vt allpool
+8. **Kas see on aktiivselt hooldatud?** (>100k allalaadimist, viimane update <6 kuud)
+9. **Kas see töötab offline?** (Eelistatud, mitte nõutud)
 
-**Miinimum:** Küsimused 1-4 peavad olema positiivsed.
+**Miinimum:** Küsimused 1-2 on blokeerivad. Küsimused 3-6 peavad olema positiivsed.
+
+---
+
+## Agendiühilduvus — "Office for Agents" võtmeküsimus
+
+Kuna Ritemark on "Office for Agents", peab iga soovitatud extensioni puhul hindama: **kas AI agent (Claude, Codex) oskab selle failiformaadiga töötada?**
+
+### Miks see oluline on
+
+Kasutaja ootab, et agent saaks:
+- Luua uue faili (nt `.drawio` diagrammi)
+- Lugeda ja mõista olemasolevat faili
+- Muuta faili sisu (nt lisada diagrammi node)
+
+Kui agent ei saa failiformaadiga midagi teha, siis on see "tavaline tööriist", mitte "agendi tööriist".
+
+### Hinnang praegustele kandidaatidele
+
+| Extension | Failiformaat | Agent saab lugeda? | Agent saab luua? | Agent saab muuta? | Hinnang |
+|-----------|-------------|-------------------|-----------------|------------------|---------|
+| Draw.io | `.drawio` (XML) | Jah — XML on loetav | Jah — agent saab XML-i genereerida | Jah — XML node'ide lisamine/muutmine | Suurepärane |
+| Pencil.dev | TBD | TBD — vajab uurimist | TBD | TBD | Uurida |
+| Rainbow CSV | `.csv` | Jah — plaintext | Jah | Jah | Suurepärane |
+| Data Preview | `.csv`/`.json` | Jah | Jah | Jah | Suurepärane |
+| GitLens | Git repo | Jah — git commands | N/A | N/A | OK (readonly) |
+| Mermaid Preview | `.mmd` (plaintext) | Jah | Jah | Jah | Suurepärane |
+
+### Agendiühilduvuse tasemed
+
+1. **Suurepärane** — Agent saab faili luua, lugeda, muuta. Failiformaat on tekstipõhine (XML, JSON, plaintext). *Näide: Draw.io (.drawio on XML), Mermaid (.mmd on plaintext)*
+2. **Hea** — Agent saab faili lugeda ja osaliselt muuta. *Näide: GitLens (git käsud)*
+3. **Piiratud** — Agent näeb faili aga ei oska sisu mõistlikult muuta. *Näide: binaarsed failiformaadid*
+4. **Puudub** — Agent ei saa failiga midagi teha.
+
+**Eelistus:** Tase 1 (Suurepärane) extensionid esimesena soovituste nimekirja.
