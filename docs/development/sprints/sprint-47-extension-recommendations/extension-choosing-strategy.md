@@ -88,15 +88,14 @@ Parem 8 head extensioni kui 40 keskpärast. Iga extension nimekirjas on **Ritema
 | Pencil.dev | Joonistamine ja visuaalne mõtlemine | Custom editor | Kõrge |
 | Mermaid Preview | Mermaid diagrammide eelvaade (täiendab Ritemark'i sisseehitatud Mermaid tuge) | Preview panel | Keskmine |
 
-### Andmed ja analüüs (Data & Analysis)
+### ~~Andmed ja analüüs~~ — EEMALDATUD
 
-Täiendab Data režiimi uute failiformaatide ja visualiseerimisega.
+Ritemark'il on juba **sisseehitatud**:
+- **CSV editor** (Data režiim) — redigeerimine, sorteerimine, ridade lisamine
+- **Excel/XLSX eelvaade** — multi-sheet, virtual scrolling
+- **PDF vaataja** — sisseehitatud PDF viewer
 
-| Extension | Miks sobib | Tüüp | Prioriteet |
-|-----------|-----------|------|------------|
-| Rainbow CSV | CSV failide värvikodeerimine, RBQL päringud omas editoris | Custom editor | Kõrge |
-| Data Preview | Andmete visualiseerimine graafikutena — avab CSV/JSON graafikuna | Custom editor | Keskmine |
-| vscode-pdf | PDF failide vaatamine (täiendab Ritemark'i PDF export'i) | Custom editor | Keskmine |
+Rainbow CSV, Data Preview, vscode-pdf **konkureerivad** meie enda funktsioonidega ja tekitavad segadust (kumb editor avaneb?). Ei soovita.
 
 ### Koostöö ja versioonihaldus (Collaboration)
 
@@ -130,6 +129,15 @@ Kirjutajad hoolivad oma töökeskkonna välimusest. Teemad töötavad alati kuna
 | Grammarly | Sama probleem — ei näe webview sisu |
 | LTeX (LanguageTool) | Spell/grammar check ei tööta webview's |
 
+### Konkureerib Ritemark'i sisseehitatud funktsioonidega
+
+| Extension | Miks EI sobi |
+|-----------|-------------|
+| Rainbow CSV | Ritemark'il on oma CSV editor (Data režiim) |
+| Data Preview | Ritemark'il on oma CSV editor |
+| vscode-pdf | Ritemark'il on oma PDF viewer |
+| Excel Viewer | Ritemark'il on oma XLSX eelvaade |
+
 ### Positsioneerimise põhjustel (vale sihtrühm)
 
 | Extension | Miks EI sobi |
@@ -149,10 +157,8 @@ Nimekirjas **esimesed** on need, mis annavad kohe väärtust ja töötavad kindl
 
 1. **Pencil.dev** — disain + MCP agendi-integratsioon, JSON-põhine `.pen` formaat, Figma-sarnane canvas. Parim "Office for Agents" showcase.
 2. **Draw.io Integration** — diagrammid, oma editor, XML-põhine, agent saab luua/muuta
-3. **Rainbow CSV** — CSV failide parem kogemus, oma editor
-4. **Mermaid Preview** — täiendab sisseehitatud Mermaid tuge, plaintext formaat
-5. **Data Preview** — andmete visualiseerimine graafikutena
-6. **GitLens** — versiooniajalugu visuaalselt
+3. **Mermaid Preview** — täiendab sisseehitatud Mermaid tuge, plaintext formaat
+4. **GitLens** — versiooniajalugu visuaalselt
 
 ---
 
@@ -216,8 +222,8 @@ Kui agent ei saa failiformaadiga midagi teha, siis on see "tavaline tööriist",
 |-----------|-------------|-------------------|-----------------|------------------|---------|
 | Draw.io | `.drawio` (XML) | Jah — XML on loetav | Jah — agent saab XML-i genereerida | Jah — XML node'ide lisamine/muutmine | Suurepärane |
 | Pencil.dev (`highagency.pencildev`) | `.pen` (JSON) | Jah — puhas JSON, loetav | Jah — agent genereerib JSON struktuurid | Jah — MCP server (`read_canvas`, `get_style_guide`, write tools) | Suurepärane |
-| Rainbow CSV | `.csv` | Jah — plaintext | Jah | Jah | Suurepärane |
-| Data Preview | `.csv`/`.json` | Jah | Jah | Jah | Suurepärane |
+| ~~Rainbow CSV~~ | `.csv` | Jah | Jah | Jah | EEMALDATUD — Ritemark'il oma CSV editor |
+| ~~Data Preview~~ | `.csv`/`.json` | Jah | Jah | Jah | EEMALDATUD — Ritemark'il oma CSV editor |
 | GitLens | Git repo | Jah — git commands | N/A | N/A | OK (readonly) |
 | Mermaid Preview | `.mmd` (plaintext) | Jah | Jah | Jah | Suurepärane |
 
