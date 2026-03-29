@@ -8,6 +8,8 @@
 import * as vscode from 'vscode';
 import { FlowStorage } from './FlowStorage';
 import { executeFlow } from './FlowExecutor';
+import { FlowScheduleState } from './FlowScheduleState';
+import { getNextScheduledRun } from './flowSchedule';
 import type { Flow } from './types';
 
 export class FlowsViewProvider implements vscode.WebviewViewProvider {
@@ -15,13 +17,16 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
 
   private _view?: vscode.WebviewView;
   private _storage: FlowStorage;
+  private _scheduleState: FlowScheduleState;
   private _activeAbortController: AbortController | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _workspacePath: string
+    private readonly _workspacePath: string,
+    workspaceState: vscode.Memento
   ) {
     this._storage = new FlowStorage(_workspacePath);
+    this._scheduleState = new FlowScheduleState(workspaceState);
   }
 
   public resolveWebviewView(
@@ -94,9 +99,24 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
   private async _sendFlowList(): Promise<void> {
     try {
       const flows = await this._storage.listFlows();
+      const flowsWithStatus = await Promise.all(
+        flows.map(async (flow) => {
+          const flowPath = this._storage.getFlowPath(flow.id);
+          const scheduleRuntime = await this._scheduleState.get(flowPath);
+          const nextScheduledRun = flow.schedule
+            ? getNextScheduledRun(flow.schedule, new Date())?.toISOString() ?? null
+            : null;
+
+          return {
+            ...flow,
+            scheduleRuntime,
+            nextScheduledRun,
+          };
+        })
+      );
       this._view?.webview.postMessage({
         type: 'flow:list',
-        flows,
+        flows: flowsWithStatus,
       });
     } catch (err) {
       console.error('[FlowsViewProvider] Failed to list flows:', err);

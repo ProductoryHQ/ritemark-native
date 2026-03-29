@@ -15,8 +15,33 @@ export interface Flow {
   created: string; // ISO 8601 timestamp
   modified: string; // ISO 8601 timestamp
   inputs: FlowInput[];
+  schedule?: FlowSchedule;
   nodes: FlowNode[];
   edges: FlowEdge[];
+}
+
+/**
+ * ISO 8601 weekday numbering for scheduled runs.
+ * Monday=1 ... Sunday=7
+ */
+export type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+/**
+ * Supported recurrence types for flow scheduling.
+ */
+export type FlowScheduleType = 'daily' | 'weekdays' | 'weekly';
+
+/**
+ * Flow-level schedule config stored in the flow file.
+ * Runtime state is intentionally kept outside the flow JSON.
+ */
+export interface FlowSchedule {
+  enabled: boolean;
+  type: FlowScheduleType;
+  /** Local time in 24-hour HH:mm format */
+  time: string;
+  /** ISO 8601 weekdays used only for weekly schedules */
+  days?: IsoWeekday[];
 }
 
 /**

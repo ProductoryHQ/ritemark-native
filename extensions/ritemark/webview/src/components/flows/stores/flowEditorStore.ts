@@ -27,6 +27,17 @@ export interface FlowInput {
   defaultValue?: string;
 }
 
+export type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type FlowScheduleType = 'daily' | 'weekdays' | 'weekly';
+
+export interface FlowSchedule {
+  enabled: boolean;
+  type: FlowScheduleType;
+  time: string;
+  days?: IsoWeekday[];
+}
+
 // Node data types matching our flow types
 // Using Record<string, unknown> compatible types for React Flow
 export interface TriggerNodeData extends Record<string, unknown> {
@@ -85,6 +96,7 @@ export interface Flow {
   created: string;
   modified: string;
   inputs: FlowInput[];
+  schedule?: FlowSchedule;
   nodes: Array<{
     id: string;
     type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
@@ -176,6 +188,7 @@ interface FlowEditorState {
   flowName: string;
   flowDescription: string;
   flowInputs: FlowInput[];
+  flowSchedule: FlowSchedule | null;
 
   // React Flow state
   nodes: Node<FlowNodeData>[];
@@ -208,6 +221,7 @@ interface FlowEditorState {
   selectNode: (nodeId: string | null) => void;
   setFlowName: (name: string) => void;
   setFlowDescription: (description: string) => void;
+  setFlowSchedule: (schedule: FlowSchedule | null) => void;
   setValidationWarnings: (warnings: string[]) => void;
   markDirty: () => void;
   markClean: () => void;
@@ -280,6 +294,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   flowName: 'Untitled Flow',
   flowDescription: '',
   flowInputs: [],
+  flowSchedule: null,
   nodes: [],
   edges: [],
   selectedNodeId: null,
@@ -323,6 +338,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       flowName: flow.name,
       flowDescription: flow.description,
       flowInputs: flow.inputs,
+      flowSchedule: flow.schedule ?? null,
       nodes,
       edges,
       selectedNodeId,
@@ -574,6 +590,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   setFlowDescription: (description) =>
     set({ flowDescription: description, isDirty: true }),
 
+  setFlowSchedule: (schedule) => set({ flowSchedule: schedule, isDirty: true }),
+
   setValidationWarnings: (warnings) => set({ validationWarnings: warnings }),
 
   markDirty: () => set({ isDirty: true }),
@@ -625,6 +643,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       created: '', // Will be set by backend
       modified: '', // Will be set by backend
       inputs: state.flowInputs,
+      schedule: state.flowSchedule ?? undefined,
       nodes: state.nodes.map((node) => ({
         id: node.id,
         type: reactFlowTypeToFlowType[node.type || 'triggerNode'] as
