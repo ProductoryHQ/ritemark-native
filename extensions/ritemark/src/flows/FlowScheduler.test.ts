@@ -181,6 +181,37 @@ async function main(): Promise<void> {
   );
   console.log('  ✓ Ineligible flow is marked skipped');
 
+  // Test 6: A long-running scheduled flow must not block other due flows in the same tick
+  let releaseFirstFlow!: () => void;
+  const firstFlowGate = new Promise<void>((resolve) => {
+    releaseFirstFlow = resolve;
+  });
+  const startedFlows: string[] = [];
+  const multiFlowScheduler = new FlowScheduler('/workspace', {
+    storage: new FakeStorage([
+      createFlow({ id: 'long-running-flow', name: 'Long Running Flow' }),
+      createFlow({ id: 'fast-flow', name: 'Fast Flow' }),
+    ]),
+    scheduleState: new FakeScheduleState(),
+    isFeatureEnabled: () => true,
+    executeFlowFn: async (flow: Flow): Promise<ExecutionResult> => {
+      startedFlows.push(flow.id);
+      if (flow.id === 'long-running-flow') {
+        await firstFlowGate;
+      }
+      return { success: true, outputs: {} };
+    },
+  });
+  await multiFlowScheduler.tick(new Date(2026, 2, 29, 9, 2));
+  assert.deepStrictEqual(
+    startedFlows.sort(),
+    ['fast-flow', 'long-running-flow'],
+    'All due flows should start even if one run remains in progress'
+  );
+  releaseFirstFlow();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  console.log('  ✓ Long-running scheduled flow does not block other due flows');
+
   console.log('\n✅ All flow scheduler tests passed!');
 }
 

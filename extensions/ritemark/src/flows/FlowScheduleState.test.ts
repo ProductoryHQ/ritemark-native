@@ -57,6 +57,19 @@ async function main(): Promise<void> {
   assert.deepStrictEqual(cleared, initial);
   console.log('  ✓ Runtime state is cleared back to defaults');
 
+  await state.update(flowPath, {
+    lastRunAt: '2026-03-29T10:00:00.000Z',
+    lastScheduledFor: '2026-03-29T10:00:00.000Z',
+    lastStatus: 'success',
+  });
+  const renamedPath = '/workspace/.ritemark/flows/renamed-summary.flow.json';
+  await state.migrate(flowPath, renamedPath);
+  const migrated = await state.get(renamedPath);
+  const oldPathState = await state.get(flowPath);
+  assert.strictEqual(migrated.lastScheduledFor, '2026-03-29T10:00:00.000Z');
+  assert.deepStrictEqual(oldPathState, initial);
+  console.log('  ✓ Runtime state migrates when the flow file path changes');
+
   console.log('\n✅ All flow schedule state tests passed!');
 }
 

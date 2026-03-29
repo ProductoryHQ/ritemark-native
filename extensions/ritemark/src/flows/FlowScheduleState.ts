@@ -47,6 +47,23 @@ export class FlowScheduleState {
     return nextState;
   }
 
+  async migrate(fromFlowPath: string, toFlowPath: string): Promise<void> {
+    const fromKey = this.getKey(fromFlowPath);
+    const toKey = this.getKey(toFlowPath);
+
+    if (fromKey === toKey) {
+      return;
+    }
+
+    const existing = this.workspaceState.get<FlowScheduleRuntimeState>(fromKey);
+    if (!existing) {
+      return;
+    }
+
+    await this.workspaceState.update(toKey, existing);
+    await this.workspaceState.update(fromKey, undefined);
+  }
+
   async clear(flowPath: string): Promise<void> {
     await this.workspaceState.update(this.getKey(flowPath), undefined);
   }

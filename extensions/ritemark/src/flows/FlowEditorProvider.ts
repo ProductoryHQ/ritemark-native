@@ -298,6 +298,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
     if (shortId && currentFilename !== expectedFilename) {
       // Name changed - rename file using WorkspaceEdit (smoother than close/reopen)
+      const oldPath = document.uri.fsPath;
       const dir = path.dirname(document.uri.fsPath);
       const newPath = path.join(dir, `${expectedFilename}.flow.json`);
       const newUri = vscode.Uri.file(newPath);
@@ -321,7 +322,9 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       await vscode.workspace.applyEdit(renameEdit);
 
       if (!flow.schedule) {
-        await scheduleState.clear(document.uri.fsPath);
+        await scheduleState.clear(oldPath);
+      } else {
+        await scheduleState.migrate(oldPath, newPath);
       }
 
       // Notify webview of the rename (new ID)
