@@ -145,7 +145,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       imageMappings,
       features: {
         voiceDictation: isEnabled('voice-dictation'),
-        markdownExport: isEnabled('markdown-export')
+        markdownExport: isEnabled('markdown-export'),
+        spellcheck: vscode.workspace.getConfiguration('ritemark').get('editor.spellcheck', true)
       }
     };
   }

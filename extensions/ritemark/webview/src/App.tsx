@@ -4,7 +4,8 @@ import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from '
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
 import { DOCXViewer } from './components/viewers/DOCXViewer'
-import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
+import { DocumentHeader, PropertiesModal, ExportMenu, TableOfContents } from './components/header'
+import { FindBar } from './components/FindBar'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
@@ -72,6 +73,7 @@ function insertDictationPlaceholder(editor: TipTapEditor, placeholder: string) {
 interface Features {
   voiceDictation: boolean
   markdownExport: boolean
+  spellcheck: boolean
 }
 
 function App() {
@@ -87,7 +89,8 @@ function App() {
   const [imageMappings, setImageMappings] = useState<Record<string, string>>({})
   const [features, setFeatures] = useState<Features>({
     voiceDictation: false,
-    markdownExport: false
+    markdownExport: false,
+    spellcheck: true
   })
 
   // Track selection for AI tool execution
@@ -100,6 +103,13 @@ function App() {
   const [showPropertiesModal, setShowPropertiesModal] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportButtonRef = useRef<HTMLElement | null>(null)
+
+  // Find bar state
+  const [showFindBar, setShowFindBar] = useState(false)
+
+  // Table of Contents state
+  const [showTOC, setShowTOC] = useState(false)
+  const contentsButtonRef = useRef<HTMLButtonElement | null>(null)
 
   // File change notification state
   const [showFileChangeNotification, setShowFileChangeNotification] = useState(false)
@@ -121,7 +131,8 @@ function App() {
           setImageMappings((message.imageMappings as Record<string, string>) || {})
           setFeatures((message.features as Features) || {
             voiceDictation: false,
-            markdownExport: false
+            markdownExport: false,
+            spellcheck: true
           })
           setIsReady(true)
           break
@@ -189,6 +200,25 @@ function App() {
 
     // Tell extension we're ready
     sendToExtension('ready', {})
+  }, [])
+
+  // CMD+F keyboard shortcut to open find bar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        e.stopPropagation()
+        setShowFindBar(true)
+      }
+      // CMD+Shift+O to toggle Table of Contents
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'o') {
+        e.preventDefault()
+        e.stopPropagation()
+        setShowTOC(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown, true) // capture phase
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [])
 
   // Handle tool calls from AI panel
@@ -312,6 +342,10 @@ function App() {
     setShowExportMenu(prev => !prev)
   }, [])
 
+  const handleContentsClick = useCallback(() => {
+    setShowTOC(prev => !prev)
+  }, [])
+
   const handleClosePropertiesModal = useCallback(() => {
     setShowPropertiesModal(false)
   }, [])
@@ -415,6 +449,8 @@ function App() {
       <DocumentHeader
         onPropertiesClick={handlePropertiesClick}
         onExportClick={handleExportClick}
+        onContentsClick={handleContentsClick}
+        contentsButtonRef={contentsButtonRef}
         hasFileChanged={showFileChangeNotification}
         onRefresh={() => {
           setShowFileChangeNotification(false)
@@ -424,7 +460,15 @@ function App() {
       />
 
       {/* Editor - Takes remaining space */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" style={{ position: 'relative' }}>
+        {/* Find Bar */}
+        {showFindBar && editorRef.current && (
+          <FindBar
+            editor={editorRef.current}
+            onClose={() => setShowFindBar(false)}
+          />
+        )}
+
         <Editor
           value={content}
           onChange={handleContentChange}
@@ -433,6 +477,7 @@ function App() {
           placeholder="Start writing..."
           className="h-full"
           imageMappings={imageMappings}
+          spellcheck={features.spellcheck}
         />
       </div>
 
@@ -453,6 +498,15 @@ function App() {
         onCopyAsMarkdown={handleCopyAsMarkdown}
         anchorElement={exportButtonRef.current}
       />
+
+      {/* Table of Contents */}
+      {showTOC && editorRef.current && (
+        <TableOfContents
+          editor={editorRef.current}
+          anchorRef={contentsButtonRef}
+          onClose={() => setShowTOC(false)}
+        />
+      )}
     </div>
   )
 }

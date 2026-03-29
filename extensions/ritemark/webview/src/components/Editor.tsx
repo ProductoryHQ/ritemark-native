@@ -344,6 +344,7 @@ interface EditorProps {
   onEditorReady?: (editor: TipTapEditor) => void
   onSelectionChange?: (selection: EditorSelection) => void
   imageMappings?: Record<string, string>
+  spellcheck?: boolean
 }
 
 export function Editor({
@@ -354,6 +355,7 @@ export function Editor({
   onEditorReady,
   onSelectionChange,
   imageMappings = {},
+  spellcheck = true,
 }: EditorProps) {
   const isInitialMount = useRef(true)
   const lastExternalValue = useRef(value)
@@ -494,6 +496,7 @@ export function Editor({
     editorProps: {
       attributes: {
         class: 'prose prose-lg max-w-none focus:outline-none',
+        spellcheck: spellcheck ? 'true' : 'false',
       },
       handleDrop: (_view, event, _slice, _moved) => {
         // Handle image drag-and-drop

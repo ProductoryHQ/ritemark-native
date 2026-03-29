@@ -343,6 +343,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     webview.postMessage({
       type: 'settings',
       data: {
+        // Editor
+        spellcheck: config.get('editor.spellcheck', true),
+
         // Features
         voiceDictation: config.get('features.voice-dictation', false),
         ritemarkFlows: config.get('features.ritemark-flows', false),

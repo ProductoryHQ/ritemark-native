@@ -109,6 +109,12 @@
       {
         "title": "Ritemark Features",
         "properties": {
+          "ritemark.editor.spellcheck": {
+            "type": "boolean",
+            "default": true,
+            "description": "Check spelling as you type.",
+            "scope": "application"
+          },
           "ritemark.features.voice-dictation": {
             "type": "boolean",
             "default": false,
