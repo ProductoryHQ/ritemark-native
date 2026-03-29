@@ -12,6 +12,7 @@ import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { FlowsViewProvider } from './flows/FlowsViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
 import { FlowStorage } from './flows/FlowStorage';
+import { createFlowScheduler, FlowScheduler } from './flows/FlowScheduler';
 import { RitemarkSettingsProvider } from './settings/RitemarkSettingsProvider';
 import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLMNodeExecutor';
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
@@ -26,6 +27,7 @@ export let unifiedViewProvider: UnifiedViewProvider;
 
 // Flows view provider
 let flowsViewProvider: FlowsViewProvider | null = null;
+let flowScheduler: FlowScheduler | null = null;
 
 // Settings provider
 let settingsProvider: RitemarkSettingsProvider | null = null;
@@ -179,12 +181,24 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register Flows View Provider (always register - visibility controlled by when clause in package.json)
   if (workspacePath) {
-    flowsViewProvider = new FlowsViewProvider(context.extensionUri, workspacePath);
+    flowsViewProvider = new FlowsViewProvider(
+      context.extensionUri,
+      workspacePath,
+      context.workspaceState
+    );
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, flowsViewProvider, {
         webviewOptions: { retainContextWhenHidden: true }
       })
     );
+
+    flowScheduler = createFlowScheduler(context, workspacePath, {
+      onRuntimeStateChanged: async () => {
+        await flowsViewProvider?.refresh();
+      },
+    });
+    flowScheduler.start();
+    context.subscriptions.push(flowScheduler);
   }
 
   // AI panel opens via activity bar click, not auto-shown on startup

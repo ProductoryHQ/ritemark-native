@@ -6,23 +6,39 @@
  */
 
 import React, { useEffect, useCallback, useState, useRef } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Clock3, X } from 'lucide-react';
 import { NodePalette } from './NodePalette';
 import { FlowCanvas } from './FlowCanvas';
 import { NodeConfigPanel } from './NodeConfigPanel';
 import { ExecutionPanel } from './ExecutionPanel';
+import { FlowSettingsPanel } from './FlowSettingsPanel';
 import { useFlowEditorStore } from './stores/flowEditorStore';
 import type { Flow } from './stores/flowEditorStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { vscode } from '../../lib/vscode';
 import { setModelConfig } from '../../config/modelConfig';
+import { formatScheduleDateTime, formatScheduleSummary, getNextScheduledRun } from './flowScheduleUi';
+
+interface FlowFeatureFlags {
+  scheduledFlowRuns: boolean;
+}
+
+interface FlowScheduleStatus {
+  lastRunAt: string | null;
+  lastScheduledFor: string | null;
+  lastStatus: 'idle' | 'running' | 'success' | 'error' | 'skipped';
+  lastError: string | null;
+}
+
+type FlowSaveState = 'idle' | 'unsaved' | 'saving' | 'saved';
 
 export function FlowEditor() {
   const setFlow = useFlowEditorStore((state) => state.setFlow);
   const toFlow = useFlowEditorStore((state) => state.toFlow);
   const flowName = useFlowEditorStore((state) => state.flowName);
   const flowDescription = useFlowEditorStore((state) => state.flowDescription);
+  const flowSchedule = useFlowEditorStore((state) => state.flowSchedule);
   const setFlowName = useFlowEditorStore((state) => state.setFlowName);
   const setFlowDescription = useFlowEditorStore(
     (state) => state.setFlowDescription
@@ -77,6 +93,15 @@ export function FlowEditor() {
   const [error, setError] = useState<string | null>(null);
   const [showWarnings, setShowWarnings] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [showFlowSettings, setShowFlowSettings] = useState(false);
+  const [featureFlags, setFeatureFlags] = useState<FlowFeatureFlags>({
+    scheduledFlowRuns: false,
+  });
+  const [scheduleStatus, setScheduleStatus] = useState<FlowScheduleStatus | null>(null);
+  const [saveState, setSaveState] = useState<FlowSaveState>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+  const savedNotificationTimerRef = useRef<number | null>(null);
 
   // Ref to track isRunning for message handler (avoids stale closure)
   const isRunningRef = useRef(isRunning);
@@ -94,10 +119,23 @@ export function FlowEditor() {
           setFlow(message.flow as Flow, message.workspacePath);
           setValidationWarnings(message.warnings || []);
           setError(null);
+          setSaveState('idle');
+          setLastSavedAt(
+            message.flow?.modified ? new Date(message.flow.modified as string) : null
+          );
           break;
 
         case 'flow:saved':
           markClean();
+          setSaveState('saved');
+          setLastSavedAt(new Date());
+          if (savedNotificationTimerRef.current) {
+            window.clearTimeout(savedNotificationTimerRef.current);
+          }
+          savedNotificationTimerRef.current = window.setTimeout(() => {
+            setSaveState('idle');
+            savedNotificationTimerRef.current = null;
+          }, 2500);
           break;
 
         case 'flow:validation':
@@ -115,6 +153,14 @@ export function FlowEditor() {
           // Receive model config from extension
           setModelConfig(message.config);
           break;
+
+        case 'flow:featureFlags':
+          setFeatureFlags(message.flags as FlowFeatureFlags);
+          break;
+
+        case 'flow:scheduleStatus':
+          setScheduleStatus(message.status as FlowScheduleStatus);
+          break;
       }
     };
 
@@ -125,20 +171,36 @@ export function FlowEditor() {
 
     return () => {
       window.removeEventListener('message', handleMessage);
+      if (savedNotificationTimerRef.current) {
+        window.clearTimeout(savedNotificationTimerRef.current);
+        savedNotificationTimerRef.current = null;
+      }
     };
   }, [setFlow, markClean, setValidationWarnings]);
+
+  useEffect(() => {
+    if (isDirty) {
+      setSaveState((current) => (current === 'saving' ? current : 'unsaved'));
+    }
+  }, [isDirty]);
 
   // Auto-save with debounce
   useEffect(() => {
     if (!isDirty) return;
 
-    const timer = setTimeout(() => {
+    saveTimerRef.current = window.setTimeout(() => {
       const vscodeApi = vscode;
       const flow = toFlow();
+      setSaveState('saving');
       vscodeApi.postMessage({ type: 'flow:save', flow });
     }, 500);
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
   }, [isDirty, toFlow]);
 
   // Handle keyboard shortcuts
@@ -175,10 +237,44 @@ export function FlowEditor() {
 
   // Handle node selection - exit execution mode to show properties
   const handleNodeSelect = useCallback(() => {
+    setShowFlowSettings(false);
     if (isRunning) {
       setIsRunning(false);
     }
   }, [isRunning]);
+
+  useEffect(() => {
+    if (!showFlowSettings) {
+      return;
+    }
+
+    const refresh = () => {
+      vscode.postMessage({ type: 'flow:getScheduleStatus' });
+    };
+
+    refresh();
+    const interval = window.setInterval(refresh, 15_000);
+    return () => window.clearInterval(interval);
+  }, [showFlowSettings]);
+
+  const openFlowSettings = useCallback(() => {
+    setShowFlowSettings(true);
+    setIsRunning(false);
+  }, []);
+
+  const handleSaveSchedule = useCallback(() => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSaveState('saving');
+    vscode.postMessage({
+      type: 'flow:save',
+      flow: toFlow(),
+    });
+  }, [toFlow]);
+
+  const nextScheduledRun = getNextScheduledRun(flowSchedule);
 
   if (error) {
     return (
@@ -235,6 +331,23 @@ export function FlowEditor() {
           placeholder="Description (optional)..."
         />
 
+        {featureFlags.scheduledFlowRuns && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openFlowSettings}
+            className="gap-2"
+          >
+            <Clock3 size={14} />
+            <span>{formatScheduleSummary(flowSchedule)}</span>
+            {flowSchedule?.enabled && (
+              <span className="text-xs text-[var(--vscode-descriptionForeground)]">
+                {formatScheduleDateTime(nextScheduledRun)}
+              </span>
+            )}
+          </Button>
+        )}
+
         {/* Validation warnings button */}
         {validationWarnings.length > 0 && (
           <Button
@@ -288,12 +401,22 @@ export function FlowEditor() {
         <FlowCanvas onRunFlow={handleRunFlow} onNodeSelect={handleNodeSelect} />
 
         {/* Right: Config Panel or Execution Panel (hidden when nothing selected) */}
-        {(isRunning || selectedNodeId) && (
+        {(isRunning || selectedNodeId || showFlowSettings) && (
           <div className="w-[280px] flex-shrink-0">
             {isRunning ? (
               <ExecutionPanel
                 flow={toFlow()}
                 onClose={() => setIsRunning(false)}
+              />
+            ) : showFlowSettings ? (
+              <FlowSettingsPanel
+                featureEnabled={featureFlags.scheduledFlowRuns}
+                runtimeStatus={scheduleStatus}
+                hasUnsavedChanges={isDirty}
+                saveState={saveState}
+                lastSavedAt={lastSavedAt}
+                onSave={handleSaveSchedule}
+                onClose={() => setShowFlowSettings(false)}
               />
             ) : (
               <NodeConfigPanel />
