@@ -129,9 +129,7 @@ export class FlowScheduler implements Disposable {
     }
 
     const flows = await this.storage.listFlows();
-    for (const flow of flows) {
-      await this.maybeRunFlow(flow, now);
-    }
+    await Promise.all(flows.map((flow) => this.maybeRunFlow(flow, now)));
   }
 
   private async maybeRunFlow(flow: Flow, now: Date): Promise<void> {
@@ -179,10 +177,18 @@ export class FlowScheduler implements Disposable {
       lastError: null,
     });
 
+    void this.executeScheduledFlow(flow, flowPath, inputResult.inputs);
+  }
+
+  private async executeScheduledFlow(
+    flow: Flow,
+    flowPath: string,
+    inputs: Record<string, unknown>
+  ): Promise<void> {
     try {
       const result = await this.executeFlowFn(
         flow,
-        inputResult.inputs,
+        inputs,
         this.workspacePath
       );
 
