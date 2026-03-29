@@ -7,11 +7,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Trash2, Pencil, Loader2, AlertCircle, Plus } from 'lucide-react';
+import { Trash2, Pencil, Loader2, AlertCircle, Plus, Clock3 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription } from '../ui/alert';
 import type { Flow, FlowsMessage } from './types';
 import { vscode } from '../../lib/vscode';
+import { formatScheduleDateTime, formatScheduleSummary } from './flowScheduleUi';
 
 export function FlowsPanel() {
   const [flows, setFlows] = useState<Flow[]>([]);
@@ -165,6 +166,28 @@ export function FlowsPanel() {
                 <p className="text-xs text-gray-500 line-clamp-2">
                   {flow.description}
                 </p>
+              )}
+
+              {flow.schedule && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Clock3 className="w-3 h-3" />
+                    <span>{formatScheduleSummary(flow.schedule)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-gray-400 truncate">
+                      Next: {formatScheduleDateTime(flow.nextScheduledRun ? new Date(flow.nextScheduledRun) : null)}
+                    </span>
+                    <span className="text-[11px] rounded-full px-1.5 py-0.5 border border-gray-200 dark:border-gray-700 text-gray-500">
+                      {flow.scheduleRuntime?.lastStatus ?? 'idle'}
+                    </span>
+                  </div>
+                  {flow.scheduleRuntime?.lastError && (
+                    <p className="text-[11px] text-red-500 line-clamp-2">
+                      {flow.scheduleRuntime.lastError}
+                    </p>
+                  )}
+                </div>
               )}
 
               {/* Modified date */}

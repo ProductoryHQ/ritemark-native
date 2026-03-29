@@ -21,7 +21,14 @@ export interface FeatureFlag {
 /**
  * All known flag IDs
  */
-export type FlagId = 'voice-dictation' | 'markdown-export' | 'document-search' | 'ritemark-flows' | 'agentic-assistant' | 'codex-integration';
+export type FlagId =
+  | 'voice-dictation'
+  | 'markdown-export'
+  | 'document-search'
+  | 'ritemark-flows'
+  | 'agentic-assistant'
+  | 'codex-integration'
+  | 'scheduled-flow-runs';
 
 /**
  * Feature flag registry
@@ -66,6 +73,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'codex-integration',
     label: 'Codex CLI Integration',
     description: 'ChatGPT-authenticated coding agent using OpenAI Codex CLI',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  'scheduled-flow-runs': {
+    id: 'scheduled-flow-runs',
+    label: 'Scheduled Flow Runs',
+    description: 'Run eligible flows automatically on a local schedule while Ritemark is open',
     status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },

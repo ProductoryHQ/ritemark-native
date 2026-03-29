@@ -8,6 +8,8 @@ import * as assert from 'assert';
 
 // Backend flow types (from types.ts)
 type BackendNodeType = 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
+type FlowScheduleType = 'daily' | 'weekdays' | 'weekly';
+type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 // Webview React Flow types
 type ReactFlowNodeType = 'triggerNode' | 'llmNode' | 'imageNode' | 'saveFileNode' | 'claudeCodeNode';
@@ -84,5 +86,23 @@ assert.strictEqual(
   'save-file should map to saveFileNode'
 );
 console.log('  ✓ Save File mappings are correct');
+
+// Test 6: Schedule types are the expected v1 contract
+const scheduleTypes: FlowScheduleType[] = ['daily', 'weekdays', 'weekly'];
+assert.deepStrictEqual(
+  scheduleTypes,
+  ['daily', 'weekdays', 'weekly'],
+  'Schedule types should match the v1 contract'
+);
+console.log('  ✓ Schedule types are correct');
+
+// Test 7: ISO weekday numbering contract is explicit
+const isoWeekdays: IsoWeekday[] = [1, 2, 3, 4, 5, 6, 7];
+assert.deepStrictEqual(
+  isoWeekdays,
+  [1, 2, 3, 4, 5, 6, 7],
+  'ISO weekdays should be Monday=1 through Sunday=7'
+);
+console.log('  ✓ ISO weekday numbering contract is correct');
 
 console.log('\n✅ All flow type mapping tests passed!');

@@ -12,8 +12,29 @@ export interface Flow {
   created: string;
   modified: string;
   inputs: FlowInput[];
+  schedule?: FlowSchedule;
+  scheduleRuntime?: FlowScheduleRuntimeState;
+  nextScheduledRun?: string | null;
   nodes: FlowNode[];
   edges: FlowEdge[];
+}
+
+export type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type FlowScheduleType = 'daily' | 'weekdays' | 'weekly';
+
+export interface FlowSchedule {
+  enabled: boolean;
+  type: FlowScheduleType;
+  time: string;
+  days?: IsoWeekday[];
+}
+
+export interface FlowScheduleRuntimeState {
+  lastRunAt: string | null;
+  lastScheduledFor: string | null;
+  lastStatus: 'idle' | 'running' | 'success' | 'error' | 'skipped';
+  lastError: string | null;
 }
 
 export interface FlowInput {

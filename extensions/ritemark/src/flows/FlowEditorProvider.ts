@@ -13,6 +13,8 @@ import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
+import { isValidFlowSchedule } from './flowSchedule';
+import { FlowScheduleState } from './FlowScheduleState';
 import { getAPIKeyManager } from '../ai/apiKeyManager';
 import {
   OPENAI_LLM_MODELS,
@@ -99,6 +101,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           case 'ready':
             // Webview is ready, send model config and flow data
             this.sendModelConfig(webview);
+            this.sendFeatureFlags(webview);
             this.sendFlowData(document, webview, workspacePath);
             return;
 
@@ -113,6 +116,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
                 // Re-validate and send updated warnings
                 const saveWarnings = this.validateFlow(message.flow);
                 webview.postMessage({ type: 'flow:validation', warnings: saveWarnings });
+                void this.sendScheduleStatus(document, webview);
                 // Refresh flows list in sidebar
                 vscode.commands.executeCommand('ritemark.flows.refresh');
               } finally {
@@ -164,6 +168,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
             // Show folder picker dialog for Save File node
             this.showFolderPicker(message.field, workspacePath, webview);
             return;
+
+          case 'flow:getScheduleStatus':
+            void this.sendScheduleStatus(document, webview);
+            return;
         }
       },
       undefined,
@@ -204,6 +212,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         warnings,
         filename: path.basename(document.uri.fsPath),
       });
+      void this.sendScheduleStatus(document, webview);
     } catch (err) {
       console.error('[FlowEditorProvider] Failed to parse flow:', err);
       webview.postMessage({
@@ -227,6 +236,31 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         geminiImage: GEMINI_IMAGE_MODELS.map(m => ({ id: m.id, name: m.name })),
         defaults: DEFAULT_MODELS,
       },
+    });
+  }
+
+  private sendFeatureFlags(webview: vscode.Webview): void {
+    const { isEnabled } =
+      require('../features/featureGate') as typeof import('../features/featureGate');
+
+    webview.postMessage({
+      type: 'flow:featureFlags',
+      flags: {
+        scheduledFlowRuns: isEnabled('scheduled-flow-runs'),
+      },
+    });
+  }
+
+  private async sendScheduleStatus(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    const scheduleState = new FlowScheduleState(this.context.workspaceState);
+    const status = await scheduleState.get(document.uri.fsPath);
+
+    webview.postMessage({
+      type: 'flow:scheduleStatus',
+      status,
     });
   }
 
@@ -305,6 +339,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     // Check for nodes
     if (!flow.nodes || flow.nodes.length === 0) {
       warnings.push('Flow has no nodes');
+    }
+
+    if (flow.schedule && !isValidFlowSchedule(flow.schedule)) {
+      warnings.push('Flow schedule is invalid');
     }
 
     // Check for cycles using topological sort
