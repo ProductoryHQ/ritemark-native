@@ -13,6 +13,9 @@ import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
+import { executeCodexNode } from './nodes/CodexNodeExecutor';
+import { isValidFlowSchedule } from './flowSchedule';
+import { FlowScheduleState } from './FlowScheduleState';
 import { getAPIKeyManager } from '../ai/apiKeyManager';
 import {
   OPENAI_LLM_MODELS,
@@ -99,6 +102,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           case 'ready':
             // Webview is ready, send model config and flow data
             this.sendModelConfig(webview);
+            this.sendFeatureFlags(webview);
             this.sendFlowData(document, webview, workspacePath);
             return;
 
@@ -113,6 +117,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
                 // Re-validate and send updated warnings
                 const saveWarnings = this.validateFlow(message.flow);
                 webview.postMessage({ type: 'flow:validation', warnings: saveWarnings });
+                void this.sendScheduleStatus(document, webview);
                 // Refresh flows list in sidebar
                 vscode.commands.executeCommand('ritemark.flows.refresh');
               } finally {
@@ -164,6 +169,21 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
             // Show folder picker dialog for Save File node
             this.showFolderPicker(message.field, workspacePath, webview);
             return;
+
+          case 'flow:getScheduleStatus':
+            void this.sendScheduleStatus(document, webview);
+            return;
+
+          case 'codex:getModels':
+            // Return available Codex models
+            try {
+              const { getCodexModels } = require('../codex');
+              const models = getCodexModels();
+              webview.postMessage({ type: 'codex:modelsResult', models });
+            } catch {
+              webview.postMessage({ type: 'codex:modelsResult', models: [] });
+            }
+            return;
         }
       },
       undefined,
@@ -204,6 +224,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         warnings,
         filename: path.basename(document.uri.fsPath),
       });
+      void this.sendScheduleStatus(document, webview);
     } catch (err) {
       console.error('[FlowEditorProvider] Failed to parse flow:', err);
       webview.postMessage({
@@ -230,6 +251,31 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     });
   }
 
+  private sendFeatureFlags(webview: vscode.Webview): void {
+    const { isEnabled } =
+      require('../features/featureGate') as typeof import('../features/featureGate');
+
+    webview.postMessage({
+      type: 'flow:featureFlags',
+      flags: {
+        scheduledFlowRuns: isEnabled('scheduled-flow-runs'),
+      },
+    });
+  }
+
+  private async sendScheduleStatus(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    const scheduleState = new FlowScheduleState(this.context.workspaceState);
+    const status = await scheduleState.get(document.uri.fsPath);
+
+    webview.postMessage({
+      type: 'flow:scheduleStatus',
+      status,
+    });
+  }
+
   /**
    * Update document with new flow content
    * If flow name changed, rename the file to match
@@ -239,6 +285,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     flow: Flow,
     webview?: vscode.Webview
   ): Promise<void> {
+    const scheduleState = new FlowScheduleState(this.context.workspaceState);
+
     // Update modified timestamp
     flow.modified = new Date().toISOString();
 
@@ -250,6 +298,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
     if (shortId && currentFilename !== expectedFilename) {
       // Name changed - rename file using WorkspaceEdit (smoother than close/reopen)
+      const oldPath = document.uri.fsPath;
       const dir = path.dirname(document.uri.fsPath);
       const newPath = path.join(dir, `${expectedFilename}.flow.json`);
       const newUri = vscode.Uri.file(newPath);
@@ -272,6 +321,12 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       renameEdit.renameFile(document.uri, newUri);
       await vscode.workspace.applyEdit(renameEdit);
 
+      if (!flow.schedule) {
+        await scheduleState.clear(oldPath);
+      } else {
+        await scheduleState.migrate(oldPath, newPath);
+      }
+
       // Notify webview of the rename (new ID)
       if (webview) {
         webview.postMessage({ type: 'flow:renamed', newId: flow.id });
@@ -286,6 +341,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         content
       );
       await vscode.workspace.applyEdit(edit);
+
+      if (!flow.schedule) {
+        await scheduleState.clear(document.uri.fsPath);
+      }
     }
   }
 
@@ -305,6 +364,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     // Check for nodes
     if (!flow.nodes || flow.nodes.length === 0) {
       warnings.push('Flow has no nodes');
+    }
+
+    if (flow.schedule && !isValidFlowSchedule(flow.schedule)) {
+      warnings.push('Flow schedule is invalid');
     }
 
     // Check for cycles using topological sort
@@ -546,6 +609,20 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           : undefined;
 
         return await executeClaudeCodeNode(node, context, undefined, onProgress);
+      }
+
+      case 'codex': {
+        const onProgress = webview
+          ? (progress: ClaudeCodeProgress) => {
+              webview.postMessage({
+                type: 'flow:codexProgress',
+                nodeId: node.id,
+                progress,
+              });
+            }
+          : undefined;
+
+        return await executeCodexNode(node, context, undefined, onProgress);
       }
 
       default:

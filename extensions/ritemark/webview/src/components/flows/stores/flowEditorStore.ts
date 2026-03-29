@@ -27,6 +27,24 @@ export interface FlowInput {
   defaultValue?: string;
 }
 
+export type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type FlowScheduleType =
+  | 'daily'
+  | 'weekdays'
+  | 'weekly'
+  | 'hourly'
+  | 'interval';
+
+export interface FlowSchedule {
+  enabled: boolean;
+  type: FlowScheduleType;
+  time?: string;
+  days?: IsoWeekday[];
+  minuteOfHour?: number;
+  intervalMinutes?: number;
+}
+
 // Node data types matching our flow types
 // Using Record<string, unknown> compatible types for React Flow
 export interface TriggerNodeData extends Record<string, unknown> {
@@ -74,7 +92,14 @@ export interface ClaudeCodeNodeData extends Record<string, unknown> {
   timeout: number;
 }
 
-export type FlowNodeData = TriggerNodeData | LLMNodeData | ImageNodeData | SaveFileNodeData | ClaudeCodeNodeData;
+export interface CodexNodeData extends Record<string, unknown> {
+  label: string;
+  prompt: string;
+  model: string;
+  timeout: number;
+}
+
+export type FlowNodeData = TriggerNodeData | LLMNodeData | ImageNodeData | SaveFileNodeData | ClaudeCodeNodeData | CodexNodeData;
 
 // Flow types from extension
 export interface Flow {
@@ -85,9 +110,10 @@ export interface Flow {
   created: string;
   modified: string;
   inputs: FlowInput[];
+  schedule?: FlowSchedule;
   nodes: Array<{
     id: string;
-    type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
+    type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code' | 'codex';
     position: { x: number; y: number };
     data: Record<string, unknown>;
   }>;
@@ -105,6 +131,7 @@ const flowTypeToReactFlowType: Record<string, string> = {
   'image-prompt': 'imageNode',
   'save-file': 'saveFileNode',
   'claude-code': 'claudeCodeNode',
+  'codex': 'codexNode',
 };
 
 const reactFlowTypeToFlowType: Record<string, string> = {
@@ -113,6 +140,7 @@ const reactFlowTypeToFlowType: Record<string, string> = {
   'imageNode': 'image-prompt',
   'saveFileNode': 'save-file',
   'claudeCodeNode': 'claude-code',
+  'codexNode': 'codex',
 };
 
 // Helper to escape special regex characters
@@ -176,6 +204,7 @@ interface FlowEditorState {
   flowName: string;
   flowDescription: string;
   flowInputs: FlowInput[];
+  flowSchedule: FlowSchedule | null;
 
   // React Flow state
   nodes: Node<FlowNodeData>[];
@@ -208,6 +237,7 @@ interface FlowEditorState {
   selectNode: (nodeId: string | null) => void;
   setFlowName: (name: string) => void;
   setFlowDescription: (description: string) => void;
+  setFlowSchedule: (schedule: FlowSchedule | null) => void;
   setValidationWarnings: (warnings: string[]) => void;
   markDirty: () => void;
   markClean: () => void;
@@ -269,6 +299,13 @@ function getDefaultNodeData(type: string): FlowNodeData {
         prompt: '',
         timeout: 5,
       };
+    case 'codexNode':
+      return {
+        label: 'Codex',
+        prompt: '',
+        model: '',
+        timeout: 5,
+      };
     default:
       return { label: 'Unknown' } as FlowNodeData;
   }
@@ -280,6 +317,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   flowName: 'Untitled Flow',
   flowDescription: '',
   flowInputs: [],
+  flowSchedule: null,
   nodes: [],
   edges: [],
   selectedNodeId: null,
@@ -323,6 +361,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       flowName: flow.name,
       flowDescription: flow.description,
       flowInputs: flow.inputs,
+      flowSchedule: flow.schedule ?? null,
       nodes,
       edges,
       selectedNodeId,
@@ -516,6 +555,23 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
             }
           }
 
+          // Check Claude Code and Codex node prompts
+          if (node.type === 'claudeCodeNode' || node.type === 'codexNode') {
+            let prompt = (nodeData as { prompt?: string }).prompt || '';
+
+            for (const { oldLabel, newLabel } of labelChanges) {
+              const pattern = new RegExp(`\\{${escapeRegex(oldLabel)}\\}`, 'g');
+              if (pattern.test(prompt)) {
+                prompt = prompt.replace(pattern, `{${newLabel}}`);
+                updated = true;
+              }
+            }
+
+            if (updated) {
+              newData.prompt = prompt;
+            }
+          }
+
           if (updated) {
             return { ...node, data: newData as FlowNodeData };
           }
@@ -574,6 +630,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   setFlowDescription: (description) =>
     set({ flowDescription: description, isDirty: true }),
 
+  setFlowSchedule: (schedule) => set({ flowSchedule: schedule, isDirty: true }),
+
   setValidationWarnings: (warnings) => set({ validationWarnings: warnings }),
 
   markDirty: () => set({ isDirty: true }),
@@ -625,6 +683,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       created: '', // Will be set by backend
       modified: '', // Will be set by backend
       inputs: state.flowInputs,
+      schedule: state.flowSchedule ?? undefined,
       nodes: state.nodes.map((node) => ({
         id: node.id,
         type: reactFlowTypeToFlowType[node.type || 'triggerNode'] as
@@ -632,7 +691,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
           | 'llm-prompt'
           | 'image-prompt'
           | 'save-file'
-          | 'claude-code',
+          | 'claude-code'
+          | 'codex',
         position: node.position,
         data: node.data as Record<string, unknown>,
       })),

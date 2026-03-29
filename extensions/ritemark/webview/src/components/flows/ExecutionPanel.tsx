@@ -28,11 +28,12 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { Flow, FlowInput } from './stores/flowEditorStore';
 import { vscode } from '../../lib/vscode';
+import { validateFlowForExecution } from './executionValidation';
 
 interface ExecutionStep {
   nodeId: string;
   label: string;
-  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code';
+  type: 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code' | 'codex';
   status: 'pending' | 'running' | 'complete' | 'error';
   output?: string;
   error?: string;
@@ -52,28 +53,8 @@ const nodeIcons: Record<string, typeof Sparkles> = {
   'image-prompt': Image,
   'save-file': Save,
   'claude-code': Terminal,
+  'codex': Terminal,
 };
-
-// Validate flow can run
-function validateFlow(flow: Flow): string[] {
-  const errors: string[] = [];
-
-  if (!flow.nodes || flow.nodes.length === 0) {
-    errors.push('Flow has no nodes');
-  } else if (flow.nodes.length === 1 && flow.nodes[0].type === 'trigger') {
-    errors.push('Flow only has a Trigger node - add more nodes to process');
-  }
-
-  // Check if there's at least one processing node (LLM, Image, Claude Code, or Save)
-  const hasProcessingNode = flow.nodes.some(
-    (n) => n.type === 'llm-prompt' || n.type === 'image-prompt' || n.type === 'save-file' || n.type === 'claude-code'
-  );
-  if (!hasProcessingNode && flow.nodes.length > 0) {
-    errors.push('Flow needs at least one AI or Output node');
-  }
-
-  return errors;
-}
 
 export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
   const [phase, setPhase] = useState<'input' | 'running' | 'complete' | 'error'>('input');
@@ -89,7 +70,7 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Validate flow
-  const validationErrors = validateFlow(flow);
+  const validationErrors = validateFlowForExecution(flow);
   const canRun = validationErrors.length === 0;
 
   // Initialize steps from flow nodes (Trigger first, then topological order)
