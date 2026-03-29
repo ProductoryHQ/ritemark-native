@@ -13,7 +13,7 @@ Flows can currently be run only manually. That works for ad hoc tasks, but it bl
 - Local-only scheduling inside the Ritemark extension host
 - Schedule attached to individual `.flow.json` files
 - Runs only while the relevant Ritemark window and workspace are open
-- Time-based recurrence only: daily, weekdays, weekly
+- Time-based recurrence only: daily, weekdays, weekly, hourly, and short minute intervals
 - Local timezone semantics
 - Grace-period semantics for wake/sleep and delayed ticks
 - No cloud execution, no background daemon, no backfill for missed runs
@@ -29,8 +29,8 @@ Flows can currently be run only manually. That works for ad hoc tasks, but it bl
 ## Success Criteria
 
 - [ ] A flow can be configured with an enabled schedule from the flow editor
-- [ ] Supported schedule types in v1 are `daily`, `weekdays`, and `weekly`
-- [ ] A user can define local trigger time, for example `09:00`
+- [ ] Supported schedule types in v1 are `daily`, `weekdays`, `weekly`, `hourly`, and `interval`
+- [ ] A user can define local trigger time, an hourly minute offset, or a short minute interval such as every `15` minutes
 - [ ] While the workspace is open in Ritemark and the feature flag is enabled, the scheduled flow executes automatically at the configured time
 - [ ] Scheduled runs reuse the existing flow execution pipeline instead of duplicating node execution logic
 - [ ] Run results are recorded in the same execution/result UI shape used by manual runs
@@ -50,7 +50,7 @@ Flows can currently be run only manually. That works for ad hoc tasks, but it bl
 
 - Catch-up runs after app restart or wake
 - Cron expression editor
-- Monthly or arbitrary interval schedules
+- Monthly schedules
 - Multi-workspace coordination across app windows
 - Remote or server-side execution
 - Running flows when Ritemark is fully closed
@@ -74,7 +74,9 @@ Separate immutable user config from mutable runtime state.
     "enabled": true,
     "type": "daily",
     "time": "09:00",
-    "days": [1, 2, 3, 4, 5]
+    "days": [1, 2, 3, 4, 5],
+    "minuteOfHour": 0,
+    "intervalMinutes": 15
   }
 }
 ```
@@ -83,6 +85,8 @@ Notes:
 - `days` is used only for `weekly`
 - Day numbering uses ISO 8601 semantics: Monday=`1` ... Sunday=`7`
 - `weekdays` is a first-class schedule type and does not require `days`
+- `minuteOfHour` is used only for `hourly`
+- `intervalMinutes` is used only for `interval`
 
 ### Runtime schedule state
 

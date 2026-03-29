@@ -13,7 +13,7 @@ import { NodeConfigPanel } from './NodeConfigPanel';
 import { ExecutionPanel } from './ExecutionPanel';
 import { FlowSettingsPanel } from './FlowSettingsPanel';
 import { useFlowEditorStore } from './stores/flowEditorStore';
-import type { Flow, FlowSchedule } from './stores/flowEditorStore';
+import type { Flow } from './stores/flowEditorStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { vscode } from '../../lib/vscode';
@@ -31,13 +31,7 @@ interface FlowScheduleStatus {
   lastError: string | null;
 }
 
-function createDefaultSchedule(): FlowSchedule {
-  return {
-    enabled: true,
-    type: 'daily',
-    time: '09:00',
-  };
-}
+type FlowSaveState = 'idle' | 'unsaved' | 'saving' | 'saved';
 
 export function FlowEditor() {
   const setFlow = useFlowEditorStore((state) => state.setFlow);
@@ -49,7 +43,6 @@ export function FlowEditor() {
   const setFlowDescription = useFlowEditorStore(
     (state) => state.setFlowDescription
   );
-  const setFlowSchedule = useFlowEditorStore((state) => state.setFlowSchedule);
   const isDirty = useFlowEditorStore((state) => state.isDirty);
   const markClean = useFlowEditorStore((state) => state.markClean);
   const validationWarnings = useFlowEditorStore(
@@ -105,6 +98,10 @@ export function FlowEditor() {
     scheduledFlowRuns: false,
   });
   const [scheduleStatus, setScheduleStatus] = useState<FlowScheduleStatus | null>(null);
+  const [saveState, setSaveState] = useState<FlowSaveState>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+  const savedNotificationTimerRef = useRef<number | null>(null);
 
   // Ref to track isRunning for message handler (avoids stale closure)
   const isRunningRef = useRef(isRunning);
@@ -122,10 +119,23 @@ export function FlowEditor() {
           setFlow(message.flow as Flow, message.workspacePath);
           setValidationWarnings(message.warnings || []);
           setError(null);
+          setSaveState('idle');
+          setLastSavedAt(
+            message.flow?.modified ? new Date(message.flow.modified as string) : null
+          );
           break;
 
         case 'flow:saved':
           markClean();
+          setSaveState('saved');
+          setLastSavedAt(new Date());
+          if (savedNotificationTimerRef.current) {
+            window.clearTimeout(savedNotificationTimerRef.current);
+          }
+          savedNotificationTimerRef.current = window.setTimeout(() => {
+            setSaveState('idle');
+            savedNotificationTimerRef.current = null;
+          }, 2500);
           break;
 
         case 'flow:validation':
@@ -161,20 +171,36 @@ export function FlowEditor() {
 
     return () => {
       window.removeEventListener('message', handleMessage);
+      if (savedNotificationTimerRef.current) {
+        window.clearTimeout(savedNotificationTimerRef.current);
+        savedNotificationTimerRef.current = null;
+      }
     };
   }, [setFlow, markClean, setValidationWarnings]);
+
+  useEffect(() => {
+    if (isDirty) {
+      setSaveState((current) => (current === 'saving' ? current : 'unsaved'));
+    }
+  }, [isDirty]);
 
   // Auto-save with debounce
   useEffect(() => {
     if (!isDirty) return;
 
-    const timer = setTimeout(() => {
+    saveTimerRef.current = window.setTimeout(() => {
       const vscodeApi = vscode;
       const flow = toFlow();
+      setSaveState('saving');
       vscodeApi.postMessage({ type: 'flow:save', flow });
     }, 500);
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
   }, [isDirty, toFlow]);
 
   // Handle keyboard shortcuts
@@ -232,12 +258,21 @@ export function FlowEditor() {
   }, [showFlowSettings]);
 
   const openFlowSettings = useCallback(() => {
-    if (!flowSchedule) {
-      setFlowSchedule(createDefaultSchedule());
-    }
     setShowFlowSettings(true);
     setIsRunning(false);
-  }, [flowSchedule, setFlowSchedule]);
+  }, []);
+
+  const handleSaveSchedule = useCallback(() => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSaveState('saving');
+    vscode.postMessage({
+      type: 'flow:save',
+      flow: toFlow(),
+    });
+  }, [toFlow]);
 
   const nextScheduledRun = getNextScheduledRun(flowSchedule);
 
@@ -377,6 +412,10 @@ export function FlowEditor() {
               <FlowSettingsPanel
                 featureEnabled={featureFlags.scheduledFlowRuns}
                 runtimeStatus={scheduleStatus}
+                hasUnsavedChanges={isDirty}
+                saveState={saveState}
+                lastSavedAt={lastSavedAt}
+                onSave={handleSaveSchedule}
                 onClose={() => setShowFlowSettings(false)}
               />
             ) : (
