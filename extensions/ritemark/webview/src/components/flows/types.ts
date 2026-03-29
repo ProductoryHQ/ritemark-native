@@ -21,13 +21,20 @@ export interface Flow {
 
 export type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-export type FlowScheduleType = 'daily' | 'weekdays' | 'weekly';
+export type FlowScheduleType =
+  | 'daily'
+  | 'weekdays'
+  | 'weekly'
+  | 'hourly'
+  | 'interval';
 
 export interface FlowSchedule {
   enabled: boolean;
   type: FlowScheduleType;
-  time: string;
+  time?: string;
   days?: IsoWeekday[];
+  minuteOfHour?: number;
+  intervalMinutes?: number;
 }
 
 export interface FlowScheduleRuntimeState {

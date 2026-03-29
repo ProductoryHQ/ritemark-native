@@ -20,6 +20,14 @@ function parseScheduleTime(value: string): { hours: number; minutes: number } | 
   return { hours, minutes };
 }
 
+function isValidMinute(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 59;
+}
+
+function isValidIntervalMinutes(value: number): boolean {
+  return Number.isInteger(value) && value >= 1 && value <= 59;
+}
+
 function getIsoWeekday(date: Date): IsoWeekday {
   const weekday = date.getDay();
   return (weekday === 0 ? 7 : weekday) as IsoWeekday;
@@ -32,6 +40,30 @@ function toSlotDate(base: Date, hours: number, minutes: number): Date {
     base.getDate(),
     hours,
     minutes,
+    0,
+    0
+  );
+}
+
+function toHourSlotDate(base: Date, minutes: number): Date {
+  return new Date(
+    base.getFullYear(),
+    base.getMonth(),
+    base.getDate(),
+    base.getHours(),
+    minutes,
+    0,
+    0
+  );
+}
+
+function startOfDay(base: Date): Date {
+  return new Date(
+    base.getFullYear(),
+    base.getMonth(),
+    base.getDate(),
+    0,
+    0,
     0,
     0
   );
@@ -51,6 +83,16 @@ function isAllowedOnDate(schedule: FlowSchedule, date: Date): boolean {
   return (schedule.days ?? []).includes(weekday);
 }
 
+function isClockSchedule(
+  schedule: FlowSchedule
+): schedule is FlowSchedule & { type: 'daily' | 'weekdays' | 'weekly'; time: string } {
+  return (
+    schedule.type === 'daily' ||
+    schedule.type === 'weekdays' ||
+    schedule.type === 'weekly'
+  );
+}
+
 export function getNextScheduledRun(
   schedule: FlowSchedule | null,
   now: Date = new Date()
@@ -59,33 +101,58 @@ export function getNextScheduledRun(
     return null;
   }
 
-  const parsedTime = parseScheduleTime(schedule.time);
-  if (!parsedTime) {
+  if (isClockSchedule(schedule)) {
+    const parsedTime = parseScheduleTime(schedule.time);
+    if (!parsedTime) {
+      return null;
+    }
+
+    for (let offset = 0; offset < 8; offset += 1) {
+      const candidateDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + offset,
+        0,
+        0,
+        0,
+        0
+      );
+
+      if (!isAllowedOnDate(schedule, candidateDay)) {
+        continue;
+      }
+
+      const candidate = toSlotDate(candidateDay, parsedTime.hours, parsedTime.minutes);
+      if (candidate.getTime() >= now.getTime()) {
+        return candidate;
+      }
+    }
+
     return null;
   }
 
-  for (let offset = 0; offset < 8; offset += 1) {
-    const candidateDay = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() + offset,
-      0,
-      0,
-      0,
-      0
-    );
-
-    if (!isAllowedOnDate(schedule, candidateDay)) {
-      continue;
+  if (schedule.type === 'hourly') {
+    if (!isValidMinute(schedule.minuteOfHour ?? -1)) {
+      return null;
     }
 
-    const candidate = toSlotDate(candidateDay, parsedTime.hours, parsedTime.minutes);
-    if (candidate.getTime() >= now.getTime()) {
-      return candidate;
+    const currentHourSlot = toHourSlotDate(now, schedule.minuteOfHour ?? 0);
+    if (currentHourSlot.getTime() >= now.getTime()) {
+      return currentHourSlot;
     }
+
+    return new Date(currentHourSlot.getTime() + 60 * 60 * 1000);
   }
 
-  return null;
+  if (!isValidIntervalMinutes(schedule.intervalMinutes ?? -1)) {
+    return null;
+  }
+
+  const intervalMs = (schedule.intervalMinutes ?? 1) * 60 * 1000;
+  const dayStart = startOfDay(now);
+  const elapsedMs = now.getTime() - dayStart.getTime();
+  const nextSlotIndex = Math.ceil(elapsedMs / intervalMs);
+  return new Date(dayStart.getTime() + nextSlotIndex * intervalMs);
 }
 
 export function formatScheduleSummary(schedule: FlowSchedule | null): string {
@@ -103,6 +170,16 @@ export function formatScheduleSummary(schedule: FlowSchedule | null): string {
 
   if (schedule.type === 'weekdays') {
     return `Weekdays at ${schedule.time}`;
+  }
+
+  if (schedule.type === 'hourly') {
+    const minute = schedule.minuteOfHour ?? 0;
+    return `Hourly at :${String(minute).padStart(2, '0')}`;
+  }
+
+  if (schedule.type === 'interval') {
+    const interval = schedule.intervalMinutes ?? 1;
+    return `Every ${interval} min`;
   }
 
   const dayCount = schedule.days?.length ?? 0;

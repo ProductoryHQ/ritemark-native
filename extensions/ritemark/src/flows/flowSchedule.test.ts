@@ -79,7 +79,27 @@ assert.strictEqual(getIsoWeekday(nextWeekly!), 2); // Tuesday
 assert.strictEqual(nextWeekly?.getDate(), 31);
 console.log('  ✓ Weekly schedule uses configured ISO weekday');
 
-// Test 7: Due run fires within grace window
+// Test 7: Hourly schedules trigger on configured minute
+const nextHourly = getNextScheduledRun(
+  createSchedule({ type: 'hourly', time: undefined, minuteOfHour: 15 }),
+  new Date(2026, 2, 28, 9, 10)
+);
+assert.ok(nextHourly);
+assert.strictEqual(nextHourly?.getHours(), 9);
+assert.strictEqual(nextHourly?.getMinutes(), 15);
+console.log('  ✓ Hourly schedule uses minute past hour');
+
+// Test 8: Interval schedules calculate next slot from wall clock
+const nextInterval = getNextScheduledRun(
+  createSchedule({ type: 'interval', time: undefined, intervalMinutes: 15 }),
+  new Date(2026, 2, 28, 9, 7)
+);
+assert.ok(nextInterval);
+assert.strictEqual(nextInterval?.getHours(), 9);
+assert.strictEqual(nextInterval?.getMinutes(), 15);
+console.log('  ✓ Interval schedule uses wall-clock minute slots');
+
+// Test 9: Due run fires within grace window
 const dueWithinGrace = getDueScheduledRun(
   createSchedule({ type: 'daily', time: '09:00' }),
   new Date(2026, 2, 28, 9, 3),
@@ -91,7 +111,7 @@ assert.strictEqual(dueWithinGrace?.getHours(), 9);
 assert.strictEqual(dueWithinGrace?.getMinutes(), 0);
 console.log('  ✓ Due run fires within grace window');
 
-// Test 8: Stale slot is skipped outside grace window
+// Test 10: Stale slot is skipped outside grace window
 const staleDue = getDueScheduledRun(
   createSchedule({ type: 'daily', time: '09:00' }),
   new Date(2026, 2, 28, 9, 10),
@@ -101,7 +121,7 @@ const staleDue = getDueScheduledRun(
 assert.strictEqual(staleDue, null);
 console.log('  ✓ Stale slot is skipped outside grace window');
 
-// Test 9: Duplicate scheduled slot is suppressed
+// Test 11: Duplicate scheduled slot is suppressed
 const todaySlot = new Date(2026, 2, 28, 9, 0, 0, 0).toISOString();
 const duplicateDue = getDueScheduledRun(
   createSchedule({ type: 'daily', time: '09:00' }),
@@ -112,7 +132,7 @@ const duplicateDue = getDueScheduledRun(
 assert.strictEqual(duplicateDue, null);
 console.log('  ✓ Duplicate scheduled slot is suppressed');
 
-// Test 10: Weekday due run does not fire on weekend
+// Test 12: Weekday due run does not fire on weekend
 const weekendDue = getDueScheduledRun(
   createSchedule({ type: 'weekdays', time: '09:00' }),
   new Date(2026, 2, 28, 9, 1), // Saturday
@@ -121,5 +141,29 @@ const weekendDue = getDueScheduledRun(
 );
 assert.strictEqual(weekendDue, null);
 console.log('  ✓ Weekday schedule does not fire on weekend');
+
+// Test 13: Hourly due run uses current hour slot
+const hourlyDue = getDueScheduledRun(
+  createSchedule({ type: 'hourly', time: undefined, minuteOfHour: 15 }),
+  new Date(2026, 2, 28, 9, 17),
+  null,
+  SCHEDULE_GRACE_MS
+);
+assert.ok(hourlyDue);
+assert.strictEqual(hourlyDue?.getHours(), 9);
+assert.strictEqual(hourlyDue?.getMinutes(), 15);
+console.log('  ✓ Hourly due run uses current hour slot');
+
+// Test 14: Interval due run uses current interval slot
+const intervalDue = getDueScheduledRun(
+  createSchedule({ type: 'interval', time: undefined, intervalMinutes: 15 }),
+  new Date(2026, 2, 28, 9, 17),
+  null,
+  SCHEDULE_GRACE_MS
+);
+assert.ok(intervalDue);
+assert.strictEqual(intervalDue?.getHours(), 9);
+assert.strictEqual(intervalDue?.getMinutes(), 15);
+console.log('  ✓ Interval due run uses current interval slot');
 
 console.log('\n✅ All flow schedule tests passed!');

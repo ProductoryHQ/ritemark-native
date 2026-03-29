@@ -8,7 +8,7 @@ import * as assert from 'assert';
 
 // Backend flow types (from types.ts)
 type BackendNodeType = 'trigger' | 'llm-prompt' | 'image-prompt' | 'save-file' | 'claude-code' | 'codex';
-type FlowScheduleType = 'daily' | 'weekdays' | 'weekly';
+type FlowScheduleType = 'daily' | 'weekdays' | 'weekly' | 'hourly' | 'interval';
 type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 // Webview React Flow types
@@ -102,12 +102,12 @@ assert.strictEqual(
 );
 console.log('  ✓ Codex mappings are correct');
 
-// Test 7: Schedule types are the expected v1 contract
-const scheduleTypes: FlowScheduleType[] = ['daily', 'weekdays', 'weekly'];
+// Test 7: Schedule types are the expected contract
+const scheduleTypes: FlowScheduleType[] = ['daily', 'weekdays', 'weekly', 'hourly', 'interval'];
 assert.deepStrictEqual(
   scheduleTypes,
-  ['daily', 'weekdays', 'weekly'],
-  'Schedule types should match the v1 contract'
+  ['daily', 'weekdays', 'weekly', 'hourly', 'interval'],
+  'Schedule types should match the scheduling contract'
 );
 console.log('  ✓ Schedule types are correct');
 

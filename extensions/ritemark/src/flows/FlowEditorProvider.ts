@@ -172,6 +172,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'flow:getScheduleStatus':
             void this.sendScheduleStatus(document, webview);
+            return;
 
           case 'codex:getModels':
             // Return available Codex models
@@ -284,6 +285,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     flow: Flow,
     webview?: vscode.Webview
   ): Promise<void> {
+    const scheduleState = new FlowScheduleState(this.context.workspaceState);
+
     // Update modified timestamp
     flow.modified = new Date().toISOString();
 
@@ -317,6 +320,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       renameEdit.renameFile(document.uri, newUri);
       await vscode.workspace.applyEdit(renameEdit);
 
+      if (!flow.schedule) {
+        await scheduleState.clear(document.uri.fsPath);
+      }
+
       // Notify webview of the rename (new ID)
       if (webview) {
         webview.postMessage({ type: 'flow:renamed', newId: flow.id });
@@ -331,6 +338,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         content
       );
       await vscode.workspace.applyEdit(edit);
+
+      if (!flow.schedule) {
+        await scheduleState.clear(document.uri.fsPath);
+      }
     }
   }
 

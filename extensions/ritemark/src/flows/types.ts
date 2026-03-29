@@ -29,7 +29,12 @@ export type IsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 /**
  * Supported recurrence types for flow scheduling.
  */
-export type FlowScheduleType = 'daily' | 'weekdays' | 'weekly';
+export type FlowScheduleType =
+  | 'daily'
+  | 'weekdays'
+  | 'weekly'
+  | 'hourly'
+  | 'interval';
 
 /**
  * Flow-level schedule config stored in the flow file.
@@ -38,10 +43,14 @@ export type FlowScheduleType = 'daily' | 'weekdays' | 'weekly';
 export interface FlowSchedule {
   enabled: boolean;
   type: FlowScheduleType;
-  /** Local time in 24-hour HH:mm format */
-  time: string;
+  /** Local time in 24-hour HH:mm format, used by daily/weekdays/weekly */
+  time?: string;
   /** ISO 8601 weekdays used only for weekly schedules */
   days?: IsoWeekday[];
+  /** Minute past the hour, used only for hourly schedules */
+  minuteOfHour?: number;
+  /** Repeat interval in minutes, used only for interval schedules */
+  intervalMinutes?: number;
 }
 
 /**
