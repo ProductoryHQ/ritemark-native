@@ -109,6 +109,7 @@ function checkCommandAvailable(command: string): boolean {
 function recommendedEnvironmentAction(input: {
   platform: NodeJS.Platform;
   gitInstalled: boolean;
+  nodeInstalled: boolean;
   restartRequired: boolean;
 }): AgentEnvironmentStatus['recommendedAction'] {
   if (input.restartRequired) {
@@ -117,6 +118,10 @@ function recommendedEnvironmentAction(input: {
 
   if (input.platform === 'win32' && !input.gitInstalled) {
     return 'install-git';
+  }
+
+  if (input.platform === 'win32' && !input.nodeInstalled) {
+    return 'install-node';
   }
 
   return null;
@@ -451,6 +456,7 @@ export async function getAgentEnvironmentStatus(options?: {
     recommendedAction: recommendedEnvironmentAction({
       platform,
       gitInstalled,
+      nodeInstalled,
       restartRequired,
     }),
   };

@@ -176,6 +176,7 @@ interface AISidebarState {
   startLogin: () => void;
   openApiKeySettings: () => void;
   openGitDownload: () => void;
+  openNodeDownload: () => void;
   recheckSetup: () => void;
   approvePlan: (turnId: string) => void;
   rejectPlan: (turnId: string, feedback?: string) => void;
@@ -420,6 +421,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   openGitDownload: () => {
     vscode.postMessage({ type: 'agent-setup:open-git-download' });
+  },
+
+  openNodeDownload: () => {
+    vscode.postMessage({ type: 'agent-setup:open-node-download' });
   },
 
   recheckSetup: () => {

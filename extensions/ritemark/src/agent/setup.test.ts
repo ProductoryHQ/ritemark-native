@@ -132,6 +132,7 @@ const { deriveClaudeSetupStatus, recommendedEnvironmentAction } = __testOnly;
   const action = recommendedEnvironmentAction({
     platform: 'win32',
     gitInstalled: false,
+    nodeInstalled: true,
     restartRequired: false,
   });
 
@@ -141,11 +142,34 @@ const { deriveClaudeSetupStatus, recommendedEnvironmentAction } = __testOnly;
 {
   const action = recommendedEnvironmentAction({
     platform: 'win32',
+    gitInstalled: true,
+    nodeInstalled: false,
+    restartRequired: false,
+  });
+
+  assert.strictEqual(action, 'install-node');
+}
+
+{
+  const action = recommendedEnvironmentAction({
+    platform: 'win32',
     gitInstalled: false,
+    nodeInstalled: false,
     restartRequired: true,
   });
 
   assert.strictEqual(action, 'reload');
+}
+
+{
+  const action = recommendedEnvironmentAction({
+    platform: 'darwin',
+    gitInstalled: true,
+    nodeInstalled: false,
+    restartRequired: false,
+  });
+
+  assert.strictEqual(action, null);
 }
 
 console.log('setup.test.ts passed');

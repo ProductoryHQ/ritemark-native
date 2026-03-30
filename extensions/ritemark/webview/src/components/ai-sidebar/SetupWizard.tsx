@@ -13,6 +13,7 @@ export function SetupWizard() {
   const startLogin = useAISidebarStore((s) => s.startLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
   const openGitDownload = useAISidebarStore((s) => s.openGitDownload);
+  const openNodeDownload = useAISidebarStore((s) => s.openNodeDownload);
   const configureApiKey = useAISidebarStore((s) => s.configureApiKey);
   const reloadWindow = useAISidebarStore((s) => s.reloadWindow);
   const dismissWelcome = useAISidebarStore((s) => s.dismissWelcome);
@@ -25,9 +26,10 @@ export function SetupWizard() {
   const loginInProgress = setupStatus.state === 'auth-in-progress';
   const isReady = setupStatus.state === 'ready';
   const missingGit = environmentStatus?.platform === 'win32' && !environmentStatus?.gitInstalled;
+  const missingNode = environmentStatus?.platform === 'win32' && !environmentStatus?.nodeInstalled;
   const missingPowerShell = environmentStatus?.platform === 'win32' && !environmentStatus?.powershellAvailable;
   const installOrRepairStep = needsInstall || (isBroken && setupStatus.repairAction !== 'reload');
-  const installBlockedByEnvironment = installOrRepairStep && (missingGit || missingPowerShell);
+  const installBlockedByEnvironment = installOrRepairStep && (missingGit || missingNode || missingPowerShell);
   const loginBlockedByEnvironment = needsAuth && missingPowerShell;
   const offlineBlocked = !isOnline && (needsAuth || loginInProgress);
 
@@ -122,6 +124,13 @@ export function SetupWizard() {
                 <SecondaryButton onClick={openGitDownload}>
                   <Wrench className="h-3.5 w-3.5" />
                   Get Git for Windows
+                </SecondaryButton>
+              )}
+
+              {installOrRepairStep && missingNode && (
+                <SecondaryButton onClick={openNodeDownload}>
+                  <Wrench className="h-3.5 w-3.5" />
+                  Get Node.js
                 </SecondaryButton>
               )}
 

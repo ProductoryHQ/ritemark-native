@@ -280,6 +280,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           await vscode.env.openExternal(vscode.Uri.parse('https://git-scm.com/download/win'));
           break;
 
+        case 'agent-setup:open-node-download':
+          await vscode.env.openExternal(vscode.Uri.parse('https://nodejs.org/en/download'));
+          break;
+
         case 'agent-setup:check':
           clearSetupCache();
           emitClaudeStatusInvalidated('status-refresh');

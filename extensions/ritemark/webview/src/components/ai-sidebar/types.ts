@@ -138,7 +138,7 @@ export type ImageAttachment = FileAttachment;
 export type ClaudeAuthMethod = 'claude-oauth' | 'api-key' | null;
 export type ClaudeSetupState = 'not-installed' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
 export type ClaudeRepairAction = 'install' | 'repair' | 'reload' | null;
-export type AgentEnvironmentRecommendedAction = 'install-git' | 'reload' | null;
+export type AgentEnvironmentRecommendedAction = 'install-git' | 'install-node' | 'reload' | null;
 
 export interface AgentEnvironmentStatus {
   platform: string;

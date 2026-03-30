@@ -56,9 +56,9 @@ Fix the bug where Windows users see "cannot find Node" when installing Ritemark 
 
 ## Status
 
-**Current Phase:** 2 (PLAN)
-**Approval Required:** Yes — Jarmo must approve before implementation begins
+**Current Phase:** 3 (DEVELOP)
+**Approval Required:** No — approved by Jarmo 2026-03-30
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan
