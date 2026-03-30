@@ -88,6 +88,11 @@
         "command": "ritemark.flows.settings",
         "title": "Flow Settings",
         "icon": "$(gear)"
+      },
+      {
+        "command": "ritemark.reactions",
+        "title": "Send Feedback",
+        "icon": "$(thumbsup)"
       }
     ],
     "configuration": [
@@ -103,6 +108,17 @@
             "type": "string",
             "default": "",
             "description": "Last dismissed update version (internal)"
+          }
+        }
+      },
+      {
+        "title": "Ritemark Analytics",
+        "properties": {
+          "ritemark.analytics.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Send anonymous usage data to help improve Ritemark. No personal information is collected.",
+            "scope": "application"
           }
         }
       },
@@ -132,6 +148,12 @@
             "default": true,
             "description": "Enable automatic scheduled execution for eligible flows (experimental). Runs only while Ritemark is open.",
             "scope": "application"
+          },
+          "ritemark.features.analytics": {
+            "type": "boolean",
+            "default": true,
+            "description": "Kill-switch for anonymous analytics. When disabled, no data is sent to PostHog.",
+            "scope": "application"
           }
         }
       },
@@ -141,7 +163,12 @@
           "ritemark.codex.approvalPolicy": {
             "type": "string",
             "default": "untrusted",
-            "enum": ["untrusted", "on-request", "on-failure", "never"],
+            "enum": [
+              "untrusted",
+              "on-request",
+              "on-failure",
+              "never"
+            ],
             "enumDescriptions": [
               "Ask before every command and file change (safest)",
               "Ask only for operations outside workspace boundaries",
@@ -154,7 +181,11 @@
           "ritemark.codex.sandboxMode": {
             "type": "string",
             "default": "workspace-write",
-            "enum": ["read-only", "workspace-write", "danger-full-access"],
+            "enum": [
+              "read-only",
+              "workspace-write",
+              "danger-full-access"
+            ],
             "enumDescriptions": [
               "Codex can only read files (no writing or command execution)",
               "Codex can read and write files within the workspace (recommended)",
@@ -283,6 +314,10 @@
           "command": "ritemark.showAIPanel",
           "group": "navigation",
           "when": "activeCustomEditorId == ritemark.editor"
+        },
+        {
+          "command": "ritemark.reactions",
+          "group": "navigation"
         }
       ],
       "view/title": [
@@ -448,7 +483,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
+    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts",
     "test:integration": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/LLMNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration:free": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts",
     "test:all": "npm run test && npm run test:integration",
@@ -466,6 +501,7 @@
     "openai": "^6.17.0",
     "papaparse": "^5.5.3",
     "pdfkit": "^0.17.2",
+    "posthog-node": "^5.28.8",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2",
     "xlsx": "^0.18.5",
