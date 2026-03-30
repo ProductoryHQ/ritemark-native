@@ -317,8 +317,7 @@
         },
         {
           "command": "ritemark.reactions",
-          "group": "navigation",
-          "when": "activeCustomEditorId == ritemark.editor"
+          "group": "navigation"
         }
       ],
       "view/title": [
@@ -502,7 +501,7 @@
     "openai": "^6.17.0",
     "papaparse": "^5.5.3",
     "pdfkit": "^0.17.2",
-    "posthog-node": "^4.18.0",
+    "posthog-node": "^5.28.8",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2",
     "xlsx": "^0.18.5",

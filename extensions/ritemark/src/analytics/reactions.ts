@@ -45,20 +45,25 @@ export function registerReactionCommand(context: vscode.ExtensionContext): void 
     });
 
     // Track the reaction (even if message was dismissed)
-    trackEvent('reaction_submitted', {
+    const reactionSent = await trackEvent('reaction_submitted', {
       reaction,
       message: message || undefined,
     });
 
     // If there's a message, also fire a dedicated feedback event
     if (message) {
-      trackEvent('feedback_sent', {
+      await trackEvent('feedback_sent', {
         message,
         reaction,
       });
     }
 
-    vscode.window.showInformationMessage('Thanks for your feedback!');
+    if (reactionSent) {
+      vscode.window.showInformationMessage('Thanks for your feedback!');
+      return;
+    }
+
+    vscode.window.showWarningMessage('Feedback was not sent. Analytics is disabled or unavailable.');
   });
 
   context.subscriptions.push(disposable);
