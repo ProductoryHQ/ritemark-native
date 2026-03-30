@@ -2,13 +2,13 @@
 
 **Status:** Open release  
 **Type:** Minor release  
-**Focus:** Codex Flow Node and Scheduled Flow Runs
+**Focus:** Codex Flow Node, Scheduled Flow Runs, and Editor Reactions
 
 ---
 
 ## Summary
 
-Ritemark v1.5.2 expands Flows in two important ways.
+Ritemark v1.5.2 expands Flows in two important ways and adds a lightweight in-editor feedback loop.
 
 It adds a dedicated **Codex** node to Flows and hardens the surrounding flow editor/runtime wiring so the feature behaves like a first-class node instead of a partial integration.
 
@@ -17,6 +17,8 @@ It also adds **Scheduled Flow Runs**, allowing eligible flows to execute automat
 While a dedicated **Claude** node already existed, there was no equivalent agent node for people who prefer OpenAI models or want to use their ChatGPT subscription for autonomous coding work. Now Codex can be used in Flows the same way as Claude.
 
 At the same time, recurring flow automation no longer depends on manual triggering. Flows can now be configured to run daily or at shorter repeating intervals without external cron setup.
+
+This release also adds **Ritemark Reactions** in the editor toolbar, making it easier to send quick product feedback without leaving the current file.
 
 ---
 
@@ -50,6 +52,14 @@ Ritemark is intended to be a genuinely open platform for AI-assisted work. The g
 - **Composable workflows:** You can choose the agent that fits the task instead of shaping the task around one model family
 - **Future-facing platform direction:** Gemini and other model ecosystems remain open as future additions
 
+### Editor Reactions
+
+Ritemark now includes a lightweight reactions action in the editor title toolbar.
+
+- **Quick feedback:** Send a reaction from the editor without switching context
+- **Optional detail:** Add a short free-text note when you want to explain more
+- **App-specific analytics routing:** Anonymous app events to help to improve product. You can always opt-out.
+
 ---
 
 ## User Impact
@@ -60,6 +70,8 @@ More importantly, this release removes a provider gap in the flow editor. Claude
 
 This release also removes a workflow gap: flows no longer have to be started manually every time. If a flow is fully automatable, it can now run on a recurring schedule while Ritemark is open.
 
+It also creates a simple feedback path from inside the editor. Instead of collecting feedback only through external channels, users can react in place while they are working.
+
 Typical use cases:
 
 - generate or update project files from a prompt with Codex
@@ -68,6 +80,7 @@ Typical use cases:
 - choose between Claude and Codex based on which model family is stronger for the job
 - run recurring flows every morning, every hour, or every few minutes without manual intervention
 - keep routine internal automations inside Ritemark instead of setting up external cron jobs
+- send fast product feedback from the editor toolbar while staying in context
 
 ---
 
@@ -86,6 +99,7 @@ Key areas:
 - extension-host scheduler runtime for flow schedules
 - workspace-scoped schedule runtime state and dedupe tracking
 - flow-level schedule editor UI and save/remove UX
+- editor-toolbar reactions command and PostHog-backed anonymous app analytics
 
 ---
 
@@ -95,3 +109,4 @@ Key areas:
 - follow-up fixes for Codex node canvas/config stability
 - follow-up fixes for Codex flow execution/result handling
 - `flows: add scheduled flow run support`
+- `feat: add PostHog-backed Ritemark reactions`
