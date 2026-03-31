@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "security:audit": "npm audit && cd extensions/ritemark && npm audit && cd webview && npm audit",
+    "security:audit:fix": "npm audit fix && cd extensions/ritemark && npm audit fix && cd webview && npm audit fix"
+  },
   "devDependencies": {
     "lucide-static": "^0.555.0"
   }

@@ -7,6 +7,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { cn } from '../../lib/utils';
 import { vscode } from '../../lib/vscode';
 
@@ -15,6 +16,27 @@ marked.setOptions({
   gfm: true,
   breaks: true,
 });
+
+// Configure DOMPurify to allow safe HTML from markdown rendering
+// while stripping XSS vectors (event handlers, javascript: URIs, etc.)
+const purifyConfig: DOMPurify.Config = {
+  ALLOWED_TAGS: [
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'p', 'br', 'hr',
+    'ul', 'ol', 'li',
+    'a', 'strong', 'em', 'code', 'pre',
+    'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'img', 'del', 'input', 'span', 'div', 'sup', 'sub',
+  ],
+  ALLOWED_ATTR: [
+    'href', 'src', 'alt', 'title', 'class',
+    'type', 'checked', 'disabled', // for task list checkboxes
+    'align', 'colspan', 'rowspan', // for tables
+  ],
+  ALLOW_DATA_ATTR: false,
+  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
+  FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+};
 
 interface RenderedMarkdownProps {
   content: string;
@@ -25,9 +47,10 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
   const html = useMemo(() => {
     if (!content) return '';
     try {
-      return marked.parse(content) as string;
+      const rawHtml = marked.parse(content) as string;
+      return DOMPurify.sanitize(rawHtml, purifyConfig);
     } catch {
-      return content;
+      return DOMPurify.sanitize(content, purifyConfig);
     }
   }, [content]);
 
