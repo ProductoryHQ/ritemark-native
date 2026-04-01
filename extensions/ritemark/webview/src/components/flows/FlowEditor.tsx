@@ -5,7 +5,7 @@
  * 3-column layout: NodePalette | FlowCanvas | NodeConfigPanel
  */
 
-import React, { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { AlertTriangle, Clock3, X } from 'lucide-react';
 import { NodePalette } from './NodePalette';
 import { FlowCanvas } from './FlowCanvas';

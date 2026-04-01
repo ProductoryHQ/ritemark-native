@@ -51,7 +51,7 @@ function getMermaidConfig() {
       background: editorBackground,
     },
     flowchart: {
-      curve: 'basis',
+      curve: 'basis' as const,
     },
   }
 }

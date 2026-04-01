@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckCircle2, Clock3, Loader2, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';

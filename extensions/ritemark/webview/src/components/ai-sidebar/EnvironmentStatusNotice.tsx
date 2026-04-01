@@ -34,6 +34,11 @@ export function EnvironmentStatusNotice({
               Install Git for Windows first, then retry setup.
             </div>
           )}
+          {environmentStatus.recommendedAction === 'install-node' && (
+            <div className="mt-2 text-xs opacity-80">
+              Node.js is required to run Claude on Windows. Install it, then reload Ritemark.
+            </div>
+          )}
           {environmentStatus.recommendedAction === 'reload' && (
             <div className="mt-2 text-xs opacity-80">
               Reload Ritemark before retrying setup or sign-in.

@@ -10,7 +10,7 @@ import { sendToExtension, emitInternalEvent } from '../bridge'
 export interface Command {
   title: string
   description: string
-  icon: ComponentType<{ size?: number }>
+  icon: ComponentType<any>
   command: ({ editor, range }: any) => void
 }
 

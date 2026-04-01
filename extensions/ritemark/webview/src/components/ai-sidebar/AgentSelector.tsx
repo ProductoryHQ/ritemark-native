@@ -6,6 +6,7 @@
  * The trigger displays "Claude · Sonnet" etc.
  */
 
+import React from 'react';
 import { useAISidebarStore } from './store';
 import {
   Select,
@@ -77,15 +78,6 @@ export function AgentSelector() {
           <span className="truncate">{triggerLabel}</span>
         </SelectTrigger>
         <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
-          {/* Ritemark Agent — single item */}
-          {visibleAgents
-            .filter((a) => a.id !== 'claude-code' && a.id !== 'codex')
-            .map((agent) => (
-              <SelectItem key={agent.id} value={agent.id} className="text-xs">
-                {agent.label}
-              </SelectItem>
-            ))}
-
           {/* Claude — grouped by model */}
           {visibleAgents.some((a) => a.id === 'claude-code') && models.length > 0 && (
             <>
@@ -125,6 +117,18 @@ export function AgentSelector() {
               </SelectGroup>
             </>
           )}
+
+          {/* Ritemark Document Agent — last */}
+          {visibleAgents
+            .filter((a) => a.id !== 'claude-code' && a.id !== 'codex')
+            .map((agent) => (
+              <React.Fragment key={agent.id}>
+                <SelectSeparator />
+                <SelectItem value={agent.id} className="text-xs">
+                  {agent.label}
+                </SelectItem>
+              </React.Fragment>
+            ))}
         </SelectContent>
       </Select>
     </div>

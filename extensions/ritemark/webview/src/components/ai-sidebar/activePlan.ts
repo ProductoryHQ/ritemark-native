@@ -155,7 +155,7 @@ export function buildActivePlanViewModel(
     if (isRunning && !fallbackSteps.some((candidate) => candidate.status === 'inProgress' || candidate.status === 'completed')) {
       return {
         ...step,
-        status: index === 0 ? 'inProgress' : 'pending',
+        status: (index === 0 ? 'inProgress' : 'pending') as ActivePlanStepStatus,
       };
     }
     return step;

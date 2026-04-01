@@ -301,6 +301,63 @@ export function openAnthropicKeySettings(): void {
   vscode.commands.executeCommand('ritemark.aiSettings');
 }
 
+/**
+ * Install Git via winget in the integrated terminal.
+ * Falls back to opening browser if winget is not available.
+ */
+export function installGit(wingetAvailable: boolean): void {
+  const vscode = getVSCode();
+  if (wingetAvailable) {
+    const terminal = vscode.window.createTerminal({
+      name: 'Install Git',
+      shellPath: 'powershell.exe',
+    });
+    terminal.show();
+    terminal.sendText('winget install Git.Git --accept-package-agreements --accept-source-agreements');
+  } else {
+    const url = getCurrentPlatform() === 'win32'
+      ? 'https://git-scm.com/download/win'
+      : 'https://git-scm.com/download/mac';
+    vscode.env.openExternal(vscode.Uri.parse(url));
+  }
+}
+
+/**
+ * Install Node.js LTS via winget in the integrated terminal.
+ * Falls back to opening browser if winget is not available.
+ */
+export function installNode(wingetAvailable: boolean): void {
+  const vscode = getVSCode();
+  if (wingetAvailable) {
+    const terminal = vscode.window.createTerminal({
+      name: 'Install Node.js',
+      shellPath: 'powershell.exe',
+    });
+    terminal.show();
+    terminal.sendText('winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements');
+  } else {
+    vscode.env.openExternal(vscode.Uri.parse('https://nodejs.org/en/download'));
+  }
+}
+
+/**
+ * Install Codex CLI via npm in the integrated terminal.
+ * For fresh installs, uses plain `@openai/codex` and lets npm resolve the
+ * correct platform package based on the user's default Node arch.
+ * Requires Node.js to be already installed.
+ */
+export function installCodexCli(): void {
+  const vscode = getVSCode();
+  const platform = getCurrentPlatform();
+
+  const terminal = vscode.window.createTerminal({
+    name: 'Install Codex',
+    shellPath: platform === 'win32' ? 'powershell.exe' : undefined,
+  });
+  terminal.show();
+  terminal.sendText('npm install -g @openai/codex');
+}
+
 export async function logoutClaude(binaryPath?: string): Promise<void> {
   const command = binaryPath || 'claude';
   const platform = getCurrentPlatform();

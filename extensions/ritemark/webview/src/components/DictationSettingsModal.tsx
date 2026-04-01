@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Settings, Trash2, HardDrive } from 'lucide-react'
 import { sendToExtension, onMessage } from '../bridge'
 import {

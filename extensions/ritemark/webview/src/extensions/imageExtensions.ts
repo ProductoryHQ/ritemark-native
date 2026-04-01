@@ -13,7 +13,7 @@ import { ResizableImage } from '../components/ResizableImage'
 
 export const ImageExtension = Image.extend({
   addNodeView() {
-    return ReactNodeViewRenderer(ResizableImage)
+    return ReactNodeViewRenderer(ResizableImage as any)
   },
 }).configure({
   inline: false,  // Block-level so /image replaces empty paragraph instead of inserting into it

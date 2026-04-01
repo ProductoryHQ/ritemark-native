@@ -15,7 +15,6 @@ import {
   ChevronRight,
   X,
   Sparkles,
-  FileText,
   Image,
   Save,
   Zap,
@@ -26,7 +25,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import type { Flow, FlowInput } from './stores/flowEditorStore';
+import type { Flow } from './stores/flowEditorStore';
 import { vscode } from '../../lib/vscode';
 import { validateFlowForExecution } from './executionValidation';
 

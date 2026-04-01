@@ -374,14 +374,30 @@ export function RitemarkSettings() {
                   </span>
                 </div>
               </div>
-              {settings.componentStatus.claudeCode.authMethod === 'claude-oauth' && (
+              <div className="flex flex-wrap gap-2">
+                {settings.componentStatus.claudeCode.authMethod === 'claude-oauth' && (
+                  <button
+                    onClick={() => handleClaudeAction('claude:logout')}
+                    className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  >
+                    Sign Out
+                  </button>
+                )}
+                {settings.componentStatus.claudeCode.authMethod === 'api-key' && (
+                  <button
+                    onClick={() => handleClaudeAction('claude:login')}
+                    className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  >
+                    Switch to Claude.ai sign-in
+                  </button>
+                )}
                 <button
-                  onClick={() => handleClaudeAction('claude:logout')}
+                  onClick={() => handleClaudeAction('claude:refreshStatus')}
                   className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
                 >
-                  Sign Out
+                  Refresh Status
                 </button>
-              )}
+              </div>
             </>
           )}
 

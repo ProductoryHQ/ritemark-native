@@ -215,7 +215,7 @@ interface TextAreaProps
   className?: string;
 }
 
-function TextArea({ className, ...props }: TextAreaProps) {
+export function TextArea({ className, ...props }: TextAreaProps) {
   return (
     <textarea
       {...props}

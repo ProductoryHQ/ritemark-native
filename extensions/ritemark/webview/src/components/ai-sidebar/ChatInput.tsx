@@ -10,7 +10,6 @@ import { useAISidebarStore } from './store';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
-import type { DiscoveredCommand } from './types';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
 import type { FileAttachment, AttachmentKind } from './types';
 
