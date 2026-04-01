@@ -382,7 +382,7 @@ export function VoiceDictationButton() {
           setShowFullPicker(false)
           startDictation(code)
         }}
-        recentLanguages={recentLanguages}
+        currentLanguage={recentLanguages[0] || null}
       />
 
       {/* Dictation settings modal */}

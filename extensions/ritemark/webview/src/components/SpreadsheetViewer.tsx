@@ -56,7 +56,7 @@ export function SpreadsheetViewer({
   useEffect(() => {
     sendToExtension('checkExcel', {})
 
-    const handleMessage = onMessage((message) => {
+    onMessage((message) => {
       if (message.type === 'excelStatus') {
         setHasExcel(message.hasExcel as boolean)
       } else if (message.type === 'showConflictDialog') {
@@ -135,7 +135,7 @@ export function SpreadsheetViewer({
         setParsedData({ columns, rows })
         setIsLoading(false)
       },
-      error: (error) => {
+      error: (error: Error) => {
         console.error('CSV parse error:', error)
         setParsedData({
           columns: [],

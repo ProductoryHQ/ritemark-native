@@ -43,6 +43,9 @@ import type {
   ExtensionMessage,
   SubagentProgress,
   AgentProgress,
+  OnboardingStatus,
+  OnboardingDependency,
+  OnboardingInstallState,
 } from './types';
 
 let msgCounter = 0;
@@ -142,6 +145,11 @@ interface AISidebarState {
   setupError: string | null;
   hasSeenWelcome: boolean;
 
+  // ── Onboarding state ──
+  onboardingStatus: OnboardingStatus | null;
+  onboardingDismissed: boolean;
+  onboardingInstallStates: Record<OnboardingDependency, OnboardingInstallState>;
+
   // ── Index state ──
   indexStatus: IndexStatus;
   indexProgress: IndexProgress | null;
@@ -176,6 +184,7 @@ interface AISidebarState {
   startLogin: () => void;
   openApiKeySettings: () => void;
   openGitDownload: () => void;
+  openNodeDownload: () => void;
   recheckSetup: () => void;
   approvePlan: (turnId: string) => void;
   rejectPlan: (turnId: string, feedback?: string) => void;
@@ -195,6 +204,11 @@ interface AISidebarState {
   dismissCurrentPlan: (key: string) => void;
   reloadWindow: () => void;
   openAgentSettings: () => void;
+
+  // ── Onboarding actions ──
+  installDependency: (dep: OnboardingDependency) => void;
+  recheckDependencies: () => void;
+  dismissOnboarding: () => void;
 
   // ── Chat history actions ──
   loadConversationList: () => void;
@@ -248,6 +262,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   setupInProgress: false,
   setupError: null,
   hasSeenWelcome: false,
+
+  onboardingStatus: null,
+  onboardingDismissed: false,
+  onboardingInstallStates: {
+    'git': 'unknown',
+    'node': 'unknown',
+    'claude-cli': 'unknown',
+    'codex-cli': 'unknown',
+  },
 
   indexStatus: { totalDocs: 0, totalChunks: 0 },
   indexProgress: null,
@@ -420,6 +443,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   openGitDownload: () => {
     vscode.postMessage({ type: 'agent-setup:open-git-download' });
+  },
+
+  openNodeDownload: () => {
+    vscode.postMessage({ type: 'agent-setup:open-node-download' });
   },
 
   recheckSetup: () => {
@@ -630,6 +657,43 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   openAgentSettings: () => {
     vscode.postMessage({ type: 'codex:openSettings' });
+  },
+
+  // ── Onboarding actions ──
+
+  installDependency: (dep) => {
+    const messageMap: Record<OnboardingDependency, string> = {
+      'git': 'onboarding:install-git',
+      'node': 'onboarding:install-node',
+      'claude-cli': 'onboarding:install-claude',
+      'codex-cli': 'onboarding:install-codex',
+    };
+    const state = get();
+    set({
+      onboardingInstallStates: {
+        ...state.onboardingInstallStates,
+        [dep]: 'installing' as OnboardingInstallState,
+      },
+    });
+    vscode.postMessage({ type: messageMap[dep] });
+  },
+
+  recheckDependencies: () => {
+    vscode.postMessage({ type: 'onboarding:recheck' });
+  },
+
+  dismissOnboarding: () => {
+    set({ onboardingDismissed: true });
+    // Auto-select best available agent
+    const status = get().onboardingStatus;
+    if (status) {
+      if (status.claudeCliAuthenticated) {
+        get().selectAgent('claude-code');
+      } else if (status.codexCliAuthenticated) {
+        get().selectAgent('codex');
+      }
+      // Ritemark Agent is lowest priority — only if user explicitly has OpenAI key
+    }
   },
 
   // ── Chat history actions ──
@@ -1264,6 +1328,37 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         set({ chatFontSize: message.fontSize });
         // Apply CSS variable to document root
         document.documentElement.style.setProperty('--chat-font-size', `${message.fontSize}px`);
+        break;
+
+      // ── Onboarding messages ──
+
+      case 'onboarding:status': {
+        // Reset stale "installing" states when a recheck shows the dep is still missing.
+        // This prevents the UI from being stuck on "Installing..." after a terminal
+        // cancel/failure (Git, Node, Codex installs don't have progress events).
+        const prev = state.onboardingInstallStates;
+        const s = message.status;
+        const installStates = { ...prev };
+        if (!s.gitInstalled && prev.git === 'installing') installStates.git = 'missing';
+        if (!s.nodeInstalled && prev.node === 'installing') installStates.node = 'missing';
+        if (!s.claudeCliInstalled && prev['claude-cli'] === 'installing') installStates['claude-cli'] = 'missing';
+        if (!s.codexCliInstalled && prev['codex-cli'] === 'installing') installStates['codex-cli'] = 'missing';
+        // Also mark installed deps as such
+        if (s.gitInstalled) installStates.git = 'installed';
+        if (s.nodeInstalled) installStates.node = 'installed';
+        if (s.claudeCliInstalled) installStates['claude-cli'] = 'installed';
+        if (s.codexCliInstalled) installStates['codex-cli'] = 'installed';
+        set({ onboardingStatus: s, onboardingInstallStates: installStates });
+        break;
+      }
+
+      case 'onboarding:install-progress':
+        set({
+          onboardingInstallStates: {
+            ...state.onboardingInstallStates,
+            [message.dependency]: message.state,
+          },
+        });
         break;
     }
   },

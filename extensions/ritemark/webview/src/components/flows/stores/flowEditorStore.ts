@@ -291,6 +291,7 @@ function getDefaultNodeData(type: string): FlowNodeData {
         label: 'Save File',
         filename: 'output.md',
         format: 'markdown',
+        folder: '',
         sourceNodeId: '',
       };
     case 'claudeCodeNode':

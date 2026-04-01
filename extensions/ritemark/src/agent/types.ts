@@ -26,13 +26,6 @@ export interface AgentInfo {
  * Registry of available agents
  */
 export const AGENTS: Record<AgentId, AgentInfo> = {
-  'ritemark-agent': {
-    id: 'ritemark-agent',
-    label: 'Ritemark Agent',
-    description: 'Chat & document search',
-    experimental: false,
-    requiresApiKey: null, // Uses whatever AI provider is configured
-  },
   'claude-code': {
     id: 'claude-code',
     label: 'Claude',
@@ -46,6 +39,13 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
     description: 'OpenAI coding agent with ChatGPT authentication',
     experimental: true,
     requiresApiKey: null, // Uses ChatGPT OAuth, not API key
+  },
+  'ritemark-agent': {
+    id: 'ritemark-agent',
+    label: 'Ritemark Document Agent',
+    description: 'Chat & document search',
+    experimental: false,
+    requiresApiKey: null, // Uses whatever AI provider is configured
   },
 };
 
@@ -154,7 +154,7 @@ export interface AgentResult {
 export type ClaudeAuthMethod = 'claude-oauth' | 'api-key' | null;
 export type ClaudeSetupState = 'not-installed' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
 export type ClaudeRepairAction = 'install' | 'repair' | 'reload' | null;
-export type AgentEnvironmentRecommendedAction = 'install-git' | 'reload' | null;
+export type AgentEnvironmentRecommendedAction = 'install-git' | 'install-node' | 'reload' | null;
 
 export interface AgentEnvironmentStatus {
   platform: NodeJS.Platform;
@@ -164,6 +164,32 @@ export interface AgentEnvironmentStatus {
   restartRequired: boolean;
   diagnostics: string[];
   recommendedAction: AgentEnvironmentRecommendedAction;
+}
+
+/**
+ * Unified onboarding status — sent to the webview on first load.
+ * Covers all dependencies needed for any AI agent to work.
+ */
+export type OnboardingInstallState = 'unknown' | 'missing' | 'installing' | 'installed' | 'failed';
+export type OnboardingDependency = 'git' | 'node' | 'claude-cli' | 'codex-cli';
+
+export interface OnboardingStatus {
+  platform: 'win32' | 'darwin';
+  // Package manager (Windows only)
+  wingetAvailable: boolean;
+  // System-level dependencies
+  gitInstalled: boolean;
+  nodeInstalled: boolean;
+  // CLI agents
+  claudeCliInstalled: boolean;
+  claudeCliAuthenticated: boolean;
+  codexCliInstalled: boolean;
+  codexCliAuthenticated: boolean;
+  // API keys (for Ritemark Agent)
+  hasOpenAiKey: boolean;
+  hasAnthropicKey: boolean;
+  // Computed
+  anyAgentReady: boolean;
 }
 
 export interface SetupStatus {

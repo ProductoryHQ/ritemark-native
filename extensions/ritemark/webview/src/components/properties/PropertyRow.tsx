@@ -19,7 +19,7 @@ const isLongText = (value: unknown): boolean => {
   return value.length > 80 || value.includes('\n')
 }
 
-export function PropertyRow({ propertyKey, label, value, type, onChange, onDelete }: PropertyRowProps) {
+export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onChange, onDelete }: PropertyRowProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)

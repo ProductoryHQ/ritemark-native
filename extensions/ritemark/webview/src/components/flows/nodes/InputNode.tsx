@@ -8,7 +8,12 @@
 import { memo } from 'react';
 import { FileText, File } from 'lucide-react';
 import { BaseNode, NodeField } from './BaseNode';
-import type { InputNodeData } from '../stores/flowEditorStore';
+interface InputNodeData {
+  label: string;
+  inputType: 'text' | 'file';
+  required: boolean;
+  defaultValue?: string;
+}
 
 interface InputNodeProps {
   data: InputNodeData;

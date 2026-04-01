@@ -138,7 +138,7 @@ export type ImageAttachment = FileAttachment;
 export type ClaudeAuthMethod = 'claude-oauth' | 'api-key' | null;
 export type ClaudeSetupState = 'not-installed' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
 export type ClaudeRepairAction = 'install' | 'repair' | 'reload' | null;
-export type AgentEnvironmentRecommendedAction = 'install-git' | 'reload' | null;
+export type AgentEnvironmentRecommendedAction = 'install-git' | 'install-node' | 'reload' | null;
 
 export interface AgentEnvironmentStatus {
   platform: string;
@@ -148,6 +148,25 @@ export interface AgentEnvironmentStatus {
   restartRequired: boolean;
   diagnostics: string[];
   recommendedAction: AgentEnvironmentRecommendedAction;
+}
+
+// ── Onboarding types ──
+
+export type OnboardingInstallState = 'unknown' | 'missing' | 'installing' | 'installed' | 'failed';
+export type OnboardingDependency = 'git' | 'node' | 'claude-cli' | 'codex-cli';
+
+export interface OnboardingStatus {
+  platform: 'win32' | 'darwin';
+  wingetAvailable: boolean;
+  gitInstalled: boolean;
+  nodeInstalled: boolean;
+  claudeCliInstalled: boolean;
+  claudeCliAuthenticated: boolean;
+  codexCliInstalled: boolean;
+  codexCliAuthenticated: boolean;
+  hasOpenAiKey: boolean;
+  hasAnthropicKey: boolean;
+  anyAgentReady: boolean;
 }
 
 export interface SetupStatus {
@@ -346,4 +365,7 @@ export type ExtensionMessage =
   | { type: 'codex-plan-text-delta'; delta: string }
   | { type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] }
   | { type: 'codex-result'; status?: string; error?: string }
-  | { type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> };
+  | { type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> }
+  // Onboarding messages
+  | { type: 'onboarding:status'; status: OnboardingStatus }
+  | { type: 'onboarding:install-progress'; dependency: OnboardingDependency; state: OnboardingInstallState; error?: string };

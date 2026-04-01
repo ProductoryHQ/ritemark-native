@@ -8,7 +8,7 @@
  * not by window-level listeners — this avoids event ordering races.
  */
 
-import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Bot } from 'lucide-react';
 import { type AgentDefinition, filterAgents } from './agentRegistry';
 import { useAISidebarStore } from './store';

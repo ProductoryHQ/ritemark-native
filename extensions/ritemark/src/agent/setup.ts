@@ -16,6 +16,7 @@ import type {
   ClaudeAuthMethod,
   ClaudeRepairAction,
   ClaudeSetupState,
+  OnboardingStatus,
   SetupStatus,
 } from './types';
 
@@ -109,6 +110,7 @@ function checkCommandAvailable(command: string): boolean {
 function recommendedEnvironmentAction(input: {
   platform: NodeJS.Platform;
   gitInstalled: boolean;
+  nodeInstalled: boolean;
   restartRequired: boolean;
 }): AgentEnvironmentStatus['recommendedAction'] {
   if (input.restartRequired) {
@@ -117,6 +119,10 @@ function recommendedEnvironmentAction(input: {
 
   if (input.platform === 'win32' && !input.gitInstalled) {
     return 'install-git';
+  }
+
+  if (input.platform === 'win32' && !input.nodeInstalled) {
+    return 'install-node';
   }
 
   return null;
@@ -451,8 +457,67 @@ export async function getAgentEnvironmentStatus(options?: {
     recommendedAction: recommendedEnvironmentAction({
       platform,
       gitInstalled,
+      nodeInstalled,
       restartRequired,
     }),
+  };
+}
+
+/**
+ * Check whether `winget` is available (Windows 11 ships with it).
+ * Used to decide whether we can automate Git/Node installs.
+ */
+export function checkWingetAvailable(): boolean {
+  if (process.platform !== 'win32') return false;
+  return checkCommandAvailable('winget');
+}
+
+/**
+ * Unified onboarding status — detects ALL dependencies at once.
+ * Used by the OnboardingWizard to show a single checklist.
+ */
+export async function getOnboardingStatus(options?: {
+  setupStatus?: SetupStatus;
+  hasOpenAiKey?: boolean;
+  hasAnthropicKey?: boolean;
+  codexCliInstalled?: boolean;
+  codexCliAuthenticated?: boolean;
+}): Promise<OnboardingStatus> {
+  const platform = getCurrentPlatform() as 'win32' | 'darwin';
+  const setupStatus = options?.setupStatus ?? await getSetupStatus({ refresh: true });
+
+  const gitInstalled = checkCommandAvailable('git');
+  const nodeInstalled = checkCommandAvailable('node');
+  const wingetAvailable = platform === 'win32' ? checkCommandAvailable('winget') : false;
+
+  const claudeCliInstalled = setupStatus.cliInstalled && setupStatus.runnable;
+  const claudeCliAuthenticated = claudeCliInstalled && setupStatus.authenticated;
+
+  // Codex status is passed in from the caller (CodexManager is async + heavier)
+  const codexCliInstalled = options?.codexCliInstalled ?? false;
+  const codexCliAuthenticated = options?.codexCliAuthenticated ?? false;
+
+  const hasOpenAiKey = options?.hasOpenAiKey ?? false;
+  const hasAnthropicKey = options?.hasAnthropicKey ?? hasAnthropicKeyInSecrets;
+
+  // Any agent is ready if at least one path is fully usable
+  const claudeReady = claudeCliAuthenticated;
+  const codexReady = codexCliInstalled && codexCliAuthenticated;
+  const ritemarkAgentReady = hasOpenAiKey;
+  const anyAgentReady = claudeReady || codexReady || ritemarkAgentReady;
+
+  return {
+    platform,
+    wingetAvailable,
+    gitInstalled,
+    nodeInstalled,
+    claudeCliInstalled,
+    claudeCliAuthenticated,
+    codexCliInstalled,
+    codexCliAuthenticated,
+    hasOpenAiKey,
+    hasAnthropicKey,
+    anyAgentReady,
   };
 }
 
