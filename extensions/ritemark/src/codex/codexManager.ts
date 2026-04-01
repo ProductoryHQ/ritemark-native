@@ -94,7 +94,17 @@ export class CodexManager {
       const nvmDir = join(home, '.nvm', 'versions', 'node');
       if (existsSync(nvmDir)) {
         try {
-          const versions = readdirSync(nvmDir).sort().reverse(); // newest first
+          const versions = readdirSync(nvmDir)
+            .filter((d: string) => d.startsWith('v'))
+            .sort((a: string, b: string) => {
+              // Semver-aware sort: v22.21.1 > v9.0.0
+              const pa = a.replace('v', '').split('.').map(Number);
+              const pb = b.replace('v', '').split('.').map(Number);
+              for (let i = 0; i < 3; i++) {
+                if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pb[i] ?? 0) - (pa[i] ?? 0);
+              }
+              return 0;
+            }); // newest first
           for (const ver of versions) {
             const candidate = join(nvmDir, ver, 'bin', 'codex');
             if (existsSync(candidate)) return candidate;

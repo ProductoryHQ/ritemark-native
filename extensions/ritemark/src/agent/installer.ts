@@ -315,7 +315,10 @@ export function installGit(wingetAvailable: boolean): void {
     terminal.show();
     terminal.sendText('winget install Git.Git --accept-package-agreements --accept-source-agreements');
   } else {
-    vscode.env.openExternal(vscode.Uri.parse('https://git-scm.com/download/win'));
+    const url = getCurrentPlatform() === 'win32'
+      ? 'https://git-scm.com/download/win'
+      : 'https://git-scm.com/download/mac';
+    vscode.env.openExternal(vscode.Uri.parse(url));
   }
 }
 
