@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { type Editor as TipTapEditor } from '@tiptap/react'
-import { GripVertical, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { BlockMenu } from './BlockMenu'
 
 interface DragHandleWithMenuProps {

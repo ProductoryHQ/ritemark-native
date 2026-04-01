@@ -11,6 +11,8 @@ export { traceClaude, showClaudeTrace, getClaudeTraceLogPath } from './agentTrac
 export {
   getSetupStatus,
   getAgentEnvironmentStatus,
+  getOnboardingStatus,
+  checkWingetAvailable,
   clearSetupCache,
   setAnthropicKeyAvailable,
   hasCliOAuth,
@@ -18,7 +20,7 @@ export {
   setClaudePendingReload,
   clearClaudePendingReload,
 } from './setup';
-export { installClaude, isClaudeInstallInProgress, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude } from './installer';
+export { installClaude, isClaudeInstallInProgress, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude, installGit, installNode, installCodexCli } from './installer';
 export {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
@@ -55,4 +57,7 @@ export type {
   ClaudeAuthMethod,
   ClaudeSetupState,
   ClaudeRepairAction,
+  OnboardingStatus,
+  OnboardingDependency,
+  OnboardingInstallState,
 } from './types';

@@ -85,7 +85,6 @@ export function ResizableImage({ node, selected }: ResizableImageProps) {
       if (!resizeState || !originalSize) return
 
       const deltaX = e.clientX - resizeState.startX
-      const deltaY = e.clientY - resizeState.startY
       const aspectRatio = originalSize.width / originalSize.height
 
       let newWidth = resizeState.startWidth

@@ -33,6 +33,11 @@ import {
   installClaude,
   openClaudeLoginTerminal,
   openAnthropicKeySettings,
+  installGit,
+  installNode,
+  installCodexCli,
+  getOnboardingStatus,
+  checkWingetAvailable,
   setClaudeLoginInProgress,
   clearClaudePendingReload,
   emitClaudeStatusInvalidated,
@@ -44,6 +49,7 @@ import {
   type FileAttachment,
   type SetupStatus,
   type AgentEnvironmentStatus,
+  type OnboardingStatus,
   traceClaude,
 } from '../agent';
 import { isEnabled } from '../features';
@@ -161,9 +167,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._sendApiKeyStatus();
           this._sendConnectivityStatus();
           this._sendIndexStatus();
-          this._sendAgentConfig();
+          // Await agent config first — it boots Codex runtime and hydrates auth.
+          // Onboarding status needs that to correctly detect authenticated users.
+          await this._sendAgentConfig();
           this._sendChatFontSize();
           this._sendActiveFile();
+          this._sendOnboardingStatus();
           break;
 
         case 'ai-configure-key':
@@ -289,6 +298,34 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           emitClaudeStatusInvalidated('status-refresh');
           this._sendAgentConfig();
           break;
+
+        // ── Onboarding wizard messages ──
+
+        case 'onboarding:install-git':
+          installGit(checkWingetAvailable());
+          break;
+
+        case 'onboarding:install-node':
+          installNode(checkWingetAvailable());
+          break;
+
+        case 'onboarding:install-claude':
+          this._handleOnboardingClaudeInstall();
+          break;
+
+        case 'onboarding:install-codex':
+          installCodexCli();
+          break;
+
+        case 'onboarding:recheck': {
+          clearSetupCache();
+          const status = await this._getOnboardingStatus();
+          this._view?.webview.postMessage({ type: 'onboarding:status', status });
+          // Also refresh the agent config so per-agent views update too
+          emitClaudeStatusInvalidated('status-refresh');
+          this._sendAgentConfig();
+          break;
+        }
 
         case 'agent-setup:dismiss-welcome':
           vscode.workspace.getConfiguration('ritemark.ai').update('hasSeenClaudeWelcome', true, vscode.ConfigurationTarget.Global);
@@ -484,6 +521,56 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Send onboarding status to webview.
+   */
+  private async _sendOnboardingStatus(): Promise<void> {
+    const status = await this._getOnboardingStatus();
+    this._view?.webview.postMessage({ type: 'onboarding:status', status });
+  }
+
+  /**
+   * Get unified onboarding status, including Codex CLI state.
+   */
+  private async _getOnboardingStatus(): Promise<OnboardingStatus> {
+    const codexManager = new CodexManager();
+    const codexBinary = await codexManager.getBinaryStatus();
+    // Use live auth state if Codex runtime is booted, otherwise false.
+    // The onboarding status is re-sent on every auth change, so the first
+    // render being conservative (false) is self-correcting.
+    const codexAuthenticated = this._codexAuth?.isAuthenticated() ?? false;
+    const keyManager = getAPIKeyManager();
+    const hasOpenAiKey = keyManager ? await keyManager.hasAPIKey() : false;
+
+    return getOnboardingStatus({
+      hasOpenAiKey,
+      codexCliInstalled: codexBinary.runnable,
+      codexCliAuthenticated: codexAuthenticated,
+    });
+  }
+
+  /**
+   * Handle Claude install from onboarding wizard, with progress feedback.
+   */
+  private async _handleOnboardingClaudeInstall(): Promise<void> {
+    this._view?.webview.postMessage({ type: 'onboarding:install-progress', dependency: 'claude-cli', state: 'installing' });
+
+    const result = await installClaude((progress) => {
+      this._view?.webview.postMessage({ type: 'agent-setup:progress', progress });
+    });
+
+    if (result.success) {
+      this._view?.webview.postMessage({ type: 'onboarding:install-progress', dependency: 'claude-cli', state: 'installed' });
+    } else {
+      this._view?.webview.postMessage({ type: 'onboarding:install-progress', dependency: 'claude-cli', state: 'failed', error: result.error });
+    }
+
+    // Refresh full onboarding status
+    clearSetupCache();
+    const status = await this._getOnboardingStatus();
+    this._view?.webview.postMessage({ type: 'onboarding:status', status });
+  }
+
+  /**
    * Send agent configuration to webview (selected agent, available agents, feature flag state)
    */
   private async _sendAgentConfig() {
@@ -558,6 +645,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     await this._sendCodexSidebarStatus();
+    this._sendOnboardingStatus();
   }
 
   private async _handleExternalClaudeStatusInvalidation(
@@ -575,6 +663,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     await this._sendAgentConfig();
+    this._sendOnboardingStatus();
   }
 
   private _stopClaudeLoginPolling(): void {

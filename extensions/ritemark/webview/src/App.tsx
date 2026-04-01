@@ -82,7 +82,7 @@ function App() {
   const [sizeBytes, setSizeBytes] = useState<number | undefined>()
   const [workerSrc, setWorkerSrc] = useState<string | undefined>()
   const [properties, setProperties] = useState<DocumentProperties>({})
-  const [hasProperties, setHasProperties] = useState(false)
+  const [_hasProperties, setHasProperties] = useState(false)
   const [isReady, setIsReady] = useState(false)
   const [imageMappings, setImageMappings] = useState<Record<string, string>>({})
   const [features, setFeatures] = useState<Features>({
@@ -103,7 +103,7 @@ function App() {
 
   // File change notification state
   const [showFileChangeNotification, setShowFileChangeNotification] = useState(false)
-  const [fileChangeData, setFileChangeData] = useState({ filename: '', isDirty: false })
+  const [_fileChangeData, setFileChangeData] = useState({ filename: '', isDirty: false })
 
   useEffect(() => {
     // Listen for messages from VS Code extension

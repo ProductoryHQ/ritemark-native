@@ -8,11 +8,11 @@
  * @see Sprint 14: Block Interactions
  */
 
-import Link from '@tiptap/extension-link'
+import Link, { type LinkOptions } from '@tiptap/extension-link'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { openExternalUrl } from '../bridge'
 
-export interface CustomLinkOptions {
+export interface CustomLinkOptions extends Partial<LinkOptions> {
   /**
    * Callback when a link is clicked (without modifier key)
    * Used to open the link edit dialog
@@ -38,7 +38,7 @@ export const CustomLink = Link.extend<CustomLinkOptions>({
       props: {
         // Use handleDOMEvents to intercept clicks BEFORE browser default behavior
         handleDOMEvents: {
-          click(view, event) {
+          click(_view, event) {
             // Check if we clicked on a link
             const link = (event.target as HTMLElement)?.closest('a')
             if (!link) return false

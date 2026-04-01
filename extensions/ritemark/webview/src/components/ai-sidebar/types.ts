@@ -150,6 +150,25 @@ export interface AgentEnvironmentStatus {
   recommendedAction: AgentEnvironmentRecommendedAction;
 }
 
+// ── Onboarding types ──
+
+export type OnboardingInstallState = 'unknown' | 'missing' | 'installing' | 'installed' | 'failed';
+export type OnboardingDependency = 'git' | 'node' | 'claude-cli' | 'codex-cli';
+
+export interface OnboardingStatus {
+  platform: 'win32' | 'darwin';
+  wingetAvailable: boolean;
+  gitInstalled: boolean;
+  nodeInstalled: boolean;
+  claudeCliInstalled: boolean;
+  claudeCliAuthenticated: boolean;
+  codexCliInstalled: boolean;
+  codexCliAuthenticated: boolean;
+  hasOpenAiKey: boolean;
+  hasAnthropicKey: boolean;
+  anyAgentReady: boolean;
+}
+
 export interface SetupStatus {
   cliInstalled: boolean;
   runnable: boolean;
@@ -346,4 +365,7 @@ export type ExtensionMessage =
   | { type: 'codex-plan-text-delta'; delta: string }
   | { type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] }
   | { type: 'codex-result'; status?: string; error?: string }
-  | { type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> };
+  | { type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> }
+  // Onboarding messages
+  | { type: 'onboarding:status'; status: OnboardingStatus }
+  | { type: 'onboarding:install-progress'; dependency: OnboardingDependency; state: OnboardingInstallState; error?: string };

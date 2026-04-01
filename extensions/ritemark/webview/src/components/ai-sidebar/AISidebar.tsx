@@ -11,6 +11,7 @@ import { vscode } from '../../lib/vscode';
 import { AgentSelector } from './AgentSelector';
 import { OfflineBanner } from './OfflineBanner';
 import { NoApiKey } from './NoApiKey';
+import { OnboardingWizard } from './OnboardingWizard';
 import { SetupWizard } from './SetupWizard';
 import { ChatView } from './ChatView';
 import { AgentView } from './AgentView';
@@ -91,6 +92,8 @@ export function AISidebar() {
     });
   }, []);
 
+  const onboardingStatus = useAISidebarStore((s) => s.onboardingStatus);
+  const onboardingDismissed = useAISidebarStore((s) => s.onboardingDismissed);
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const hasSeenWelcome = useAISidebarStore((s) => s.hasSeenWelcome);
@@ -133,8 +136,8 @@ export function AISidebar() {
       {/* Inject markdown styles once at root level */}
       <style dangerouslySetInnerHTML={{ __html: markdownStyles }} />
 
-      {/* Agent selector — only when agentic feature is enabled */}
-      {agenticEnabled && <AgentSelector />}
+      {/* Agent selector — hidden during onboarding wizard */}
+      {agenticEnabled && !(onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed) && <AgentSelector />}
 
       {/* Chat History Panel (overlay) */}
       {showHistoryPanel && <ChatHistoryPanel />}
@@ -142,8 +145,10 @@ export function AISidebar() {
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}
 
-      {/* No API key — only for Ritemark Agent mode */}
-      {ready && needsOpenAIKey ? (
+      {/* Onboarding wizard — shown on first run when no agent is ready */}
+      {ready && onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed ? (
+        <OnboardingWizard />
+      ) : ready && needsOpenAIKey ? (
         <NoApiKey />
       ) : ready && (needsSetup || showWelcome) ? (
         <>

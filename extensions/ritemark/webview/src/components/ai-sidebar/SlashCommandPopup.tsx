@@ -22,11 +22,11 @@ import {
   Sparkles,
   Terminal,
 } from 'lucide-react';
-import { type SlashCommand, filterCommands, mergeCommands, BUILTIN_COMMANDS } from './slashCommands';
+import { type SlashCommand, filterCommands, mergeCommands } from './slashCommands';
 import { useAISidebarStore } from './store';
 
 // Map icon names to components
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+const ICON_MAP: Record<string, React.ComponentType<any>> = {
   Trash2,
   Plus,
   History,

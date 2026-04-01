@@ -399,7 +399,6 @@ export function Editor({
         orderedList: false,
         listItem: false,
         codeBlock: false, // Disable default to use enhanced version
-        link: false, // Disable StarterKit's Link to use custom Link extension
         heading: {
           levels: [1, 2, 3, 4, 5, 6],
         },
@@ -781,7 +780,7 @@ export function Editor({
   }, [editor, value, imageMappings])
 
   // Calculate word count - simple approach using editor state
-  const [wordCount, setWordCount] = useState(0)
+  const [_wordCount, setWordCount] = useState(0)
 
   // Update word count when editor content changes and send to extension
   useEffect(() => {
