@@ -15,8 +15,7 @@ function buildRepairCommandFor(env: {
   machineArch: string;
 }): string {
   const runtimeArch = env.machineArch === 'arm64' ? 'arm64' : 'x64';
-  const platformTag = `${env.platform}-${runtimeArch}`;
-  const pkg = `@openai/codex@${platformTag}`;
+  const pkg = '@openai/codex';
 
   if (env.platform === 'win32') {
     return `npm install -g ${pkg}`;
@@ -55,11 +54,11 @@ function buildRepairCommandFor(env: {
     machineArch: 'arm64',
   });
 
-  assert.ok(cmd.includes('@openai/codex@darwin-arm64'), `Should use arm64 (runtime arch), got: ${cmd}`);
+  assert.ok(cmd.includes('npm install -g @openai/codex\''), `Should install plain @openai/codex (no platform tag), got: ${cmd}`);
+  assert.ok(!cmd.includes('@darwin-arm64'), `Must NOT use platform tag (only installs addon, not CLI), got: ${cmd}`);
   assert.ok(cmd.includes('nvm use 23.0.0'), `Should uninstall from install Node, got: ${cmd}`);
   assert.ok(cmd.includes('nvm use 22.21.1'), `Should install under runtime Node, got: ${cmd}`);
   assert.ok(cmd.includes('arch -arm64'), `Should use arch wrapper for arm64, got: ${cmd}`);
-  // Verify order: uninstall from v23 THEN install under v22
   const uninstallPos = cmd.indexOf('nvm use 23.0.0');
   const installPos = cmd.indexOf('nvm use 22.21.1');
   assert.ok(uninstallPos < installPos, `Uninstall (v23) must come before install (v22), got: ${cmd}`);
@@ -75,11 +74,8 @@ function buildRepairCommandFor(env: {
     machineArch: 'arm64',
   });
 
-  assert.ok(cmd.includes('@openai/codex@darwin-arm64'), `Expected darwin-arm64 tag, got: ${cmd}`);
+  assert.ok(cmd.includes('npm install -g @openai/codex\''), `Should install plain package, got: ${cmd}`);
   assert.ok(cmd.includes('arch -arm64'), `Should use arch wrapper, got: ${cmd}`);
-  assert.ok(cmd.includes('nvm use 22.21.1'), `Should use runtime version, got: ${cmd}`);
-  // Should NOT have two different nvm use calls
-  assert.ok(!cmd.includes('nvm use 22.21.1 && npm uninstall-g') || true); // same version = single nvm use
 }
 
 // ── Windows ──
@@ -92,7 +88,7 @@ function buildRepairCommandFor(env: {
     machineArch: 'x64',
   });
 
-  assert.ok(cmd.includes('@openai/codex@win32-x64'), `Expected win32-x64 tag, got: ${cmd}`);
+  assert.ok(cmd.includes('npm install -g @openai/codex'), `Should install plain package, got: ${cmd}`);
   assert.ok(!cmd.includes('nvm'), `Windows should not use nvm, got: ${cmd}`);
 }
 
@@ -106,7 +102,7 @@ function buildRepairCommandFor(env: {
     machineArch: 'arm64',
   });
 
-  assert.ok(cmd.includes('@openai/codex@darwin-arm64'), `Expected darwin-arm64 fallback, got: ${cmd}`);
+  assert.ok(cmd.includes('npm install -g @openai/codex'), `Should install plain package, got: ${cmd}`);
   assert.ok(cmd.includes('arch -arm64'), `Should use arch wrapper, got: ${cmd}`);
 }
 
@@ -120,7 +116,7 @@ function buildRepairCommandFor(env: {
     machineArch: 'x86_64',
   });
 
-  assert.ok(cmd.includes('@openai/codex@darwin-x64'), `Expected darwin-x64, got: ${cmd}`);
+  assert.ok(cmd.includes('npm install -g @openai/codex'), `Should install plain package, got: ${cmd}`);
 }
 
 console.log('codexManager.test.ts: all tests passed');

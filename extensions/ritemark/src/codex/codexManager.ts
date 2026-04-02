@@ -471,26 +471,25 @@ export class CodexManager {
     runtimeNodeVersion: string;
     machineArch: string;
   }): string {
-    // The platform tag must match the RUNTIME arch (what Electron/Ritemark uses),
-    // because that's where codex's native modules will be loaded.
-    const runtimeArch = env.machineArch === 'arm64' ? 'arm64' : 'x64';
-    const platformTag = `${env.platform}-${runtimeArch}`;
-    const pkg = `@openai/codex@${platformTag}`;
+    // Use plain @openai/codex — npm resolves the correct platform-specific
+    // native addon automatically. Platform-specific tags like @darwin-arm64
+    // only install the addon without the CLI wrapper.
+    const pkg = '@openai/codex';
 
     if (env.platform === 'win32') {
       return `npm install -g ${pkg}`;
     }
 
     const uninstallPkgs = '@openai/codex @openai/codex-darwin-x64 @openai/codex-darwin-arm64';
+    const runtimeArch = env.machineArch === 'arm64' ? 'arm64' : 'x64';
 
     // If install Node differs from runtime Node, uninstall from install Node first,
-    // then install under runtime Node.
+    // then install under runtime Node so native deps match the runtime arch.
     const installAndRuntimeDiffer = env.installNodeVersion
       && env.installNodeVersion !== env.runtimeNodeVersion;
 
     if (env.platform === 'darwin' && runtimeArch === 'arm64') {
       if (installAndRuntimeDiffer) {
-        // Uninstall from install Node, then install under runtime Node
         return `arch -arm64 /bin/bash -lc 'source "$HOME/.nvm/nvm.sh" && nvm use ${env.installNodeVersion} && npm uninstall -g ${uninstallPkgs}; nvm use ${env.runtimeNodeVersion} && npm install -g ${pkg}'`;
       }
       return `arch -arm64 /bin/bash -lc 'source "$HOME/.nvm/nvm.sh" && nvm use ${env.runtimeNodeVersion} && npm uninstall -g ${uninstallPkgs}; npm install -g ${pkg}'`;
