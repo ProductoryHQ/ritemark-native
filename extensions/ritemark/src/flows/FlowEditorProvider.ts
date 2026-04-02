@@ -8,6 +8,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import OpenAI from 'openai';
+import { trackEvent } from '../analytics/posthog';
 import type { Flow, FlowNode, ExecutionContext, ClaudeCodeProgress } from './types';
 import { executeLLMNode } from './nodes/LLMNodeExecutor';
 import { executeImageNode } from './nodes/ImageNodeExecutor';
@@ -68,6 +69,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    void trackEvent('feature_used', { feature: 'flows' });
+
     // Get URI for the webview bundle (same bundle as main editor)
     const scriptUri = webviewPanel.webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js')

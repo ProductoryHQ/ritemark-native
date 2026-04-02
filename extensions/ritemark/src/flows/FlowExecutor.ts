@@ -17,6 +17,7 @@ import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
 import { executeCodexNode } from './nodes/CodexNodeExecutor';
+import { trackEvent } from '../analytics/posthog';
 
 /**
  * Progress callback
@@ -96,6 +97,7 @@ async function executeNode(
       return context.inputs;
 
     case 'llm-prompt':
+      void trackEvent('agent_used', { agent: 'ritemark_llm' });
       return await executeLLMNode(node, context);
 
     case 'image-prompt':
@@ -105,9 +107,11 @@ async function executeNode(
       return await executeSaveFileNode(node, context);
 
     case 'claude-code':
+      void trackEvent('agent_used', { agent: 'claude' });
       return await executeClaudeCodeNode(node, context, abortSignal);
 
     case 'codex':
+      void trackEvent('agent_used', { agent: 'codex' });
       return await executeCodexNode(node, context, abortSignal);
 
     default:

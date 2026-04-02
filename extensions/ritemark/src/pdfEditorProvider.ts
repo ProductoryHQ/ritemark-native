@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PdfDocument } from './pdfDocument';
+import { trackEvent } from './analytics/posthog';
 
 /**
  * Custom editor provider for PDF files
@@ -44,6 +45,8 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    void trackEvent('feature_used', { feature: 'pdf_preview' });
+
     const scriptUri = webviewPanel.webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js')
     );

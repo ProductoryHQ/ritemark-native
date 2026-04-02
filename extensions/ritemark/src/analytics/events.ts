@@ -1,5 +1,5 @@
 /**
- * Analytics event definitions for Ritemark Reactions.
+ * Analytics event definitions for Ritemark.
  *
  * All PostHog events are typed here so callers get compile-time safety
  * and we have a single inventory of what the product tracks.
@@ -8,7 +8,7 @@
 export type EventName =
   | 'app_session_start'
   | 'feature_used'
-  | 'ai_model_used'
+  | 'agent_used'
   | 'reaction_submitted'
   | 'feedback_sent';
 
@@ -20,9 +20,8 @@ export interface EventPayloads {
   feature_used: {
     feature: string;
   };
-  ai_model_used: {
-    model: string;
-    provider: string;
+  agent_used: {
+    agent: string;
   };
   reaction_submitted: {
     reaction: string;

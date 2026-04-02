@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ExcelDocument } from './excelDocument';
 import { isAppInstalled, openInExternalApp, getSpreadsheetAppName } from './utils/openExternal';
+import { trackEvent } from './analytics/posthog';
 
 /**
  * Custom editor provider for Excel files (.xlsx, .xls)
@@ -56,6 +57,8 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    void trackEvent('feature_used', { feature: 'excel_preview' });
+
     // Setup webview options
     const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js');
     const scriptUri = webviewPanel.webview.asWebviewUri(scriptPath);
