@@ -15,7 +15,7 @@ import type { EventName, EventPayloads } from './events';
 const ALL_EVENT_NAMES: EventName[] = [
   'app_session_start',
   'feature_used',
-  'ai_model_used',
+  'agent_used',
   'reaction_submitted',
   'feedback_sent',
 ];
@@ -31,7 +31,7 @@ const _payloadCheck: {
 } = {
   app_session_start: { version: '1.0.0', platform: 'darwin' },
   feature_used: { feature: 'editor' },
-  ai_model_used: { model: 'gpt-4o', provider: 'openai' },
+  agent_used: { agent: 'claude' },
   reaction_submitted: { reaction: 'love_it', message: 'Great app!' },
   feedback_sent: { message: 'Please add dark mode', reaction: 'good' },
 };

@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DocxDocument } from './docxDocument';
 import { isAppInstalled, openInExternalApp, getWordProcessorAppName } from './utils/openExternal';
+import { trackEvent } from './analytics/posthog';
 
 /**
  * Custom editor provider for DOCX files
@@ -45,6 +46,8 @@ export class DocxEditorProvider implements vscode.CustomReadonlyEditorProvider<D
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    void trackEvent('feature_used', { feature: 'word_preview' });
+
     const scriptUri = webviewPanel.webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js')
     );

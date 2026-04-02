@@ -54,7 +54,7 @@ Ritemark is intended to be a genuinely open platform for AI-assisted work. The g
 
 ### Editor Reactions
 
-Ritemark now includes a lightweight reactions action in the editor title toolbar.
+Love it? Hate it? Ritemark now includes a lightweight reactions action in the editor title toolbar.
 
 - **Quick feedback:** Send a reaction from the editor without switching context
 - **Optional detail:** Add a short free-text note when you want to explain more
@@ -81,6 +81,43 @@ Typical use cases:
 - run recurring flows every morning, every hour, or every few minutes without manual intervention
 - keep routine internal automations inside Ritemark instead of setting up external cron jobs
 - send fast product feedback from the editor toolbar while staying in context
+
+---
+
+## Analytics Disclosure
+
+Starting with v1.5.2, Ritemark collects anonymous usage analytics via PostHog (EU-hosted). This section is a complete and transparent list of every event the app can send. No personal information is collected.
+
+### What is collected
+
+| Event | When it fires | Data sent |
+| --- | --- | --- |
+| `app_session_start` | Each time Ritemark launches | App version, platform (e.g. `darwin`) |
+| `feature_used` | When you open a file or use an export | Feature name: `editor`, `csv_editor`, `flows`, `excel_preview`, `word_preview`, `pdf_preview`, `export_pdf`, `export_word` |
+| `agent_used` | When an AI agent runs inside a Flow | Agent name: `claude`, `codex`, or `ritemark_llm` |
+| `reaction_submitted` | When you send a reaction from the toolbar | Reaction choice (e.g. `love_it`), optional free-text message |
+| `feedback_sent` | When you include a message with a reaction | Your message text, reaction choice |
+
+### What is NOT collected
+
+- No file contents, filenames, or folder paths
+- No API keys or credentials
+- No IP-based geolocation (PostHog EU instance, no geo enrichment)
+- No personal identifiers (name, email, account)
+- No keystroke or interaction tracking
+- No clipboard contents
+
+### How it works
+
+- A random anonymous UUID is generated on first launch and stored locally. It is not linked to any identity.
+- All events include `$process_person_profile: false`, which tells PostHog not to create a person profile.
+- Events are sent to `https://eu.i.posthog.com` (EU data residency).
+
+### How to opt out
+
+Go to **Settings** and disable **Analytics**. When disabled, no events are sent. The setting takes effect immediately per-event — no restart needed.
+
+You can also set `"ritemark.analytics.enabled": false` in your settings JSON.
 
 ---
 

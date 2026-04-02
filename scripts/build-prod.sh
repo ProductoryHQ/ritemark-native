@@ -197,6 +197,11 @@ import json
 with open("'"$PRODUCT_JSON"'", "r") as f:
     data = json.load(f)
 data["ritemarkVersion"] = "'"$RITEMARK_VERSION"'"
+import os, pathlib
+branding = json.load(open(pathlib.Path("'"$(pwd)"'") / "branding" / "product.json"))
+for key in ("posthogProjectApiKey", "posthogHost"):
+    if key in branding:
+        data[key] = branding[key]
 with open("'"$PRODUCT_JSON"'", "w") as f:
     json.dump(data, f, indent=2)
 '

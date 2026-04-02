@@ -8,6 +8,7 @@ import { exportToWordV2 } from './export/v2/wordHtmlExporter';
 import { DictationController } from './voiceDictation/controller';
 import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
+import { trackEvent } from './analytics/posthog';
 
 // Properties type for front-matter
 export interface DocumentProperties {
@@ -205,6 +206,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       await this.initializeUntitledCsv(document);
     }
 
+    // Track which editor type was opened
+    void trackEvent('feature_used', {
+      feature: this.getFileType(document.uri.fsPath) === 'csv' ? 'csv_editor' : 'editor',
+    });
+
     // Get URI for the webview bundle
     const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js');
     const scriptUri = webviewPanel.webview.asWebviewUri(scriptPath);
@@ -400,6 +406,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'exportPDF':
             // Export document to PDF (V2 HTML contract with markdown fallback)
+            void trackEvent('feature_used', { feature: 'export_pdf' });
             exportToPDFV2(
               {
                 html: (message.html as string) || '',
@@ -413,6 +420,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'exportWord':
             // Export document to Word (V2 HTML contract with markdown fallback)
+            void trackEvent('feature_used', { feature: 'export_word' });
             exportToWordV2(
               {
                 html: (message.html as string) || '',
