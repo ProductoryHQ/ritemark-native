@@ -713,14 +713,22 @@ export class CodexManager {
     return 0;
   }
 
+  /**
+   * Spawn a resolved binary with the correct PATH.
+   * For nvm-installed binaries, prepends the nvm bin dir to PATH so that
+   * `#!/usr/bin/env node` resolves to the same Node version the binary
+   * was installed under (not the system default which may differ in arch).
+   */
   private spawnResolvedBinary(
     binaryPath: string,
     args: string[],
     options: Parameters<typeof spawn>[2] = {}
   ): ChildProcess {
     const isWindowsScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binaryPath);
+    const env = this.buildSpawnEnv(binaryPath, options.env);
     return spawn(binaryPath, args, {
       ...options,
+      env,
       shell: options.shell ?? isWindowsScript,
     });
   }
@@ -731,9 +739,29 @@ export class CodexManager {
     options: Parameters<typeof spawnSync>[2] = {}
   ): ReturnType<typeof spawnSync> {
     const isWindowsScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binaryPath);
+    const env = this.buildSpawnEnv(binaryPath, options.env as Record<string, string> | undefined);
     return spawnSync(binaryPath, args, {
       ...options,
+      env,
       shell: options.shell ?? isWindowsScript,
     });
+  }
+
+  /**
+   * Build environment for spawning codex binary.
+   * If binaryPath is under ~/.nvm, prepend that Node version's bin dir
+   * to PATH so `#!/usr/bin/env node` finds the matching Node.
+   */
+  private buildSpawnEnv(
+    binaryPath: string,
+    baseEnv?: Record<string, string> | NodeJS.ProcessEnv | undefined
+  ): Record<string, string> | NodeJS.ProcessEnv {
+    const nvmBinMatch = binaryPath.match(/^(.+\/\.nvm\/versions\/node\/v[^/]+\/bin)\//);
+    if (!nvmBinMatch) return baseEnv ?? process.env;
+
+    const nvmBinDir = nvmBinMatch[1];
+    const env = { ...(baseEnv ?? process.env) };
+    env.PATH = `${nvmBinDir}:${env.PATH ?? ''}`;
+    return env;
   }
 }
