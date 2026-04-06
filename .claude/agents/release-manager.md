@@ -98,14 +98,14 @@ Ritemark Native supports THREE platforms:
 1. Create a task for EACH step using TaskCreate:
    ```
    Task 0: Run preflight checks
-   Task 1: Version bump and tag (triggers CI for Windows + macOS x64)
+   Task 1: Version bump (commit + push, NO tag yet)
    Task 2: Build macOS arm64 locally
-   Task 2b: Download + sign macOS x64 from CI
-   Task 3: [GATE 1] Wait for app approval
-   Task 4: Create and notarize DMGs
-   Task 5: [GATE 2] Wait for DMG approval
-   Task 6: [GATE 3] Wait for Windows approval
-   Task 7: Create GitHub release + publish update feed
+   Task 3: Sign arm64 app + create arm64 DMG + notarize
+   Task 4: [GATE 1] Jarmo tests arm64 DMG locally
+   Task 5: Create + push tag (triggers CI for Windows + macOS x64)
+   Task 6: Download + sign macOS x64 from CI, create + notarize x64 DMG
+   Task 7: [GATE 2] Jarmo tests x64 DMG + Windows installer
+   Task 8: Create GitHub release + publish update feed
    ```
 
 2. Mark task as `in_progress` when starting it
@@ -157,14 +157,14 @@ On startup, create tasks for all steps using TaskCreate, then work through them 
 
 ---
 
-#### STEP 1: VERSION BUMP
+#### STEP 1: VERSION BUMP (NO TAG YET)
 
 1. Update version in `branding/product.json`
 2. Update version in `extensions/ritemark/package.json`
 3. Commit: `git commit -m "chore: bump version to X.Y.Z"`
 4. Push: `git push origin main`
-5. Create tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
-   - This triggers Windows build in GitHub Actions
+
+**Do NOT create tag yet.** Tag is created after Jarmo tests the arm64 DMG.
 
 ---
 
@@ -176,11 +176,37 @@ On startup, create tasks for all steps using TaskCreate, then work through them 
 **Output:**
 - `VSCode-darwin-arm64/Ritemark.app`
 
-**Note:** macOS x64 build is handled by GitHub Actions (triggered by tag push in Step 1). Do NOT build x64 locally - cross-compiling from arm64 produces broken native modules.
+---
+
+#### STEP 3: SIGN + DMG + NOTARIZE arm64
+
+1. Code sign: `./scripts/codesign-app.sh`
+2. Create DMG: `./scripts/create-dmg.sh`
+3. Notarize DMG: `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
+
+**Output:**
+- `dist/Ritemark-X.Y.Z-darwin-arm64.dmg` (signed + notarized)
 
 ---
 
-#### STEP 2b: DOWNLOAD + SIGN macOS x64 (FROM CI)
+#### ⛔ GATE 1: ARM64 DMG TESTING (STOP AND WAIT)
+
+**Tell Jarmo:** "arm64 DMG is ready. Please install and test."
+
+This is the fast feedback loop — Jarmo tests locally before triggering CI.
+
+**DO NOT proceed until Jarmo says:** "approved", "DMG approved", or "GATE 1 passed"
+
+---
+
+#### STEP 5: CREATE + PUSH TAG (TRIGGERS CI)
+
+1. Create tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+   - This triggers GitHub Actions for Windows + macOS x64 builds
+
+---
+
+#### STEP 6: DOWNLOAD + SIGN macOS x64 + CREATE x64 DMG
 
 Wait for GitHub Actions `build-macos-x64.yml` to complete, then:
 
@@ -194,65 +220,26 @@ Wait for GitHub Actions `build-macos-x64.yml` to complete, then:
    gh run download <run-id> --name ritemark-darwin-x64 --dir VSCode-darwin-x64
    ```
 
-3. Code sign locally:
-   ```bash
-   ./scripts/codesign-app.sh darwin-x64
-   ```
+3. Code sign: `./scripts/codesign-app.sh darwin-x64`
+4. Create DMG: `./scripts/create-dmg.sh x64`
+5. Notarize DMG: `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
 
 **Output:**
-- `VSCode-darwin-x64/Ritemark.app` (signed with Developer ID)
+- `dist/Ritemark-X.Y.Z-darwin-x64.dmg` (signed + notarized)
 
 ---
 
-#### ⛔ GATE 1: APP TESTING (STOP AND WAIT)
+#### ⛔ GATE 2: x64 + WINDOWS TESTING (STOP AND WAIT)
 
-**Tell Jarmo:** "macOS arm64 app built locally. x64 app downloaded from CI and signed. Please test both .app files."
+1. Jarmo tests x64 DMG
+2. Check Windows CI: `gh run list --workflow=build-windows.yml --limit 3`
+3. Jarmo downloads Windows artifact and tests installer
 
-**DO NOT proceed until Jarmo says:** "approved", "apps approved", or "GATE 1 passed"
-
----
-
-#### STEP 3: SIGN, DMG, NOTARIZE
-
-1. Create DMGs:
-   - `./scripts/create-dmg.sh` (arm64)
-   - `./scripts/create-dmg.sh x64`
-2. Notarize DMGs:
-   - `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg`
-   - `./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg`
-
-**Output:**
-- `dist/Ritemark-X.Y.Z-darwin-arm64.dmg` (notarized)
-- `dist/Ritemark-X.Y.Z-darwin-x64.dmg` (notarized)
+**DO NOT proceed until Jarmo says:** "x64 approved", "Windows approved", or "GATE 2 passed"
 
 ---
 
-#### ⛔ GATE 2: DMG TESTING (STOP AND WAIT)
-
-**Tell Jarmo:** "DMGs created and notarized. Please test both DMGs."
-
-**DO NOT proceed until Jarmo says:** "DMGs approved" or "GATE 2 passed"
-
----
-
-#### STEP 4: WINDOWS VERIFICATION
-
-1. Check GH Actions status:
-   - Windows: `gh run list --workflow=build-windows.yml --limit 3`
-   - macOS x64 (should already be done by Step 2b): `gh run list --workflow=build-macos-x64.yml --limit 3`
-2. Wait for Windows build to complete
-3. Jarmo downloads artifact and creates installer
-4. Jarmo tests Windows installer
-
----
-
-#### ⛔ GATE 3: WINDOWS TESTING (STOP AND WAIT)
-
-**DO NOT proceed until Jarmo says:** "Windows approved" or "GATE 3 passed"
-
----
-
-#### STEP 5: GITHUB RELEASE + UPDATE FEED
+#### STEP 8: GITHUB RELEASE + UPDATE FEED
 
 **MANDATORY:** Release is incomplete unless the canonical update feed / metadata is regenerated and published with the exact assets for this release.
 
@@ -279,7 +266,7 @@ Wait for GitHub Actions `build-macos-x64.yml` to complete, then:
 
 ---
 
-#### STEP 6: POST-RELEASE
+#### STEP 9: POST-RELEASE
 
 1. Invoke `product-marketer` agent for marketing content
 2. Update landing page if needed
