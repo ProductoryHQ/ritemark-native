@@ -8,7 +8,7 @@ on:
 
 env:
   VSCODE_VERSION: '1.109.5'
-  NODE_VERSION: '22.21.1'
+  NODE_VERSION: '22.22.0'
 
 jobs:
   build:
@@ -110,13 +110,25 @@ jobs:
         working-directory: r/vscode/extensions/ritemark
         run: npm run compile
 
-      - name: Clean webview dev files before build
+      - name: Prune extension dev files before build
         shell: bash
         working-directory: r/vscode/extensions/ritemark
         run: |
-          rm -rf webview/node_modules 2>/dev/null || true
-          rm -rf webview/src 2>/dev/null || true
-          echo "Cleaned webview dev files (prevents EMFILE during bundling)"
+          echo "Pruning dev-only dependencies and source files to reduce Windows packaging footprint"
+
+          npm prune --omit=dev --legacy-peer-deps
+
+          rm -rf src 2>/dev/null || true
+          rm -rf scripts 2>/dev/null || true
+          rm -rf webview 2>/dev/null || true
+
+          rm -f .env_local 2>/dev/null || true
+          rm -f .gitignore 2>/dev/null || true
+          rm -f package-lock.json 2>/dev/null || true
+          rm -f tsconfig.json 2>/dev/null || true
+
+          echo "Retained top-level extension paths:"
+          find . -maxdepth 1 -mindepth 1 | sort
 
       - name: Build VS Code (win32-x64-min)
         shell: bash
