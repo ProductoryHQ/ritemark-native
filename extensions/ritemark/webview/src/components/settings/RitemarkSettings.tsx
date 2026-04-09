@@ -23,7 +23,6 @@ import {
   HardDrive,
   ShieldCheck,
   AlertTriangle,
-  Pencil,
 } from 'lucide-react';
 import { vscode } from '../../lib/vscode';
 import { getDefaultAssistantModel } from '../../config/modelConfig';
@@ -37,7 +36,6 @@ interface ModelInfo {
 }
 
 interface SettingsData {
-  spellcheck: boolean;
   voiceDictation: boolean;
   ritemarkFlows: boolean;
   codexIntegration: boolean;
@@ -985,25 +983,6 @@ export function RitemarkSettings() {
           <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
             Adjust the font size for the AI chat messages (10-20px).
           </p>
-        </div>
-      </section>
-
-      {/* Editor Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Pencil className="w-5 h-5 text-[var(--vscode-foreground)]" />
-          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
-            Editor
-          </h2>
-        </div>
-
-        <div className="space-y-3">
-          <ToggleRow
-            label="Spell Check"
-            description="Check spelling as you type"
-            checked={settings?.spellcheck ?? true}
-            onChange={(value) => handleToggle('editor.spellcheck', value)}
-          />
         </div>
       </section>
 

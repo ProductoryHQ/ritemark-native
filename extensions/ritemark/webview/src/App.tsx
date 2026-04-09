@@ -73,7 +73,6 @@ function insertDictationPlaceholder(editor: TipTapEditor, placeholder: string) {
 interface Features {
   voiceDictation: boolean
   markdownExport: boolean
-  spellcheck: boolean
 }
 
 function App() {
@@ -89,8 +88,7 @@ function App() {
   const [imageMappings, setImageMappings] = useState<Record<string, string>>({})
   const [features, setFeatures] = useState<Features>({
     voiceDictation: false,
-    markdownExport: false,
-    spellcheck: true
+    markdownExport: false
   })
 
   // Track selection for AI tool execution
@@ -131,8 +129,7 @@ function App() {
           setImageMappings((message.imageMappings as Record<string, string>) || {})
           setFeatures((message.features as Features) || {
             voiceDictation: false,
-            markdownExport: false,
-            spellcheck: true
+            markdownExport: false
           })
           setIsReady(true)
           break
@@ -476,7 +473,6 @@ function App() {
           placeholder="Start writing..."
           className="h-full"
           imageMappings={imageMappings}
-          spellcheck={features.spellcheck}
         />
       </div>
 

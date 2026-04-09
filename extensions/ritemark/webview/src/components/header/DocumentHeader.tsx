@@ -5,7 +5,6 @@ import { VoiceDictationButton } from '../VoiceDictationButton'
 interface Features {
   voiceDictation: boolean
   markdownExport: boolean
-  spellcheck: boolean
 }
 
 interface DocumentHeaderProps {
