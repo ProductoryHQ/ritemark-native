@@ -10,7 +10,6 @@ import { useAISidebarStore } from './store';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
-import type { DiscoveredCommand } from './types';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
 import type { FileAttachment, AttachmentKind } from './types';
 
@@ -172,7 +171,7 @@ export function ChatInput() {
 
   const handleSend = useCallback(() => {
     const prompt = buildFinalPrompt();
-    if (!prompt || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
+    if (!prompt || !isOnline || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
 
     if (isCodex) {
       sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined);
@@ -191,7 +190,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, sendAgentMessage, sendCodexMessage, sendChatMessage]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, sendAgentMessage, sendCodexMessage, sendChatMessage]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
   const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
@@ -794,7 +793,7 @@ export function ChatInput() {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={placeholder}
-          disabled={isLoading || !isOnline}
+          disabled={isLoading}
           rows={1}
           className="flex-1 resize-none rounded px-2.5 py-1.5 leading-relaxed bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] outline-none focus:border-[var(--vscode-focusBorder)] disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ fontSize: 'var(--chat-font-size, 13px)' }}

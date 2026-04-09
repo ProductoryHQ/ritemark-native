@@ -385,9 +385,12 @@ function ApprovalCard({
           {Object.entries(approval.fileChanges).map(([path, change]) => (
             <div key={path} className="mb-1">
               <div className="text-[11px] font-medium">{path}</div>
-              {change && typeof change === 'object' && 'type' in change && (
-                <div className="text-[10px] opacity-60">{(change as { type: string }).type}</div>
-              )}
+              {(() => {
+                if (change != null && typeof change === 'object' && 'type' in change) {
+                  return <div className="text-[10px] opacity-60">{(change as { type: string }).type}</div>;
+                }
+                return null;
+              })()}
             </div>
           ))}
         </div>

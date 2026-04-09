@@ -53,8 +53,8 @@ export interface CodexCompatibilityStatus {
 
 export class CodexManager {
   private static readonly MIN_AUDITED_VERSION = '0.111.0';
-  private static readonly MAX_AUDITED_VERSION_EXCLUSIVE = '0.115.0';
-  private static readonly AUDITED_RANGE_LABEL = '0.111.x - 0.114.x';
+  private static readonly MAX_AUDITED_VERSION_EXCLUSIVE = '0.119.0';
+  private static readonly AUDITED_RANGE_LABEL = '0.111.x - 0.118.x';
   private static readonly compatibilityCache = new Map<string, CodexCompatibilityStatus>();
   private process: ChildProcess | null = null;
   private config: CodexManagerConfig;
@@ -80,6 +80,54 @@ export class CodexManager {
    * (it's a bash shim), so we must prefer the .cmd or .exe variant.
    */
   async findBinaryPath(): Promise<string | null> {
+    // First try `which`/`where` for the active PATH
+    const fromPath = await this.findBinaryInPath();
+    if (fromPath) return fromPath;
+
+    // Fallback: scan common install locations (nvm, Homebrew, etc.)
+    if (process.platform !== 'win32') {
+      const home = require('os').homedir();
+      const { existsSync, readdirSync } = require('fs');
+      const { join } = require('path');
+
+      // Scan all nvm Node versions for codex
+      const nvmDir = join(home, '.nvm', 'versions', 'node');
+      if (existsSync(nvmDir)) {
+        try {
+          const versions = readdirSync(nvmDir)
+            .filter((d: string) => d.startsWith('v'))
+            .sort((a: string, b: string) => {
+              // Semver-aware sort: v22.21.1 > v9.0.0
+              const pa = a.replace('v', '').split('.').map(Number);
+              const pb = b.replace('v', '').split('.').map(Number);
+              for (let i = 0; i < 3; i++) {
+                if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pb[i] ?? 0) - (pa[i] ?? 0);
+              }
+              return 0;
+            }); // newest first
+          for (const ver of versions) {
+            const candidate = join(nvmDir, ver, 'bin', 'codex');
+            if (existsSync(candidate)) return candidate;
+          }
+        } catch { /* not readable */ }
+      }
+
+      // Other common locations
+      const candidates = [
+        join(home, '.local', 'bin', 'codex'),
+        join(home, '.npm-global', 'bin', 'codex'),
+        '/opt/homebrew/bin/codex',
+        '/usr/local/bin/codex',
+      ];
+      for (const c of candidates) {
+        if (existsSync(c)) return c;
+      }
+    }
+
+    return null;
+  }
+
+  private async findBinaryInPath(): Promise<string | null> {
     return new Promise((resolve) => {
       const cmd = process.platform === 'win32' ? 'where' : 'which';
       const check = spawn(cmd, ['codex']);
@@ -101,7 +149,6 @@ export class CodexManager {
           .filter(Boolean);
 
         if (process.platform === 'win32') {
-          // Prefer .exe, then .cmd, then .bat — never the extensionless bash shim
           const exeMatch = lines.find(l => /\.exe$/i.test(l));
           if (exeMatch) {
             resolve(exeMatch);
@@ -112,7 +159,6 @@ export class CodexManager {
             resolve(cmdMatch);
             return;
           }
-          // Fallback: if all entries are extensionless, they are Unix shims — unusable
           resolve(null);
           return;
         }
@@ -144,7 +190,7 @@ export class CodexManager {
         installNodeVersion: null,
         runtimeNodeVersion,
         diagnostics: [],
-        repairCommand: this.buildRepairCommand(null, runtimeNodeVersion, machineArch),
+        repairCommand: this.buildRepairCommand(null, runtimeNodeVersion, machineArch, null),
         installNodeArch: null,
         runtimeNodeArch,
         machineArch,
@@ -177,7 +223,7 @@ export class CodexManager {
             installNodeVersion,
             runtimeNodeVersion,
             diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-            repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch),
+            repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
             installNodeArch,
             runtimeNodeArch,
             machineArch,
@@ -196,7 +242,7 @@ export class CodexManager {
           installNodeVersion,
           runtimeNodeVersion,
           diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-          repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch),
+          repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
           installNodeArch,
           runtimeNodeArch,
           machineArch,
@@ -214,7 +260,7 @@ export class CodexManager {
           installNodeVersion,
           runtimeNodeVersion,
           diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-          repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch),
+          repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
           installNodeArch,
           runtimeNodeArch,
           machineArch,
@@ -391,20 +437,72 @@ export class CodexManager {
     return diagnostics;
   }
 
-  private buildRepairCommand(installNodeVersion: string | null, runtimeNodeVersion: string, machineArch: string): string {
-    if (process.platform === 'win32') {
-      return 'npm install -g @openai/codex@latest';
+  private buildRepairCommand(installNodeVersion: string | null, runtimeNodeVersion: string, machineArch: string, installNodeArch?: string | null): string {
+    return CodexManager.buildRepairCommandFor({
+      platform: process.platform,
+      installNodeVersion,
+      installNodeArch: installNodeArch ?? null,
+      runtimeNodeVersion,
+      machineArch,
+    });
+  }
+
+  /**
+   * Build the repair command for a given environment. Pure function, testable.
+   *
+   * The platform tag must match the Node arch that codex will run under,
+   * NOT the machine arch. Example: Apple Silicon with x64 Node via Rosetta
+   * needs @darwin-x64, not @darwin-arm64.
+   */
+  /**
+   * Build the repair command for a given environment. Pure function, testable.
+   *
+   * Key insight: Ritemark's Electron runs its own Node (the runtime). Codex
+   * native modules must match that runtime's arch, NOT the install Node's arch.
+   * Example: Apple Silicon + x64 Node v23 via Rosetta → codex was installed
+   * under v23/x64, but Ritemark needs arm64 native deps. The repair must:
+   * 1. Uninstall from the install Node (v23) to remove the broken binary
+   * 2. Install under the runtime Node (v22/arm64) with matching native deps
+   */
+  static buildRepairCommandFor(env: {
+    platform: string;
+    installNodeVersion: string | null;
+    installNodeArch: string | null;
+    runtimeNodeVersion: string;
+    machineArch: string;
+  }): string {
+    // Use plain @openai/codex — npm resolves the correct platform-specific
+    // native addon automatically. Platform-specific tags like @darwin-arm64
+    // only install the addon without the CLI wrapper.
+    const pkg = '@openai/codex';
+
+    if (env.platform === 'win32') {
+      return `npm install -g ${pkg}`;
     }
 
-    if (process.platform === 'darwin' && machineArch === 'arm64') {
-      return `arch -arm64 /bin/bash -lc 'source "$HOME/.nvm/nvm.sh" && nvm use ${runtimeNodeVersion} && npm uninstall -g @openai/codex @openai/codex-darwin-x64 @openai/codex-darwin-arm64; npm install -g @openai/codex@latest'`;
+    const uninstallPkgs = '@openai/codex @openai/codex-darwin-x64 @openai/codex-darwin-arm64';
+    const runtimeArch = env.machineArch === 'arm64' ? 'arm64' : 'x64';
+
+    // If install Node differs from runtime Node, uninstall from install Node first,
+    // then install under runtime Node so native deps match the runtime arch.
+    const installAndRuntimeDiffer = env.installNodeVersion
+      && env.installNodeVersion !== env.runtimeNodeVersion;
+
+    if (env.platform === 'darwin' && runtimeArch === 'arm64') {
+      if (installAndRuntimeDiffer) {
+        return `arch -arm64 /bin/bash -lc 'source "$HOME/.nvm/nvm.sh" && nvm use ${env.installNodeVersion} && npm uninstall -g ${uninstallPkgs}; nvm use ${env.runtimeNodeVersion} && npm install -g ${pkg}'`;
+      }
+      return `arch -arm64 /bin/bash -lc 'source "$HOME/.nvm/nvm.sh" && nvm use ${env.runtimeNodeVersion} && npm uninstall -g ${uninstallPkgs}; npm install -g ${pkg}'`;
     }
 
-    if (installNodeVersion) {
-      return `source "$HOME/.nvm/nvm.sh" && nvm use ${installNodeVersion} && npm uninstall -g @openai/codex @openai/codex-darwin-x64 @openai/codex-darwin-arm64; npm install -g @openai/codex@latest`;
+    if (env.installNodeVersion) {
+      if (installAndRuntimeDiffer) {
+        return `source "$HOME/.nvm/nvm.sh" && nvm use ${env.installNodeVersion} && npm uninstall -g ${uninstallPkgs}; nvm use ${env.runtimeNodeVersion} && npm install -g ${pkg}`;
+      }
+      return `source "$HOME/.nvm/nvm.sh" && nvm use ${env.installNodeVersion} && npm uninstall -g ${uninstallPkgs}; npm install -g ${pkg}`;
     }
 
-    return 'npm install -g @openai/codex@latest';
+    return `npm install -g ${pkg}`;
   }
 
   private getMachineArch(): string {
@@ -430,8 +528,15 @@ export class CodexManager {
       return null;
     }
 
+    // The codex binary is a text script (#!/usr/bin/env node), so `file` on it
+    // won't reveal architecture. Instead, check the Node binary that will
+    // actually run it — derive from the nvm path.
+    const nvmMatch = binaryPath.match(/(.+\/\.nvm\/versions\/node\/v[^/]+\/bin\/)codex$/);
+    const nodeBinary = nvmMatch ? `${nvmMatch[1]}node` : null;
+    const target = nodeBinary ?? binaryPath;
+
     try {
-      const result = spawnSync('/usr/bin/file', [binaryPath], {
+      const result = spawnSync('/usr/bin/file', [target], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       });
@@ -608,14 +713,22 @@ export class CodexManager {
     return 0;
   }
 
+  /**
+   * Spawn a resolved binary with the correct PATH.
+   * For nvm-installed binaries, prepends the nvm bin dir to PATH so that
+   * `#!/usr/bin/env node` resolves to the same Node version the binary
+   * was installed under (not the system default which may differ in arch).
+   */
   private spawnResolvedBinary(
     binaryPath: string,
     args: string[],
     options: Parameters<typeof spawn>[2] = {}
   ): ChildProcess {
     const isWindowsScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binaryPath);
+    const env = this.buildSpawnEnv(binaryPath, options.env);
     return spawn(binaryPath, args, {
       ...options,
+      env,
       shell: options.shell ?? isWindowsScript,
     });
   }
@@ -626,9 +739,29 @@ export class CodexManager {
     options: Parameters<typeof spawnSync>[2] = {}
   ): ReturnType<typeof spawnSync> {
     const isWindowsScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binaryPath);
+    const env = this.buildSpawnEnv(binaryPath, options.env as Record<string, string> | undefined);
     return spawnSync(binaryPath, args, {
       ...options,
+      env,
       shell: options.shell ?? isWindowsScript,
     });
+  }
+
+  /**
+   * Build environment for spawning codex binary.
+   * If binaryPath is under ~/.nvm, prepend that Node version's bin dir
+   * to PATH so `#!/usr/bin/env node` finds the matching Node.
+   */
+  private buildSpawnEnv(
+    binaryPath: string,
+    baseEnv?: Record<string, string> | NodeJS.ProcessEnv | undefined
+  ): Record<string, string> | NodeJS.ProcessEnv {
+    const nvmBinMatch = binaryPath.match(/^(.+\/\.nvm\/versions\/node\/v[^/]+\/bin)\//);
+    if (!nvmBinMatch) return baseEnv ?? process.env;
+
+    const nvmBinDir = nvmBinMatch[1];
+    const env = { ...(baseEnv ?? process.env) };
+    env.PATH = `${nvmBinDir}:${env.PATH ?? ''}`;
+    return env;
   }
 }
