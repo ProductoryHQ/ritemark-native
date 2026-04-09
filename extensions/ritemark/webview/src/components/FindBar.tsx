@@ -1,42 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, ChevronUp, ChevronDown, X } from 'lucide-react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
+import { searchPluginKey } from '../extensions/SearchExtension'
 
 interface FindBarProps {
   editor: TipTapEditor
   onClose: () => void
 }
 
-interface SearchMatch {
-  from: number
-  to: number
-}
-
-function findAllMatches(editor: TipTapEditor, query: string): SearchMatch[] {
-  if (!query) return []
-
-  const matches: SearchMatch[] = []
-  const doc = editor.state.doc
-  const lowerQuery = query.toLowerCase()
-
-  doc.descendants((node, pos) => {
-    if (node.isText && node.text) {
-      const text = node.text.toLowerCase()
-      let index = 0
-      while ((index = text.indexOf(lowerQuery, index)) !== -1) {
-        matches.push({ from: pos + index, to: pos + index + query.length })
-        index += 1
-      }
-    }
-  })
-
-  return matches
-}
-
 export function FindBar({ editor, onClose }: FindBarProps) {
   const [query, setQuery] = useState('')
-  const [matches, setMatches] = useState<SearchMatch[]>([])
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [matchCount, setMatchCount] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Focus input on mount
@@ -44,95 +19,81 @@ export function FindBar({ editor, onClose }: FindBarProps) {
     inputRef.current?.focus()
   }, [])
 
-  // Search on query change
+  // Push query changes into the editor plugin
   useEffect(() => {
-    const found = findAllMatches(editor, query)
-    setMatches(found)
-    setActiveIndex(found.length > 0 ? 0 : -1)
+    editor.commands.setSearchTerm(query)
   }, [query, editor])
 
-  // Apply decorations and scroll to active match
+  // Pull plugin state (match count + active index) back into UI state on every transaction
   useEffect(() => {
-    // Clear existing decorations
-    const existingMarks = document.querySelectorAll('.find-highlight, .find-highlight-active')
-    existingMarks.forEach(el => {
-      const parent = el.parentNode
-      if (parent) {
-        parent.replaceChild(document.createTextNode(el.textContent || ''), el)
-        parent.normalize()
+    const sync = () => {
+      const state = searchPluginKey.getState(editor.state)
+      if (state) {
+        setMatchCount(state.results.length)
+        setActiveIndex(state.activeIndex)
       }
-    })
-
-    if (matches.length === 0 || !query) return
-
-    // Apply highlights using DOM manipulation on the ProseMirror view
-    // We use decorations via the editor view's DOM
-    const view = editor.view
-    matches.forEach((match, i) => {
-      try {
-        const startCoords = view.coordsAtPos(match.from)
-        const endCoords = view.coordsAtPos(match.to)
-
-        // Find the DOM range for this match
-        const domStart = view.domAtPos(match.from)
-        const domEnd = view.domAtPos(match.to)
-
-        if (domStart.node && domEnd.node) {
-          const range = document.createRange()
-          range.setStart(domStart.node, domStart.offset)
-          range.setEnd(domEnd.node, domEnd.offset)
-
-          const span = document.createElement('span')
-          span.className = i === activeIndex ? 'find-highlight-active' : 'find-highlight'
-          range.surroundContents(span)
-
-          // Scroll active match into view
-          if (i === activeIndex) {
-            span.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          }
-        }
-      } catch {
-        // Skip matches that can't be highlighted (e.g., spanning across nodes)
-      }
-    })
-
-    return () => {
-      // Cleanup on unmount
-      const marks = document.querySelectorAll('.find-highlight, .find-highlight-active')
-      marks.forEach(el => {
-        const parent = el.parentNode
-        if (parent) {
-          parent.replaceChild(document.createTextNode(el.textContent || ''), el)
-          parent.normalize()
-        }
-      })
     }
-  }, [matches, activeIndex, query, editor])
+    sync()
+    editor.on('transaction', sync)
+    return () => {
+      editor.off('transaction', sync)
+    }
+  }, [editor])
+
+  // Scroll the active match into view
+  useEffect(() => {
+    if (activeIndex < 0 || matchCount === 0) return
+    const state = searchPluginKey.getState(editor.state)
+    const match = state?.results[activeIndex]
+    if (!match) return
+
+    try {
+      const coords = editor.view.coordsAtPos(match.from)
+      const scrollContainer = editor.view.dom.closest('.overflow-y-auto') as HTMLElement | null
+      if (scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect()
+        const targetTop = coords.top - containerRect.top + scrollContainer.scrollTop - 100
+        scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' })
+      }
+    } catch {
+      // position no longer in viewport-resolvable state; ignore
+    }
+  }, [activeIndex, matchCount, editor])
+
+  // Clear search state when the find bar unmounts
+  useEffect(() => {
+    return () => {
+      editor.commands.clearSearch()
+    }
+  }, [editor])
 
   const goToNext = useCallback(() => {
-    if (matches.length === 0) return
-    setActiveIndex((prev) => (prev + 1) % matches.length)
-  }, [matches.length])
+    editor.commands.nextSearchResult()
+  }, [editor])
 
   const goToPrev = useCallback(() => {
-    if (matches.length === 0) return
-    setActiveIndex((prev) => (prev - 1 + matches.length) % matches.length)
-  }, [matches.length])
+    editor.commands.previousSearchResult()
+  }, [editor])
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose()
-    } else if (e.key === 'Enter') {
-      if (e.shiftKey) {
-        goToPrev()
-      } else {
-        goToNext()
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          goToPrev()
+        } else {
+          goToNext()
+        }
       }
-    }
-  }, [onClose, goToNext, goToPrev])
+    },
+    [onClose, goToNext, goToPrev]
+  )
 
   return (
-    <div className="find-bar" onKeyDown={handleKeyDown}>
+    <div className="find-bar">
       <div className="find-bar-inner">
         <Search size={14} className="find-bar-icon" />
         <input
@@ -142,17 +103,39 @@ export function FindBar({ editor, onClose }: FindBarProps) {
           placeholder="Find in document..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
         />
         <span className="find-bar-count">
-          {query ? (matches.length > 0 ? `${activeIndex + 1} of ${matches.length}` : 'No results') : ''}
+          {query
+            ? matchCount > 0
+              ? `${activeIndex + 1} of ${matchCount}`
+              : 'No results'
+            : ''}
         </span>
-        <button className="find-bar-btn" onClick={goToPrev} disabled={matches.length === 0} aria-label="Previous match" title="Previous (Shift+Enter)">
+        <button
+          className="find-bar-btn"
+          onClick={goToPrev}
+          disabled={matchCount === 0}
+          aria-label="Previous match"
+          title="Previous (Shift+Enter)"
+        >
           <ChevronUp size={14} />
         </button>
-        <button className="find-bar-btn" onClick={goToNext} disabled={matches.length === 0} aria-label="Next match" title="Next (Enter)">
+        <button
+          className="find-bar-btn"
+          onClick={goToNext}
+          disabled={matchCount === 0}
+          aria-label="Next match"
+          title="Next (Enter)"
+        >
           <ChevronDown size={14} />
         </button>
-        <button className="find-bar-btn" onClick={onClose} aria-label="Close search" title="Close (Escape)">
+        <button
+          className="find-bar-btn"
+          onClick={onClose}
+          aria-label="Close search"
+          title="Close (Escape)"
+        >
           <X size={14} />
         </button>
       </div>
@@ -238,17 +221,6 @@ export function FindBar({ editor, onClose }: FindBarProps) {
         .find-bar-btn:disabled {
           opacity: 0.4;
           cursor: default;
-        }
-
-        /* Search highlight styles */
-        .find-highlight {
-          background: rgba(255, 200, 0, 0.25);
-          border-radius: 2px;
-        }
-
-        .find-highlight-active {
-          background: rgba(255, 180, 0, 0.55);
-          border-radius: 2px;
         }
       `}</style>
     </div>

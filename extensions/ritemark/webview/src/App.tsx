@@ -109,7 +109,7 @@ function App() {
 
   // Table of Contents state
   const [showTOC, setShowTOC] = useState(false)
-  const contentsButtonRef = useRef<HTMLButtonElement | null>(null)
+  const contentsButtonRef = useRef<HTMLButtonElement>(null)
 
   // File change notification state
   const [showFileChangeNotification, setShowFileChangeNotification] = useState(false)
@@ -202,24 +202,23 @@ function App() {
     sendToExtension('ready', {})
   }, [])
 
-  // CMD+F keyboard shortcut to open find bar
+  // CMD+F keyboard shortcut to open find bar (or advance to next match if already open)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'f') {
         e.preventDefault()
         e.stopPropagation()
-        setShowFindBar(true)
-      }
-      // CMD+Shift+O to toggle Table of Contents
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'o') {
-        e.preventDefault()
-        e.stopPropagation()
-        setShowTOC(prev => !prev)
+        if (showFindBar && editorRef.current) {
+          // Already open: cycle to next match
+          editorRef.current.commands.nextSearchResult()
+        } else {
+          setShowFindBar(true)
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown, true) // capture phase
     return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [])
+  }, [showFindBar])
 
   // Handle tool calls from AI panel
   const handleToolCall = useCallback((

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React from 'react'
 import { FileText, Download, RotateCw, List } from 'lucide-react'
 import { VoiceDictationButton } from '../VoiceDictationButton'
 
@@ -12,7 +12,7 @@ interface DocumentHeaderProps {
   onPropertiesClick: () => void
   onExportClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   onContentsClick?: () => void
-  contentsButtonRef?: React.RefObject<HTMLButtonElement | null>
+  contentsButtonRef?: React.Ref<HTMLButtonElement>
   hasFileChanged?: boolean
   onRefresh?: () => void
   features: Features

@@ -18,6 +18,7 @@ import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
+import { SearchExtension } from '../extensions/SearchExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
@@ -467,6 +468,7 @@ export function Editor({
       ...tableExtensions,
       ImageExtension,
       SlashCommands,
+      SearchExtension,
       GlobalDragHandle.configure({
         dragHandleWidth: 24,
         scrollTreshold: 100,
@@ -714,6 +716,12 @@ export function Editor({
       onEditorReady?.(editor)
     }
   }, [editor]) // Don't include onEditorReady to avoid re-calling when callback changes
+
+  // Live-toggle spellcheck attribute on the contenteditable without re-initializing the editor
+  useEffect(() => {
+    if (!editor) return
+    editor.view.dom.setAttribute('spellcheck', spellcheck ? 'true' : 'false')
+  }, [editor, spellcheck])
 
   // Update editor content when value prop changes (e.g., when loading a file)
   // Skip updates during active editing to prevent bubble menus from closing
