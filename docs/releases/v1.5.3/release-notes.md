@@ -51,10 +51,24 @@ A new **Contents** button in the document header opens a panel listing every hea
 
 ## Improvements
 
+### Unified block menus
+
+The slash command menu (`/`) and the `+` button block menu now share a single source of truth for all block types. Both menus offer the same 13 block types (Text, Heading 1-3, Bullet List, Numbered List, Task List, Quote, Code Block, Table, Mermaid Diagram, Image, Divider) with consistent styling.
+
+### Search fixes
+
+- **CMD+F restricted to markdown editor:** The CMD+F shortcut no longer intercepts search in PDF, DOCX, and Spreadsheet viewers — those viewers keep their native find behavior.
+- **Cross-node search:** Search now finds matches that span formatting boundaries (e.g. a phrase split between plain and **bold** text).
+
 ### Editor robustness
 
 - **No-op transactions skipped in onUpdate:** The editor now ignores meta-only transactions (used by search and future extensions) in its `onUpdate` handler, preventing unnecessary `contentChanged` round-trips to the extension host.
 - **Search extension is document-change aware:** While a search is active, edits to the document automatically rebuild decorations instead of leaving stale highlights behind.
+
+### Developer experience
+
+- **TypeScript type checking:** Added `npm run typecheck` (`tsc --noEmit`) to the webview project for catching type errors before they reach production.
+- **CI hardening:** Windows build workflow hardened against EMFILE errors.
 
 ---
 
@@ -109,3 +123,5 @@ No new dependencies. No new VS Code settings. No extension-host changes.
 - `feat: add CMD+F search and table of contents`
 - `fix(sprint-47): rewrite FindBar with ProseMirror decorations + ref/spellcheck fixes`
 - `revert(sprint-47): remove spellcheck feature entirely`
+- `fix(sprint-47): unify block menus, fix Codex review issues, add typecheck`
+- `ci: harden windows build against EMFILE`
