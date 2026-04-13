@@ -18,6 +18,7 @@ import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
+import { SearchExtension } from '../extensions/SearchExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
@@ -464,6 +465,7 @@ export function Editor({
       ...tableExtensions,
       ImageExtension,
       SlashCommands,
+      SearchExtension,
       GlobalDragHandle.configure({
         dragHandleWidth: 24,
         scrollTreshold: 100,
@@ -1480,61 +1482,6 @@ export function Editor({
 
         .block-plus-btn:active {
           background-color: rgba(0, 0, 0, 0.1);
-        }
-
-        /* Block menu styling */
-        .block-menu {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          padding: 4px;
-          min-width: 200px;
-          max-height: 300px;
-          overflow-y: auto;
-        }
-
-        .block-menu-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          width: 100%;
-          padding: 8px 12px;
-          border: none;
-          border-radius: 4px;
-          background: transparent;
-          cursor: pointer;
-          text-align: left;
-          transition: background-color 0.15s ease;
-        }
-
-        .block-menu-item:hover {
-          background-color: #f3f4f6;
-        }
-
-        .block-menu-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 24px;
-          height: 24px;
-          color: #6b7280;
-        }
-
-        .block-menu-text {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .block-menu-title {
-          font-size: 14px;
-          font-weight: 500;
-          color: #111827;
-        }
-
-        .block-menu-description {
-          font-size: 12px;
-          color: #9ca3af;
         }
 
         /* Hide drag handle and + button on mobile */

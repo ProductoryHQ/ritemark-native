@@ -201,6 +201,12 @@ This is the fast feedback loop — Jarmo tests locally before triggering CI.
 
 #### STEP 5: CREATE + PUSH TAG (TRIGGERS CI)
 
+**⚠️ CRITICAL: PUBLIC REPO + LARGE RUNNERS**
+GitHub does NOT allow larger runners (windows-8core) on public repos.
+Before creating the tag (which triggers Windows CI):
+1. Switch repo to private: `gh repo edit ProductoryHQ/ritemark-native --visibility private --accept-visibility-change-consequences`
+2. After Windows build completes, switch back: `gh repo edit ProductoryHQ/ritemark-native --visibility public --accept-visibility-change-consequences`
+
 1. Create tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
    - This triggers GitHub Actions for Windows + macOS x64 builds
 

@@ -4,7 +4,8 @@ import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from '
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
 import { DOCXViewer } from './components/viewers/DOCXViewer'
-import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
+import { DocumentHeader, PropertiesModal, ExportMenu, TableOfContents } from './components/header'
+import { FindBar } from './components/FindBar'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
@@ -101,6 +102,13 @@ function App() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportButtonRef = useRef<HTMLElement | null>(null)
 
+  // Find bar state
+  const [showFindBar, setShowFindBar] = useState(false)
+
+  // Table of Contents state
+  const [showTOC, setShowTOC] = useState(false)
+  const contentsButtonRef = useRef<HTMLButtonElement>(null)
+
   // File change notification state
   const [showFileChangeNotification, setShowFileChangeNotification] = useState(false)
   const [_fileChangeData, setFileChangeData] = useState({ filename: '', isDirty: false })
@@ -190,6 +198,26 @@ function App() {
     // Tell extension we're ready
     sendToExtension('ready', {})
   }, [])
+
+  // CMD+F keyboard shortcut to open find bar (or advance to next match if already open)
+  // Only intercept in markdown mode — let PDF/DOCX/Spreadsheet viewers handle their own find
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (fileType !== 'markdown') return
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'f') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (showFindBar && editorRef.current) {
+          // Already open: cycle to next match
+          editorRef.current.commands.nextSearchResult()
+        } else {
+          setShowFindBar(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown, true) // capture phase
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [showFindBar, fileType])
 
   // Handle tool calls from AI panel
   const handleToolCall = useCallback((
@@ -312,6 +340,10 @@ function App() {
     setShowExportMenu(prev => !prev)
   }, [])
 
+  const handleContentsClick = useCallback(() => {
+    setShowTOC(prev => !prev)
+  }, [])
+
   const handleClosePropertiesModal = useCallback(() => {
     setShowPropertiesModal(false)
   }, [])
@@ -415,6 +447,8 @@ function App() {
       <DocumentHeader
         onPropertiesClick={handlePropertiesClick}
         onExportClick={handleExportClick}
+        onContentsClick={handleContentsClick}
+        contentsButtonRef={contentsButtonRef}
         hasFileChanged={showFileChangeNotification}
         onRefresh={() => {
           setShowFileChangeNotification(false)
@@ -424,7 +458,15 @@ function App() {
       />
 
       {/* Editor - Takes remaining space */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" style={{ position: 'relative' }}>
+        {/* Find Bar */}
+        {showFindBar && editorRef.current && (
+          <FindBar
+            editor={editorRef.current}
+            onClose={() => setShowFindBar(false)}
+          />
+        )}
+
         <Editor
           value={content}
           onChange={handleContentChange}
@@ -453,6 +495,15 @@ function App() {
         onCopyAsMarkdown={handleCopyAsMarkdown}
         anchorElement={exportButtonRef.current}
       />
+
+      {/* Table of Contents */}
+      {showTOC && editorRef.current && (
+        <TableOfContents
+          editor={editorRef.current}
+          anchorRef={contentsButtonRef}
+          onClose={() => setShowTOC(false)}
+        />
+      )}
     </div>
   )
 }
