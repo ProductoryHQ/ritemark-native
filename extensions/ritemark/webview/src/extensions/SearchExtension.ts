@@ -51,16 +51,38 @@ function computeResults(doc: ProseMirrorNode, term: string): SearchResult[] {
   const lowerTerm = term.toLowerCase()
   const termLength = lowerTerm.length
 
+  // Search across node boundaries by flattening text per block node.
+  // Each block (paragraph, heading, etc.) produces a contiguous text run
+  // where formatting boundaries (bold, italic, etc.) don't break matches.
   doc.descendants((node, pos) => {
-    if (node.isText && node.text) {
-      const text = node.text.toLowerCase()
-      let index = 0
-      while ((index = text.indexOf(lowerTerm, index)) !== -1) {
-        const from = pos + index
-        const to = from + termLength
-        results.push({ from, to })
-        index += termLength
+    if (!node.isBlock || node.childCount === 0) return
+
+    // Only process leaf-level blocks (paragraphs, headings, etc.)
+    let hasBlockChild = false
+    node.forEach(child => {
+      if (child.isBlock) hasBlockChild = true
+    })
+    if (hasBlockChild) return
+
+    // Build flattened text + position map for this block
+    let flatText = ''
+    const posMap: number[] = [] // flatText index → doc position
+
+    node.forEach((child, offset) => {
+      if (child.isText && child.text) {
+        const docPos = pos + 1 + offset // +1 for block node open tag
+        for (let i = 0; i < child.text.length; i++) {
+          posMap.push(docPos + i)
+        }
+        flatText += child.text
       }
+    })
+
+    const lowerFlat = flatText.toLowerCase()
+    let index = 0
+    while ((index = lowerFlat.indexOf(lowerTerm, index)) !== -1) {
+      results.push({ from: posMap[index], to: posMap[index + termLength - 1] + 1 })
+      index += termLength
     }
   })
 

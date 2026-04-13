@@ -1,9 +1,14 @@
+/**
+ * Shared visual component for slash commands and block menu.
+ * Renders a list of block items with icons, keyboard navigation, and selection.
+ */
+
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
-import type { Command } from './SlashCommands'
+import type { BlockItemDef } from './blockItems'
 
 interface CommandsListProps {
-  items: Command[]
-  command: (item: Command) => void
+  items: BlockItemDef[]
+  command: (item: BlockItemDef) => void
 }
 
 export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
@@ -15,7 +20,6 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }: any) => {
-      // Guard against empty items list
       if (props.items.length === 0) {
         return false
       }
@@ -75,6 +79,7 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
               }
             }}
             onClick={() => props.command(item)}
+            onMouseDown={(e) => e.preventDefault()}
           >
             <span
               className="flex items-center justify-center w-8 h-8"

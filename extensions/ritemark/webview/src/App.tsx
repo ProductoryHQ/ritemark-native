@@ -200,8 +200,10 @@ function App() {
   }, [])
 
   // CMD+F keyboard shortcut to open find bar (or advance to next match if already open)
+  // Only intercept in markdown mode — let PDF/DOCX/Spreadsheet viewers handle their own find
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (fileType !== 'markdown') return
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'f') {
         e.preventDefault()
         e.stopPropagation()
@@ -215,7 +217,7 @@ function App() {
     }
     window.addEventListener('keydown', handleKeyDown, true) // capture phase
     return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [showFindBar])
+  }, [showFindBar, fileType])
 
   // Handle tool calls from AI panel
   const handleToolCall = useCallback((

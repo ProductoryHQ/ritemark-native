@@ -2,17 +2,10 @@ import { Extension } from '@tiptap/core'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import tippy from 'tippy.js'
-import type { ComponentType } from 'react'
 import { CommandsList } from './CommandsList'
-import { Heading1, Heading2, Heading3, List, ListOrdered, Code, Table, Image, CheckSquare, Quote, GitBranch } from 'lucide-react'
-import { sendToExtension, emitInternalEvent } from '../bridge'
+import { blockItems, executeSlashCommand, type BlockItemDef } from './blockItems'
 
-export interface Command {
-  title: string
-  description: string
-  icon: ComponentType<any>
-  command: ({ editor, range }: any) => void
-}
+export type { BlockItemDef as Command }
 
 export const SlashCommands = Extension.create({
   name: 'slashCommands',
@@ -22,7 +15,7 @@ export const SlashCommands = Extension.create({
       suggestion: {
         char: '/',
         command: ({ editor, range, props }: any) => {
-          props.command({ editor, range })
+          executeSlashCommand(editor, range, props)
         },
       },
     }
@@ -34,155 +27,8 @@ export const SlashCommands = Extension.create({
         editor: this.editor,
         ...this.options.suggestion,
         items: ({ query }: any) => {
-          const commands: Command[] = [
-            {
-              title: 'Heading 1',
-              description: 'Large heading',
-              icon: Heading1,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .setNode('heading', { level: 1 })
-                  .run()
-              },
-            },
-            {
-              title: 'Heading 2',
-              description: 'Medium heading',
-              icon: Heading2,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .setNode('heading', { level: 2 })
-                  .run()
-              },
-            },
-            {
-              title: 'Heading 3',
-              description: 'Small heading',
-              icon: Heading3,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .setNode('heading', { level: 3 })
-                  .run()
-              },
-            },
-            {
-              title: 'Bullet List',
-              description: 'Create a bulleted list',
-              icon: List,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .toggleBulletList()
-                  .run()
-              },
-            },
-            {
-              title: 'Numbered List',
-              description: 'Create a numbered list',
-              icon: ListOrdered,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .toggleOrderedList()
-                  .run()
-              },
-            },
-            {
-              title: 'Task List',
-              description: 'Create a checklist',
-              icon: CheckSquare,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .toggleTaskList()
-                  .run()
-              },
-            },
-            {
-              title: 'Quote',
-              description: 'Insert a blockquote',
-              icon: Quote,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .toggleBlockquote()
-                  .run()
-              },
-            },
-            {
-              title: 'Code Block',
-              description: 'Insert a code block',
-              icon: Code,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .setCodeBlock()
-                  .run()
-              },
-            },
-            {
-              title: 'Table',
-              description: 'Insert a 3x3 table',
-              icon: Table,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-                  .run()
-              },
-            },
-            {
-              title: 'Mermaid Diagram',
-              description: 'Insert a mermaid diagram',
-              icon: GitBranch,
-              command: ({ editor, range }: any) => {
-                editor
-                  .chain()
-                  .focus()
-                  .deleteRange(range)
-                  .setCodeBlock({ language: 'mermaid' })
-                  .run()
-              },
-            },
-            {
-              title: 'Image',
-              description: 'Insert an image from file',
-              icon: Image,
-              command: ({ editor, range }: any) => {
-                // Save cursor position BEFORE async file picker opens
-                const insertPos = range.from
-                editor.chain().focus().deleteRange(range).run()
-                // Tell Editor.tsx where to insert the image when it arrives
-                emitInternalEvent('image:pending-position', insertPos)
-                // Request file selection from VS Code extension
-                sendToExtension('selectImageFile')
-              },
-            },
-          ]
-
-          return commands.filter((command) =>
-            command.title.toLowerCase().startsWith(query.toLowerCase())
+          return blockItems.filter((item) =>
+            item.title.toLowerCase().startsWith(query.toLowerCase())
           )
         },
         render: () => {
