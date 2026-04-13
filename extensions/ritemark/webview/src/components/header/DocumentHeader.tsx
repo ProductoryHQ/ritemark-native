@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText, Download, RotateCw } from 'lucide-react'
+import { FileText, Download, RotateCw, List } from 'lucide-react'
 import { VoiceDictationButton } from '../VoiceDictationButton'
 
 interface Features {
@@ -10,6 +10,8 @@ interface Features {
 interface DocumentHeaderProps {
   onPropertiesClick: () => void
   onExportClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  onContentsClick?: () => void
+  contentsButtonRef?: React.Ref<HTMLButtonElement>
   hasFileChanged?: boolean
   onRefresh?: () => void
   features: Features
@@ -25,6 +27,8 @@ interface DocumentHeaderProps {
 export function DocumentHeader({
   onPropertiesClick,
   onExportClick,
+  onContentsClick,
+  contentsButtonRef,
   hasFileChanged = false,
   onRefresh,
   features
@@ -32,6 +36,20 @@ export function DocumentHeader({
   return (
     <header className="document-header">
       <div className="header-content">
+        {/* Contents (TOC) button */}
+        {onContentsClick && (
+          <button
+            ref={contentsButtonRef}
+            className="header-btn"
+            onClick={onContentsClick}
+            aria-label="Table of contents"
+            title="Contents"
+          >
+            <List size={16} />
+            <span className="header-btn-text">Contents</span>
+          </button>
+        )}
+
         {/* Properties button */}
         <button
           className="header-btn"
