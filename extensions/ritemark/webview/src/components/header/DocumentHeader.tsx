@@ -12,6 +12,7 @@ interface DocumentHeaderProps {
   onExportClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   onContentsClick?: () => void
   contentsButtonRef?: React.Ref<HTMLButtonElement>
+  contentsActive?: boolean
   hasFileChanged?: boolean
   onRefresh?: () => void
   features: Features
@@ -29,6 +30,7 @@ export function DocumentHeader({
   onExportClick,
   onContentsClick,
   contentsButtonRef,
+  contentsActive = false,
   hasFileChanged = false,
   onRefresh,
   features
@@ -36,14 +38,16 @@ export function DocumentHeader({
   return (
     <header className="document-header">
       <div className="header-content">
-        {/* Contents (TOC) button */}
+        {/* Contents (TOC) button — acts as a toggle for the inline ToC on wide
+            screens and as a dropdown trigger on narrow screens. */}
         {onContentsClick && (
           <button
             ref={contentsButtonRef}
-            className="header-btn"
+            className={'header-btn' + (contentsActive ? ' is-active' : '')}
             onClick={onContentsClick}
             aria-label="Table of contents"
-            title="Contents"
+            aria-pressed={contentsActive}
+            title={contentsActive ? 'Hide table of contents' : 'Contents'}
           >
             <List size={16} />
             <span className="header-btn-text">Contents</span>
@@ -133,7 +137,8 @@ export function DocumentHeader({
           background: var(--vscode-toolbar-hoverBackground);
         }
 
-        .header-btn:active {
+        .header-btn:active,
+        .header-btn.is-active {
           background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
         }
 

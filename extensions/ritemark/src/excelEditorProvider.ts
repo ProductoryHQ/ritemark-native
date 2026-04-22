@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ExcelDocument } from './excelDocument';
-import { isAppInstalled, openInExternalApp, getSpreadsheetAppName } from './utils/openExternal';
+import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName } from './utils/openExternal';
 import { trackEvent } from './analytics/posthog';
 
 /**
@@ -231,7 +231,11 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
       const hasExcel = app === 'excel';
       const appName = getSpreadsheetAppName(hasExcel);
 
-      await openInExternalApp(filePath, appName);
+      if (hasExcel && filePath.toLowerCase().endsWith('.csv')) {
+        await openCsvInExcelWithHints(filePath, appName);
+      } else {
+        await openInExternalApp(filePath, appName);
+      }
 
       vscode.window.showInformationMessage(`Opening in ${appName}...`);
     } catch (error) {

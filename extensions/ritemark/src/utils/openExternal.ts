@@ -4,6 +4,10 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import * as XLSX from 'xlsx';
 import { getCurrentPlatform } from './platform';
 
 const execAsync = promisify(exec);
@@ -57,6 +61,59 @@ export async function openInExternalApp(filePath: string, appName: string): Prom
     // Linux: xdg-open
     await execAsync(`xdg-open "${filePath}"`);
   }
+}
+
+/**
+ * Open a CSV file in Excel by converting it to a temporary .xlsx workbook.
+ *
+ * Why convert instead of opening the .csv directly:
+ *   - Locale-dependent delimiter guessing: EU-locale CSVs (semicolon) open as
+ *     one column in Excel unless given a `sep=` directive.
+ *   - Encoding issues: Mac Excel is unreliable with UTF-8/UTF-16 BOM detection,
+ *     producing mojibake like `K‰ive` instead of `Käive` for Estonian chars.
+ *
+ * Writing an .xlsx via SheetJS sidesteps both problems — .xlsx is a structured
+ * binary format, no encoding ambiguity, no delimiter ambiguity. Excel always
+ * opens it correctly on all platforms.
+ *
+ * The temp file is cleaned up after 5s (matches whisperCpp.ts pattern).
+ */
+export async function openCsvInExcelWithHints(filePath: string, appName: string): Promise<void> {
+  let content = fs.readFileSync(filePath, 'utf8');
+
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+
+  const firstNewline = content.indexOf('\n');
+  const firstLine = firstNewline === -1 ? content : content.slice(0, firstNewline);
+  if (/^sep=/i.test(firstLine)) {
+    content = firstNewline === -1 ? '' : content.slice(firstNewline + 1);
+  }
+
+  const scanEnd = content.indexOf('\n');
+  const scanLine = scanEnd === -1 ? content : content.slice(0, scanEnd);
+  const counts = {
+    ',': (scanLine.match(/,/g) || []).length,
+    ';': (scanLine.match(/;/g) || []).length,
+    '\t': (scanLine.match(/\t/g) || []).length,
+  };
+  let delimiter: ',' | ';' | '\t' = ',';
+  if (counts[';'] > counts[','] && counts[';'] >= counts['\t']) delimiter = ';';
+  else if (counts['\t'] > counts[','] && counts['\t'] > counts[';']) delimiter = '\t';
+
+  // Parse with SheetJS using the detected delimiter, then write as .xlsx.
+  const workbook = XLSX.read(content, { type: 'string', raw: true, FS: delimiter });
+
+  const baseName = path.basename(filePath, path.extname(filePath));
+  const tempPath = path.join(os.tmpdir(), `ritemark-csv-${Date.now()}-${baseName}.xlsx`);
+  XLSX.writeFile(workbook, tempPath, { bookType: 'xlsx' });
+
+  await openInExternalApp(tempPath, appName);
+
+  setTimeout(() => {
+    try { fs.unlinkSync(tempPath); } catch { /* best-effort */ }
+  }, 5000);
 }
 
 /**
