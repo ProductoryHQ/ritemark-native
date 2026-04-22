@@ -8,17 +8,14 @@ A collection of ideas for future development. No commitment, no order - just a p
 
 - [ ] Improve "Add link" dialog to smart-search from files inside the repository when user starts typing with "@"
 - [ ] Add Youtube (any other streaming) videos from / command palette
-- [ ] **Windows: save triggers "file updated" notification** - On Windows, every save triggers the stale file indicator as if the file was modified externally. Needs investigation — likely the file watcher is not distinguishing between internal saves and external changes on Windows
 
 
 ## Data Editor
 
-- [ ] **BUG: Columns have no max-width — text never wraps** - Long cell content stretches columns infinitely with no line breaks (cells use `whitespace-nowrap` + `text-ellipsis`). Fix: add `max-width` (e.g. 300-400px) to columns and switch to `whitespace-normal` + `word-break: break-word` so text wraps within a bounded column. Consider `table-layout: fixed` for predictable column sizing. Affects both CSV and Excel preview. (`DataTable.tsx:516`, header `minWidth: 100` at line 271 but no max)
 - [ ] Rebrand current Excel viewer/CSV editor as "Data Editor"
 - [ ] CSV filter and column operations (add/delete/rename columns)
 - [ ] CSV cell in "editable" mode must be multi-line and extend to "full-height"
 - [ ] CSV open in Excel (automatically export as UTF-8)
-- [ ] CSV row deletion with context menu
 - [ ] Excel (.xlsx) editing (currently preview-only)
 - [ ] PowerPoint (.pptx) preview
 
@@ -36,7 +33,6 @@ Redesign Welcome screen for total newbies
 - [ ] How to install AI coding assistants from terminal: Claude Code Codex CLI Gemini CLI
 - [ ] Visual tutorials / article links
 - [ ] Make it obvious what to do first
-- [ ] **Custom Welcome tab icon** - Replace default VS Code editor icon with Ritemark icon in the Welcome tab (especially visible on Windows)
 
 ### Built-in Support Module
 
@@ -194,7 +190,11 @@ Consolidate UI components using shadcn/ui for consistency.
 - [x] When deleting table column, it leaves a "ghost" column
 - [x] Nested checklist is broken after edits
 - [x] Copy-paste screenshot on Mac creates double image (needs investigation)
+- [x] Windows: save triggers "file updated" notification (file watcher guard)
+- [x] DataTable columns have no max-width — text never wraps
+- [x] CSV row deletion with context menu
+- [x] Custom Welcome tab icon (Ritemark icon on Welcome tab)
 
 * * *
 
-*Last updated: 2026-03-03*
+*Last updated: 2026-04-21*

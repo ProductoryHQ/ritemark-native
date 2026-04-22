@@ -6,13 +6,20 @@ import { PDFViewer } from './components/viewers/PDFViewer'
 import { DOCXViewer } from './components/viewers/DOCXViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu, TableOfContents } from './components/header'
 import { FindBar } from './components/FindBar'
+import { InlineTableOfContents } from './components/InlineTableOfContents'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
+import { getHeadings } from './lib/headingUtils'
+import type { Heading } from './lib/headingUtils'
 import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { DocumentProperties } from './components/properties'
 
 type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf' | 'docx'
+
+// Minimum container width (px) at which the inline ToC panel is shown.
+// Tunable in T7 during live testing.
+const INLINE_TOC_MIN_WIDTH = 960
 
 // Dictation placeholder texts
 const LISTENING_PLACEHOLDER = '🎤 Listening...'
@@ -108,6 +115,27 @@ function App() {
   // Table of Contents state
   const [showTOC, setShowTOC] = useState(false)
   const contentsButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Inline ToC state
+  const editorScrollRef = useRef<HTMLDivElement>(null)
+  const flexWrapperRef = useRef<HTMLDivElement>(null)
+  const [inlineTocVisible, setInlineTocVisible] = useState(false)
+  const [activeHeadingPos, setActiveHeadingPos] = useState<number | null>(null)
+  const [headings, setHeadings] = useState<Heading[]>([])
+  // Flag flipped when handleEditorReady fires so effects depending on
+  // editorRef.current actually re-run (ref mutations don't trigger re-renders).
+  const [editorReady, setEditorReady] = useState(false)
+  // User preference: whether the inline ToC should render on wide screens.
+  // The Contents button acts as a toggle on wide screens (flips this pref),
+  // and as the classic dropdown trigger on narrow screens.
+  const [inlineTocEnabled, setInlineTocEnabled] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('ritemark.inlineTocEnabled')
+      return stored === null ? true : stored === 'true'
+    } catch {
+      return true
+    }
+  })
 
   // File change notification state
   const [showFileChangeNotification, setShowFileChangeNotification] = useState(false)
@@ -322,6 +350,7 @@ function App() {
 
   const handleEditorReady = useCallback((editor: TipTapEditor) => {
     editorRef.current = editor
+    setEditorReady(true)
   }, [])
 
   // Handle CSV content changes (must be before any early returns!)
@@ -342,6 +371,14 @@ function App() {
 
   const handleContentsClick = useCallback(() => {
     setShowTOC(prev => !prev)
+  }, [])
+
+  const toggleInlineToc = useCallback(() => {
+    setInlineTocEnabled(prev => {
+      const next = !prev
+      try { localStorage.setItem('ritemark.inlineTocEnabled', String(next)) } catch { /* ignore */ }
+      return next
+    })
   }, [])
 
   const handleClosePropertiesModal = useCallback(() => {
@@ -397,6 +434,94 @@ function App() {
     }
   }, [])
 
+  // ResizeObserver: show/hide inline ToC based on container width.
+  // Watches the flex-row wrapper so sidebar open/close is detected correctly
+  // (sidebar shrinks the container but not the window).
+  // Depends on isReady so the effect waits until the flex wrapper is in the DOM
+  // (on first render, `<Loading />` is shown instead and flexWrapperRef is null).
+  useEffect(() => {
+    if (!isReady) return
+    const wrapper = flexWrapperRef.current
+    if (!wrapper) return
+    let timeoutId: number | null = null
+    const observer = new ResizeObserver((entries) => {
+      if (timeoutId) window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(() => {
+        const width = entries[0].contentRect.width
+        setInlineTocVisible(width >= INLINE_TOC_MIN_WIDTH)
+      }, 50)
+    })
+    observer.observe(wrapper)
+    return () => {
+      observer.disconnect()
+      if (timeoutId) window.clearTimeout(timeoutId)
+    }
+  }, [isReady])
+
+  // Scroll-spy: track which heading is currently topmost in the editor view.
+  // Uses a scroll listener (not IntersectionObserver) so the active heading is
+  // always well-defined — between headings, the most recently scrolled-past
+  // heading stays active. Re-runs when heading count changes, visibility
+  // toggles, or the user flips the inline-ToC preference.
+  useEffect(() => {
+    if (!editorRef.current) return
+    if (!inlineTocVisible || !inlineTocEnabled) return
+    if (headings.length < 2) return
+    const editor = editorRef.current
+    // The real scroll container is the Editor's inner `.overflow-y-auto` div
+    // (see Editor.tsx:938), NOT our outer editorScrollRef. Use the same
+    // lookup that FindBar and scrollToHeading use.
+    const scrollContainer = editor.view.dom.closest('.overflow-y-auto') as HTMLElement | null
+    if (!scrollContainer) return
+
+    let rafId: number | null = null
+    const computeActive = () => {
+      rafId = null
+      const nodes = Array.from(
+        editor.view.dom.querySelectorAll('h1,h2,h3,h4,h5,h6')
+      ) as HTMLElement[]
+      const count = Math.min(nodes.length, headings.length)
+      if (count === 0) return
+      const containerTop = scrollContainer.getBoundingClientRect().top
+      // Anchor line: 120px below the top of the scroll container. A heading
+      // becomes "active" once its top crosses this line while scrolling down.
+      const anchorOffset = 120
+      let activeIdx = 0
+      for (let i = 0; i < count; i++) {
+        const top = nodes[i].getBoundingClientRect().top - containerTop
+        if (top - anchorOffset <= 0) activeIdx = i
+        else break
+      }
+      // Map by index, not by posAtDOM — DOM order matches headings array order,
+      // and headings[i].pos is the canonical ProseMirror position used by the
+      // InlineTableOfContents comparator.
+      setActiveHeadingPos(headings[activeIdx].pos)
+    }
+    const onScroll = () => {
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(computeActive)
+    }
+
+    computeActive()
+    scrollContainer.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      scrollContainer.removeEventListener('scroll', onScroll)
+      if (rafId !== null) cancelAnimationFrame(rafId)
+    }
+  }, [inlineTocVisible, inlineTocEnabled, headings])
+
+  // Headings refresh: rebuild headings array whenever the editor content changes.
+  // Depends on editorReady (a state flag) rather than editorRef.current directly —
+  // ref mutations don't trigger effect re-runs.
+  useEffect(() => {
+    if (!editorReady || !editorRef.current) return
+    const editor = editorRef.current
+    const refresh = () => setHeadings(getHeadings(editor))
+    refresh()
+    editor.on('update', refresh)
+    return () => { editor.off('update', refresh) }
+  }, [editorReady])
+
   if (!isReady) {
     return (
       <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
@@ -440,6 +565,18 @@ function App() {
     )
   }
 
+  // Contents button truth table:
+  // - 0 headings → hide (nothing to navigate to)
+  // - wide viewport + >= 2 headings → toggle inline ToC on/off
+  // - otherwise (narrow or only 1 heading) → open dropdown ToC
+  // When inline ToC is currently showing, the button renders in "active" state
+  // so the user can tell clicking will hide it.
+  const inlineTocShown = inlineTocVisible && inlineTocEnabled && headings.length >= 2
+  const contentsClick =
+    headings.length < 1 ? undefined
+    : inlineTocVisible && headings.length >= 2 ? toggleInlineToc
+    : handleContentsClick
+
   // Default: Markdown editor
   return (
     <div className="h-screen bg-[var(--vscode-editor-background)] flex flex-col">
@@ -447,8 +584,9 @@ function App() {
       <DocumentHeader
         onPropertiesClick={handlePropertiesClick}
         onExportClick={handleExportClick}
-        onContentsClick={handleContentsClick}
+        onContentsClick={contentsClick}
         contentsButtonRef={contentsButtonRef}
+        contentsActive={inlineTocShown}
         hasFileChanged={showFileChangeNotification}
         onRefresh={() => {
           setShowFileChangeNotification(false)
@@ -457,25 +595,38 @@ function App() {
         features={features}
       />
 
-      {/* Editor - Takes remaining space */}
-      <div className="flex-1 overflow-y-auto" style={{ position: 'relative' }}>
-        {/* Find Bar */}
-        {showFindBar && editorRef.current && (
-          <FindBar
+      {/* Editor row — flex-row so inline ToC sits left of the scroll container */}
+      <div ref={flexWrapperRef} className="flex-1 flex overflow-hidden" style={{ position: 'relative' }}>
+        {/* Inline Table of Contents — visible only at wide viewports and
+            when the user hasn't toggled it off via the Contents button. */}
+        {inlineTocShown && editorRef.current && (
+          <InlineTableOfContents
             editor={editorRef.current}
-            onClose={() => setShowFindBar(false)}
+            headings={headings}
+            activeHeadingPos={activeHeadingPos}
           />
         )}
 
-        <Editor
-          value={content}
-          onChange={handleContentChange}
-          onSelectionChange={handleSelectionChange}
-          onEditorReady={handleEditorReady}
-          placeholder="Start writing..."
-          className="h-full"
-          imageMappings={imageMappings}
-        />
+        {/* Editor scroll container */}
+        <div ref={editorScrollRef} className="flex-1 overflow-y-auto" style={{ position: 'relative' }}>
+          {/* Find Bar */}
+          {showFindBar && editorRef.current && (
+            <FindBar
+              editor={editorRef.current}
+              onClose={() => setShowFindBar(false)}
+            />
+          )}
+
+          <Editor
+            value={content}
+            onChange={handleContentChange}
+            onSelectionChange={handleSelectionChange}
+            onEditorReady={handleEditorReady}
+            placeholder="Start writing..."
+            className="h-full"
+            imageMappings={imageMappings}
+          />
+        </div>
       </div>
 
       {/* Properties Modal */}

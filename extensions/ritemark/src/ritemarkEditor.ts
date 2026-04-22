@@ -7,7 +7,7 @@ import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
 import { exportToWordV2 } from './export/v2/wordHtmlExporter';
 import { DictationController } from './voiceDictation/controller';
 import { isEnabled } from './features';
-import { isAppInstalled, openInExternalApp, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
+import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
 import { trackEvent } from './analytics/posthog';
 
 // Properties type for front-matter
@@ -1044,7 +1044,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       const hasExcel = app === 'excel';
       const appName = getSpreadsheetAppName(hasExcel);
 
-      await openInExternalApp(filePath, appName);
+      if (hasExcel && filePath.toLowerCase().endsWith('.csv')) {
+        await openCsvInExcelWithHints(filePath, appName);
+      } else {
+        await openInExternalApp(filePath, appName);
+      }
 
       vscode.window.showInformationMessage(`Opening in ${appName}...`);
     } catch (error) {
