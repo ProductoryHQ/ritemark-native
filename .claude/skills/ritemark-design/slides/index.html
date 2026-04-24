@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ritemark slide templates — Index</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: var(--r-surface-muted);
+    color: var(--r-ink-strong);
+    font-family: var(--ritemark-font-ui);
+    font-size: var(--ritemark-size-base);
+  }
+  .shell { max-width: 1200px; margin: 0 auto; padding: 64px 32px; }
+
+  header.page-head {
+    margin-bottom: 48px;
+  }
+  .eyebrow { font-size: var(--ritemark-size-xs); font-weight: 600; color: var(--r-accent); letter-spacing: var(--ritemark-tracking-widest); text-transform: uppercase; margin-bottom: 12px; }
+  h1 {
+    font-family: var(--ritemark-font-display);
+    font-size: var(--ritemark-size-4xl);
+    font-weight: 700;
+    letter-spacing: var(--ritemark-tracking-tight);
+    line-height: var(--ritemark-leading-tight);
+    margin-bottom: 16px;
+  }
+  .lede { font-size: var(--ritemark-size-lg); color: var(--r-ink-body); max-width: 640px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+  }
+  .card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--r-surface);
+    border: 1px solid var(--r-hairline);
+    border-radius: var(--ritemark-radius-lg);
+    overflow: hidden;
+    transition: all 200ms var(--ritemark-ease-quick);
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--ritemark-shadow-lg);
+    border-color: var(--r-hairline-strong);
+  }
+
+  .preview {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: var(--r-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--r-hairline);
+  }
+  .preview::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--r-accent);
+  }
+  .preview.is-dark { background: var(--ritemark-dark-surface); color: var(--ritemark-dark-ink-strong); }
+  .preview.is-dark::before { background: var(--ritemark-dark-indigo); }
+  .preview-inner {
+    text-align: center;
+    padding: 24px;
+  }
+
+  .card-body { padding: 16px 20px; }
+  .card-body .kind { font-size: var(--ritemark-size-xs); color: var(--r-ink-muted); letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+  .card-body .name { font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-xl); font-weight: 700; color: var(--r-ink-strong); margin-bottom: 4px; }
+  .card-body .desc { font-size: var(--ritemark-size-sm); color: var(--r-ink-body); }
+</style>
+</head>
+<body class="ritemark">
+
+<div class="shell">
+
+<header class="page-head">
+  <div class="eyebrow">Ritemark · Slide templates</div>
+  <h1>Seven slide types.</h1>
+  <p class="lede">Every Ritemark deck is some combination of these. All templates at 1920×1080. Open any template, view it at 1:1 in the browser, then screenshot or headless-Chrome-to-PDF for final output.</p>
+</header>
+
+<div class="grid">
+
+  <a class="card" href="cover.html">
+    <div class="preview">
+      <div class="preview-inner">
+        <div style="width: 24px; height: 24px; border-radius: 5px; background: var(--r-accent); display: inline-block; margin-bottom: 12px;"></div>
+        <div style="font-family: var(--ritemark-font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.5px; color: var(--r-ink-strong); line-height: 1.1;">The agent curation<br>layer is boring, in<br>a good way.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="kind">01 · Cover</div>
+      <div class="name">Cover</div>
+      <div class="desc">Deck opener. Mark, eyebrow, title, date / author.</div>
+    </div>
+  </a>
+
+  <a class="card" href="section.html">
+    <div class="preview is-dark">
+      <div class="preview-inner">
+        <div style="font-family: var(--ritemark-font-ui); font-size: 11px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; color: var(--ritemark-dark-indigo); margin-bottom: 12px;">01 · The problem</div>
+        <div style="font-family: var(--ritemark-font-display); font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1;">Viktor has 32 agents.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="kind">02 · Section</div>
+      <div class="name">Section divider</div>
+      <div class="desc">Dark takeover between sections. Use sparingly.</div>
+    </div>
+  </a>
+
+  <a class="card" href="content.html">
+    <div class="preview">
+      <div class="preview-inner" style="text-align: left; padding-left: 32px;">
+        <div style="width: 24px; height: 2px; background: var(--r-accent); margin-bottom: 8px;"></div>
+        <div style="font-size: 10px; font-weight: 600; letter-spacing: 2px; color: var(--r-accent); text-transform: uppercase;">Principles</div>
+        <div style="font-family: var(--ritemark-font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; margin: 8px 0 12px;">Density over decoration.</div>
+        <div style="font-size: 11px; color: var(--r-ink-body); line-height: 1.5;">A power-user screen. Scannable rows, small type…</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="kind">03 · Content</div>
+      <div class="name">Content</div>
+      <div class="desc">One idea per slide. Eyebrow + title + paragraph.</div>
+    </div>
+  </a>
+
+  <a class="card" href="quote.html">
+    <div class="preview">
+      <div class="preview-inner">
+        <div style="font-family: var(--ritemark-font-display); font-size: 44px; font-weight: 300; color: var(--r-accent-fainter); line-height: 0.4;">&ldquo;</div>
+        <div style="font-family: var(--ritemark-font-display); font-size: 18px; font-weight: 500; line-height: 1.3; color: var(--r-ink-strong); margin: 12px 0;">I stopped using<br>Obsidian three weeks in.</div>
+        <div style="font-size: 11px; color: var(--r-ink-muted); font-weight: 500;">— Maya, writer</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="kind">04 · Quote</div>
+      <div class="name">Quote</div>
+      <div class="desc">One voice, centered. Display glyph + attribution.</div>
+    </div>
+  </a>
+
+  <a class="card" href="comparison.html">
+    <div class="preview">
+      <div class="preview-inner" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: left; padding: 12px;">
+        <div>
+          <div style="font-size: 9px; font-weight: 600; letter-spacing: 1.5px; color: var(--r-ink-muted); text-transform: uppercase;">Before</div>
+          <div style="font-family: var(--ritemark-font-display); font-size: 14px; font-weight: 600; line-height: 1.1; margin-top: 4px;">Colored bg only.</div>
+        </div>
+        <div>
+          <div style="font-size: 9px; font-weight: 600; letter-spacing: 1.5px; color: var(--r-accent); text-transform: uppercase;">After</div>
+          <div style="font-family: var(--ritemark-font-display); font-size: 14px; font-weight: 600; line-height: 1.1; margin-top: 4px;">Border + bg + weight.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="kind">05 · Comparison</div>
+      <div class="name">Before / After</div>
+      <div class="desc">Two-column contrast. No green-red "good / bad" coloring.</div>
+    </div>
+  </a>
+
+  <a class="card" href="data.html">
+    <div class="preview">
+      <div class="preview-inner" style="text-align: left; padding-left: 24px;">
+        <div style="width: 24px; height: 2px; background: var(--r-accent); margin-bottom: 8px;"></div>
+        <div style="font-size: 10px; font-weight: 600; letter-spacing: 2px; color: var(--r-accent); text-transform: uppercase; margin-bottom: 8px;">By the numbers</div>
+        <div style="font-family: var(--ritemark-font-display); font-size: 64px; font-weight: 700; line-height: 1; letter-spacing: -1px;">32 → 19</div>
+        <div style="font-size: 11px; color: var(--r-ink-body); margin-top: 8px;">Agents, before and after.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="kind">06 · Data</div>
+      <div class="name">Numbers</div>
+      <div class="desc">Up to 3 metrics per slide. No charts — if you need charts, it's a different slide.</div>
+    </div>
+  </a>
+
+  <a class="card" href="end.html">
+    <div class="preview">
+      <div class="preview-inner">
+        <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--r-accent); margin: 0 auto 12px; display: inline-block;"></div>
+        <div style="font-family: var(--ritemark-font-display); font-size: 44px; font-weight: 700; letter-spacing: -0.5px;">Ritemark</div>
+        <div style="font-size: 11px; color: var(--r-ink-muted); margin-top: 8px;">ritemark.app</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="kind">07 · End</div>
+      <div class="name">Thanks</div>
+      <div class="desc">Closer. Mark + wordmark + URLs.</div>
+    </div>
+  </a>
+
+</div>
+
+</div>
+
+</body>
+</html>

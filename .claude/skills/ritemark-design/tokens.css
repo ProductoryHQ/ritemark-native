@@ -1,0 +1,281 @@
+/* ============================================================
+   Ritemark Design System — tokens.css
+   ----------------------------------------------------------
+   The single source of truth for Ritemark's visual language.
+
+   Import once. Everything downstream reads from these vars.
+
+   Two layers:
+     1. Raw tokens (--ritemark-*)         — hard values
+     2. Role tokens (--r-*)               — semantic aliases
+
+   In the webview, role tokens also chain through VS Code's own
+   variables so themed surfaces inherit VS Code behavior where
+   that's correct (scrollbars, context menus). For surfaces we
+   own, the raw Ritemark tokens take over. See references/webview-ui.md.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Space Grotesk is loaded separately — only on surfaces that use it.
+   See references/typography.md. For standalone mocks in the skill's
+   preview/ and slides/ folders, it's loaded via Google Fonts. */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ========================================================
+     RAW TOKENS — Light (the primary, ship-today theme)
+     Values pulled verbatim from themes/ritemark-light.json
+     and webview/src/index.css.
+     ======================================================== */
+
+  /* Surfaces — white-to-slate ladder */
+  --ritemark-surface:            #FFFFFF; /* editor.background */
+  --ritemark-surface-muted:      #F8FAFC; /* sidebar, statusBar, titleBar, panel */
+  --ritemark-surface-soft:       #F1F5F9; /* secondary button, code blocks, hover */
+  --ritemark-hairline:           #E2E8F0; /* every border */
+  --ritemark-hairline-strong:    #CBD5E1; /* input borders, stronger dividers */
+
+  /* Ink ladder — always 4 steps, used for hierarchy */
+  --ritemark-ink-strong:         #1E1B4B; /* editor.foreground — "Deep Space" */
+  --ritemark-ink-body:           #475569; /* primary body text (Slate 600) */
+  --ritemark-ink-muted:          #64748B; /* secondary text, descriptions (Slate 500) */
+  --ritemark-ink-faint:          #94A3B8; /* placeholders, inactive (Slate 400) */
+  --ritemark-ink-disabled:       #CBD5E1; /* fully disabled state (Slate 300) */
+
+  /* The single accent */
+  --ritemark-indigo:             #4338CA; /* primary, cursor, focus, CTA */
+  --ritemark-indigo-deep:        #3730A3; /* hover, active */
+  --ritemark-indigo-darker:      #312E81; /* pressed */
+  --ritemark-indigo-soft:        #E0E7FF; /* active row bg, soft pill bg */
+  --ritemark-indigo-fainter:     #C7D2FE; /* selection highlight, dark-mode body text */
+
+  /* Semantic */
+  --ritemark-success:            #22C55E; /* green 500 */
+  --ritemark-success-soft:       #DCFCE7;
+  --ritemark-warning:            #F59E0B; /* amber 500 */
+  --ritemark-warning-soft:       #FEF3C7;
+  --ritemark-error:              #EF4444; /* red 500 */
+  --ritemark-error-soft:         #FEE2E2;
+  --ritemark-info:               var(--ritemark-indigo); /* info == brand */
+  --ritemark-info-soft:          var(--ritemark-indigo-soft);
+
+  /* ========================================================
+     RAW TOKENS — Dark (new, spec'd for Ritemark Native)
+     Deep Space inverts from "ink" to "surface". The chrome
+     stays unmistakably Ritemark instead of reading as VS Code.
+     ======================================================== */
+
+  --ritemark-dark-surface:       #1E1B4B; /* Deep Space becomes the page */
+  --ritemark-dark-surface-muted: #191635; /* slightly darker for chrome */
+  --ritemark-dark-surface-soft:  #251F5C; /* active rows, hover */
+  --ritemark-dark-hairline:      #3730A3; /* indigo-deep — keeps the brand in the borders */
+  --ritemark-dark-hairline-strong: #4338CA;
+
+  --ritemark-dark-ink-strong:    #F8FAFC; /* light-theme surface-muted flips to ink */
+  --ritemark-dark-ink-body:      #C7D2FE; /* indigo-fainter — warmth on dark */
+  --ritemark-dark-ink-muted:     #94A3B8; /* Slate 400 works on both themes */
+  --ritemark-dark-ink-faint:     #64748B;
+  --ritemark-dark-ink-disabled:  #475569;
+
+  --ritemark-dark-indigo:        #818CF8; /* Indigo 400 — lighter for dark contrast */
+  --ritemark-dark-indigo-deep:   #6366F1; /* Indigo 500 */
+  --ritemark-dark-indigo-darker: #4F46E5;
+  --ritemark-dark-indigo-soft:   rgba(129, 140, 248, 0.16);
+  --ritemark-dark-indigo-fainter: rgba(129, 140, 248, 0.28);
+
+  /* Semantic on dark — slightly brighter to survive contrast */
+  --ritemark-dark-success:       #4ADE80;
+  --ritemark-dark-success-soft:  rgba(34, 197, 94, 0.18);
+  --ritemark-dark-warning:       #FBBF24;
+  --ritemark-dark-warning-soft:  rgba(245, 158, 11, 0.18);
+  --ritemark-dark-error:         #F87171;
+  --ritemark-dark-error-soft:    rgba(239, 68, 68, 0.18);
+
+  /* ========================================================
+     TYPOGRAPHY
+     ======================================================== */
+
+  --ritemark-font-ui: 'Sofia Sans', ui-sans-serif, system-ui, -apple-system,
+                      BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ritemark-font-display: 'Space Grotesk', 'Sofia Sans', ui-sans-serif, system-ui, sans-serif;
+  --ritemark-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco,
+                        Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  /* Type scale — compact for in-app, larger in marketing (see references/typography.md) */
+  --ritemark-size-xs:   11px;
+  --ritemark-size-sm:   12px;
+  --ritemark-size-base: 13px;     /* body UI */
+  --ritemark-size-md:   14px;     /* body copy */
+  --ritemark-size-lg:   16px;     /* emphasized body, dialog titles */
+  --ritemark-size-xl:   20px;     /* section titles */
+  --ritemark-size-2xl:  24px;     /* marketing H3 */
+  --ritemark-size-3xl:  30px;     /* marketing H2 */
+  --ritemark-size-4xl:  40px;     /* marketing H1 small */
+  --ritemark-size-5xl:  56px;     /* marketing H1, welcome title */
+  --ritemark-size-6xl:  72px;     /* slide covers */
+
+  --ritemark-leading-tight:    1.15;
+  --ritemark-leading-snug:     1.3;
+  --ritemark-leading-normal:   1.55;
+  --ritemark-leading-relaxed:  1.7;
+
+  --ritemark-tracking-tight:   -0.5px;  /* display heads */
+  --ritemark-tracking-normal:  0;
+  --ritemark-tracking-wide:    0.5px;
+  --ritemark-tracking-widest:  3px;     /* eyebrows, all caps */
+
+  /* ========================================================
+     SPACING — 4pt base
+     ======================================================== */
+
+  --ritemark-space-0:   0;
+  --ritemark-space-1:   4px;
+  --ritemark-space-2:   8px;
+  --ritemark-space-3:   12px;
+  --ritemark-space-4:   16px;
+  --ritemark-space-5:   20px;
+  --ritemark-space-6:   24px;
+  --ritemark-space-8:   32px;
+  --ritemark-space-10:  40px;
+  --ritemark-space-12:  48px;
+  --ritemark-space-16:  64px;
+  --ritemark-space-20:  80px;
+  --ritemark-space-24:  96px;
+
+  /* ========================================================
+     RADII
+     ======================================================== */
+
+  --ritemark-radius-xs:  3px;   /* tag pills inside rows */
+  --ritemark-radius-sm:  4px;   /* sidebar items, tight chips */
+  --ritemark-radius-md:  6px;   /* inputs, buttons (default) */
+  --ritemark-radius-lg:  10px;  /* dialogs, cards, CTAs */
+  --ritemark-radius-xl:  16px;  /* marketing cards */
+  --ritemark-radius-pill: 999px; /* CTAs in marketing only */
+
+  /* ========================================================
+     SHADOWS & ELEVATION
+     ======================================================== */
+
+  --ritemark-shadow-xs:  0 1px 2px rgba(30, 27, 75, 0.05);
+  --ritemark-shadow-sm:  0 1px 2px rgba(30, 27, 75, 0.06), 0 1px 3px rgba(30, 27, 75, 0.04);
+  --ritemark-shadow-md:  0 4px 6px -1px rgba(30, 27, 75, 0.08), 0 2px 4px -2px rgba(30, 27, 75, 0.06);
+  --ritemark-shadow-lg:  0 10px 15px -3px rgba(30, 27, 75, 0.10), 0 4px 6px -4px rgba(30, 27, 75, 0.08);
+  --ritemark-shadow-xl:  0 20px 25px -5px rgba(30, 27, 75, 0.12), 0 8px 10px -6px rgba(30, 27, 75, 0.08);
+  --ritemark-shadow-2xl: 0 24px 64px rgba(30, 27, 75, 0.14);
+
+  /* The signature — indigo drop-shadow on primary CTAs */
+  --ritemark-shadow-indigo-sm: 0 4px 6px -1px rgba(67, 56, 202, 0.25);
+  --ritemark-shadow-indigo-md: 0 8px 20px -4px rgba(67, 56, 202, 0.35);
+  --ritemark-shadow-indigo-lg: 0 16px 32px -8px rgba(67, 56, 202, 0.40);
+
+  /* Focus ring — always 4px at 10% indigo */
+  --ritemark-ring-width: 4px;
+  --ritemark-ring-color: rgba(67, 56, 202, 0.10);
+  --ritemark-ring-color-dark: rgba(129, 140, 248, 0.25);
+
+  /* ========================================================
+     MOTION
+     ======================================================== */
+
+  --ritemark-ease-editorial: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ritemark-ease-quick:     cubic-bezier(0.4, 0, 0.2, 1);
+  --ritemark-ease-spring:    cubic-bezier(0.34, 1.56, 0.64, 1); /* use sparingly — buttons press, nothing else */
+
+  --ritemark-dur-fast:    120ms;
+  --ritemark-dur-base:    200ms;
+  --ritemark-dur-slow:    360ms;
+
+  /* ========================================================
+     ROLE TOKENS — Light (default)
+     These are the semantic aliases used by components.
+     In the webview, role tokens fall through VS Code vars for
+     VS Code-native surfaces; see references/webview-ui.md.
+     ======================================================== */
+
+  --r-surface:           var(--ritemark-surface);
+  --r-surface-muted:     var(--ritemark-surface-muted);
+  --r-surface-soft:      var(--ritemark-surface-soft);
+  --r-hairline:          var(--ritemark-hairline);
+  --r-hairline-strong:   var(--ritemark-hairline-strong);
+
+  --r-ink-strong:        var(--ritemark-ink-strong);
+  --r-ink-body:          var(--ritemark-ink-body);
+  --r-ink-muted:         var(--ritemark-ink-muted);
+  --r-ink-faint:         var(--ritemark-ink-faint);
+  --r-ink-disabled:      var(--ritemark-ink-disabled);
+
+  --r-accent:            var(--ritemark-indigo);
+  --r-accent-deep:       var(--ritemark-indigo-deep);
+  --r-accent-darker:     var(--ritemark-indigo-darker);
+  --r-accent-soft:       var(--ritemark-indigo-soft);
+  --r-accent-fainter:    var(--ritemark-indigo-fainter);
+
+  --r-ring-color:        var(--ritemark-ring-color);
+  --r-shadow-accent:     var(--ritemark-shadow-indigo-sm);
+}
+
+/* ============================================================
+   Dark theme — activated by .ritemark-dark or [data-theme="dark"]
+   (depending on integration). In the VS Code core theme JSON,
+   dark colors are applied at the theme level, but webview surfaces
+   rely on this class/attribute switch.
+   ============================================================ */
+
+.ritemark-dark,
+[data-theme="dark"] {
+  --r-surface:           var(--ritemark-dark-surface);
+  --r-surface-muted:     var(--ritemark-dark-surface-muted);
+  --r-surface-soft:      var(--ritemark-dark-surface-soft);
+  --r-hairline:          var(--ritemark-dark-hairline);
+  --r-hairline-strong:   var(--ritemark-dark-hairline-strong);
+
+  --r-ink-strong:        var(--ritemark-dark-ink-strong);
+  --r-ink-body:          var(--ritemark-dark-ink-body);
+  --r-ink-muted:         var(--ritemark-dark-ink-muted);
+  --r-ink-faint:         var(--ritemark-dark-ink-faint);
+  --r-ink-disabled:      var(--ritemark-dark-ink-disabled);
+
+  --r-accent:            var(--ritemark-dark-indigo);
+  --r-accent-deep:       var(--ritemark-dark-indigo-deep);
+  --r-accent-darker:     var(--ritemark-dark-indigo-darker);
+  --r-accent-soft:       var(--ritemark-dark-indigo-soft);
+  --r-accent-fainter:    var(--ritemark-dark-indigo-fainter);
+
+  --r-ring-color:        var(--ritemark-ring-color-dark);
+}
+
+/* ============================================================
+   Base element styles — can be opted into by adding
+   class="ritemark" to <body> or a scope root. These only apply
+   when inside .ritemark so they don't leak into VS Code core.
+   ============================================================ */
+
+.ritemark {
+  font-family: var(--ritemark-font-ui);
+  font-size: var(--ritemark-size-base);
+  line-height: var(--ritemark-leading-normal);
+  color: var(--r-ink-strong);
+  background: var(--r-surface);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.ritemark ::selection {
+  background: var(--ritemark-indigo-fainter);
+  color: var(--r-ink-strong);
+}
+
+.ritemark-dark ::selection,
+[data-theme="dark"] ::selection {
+  background: var(--ritemark-dark-indigo-fainter);
+  color: var(--r-ink-strong);
+}
+
+/* Accessible focus — use this utility, don't reinvent it */
+.ritemark-focus-ring {
+  outline: none;
+  box-shadow: 0 0 0 var(--ritemark-ring-width) var(--r-ring-color);
+  border-color: var(--r-accent);
+}

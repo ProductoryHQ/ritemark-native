@@ -105,23 +105,26 @@ priority: normal  # or high, low
 
 **IMPORTANT: Before creating skills/agents, READ these references:**
 
-### Primary: knowledge-builder skill
-Location: `.claude/skills/knowledge-builder/`
+### Primary: skill-creator skill
+Location: `~/.claude/skills/skill-creator/` (user-level)
 
 | File | When to Read | Contains |
 |------|--------------|----------|
-| `SKILL.md` | Always read first | Complete templates, frontmatter syntax, best practices, storage locations, validation checklist |
+| `SKILL.md` | Always read first | Full skill-authoring guide: frontmatter, structure, description-writing, validation |
+| `references/schemas.md` | When defining frontmatter | Exact schema for SKILL.md and agent frontmatter |
+| `scripts/quick_validate.py` | After drafting | Validates SKILL.md structure and description quality |
+| `scripts/improve_description.py` | When description feels weak | Rewrites descriptions for better trigger accuracy |
 
 ### Usage Pattern
 
 ```
 1. Receive request to create skill or agent
-2. READ .claude/skills/knowledge-builder/SKILL.md
+2. READ ~/.claude/skills/skill-creator/SKILL.md
 3. Follow templates exactly for frontmatter format
 4. Research topic (WebSearch, Read codebase)
 5. Structure findings using skill template
 6. Create files with proper format
-7. Validate against checklist in SKILL.md
+7. Run scripts/quick_validate.py to verify
 ```
 
 ### Existing Skills to Reference

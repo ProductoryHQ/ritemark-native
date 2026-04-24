@@ -1,4 +1,4 @@
-# Design Brief — Sprint 52: Agent Curation Layer
+# Design Brief — Sprint 54: Agent Curation Layer
 
 Audience: a designer (internal or external) who has not read the strategic docs. This brief is self-contained. By the end of it, the designer should know what to produce, for whom, and within what constraints.
 
@@ -22,6 +22,8 @@ Read `docs-internal/user-flows.md` (the Viktor section) for the full scenes. The
 
 ## 3. Design principles (non-negotiable)
 
+0. **Use the Ritemark design skill.** Before drawing, read `.claude/skills/ritemark-design/SKILL.md` and browse `.claude/skills/ritemark-design/preview/` for live token + component references. The skill is the visual vocabulary — Indigo-current palette, light + dark, shadcn-on-Indigo components, muted-tone hierarchy, density-first spacing. Every color, radius, and spacing unit in your wireframes should resolve to a token from the skill's `tokens.css`. If something the Library needs isn't in the skill yet, surface it — the skill gets extended, not ignored. Origin study: `docs-internal/analysis/design-study/`.
+
 1. **Round-trip guarantee visible.** Every screen has an "Edit as markdown" action that opens the underlying file in Ritemark's markdown editor. This is not a power-user easter-egg — it is always visible. It is the trust signal that the UI is a view over files, not a cage around them. Full explanation: `docs-internal/round-trip-guarantee.md`.
 
 2. **File paths always on screen.** On every row, every dialog, every diff view — the absolute file path is visible (hover reveals full path if truncated). No hidden state. Viktor must always know which file he's looking at.
@@ -43,15 +45,16 @@ Deliver wireframes and interaction notes for each of these. Low-fi is fine; the 
 The primary surface. Dense, sortable table of every discovered agent/skill/command.
 
 Must include:
-- Count banner at top ("Agents: 32 · Skills: 15 · Commands: 9 · MCP servers: 4")
+- Count banner at top ("Agents: 32 · Skills: 15 · Commands: 9")
 - Filter rail (scope, vendor, status, health)
 - Sortable columns: Name, Scope, Vendor, Last modified, Last run, Duplicates, Source (path)
 - Multi-select for bulk ops
-- Per-row actions: Edit as markdown, Open, Archive, Delete, Set canonical, View diff (if duplicate)
+- Per-row actions: Edit as markdown, Open, Set canonical, View diff (if duplicate), plus Archive/Delete only when the source is writable in this sprint
 - Health badges (duplicated, broken frontmatter, stale)
 - Vendor badges (Claude, Codex, Gemini stub)
 - Canonical flag indicator
 - Footer with selection count and bulk-op menu
+- Read-only indicator on sources that cannot be mutated in this sprint (`AGENTS.md`, plugin dirs, repo-tracked vendor files)
 
 Consider: how does the sidebar width constraint affect column visibility? What collapses first, what stays?
 
@@ -77,9 +80,9 @@ A focused view filtered to agents that haven't been invoked in 90+ days.
 
 Must include:
 - Heuristic explanation ("Not invoked in the last 90 days") with a learn-more
-- Per-row archive / delete / mark-active actions
+- Per-row archive / delete / mark-active actions for writable rows only
 - Bulk archive action
-- Reassurance about reversibility ("Archived files go to `.claude/.archive/` and can be restored")
+- Reassurance about reversibility ("Archived files stay under the same root and can be restored")
 
 ### 4.5 Bulk-op dry-run dialog
 
@@ -91,6 +94,7 @@ Must include:
 - Count of affected files
 - Cancel and Confirm actions; Confirm is not the default focused button (prevent muscle-memory commits)
 - If operation is reversible, say so explicitly
+- If a row is read-only, do not show destructive actions; explain why instead of teasing a disabled control
 
 ### 4.6 Agent detail view (provenance panel)
 
@@ -99,9 +103,10 @@ Clicking a row opens a side panel with the agent's detail.
 Must include:
 - Name, description, scope, vendor, file path
 - Provenance: created-at, created-from (template ref if any), last-invoked-at, invocation count
+- If provenance is derived from Ritemark state rather than file frontmatter, label it clearly as derived/read-only
 - Frontmatter fields visualized (common fields prominent; vendor-specific fields in a collapsible "Advanced" section)
 - Body preview (first ~10 lines; "Edit as markdown" to see all)
-- Actions: Edit as markdown, Set canonical, Archive, Delete, Duplicate
+- Actions: Edit as markdown, Set canonical, Duplicate, plus Archive/Delete only when the source is writable in this sprint
 - Drift warning if this is a non-canonical duplicate of a canonical agent
 
 ### 4.7 "Edit as markdown" transition

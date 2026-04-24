@@ -1,4 +1,4 @@
-# Sprint 52: Agent Curation Layer
+# Sprint 54: Agent Curation Layer
 
 This sprint ships the first altitude of Ritemark's unified agent-management UX — the *curation layer*. It is the archaeology / hygiene surface over an accumulated mess of `.md` agent/skill files across vendors (Claude Code first, Codex `AGENTS.md` secondary, Gemini stub only).
 
