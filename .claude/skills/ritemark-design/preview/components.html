@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ritemark Design — Components</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--r-surface-muted);
+    color: var(--r-ink-strong);
+    font-family: var(--ritemark-font-ui);
+    font-size: var(--ritemark-size-base);
+    line-height: var(--ritemark-leading-normal);
+  }
+
+  .shell { max-width: 1200px; margin: 0 auto; padding: 48px 32px 96px; }
+
+  header.page-head {
+    position: sticky; top: 0; z-index: 10;
+    margin: -48px -32px 48px;
+    padding: 16px 32px;
+    background: color-mix(in srgb, var(--r-surface) 90%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--r-hairline);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .page-head h1 {
+    font-family: var(--ritemark-font-display);
+    font-size: var(--ritemark-size-xl); font-weight: 700;
+    letter-spacing: var(--ritemark-tracking-tight); margin: 0; flex: 1;
+  }
+  .theme-toggle { display: inline-flex; gap: 2px; padding: 3px; background: var(--r-surface-soft); border-radius: var(--ritemark-radius-md); }
+  .theme-toggle button { padding: 6px 12px; border-radius: var(--ritemark-radius-sm); background: transparent; color: var(--r-ink-body); border: 0; cursor: pointer; font-family: var(--ritemark-font-ui); font-size: var(--ritemark-size-sm); font-weight: 500; }
+  .theme-toggle button.is-active { background: var(--r-surface); color: var(--r-ink-strong); box-shadow: var(--ritemark-shadow-xs); }
+
+  .nav-links { display: flex; gap: 16px; font-size: var(--ritemark-size-sm); }
+  .nav-links a { color: var(--r-ink-muted); text-decoration: none; }
+  .nav-links a:hover { color: var(--r-ink-strong); }
+  .nav-links a.is-current { color: var(--r-accent); font-weight: 500; }
+
+  section { margin: 48px 0; }
+  section > header { margin-bottom: 24px; }
+  .eyebrow { font-size: var(--ritemark-size-xs); font-weight: 600; color: var(--r-ink-muted); letter-spacing: var(--ritemark-tracking-wide); text-transform: uppercase; margin-bottom: 6px; }
+  section h2 { font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700; margin: 0 0 4px; letter-spacing: var(--ritemark-tracking-tight); }
+  section .caption { font-size: var(--ritemark-size-md); color: var(--r-ink-body); max-width: 640px; }
+
+  .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 760px) { .demo-grid { grid-template-columns: 1fr; } }
+
+  .demo {
+    background: var(--r-surface);
+    border: 1px solid var(--r-hairline);
+    border-radius: var(--ritemark-radius-lg);
+    padding: 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .demo .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .demo .label {
+    font-size: var(--ritemark-size-xs); font-weight: 600;
+    color: var(--r-ink-muted); letter-spacing: var(--ritemark-tracking-wide);
+    text-transform: uppercase;
+  }
+
+  /* Component styles below — exact tokens from components.md */
+  .rm-cta-primary {
+    background: var(--r-accent);
+    color: #FFFFFF;
+    font-family: var(--ritemark-font-ui);
+    font-weight: 600;
+    font-size: var(--ritemark-size-base);
+    padding: 10px 18px;
+    border: 0;
+    border-radius: var(--ritemark-radius-lg);
+    cursor: pointer;
+    box-shadow: var(--ritemark-shadow-indigo-sm);
+    transition: background 200ms, box-shadow 200ms, transform 120ms;
+  }
+  .rm-cta-primary:hover { background: var(--r-accent-deep); box-shadow: var(--ritemark-shadow-indigo-md); }
+  .rm-cta-primary:active { background: var(--r-accent-darker); transform: scale(0.98); }
+
+  .rm-cta-secondary {
+    background: var(--r-surface-soft);
+    color: var(--r-ink-strong);
+    font-family: var(--ritemark-font-ui);
+    font-weight: 500;
+    font-size: var(--ritemark-size-base);
+    padding: 10px 18px;
+    border: 0;
+    border-radius: var(--ritemark-radius-lg);
+    cursor: pointer;
+  }
+  .rm-cta-secondary:hover { background: var(--r-hairline); }
+
+  .rm-btn-ghost {
+    background: transparent;
+    color: var(--r-ink-body);
+    border: 0;
+    padding: 6px 10px;
+    border-radius: var(--ritemark-radius-sm);
+    font-size: var(--ritemark-size-base);
+    font-family: var(--ritemark-font-ui);
+    cursor: pointer;
+  }
+  .rm-btn-ghost:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+
+  .rm-btn-destructive {
+    background: var(--ritemark-error);
+    color: #FFFFFF;
+    font-family: var(--ritemark-font-ui);
+    font-weight: 500;
+    font-size: var(--ritemark-size-base);
+    padding: 10px 18px;
+    border: 0;
+    border-radius: var(--ritemark-radius-lg);
+    cursor: pointer;
+  }
+  .rm-btn-destructive:hover { opacity: 0.92; }
+
+  .rm-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--r-hairline-strong);
+    border-radius: var(--ritemark-radius-md);
+    background: var(--r-surface);
+    color: var(--r-ink-strong);
+    font-family: var(--ritemark-font-ui);
+    font-size: var(--ritemark-size-md);
+    transition: border-color 120ms, box-shadow 200ms;
+  }
+  .rm-input::placeholder { color: var(--r-ink-faint); }
+  .rm-input:focus {
+    outline: none;
+    border-color: var(--r-accent);
+    box-shadow: 0 0 0 var(--ritemark-ring-width) var(--r-ring-color);
+  }
+  .rm-label {
+    display: block;
+    font-size: var(--ritemark-size-sm);
+    font-weight: 500;
+    color: var(--r-ink-body);
+    margin-bottom: 6px;
+  }
+
+  /* Sidebar */
+  .rm-sidebar {
+    background: var(--r-surface-muted);
+    border: 1px solid var(--r-hairline);
+    border-radius: var(--ritemark-radius-md);
+    padding: 10px 6px;
+    width: 100%;
+  }
+  .rm-sidebar-group {
+    padding: 14px 10px 4px;
+    font-size: var(--ritemark-size-xs);
+    font-weight: 600;
+    color: var(--r-ink-strong);
+    letter-spacing: var(--ritemark-tracking-wide);
+    text-transform: uppercase;
+  }
+  .rm-sidebar-item {
+    padding: 6px 10px;
+    border-radius: var(--ritemark-radius-sm);
+    font-size: var(--ritemark-size-base);
+    color: var(--r-ink-body);
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    transition: background 120ms;
+  }
+  .rm-sidebar-item:hover { background: var(--r-surface-soft); }
+  .rm-sidebar-item.is-active {
+    background: var(--r-accent-soft);
+    color: var(--r-ink-strong);
+    font-weight: 500;
+    padding-left: 8px;
+    border-left: 2px solid var(--r-accent);
+  }
+
+  /* Dialog */
+  .rm-dialog-wrap {
+    padding: 48px;
+    border: 1px solid var(--r-hairline);
+    border-radius: var(--ritemark-radius-lg);
+    background: var(--r-surface-muted);
+    display: flex; justify-content: center; align-items: center;
+    min-height: 280px;
+  }
+  .rm-dialog {
+    background: var(--r-surface);
+    border-radius: var(--ritemark-radius-lg);
+    box-shadow: var(--ritemark-shadow-lg);
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+  }
+  .rm-dialog-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--r-hairline);
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600;
+    color: var(--r-ink-strong);
+    font-size: var(--ritemark-size-lg);
+  }
+  .rm-dialog-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .rm-dialog-foot {
+    padding: 14px 20px;
+    border-top: 1px solid var(--r-hairline);
+    display: flex; gap: 10px; justify-content: flex-end;
+  }
+
+  /* Table row */
+  .rm-table {
+    background: var(--r-surface);
+    border: 1px solid var(--r-hairline);
+    border-radius: var(--ritemark-radius-md);
+    overflow: hidden;
+  }
+  .rm-table-head,
+  .rm-table-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    padding: 0 12px;
+    align-items: center;
+    min-height: 36px;
+  }
+  .rm-table-head {
+    background: var(--r-surface-muted);
+    border-bottom: 1px solid var(--r-hairline);
+    font-size: var(--ritemark-size-sm);
+    font-weight: 500;
+    color: var(--r-ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .rm-table-row {
+    font-size: var(--ritemark-size-base);
+    color: var(--r-ink-body);
+    border-bottom: 1px solid var(--r-hairline);
+    cursor: default;
+  }
+  .rm-table-row:last-child { border-bottom: 0; }
+  .rm-table-row:hover { background: var(--r-surface-soft); }
+  .rm-table-row.is-selected { background: var(--r-accent-soft); }
+  .rm-table-row .name { color: var(--r-ink-strong); font-weight: 500; }
+
+  /* Badge */
+  .rm-pill-soft {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--ritemark-radius-xs);
+    font-size: var(--ritemark-size-xs);
+    font-weight: 500;
+    background: var(--r-surface-soft);
+    color: var(--r-ink-body);
+  }
+  .rm-pill-soft.is-accent { background: var(--r-accent-soft); color: var(--r-accent-deep); }
+  .rm-pill-soft.is-success { background: var(--ritemark-success-soft); color: #15803D; }
+  .rm-pill-soft.is-warning { background: var(--ritemark-warning-soft); color: #B45309; }
+  .rm-pill-soft.is-error { background: var(--ritemark-error-soft); color: #B91C1C; }
+
+  .rm-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .rm-dot.is-success { background: var(--ritemark-success); }
+  .rm-dot.is-warning { background: var(--ritemark-warning); }
+  .rm-dot.is-error { background: var(--ritemark-error); }
+
+  /* Toast */
+  .rm-toast {
+    background: var(--r-surface);
+    border: 1px solid var(--r-hairline);
+    border-left: 3px solid var(--r-accent);
+    border-radius: var(--ritemark-radius-lg);
+    padding: 12px 16px;
+    box-shadow: var(--ritemark-shadow-lg);
+    max-width: 360px;
+    font-size: var(--ritemark-size-md);
+    color: var(--r-ink-strong);
+  }
+  .rm-toast.is-success { border-left-color: var(--ritemark-success); }
+  .rm-toast.is-warning { border-left-color: var(--ritemark-warning); }
+  .rm-toast.is-error { border-left-color: var(--ritemark-error); }
+  .rm-toast .toast-title { font-weight: 600; }
+  .rm-toast .toast-body { color: var(--r-ink-body); font-size: var(--ritemark-size-sm); margin-top: 4px; }
+
+  /* Focus ring example */
+  .focus-demo-input {
+    border: 1px solid var(--r-accent);
+    box-shadow: 0 0 0 var(--ritemark-ring-width) var(--r-ring-color);
+  }
+
+  /* Icon placeholder (16x16 svg stand-in) */
+  .icon { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; color: currentColor; }
+  .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+
+</style>
+</head>
+<body class="ritemark">
+
+<div class="shell">
+
+<header class="page-head">
+  <h1>Ritemark components</h1>
+  <div class="nav-links">
+    <a href="tokens.html">Tokens</a>
+    <a href="components.html" class="is-current">Components</a>
+    <a href="typography.html">Typography</a>
+  </div>
+  <div class="theme-toggle">
+    <button id="theme-light" class="is-active">Light</button>
+    <button id="theme-dark">Dark</button>
+  </div>
+</header>
+
+<section>
+  <header>
+    <div class="eyebrow">01 — CTAs</div>
+    <h2>The signature button + siblings.</h2>
+    <p class="caption">Primary CTA has the indigo drop-shadow — this is where the brand lives. Press it; the shadow deepens and the button scales 0.98.</p>
+  </header>
+  <div class="demo">
+    <div class="row">
+      <button class="rm-cta-primary">Save changes</button>
+      <button class="rm-cta-primary" disabled style="opacity: 0.5; cursor: not-allowed; box-shadow: none;">Disabled</button>
+      <button class="rm-cta-secondary">Cancel</button>
+      <button class="rm-btn-ghost">Dismiss</button>
+      <button class="rm-btn-destructive">Delete</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <header>
+    <div class="eyebrow">02 — Inputs + focus</div>
+    <h2>1px border, 4px indigo ring.</h2>
+    <p class="caption">Thin border lets the 4px-at-10%-indigo focus ring do the signaling. Never 2px on both.</p>
+  </header>
+  <div class="demo-grid">
+    <div class="demo">
+      <span class="label">Default</span>
+      <div>
+        <label class="rm-label">Line width</label>
+        <input class="rm-input" type="text" value="72 characters">
+      </div>
+      <div>
+        <label class="rm-label">Font family</label>
+        <input class="rm-input" type="text" placeholder="Sofia Sans, -apple-system">
+      </div>
+    </div>
+    <div class="demo">
+      <span class="label">Focus state (shown)</span>
+      <div>
+        <label class="rm-label">Workspace name</label>
+        <input class="rm-input focus-demo-input" type="text" value="my-notes">
+      </div>
+      <span class="label">Disabled</span>
+      <div>
+        <label class="rm-label">API key</label>
+        <input class="rm-input" type="text" value="sk-•••••••••" disabled style="opacity: 0.6; cursor: not-allowed;">
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <header>
+    <div class="eyebrow">03 — Sidebar</div>
+    <h2>Active row: three signals at once.</h2>
+    <p class="caption">Background + left-border + weight. Remove any one and it stops reading as "active."</p>
+  </header>
+  <div class="demo" style="max-width: 320px;">
+    <div class="rm-sidebar">
+      <div class="rm-sidebar-group">Recents</div>
+      <div class="rm-sidebar-item is-active">2026-Q1-goals.md</div>
+      <div class="rm-sidebar-item">notes.md</div>
+      <div class="rm-sidebar-item">inbox.md</div>
+      <div class="rm-sidebar-item">retro-march.md</div>
+      <div class="rm-sidebar-group">Folders</div>
+      <div class="rm-sidebar-item">writing/</div>
+      <div class="rm-sidebar-item">archive/</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <header>
+    <div class="eyebrow">04 — Dialog</div>
+    <h2>Header · body · footer. 10px radius, soft shadow.</h2>
+    <p class="caption">Sofia Sans title (not Space Grotesk — this is chrome). Focus goes to the primary button in the footer; pressing it scales and pulses indigo.</p>
+  </header>
+  <div class="rm-dialog-wrap">
+    <div class="rm-dialog">
+      <div class="rm-dialog-head">
+        <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        Editor preferences
+      </div>
+      <div class="rm-dialog-body">
+        <div>
+          <label class="rm-label">Line width</label>
+          <input class="rm-input" type="text" value="72 characters">
+        </div>
+        <div>
+          <label class="rm-label">Font family</label>
+          <input class="rm-input" type="text" value="Sofia Sans, -apple-system">
+        </div>
+      </div>
+      <div class="rm-dialog-foot">
+        <button class="rm-cta-secondary" style="background: transparent;">Cancel</button>
+        <button class="rm-cta-primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <header>
+    <div class="eyebrow">05 — Table row (Library style)</div>
+    <h2>Dense and sortable.</h2>
+    <p class="caption">36px min-height rows. Name is strong-ink; everything else is body-ink. Hover and selected are distinct but quiet.</p>
+  </header>
+  <div class="demo">
+    <div class="rm-table">
+      <div class="rm-table-head">
+        <span>Name</span>
+        <span>Scope</span>
+        <span>Vendor</span>
+        <span>Last run</span>
+      </div>
+      <div class="rm-table-row is-selected">
+        <span class="name">code-reviewer</span>
+        <span><span class="rm-pill-soft is-accent">project</span></span>
+        <span><span class="rm-pill-soft">Claude</span></span>
+        <span>3d ago</span>
+      </div>
+      <div class="rm-table-row">
+        <span class="name">qa-validator</span>
+        <span><span class="rm-pill-soft">project</span></span>
+        <span><span class="rm-pill-soft">Claude</span></span>
+        <span>1h ago</span>
+      </div>
+      <div class="rm-table-row">
+        <span class="name">release-manager</span>
+        <span><span class="rm-pill-soft">project</span></span>
+        <span><span class="rm-pill-soft">Claude</span></span>
+        <span>4d ago</span>
+      </div>
+      <div class="rm-table-row">
+        <span class="name" style="color: var(--r-ink-muted);">old-sprint-agent <span class="rm-pill-soft is-warning" style="margin-left: 6px;">stale</span></span>
+        <span><span class="rm-pill-soft">user</span></span>
+        <span><span class="rm-pill-soft">Claude</span></span>
+        <span>92d ago</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <header>
+    <div class="eyebrow">06 — Pills and dots</div>
+    <h2>Status signals.</h2>
+    <p class="caption">Dot + label beats full-colored pill in dense UI. Pills get the soft variant, never saturated backgrounds.</p>
+  </header>
+  <div class="demo">
+    <div class="row">
+      <span class="rm-pill-soft">Default</span>
+      <span class="rm-pill-soft is-accent">Active</span>
+      <span class="rm-pill-soft is-success">Synced</span>
+      <span class="rm-pill-soft is-warning">Stale</span>
+      <span class="rm-pill-soft is-error">Broken</span>
+    </div>
+    <div class="row">
+      <span class="rm-dot is-success"></span><span>Passed check</span>
+      <span class="rm-dot is-warning" style="margin-left: 16px;"></span><span>Unsaved</span>
+      <span class="rm-dot is-error" style="margin-left: 16px;"></span><span>Error</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <header>
+    <div class="eyebrow">07 — Toast</div>
+    <h2>3px left-border, never full tint.</h2>
+    <p class="caption">Left-border carries the status signal. A fully-tinted toast is too loud for in-chrome notifications.</p>
+  </header>
+  <div class="demo-grid">
+    <div class="rm-toast">
+      <div class="toast-title">File saved</div>
+      <div class="toast-body">retro-march.md saved to ~/notes</div>
+    </div>
+    <div class="rm-toast is-success">
+      <div class="toast-title">Synced</div>
+      <div class="toast-body">3 files pushed to remote</div>
+    </div>
+    <div class="rm-toast is-warning">
+      <div class="toast-title">Unsaved changes</div>
+      <div class="toast-body">You have 2 files with pending edits</div>
+    </div>
+    <div class="rm-toast is-error">
+      <div class="toast-title">Failed to move file</div>
+      <div class="toast-body">Permission denied: ~/read-only.md</div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+  const lightBtn = document.getElementById('theme-light');
+  const darkBtn = document.getElementById('theme-dark');
+  const body = document.body;
+  lightBtn.addEventListener('click', () => { body.classList.remove('ritemark-dark'); lightBtn.classList.add('is-active'); darkBtn.classList.remove('is-active'); });
+  darkBtn.addEventListener('click', () => { body.classList.add('ritemark-dark'); darkBtn.classList.add('is-active'); lightBtn.classList.remove('is-active'); });
+</script>
+
+</body>
+</html>

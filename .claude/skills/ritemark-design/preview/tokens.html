@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ritemark Design — Tokens</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--r-surface-muted);
+    color: var(--r-ink-strong);
+    font-family: var(--ritemark-font-ui);
+    font-size: var(--ritemark-size-base);
+    line-height: var(--ritemark-leading-normal);
+  }
+
+  /* Shell */
+  .shell {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+
+  header.page-head {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin: -48px -32px 48px;
+    padding: 16px 32px;
+    background: color-mix(in srgb, var(--r-surface) 90%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--r-hairline);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .page-head h1 {
+    font-family: var(--ritemark-font-display);
+    font-size: var(--ritemark-size-xl);
+    font-weight: 700;
+    letter-spacing: var(--ritemark-tracking-tight);
+    margin: 0;
+    flex: 1;
+  }
+  .theme-toggle {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--r-surface-soft);
+    border-radius: var(--ritemark-radius-md);
+  }
+  .theme-toggle button {
+    padding: 6px 12px;
+    border-radius: var(--ritemark-radius-sm);
+    background: transparent;
+    color: var(--r-ink-body);
+    border: 0;
+    cursor: pointer;
+    font-family: var(--ritemark-font-ui);
+    font-size: var(--ritemark-size-sm);
+    font-weight: 500;
+  }
+  .theme-toggle button.is-active {
+    background: var(--r-surface);
+    color: var(--r-ink-strong);
+    box-shadow: var(--ritemark-shadow-xs);
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 16px;
+    font-size: var(--ritemark-size-sm);
+  }
+  .nav-links a {
+    color: var(--r-ink-muted);
+    text-decoration: none;
+  }
+  .nav-links a:hover { color: var(--r-ink-strong); }
+  .nav-links a.is-current { color: var(--r-accent); font-weight: 500; }
+
+  section {
+    margin: 48px 0;
+  }
+  section > header {
+    margin-bottom: 16px;
+  }
+  .eyebrow {
+    font-size: var(--ritemark-size-xs);
+    font-weight: 600;
+    color: var(--r-ink-muted);
+    letter-spacing: var(--ritemark-tracking-wide);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  section h2 {
+    font-family: var(--ritemark-font-display);
+    font-size: var(--ritemark-size-2xl);
+    font-weight: 700;
+    margin: 0 0 4px;
+    letter-spacing: var(--ritemark-tracking-tight);
+  }
+  section .caption {
+    font-size: var(--ritemark-size-md);
+    color: var(--r-ink-body);
+    max-width: 640px;
+  }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .chip {
+    background: var(--r-surface);
+    border: 1px solid var(--r-hairline);
+    border-radius: var(--ritemark-radius-lg);
+    padding: 16px;
+  }
+  .chip .swatch {
+    width: 100%;
+    aspect-ratio: 2 / 1;
+    border-radius: var(--ritemark-radius-md);
+    margin-bottom: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  .chip .name {
+    font-size: var(--ritemark-size-sm);
+    font-weight: 600;
+    color: var(--r-ink-strong);
+    margin-bottom: 2px;
+    font-family: var(--ritemark-font-mono);
+  }
+  .chip .role {
+    font-size: var(--ritemark-size-xs);
+    color: var(--r-ink-muted);
+    font-family: var(--ritemark-font-mono);
+  }
+
+  /* Type scale demo */
+  .type-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+  .type-row {
+    display: grid;
+    grid-template-columns: 90px 70px 1fr;
+    gap: 24px;
+    align-items: baseline;
+    padding: 12px 16px;
+    background: var(--r-surface);
+    border: 1px solid var(--r-hairline);
+    border-radius: var(--ritemark-radius-md);
+  }
+  .type-row .token { font-family: var(--ritemark-font-mono); font-size: 11px; color: var(--r-ink-muted); }
+  .type-row .px { font-family: var(--ritemark-font-mono); font-size: 11px; color: var(--r-ink-muted); }
+  .type-row .spec { line-height: 1; }
+
+  /* Radii demo */
+  .radii-row { display: flex; gap: 24px; margin-top: 24px; align-items: end; }
+  .radius-card {
+    width: 88px; height: 88px;
+    background: var(--r-accent-soft);
+    border: 1px solid var(--r-accent-fainter);
+    display: flex; align-items: end; justify-content: center;
+    padding-bottom: 6px;
+    font-size: var(--ritemark-size-xs);
+    color: var(--r-accent-deep);
+    font-family: var(--ritemark-font-mono);
+  }
+
+  /* Shadow demo */
+  .shadow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 24px; margin-top: 24px; }
+  .shadow-card {
+    padding: 24px;
+    background: var(--r-surface);
+    border-radius: var(--ritemark-radius-lg);
+  }
+  .shadow-card .name { font-family: var(--ritemark-font-mono); font-size: var(--ritemark-size-xs); color: var(--r-ink-muted); }
+
+  /* Spacing demo */
+  .space-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    background: var(--r-surface);
+    border: 1px solid var(--r-hairline);
+    border-radius: var(--ritemark-radius-md);
+    margin-bottom: 6px;
+  }
+  .space-row .label { font-family: var(--ritemark-font-mono); font-size: 11px; color: var(--r-ink-muted); width: 140px; }
+  .space-row .bar { height: 12px; background: var(--r-accent); border-radius: 2px; }
+
+</style>
+</head>
+<body class="ritemark">
+
+<div class="shell">
+
+<header class="page-head">
+  <h1>Ritemark tokens</h1>
+  <div class="nav-links">
+    <a href="tokens.html" class="is-current">Tokens</a>
+    <a href="components.html">Components</a>
+    <a href="typography.html">Typography</a>
+  </div>
+  <div class="theme-toggle">
+    <button id="theme-light" class="is-active">Light</button>
+    <button id="theme-dark">Dark</button>
+  </div>
+</header>
+
+<!-- Surfaces -->
+<section>
+  <header>
+    <div class="eyebrow">01 — Surfaces</div>
+    <h2>The neutral ladder.</h2>
+    <p class="caption">Four surfaces and two hairlines. Every chrome layout is some combination of these. Grey on dark is replaced by indigo-tinted hairlines — see tokens.md for why.</p>
+  </header>
+  <div class="grid">
+    <div class="chip"><div class="swatch" style="background: var(--r-surface);"></div><div class="name">--r-surface</div><div class="role">editor, dialog body</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-surface-muted);"></div><div class="name">--r-surface-muted</div><div class="role">sidebar, titlebar, panels</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-surface-soft);"></div><div class="name">--r-surface-soft</div><div class="role">hover, secondary btn</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-hairline);"></div><div class="name">--r-hairline</div><div class="role">default border</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-hairline-strong);"></div><div class="name">--r-hairline-strong</div><div class="role">input border</div></div>
+  </div>
+</section>
+
+<!-- Ink ladder -->
+<section>
+  <header>
+    <div class="eyebrow">02 — Ink ladder</div>
+    <h2>Four steps, never five.</h2>
+    <p class="caption">Hierarchy comes from this ladder, not from adding color. If you need a fifth step, collapse something instead.</p>
+  </header>
+  <div class="grid">
+    <div class="chip"><div class="swatch" style="background: var(--r-ink-strong);"></div><div class="name">--r-ink-strong</div><div class="role">body, H1–H3, labels</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-ink-body);"></div><div class="name">--r-ink-body</div><div class="role">paragraph body</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-ink-muted);"></div><div class="name">--r-ink-muted</div><div class="role">meta, captions</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-ink-faint);"></div><div class="name">--r-ink-faint</div><div class="role">placeholders, counts</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-ink-disabled);"></div><div class="name">--r-ink-disabled</div><div class="role">disabled state</div></div>
+  </div>
+</section>
+
+<!-- Accent -->
+<section>
+  <header>
+    <div class="eyebrow">03 — Accent</div>
+    <h2>Indigo — the only one.</h2>
+    <p class="caption">The single chromatic signal. Primary buttons, cursor, focus, active indicators. If you're reaching for a second accent, hierarchy can be solved another way.</p>
+  </header>
+  <div class="grid">
+    <div class="chip"><div class="swatch" style="background: var(--r-accent);"></div><div class="name">--r-accent</div><div class="role">primary btn, cursor</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-accent-deep);"></div><div class="name">--r-accent-deep</div><div class="role">hover state</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-accent-darker);"></div><div class="name">--r-accent-darker</div><div class="role">pressed state</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-accent-soft);"></div><div class="name">--r-accent-soft</div><div class="role">active row bg</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--r-accent-fainter);"></div><div class="name">--r-accent-fainter</div><div class="role">selection highlight</div></div>
+  </div>
+</section>
+
+<!-- Semantic -->
+<section>
+  <header>
+    <div class="eyebrow">04 — Semantic</div>
+    <h2>Used sparingly, functionally.</h2>
+    <p class="caption">No decorative green/amber/red. Success is for "saved/synced." Warning for "stale/unsaved." Error for destructive + genuine errors. Info resolves to indigo (no second "info blue").</p>
+  </header>
+  <div class="grid">
+    <div class="chip"><div class="swatch" style="background: var(--ritemark-success);"></div><div class="name">--ritemark-success</div><div class="role">saved, synced, pass</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--ritemark-success-soft);"></div><div class="name">--ritemark-success-soft</div><div class="role">success bg tint</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--ritemark-warning);"></div><div class="name">--ritemark-warning</div><div class="role">stale, caution</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--ritemark-warning-soft);"></div><div class="name">--ritemark-warning-soft</div><div class="role">warning bg tint</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--ritemark-error);"></div><div class="name">--ritemark-error</div><div class="role">destructive, error</div></div>
+    <div class="chip"><div class="swatch" style="background: var(--ritemark-error-soft);"></div><div class="name">--ritemark-error-soft</div><div class="role">error bg tint</div></div>
+  </div>
+</section>
+
+<!-- Type scale -->
+<section>
+  <header>
+    <div class="eyebrow">05 — Type scale</div>
+    <h2>Sofia Sans in-chrome, Space Grotesk for moments.</h2>
+    <p class="caption">In-chrome type rarely exceeds 20px. 24px+ is marketing and welcome territory only.</p>
+  </header>
+  <div class="type-rows">
+    <div class="type-row"><span class="token">--size-xs</span><span class="px">11px</span><span class="spec" style="font-size: var(--ritemark-size-xs); font-weight: 600; letter-spacing: var(--ritemark-tracking-wide); text-transform: uppercase;">EYEBROW LABEL</span></div>
+    <div class="type-row"><span class="token">--size-sm</span><span class="px">12px</span><span class="spec" style="font-size: var(--ritemark-size-sm);">Secondary meta / captions</span></div>
+    <div class="type-row"><span class="token">--size-base</span><span class="px">13px</span><span class="spec" style="font-size: var(--ritemark-size-base);">Default body UI — sidebar items, table rows</span></div>
+    <div class="type-row"><span class="token">--size-md</span><span class="px">14px</span><span class="spec" style="font-size: var(--ritemark-size-md);">Body copy in dialogs, comfortable text</span></div>
+    <div class="type-row"><span class="token">--size-lg</span><span class="px">16px</span><span class="spec" style="font-size: var(--ritemark-size-lg); font-weight: 600;">Dialog titles, section heads</span></div>
+    <div class="type-row"><span class="token">--size-xl</span><span class="px">20px</span><span class="spec" style="font-size: var(--ritemark-size-xl); font-weight: 600;">Settings page headings</span></div>
+    <div class="type-row"><span class="token">--size-2xl</span><span class="px">24px</span><span class="spec" style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700;">Marketing H3</span></div>
+    <div class="type-row"><span class="token">--size-4xl</span><span class="px">40px</span><span class="spec" style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-4xl); font-weight: 700; letter-spacing: var(--ritemark-tracking-tight);">Marketing H1</span></div>
+    <div class="type-row"><span class="token">--size-5xl</span><span class="px">56px</span><span class="spec" style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-5xl); font-weight: 700; letter-spacing: var(--ritemark-tracking-tight); line-height: 1;">Welcome H1</span></div>
+  </div>
+</section>
+
+<!-- Radii -->
+<section>
+  <header>
+    <div class="eyebrow">06 — Radii</div>
+    <h2>Four sizes in chrome. One in marketing.</h2>
+    <p class="caption">xl (16px) and pill are marketing-only. The moment you use them in-chrome, it starts looking like a landing page.</p>
+  </header>
+  <div class="radii-row">
+    <div class="radius-card" style="border-radius: var(--ritemark-radius-xs);">3</div>
+    <div class="radius-card" style="border-radius: var(--ritemark-radius-sm);">4</div>
+    <div class="radius-card" style="border-radius: var(--ritemark-radius-md);">6</div>
+    <div class="radius-card" style="border-radius: var(--ritemark-radius-lg);">10</div>
+    <div class="radius-card" style="border-radius: var(--ritemark-radius-xl);">16</div>
+    <div class="radius-card" style="border-radius: var(--ritemark-radius-pill);">pill</div>
+  </div>
+</section>
+
+<!-- Shadows -->
+<section>
+  <header>
+    <div class="eyebrow">07 — Shadows</div>
+    <h2>Neutral shadows for layout. Indigo for brand.</h2>
+    <p class="caption">The indigo-shadow family is part of the brand signature. Use on primary CTAs only.</p>
+  </header>
+  <div class="shadow-grid">
+    <div class="shadow-card" style="box-shadow: var(--ritemark-shadow-xs);"><div class="name">--shadow-xs</div></div>
+    <div class="shadow-card" style="box-shadow: var(--ritemark-shadow-sm);"><div class="name">--shadow-sm</div></div>
+    <div class="shadow-card" style="box-shadow: var(--ritemark-shadow-md);"><div class="name">--shadow-md</div></div>
+    <div class="shadow-card" style="box-shadow: var(--ritemark-shadow-lg);"><div class="name">--shadow-lg</div></div>
+    <div class="shadow-card" style="box-shadow: var(--ritemark-shadow-xl);"><div class="name">--shadow-xl</div></div>
+    <div class="shadow-card" style="box-shadow: var(--ritemark-shadow-indigo-sm); background: var(--r-accent); color: #FFF;"><div class="name" style="color: rgba(255,255,255,0.8);">--shadow-indigo-sm</div></div>
+    <div class="shadow-card" style="box-shadow: var(--ritemark-shadow-indigo-md); background: var(--r-accent); color: #FFF;"><div class="name" style="color: rgba(255,255,255,0.8);">--shadow-indigo-md</div></div>
+    <div class="shadow-card" style="box-shadow: var(--ritemark-shadow-indigo-lg); background: var(--r-accent); color: #FFF;"><div class="name" style="color: rgba(255,255,255,0.8);">--shadow-indigo-lg</div></div>
+  </div>
+</section>
+
+<!-- Spacing -->
+<section>
+  <header>
+    <div class="eyebrow">08 — Spacing</div>
+    <h2>4-point grid.</h2>
+    <p class="caption">In-chrome components rarely exceed --space-8 (32px). Above that, you're probably designing marketing.</p>
+  </header>
+  <div style="margin-top: 24px;">
+    <div class="space-row"><span class="label">--space-1 · 4px</span><span class="bar" style="width: 4px;"></span></div>
+    <div class="space-row"><span class="label">--space-2 · 8px</span><span class="bar" style="width: 8px;"></span></div>
+    <div class="space-row"><span class="label">--space-3 · 12px</span><span class="bar" style="width: 12px;"></span></div>
+    <div class="space-row"><span class="label">--space-4 · 16px</span><span class="bar" style="width: 16px;"></span></div>
+    <div class="space-row"><span class="label">--space-5 · 20px</span><span class="bar" style="width: 20px;"></span></div>
+    <div class="space-row"><span class="label">--space-6 · 24px</span><span class="bar" style="width: 24px;"></span></div>
+    <div class="space-row"><span class="label">--space-8 · 32px</span><span class="bar" style="width: 32px;"></span></div>
+    <div class="space-row"><span class="label">--space-10 · 40px</span><span class="bar" style="width: 40px;"></span></div>
+    <div class="space-row"><span class="label">--space-12 · 48px</span><span class="bar" style="width: 48px;"></span></div>
+    <div class="space-row"><span class="label">--space-16 · 64px</span><span class="bar" style="width: 64px;"></span></div>
+    <div class="space-row"><span class="label">--space-20 · 80px</span><span class="bar" style="width: 80px;"></span></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+  const lightBtn = document.getElementById('theme-light');
+  const darkBtn = document.getElementById('theme-dark');
+  const body = document.body;
+
+  lightBtn.addEventListener('click', () => {
+    body.classList.remove('ritemark-dark');
+    lightBtn.classList.add('is-active');
+    darkBtn.classList.remove('is-active');
+  });
+  darkBtn.addEventListener('click', () => {
+    body.classList.add('ritemark-dark');
+    darkBtn.classList.add('is-active');
+    lightBtn.classList.remove('is-active');
+  });
+</script>
+
+</body>
+</html>

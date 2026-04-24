@@ -53,8 +53,8 @@ export interface CodexCompatibilityStatus {
 
 export class CodexManager {
   private static readonly MIN_AUDITED_VERSION = '0.111.0';
-  private static readonly MAX_AUDITED_VERSION_EXCLUSIVE = '0.119.0';
-  private static readonly AUDITED_RANGE_LABEL = '0.111.x - 0.118.x';
+  private static readonly MAX_AUDITED_VERSION_EXCLUSIVE = '0.125.0';
+  private static readonly AUDITED_RANGE_LABEL = '0.111.x - 0.124.x';
   private static readonly compatibilityCache = new Map<string, CodexCompatibilityStatus>();
   private process: ChildProcess | null = null;
   private config: CodexManagerConfig;

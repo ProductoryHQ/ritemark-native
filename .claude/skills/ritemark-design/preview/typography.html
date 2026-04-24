@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ritemark Design — Typography</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: var(--r-surface-muted);
+    color: var(--r-ink-strong);
+    font-family: var(--ritemark-font-ui);
+    font-size: var(--ritemark-size-base);
+  }
+  .shell { max-width: 1080px; margin: 0 auto; padding: 48px 32px 96px; }
+
+  header.page-head {
+    position: sticky; top: 0; z-index: 10;
+    margin: -48px -32px 48px;
+    padding: 16px 32px;
+    background: color-mix(in srgb, var(--r-surface) 90%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--r-hairline);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .page-head h1 {
+    font-family: var(--ritemark-font-display);
+    font-size: var(--ritemark-size-xl); font-weight: 700;
+    letter-spacing: var(--ritemark-tracking-tight); margin: 0; flex: 1;
+  }
+  .theme-toggle { display: inline-flex; gap: 2px; padding: 3px; background: var(--r-surface-soft); border-radius: var(--ritemark-radius-md); }
+  .theme-toggle button { padding: 6px 12px; border-radius: var(--ritemark-radius-sm); background: transparent; color: var(--r-ink-body); border: 0; cursor: pointer; font-family: var(--ritemark-font-ui); font-size: var(--ritemark-size-sm); font-weight: 500; }
+  .theme-toggle button.is-active { background: var(--r-surface); color: var(--r-ink-strong); box-shadow: var(--ritemark-shadow-xs); }
+
+  .nav-links { display: flex; gap: 16px; font-size: var(--ritemark-size-sm); }
+  .nav-links a { color: var(--r-ink-muted); text-decoration: none; }
+  .nav-links a:hover { color: var(--r-ink-strong); }
+  .nav-links a.is-current { color: var(--r-accent); font-weight: 500; }
+
+  section { margin: 48px 0; padding: 32px; background: var(--r-surface); border: 1px solid var(--r-hairline); border-radius: var(--ritemark-radius-lg); }
+  section .eyebrow { font-size: var(--ritemark-size-xs); font-weight: 600; color: var(--r-ink-muted); letter-spacing: var(--ritemark-tracking-wide); text-transform: uppercase; margin-bottom: 8px; }
+  section .caption { font-size: var(--ritemark-size-md); color: var(--r-ink-body); max-width: 720px; margin-bottom: 24px; }
+
+  .meta {
+    display: inline-flex; gap: 16px;
+    font-family: var(--ritemark-font-mono); font-size: 11px; color: var(--r-ink-muted);
+    margin-top: 8px;
+  }
+  .meta code {
+    background: var(--r-surface-soft);
+    padding: 2px 6px;
+    border-radius: var(--ritemark-radius-xs);
+  }
+
+  .specimen-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 24px;
+    align-items: baseline;
+    padding: 16px 0;
+    border-top: 1px solid var(--r-hairline);
+  }
+  .specimen-row:first-child { border-top: 0; }
+  .specimen-row .token {
+    font-family: var(--ritemark-font-mono);
+    font-size: 11px;
+    color: var(--r-ink-muted);
+    padding-top: 6px;
+  }
+  .specimen-row .spec { line-height: 1; }
+
+  /* Ink tone demo */
+  .ink-demo p { margin: 0 0 8px; line-height: var(--ritemark-leading-normal); }
+  .ink-demo .ink-1 { color: var(--r-ink-strong); font-size: 14px; }
+  .ink-demo .ink-2 { color: var(--r-ink-body); font-size: 14px; }
+  .ink-demo .ink-3 { color: var(--r-ink-muted); font-size: 13px; }
+  .ink-demo .ink-4 { color: var(--r-ink-faint); font-size: 12px; }
+</style>
+</head>
+<body class="ritemark">
+
+<div class="shell">
+
+<header class="page-head">
+  <h1>Ritemark typography</h1>
+  <div class="nav-links">
+    <a href="tokens.html">Tokens</a>
+    <a href="components.html">Components</a>
+    <a href="typography.html" class="is-current">Typography</a>
+  </div>
+  <div class="theme-toggle">
+    <button id="theme-light" class="is-active">Light</button>
+    <button id="theme-dark">Dark</button>
+  </div>
+</header>
+
+<!-- Sofia Sans (chrome) -->
+<section>
+  <div class="eyebrow">01 — Sofia Sans (chrome)</div>
+  <h2 style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700; margin: 0 0 8px;">Sofia Sans does the work.</h2>
+  <p class="caption">Every in-chrome surface uses Sofia Sans. All the text you see in a running Ritemark session — dialogs, settings, sidebar, body copy — is this family.</p>
+
+  <div class="specimen-row">
+    <div class="token">--size-xs · 11px · 600</div>
+    <div class="spec" style="font-size: var(--ritemark-size-xs); font-weight: 600; letter-spacing: var(--ritemark-tracking-wide); text-transform: uppercase;">EYEBROW / GROUP HEADER</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-sm · 12px · 400</div>
+    <div class="spec" style="font-size: var(--ritemark-size-sm);">Secondary meta, helper text, and dense captions. A little smaller than default body so it stays quiet.</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-base · 13px · 400</div>
+    <div class="spec" style="font-size: var(--ritemark-size-base);">Default body UI. Sidebar items, Library table rows, most inline copy in chrome. Sofia Sans at 13px is the most-seen text in the product.</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-md · 14px · 400</div>
+    <div class="spec" style="font-size: var(--ritemark-size-md);">Body copy in dialogs, marketing body, comfortable text when a row isn't dense.</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-lg · 16px · 600</div>
+    <div class="spec" style="font-size: var(--ritemark-size-lg); font-weight: 600;">Dialog titles, settings section headers</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-xl · 20px · 600</div>
+    <div class="spec" style="font-size: var(--ritemark-size-xl); font-weight: 600; line-height: var(--ritemark-leading-snug);">Settings page headings</div>
+  </div>
+</section>
+
+<!-- Space Grotesk (moments) -->
+<section>
+  <div class="eyebrow">02 — Space Grotesk (moments)</div>
+  <h2 style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700; margin: 0 0 8px;">Space Grotesk earns its screen time.</h2>
+  <p class="caption">Display family. Welcome screen titles, marketing H1–H2, slide covers. Never inside chrome. The body copy on a "moment" surface still uses Sofia Sans — only the headline switches.</p>
+
+  <div class="specimen-row">
+    <div class="token">--size-2xl · 24px · 700</div>
+    <div class="spec" style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700; line-height: var(--ritemark-leading-snug);">Marketing H3 · Section eyebrow subhead</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-3xl · 30px · 700</div>
+    <div class="spec" style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-3xl); font-weight: 700; line-height: var(--ritemark-leading-snug);">Marketing H2 · Mid-section head</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-4xl · 40px · 700</div>
+    <div class="spec" style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-4xl); font-weight: 700; line-height: var(--ritemark-leading-tight); letter-spacing: var(--ritemark-tracking-tight);">Release card title</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-5xl · 56px · 700</div>
+    <div class="spec" style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-5xl); font-weight: 700; line-height: var(--ritemark-leading-tight); letter-spacing: var(--ritemark-tracking-tight);">Welcome H1, marketing hero</div>
+  </div>
+  <div class="specimen-row">
+    <div class="token">--size-6xl · 72px · 700</div>
+    <div class="spec" style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-6xl); font-weight: 700; line-height: 1.0; letter-spacing: var(--ritemark-tracking-tight);">Slide cover</div>
+  </div>
+</section>
+
+<!-- Ink ladder as applied to paragraph -->
+<section>
+  <div class="eyebrow">03 — Ink ladder in practice</div>
+  <h2 style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700; margin: 0 0 8px;">Four steps, four jobs.</h2>
+  <p class="caption">Same body content, four tones. Notice how hierarchy reads without any color changes.</p>
+
+  <div class="ink-demo" style="max-width: 640px;">
+    <p class="ink-1"><strong>Strong ink.</strong> This is the primary tone — body copy and headings live here. High contrast, strong presence. Use for labels, H1–H3, primary text.</p>
+    <p class="ink-2">Body ink. The second step is where paragraph copy settles. Slightly softer than strong-ink so long passages stay readable without being heavy.</p>
+    <p class="ink-3">Muted ink — for captions, meta, helper text. Present but secondary. The reader knows it's there without being pulled toward it.</p>
+    <p class="ink-4">Faint ink. Placeholders, inactive indicators, counts. If a reader looks at this, they should feel they're looking at "supporting information" without being told.</p>
+  </div>
+</section>
+
+<!-- Pairing example — chrome -->
+<section>
+  <div class="eyebrow">04 — Pairing example: chrome</div>
+  <h2 style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700; margin: 0 0 8px;">A dialog.</h2>
+  <p class="caption">Sofia Sans everywhere. Hierarchy from weight + size, not from switching families.</p>
+
+  <div style="background: var(--r-surface); border: 1px solid var(--r-hairline); border-radius: var(--ritemark-radius-lg); padding: 20px; max-width: 420px; box-shadow: var(--ritemark-shadow-sm);">
+    <div style="font-size: var(--ritemark-size-lg); font-weight: 600; color: var(--r-ink-strong); margin-bottom: 16px;">Editor preferences</div>
+    <div style="font-size: var(--ritemark-size-sm); font-weight: 500; color: var(--r-ink-body); margin-bottom: 4px;">Line width</div>
+    <div style="font-size: var(--ritemark-size-md); color: var(--r-ink-strong); margin-bottom: 16px;">72 characters</div>
+    <div style="font-size: var(--ritemark-size-sm); font-weight: 500; color: var(--r-ink-body); margin-bottom: 4px;">Font family</div>
+    <div style="font-size: var(--ritemark-size-md); color: var(--r-ink-strong); margin-bottom: 8px;">Sofia Sans, -apple-system</div>
+    <div style="font-size: var(--ritemark-size-sm); color: var(--r-ink-muted);">Changes apply to new documents. Existing documents keep their font until you reopen them.</div>
+  </div>
+</section>
+
+<!-- Pairing example — moment -->
+<section>
+  <div class="eyebrow">05 — Pairing example: moment</div>
+  <h2 style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700; margin: 0 0 8px;">A welcome screen.</h2>
+  <p class="caption">Space Grotesk headline, Sofia Sans body, CTA pair.</p>
+
+  <div style="padding: 48px 32px; background: var(--r-surface); border: 1px solid var(--r-hairline); border-radius: var(--ritemark-radius-lg); position: relative; overflow: hidden;">
+    <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--r-accent);"></div>
+    <div style="width: 40px; height: 40px; border-radius: var(--ritemark-radius-lg); background: var(--r-accent); color: #FFF; display: flex; align-items: center; justify-content: center; font-family: var(--ritemark-font-display); font-weight: 700; font-size: 18px; margin-bottom: 20px; box-shadow: var(--ritemark-shadow-indigo-sm);">R</div>
+    <h1 style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-4xl); font-weight: 700; letter-spacing: var(--ritemark-tracking-tight); line-height: var(--ritemark-leading-tight); color: var(--r-ink-strong); margin: 0 0 12px;">Markdown, without the syntax.</h1>
+    <p style="font-size: var(--ritemark-size-md); line-height: var(--ritemark-leading-normal); color: var(--r-ink-body); margin: 0 0 24px; max-width: 520px;">A visual editor for the notes you already write. Local-first, offline, and obviously designed.</p>
+    <div style="display: flex; gap: 10px;">
+      <button style="background: var(--r-accent); color: #FFF; border: 0; padding: 10px 18px; border-radius: var(--ritemark-radius-lg); font-size: var(--ritemark-size-base); font-weight: 600; box-shadow: var(--ritemark-shadow-indigo-sm); cursor: pointer;">Open a folder</button>
+      <button style="background: transparent; color: var(--r-ink-strong); border: 1px solid var(--r-hairline-strong); padding: 10px 18px; border-radius: var(--ritemark-radius-lg); font-size: var(--ritemark-size-base); font-weight: 500; cursor: pointer;">Start from scratch</button>
+    </div>
+  </div>
+</section>
+
+<!-- Loading section -->
+<section>
+  <div class="eyebrow">06 — Font loading</div>
+  <h2 style="font-family: var(--ritemark-font-display); font-size: var(--ritemark-size-2xl); font-weight: 700; margin: 0 0 8px;">Where the fonts come from.</h2>
+  <p class="caption">Both families are loaded via Google Fonts in this skill's <code style="background: var(--r-surface-soft); padding: 2px 6px; border-radius: 3px; font-family: var(--ritemark-font-mono);">tokens.css</code>. In production Ritemark, Sofia Sans is self-hosted and Space Grotesk is loaded only on moment surfaces that use it.</p>
+  <div class="meta">
+    <span>Sofia Sans — <code>var(--ritemark-font-ui)</code></span>
+    <span>Space Grotesk — <code>var(--ritemark-font-display)</code></span>
+    <span>Mono — <code>var(--ritemark-font-mono)</code></span>
+  </div>
+</section>
+
+</div>
+
+<script>
+  const lightBtn = document.getElementById('theme-light');
+  const darkBtn = document.getElementById('theme-dark');
+  const body = document.body;
+  lightBtn.addEventListener('click', () => { body.classList.remove('ritemark-dark'); lightBtn.classList.add('is-active'); darkBtn.classList.remove('is-active'); });
+  darkBtn.addEventListener('click', () => { body.classList.add('ritemark-dark'); darkBtn.classList.add('is-active'); lightBtn.classList.remove('is-active'); });
+</script>
+
+</body>
+</html>

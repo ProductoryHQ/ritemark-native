@@ -1,0 +1,181 @@
+/* ============================================================
+   Ritemark slide base — 1920 × 1080
+   Shared by all slide templates in this folder.
+   ============================================================ */
+
+@import url('../tokens.css');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--r-surface-muted);
+  font-family: var(--ritemark-font-ui);
+  color: var(--r-ink-strong);
+}
+
+/* Sticky nav across slides */
+.slide-nav {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--r-surface) 90%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--ritemark-radius-md);
+  box-shadow: var(--ritemark-shadow-sm);
+  font-size: var(--ritemark-size-sm);
+}
+.slide-nav a {
+  color: var(--r-ink-body);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--ritemark-radius-sm);
+  transition: background 120ms;
+}
+.slide-nav a:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+.slide-nav a.is-current { background: var(--r-accent); color: #FFF; }
+
+/* The slide itself — 1920×1080 canvas, scaled to fit */
+.slide {
+  width: 1920px;
+  height: 1080px;
+  background: var(--r-surface);
+  position: relative;
+  overflow: hidden;
+  margin: 48px auto;
+  box-shadow: var(--ritemark-shadow-xl);
+  transform-origin: top center;
+}
+
+/* Scale the slide down when viewing in a smaller window */
+@media (max-width: 2016px) {
+  .slide { transform: scale(0.9); margin-bottom: -108px; }
+}
+@media (max-width: 1800px) {
+  .slide { transform: scale(0.8); margin-bottom: -216px; }
+}
+@media (max-width: 1600px) {
+  .slide { transform: scale(0.7); margin-bottom: -324px; }
+}
+@media (max-width: 1400px) {
+  .slide { transform: scale(0.6); margin-bottom: -432px; }
+}
+@media (max-width: 1200px) {
+  .slide { transform: scale(0.5); margin-bottom: -540px; }
+}
+
+/* Top indigo bar — common to every slide */
+.slide::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--r-accent);
+}
+
+/* Dark slide */
+.slide.is-dark {
+  background: var(--ritemark-dark-surface);
+  color: var(--ritemark-dark-ink-strong);
+}
+.slide.is-dark::before {
+  background: var(--ritemark-dark-indigo);
+}
+
+/* Content container — inside the canvas, respects 96px side margins */
+.slide .content {
+  position: absolute;
+  inset: 0;
+  padding: 96px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Common elements */
+.slide .eyebrow {
+  font-family: var(--ritemark-font-ui);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--r-accent);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+}
+.slide.is-dark .eyebrow {
+  color: var(--ritemark-dark-indigo);
+}
+
+.slide h1 {
+  font-family: var(--ritemark-font-display);
+  font-weight: 700;
+  color: var(--r-ink-strong);
+  letter-spacing: -1px;
+  line-height: 1.05;
+}
+.slide.is-dark h1 {
+  color: var(--ritemark-dark-ink-strong);
+}
+
+.slide h2 {
+  font-family: var(--ritemark-font-display);
+  font-weight: 700;
+  color: var(--r-ink-strong);
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+}
+.slide.is-dark h2 {
+  color: var(--ritemark-dark-ink-strong);
+}
+
+.slide p {
+  font-family: var(--ritemark-font-ui);
+  color: var(--r-ink-body);
+}
+.slide.is-dark p {
+  color: var(--ritemark-dark-ink-body);
+}
+
+.slide .meta {
+  font-family: var(--ritemark-font-ui);
+  color: var(--r-ink-muted);
+}
+.slide.is-dark .meta {
+  color: var(--ritemark-dark-ink-muted);
+}
+
+.slide .indigo-bar {
+  width: 80px;
+  height: 3px;
+  background: var(--r-accent);
+  border-radius: 2px;
+  margin-bottom: 24px;
+}
+.slide.is-dark .indigo-bar {
+  background: var(--ritemark-dark-indigo);
+}
+
+.slide .mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--ritemark-radius-lg);
+  background: var(--r-accent);
+  color: #FFFFFF;
+  font-family: var(--ritemark-font-display);
+  font-weight: 700;
+  font-size: 28px;
+  box-shadow: var(--ritemark-shadow-indigo-md);
+}
+.slide.is-dark .mark {
+  background: var(--ritemark-dark-indigo);
+  color: var(--ritemark-dark-surface);
+}
