@@ -62,7 +62,16 @@ if [ -f "$PRODUCT_JSON" ]; then
     echo "  OK"
 fi
 
-# 3. Update installer/windows/ritemark.iss
+# 3. Update vscode/product.json (dev mode reads this directly)
+echo "Updating vscode/product.json..."
+VSCODE_PRODUCT="$ROOT_DIR/vscode/product.json"
+if [ -f "$VSCODE_PRODUCT" ]; then
+    sed -i.bak 's/"ritemarkVersion": *"[^"]*"/"ritemarkVersion": "'"$VERSION"'"/' "$VSCODE_PRODUCT"
+    rm -f "$VSCODE_PRODUCT.bak"
+    echo "  OK"
+fi
+
+# 5. Update installer/windows/ritemark.iss
 echo "Updating installer/windows/ritemark.iss..."
 ISS_FILE="$ROOT_DIR/installer/windows/ritemark.iss"
 if [ -f "$ISS_FILE" ]; then
@@ -76,7 +85,7 @@ if [ -f "$ISS_FILE" ]; then
     echo "  OK"
 fi
 
-# 4. Update branding/BRANDING.json version
+# 6. Update branding/BRANDING.json version
 echo "Updating branding/BRANDING.json..."
 if [ -f "$BRANDING_FILE" ]; then
     sed -i.bak 's/"version": *"[^"]*"/"version": "'"$VERSION"'"/' "$BRANDING_FILE"
@@ -91,6 +100,7 @@ echo ""
 echo "Files updated:"
 echo "  - extensions/ritemark/package.json"
 echo "  - branding/product.json"
+echo "  - vscode/product.json"
 echo "  - branding/BRANDING.json"
 echo "  - installer/windows/ritemark.iss"
 echo ""

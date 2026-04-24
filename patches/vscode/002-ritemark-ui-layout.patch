@@ -657,10 +657,27 @@ index ecc6af48668..a42a1bd4f31 100644
  		order: 0
  	},
 diff --git a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-index db5712fe9b0..199a2be595f 100644
+index db5712fe9b0..0ea986538c2 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 +++ b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-@@ -106,3 +106,28 @@
+@@ -16,13 +16,14 @@
+
+ .explorer-folders-view .explorer-item,
+ .explorer-folders-view .editor-group {
+-	height: 22px;
+-	line-height: 22px;
++	height: 28px;
++	line-height: 28px;
+ }
+
+ .explorer-folders-view .explorer-item {
+ 	display: flex; /* this helps showing the overflow ellipsis (...) even though we use display:inline-block for the labels */
+ 	flex-wrap: nowrap;
++	align-items: center;
+ }
+
+ .explorer-folders-view .explorer-item > a,
+@@ -106,3 +107,16 @@
  .monaco-workbench.context-menu-visible .explorer-folders-view.highlight .monaco-list-row {
  	outline: none !important;
  }
@@ -672,23 +689,24 @@ index db5712fe9b0..199a2be595f 100644
 +	border-left-color: transparent !important;
 +}
 +
-+/* Remove row backgrounds for cleaner look */
-+.explorer-folders-view .monaco-list .monaco-list-row {
-+	background: none !important;
++/* 2px left indigo accent bar on focused+selected rows (inset so content doesn't shift) */
++.explorer-folders-view .monaco-list:focus .monaco-list-row.selected {
++	box-shadow: inset 2px 0 0 0 var(--vscode-list-focusAndSelectionOutline, var(--vscode-focusBorder, #4338CA)) !important;
++	outline: none !important;
 +}
-+
-+/* Rounded corners with inset margins */
-+.explorer-folders-view .monaco-list .monaco-list-row {
-+	border-radius: 6px;
-+	margin-left: 4px;
-+	margin-right: 4px;
-+}
-+
-+/* Rounded selection highlights */
-+.explorer-folders-view .monaco-list .monaco-list-row.selected,
-+.explorer-folders-view .monaco-list .monaco-list-row.focused {
-+	border-radius: 6px;
-+}
+diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
+index a4a00dfa7ea..11218ba3a85 100644
+--- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
++++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
+@@ -77,7 +77,7 @@ import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.j
+
+ export class ExplorerDelegate implements IListVirtualDelegate<ExplorerItem> {
+
+-	static readonly ITEM_HEIGHT = 22;
++	static readonly ITEM_HEIGHT = 28;
+
+ 	getHeight(element: ExplorerItem): number {
+ 		return ExplorerDelegate.ITEM_HEIGHT;
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 index 5b115684ac0..9ca4a048788 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerView.ts

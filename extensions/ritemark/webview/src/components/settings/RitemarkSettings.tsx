@@ -5,25 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import {
-  Key,
-  Zap,
-  RefreshCw,
-  Check,
-  X,
-  Loader2,
-  Eye,
-  EyeOff,
-  ExternalLink,
-  Bot,
-  Type,
-  Timer,
-  Download,
-  RotateCcw,
-  HardDrive,
-  ShieldCheck,
-  AlertTriangle,
-} from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { vscode } from '../../lib/vscode';
 import { getDefaultAssistantModel } from '../../config/modelConfig';
 import { Slider } from '../ui/slider';
@@ -53,6 +35,8 @@ interface SettingsData {
   anthropicKey: string;
   anthropicKeyConfigured: boolean;
   chatFontSize: number;
+  currentTheme: string;
+  availableThemes: ThemeInfo[];
   updateCenter: {
     state: 'idle' | 'checking' | 'up-to-date' | 'update-available' | 'paused' | 'restart-required' | 'blocked' | 'error';
     currentAppVersion: string;
@@ -119,6 +103,13 @@ interface SettingsData {
       } | null;
     };
   };
+}
+
+interface ThemeInfo {
+  id: string;
+  label: string;
+  description: string;
+  kind: 'light' | 'dark';
 }
 
 interface CodexAuthStatus {
@@ -215,6 +206,11 @@ export function RitemarkSettings() {
     vscode.postMessage({ type: 'setSetting', key, value });
   };
 
+  const handleThemeChange = (themeId: string) => {
+    setSettings((prev) => prev ? { ...prev, currentTheme: themeId } : prev);
+    vscode.postMessage({ type: 'theme:set', value: themeId });
+  };
+
   const handleUpdateAction = (
     type: 'updates:checkNow' | 'updates:install' | 'updates:skipVersion' | 'updates:pause' | 'updates:resume' | 'updates:reload'
   ) => {
@@ -251,47 +247,70 @@ export function RitemarkSettings() {
 
   if (!settings) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-[var(--vscode-descriptionForeground)]" />
+      <div className="h-full flex items-center justify-center bg-surface-muted">
+        <Icon name="circle-notch" size={20} className="animate-spin text-ink-muted" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-8">
+    <div className="max-w-3xl mx-auto p-8 text-ink-body">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--vscode-foreground)] mb-2">
+        <h1 className="text-3xl font-semibold tracking-[-0.02em] text-ink-strong mb-2">
           Ritemark Settings
         </h1>
-        <p className="text-sm text-[var(--vscode-descriptionForeground)]">
+        <p className="text-sm text-ink-muted">
           Configure API keys and features for Ritemark AI.
         </p>
       </div>
 
+      {/* Appearance Section */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Icon name="palette" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
+            Appearance
+          </h2>
+        </div>
+
+        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(settings.availableThemes || []).map((theme) => (
+              <ThemePreviewCard
+                key={theme.id}
+                theme={theme}
+                selected={settings.currentTheme === theme.id}
+                onSelect={() => handleThemeChange(theme.id)}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* API Keys Section */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
-          <Key className="w-5 h-5 text-[var(--vscode-foreground)]" />
-          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
+          <Icon name="key" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
             API Keys
           </h2>
         </div>
 
-        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] mb-6">
+        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm mb-6">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+              <label className="text-sm font-medium text-ink-strong">
                 Claude Account
               </label>
-              <span className="ml-2 text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+              <span className="ml-2 text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
                 Experimental
               </span>
             </div>
             {(settings.componentStatus.claudeCode.state === 'ready'
               || settings.componentStatus.claudeCode.authMethod === 'api-key') && (
-              <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
-                <Check size={12} />
+              <span className="flex items-center gap-1 text-xs text-ritemark-success">
+                <Icon name="check" size={12} />
                 Connected
               </span>
             )}
@@ -299,33 +318,33 @@ export function RitemarkSettings() {
 
           {settings.componentStatus.claudeCode.state === 'not-installed' ? (
             <>
-              <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+              <p className="text-xs text-ink-muted mb-3">
                 Install Claude to use Claude agent mode in Ritemark.
               </p>
               <button
                 onClick={() => handleClaudeAction('claude:install')}
-                className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
               >
                 Install Claude
               </button>
             </>
           ) : settings.componentStatus.claudeCode.state === 'broken' ? (
             <>
-              <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+              <p className="text-xs text-ink-muted mb-3">
                 {settings.componentStatus.claudeCode.error || 'Claude is installed, but it is not ready yet.'}
               </p>
               <div className="flex flex-wrap gap-2">
                 {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
                   <button
                     onClick={() => handleClaudeAction('claude:reload')}
-                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                    className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
                   >
                     Reload Window
                   </button>
                 ) : (
                   <button
                     onClick={() => handleClaudeAction('claude:repair')}
-                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                    className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
                   >
                     Repair Claude
                   </button>
@@ -334,42 +353,42 @@ export function RitemarkSettings() {
             </>
           ) : settings.componentStatus.claudeCode.state === 'needs-auth' ? (
             <>
-              <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+              <p className="text-xs text-ink-muted mb-3">
                 Sign in with Claude.ai to use Claude without an API key, or use your Anthropic API key instead.
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => handleClaudeAction('claude:login')}
-                  className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                  className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
                 >
                   Sign in with Claude.ai
                 </button>
               </div>
             </>
           ) : settings.componentStatus.claudeCode.state === 'auth-in-progress' ? (
-            <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+            <p className="text-xs text-ink-muted mb-3">
               Finish Claude.ai sign-in in your terminal and browser. Ritemark will refresh automatically when sign-in completes.
             </p>
           ) : (
             <>
               <div className="space-y-2 mb-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--vscode-descriptionForeground)]">Auth method:</span>
-                  <span className="text-[var(--vscode-foreground)] font-semibold">
+                  <span className="text-ink-muted">Auth method:</span>
+                  <span className="text-ink-strong font-semibold">
                     {settings.componentStatus.claudeCode.authMethod === 'api-key' ? 'Anthropic API key' : 'Claude.ai'}
                   </span>
                 </div>
                 {settings.componentStatus.claudeCode.version && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[var(--vscode-descriptionForeground)]">CLI version:</span>
-                    <span className="text-[var(--vscode-foreground)] font-mono">
+                    <span className="text-ink-muted">CLI version:</span>
+                    <span className="text-ink-strong font-mono">
                       {settings.componentStatus.claudeCode.version}
                     </span>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--vscode-descriptionForeground)]">Billing source:</span>
-                  <span className="text-[var(--vscode-foreground)]">
+                  <span className="text-ink-muted">Billing source:</span>
+                  <span className="text-ink-strong">
                     {settings.componentStatus.claudeCode.authMethod === 'api-key' ? 'Anthropic API' : 'Claude.ai'}
                   </span>
                 </div>
@@ -378,7 +397,7 @@ export function RitemarkSettings() {
                 {settings.componentStatus.claudeCode.authMethod === 'claude-oauth' && (
                   <button
                     onClick={() => handleClaudeAction('claude:logout')}
-                    className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                    className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                   >
                     Sign Out
                   </button>
@@ -386,14 +405,14 @@ export function RitemarkSettings() {
                 {settings.componentStatus.claudeCode.authMethod === 'api-key' && (
                   <button
                     onClick={() => handleClaudeAction('claude:login')}
-                    className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                    className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                   >
                     Switch to Claude.ai sign-in
                   </button>
                 )}
                 <button
                   onClick={() => handleClaudeAction('claude:refreshStatus')}
-                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                 >
                   Refresh Status
                 </button>
@@ -404,10 +423,10 @@ export function RitemarkSettings() {
           {(settings.componentStatus.claudeCode.binaryPath
             || settings.componentStatus.claudeCode.diagnostics.length > 0) && (
             <details className="mt-3">
-              <summary className="cursor-pointer text-xs text-[var(--vscode-textLink-foreground)] hover:underline">
+              <summary className="cursor-pointer text-xs text-accent-deep hover:underline">
                 Technical details
               </summary>
-              <div className="mt-2 space-y-2 text-xs text-[var(--vscode-descriptionForeground)]">
+              <div className="mt-2 space-y-2 text-xs text-ink-muted">
                 {settings.componentStatus.claudeCode.binaryPath && (
                   <div className="break-words [overflow-wrap:anywhere]">
                     Binary: {settings.componentStatus.claudeCode.binaryPath}
@@ -420,7 +439,7 @@ export function RitemarkSettings() {
                 ))}
                 <button
                   onClick={() => handleClaudeAction('claude:refreshStatus')}
-                  className="text-xs text-[var(--vscode-textLink-foreground)] hover:underline bg-transparent border-none p-0"
+                  className="text-xs text-accent-deep hover:underline bg-transparent border-none p-0"
                 >
                   Refresh Status
                 </button>
@@ -428,31 +447,31 @@ export function RitemarkSettings() {
             </details>
           )}
 
-          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-3">
+          <p className="text-xs text-ink-muted mt-3">
             Used for: Claude agents (autonomous file work), Claude Flow nodes
             <a
               href="https://docs.anthropic.com/en/docs/claude-code/setup"
-              className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+              className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
             >
-              Learn more <ExternalLink size={10} />
+              Learn more <Icon name="arrow-square-out" size={12} />
             </a>
           </p>
         </div>
 
         {/* Codex ChatGPT Auth (experimental) */}
-        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] mb-6">
+        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm mb-6">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+                <label className="text-sm font-medium text-ink-strong">
                   ChatGPT Account
                 </label>
-                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
                   Experimental
                 </span>
               </div>
               {settings.codexIntegration && codexAuth.authenticated && (
-                <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
-                  <Check size={12} />
+                <span className="flex items-center gap-1 text-xs text-ritemark-success">
+                  <Icon name="check" size={12} />
                   Connected
                 </span>
               )}
@@ -460,32 +479,32 @@ export function RitemarkSettings() {
 
             {!settings.codexIntegration ? (
               <>
-                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                <p className="text-xs text-ink-muted mb-3">
                   Turn on Codex Integration in Features to connect your ChatGPT account and use Codex agents in Ritemark.
                 </p>
-                <div className="text-xs p-2 rounded bg-[var(--vscode-badge-background)]/35 text-[var(--vscode-descriptionForeground)]">
+                <div className="text-xs p-2 rounded bg-accent-soft text-ink-muted">
                   The feature toggle is currently off.
                 </div>
               </>
             ) : codexAuth.binaryMissing || codexAuth.binaryBroken ? (
               <>
-                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                <p className="text-xs text-ink-muted mb-3">
                   {codexAuth.binaryMissing
                     ? 'Codex CLI binary not found. Install it first:'
                     : 'Codex CLI is installed but broken. Reinstall it first:'}
                 </p>
-                <code className="block text-xs p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-foreground)] font-mono break-all">
+                <code className="block text-xs p-2 rounded bg-surface-soft text-ink-strong font-mono break-all">
                   {codexAuth.repairCommand || 'npm install -g @openai/codex@latest'}
                 </code>
                 {codexAuth.error && (
-                  <div className="text-xs p-2 mt-2 rounded bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]">
+                  <div className="text-xs p-2 mt-2 rounded bg-ritemark-error-soft text-ritemark-error">
                     <span className="flex items-center gap-1">
-                      <X size={12} /> {codexAuth.error}
+                      <Icon name="x" size={12} /> {codexAuth.error}
                     </span>
                   </div>
                 )}
                 {codexAuth.diagnostics && codexAuth.diagnostics.length > 0 && (
-                  <div className="mt-2 space-y-1 text-xs text-[var(--vscode-descriptionForeground)]">
+                  <div className="mt-2 space-y-1 text-xs text-ink-muted">
                     {codexAuth.diagnostics.map((diagnostic) => (
                       <div key={diagnostic}>{diagnostic}</div>
                     ))}
@@ -494,30 +513,30 @@ export function RitemarkSettings() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     onClick={() => vscode.postMessage({ type: 'codex:repair' })}
-                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                    className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
                   >
                     Repair Codex
                   </button>
                   <button
                     onClick={() => vscode.postMessage({ type: 'updates:reload' })}
-                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                    className="px-4 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                   >
                     Reload Window
                   </button>
                   <button
                     onClick={() => vscode.postMessage({ type: 'codex:refreshStatus' })}
-                    className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                    className="px-4 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                   >
                     Refresh Status
                   </button>
                 </div>
-                <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+                <p className="text-xs text-ink-muted mt-2">
                   After reinstalling, use Reload Window here and then reopen Settings.
                 </p>
               </>
             ) : !codexAuth.authenticated ? (
               <>
-                <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
+                <p className="text-xs text-ink-muted mb-3">
                   Sign in with your ChatGPT account to use Codex agents without an API key.
                   Requires ChatGPT Plus ($20/mo) or Pro ($200/mo) subscription.
                 </p>
@@ -528,11 +547,11 @@ export function RitemarkSettings() {
                     setTimeout(() => setCodexLoading(false), 60_000);
                   }}
                   disabled={codexLoading}
-                  className="px-4 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md disabled:opacity-50 flex items-center gap-2"
                 >
                   {codexLoading ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
+                      <Icon name="circle-notch" size={16} className="animate-spin" />
                       Opening browser...
                     </>
                   ) : (
@@ -540,9 +559,9 @@ export function RitemarkSettings() {
                   )}
                 </button>
                 {codexAuth.error && (
-                  <div className="text-xs p-2 mt-2 rounded bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]">
+                  <div className="text-xs p-2 mt-2 rounded bg-ritemark-error-soft text-ritemark-error">
                     <span className="flex items-center gap-1">
-                      <X size={12} /> {codexAuth.error}
+                      <Icon name="x" size={12} /> {codexAuth.error}
                     </span>
                   </div>
                 )}
@@ -551,21 +570,21 @@ export function RitemarkSettings() {
               <>
                 <div className="space-y-2 mb-3 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-[var(--vscode-descriptionForeground)]">Email:</span>
-                    <span className="text-[var(--vscode-foreground)] font-mono">{codexAuth.email}</span>
+                    <span className="text-ink-muted">Email:</span>
+                    <span className="text-ink-strong font-mono">{codexAuth.email}</span>
                   </div>
                   {codexAuth.plan && (
                     <div className="flex items-center justify-between">
-                      <span className="text-[var(--vscode-descriptionForeground)]">Plan:</span>
-                      <span className="text-[var(--vscode-foreground)] font-semibold">
+                      <span className="text-ink-muted">Plan:</span>
+                      <span className="text-ink-strong font-semibold">
                         ChatGPT {codexAuth.plan.charAt(0).toUpperCase() + codexAuth.plan.slice(1)}
                       </span>
                     </div>
                   )}
                   {codexAuth.credits && (
                     <div className="flex items-center justify-between">
-                      <span className="text-[var(--vscode-descriptionForeground)]">API Credits:</span>
-                      <span className="text-[var(--vscode-foreground)]">
+                      <span className="text-ink-muted">API Credits:</span>
+                      <span className="text-ink-strong">
                         ${(codexAuth.credits.limit - codexAuth.credits.used).toFixed(2)} / ${codexAuth.credits.limit.toFixed(2)} remaining
                       </span>
                     </div>
@@ -573,59 +592,59 @@ export function RitemarkSettings() {
                 </div>
                 <button
                   onClick={() => vscode.postMessage({ type: 'codex:logout' })}
-                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                 >
                   Sign Out
                 </button>
               </>
             )}
 
-            <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-3">
+            <p className="text-xs text-ink-muted mt-3">
               Used for: Codex Agents (autonomous coding)
               <a
                 href="https://developers.openai.com/codex/cli"
-                className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+                className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
               >
-                Learn more <ExternalLink size={10} />
+                Learn more <Icon name="arrow-square-out" size={12} />
               </a>
             </p>
 
             {/* Codex Approval & Sandbox settings — only show when Codex is enabled */}
             {settings.codexIntegration && (
-              <div className="mt-4 pt-4 border-t border-[var(--vscode-panel-border)] space-y-4">
+              <div className="mt-4 pt-4 border-t border-hairline space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-1">
+                  <label className="text-sm font-medium text-ink-strong block mb-1">
                     Approval Policy
                   </label>
                   <select
                     value={settings.codexApprovalPolicy || 'untrusted'}
                     onChange={(e) => handleSettingChange('codex.approvalPolicy', e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+                    className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
                   >
                     <option value="untrusted">Ask before every command and file change (safest)</option>
                     <option value="on-request">Ask only for operations outside workspace</option>
                     <option value="on-failure">Auto-approve, ask only on failure</option>
                     <option value="never">Never ask — run everything automatically</option>
                   </select>
-                  <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                  <p className="text-xs text-ink-muted mt-1">
                     Controls when Codex asks for your approval before executing shell commands or modifying files.
                   </p>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-1">
+                  <label className="text-sm font-medium text-ink-strong block mb-1">
                     Sandbox Mode
                   </label>
                   <select
                     value={settings.codexSandboxMode || 'workspace-write'}
                     onChange={(e) => handleSettingChange('codex.sandboxMode', e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+                    className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
                   >
                     <option value="read-only">Read only — Codex can only read files</option>
                     <option value="workspace-write">Workspace write — read and write within project (recommended)</option>
                     <option value="danger-full-access">Full access — includes network and system (use with caution)</option>
                   </select>
-                  <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                  <p className="text-xs text-ink-muted mt-1">
                     Controls what Codex is allowed to do on your filesystem.
                   </p>
                 </div>
@@ -634,14 +653,14 @@ export function RitemarkSettings() {
           </div>
 
         {/* OpenAI */}
-        <div className="mb-6 p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+        <div className="mb-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+            <label className="text-sm font-medium text-ink-strong">
               OpenAI API Key
             </label>
             {settings.openaiKeyConfigured && (
-              <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
-                <Check size={12} />
+              <span className="flex items-center gap-1 text-xs text-ritemark-success">
+                <Icon name="check" size={12} />
                 Configured
               </span>
             )}
@@ -654,27 +673,27 @@ export function RitemarkSettings() {
                 value={openaiKey}
                 onChange={(e) => setOpenaiKey(e.target.value)}
                 placeholder="sk-..."
-                className="w-full px-3 py-2 pr-10 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+                className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
               />
               <button
                 onClick={() => setShowOpenaiKey(!showOpenaiKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)]"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
               >
-                {showOpenaiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showOpenaiKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
             <button
               onClick={() => handleSaveApiKey('openai-api-key', openaiKey)}
-              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
             >
               Save
             </button>
             <button
               onClick={() => handleTestApiKey('openai-api-key')}
               disabled={!settings.openaiKeyConfigured || testingOpenai}
-              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:opacity-50"
+              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
             >
-              {testingOpenai ? <Loader2 size={16} className="animate-spin" /> : 'Test'}
+              {testingOpenai ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
             </button>
           </div>
 
@@ -682,43 +701,43 @@ export function RitemarkSettings() {
             <div
               className={`text-xs p-2 rounded ${
                 testResults.openai.success
-                  ? 'bg-[var(--vscode-testing-iconPassed)]/10 text-[var(--vscode-testing-iconPassed)]'
-                  : 'bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]'
+                  ? 'bg-ritemark-success-soft text-ritemark-success'
+                  : 'bg-ritemark-error-soft text-ritemark-error'
               }`}
             >
               {testResults.openai.success ? (
                 <span className="flex items-center gap-1">
-                  <Check size={12} /> API key is valid
+                  <Icon name="check" size={12} /> API key is valid
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
-                  <X size={12} /> {testResults.openai.error}
+                  <Icon name="x" size={12} /> {testResults.openai.error}
                 </span>
               )}
             </div>
           )}
 
-          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+          <p className="text-xs text-ink-muted mt-2">
             Used for: AI Chat, Flows (LLM), Image Generation (GPT Image 1.5)
             <a
               href="https://platform.openai.com/api-keys"
-              className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+              className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
             >
-              Get API key <ExternalLink size={10} />
+              Get API key <Icon name="arrow-square-out" size={12} />
             </a>
           </p>
         </div>
 
         {/* Google AI */}
-        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+            <label className="text-sm font-medium text-ink-strong">
               Google AI API Key
-              <span className="ml-2 text-xs text-[var(--vscode-descriptionForeground)]">(optional)</span>
+              <span className="ml-2 text-xs text-ink-muted">(optional)</span>
             </label>
             {settings.googleKeyConfigured && (
-              <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
-                <Check size={12} />
+              <span className="flex items-center gap-1 text-xs text-ritemark-success">
+                <Icon name="check" size={12} />
                 Configured
               </span>
             )}
@@ -731,27 +750,27 @@ export function RitemarkSettings() {
                 value={googleKey}
                 onChange={(e) => setGoogleKey(e.target.value)}
                 placeholder="AIza..."
-                className="w-full px-3 py-2 pr-10 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+                className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
               />
               <button
                 onClick={() => setShowGoogleKey(!showGoogleKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)]"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
               >
-                {showGoogleKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showGoogleKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
             <button
               onClick={() => handleSaveApiKey('google-ai-key', googleKey)}
-              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
             >
               Save
             </button>
             <button
               onClick={() => handleTestApiKey('google-ai-key')}
               disabled={!settings.googleKeyConfigured || testingGoogle}
-              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:opacity-50"
+              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
             >
-              {testingGoogle ? <Loader2 size={16} className="animate-spin" /> : 'Test'}
+              {testingGoogle ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
             </button>
           </div>
 
@@ -759,42 +778,42 @@ export function RitemarkSettings() {
             <div
               className={`text-xs p-2 rounded ${
                 testResults.google.success
-                  ? 'bg-[var(--vscode-testing-iconPassed)]/10 text-[var(--vscode-testing-iconPassed)]'
-                  : 'bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]'
+                  ? 'bg-ritemark-success-soft text-ritemark-success'
+                  : 'bg-ritemark-error-soft text-ritemark-error'
               }`}
             >
               {testResults.google.success ? (
                 <span className="flex items-center gap-1">
-                  <Check size={12} /> {testResults.google.message || 'API key is valid'}
+                  <Icon name="check" size={12} /> {testResults.google.message || 'API key is valid'}
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
-                  <X size={12} /> {testResults.google.error}
+                  <Icon name="x" size={12} /> {testResults.google.error}
                 </span>
               )}
             </div>
           )}
 
-          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+          <p className="text-xs text-ink-muted mt-2">
             Used for: Gemini models, Imagen 3 (coming soon)
             <a
               href="https://aistudio.google.com/apikey"
-              className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+              className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
             >
-              Get API key <ExternalLink size={10} />
+              Get API key <Icon name="arrow-square-out" size={12} />
             </a>
           </p>
         </div>
         {/* Anthropic */}
-        <div className="mt-6 p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+        <div className="mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+            <label className="text-sm font-medium text-ink-strong">
               Anthropic API Key
-              <span className="ml-2 text-xs text-[var(--vscode-descriptionForeground)]">(optional)</span>
+              <span className="ml-2 text-xs text-ink-muted">(optional)</span>
             </label>
             {settings.anthropicKeyConfigured && (
-              <span className="flex items-center gap-1 text-xs text-[var(--vscode-testing-iconPassed)]">
-                <Check size={12} />
+              <span className="flex items-center gap-1 text-xs text-ritemark-success">
+                <Icon name="check" size={12} />
                 Configured
               </span>
             )}
@@ -807,27 +826,27 @@ export function RitemarkSettings() {
                 value={anthropicKey}
                 onChange={(e) => setAnthropicKey(e.target.value)}
                 placeholder="sk-ant-..."
-                className="w-full px-3 py-2 pr-10 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+                className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
               />
               <button
                 onClick={() => setShowAnthropicKey(!showAnthropicKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)]"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
               >
-                {showAnthropicKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showAnthropicKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
             <button
               onClick={() => handleSaveApiKey('anthropic-api-key', anthropicKey)}
-              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
             >
               Save
             </button>
             <button
               onClick={() => handleTestApiKey('anthropic-api-key')}
               disabled={!settings.anthropicKeyConfigured || testingAnthropic}
-              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:opacity-50"
+              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
             >
-              {testingAnthropic ? <Loader2 size={16} className="animate-spin" /> : 'Test'}
+              {testingAnthropic ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
             </button>
           </div>
 
@@ -835,29 +854,29 @@ export function RitemarkSettings() {
             <div
               className={`text-xs p-2 rounded ${
                 testResults.anthropic.success
-                  ? 'bg-[var(--vscode-testing-iconPassed)]/10 text-[var(--vscode-testing-iconPassed)]'
-                  : 'bg-[var(--vscode-testing-iconFailed)]/10 text-[var(--vscode-testing-iconFailed)]'
+                  ? 'bg-ritemark-success-soft text-ritemark-success'
+                  : 'bg-ritemark-error-soft text-ritemark-error'
               }`}
             >
               {testResults.anthropic.success ? (
                 <span className="flex items-center gap-1">
-                  <Check size={12} /> {testResults.anthropic.message || 'API key is valid'}
+                  <Icon name="check" size={12} /> {testResults.anthropic.message || 'API key is valid'}
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
-                  <X size={12} /> {testResults.anthropic.error}
+                  <Icon name="x" size={12} /> {testResults.anthropic.error}
                 </span>
               )}
             </div>
           )}
 
-          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+          <p className="text-xs text-ink-muted mt-2">
             Used for: Claude in Ritemark (alternative to signing in with Claude.ai)
             <a
               href="https://console.anthropic.com/settings/keys"
-              className="ml-2 inline-flex items-center gap-1 text-[var(--vscode-textLink-foreground)] hover:underline"
+              className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
             >
-              Get API key <ExternalLink size={10} />
+              Get API key <Icon name="arrow-square-out" size={12} />
             </a>
           </p>
         </div>
@@ -867,21 +886,21 @@ export function RitemarkSettings() {
       {/* AI Model Section */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
-          <Bot className="w-5 h-5 text-[var(--vscode-foreground)]" />
-          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
+          <Icon name="robot" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
             AI Model
           </h2>
         </div>
 
-        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
-          <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-2">
+        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <label className="text-sm font-medium text-ink-strong block mb-2">
             Model for Ritemark AI Assistant
           </label>
 
           <select
             value={settings.aiModel || getDefaultAssistantModel()}
             onChange={(e) => handleSettingChange('ai.model', e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+            className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
           >
             {(settings.availableModels || []).map((model) => (
               <option key={model.id} value={model.id}>
@@ -890,7 +909,7 @@ export function RitemarkSettings() {
             ))}
           </select>
 
-          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+          <p className="text-xs text-ink-muted mt-2">
             GPT-5 models use the newer Responses API with enhanced reasoning.
             GPT-4 models use Chat Completions API with tool support.
           </p>
@@ -900,14 +919,14 @@ export function RitemarkSettings() {
       {/* Agent Timeout Section */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
-          <Timer className="w-5 h-5 text-[var(--vscode-foreground)]" />
-          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
+          <Icon name="timer" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
             Agent Timeout
           </h2>
         </div>
 
-        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
-          <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-2">
+        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <label className="text-sm font-medium text-ink-strong block mb-2">
             Inactivity Timeout
           </label>
 
@@ -921,17 +940,17 @@ export function RitemarkSettings() {
               onValueCommit={([v]) => handleSettingChange('ai.agentTimeout', v)}
               className="flex-1"
             />
-            <span className="text-sm font-mono w-16 text-right text-[var(--vscode-foreground)]">
+            <span className="text-sm font-mono w-16 text-right text-ink-strong">
               {localAgentTimeout} min
             </span>
           </div>
 
-          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+          <p className="text-xs text-ink-muted mt-2">
             Claude will be stopped if it produces no activity for this duration.
             Increase if the agent times out on complex tasks. Default: 15 minutes.
           </p>
 
-          <div className="mt-4 pt-4 border-t border-[var(--vscode-panel-border)]">
+          <div className="mt-4 pt-4 border-t border-hairline">
             <ToggleRow
               label="Debug Trace Logging"
               description="Log AI agent activity to a temporary file for troubleshooting. Reload window after changing."
@@ -945,14 +964,14 @@ export function RitemarkSettings() {
       {/* Chat Appearance Section */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
-          <Type className="w-5 h-5 text-[var(--vscode-foreground)]" />
-          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
+          <Icon name="text-t" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
             Chat Appearance
           </h2>
         </div>
 
-        <div className="p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
-          <label className="text-sm font-medium text-[var(--vscode-foreground)] block mb-2">
+        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <label className="text-sm font-medium text-ink-strong block mb-2">
             Chat Font Size
           </label>
 
@@ -966,21 +985,21 @@ export function RitemarkSettings() {
               onValueCommit={([v]) => handleSettingChange('chat.fontSize', v)}
               className="flex-1"
             />
-            <span className="text-sm font-mono w-12 text-right text-[var(--vscode-foreground)]">
+            <span className="text-sm font-mono w-12 text-right text-ink-strong">
               {localChatFontSize}px
             </span>
           </div>
 
-          <div className="mt-3 p-3 rounded bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)]">
+          <div className="mt-3 p-3 rounded bg-surface-soft border border-hairline-strong">
             <p
-              className="text-[var(--vscode-foreground)]"
+              className="text-ink-strong"
               style={{ fontSize: `${localChatFontSize}px` }}
             >
               Preview: This is how text will appear in the AI chat interface.
             </p>
           </div>
 
-          <p className="text-xs text-[var(--vscode-descriptionForeground)] mt-2">
+          <p className="text-xs text-ink-muted mt-2">
             Adjust the font size for the AI chat messages (10-20px).
           </p>
         </div>
@@ -989,8 +1008,8 @@ export function RitemarkSettings() {
       {/* Features Section */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
-          <Zap className="w-5 h-5 text-[var(--vscode-foreground)]" />
-          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
+          <Icon name="lightning" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
             Features
           </h2>
         </div>
@@ -1023,8 +1042,8 @@ export function RitemarkSettings() {
       {/* Updates Section */}
       <section>
         <div className="flex items-center gap-2 mb-4">
-          <RefreshCw className="w-5 h-5 text-[var(--vscode-foreground)]" />
-          <h2 className="text-lg font-semibold text-[var(--vscode-foreground)]">
+          <Icon name="arrows-clockwise" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
             Updates
           </h2>
         </div>
@@ -1036,28 +1055,28 @@ export function RitemarkSettings() {
           onChange={(value) => handleToggle('updates.enabled', value)}
         />
 
-        <div className="mt-4 p-4 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] space-y-4">
+        <div className="mt-4 p-5 rounded-lg bg-surface border border-hairline shadow-sm space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-sm font-medium text-[var(--vscode-foreground)] flex items-center gap-2">
+              <div className="text-sm font-medium text-ink-strong flex items-center gap-2">
                 Update Center
                 <StatusBadge state={settings.updateCenter.state} />
               </div>
-              <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+              <div className="text-xs text-ink-muted mt-1">
                 App {settings.updateCenter.currentAppVersion} · Extension {settings.updateCenter.currentExtensionVersion}
               </div>
             </div>
 
             <button
               onClick={() => handleUpdateAction('updates:checkNow')}
-              className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] flex items-center gap-2"
+              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft flex items-center gap-2"
             >
-              <RefreshCw size={14} />
+              <Icon name="arrows-clockwise" size={14} />
               Check Now
             </button>
           </div>
 
-          <div className="grid gap-2 text-xs text-[var(--vscode-descriptionForeground)] sm:grid-cols-2">
+          <div className="grid gap-2 text-xs text-ink-muted sm:grid-cols-2">
             <div>Last successful check: {formatTimestamp(settings.updateCenter.lastSuccessfulCheckAt)}</div>
             <div>Last failed check: {formatTimestamp(settings.updateCenter.lastFailedCheckAt)}</div>
             <div>Skipped version: {settings.updateCenter.skippedVersion || 'None'}</div>
@@ -1066,7 +1085,7 @@ export function RitemarkSettings() {
             </div>
           </div>
 
-          <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+          <div className="text-xs text-ink-muted">
             Update source: {settings.updateCenter.feedSource === 'feed'
               ? 'Canonical release feed'
               : settings.updateCenter.feedSource === 'legacy'
@@ -1075,35 +1094,35 @@ export function RitemarkSettings() {
           </div>
 
           {settings.updateCenter.pendingRestartVersion && (
-            <div className="p-3 rounded bg-[var(--vscode-inputValidation-infoBackground)] border border-[var(--vscode-focusBorder)]">
-              <div className="text-sm font-medium text-[var(--vscode-foreground)]">
+            <div className="p-3 rounded bg-accent-soft border border-accent">
+              <div className="text-sm font-medium text-ink-strong">
                 Restart required
               </div>
-              <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+              <div className="text-xs text-ink-muted mt-1">
                 Extension {settings.updateCenter.pendingRestartVersion} is installed and will activate after reload.
               </div>
               <button
                 onClick={() => handleUpdateAction('updates:reload')}
-                className="mt-3 px-3 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] flex items-center gap-2"
+                className="mt-3 px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md flex items-center gap-2"
               >
-                <RotateCcw size={14} />
+                <Icon name="arrow-counter-clockwise" size={14} />
                 Reload Window
               </button>
             </div>
           )}
 
           {settings.updateCenter.availableUpdate && (
-            <div className="p-4 rounded bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)]">
+            <div className="p-4 rounded bg-surface-soft border border-hairline-strong">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-sm font-medium text-[var(--vscode-foreground)]">
+                  <div className="text-sm font-medium text-ink-strong">
                     {settings.updateCenter.availableUpdate.action === 'full' ? 'Full app update' : 'Extension update'} {settings.updateCenter.availableUpdate.version}
                   </div>
-                  <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                  <div className="text-xs text-ink-muted mt-1">
                     {settings.updateCenter.availableUpdate.summary || 'No release summary available.'}
                   </div>
                 </div>
-                <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+                <div className="text-xs text-ink-muted">
                   {formatSize(settings.updateCenter.availableUpdate.downloadSize)}
                 </div>
               </div>
@@ -1111,27 +1130,27 @@ export function RitemarkSettings() {
               <div className="flex flex-wrap gap-2 mt-4">
                 <button
                   onClick={() => handleUpdateAction('updates:install')}
-                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] flex items-center gap-2"
+                  className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md flex items-center gap-2"
                 >
-                  <Download size={14} />
+                  <Icon name="download" size={14} />
                   {settings.updateCenter.availableUpdate.action === 'full' ? 'Download Installer' : 'Install Update'}
                 </button>
                 <button
                   onClick={() => handleUpdateAction('updates:skipVersion')}
-                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                 >
                   Skip This Version
                 </button>
                 <button
                   onClick={() => handleUpdateAction('updates:pause')}
-                  className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                 >
                   Pause 7 Days
                 </button>
                 {(settings.updateCenter.skippedVersion || settings.updateCenter.snoozeUntil) && (
                   <button
                     onClick={() => handleUpdateAction('updates:resume')}
-                    className="px-3 py-2 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                    className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                   >
                     Re-enable Notifications
                   </button>
@@ -1141,32 +1160,32 @@ export function RitemarkSettings() {
           )}
 
           {settings.updateCenter.state === 'up-to-date' && !settings.updateCenter.pendingRestartVersion && (
-            <div className="text-sm text-[var(--vscode-foreground)]">
+            <div className="text-sm text-ink-strong">
               Ritemark is up to date.
             </div>
           )}
 
           {settings.updateCenter.state === 'blocked' && settings.updateCenter.blockedReason && (
-            <div className="p-3 rounded bg-[var(--vscode-inputValidation-warningBackground)] border border-[var(--vscode-inputValidation-warningBorder)] text-sm text-[var(--vscode-foreground)] flex items-start gap-2">
-              <AlertTriangle size={16} className="mt-0.5" />
+            <div className="p-3 rounded bg-ritemark-warning-soft border border-ritemark-warning text-sm text-ink-strong flex items-start gap-2">
+              <Icon name="warning" size={16} className="mt-0.5" />
               <span>{settings.updateCenter.blockedReason}</span>
             </div>
           )}
 
           {settings.updateCenter.state === 'error' && settings.updateCenter.error && (
-            <div className="p-3 rounded bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)] text-sm text-[var(--vscode-foreground)]">
+            <div className="p-3 rounded bg-ritemark-error-soft border border-ritemark-error text-sm text-ink-strong">
               Could not check for updates: {settings.updateCenter.error}
             </div>
           )}
 
           <div>
-            <div className="text-sm font-medium text-[var(--vscode-foreground)] mb-3">
+            <div className="text-sm font-medium text-ink-strong mb-3">
               Component readiness
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">
               <ComponentCard
-                icon={<HardDrive className="w-4 h-4" />}
+                icon={<Icon name="hard-drive" size={16} />}
                 title="Voice model"
                 status={settings.componentStatus.voiceModel.installed ? 'Installed' : 'Missing'}
                 details={[
@@ -1179,7 +1198,7 @@ export function RitemarkSettings() {
               />
 
               <ComponentCard
-                icon={<ShieldCheck className="w-4 h-4" />}
+                icon={<Icon name="shield-check" size={16} />}
                 title="Claude"
                 status={
                   settings.componentStatus.claudeCode.state === 'ready'
@@ -1220,7 +1239,7 @@ export function RitemarkSettings() {
                     || settings.componentStatus.claudeCode.state === 'not-installed') && (
                     <button
                       onClick={() => handleClaudeAction('claude:install')}
-                      className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                      className="px-3 py-1.5 text-xs rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
                     >
                       Install Claude
                     </button>
@@ -1229,7 +1248,7 @@ export function RitemarkSettings() {
                     || settings.componentStatus.claudeCode.state === 'broken') && (
                     <button
                       onClick={() => handleClaudeAction('claude:repair')}
-                      className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                      className="px-3 py-1.5 text-xs rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
                     >
                       Repair Claude
                     </button>
@@ -1237,7 +1256,7 @@ export function RitemarkSettings() {
                   {settings.componentStatus.claudeCode.repairAction === 'reload' && (
                     <button
                       onClick={() => handleClaudeAction('claude:reload')}
-                      className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                      className="px-3 py-1.5 text-xs rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
                     >
                       Reload Window
                     </button>
@@ -1250,7 +1269,7 @@ export function RitemarkSettings() {
                           ? 'claude:refreshStatus'
                           : 'claude:login'
                       )}
-                      className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                      className="px-3 py-1.5 text-xs rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
                     >
                       {settings.componentStatus.claudeCode.state === 'auth-in-progress'
                         ? 'Refresh Status'
@@ -1260,10 +1279,10 @@ export function RitemarkSettings() {
                 </div>
                 {settings.componentStatus.claudeCode.diagnostics.length > 0 && (
                   <details className="mt-3">
-                    <summary className="cursor-pointer text-xs text-[var(--vscode-textLink-foreground)] hover:underline">
+                    <summary className="cursor-pointer text-xs text-accent-deep hover:underline">
                       Technical details
                     </summary>
-                    <div className="mt-2 space-y-1 text-xs text-[var(--vscode-descriptionForeground)]">
+                    <div className="mt-2 space-y-1 text-xs text-ink-muted">
                       {settings.componentStatus.claudeCode.diagnostics.map((detail) => (
                         <div key={detail} className="break-words [overflow-wrap:anywhere]">
                           {detail}
@@ -1275,7 +1294,7 @@ export function RitemarkSettings() {
               </ComponentCard>
 
               <ComponentCard
-                icon={<Bot className="w-4 h-4" />}
+                icon={<Icon name="robot" size={16} />}
                 title="Codex CLI"
                 status={
                   settings.componentStatus.codex.state === 'ready'
@@ -1373,7 +1392,7 @@ function StatusBadge({ state }: { state: SettingsData['updateCenter']['state'] }
                 : 'Idle';
 
   return (
-    <span className="text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+    <span className="text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
       {label}
     </span>
   );
@@ -1393,13 +1412,13 @@ function ComponentCard({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 p-3 rounded bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
-      <div className="flex items-center gap-2 text-sm font-medium text-[var(--vscode-foreground)]">
+    <div className="min-w-0 p-4 rounded-lg bg-surface border border-hairline shadow-sm">
+      <div className="flex items-center gap-2 text-sm font-medium text-ink-strong">
         {icon}
         {title}
       </div>
-      <div className="mt-2 text-sm text-[var(--vscode-foreground)]">{status}</div>
-      <div className="mt-2 space-y-1 text-xs text-[var(--vscode-descriptionForeground)]">
+      <div className="mt-2 text-sm text-ink-strong">{status}</div>
+      <div className="mt-2 space-y-1 text-xs text-ink-muted">
         {details.map((detail) => (
           <div key={detail} className="break-words [overflow-wrap:anywhere]">
             {detail}
@@ -1411,28 +1430,146 @@ function ComponentCard({
   );
 }
 
+function ThemePreviewCard({
+  theme,
+  selected,
+  onSelect,
+}: {
+  theme: ThemeInfo;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const dark = theme.kind === 'dark';
+  const swatches = dark
+    ? {
+        frame: '#020617',
+        sidebar: '#020617',
+        surface: '#0F172A',
+        soft: '#1E293B',
+        hairline: '#334155',
+        text: '#F8FAFC',
+        muted: '#94A3B8',
+        body: '#CBD5E1',
+        accent: '#818CF8',
+      }
+    : {
+        frame: '#F8FAFC',
+        sidebar: '#F8FAFC',
+        surface: '#FFFFFF',
+        soft: '#F1F5F9',
+        hairline: '#CBD5E1',
+        text: '#1E1B4B',
+        muted: '#64748B',
+        body: '#475569',
+        accent: '#4338CA',
+      };
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`group text-left rounded-lg border p-3 transition-all focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)] ${
+        selected
+          ? 'border-accent shadow-ritemark-accent'
+          : 'border-hairline hover:border-hairline-strong hover:bg-surface-soft'
+      }`}
+    >
+      <div
+        className="overflow-hidden rounded-md border"
+        style={{
+          background: swatches.frame,
+          borderColor: swatches.hairline,
+        }}
+      >
+        <div
+          className="h-5 border-b"
+          style={{
+            background: swatches.frame,
+            borderColor: swatches.hairline,
+          }}
+        >
+          <div className="flex h-full items-center gap-1 px-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#F87171]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#FBBF24]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#4ADE80]" />
+            <span
+              className="ml-auto h-2 w-8 rounded-sm"
+              style={{ background: swatches.soft }}
+            />
+          </div>
+        </div>
+        <div className="grid h-28 grid-cols-[44px_1fr]">
+          <div
+            className="border-r p-2"
+            style={{
+              background: swatches.sidebar,
+              borderColor: swatches.hairline,
+            }}
+          >
+            <div className="mb-2 h-2 w-5 rounded-sm" style={{ background: swatches.accent }} />
+            <div className="space-y-1.5">
+              <div className="h-1.5 w-7 rounded-sm" style={{ background: swatches.muted }} />
+              <div className="h-1.5 w-5 rounded-sm" style={{ background: swatches.muted }} />
+              <div className="h-1.5 w-6 rounded-sm" style={{ background: swatches.soft }} />
+              <div className="h-1.5 w-4 rounded-sm" style={{ background: swatches.muted }} />
+            </div>
+          </div>
+          <div
+            className="p-3"
+            style={{ background: swatches.surface }}
+          >
+            <div className="mb-3 h-3 w-24 rounded-sm" style={{ background: swatches.text }} />
+            <div className="space-y-2">
+              <div className="h-2 w-full rounded-sm" style={{ background: swatches.body }} />
+              <div className="h-2 w-5/6 rounded-sm" style={{ background: swatches.body }} />
+              <div className="h-2 w-2/3 rounded-sm" style={{ background: swatches.muted }} />
+            </div>
+            <div className="mt-3 flex gap-1.5">
+              <div className="h-2 w-2 rounded-full" style={{ background: swatches.accent }} />
+              <div className="h-2 w-16 rounded-sm" style={{ background: swatches.body }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-ink-strong">{theme.label}</div>
+          <div className="mt-0.5 text-xs text-ink-muted">{theme.description}</div>
+        </div>
+        {selected && (
+          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Icon name="check" size={12} />
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 function ToggleRow({ label, description, checked, onChange, badge }: ToggleRowProps) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+    <div className="flex items-center justify-between p-4 rounded-lg bg-surface border border-hairline shadow-sm">
       <div>
-        <div className="text-sm font-medium text-[var(--vscode-foreground)] flex items-center gap-2">
+        <div className="text-sm font-medium text-ink-strong flex items-center gap-2">
           {label}
           {badge && (
-            <span className="text-xs px-2 py-0.5 rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
+            <span className="text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
               {badge}
             </span>
           )}
         </div>
-        <div className="text-xs text-[var(--vscode-descriptionForeground)]">{description}</div>
+        <div className="text-xs text-ink-muted">{description}</div>
       </div>
       <button
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative w-10 h-6 rounded-full transition-colors ${
+        className={`relative w-10 h-6 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)] ${
           checked
-            ? 'bg-[var(--vscode-button-background)]'
-            : 'bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)]'
+            ? 'bg-primary shadow-ritemark-accent'
+            : 'bg-surface-soft border border-hairline-strong'
         }`}
       >
         <span

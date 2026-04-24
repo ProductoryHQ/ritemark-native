@@ -6,7 +6,7 @@
  */
 
 import { memo } from 'react';
-import { Save } from 'lucide-react';
+import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { SaveFileNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -30,7 +30,7 @@ function SaveFileNodeComponent({ id, data, selected }: SaveFileNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Save size={16} />}
+      icon={<Icon name="floppy-disk" size={16} />}
       selected={selected}
       showSourceHandle={true}
       headerColor="var(--vscode-charts-orange)"

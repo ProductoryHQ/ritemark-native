@@ -6,7 +6,7 @@
  */
 
 import { memo } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { LLMNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -35,7 +35,7 @@ function LLMNodeComponent({ id, data, selected }: LLMNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Sparkles size={16} />}
+      icon={<Icon name="star-four" size={16} />}
       selected={selected}
       headerColor="var(--vscode-charts-purple)"
       executionStep={executionStep}
@@ -51,7 +51,7 @@ function LLMNodeComponent({ id, data, selected }: LLMNodeProps) {
         label="Prompt"
         value={truncateText(data.userPrompt) || 'No prompt'}
       />
-      <div className="flex gap-4 mt-2 text-xs text-[var(--vscode-descriptionForeground)]">
+      <div className="flex gap-4 mt-2 text-xs text-[var(--r-ink-muted)]">
         <span>Temp: {data.temperature ?? 0.7}</span>
         <span>Max: {data.maxTokens ?? 2000}</span>
       </div>

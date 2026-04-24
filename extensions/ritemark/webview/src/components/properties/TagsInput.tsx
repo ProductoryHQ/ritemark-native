@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 
 interface TagsInputProps {
   tags: string[]
@@ -43,7 +43,7 @@ export function TagsInput({ tags, onChange }: TagsInputProps) {
     <div
       onClick={handleContainerClick}
       className={`flex-1 flex flex-wrap items-center gap-1 px-2 py-1 min-h-[32px] bg-white border rounded cursor-text transition-colors ${
-        isFocused ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'
+        isFocused ? 'border-blue-400 ring-2 ring-blue-100' : 'border-hairline hover:border-hairline-strong'
       }`}
     >
       {/* Tag chips */}
@@ -60,7 +60,7 @@ export function TagsInput({ tags, onChange }: TagsInputProps) {
             }}
             className="hover:text-blue-600"
           >
-            <X size={12} />
+            <Icon name="x" size={12} />
           </button>
         </span>
       ))}
@@ -81,7 +81,7 @@ export function TagsInput({ tags, onChange }: TagsInputProps) {
         }}
         onFocus={() => setIsFocused(true)}
         placeholder={tags.length === 0 ? 'Add tags...' : ''}
-        className="flex-1 min-w-[80px] text-sm bg-transparent border-none outline-none placeholder-gray-400"
+        className="flex-1 min-w-[80px] text-sm bg-transparent border-none outline-none placeholder-ink-faint"
       />
     </div>
   )

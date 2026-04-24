@@ -6,7 +6,7 @@
  */
 
 import { memo } from 'react';
-import { Terminal } from 'lucide-react';
+import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { CodexNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -29,7 +29,7 @@ function CodexNodeComponent({ id, data, selected }: CodexNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Terminal size={16} />}
+      icon={<Icon name="terminal" size={16} />}
       selected={selected}
       headerColor="var(--vscode-charts-purple)"
       executionStep={executionStep}
@@ -44,7 +44,7 @@ function CodexNodeComponent({ id, data, selected }: CodexNodeProps) {
           value={data.model}
         />
       )}
-      <div className="mt-2 text-xs text-[var(--vscode-descriptionForeground)]">
+      <div className="mt-2 text-xs text-[var(--r-ink-muted)]">
         Timeout: {data.timeout || 5} min
       </div>
     </BaseNode>

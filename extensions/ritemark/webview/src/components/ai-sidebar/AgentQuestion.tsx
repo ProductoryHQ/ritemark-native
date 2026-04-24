@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { MessageCircle, Check } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import type { AgentQuestion as AgentQuestionData, AgentQuestionItem } from './types';
 
 interface AgentQuestionProps {
@@ -97,13 +97,13 @@ function SingleQuestion({
       {/* Question header chip */}
       <div className="flex items-center gap-2">
         <span
-          className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--vscode-panel-border)] text-[var(--vscode-descriptionForeground)]"
+          className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--r-hairline)] text-[var(--r-ink-muted)]"
           style={{ fontSize: '10px' }}
         >
           {item.header}
         </span>
         {item.multiSelect && (
-          <span className="text-[10px] text-[var(--vscode-descriptionForeground)] italic">
+          <span className="text-[10px] text-[var(--r-ink-muted)] italic">
             select all that apply
           </span>
         )}
@@ -111,7 +111,7 @@ function SingleQuestion({
 
       {/* Question text */}
       <p
-        className="text-[var(--vscode-foreground)]"
+        className="text-[var(--r-ink-strong)]"
         style={{ fontSize: 'var(--chat-font-size, 13px)' }}
       >
         {item.question}
@@ -128,21 +128,21 @@ function SingleQuestion({
               className="w-full text-left px-3 py-2 rounded border transition-colors"
               style={{
                 background: isSelected
-                  ? 'var(--vscode-button-background)'
+                  ? 'var(--r-accent)'
                   : 'var(--vscode-button-secondaryBackground)',
                 color: isSelected
                   ? 'var(--vscode-button-foreground)'
                   : 'var(--vscode-button-secondaryForeground)',
                 borderColor: isSelected
-                  ? 'var(--vscode-button-background)'
-                  : 'var(--vscode-panel-border)',
+                  ? 'var(--r-accent)'
+                  : 'var(--r-hairline)',
                 fontSize: 'var(--chat-font-size, 13px)',
               }}
             >
               <div className="flex items-start gap-2">
                 {/* Selection indicator */}
                 <span className="shrink-0 mt-0.5 w-3.5 h-3.5 flex items-center justify-center">
-                  {isSelected && <Check size={11} />}
+                  {isSelected && <Icon name="check" size={12} />}
                 </span>
                 <div>
                   <div className="font-medium">{option.label}</div>
@@ -170,20 +170,20 @@ function SingleQuestion({
             className="w-full text-left px-3 py-2 rounded border transition-colors"
             style={{
               background: otherSelected
-                ? 'var(--vscode-button-background)'
+                ? 'var(--r-accent)'
                 : 'var(--vscode-button-secondaryBackground)',
               color: otherSelected
                 ? 'var(--vscode-button-foreground)'
                 : 'var(--vscode-button-secondaryForeground)',
               borderColor: otherSelected
-                ? 'var(--vscode-button-background)'
-                : 'var(--vscode-panel-border)',
+                ? 'var(--r-accent)'
+                : 'var(--r-hairline)',
               fontSize: 'var(--chat-font-size, 13px)',
             }}
           >
             <div className="flex items-start gap-2">
               <span className="shrink-0 mt-0.5 w-3.5 h-3.5 flex items-center justify-center">
-                {otherSelected && <Check size={11} />}
+                {otherSelected && <Icon name="check" size={12} />}
               </span>
               <span className="font-medium">Other</span>
             </div>
@@ -255,12 +255,12 @@ export function AgentQuestion({ turnId, question, onAnswer, providerLabel = 'Cla
       className="rounded border px-3 py-3 space-y-4"
       style={{
         background: 'var(--vscode-input-background)',
-        borderColor: 'var(--vscode-panel-border)',
+        borderColor: 'var(--r-hairline)',
       }}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 text-[11px] text-[var(--vscode-descriptionForeground)]">
-        <MessageCircle size={13} className="shrink-0" />
+      <div className="flex items-center gap-2 text-[11px] text-[var(--r-ink-muted)]">
+        <Icon name="chat-circle" size={14} className="shrink-0" />
         <span>{providerLabel} needs your input to continue</span>
       </div>
 
@@ -281,7 +281,7 @@ export function AgentQuestion({ turnId, question, onAnswer, providerLabel = 'Cla
         disabled={!canSubmit}
         className="px-3 py-1.5 rounded text-xs font-medium transition-opacity"
         style={{
-          background: 'var(--vscode-button-background)',
+          background: 'var(--r-accent)',
           color: 'var(--vscode-button-foreground)',
           opacity: canSubmit ? 1 : 0.4,
           cursor: canSubmit ? 'pointer' : 'not-allowed',

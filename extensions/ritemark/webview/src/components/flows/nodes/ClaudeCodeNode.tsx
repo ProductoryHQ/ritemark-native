@@ -6,7 +6,7 @@
  */
 
 import { memo } from 'react';
-import { Bot } from 'lucide-react';
+import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { ClaudeCodeNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -29,7 +29,7 @@ function ClaudeCodeNodeComponent({ id, data, selected }: ClaudeCodeNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Bot size={16} />}
+      icon={<Icon name="robot" size={16} />}
       selected={selected}
       headerColor="var(--vscode-charts-orange)"
       executionStep={executionStep}
@@ -38,7 +38,7 @@ function ClaudeCodeNodeComponent({ id, data, selected }: ClaudeCodeNodeProps) {
         label="Prompt"
         value={truncateText(data.prompt) || 'No prompt'}
       />
-      <div className="mt-2 text-xs text-[var(--vscode-descriptionForeground)]">
+      <div className="mt-2 text-xs text-[var(--r-ink-muted)]">
         Timeout: {data.timeout || 5} min
       </div>
     </BaseNode>

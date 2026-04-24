@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Trash2, Pencil, Loader2, AlertCircle, Plus, Clock3 } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription } from '../ui/alert';
 import type { Flow, FlowsMessage } from './types';
@@ -80,7 +80,7 @@ export function FlowsPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full p-4">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+        <Icon name="circle-notch" size={20} className="animate-spin text-ink-muted" />
       </div>
     );
   }
@@ -89,7 +89,7 @@ export function FlowsPanel() {
     return (
       <div className="p-4">
         <Alert>
-          <AlertCircle className="h-4 w-4" />
+          <Icon name="warning-circle" size={16} />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
         <Button
@@ -106,14 +106,14 @@ export function FlowsPanel() {
   if (flows.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <div className="text-gray-500 mb-4">
+        <div className="text-ink-muted mb-4">
           <p className="text-sm mb-2">No flows yet</p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-ink-faint">
             Create your first automation workflow
           </p>
         </div>
         <Button onClick={handleNewFlow} size="sm">
-          <Plus className="w-4 h-4 mr-1" />
+          <Icon name="plus" size={16} className="mr-1" />
           New Flow
         </Button>
       </div>
@@ -128,7 +128,7 @@ export function FlowsPanel() {
             <div
               key={flow.id}
               onClick={() => handleOpenFlow(flow)}
-              className="group border rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+              className="group border rounded-lg p-3 hover:bg-surface-soft cursor-pointer transition-colors"
             >
               {/* Header with title and hover actions */}
               <div className="flex items-start justify-between mb-1">
@@ -147,43 +147,43 @@ export function FlowsPanel() {
                     className="h-6 w-6 p-0"
                     title="Edit flow"
                   >
-                    <Pencil className="w-3 h-3" />
+                    <Icon name="pencil-simple" size={12} />
                   </Button>
                   <Button
                     onClick={(e) => handleDeleteFlow(flow, e)}
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0 hover:text-red-500"
+                    className="h-6 w-6 p-0 hover:text-ritemark-error"
                     title="Delete flow"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Icon name="trash" size={12} />
                   </Button>
                 </div>
               </div>
 
               {/* Description */}
               {flow.description && (
-                <p className="text-xs text-gray-500 line-clamp-2">
+                <p className="text-xs text-ink-muted line-clamp-2">
                   {flow.description}
                 </p>
               )}
 
               {flow.schedule && (
                 <div className="mt-2 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <Clock3 className="w-3 h-3" />
+                  <div className="flex items-center gap-1.5 text-xs text-ink-muted">
+                    <Icon name="clock" size={12} />
                     <span>{formatScheduleSummary(flow.schedule)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-gray-400 truncate">
+                    <span className="text-[11px] text-ink-faint truncate">
                       Next: {formatScheduleDateTime(flow.nextScheduledRun ? new Date(flow.nextScheduledRun) : null)}
                     </span>
-                    <span className="text-[11px] rounded-full px-1.5 py-0.5 border border-gray-200 dark:border-gray-700 text-gray-500">
+                    <span className="text-[11px] rounded-full px-1.5 py-0.5 border border-hairline text-ink-muted">
                       {flow.scheduleRuntime?.lastStatus ?? 'idle'}
                     </span>
                   </div>
                   {flow.scheduleRuntime?.lastError && (
-                    <p className="text-[11px] text-red-500 line-clamp-2">
+                    <p className="text-[11px] text-ritemark-error line-clamp-2">
                       {flow.scheduleRuntime.lastError}
                     </p>
                   )}
@@ -191,7 +191,7 @@ export function FlowsPanel() {
               )}
 
               {/* Modified date */}
-              <div className="text-xs text-gray-400 mt-2">
+              <div className="text-xs text-ink-faint mt-2">
                 Modified: {new Date(flow.modified).toLocaleDateString()}
               </div>
             </div>

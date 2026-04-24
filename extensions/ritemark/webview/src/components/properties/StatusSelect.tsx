@@ -18,7 +18,7 @@ export function StatusSelect({ value, onChange }: StatusSelectProps) {
           className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
             value === option.value
               ? option.color
-              : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+              : 'bg-white text-ink-muted border-hairline hover:border-hairline-strong'
           }`}
         >
           {option.label}

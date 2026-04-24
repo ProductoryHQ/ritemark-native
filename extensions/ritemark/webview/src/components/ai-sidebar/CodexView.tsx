@@ -8,7 +8,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore } from './store';
-import { Terminal, FileCode, Loader2, Check, X, AlertTriangle, ChevronRight, Wrench } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { UserPromptBubble, AIResponseBubble } from './ChatBubbles';
 import { RunningIndicator } from './RunningIndicator';
 import { AgentQuestion } from './AgentQuestion';
@@ -51,7 +51,7 @@ export function CodexView() {
               />
             </div>
           )}
-          <Terminal className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <Icon name="terminal" size={20} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm font-medium opacity-70">Codex Agent</p>
           <p className="text-xs opacity-50 mt-1">
             OpenAI coding agent with ChatGPT authentication.
@@ -217,7 +217,7 @@ function CodexTurn({
       {/* Error */}
       {turn.result?.error && (
         <div className="flex items-start gap-2 text-xs text-[var(--vscode-testing-iconFailed)] pl-2">
-          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+          <Icon name="warning" size={12} className="mt-0.5 shrink-0" />
           <span>{turn.result.error}</span>
         </div>
       )}
@@ -225,7 +225,7 @@ function CodexTurn({
       {/* Plan-specific status (only when plan mode was explicitly requested) */}
       {turn.result && !turn.result.error && needsPlanReview && (
         <div className="flex items-center gap-2 text-xs text-[var(--vscode-testing-iconPassed)] pl-2">
-          <Check size={12} />
+          <Icon name="check" size={12} />
           <span>Waiting for plan review</span>
         </div>
       )}
@@ -243,7 +243,7 @@ function PlanCard({
   planText?: string;
 }) {
   return (
-    <div className="mx-1 p-3 rounded-lg border border-[var(--vscode-panel-border)] bg-[var(--vscode-input-background)]">
+    <div className="mx-1 p-3 rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]">
       <div className="text-[11px] opacity-70 mb-2 font-medium">Codex plan</div>
       {explanation && (
         <p className="text-[12px] opacity-85 mb-2 whitespace-pre-wrap">{explanation}</p>
@@ -299,14 +299,15 @@ function ActivitySection({
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 w-full text-left group hover:opacity-80 transition-opacity"
       >
-        <ChevronRight
+        <Icon
+          name="caret-right"
           size={12}
           className={`shrink-0 opacity-40 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
         />
         {isRunning ? (
-          <Loader2 size={11} className="shrink-0 animate-spin opacity-50" />
+          <Icon name="circle-notch" size={12} className="shrink-0 animate-spin opacity-50" />
         ) : (
-          <Wrench size={11} className="shrink-0 opacity-40" />
+          <Icon name="wrench" size={12} className="shrink-0 opacity-40" />
         )}
         <span className="text-[11px] opacity-50 truncate">
           {isRunning
@@ -318,7 +319,7 @@ function ActivitySection({
 
       {/* Expanded details */}
       {expanded && (
-        <div className="mt-1 ml-5 space-y-0.5 border-l border-[var(--vscode-panel-border)] pl-2">
+        <div className="mt-1 ml-5 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
           {activities.map((activity, i) => (
             <ActivityLine key={i} activity={activity} />
           ))}
@@ -330,11 +331,11 @@ function ActivitySection({
 
 function ActivityLine({ activity }: { activity: AgentProgress }) {
   const icon = activity.tool === 'shell' ? (
-    <Terminal size={10} className="shrink-0" />
+    <Icon name="terminal" size={12} className="shrink-0" />
   ) : activity.tool === 'apply_patch' ? (
-    <FileCode size={10} className="shrink-0" />
+    <Icon name="file-code" size={12} className="shrink-0" />
   ) : (
-    <Wrench size={10} className="shrink-0" />
+    <Icon name="wrench" size={12} className="shrink-0" />
   );
 
   return (
@@ -359,7 +360,7 @@ function ApprovalCard({
   return (
     <div className="mx-1 p-3 rounded-lg border-2 border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-editor-background)]">
       <div className="flex items-center gap-2 mb-2">
-        <AlertTriangle size={14} className="text-[var(--vscode-inputValidation-warningBorder)]" />
+        <Icon name="warning" size={14} className="text-[var(--vscode-inputValidation-warningBorder)]" />
         <span className="text-xs font-semibold">
           {isCommand ? 'Shell Command Approval' : 'File Change Approval'}
         </span>
@@ -400,15 +401,15 @@ function ApprovalCard({
       <div className="flex gap-2">
         <button
           onClick={() => onApprove(approval.requestId)}
-          className="flex items-center gap-1 px-3 py-1 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+          className="flex items-center gap-1 px-3 py-1 text-xs rounded bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
         >
-          <Check size={12} /> Approve
+          <Icon name="check" size={12} /> Approve
         </button>
         <button
           onClick={() => onReject(approval.requestId)}
           className="flex items-center gap-1 px-3 py-1 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
         >
-          <X size={12} /> Reject
+          <Icon name="x" size={12} /> Reject
         </button>
       </div>
     </div>
@@ -430,7 +431,7 @@ function CompatibilityNotice({
     <div className="rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-editorWarning-background)]/20 p-3 text-left">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2 min-w-0">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-[var(--vscode-inputValidation-warningBorder)]" />
+          <Icon name="warning" size={14} className="mt-0.5 shrink-0 text-[var(--vscode-inputValidation-warningBorder)]" />
           <div className="min-w-0">
             <div className="text-xs font-semibold">{title}</div>
             <p className="mt-1 text-xs leading-5 opacity-80">{message}</p>
@@ -449,7 +450,7 @@ function CompatibilityNotice({
           aria-label="Dismiss Codex compatibility notice"
           title="Dismiss"
         >
-          <X size={12} />
+          <Icon name="x" size={12} />
         </button>
       </div>
     </div>

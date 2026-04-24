@@ -975,8 +975,8 @@ export function Editor({
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
           font-size: 18px !important;
           line-height: 1.7 !important;
-          color: #374151 !important;
-          caret-color: #374151 !important;
+          color: var(--r-ink-body) !important;
+          caret-color: var(--r-ink-body) !important;
           max-width: 100% !important;
           max-width: 900px !important;
           margin: 0 auto !important;
@@ -987,49 +987,49 @@ export function Editor({
           margin: 0 0 1em 0 !important;
           font-size: 18px !important;
           line-height: 1.7 !important;
-          color: #374151 !important;
+          color: var(--r-ink-body) !important;
         }
 
         .wysiwyg-editor .ProseMirror h1 {
           font-size: 2rem !important;
           font-weight: 600 !important;
           margin: 1.5em 0 0.5em 0 !important;
-          color: #111827 !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror h2 {
           font-size: 1.5rem !important;
           font-weight: 600 !important;
           margin: 1.25em 0 0.5em 0 !important;
-          color: #111827 !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror h3 {
           font-size: 1.25rem !important;
           font-weight: 600 !important;
           margin: 1em 0 0.5em 0 !important;
-          color: #111827 !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror h4 {
           font-size: 1.125rem !important;
           font-weight: 600 !important;
           margin: 1em 0 0.5em 0 !important;
-          color: #111827 !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror h5 {
           font-size: 1rem !important;
           font-weight: 600 !important;
           margin: 1em 0 0.5em 0 !important;
-          color: #111827 !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror h6 {
           font-size: 0.875rem !important;
           font-weight: 600 !important;
           margin: 1em 0 0.5em 0 !important;
-          color: #111827 !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror ul.tiptap-bullet-list {
@@ -1076,19 +1076,19 @@ export function Editor({
           height: 1rem !important;
           margin: 0 !important;
           cursor: pointer !important;
-          border: 2px solid #9ca3af !important;
+          border: 2px solid var(--r-ink-faint) !important;
           border-radius: 3px !important;
           appearance: none !important;
           -webkit-appearance: none !important;
-          background-color: white !important;
+          background-color: var(--r-surface) !important;
           position: relative !important;
           top: 1px !important;
           flex-shrink: 0 !important;
         }
 
         .wysiwyg-editor .ProseMirror li.tiptap-task-item > label > input[type="checkbox"]:checked {
-          background-color: #4338ca !important;
-          border-color: #4338ca !important;
+          background-color: var(--r-accent) !important;
+          border-color: var(--r-accent) !important;
         }
 
         .wysiwyg-editor .ProseMirror li.tiptap-task-item > label > input[type="checkbox"]:checked::after {
@@ -1097,14 +1097,14 @@ export function Editor({
           top: 50% !important;
           left: 50% !important;
           transform: translate(-50%, -50%) !important;
-          color: white !important;
+          color: #ffffff !important;
           font-size: 11px !important;
           font-weight: bold !important;
           line-height: 1 !important;
         }
 
         .wysiwyg-editor .ProseMirror li.tiptap-task-item > label > input[type="checkbox"]:hover {
-          border-color: #4338ca !important;
+          border-color: var(--r-accent) !important;
         }
 
         .wysiwyg-editor .ProseMirror li.tiptap-task-item > div {
@@ -1119,32 +1119,32 @@ export function Editor({
 
         .wysiwyg-editor .ProseMirror strong {
           font-weight: 600 !important;
-          color: #111827 !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror em {
           font-style: italic !important;
-          color: #374151 !important;
+          color: var(--r-ink-body) !important;
         }
 
         .wysiwyg-editor .ProseMirror a.tiptap-link {
-          color: #4338ca !important;
+          color: var(--r-accent) !important;
           text-decoration: underline !important;
           cursor: pointer !important;
         }
 
         .wysiwyg-editor .ProseMirror a.tiptap-link:hover {
-          color: #3730a3 !important;
+          color: var(--r-accent-deep) !important;
         }
 
         /* Blockquote styling */
         .wysiwyg-editor .ProseMirror blockquote {
-          border-left: 4px solid #4338ca !important;
+          border-left: 4px solid var(--r-accent) !important;
           padding-left: 1rem !important;
           margin: 1em 0 !important;
-          color: #6b7280 !important;
+          color: var(--r-ink-muted) !important;
           font-style: italic !important;
-          background: #f9fafb !important;
+          background: var(--r-surface-soft) !important;
           padding: 0.75rem 1rem !important;
           border-radius: 0 8px 8px 0 !important;
         }
@@ -1155,12 +1155,12 @@ export function Editor({
 
         /* Increased specificity to override Vite HMR styles in dev mode */
         div.wysiwyg-editor .ProseMirror.ProseMirror ::selection {
-          background: rgba(67, 56, 202, 0.15) !important;
+          background: var(--r-accent-soft) !important;
           border-radius: 2px !important;
         }
 
         div.wysiwyg-editor .ProseMirror.ProseMirror ::-moz-selection {
-          background: rgba(67, 56, 202, 0.15) !important;
+          background: var(--r-accent-soft) !important;
         }
 
         /* Code block styling with dark theme */
@@ -1218,7 +1218,7 @@ export function Editor({
           background: rgba(255, 255, 255, 0.1) !important;
           border: 1px solid rgba(255, 255, 255, 0.2) !important;
           border-radius: 4px !important;
-          color: #9ca3af !important;
+          color: var(--r-ink-faint) !important;
           font-size: 12px !important;
           font-family: var(--ritemark-ui-font-family) !important;
           cursor: pointer !important;
@@ -1233,7 +1233,7 @@ export function Editor({
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:hover {
           background: rgba(255, 255, 255, 0.2) !important;
-          color: #f9fafb !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:active {
@@ -1242,7 +1242,7 @@ export function Editor({
 
         /* Copied state - green feedback */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn.copied {
-          color: #4ade80 !important;
+          color: var(--r-success) !important;
           opacity: 1 !important;
         }
 
@@ -1252,9 +1252,9 @@ export function Editor({
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram {
-          background: #f5f7fb !important;
-          border: 1px solid var(--vscode-panel-border, rgba(0, 0, 0, 0.12)) !important;
-          color: var(--vscode-editor-foreground, #111827) !important;
+          background: var(--r-surface-muted) !important;
+          border: 1px solid var(--r-hairline) !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .mermaid-toolbar {
@@ -1286,14 +1286,14 @@ export function Editor({
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn {
           background: rgba(255, 255, 255, 0.9) !important;
           border: 1px solid rgba(100, 116, 139, 0.24) !important;
-          color: #64748b !important;
+          color: var(--r-ink-muted) !important;
           box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn:hover {
           background: rgba(255, 255, 255, 1) !important;
-          color: #334155 !important;
-          border-color: rgba(67, 56, 202, 0.28) !important;
+          color: var(--r-ink-strong) !important;
+          border-color: var(--r-accent-fainter) !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn:active {
@@ -1308,7 +1308,7 @@ export function Editor({
           min-height: 60px !important;
           max-height: 1024px !important;
           overflow: auto !important;
-          background: #f5f7fb !important;
+          background: var(--r-surface-muted) !important;
           border-radius: 12px !important;
         }
 
@@ -1322,24 +1322,24 @@ export function Editor({
 
         .wysiwyg-editor .ProseMirror .mermaid-error {
           padding: 12px 16px !important;
-          color: #f87171 !important;
+          color: var(--r-error) !important;
           font-size: 13px !important;
           font-family: var(--vscode-editor-font-family, monospace) !important;
-          border: 1px solid rgba(248, 113, 113, 0.3) !important;
+          border: 1px solid var(--r-error-soft) !important;
           border-radius: 4px !important;
           margin: 8px 16px !important;
-          background: rgba(248, 113, 113, 0.05) !important;
+          background: var(--r-error-soft) !important;
         }
 
         /* Enhanced mobile selection */
         @media (max-width: 768px) {
           div.wysiwyg-editor .ProseMirror.ProseMirror ::selection {
-            background: rgba(67, 56, 202, 0.2) !important;
+            background: var(--r-accent-soft) !important;
           }
         }
 
         .wysiwyg-editor .ProseMirror p.is-editor-empty:first-child::before {
-          color: #9ca3af !important;
+          color: var(--r-ink-faint) !important;
           content: attr(data-placeholder) !important;
           float: left !important;
           height: 0 !important;
@@ -1354,14 +1354,14 @@ export function Editor({
           width: 100% !important;
           margin: 1em 0 !important;
           overflow: hidden !important;
-          border: 1px solid #d1d5db !important; /* User requested: 1px solid light grey */
+          border: 1px solid var(--r-hairline) !important; /* User requested: 1px solid light grey */
         }
 
         /* Table cells */
         .wysiwyg-editor .ProseMirror td.tiptap-table-cell,
         .wysiwyg-editor .ProseMirror th.tiptap-table-header {
           min-width: 1em !important;
-          border: 1px solid #d1d5db !important; /* User requested: 1px solid light grey */
+          border: 1px solid var(--r-hairline) !important; /* User requested: 1px solid light grey */
           padding: 0.5rem 0.75rem !important;
           vertical-align: top !important;
           box-sizing: border-box !important;
@@ -1372,14 +1372,14 @@ export function Editor({
         .wysiwyg-editor .ProseMirror th.tiptap-table-header {
           font-weight: 600 !important;
           text-align: left !important;
-          background-color: #f8fafc !important;
-          color: #111827 !important;
+          background-color: var(--r-surface-muted) !important;
+          color: var(--r-ink-strong) !important;
         }
 
         /* Row hover effect */
         .wysiwyg-editor .ProseMirror tr.tiptap-table-row:hover td,
         .wysiwyg-editor .ProseMirror tr.tiptap-table-row:hover th {
-          background-color: rgba(67, 56, 202, 0.05) !important;
+          background-color: var(--r-accent-soft) !important;
         }
 
         /* Selected cell */
@@ -1391,7 +1391,7 @@ export function Editor({
           right: 0 !important;
           top: 0 !important;
           bottom: 0 !important;
-          background: rgba(67, 56, 202, 0.1) !important;
+          background: var(--r-accent-soft) !important;
           pointer-events: none !important;
         }
 
@@ -1402,7 +1402,7 @@ export function Editor({
           top: 0 !important;
           bottom: 0 !important;
           width: 4px !important;
-          background-color: #4338ca !important;
+          background-color: var(--r-accent) !important;
           cursor: col-resize !important;
           opacity: 0 !important;
           transition: opacity 0.2s !important;
@@ -1469,7 +1469,7 @@ export function Editor({
           border: none;
           border-radius: 4px;
           background-color: transparent;
-          color: #9ca3af;
+          color: var(--r-ink-faint);
           cursor: pointer;
           opacity: 1 !important;
           transition: background-color 0.15s ease;

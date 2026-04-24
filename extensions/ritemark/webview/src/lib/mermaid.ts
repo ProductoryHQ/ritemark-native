@@ -11,6 +11,7 @@ let initialized = false
 // Detect VS Code theme from body class
 function getTheme(): 'dark' | 'neutral' {
   return document.body.classList.contains('vscode-dark') ||
+    document.body.classList.contains('ritemark-dark') ||
     document.body.classList.contains('vscode-high-contrast')
     ? 'dark'
     : 'neutral'
@@ -20,11 +21,13 @@ function getMermaidConfig() {
   const styles = getComputedStyle(document.documentElement)
   const bodyStyles = getComputedStyle(document.body)
   const isDark = getTheme() === 'dark'
+  const token = (name: string) =>
+    bodyStyles.getPropertyValue(name).trim() || styles.getPropertyValue(name).trim()
 
-  const foreground = styles.getPropertyValue('--foreground').trim() || (isDark ? '#e5e7eb' : '#1f2937')
-  const border = styles.getPropertyValue('--border').trim() || (isDark ? '#374151' : '#d1d5db')
-  const primary = styles.getPropertyValue('--primary').trim() || '#4338ca'
-  const editorBackground = styles.getPropertyValue('--background').trim() || (isDark ? '#111827' : '#ffffff')
+  const foreground = token('--foreground') || (isDark ? '#f8fafc' : '#1e1b4b')
+  const border = token('--border') || (isDark ? '#1E293B' : '#e2e8f0')
+  const primary = token('--primary') || (isDark ? '#818cf8' : '#4338ca')
+  const editorBackground = token('--background') || (isDark ? '#0F172A' : '#ffffff')
   const fontFamily = bodyStyles.fontFamily || "'Sofia Sans', sans-serif"
 
   return {

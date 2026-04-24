@@ -269,11 +269,11 @@ export function PromptTextArea({
       {showDropdown && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full max-h-[200px] overflow-y-auto rounded-md border bg-[var(--vscode-dropdown-background)] border-[var(--vscode-dropdown-border)] shadow-lg"
+          className="absolute z-50 w-full max-h-[200px] overflow-y-auto rounded-md border bg-[var(--r-surface)] border-[var(--r-hairline)] shadow-lg"
           style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
         >
           {filteredVariables.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-[var(--vscode-descriptionForeground)]">
+            <div className="px-3 py-2 text-sm text-[var(--r-ink-muted)]">
               No variables available
             </div>
           ) : (
@@ -283,15 +283,15 @@ export function PromptTextArea({
                   key={`${variable.type}-${variable.id}`}
                   className={cn(
                     'w-full px-3 py-2 text-left text-sm flex items-center justify-between',
-                    'hover:bg-[var(--vscode-list-hoverBackground)]',
+                    'hover:bg-[var(--r-surface-soft)]',
                     index === selectedIndex &&
-                      'bg-[var(--vscode-list-activeSelectionBackground)] text-[var(--vscode-list-activeSelectionForeground)]'
+                      'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)]'
                   )}
                   onClick={() => insertVariable(variable)}
                   onMouseEnter={() => setSelectedIndex(index)}
                 >
                   <span className="font-medium">{variable.label}</span>
-                  <span className="text-xs text-[var(--vscode-descriptionForeground)]">
+                  <span className="text-xs text-[var(--r-ink-muted)]">
                     {variable.description}
                   </span>
                 </button>

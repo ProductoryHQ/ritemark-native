@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, Loader2, Check, AlertCircle, Bot } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { ActivityCard } from './ActivityCard';
 import type { SubagentProgress } from './types';
 
@@ -21,9 +21,9 @@ export function SubagentCard({ subagent }: SubagentCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const statusIcon = {
-    running: <Loader2 size={12} className="animate-spin text-[var(--vscode-progressBar-background)]" />,
-    done: <Check size={12} className="text-green-500" />,
-    error: <AlertCircle size={12} className="text-[var(--vscode-errorForeground)]" />,
+    running: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--vscode-progressBar-background)]" />,
+    done: <Icon name="check" size={12} className="text-green-500" />,
+    error: <Icon name="warning-circle" size={12} className="text-[var(--r-error)]" />,
   }[subagent.status];
 
   const hasActivities = subagent.activities.length > 0;
@@ -34,26 +34,26 @@ export function SubagentCard({ subagent }: SubagentCardProps) {
       <button
         onClick={() => hasActivities && setIsExpanded(!isExpanded)}
         className={`flex items-center gap-2 w-full text-left ${
-          hasActivities ? 'cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)]' : 'cursor-default'
+          hasActivities ? 'cursor-pointer hover:bg-[var(--r-surface-soft)]' : 'cursor-default'
         } rounded px-1.5 py-1 -mx-1.5 transition-colors`}
         disabled={!hasActivities}
       >
         {/* Expand/collapse chevron */}
         {hasActivities ? (
           isExpanded ? (
-            <ChevronDown size={12} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+            <Icon name="caret-down" size={12} className="shrink-0 text-[var(--r-ink-muted)]" />
           ) : (
-            <ChevronRight size={12} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+            <Icon name="caret-right" size={12} className="shrink-0 text-[var(--r-ink-muted)]" />
           )
         ) : (
           <div className="w-3" />
         )}
 
         {/* Bot icon */}
-        <Bot size={13} className="shrink-0 text-[var(--vscode-progressBar-background)]" />
+        <Icon name="robot" size={14} className="shrink-0 text-[var(--vscode-progressBar-background)]" />
 
         {/* Task description */}
-        <span className="flex-1 text-[11px] truncate text-[var(--vscode-foreground)]">
+        <span className="flex-1 text-[11px] truncate text-[var(--r-ink-strong)]">
           {subagent.task}
         </span>
 
@@ -72,7 +72,7 @@ export function SubagentCard({ subagent }: SubagentCardProps) {
 
       {/* Result when done */}
       {subagent.status === 'done' && subagent.result && (
-        <div className="mt-1 ml-5 text-[10px] text-[var(--vscode-descriptionForeground)] italic">
+        <div className="mt-1 ml-5 text-[10px] text-[var(--r-ink-muted)] italic">
           {subagent.result}
         </div>
       )}

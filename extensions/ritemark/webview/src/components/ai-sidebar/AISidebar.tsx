@@ -132,7 +132,7 @@ export function AISidebar() {
     : null;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)]">
+    <div className="flex flex-col h-screen overflow-hidden text-[var(--r-ink-strong)] bg-[var(--vscode-sideBar-background)]">
       {/* Inject markdown styles once at root level */}
       <style dangerouslySetInnerHTML={{ __html: markdownStyles }} />
 

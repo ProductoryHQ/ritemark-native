@@ -21,9 +21,7 @@ function getPaddingLeft(level: number): number {
   return leftPaddingForLevel[level] ?? 42
 }
 
-// Active heading indicator — indigo reads well on both light and dark
-// VS Code sidebar backgrounds. Tailwind's indigo-500.
-const ACTIVE_COLOR = '#6366f1'
+const ACTIVE_COLOR = 'var(--r-accent)'
 
 function getItemStyle(
   heading: Heading,
@@ -55,7 +53,7 @@ function getItemStyle(
   if (heading.level === 1) {
     return {
       ...base,
-      color: isActive ? ACTIVE_COLOR : 'var(--vscode-foreground)',
+      color: isActive ? ACTIVE_COLOR : 'var(--r-ink-strong)',
       fontWeight: isActive ? 600 : 500,
       fontSize: 13,
     }
@@ -64,7 +62,7 @@ function getItemStyle(
   if (heading.level === 2) {
     return {
       ...base,
-      color: isActive ? ACTIVE_COLOR : 'var(--vscode-descriptionForeground)',
+      color: isActive ? ACTIVE_COLOR : 'var(--r-ink-muted)',
       fontWeight: isActive ? 600 : 400,
       fontSize: 12,
     }
@@ -73,7 +71,7 @@ function getItemStyle(
   if (heading.level === 3) {
     return {
       ...base,
-      color: isActive ? ACTIVE_COLOR : 'var(--vscode-descriptionForeground)',
+      color: isActive ? ACTIVE_COLOR : 'var(--r-ink-muted)',
       fontWeight: isActive ? 500 : 400,
       fontSize: 12,
       fontStyle: 'italic',
@@ -84,7 +82,7 @@ function getItemStyle(
   // H4+
   return {
     ...base,
-    color: isActive ? ACTIVE_COLOR : 'var(--vscode-descriptionForeground)',
+    color: isActive ? ACTIVE_COLOR : 'var(--r-ink-muted)',
     fontWeight: isActive ? 500 : 400,
     fontSize: 11,
     fontStyle: 'italic',

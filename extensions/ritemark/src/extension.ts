@@ -110,19 +110,21 @@ async function createAndOpenWorkspaceFlow(workspacePath: string): Promise<void> 
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  // === Theme & branding: only on fresh install or version upgrade ===
+  // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;
+  const designFoundationsThemeMigration = 'sprint-52-design-foundations-v1';
   const lastThemeVersion = context.globalState.get<string>('ritemark.themeAppliedVersion');
-  if (lastThemeVersion !== currentVersion) {
+  const lastDesignThemeMigration = context.globalState.get<string>('ritemark.designFoundationsThemeMigration');
+  if (lastThemeVersion !== currentVersion || lastDesignThemeMigration !== designFoundationsThemeMigration) {
     setTimeout(async () => {
       const wb = vscode.workspace.getConfiguration('workbench');
       const win = vscode.workspace.getConfiguration('window');
-      await win.update('autoDetectColorScheme', false, vscode.ConfigurationTarget.Global);
-      await wb.update('colorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
+      await win.update('autoDetectColorScheme', true, vscode.ConfigurationTarget.Global);
       await wb.update('iconTheme', 'ritemark-icons', vscode.ConfigurationTarget.Global);
       await wb.update('preferredLightColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredDarkColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
+      await wb.update('preferredDarkColorTheme', 'ritemark-dark', vscode.ConfigurationTarget.Global);
       context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
+      context.globalState.update('ritemark.designFoundationsThemeMigration', designFoundationsThemeMigration);
     }, 1500);
   }
 

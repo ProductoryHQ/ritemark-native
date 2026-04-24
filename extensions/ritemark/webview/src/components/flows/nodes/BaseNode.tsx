@@ -38,7 +38,7 @@ export function BaseNode({
       className={cn(
         'min-w-[200px] rounded-lg border shadow-sm',
         'bg-[var(--vscode-editor-background)]',
-        'border-[var(--vscode-panel-border)]',
+        'border-[var(--r-hairline)]',
         selected && 'ring-2 ring-[var(--vscode-focusBorder)]',
         className
       )}
@@ -48,13 +48,13 @@ export function BaseNode({
         <Handle
           type="target"
           position={Position.Top}
-          className="!w-3 !h-3 !bg-[var(--vscode-button-background)] !border-[var(--vscode-panel-border)]"
+          className="!w-3 !h-3 !bg-[var(--r-accent)] !border-[var(--r-hairline)]"
         />
       )}
 
       {/* Header */}
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-b border-[var(--vscode-panel-border)]"
+        className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-b border-[var(--r-hairline)]"
         style={{ background: headerColor }}
       >
         {/* Execution step badge */}
@@ -79,7 +79,7 @@ export function BaseNode({
         <Handle
           type="source"
           position={Position.Bottom}
-          className="!w-3 !h-3 !bg-[var(--vscode-button-background)] !border-[var(--vscode-panel-border)]"
+          className="!w-3 !h-3 !bg-[var(--r-accent)] !border-[var(--r-hairline)]"
         />
       )}
     </div>
@@ -96,12 +96,12 @@ interface NodeFieldProps {
 export function NodeField({ label, value, truncate = true }: NodeFieldProps) {
   return (
     <div className="mb-2 last:mb-0">
-      <div className="text-xs text-[var(--vscode-descriptionForeground)] mb-0.5">
+      <div className="text-xs text-[var(--r-ink-muted)] mb-0.5">
         {label}
       </div>
       <div
         className={cn(
-          'text-sm text-[var(--vscode-foreground)]',
+          'text-sm text-[var(--r-ink-strong)]',
           truncate && 'truncate'
         )}
         title={value}

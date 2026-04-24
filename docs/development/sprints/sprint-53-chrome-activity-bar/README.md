@@ -4,13 +4,15 @@ The second altitude of Ritemark's Indigo-Editorial rollout. Sprint 52 ships the 
 
 ## Why this sprint exists
 
-Ritemark currently ships a custom titlebar, a truncated layout-controls menu, hidden accounts icon, Explorer sidebar with Ritemark polish, and an Auxiliary Bar reserved for AI. What it doesn't ship: a coherent activity bar plan (slots for Agents + Flows on the right-hand rail), a selected-row indicator rule (2px indigo left-border — spec'd in Sprint 52, not yet applied to VS Code core surfaces), unified tab styling that reads as Ritemark rather than VS Code, a status bar that respects the palette instead of defaulting to VS Code blue, and a keyboard-first navigation audit that confirms every chrome surface responds to keyboard without mouse.
+Ritemark currently ships a custom titlebar, a truncated layout-controls menu, hidden accounts icon, Explorer sidebar with Ritemark polish, the existing Flow activity button, and a right-side Agent Chat Panel. What it doesn't ship yet is the target chrome layout: the activity bar should be vertical on the far left of the sidebar instead of horizontal above the sidebar. Sprint 53 also applies the selected-row rule, unified tab styling, status bar palette, and keyboard-first navigation audit across chrome surfaces.
 
 Sprint 52 gives us the vocabulary (tokens, primitives, dark theme). Sprint 53 writes the sentence (the chrome you live inside).
 
 ## In scope
 
-- Activity bar (`workbench.parts.activitybar.*` via patch 002) — add explicit slots for Ritemark Agents and Ritemark Flows, each with a defined position, icon, and selected-row indicator (2px indigo left-border per skill spec)
+- Activity bar (`workbench.parts.activitybar.*` via patch 002) — move the existing horizontal-over-sidebar activity bar to the vertical rail left of the sidebar, matching the attached target layout
+- Existing Flow button — preserve it in the migrated vertical activity bar
+- Right Agent Chat Panel — keep it as-is; Sprint 53 does not implement the Sprint 54 Agent Library / Agents feature
 - Titlebar — confirm layout-controls menu is exactly three items (left sidebar toggle, right sidebar toggle, settings gear); account for any drift since patch 002
 - Tabs — restyle through `tab.*` theme keys to match Ritemark hairlines + active-indicator color; active tab indicator becomes indigo (top border, 2px)
 - Status bar — restyle through `statusBar.*` theme keys; no more VS Code blue; reads as Ritemark (surface-muted background, ink-body text, indigo for interactive segments)
@@ -21,8 +23,8 @@ Sprint 52 gives us the vocabulary (tokens, primitives, dark theme). Sprint 53 wr
 ## Out of scope
 
 - Editor area redesign (future sprint — design is currently missing per the pen file roadmap card discussion)
-- Agent Library surface (Sprint 54)
-- Flows sidebar content (Sprint 55 promotes Flows from experimental to activity-bar; this sprint only reserves the slot and wires the icon)
+- Agent Library / Agents feature surface (Sprint 54)
+- Flows sidebar content (Sprint 55); Sprint 53 only preserves the existing Flow button while moving the activity bar
 - Settings page redesign (Sprint 56)
 - New patches beyond the existing 001-006 set; changes to chrome land inside the existing domain-grouped patches
 
@@ -33,13 +35,19 @@ Sprint 52 gives us the vocabulary (tokens, primitives, dark theme). Sprint 53 wr
 ## Success signal
 
 - A new user opens Ritemark Native cold and the chrome reads as *a product*, not *a VS Code variant*
-- Every primary surface (Explorer, Agents, Flows, Settings, Terminal, AI) reachable via a single activity-bar click with a visible selected state
+- Existing primary surfaces remain reachable after the activity bar moves vertical, including the current Flow button and the right Agent Chat Panel
 - Dark mode + light mode chrome both respect the palette; status bar is never VS Code blue
 - Keyboard users can navigate the full chrome without touching the mouse; `notes/keyboard-map.md` documents the path
 - Visual regression harness (from Sprint 52) captures new chrome baselines and catches future drift
 
 ## Status
 
-**Current Phase:** Not started — blocked on Sprint 52 completion
+**Current Phase:** Preparation — user clarification applied; Sprint 53 is chrome layout, not Agents implementation
 **Current Branch:** TBD
-**Next Gate:** Sprint 52 handover → Sprint 53 Phase 1 audit
+**Next Gate:** Sprint 53 Phase 1 chrome audit + remaining designer defaults confirmed or accepted
+
+## Open UI Inputs
+
+Designer answers and later user clarification are tracked in `notes/designer-questions.md`. The authoritative clarification: keep the right Agent Chat Panel as-is, do not implement Agents in Sprint 53, preserve the existing Flow button, and move the current activity bar from horizontal-over-sidebar to the vertical rail left of the sidebar.
+
+Remaining defaulted items before Phase 3: migrated activity-bar hover/selected/focus treatment, collapsed activity-bar behavior, unfocused active-tab border, status bar semantic intensity, keyboard/focus visual treatment, and exact visual-regression baselines.

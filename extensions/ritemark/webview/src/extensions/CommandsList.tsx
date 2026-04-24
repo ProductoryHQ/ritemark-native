@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { Icon } from '../components/ui/Icon'
 import type { BlockItemDef } from './blockItems'
 
 interface CommandsListProps {
@@ -85,7 +86,7 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
               className="flex items-center justify-center w-8 h-8"
               style={{ color: 'var(--vscode-descriptionForeground, #666666)' }}
             >
-              <item.icon size={18} />
+              <Icon name={item.icon} size={20} />
             </span>
             <div className="flex flex-col items-start flex-1">
               <div className="font-medium">{item.title}</div>

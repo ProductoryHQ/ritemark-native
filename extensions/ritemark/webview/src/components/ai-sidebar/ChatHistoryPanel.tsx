@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react';
-import { MessageSquarePlus, Trash2, Bot, Sparkles, Terminal, X, History } from 'lucide-react';
+import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import type { SavedConversation } from './chatHistoryStorage';
 import type { AgentId } from './types';
@@ -64,18 +64,17 @@ const groupLabels: Record<DateGroup, string> = {
 
 // ── Agent Badge ────────────────────────────────────────────────────────
 
-const agentBadgeConfig: Record<AgentId, { icon: typeof Bot; label: string }> = {
-  'claude-code': { icon: Bot, label: 'Claude' },
-  'codex': { icon: Terminal, label: 'Codex' },
-  'ritemark-agent': { icon: Sparkles, label: 'Agent' },
+const agentBadgeConfig: Record<AgentId, { icon: PhosphorIconName; label: string }> = {
+  'claude-code': { icon: 'robot', label: 'Claude' },
+  'codex': { icon: 'terminal', label: 'Codex' },
+  'ritemark-agent': { icon: 'star-four', label: 'Agent' },
 };
 
 function AgentBadge({ agentId }: { agentId: AgentId }) {
   const config = agentBadgeConfig[agentId] || agentBadgeConfig['ritemark-agent'];
-  const Icon = config.icon;
   return (
     <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
-      <Icon size={10} />
+      <Icon name={config.icon} size={12} />
       <span>{config.label}</span>
     </span>
   );
@@ -117,8 +116,8 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: Conver
         group flex items-start gap-2 p-2 rounded cursor-pointer
         transition-colors duration-100
         ${isActive
-          ? 'bg-[var(--vscode-list-activeSelectionBackground)] text-[var(--vscode-list-activeSelectionForeground)]'
-          : 'hover:bg-[var(--vscode-list-hoverBackground)]'
+          ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)]'
+          : 'hover:bg-[var(--r-surface-soft)]'
         }
       `}
     >
@@ -129,7 +128,7 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: Conver
           </span>
           <AgentBadge agentId={conversation.agentId} />
         </div>
-        <span className="text-[10px] text-[var(--vscode-descriptionForeground)]">
+        <span className="text-[10px] text-[var(--r-ink-muted)]">
           {formatTime(conversation.updatedAt)}
         </span>
       </div>
@@ -139,12 +138,12 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: Conver
           shrink-0 p-1 rounded transition-colors
           ${confirmDelete
             ? 'bg-[var(--vscode-inputValidation-errorBackground)] text-[var(--vscode-inputValidation-errorForeground)]'
-            : 'opacity-0 group-hover:opacity-100 hover:bg-[var(--vscode-toolbar-hoverBackground)]'
+            : 'opacity-0 group-hover:opacity-100 hover:bg-[var(--r-surface-soft)]'
           }
         `}
         title={confirmDelete ? 'Click again to confirm delete' : 'Delete conversation'}
       >
-        <Trash2 size={14} />
+        <Icon name="trash" size={14} />
       </button>
     </div>
   );
@@ -155,11 +154,11 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: Conver
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-      <History size={48} className="mb-4 opacity-30" />
-      <p className="text-[13px] text-[var(--vscode-descriptionForeground)]">
+      <Icon name="clock-counter-clockwise" size={20} className="mb-4 opacity-30" />
+      <p className="text-[13px] text-[var(--r-ink-muted)]">
         No conversations yet
       </p>
-      <p className="text-[11px] text-[var(--vscode-descriptionForeground)] mt-1">
+      <p className="text-[11px] text-[var(--r-ink-muted)] mt-1">
         Your chat history will appear here
       </p>
     </div>
@@ -182,27 +181,27 @@ export function ChatHistoryPanel() {
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-[var(--vscode-sideBar-background)] animate-in slide-in-from-left duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--vscode-panel-border)]">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--r-hairline)]">
         <div className="flex items-center gap-2">
-          <History size={16} />
+          <Icon name="clock-counter-clockwise" size={16} />
           <span className="text-[13px] font-medium">Chat History</span>
         </div>
         <button
           onClick={toggleHistoryPanel}
-          className="p-1 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+          className="p-1 rounded hover:bg-[var(--r-surface-soft)]"
           title="Close"
         >
-          <X size={16} />
+          <Icon name="x" size={16} />
         </button>
       </div>
 
       {/* New Chat Button */}
-      <div className="px-2 py-2 border-b border-[var(--vscode-panel-border)]">
+      <div className="px-2 py-2 border-b border-[var(--r-hairline)]">
         <button
           onClick={startNewConversation}
-          className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded text-[12px] font-medium bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] transition-colors"
+          className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded text-[12px] font-medium bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] transition-colors"
         >
-          <MessageSquarePlus size={14} />
+          <Icon name="note-pencil" size={14} />
           New Chat
         </button>
       </div>
@@ -217,7 +216,7 @@ export function ChatHistoryPanel() {
               if (grouped[group].length === 0) return null;
               return (
                 <div key={group} className="mb-3">
-                  <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--vscode-descriptionForeground)]">
+                  <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--r-ink-muted)]">
                     {groupLabels[group]}
                   </div>
                   {grouped[group].map((conv) => (

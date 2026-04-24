@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 import { PropertyRow } from './PropertyRow'
 import { AddPropertyMenu } from './AddPropertyMenu'
 
@@ -88,9 +88,9 @@ export function PropertiesPanel({ properties, hasProperties, onChange }: Propert
         <div className="relative">
           <button
             onClick={() => setShowAddMenu(!showAddMenu)}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink-strong hover:bg-surface-soft rounded transition-colors"
           >
-            <Plus size={12} />
+            <Icon name="plus" size={12} />
             Add properties
           </button>
           {showAddMenu && (
@@ -106,28 +106,28 @@ export function PropertiesPanel({ properties, hasProperties, onChange }: Propert
   }
 
   return (
-    <div className="border-b border-gray-200">
+    <div className="border-b border-hairline">
       {/* Header - always visible */}
       <div
-        className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-gray-100 transition-colors"
+        className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-surface-soft transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
           {isExpanded ? (
-            <ChevronUp size={16} className="text-gray-500" />
+            <Icon name="caret-up" size={16} className="text-ink-muted" />
           ) : (
-            <ChevronDown size={16} className="text-gray-500" />
+            <Icon name="caret-down" size={16} className="text-ink-muted" />
           )}
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-ink-strong">
             Properties ({propertyCount})
           </span>
         </div>
         <div className="relative" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowAddMenu(!showAddMenu)}
-            className="flex items-center gap-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-xs bg-white border border-hairline-strong rounded hover:bg-surface-muted transition-colors"
           >
-            <Plus size={12} />
+            <Icon name="plus" size={12} />
             Add
           </button>
           {showAddMenu && (

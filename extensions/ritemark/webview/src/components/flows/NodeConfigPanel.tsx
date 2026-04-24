@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trash2, Plus, X, FolderOpen } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
@@ -45,8 +45,8 @@ export function NodeConfigPanel() {
 
   if (!selectedNode) {
     return (
-      <div className="h-full p-4 bg-[var(--vscode-sideBar-background)] border-l border-[var(--vscode-panel-border)]">
-        <div className="text-center text-[var(--vscode-descriptionForeground)] mt-8">
+      <div className="h-full p-4 bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
+        <div className="text-center text-[var(--r-ink-muted)] mt-8">
           <p className="text-sm">Select a node to edit its properties</p>
         </div>
       </div>
@@ -74,20 +74,20 @@ export function NodeConfigPanel() {
   const nodeLabel = (selectedNode.data as { label?: string }).label || 'this node';
 
   return (
-    <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--vscode-panel-border)]">
+    <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-[var(--vscode-panel-border)]">
+      <div className="flex-shrink-0 p-4 border-b border-[var(--r-hairline)]">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-[var(--vscode-foreground)]">
+          <div className="text-sm font-semibold text-[var(--r-ink-strong)]">
             {isTriggerNode ? 'Trigger Settings' : 'Node Properties'}
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClose}
-            className="text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+            className="text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]"
           >
-            <X size={16} />
+            <Icon name="x" size={16} />
           </Button>
         </div>
       </div>
@@ -144,10 +144,10 @@ export function NodeConfigPanel() {
 
         {/* Delete button at bottom (not for Trigger node) */}
         {!isTriggerNode && (
-          <div className="pt-4 mt-4 border-t border-[var(--vscode-panel-border)]">
+          <div className="pt-4 mt-4 border-t border-[var(--r-hairline)]">
             {showDeleteConfirm ? (
               <div className="p-3 rounded bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)]">
-                <p className="text-sm text-[var(--vscode-foreground)] mb-3">
+                <p className="text-sm text-[var(--r-ink-strong)] mb-3">
                   Delete "{nodeLabel}"? This cannot be undone.
                 </p>
                 <div className="flex gap-2">
@@ -155,9 +155,9 @@ export function NodeConfigPanel() {
                     variant="destructive"
                     size="sm"
                     onClick={handleDeleteConfirm}
-                    className="flex-1 bg-[var(--vscode-errorForeground)] text-white hover:opacity-90"
+                    className="flex-1 bg-[var(--r-error)] text-white hover:opacity-90"
                   >
-                    <Trash2 size={14} className="mr-1" />
+                    <Icon name="trash" size={14} className="mr-1" />
                     Delete
                   </Button>
                   <Button
@@ -175,9 +175,9 @@ export function NodeConfigPanel() {
                 variant="ghost"
                 size="sm"
                 onClick={handleDeleteClick}
-                className="w-full text-[var(--vscode-errorForeground)] hover:bg-[var(--vscode-inputValidation-errorBackground)]"
+                className="w-full text-[var(--r-error)] hover:bg-[var(--vscode-inputValidation-errorBackground)]"
               >
-                <Trash2 size={14} className="mr-2" />
+                <Icon name="trash" size={14} className="mr-2" />
                 Delete Node
               </Button>
             )}
@@ -198,10 +198,10 @@ interface FieldProps {
 function Field({ label, children, description }: FieldProps) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs text-[var(--vscode-foreground)]">{label}</Label>
+      <Label className="text-xs text-[var(--r-ink-strong)]">{label}</Label>
       {children}
       {description && (
-        <p className="text-xs text-[var(--vscode-descriptionForeground)]">
+        <p className="text-xs text-[var(--r-ink-muted)]">
           {description}
         </p>
       )}
@@ -276,9 +276,9 @@ function TriggerNodeConfig({ data, onUpdate }: TriggerNodeConfigProps) {
         />
       </Field>
 
-      <div className="pt-2 border-t border-[var(--vscode-panel-border)]">
+      <div className="pt-2 border-t border-[var(--r-hairline)]">
         <div className="flex items-center justify-between mb-3">
-          <Label className="text-xs font-semibold text-[var(--vscode-foreground)]">
+          <Label className="text-xs font-semibold text-[var(--r-ink-strong)]">
             Flow Inputs
           </Label>
           <Button
@@ -287,13 +287,13 @@ function TriggerNodeConfig({ data, onUpdate }: TriggerNodeConfigProps) {
             onClick={addInput}
             className="h-7 px-2 text-xs"
           >
-            <Plus size={14} className="mr-1" />
+            <Icon name="plus" size={14} className="mr-1" />
             Add Input
           </Button>
         </div>
 
         {inputs.length === 0 ? (
-          <p className="text-xs text-[var(--vscode-descriptionForeground)] italic">
+          <p className="text-xs text-[var(--r-ink-muted)] italic">
             No inputs. Click "Add Input" to create one.
           </p>
         ) : (
@@ -301,19 +301,19 @@ function TriggerNodeConfig({ data, onUpdate }: TriggerNodeConfigProps) {
             {inputs.map((input, index) => (
               <div
                 key={input.id}
-                className="p-3 rounded bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]"
+                className="p-3 rounded bg-[var(--vscode-editor-background)] border border-[var(--r-hairline)]"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-[var(--vscode-descriptionForeground)]">
+                  <span className="text-xs font-medium text-[var(--r-ink-muted)]">
                     Input {index + 1}
                   </span>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => removeInput(input.id)}
-                    className="h-6 w-6 p-0 text-[var(--vscode-errorForeground)]"
+                    className="h-6 w-6 p-0 text-[var(--r-error)]"
                   >
-                    <X size={14} />
+                    <Icon name="x" size={14} />
                   </Button>
                 </div>
 
@@ -602,7 +602,7 @@ function ImageInputSelector({ nodeId, selectedImages, onChange }: ImageInputSele
   if (availableSources.length === 0) {
     return (
       <Field label="Input Images" description="Add file inputs to Trigger or connect upstream Image nodes">
-        <div className="text-xs text-[var(--vscode-descriptionForeground)] italic p-2 rounded bg-[var(--vscode-editor-background)]">
+        <div className="text-xs text-[var(--r-ink-muted)] italic p-2 rounded bg-[var(--vscode-editor-background)]">
           No image sources available
         </div>
       </Field>
@@ -617,8 +617,8 @@ function ImageInputSelector({ nodeId, selectedImages, onChange }: ImageInputSele
             key={source.id}
             className={cn(
               'flex items-center gap-2 p-2 rounded cursor-pointer text-sm',
-              'hover:bg-[var(--vscode-list-hoverBackground)]',
-              selectedImages.includes(source.id) && 'bg-[var(--vscode-list-activeSelectionBackground)]'
+              'hover:bg-[var(--r-surface-soft)]',
+              selectedImages.includes(source.id) && 'bg-[var(--r-accent-soft)]'
             )}
           >
             <input
@@ -902,9 +902,9 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
         />
       </Field>
 
-      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
-        <div className="text-xs text-[var(--vscode-descriptionForeground)]">
-          <strong className="text-[var(--vscode-foreground)]">Tip:</strong>{' '}
+      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--r-hairline)]">
+        <div className="text-xs text-[var(--r-ink-muted)]">
+          <strong className="text-[var(--r-ink-strong)]">Tip:</strong>{' '}
           Reference upstream file outputs using{' '}
           <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Node Label}'}</code>.
           Example: "Process the file at{' '}
@@ -912,9 +912,9 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
         </div>
       </div>
 
-      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
-        <div className="text-xs text-[var(--vscode-descriptionForeground)]">
-          <strong className="text-[var(--vscode-foreground)]">Note:</strong>{' '}
+      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--r-hairline)]">
+        <div className="text-xs text-[var(--r-ink-muted)]">
+          <strong className="text-[var(--r-ink-strong)]">Note:</strong>{' '}
           Claude Code CLI must be installed and authenticated. Run{' '}
           <code className="px-1 bg-[var(--vscode-editor-background)] rounded">claude</code>{' '}
           in your terminal to set up.
@@ -1009,9 +1009,9 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
         />
       </Field>
 
-      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
-        <div className="text-xs text-[var(--vscode-descriptionForeground)]">
-          <strong className="text-[var(--vscode-foreground)]">Tip:</strong>{' '}
+      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--r-hairline)]">
+        <div className="text-xs text-[var(--r-ink-muted)]">
+          <strong className="text-[var(--r-ink-strong)]">Tip:</strong>{' '}
           Reference upstream file outputs using{' '}
           <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Node Label}'}</code>.
           Example: "Process the file at{' '}
@@ -1019,9 +1019,9 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
         </div>
       </div>
 
-      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--vscode-panel-border)]">
-        <div className="text-xs text-[var(--vscode-descriptionForeground)]">
-          <strong className="text-[var(--vscode-foreground)]">Note:</strong>{' '}
+      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--r-hairline)]">
+        <div className="text-xs text-[var(--r-ink-muted)]">
+          <strong className="text-[var(--r-ink-strong)]">Note:</strong>{' '}
           Codex CLI must be installed and authenticated via ChatGPT. Actions are auto-approved during flow execution.
         </div>
       </div>
@@ -1152,7 +1152,7 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
             onClick={() => vscode.postMessage({ type: 'flow:pickFolder', field: 'folder' })}
             title="Browse folders"
           >
-            <FolderOpen className="w-4 h-4" />
+            <Icon name="folder-open" size={16} />
           </Button>
         </div>
       </Field>
@@ -1185,20 +1185,20 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
 
           {/* Variable picker dropdown */}
           {showVarPicker && (
-            <div className="absolute z-50 mt-1 w-full bg-[var(--vscode-dropdown-background)] border border-[var(--vscode-dropdown-border)] rounded shadow-lg max-h-48 overflow-y-auto">
+            <div className="absolute z-50 mt-1 w-full bg-[var(--r-surface)] border border-[var(--r-hairline)] rounded shadow-lg max-h-48 overflow-y-auto">
               {availableVars.map((v, i) => (
                 <button
                   key={i}
                   onClick={() => insertVariable(v.value)}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--vscode-list-hoverBackground)] flex justify-between items-center"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--r-surface-soft)] flex justify-between items-center"
                 >
-                  <span className="text-[var(--vscode-foreground)]">{v.label}</span>
-                  <span className="text-xs text-[var(--vscode-descriptionForeground)]">{v.type}</span>
+                  <span className="text-[var(--r-ink-strong)]">{v.label}</span>
+                  <span className="text-xs text-[var(--r-ink-muted)]">{v.type}</span>
                 </button>
               ))}
               <button
                 onClick={() => setShowVarPicker(false)}
-                className="w-full px-3 py-1 text-left text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-list-hoverBackground)] border-t border-[var(--vscode-dropdown-border)]"
+                className="w-full px-3 py-1 text-left text-xs text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] border-t border-[var(--r-hairline)]"
               >
                 Cancel
               </button>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileText, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 
 interface FileChangeNotificationProps {
   isVisible: boolean
@@ -51,7 +51,7 @@ export function FileChangeNotification({
   return (
     <div className="file-change-banner">
       <div className="banner-content">
-        <FileText size={16} className="banner-icon" />
+        <Icon name="file-text" size={16} className="banner-icon" />
         <div className="banner-text">
           <strong>{filename}</strong> changed on disk.
           {isDirty && <span className="warning-text"> You have unsaved changes.</span>}
@@ -72,7 +72,7 @@ export function FileChangeNotification({
           </>
         )}
         <button className="btn-dismiss" onClick={onDismiss} aria-label="Dismiss">
-          <X size={16} />
+          <Icon name="x" size={16} />
         </button>
       </div>
 
@@ -156,7 +156,7 @@ export function FileChangeNotification({
         /* Refresh Now button */
         .btn-refresh {
           padding: 6px 12px;
-          background: var(--vscode-button-background);
+          background: var(--r-accent);
           color: var(--vscode-button-foreground);
         }
 
@@ -171,7 +171,7 @@ export function FileChangeNotification({
         /* Review button (for dirty state) */
         .btn-review {
           padding: 6px 12px;
-          background: var(--vscode-button-background);
+          background: var(--r-accent);
           color: var(--vscode-button-foreground);
         }
 
@@ -191,7 +191,7 @@ export function FileChangeNotification({
         }
 
         .btn-dismiss:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .btn-dismiss:active {
@@ -201,7 +201,7 @@ export function FileChangeNotification({
         /* Countdown text */
         .countdown-text {
           font-size: 11px;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           opacity: 0.7;
         }
 

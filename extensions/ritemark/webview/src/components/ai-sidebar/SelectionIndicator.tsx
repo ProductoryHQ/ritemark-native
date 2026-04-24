@@ -2,7 +2,7 @@
  * SelectionIndicator — shows truncated selected text from the editor.
  */
 
-import { TextSelect } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 
 export function SelectionIndicator() {
@@ -16,9 +16,9 @@ export function SelectionIndicator() {
       : selection.text;
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] bg-[var(--vscode-inputValidation-infoBackground)] border-b border-[var(--vscode-panel-border)]">
-      <TextSelect size={12} className="shrink-0 opacity-60" />
-      <span className="text-[var(--vscode-descriptionForeground)]">Selected:</span>
+    <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] bg-[var(--vscode-inputValidation-infoBackground)] border-b border-[var(--r-hairline)]">
+      <Icon name="selection" size={12} className="shrink-0 opacity-60" />
+      <span className="text-[var(--r-ink-muted)]">Selected:</span>
       <span className="truncate">{displayText}</span>
     </div>
   );

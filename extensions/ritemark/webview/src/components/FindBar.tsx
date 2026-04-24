@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { Icon } from './ui/Icon'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { searchPluginKey } from '../extensions/SearchExtension'
 
@@ -95,7 +95,7 @@ export function FindBar({ editor, onClose }: FindBarProps) {
   return (
     <div className="find-bar">
       <div className="find-bar-inner">
-        <Search size={14} className="find-bar-icon" />
+        <Icon name="magnifying-glass" size={14} className="find-bar-icon" />
         <input
           ref={inputRef}
           type="text"
@@ -119,7 +119,7 @@ export function FindBar({ editor, onClose }: FindBarProps) {
           aria-label="Previous match"
           title="Previous (Shift+Enter)"
         >
-          <ChevronUp size={14} />
+          <Icon name="caret-up" size={14} />
         </button>
         <button
           className="find-bar-btn"
@@ -128,7 +128,7 @@ export function FindBar({ editor, onClose }: FindBarProps) {
           aria-label="Next match"
           title="Next (Enter)"
         >
-          <ChevronDown size={14} />
+          <Icon name="caret-down" size={14} />
         </button>
         <button
           className="find-bar-btn"
@@ -136,7 +136,7 @@ export function FindBar({ editor, onClose }: FindBarProps) {
           aria-label="Close search"
           title="Close (Escape)"
         >
-          <X size={14} />
+          <Icon name="x" size={14} />
         </button>
       </div>
 
@@ -162,7 +162,7 @@ export function FindBar({ editor, onClose }: FindBarProps) {
           gap: 4px;
           padding: 6px 10px;
           background: var(--vscode-editor-background);
-          border: 1px solid var(--vscode-panel-border);
+          border: 1px solid var(--r-hairline);
           border-radius: 8px;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
           min-width: 320px;
@@ -170,7 +170,7 @@ export function FindBar({ editor, onClose }: FindBarProps) {
         }
 
         .find-bar-icon {
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           flex-shrink: 0;
         }
 
@@ -178,7 +178,7 @@ export function FindBar({ editor, onClose }: FindBarProps) {
           flex: 1;
           border: none;
           background: transparent;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           font-size: 13px;
           font-family: var(--ritemark-ui-font-family);
           outline: none;
@@ -187,12 +187,12 @@ export function FindBar({ editor, onClose }: FindBarProps) {
         }
 
         .find-bar-input::placeholder {
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
         }
 
         .find-bar-count {
           font-size: 11px;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           white-space: nowrap;
           flex-shrink: 0;
           min-width: 60px;
@@ -208,14 +208,14 @@ export function FindBar({ editor, onClose }: FindBarProps) {
           border: none;
           border-radius: 4px;
           background: transparent;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           cursor: pointer;
           flex-shrink: 0;
           transition: background-color 0.1s;
         }
 
         .find-bar-btn:hover:not(:disabled) {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .find-bar-btn:disabled {

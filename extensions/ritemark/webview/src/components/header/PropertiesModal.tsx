@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react'
-import { X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 import { PropertiesPanel, type DocumentProperties } from '../properties'
 
 interface PropertiesModalProps {
@@ -69,7 +69,7 @@ export function PropertiesModal({
               aria-label="Close"
               title="Close"
             >
-              <X size={16} />
+              <Icon name="x" size={16} />
             </button>
           </div>
 
@@ -113,7 +113,7 @@ export function PropertiesModal({
           max-width: 90vw;
           max-height: 80vh;
           background: var(--vscode-editor-background);
-          border: 1px solid var(--vscode-panel-border);
+          border: 1px solid var(--r-hairline);
           border-radius: 12px;
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
           z-index: 1000;
@@ -140,14 +140,14 @@ export function PropertiesModal({
           align-items: center;
           justify-content: space-between;
           padding: 16px;
-          border-bottom: 1px solid var(--vscode-panel-border);
+          border-bottom: 1px solid var(--r-hairline);
           flex-shrink: 0;
         }
 
         .properties-modal-title {
           font-size: 16px;
           font-weight: 600;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           margin: 0;
         }
 
@@ -160,17 +160,17 @@ export function PropertiesModal({
           border: none;
           border-radius: 6px;
           background: transparent;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           cursor: pointer;
           transition: background-color 0.15s ease;
         }
 
         .properties-modal-close:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .properties-modal-close:active {
-          background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
+          background: var(--r-surface-muted, var(--r-surface-soft));
         }
 
         /* Modal content - scrollable when content exceeds max-height */

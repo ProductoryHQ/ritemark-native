@@ -61,7 +61,7 @@ function LazyPage({
         height: scaledHeight,
         margin: '0 auto 16px auto',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        border: '1px solid var(--vscode-panel-border, #e0e0e0)',
+        border: '1px solid var(--r-hairline, #e0e0e0)',
         background: 'white',
         overflow: 'hidden',
       }}
@@ -163,8 +163,8 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
   if (error) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem' }}>
-        <div style={{ fontSize: '1.2rem', color: 'var(--vscode-errorForeground, #f44)' }}>Failed to load PDF</div>
-        <div style={{ color: 'var(--vscode-descriptionForeground, #888)' }}>{error}</div>
+        <div style={{ fontSize: '1.2rem', color: 'var(--r-error, #f44)' }}>Failed to load PDF</div>
+        <div style={{ color: 'var(--r-ink-muted, #888)' }}>{error}</div>
       </div>
     )
   }
@@ -172,7 +172,7 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
   if (!pdfData) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <div style={{ color: 'var(--vscode-descriptionForeground, #888)' }}>Loading...</div>
+        <div style={{ color: 'var(--r-ink-muted, #888)' }}>Loading...</div>
       </div>
     )
   }
@@ -185,20 +185,20 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
         display: 'flex',
         alignItems: 'center',
         padding: '0 12px',
-        borderBottom: '1px solid var(--vscode-panel-border, #e0e0e0)',
+        borderBottom: '1px solid var(--r-hairline, #e0e0e0)',
         gap: '8px',
         flexShrink: 0
       }}>
-        <span style={{ color: 'var(--vscode-descriptionForeground, #888)', fontSize: '13px' }}>{filename}</span>
+        <span style={{ color: 'var(--r-ink-muted, #888)', fontSize: '13px' }}>{filename}</span>
         <div style={{ flex: 1 }} />
 
-        <span style={{ fontSize: '13px', color: 'var(--vscode-descriptionForeground, #888)' }}>
+        <span style={{ fontSize: '13px', color: 'var(--r-ink-muted, #888)' }}>
           {currentPage} / {numPages || '...'}
         </span>
 
         <button
           onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', color: 'var(--vscode-foreground)' }}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', color: 'var(--r-ink-strong)' }}
           title="Zoom out"
         >
           -
@@ -208,7 +208,7 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
         </span>
         <button
           onClick={() => setScale(s => Math.min(3, s + 0.25))}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', color: 'var(--vscode-foreground)' }}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', color: 'var(--r-ink-strong)' }}
           title="Zoom in"
         >
           +
@@ -226,7 +226,7 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           loading={
-            <div style={{ padding: '2rem', color: 'var(--vscode-descriptionForeground, #888)' }}>
+            <div style={{ padding: '2rem', color: 'var(--r-ink-muted, #888)' }}>
               Loading PDF...
             </div>
           }
