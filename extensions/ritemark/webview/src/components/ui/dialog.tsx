@@ -1,7 +1,7 @@
 /**
  * Dialog Components (shadcn/ui style)
  *
- * Re-exports using Radix UI primitives with VS Code styling.
+ * Re-exports using Radix UI primitives with Ritemark token styling.
  * Visual standard matches Dictation Settings dialog:
  * - Header row: icon + title + X close button, border-bottom
  * - Content area: scrollable, padding 16px
@@ -11,7 +11,7 @@
 
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { Icon } from './Icon';
 import { cn } from '../../lib/utils';
 
 const Dialog = DialogPrimitive.Root;
@@ -29,7 +29,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/40',
+      'fixed inset-0 z-50 bg-[rgba(30,27,75,0.45)] backdrop-blur-[6px]',
       'data-[state=open]:animate-in data-[state=closed]:animate-out',
       'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className
@@ -48,11 +48,11 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[50%] z-50 w-full max-w-[400px] translate-x-[-50%] translate-y-[-50%]',
+        'fixed left-[50%] top-[50%] z-50 w-full max-w-[480px] translate-x-[-50%] translate-y-[-50%]',
         'flex flex-col max-h-[80vh]',
-        'rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.24)]',
-        'bg-[var(--vscode-editor-background)]',
-        'border border-[var(--vscode-panel-border)]',
+        'rounded-lg shadow-ritemark-lg',
+        'bg-surface text-ink-strong',
+        'border border-hairline',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -81,22 +81,22 @@ const DialogHeader = ({
 }) => (
   <div
     className={cn(
-      'flex items-center justify-between px-4 py-3',
-      'border-b border-[var(--vscode-panel-border)]',
+      'flex items-center justify-between px-5 py-4',
+      'border-b border-hairline',
       className
     )}
     {...props}
   >
-    <div className="flex items-center gap-2 text-[var(--vscode-foreground)]">
+    <div className="flex items-center gap-2 text-ink-strong">
       {icon}
       {children}
     </div>
     {onClose && (
       <DialogPrimitive.Close
         onClick={onClose}
-        className="flex items-center justify-center w-7 h-7 rounded-md border-none bg-transparent text-[var(--vscode-foreground)] cursor-pointer transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+        className="flex items-center justify-center w-7 h-7 rounded-md border-none bg-transparent text-ink-muted cursor-pointer transition-colors hover:bg-surface-soft hover:text-ink-strong"
       >
-        <X size={16} />
+        <Icon name="x" size={16} />
       </DialogPrimitive.Close>
     )}
   </div>
@@ -109,7 +109,7 @@ const DialogBody = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn('flex-1 overflow-y-auto p-4', className)}
+    className={cn('flex-1 overflow-y-auto p-5', className)}
     {...props}
   />
 );
@@ -122,8 +122,8 @@ const DialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'flex justify-end gap-2 px-4 py-3',
-      'border-t border-[var(--vscode-panel-border)]',
+      'flex justify-end gap-2.5 px-5 py-3.5',
+      'border-t border-hairline',
       className
     )}
     {...props}
@@ -139,7 +139,7 @@ const DialogTitle = React.forwardRef<
     ref={ref}
     className={cn(
       'text-base font-semibold leading-none',
-      'text-[var(--vscode-foreground)]',
+      'text-ink-strong',
       className
     )}
     {...props}
@@ -153,7 +153,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn('text-sm text-[var(--vscode-descriptionForeground)]', className)}
+    className={cn('text-sm text-ink-muted', className)}
     {...props}
   />
 ));
@@ -169,10 +169,10 @@ const DialogButton = ({
 }) => (
   <button
     className={cn(
-      'px-4 py-2 rounded-md text-[13px] font-medium border-none cursor-pointer transition-colors',
-      variant === 'primary' && 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]',
-      variant === 'secondary' && 'bg-[var(--vscode-button-secondaryBackground,#3a3d41)] text-[var(--vscode-button-secondaryForeground,#fff)] hover:bg-[var(--vscode-button-secondaryHoverBackground,#45494e)]',
-      variant === 'danger' && 'bg-[var(--vscode-errorForeground,#ef4444)] text-white hover:opacity-90',
+      'px-4 py-2 rounded-md text-[13px] font-medium border-none cursor-pointer transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]',
+      variant === 'primary' && 'bg-primary text-primary-foreground shadow-ritemark-accent hover:bg-accent-deep hover:shadow-ritemark-accent-md',
+      variant === 'secondary' && 'bg-secondary text-secondary-foreground hover:bg-surface-soft',
+      variant === 'danger' && 'bg-destructive text-white hover:opacity-90 focus-visible:ring-[var(--r-error-soft)]',
       className
     )}
     {...props}

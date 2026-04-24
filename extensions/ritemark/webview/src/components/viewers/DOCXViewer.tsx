@@ -82,10 +82,10 @@ export function DOCXViewer({ content, filename }: DOCXViewerProps) {
   if (isDocFormat) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem' }}>
-        <div style={{ fontSize: '1.2rem', color: 'var(--vscode-errorForeground, #f44)' }}>
+        <div style={{ fontSize: '1.2rem', color: 'var(--r-error, #f44)' }}>
           Unsupported format
         </div>
-        <div style={{ color: 'var(--vscode-descriptionForeground, #888)', textAlign: 'center', maxWidth: '400px' }}>
+        <div style={{ color: 'var(--r-ink-muted, #888)', textAlign: 'center', maxWidth: '400px' }}>
           The legacy .doc format is not supported. Please convert to .docx format using Microsoft Word or another word processor.
         </div>
       </div>
@@ -100,11 +100,11 @@ export function DOCXViewer({ content, filename }: DOCXViewerProps) {
         display: 'flex',
         alignItems: 'center',
         padding: '0 12px',
-        borderBottom: '1px solid var(--vscode-panel-border, #e0e0e0)',
+        borderBottom: '1px solid var(--r-hairline, #e0e0e0)',
         gap: '8px',
         flexShrink: 0
       }}>
-        <span style={{ color: 'var(--vscode-descriptionForeground, #888)', fontSize: '13px' }}>
+        <span style={{ color: 'var(--r-ink-muted, #888)', fontSize: '13px' }}>
           {filename}
         </span>
         <div style={{ flex: 1 }} />
@@ -118,7 +118,7 @@ export function DOCXViewer({ content, filename }: DOCXViewerProps) {
               cursor: 'pointer',
               padding: '4px 8px',
               borderRadius: '4px',
-              color: 'var(--vscode-foreground)',
+              color: 'var(--r-ink-strong)',
               fontSize: '12px'
             }}
             title="Open in Microsoft Word"
@@ -135,7 +135,7 @@ export function DOCXViewer({ content, filename }: DOCXViewerProps) {
             cursor: 'pointer',
             padding: '4px 8px',
             borderRadius: '6px',
-            color: 'var(--vscode-foreground)',
+            color: 'var(--r-ink-strong)',
             fontSize: '12px'
           }}
           title="Refresh"
@@ -151,7 +151,7 @@ export function DOCXViewer({ content, filename }: DOCXViewerProps) {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '2rem',
-          color: 'var(--vscode-descriptionForeground, #888)'
+          color: 'var(--r-ink-muted, #888)'
         }}>
           Loading {filename}...
         </div>
@@ -167,14 +167,14 @@ export function DOCXViewer({ content, filename }: DOCXViewerProps) {
           height: '100%',
           gap: '1rem'
         }}>
-          <div style={{ fontSize: '1.2rem', color: 'var(--vscode-errorForeground, #f44)' }}>
+          <div style={{ fontSize: '1.2rem', color: 'var(--r-error, #f44)' }}>
             Failed to load document
           </div>
-          <div style={{ color: 'var(--vscode-descriptionForeground, #888)' }}>{error}</div>
+          <div style={{ color: 'var(--r-ink-muted, #888)' }}>{error}</div>
           <button
             onClick={handleRefresh}
             style={{
-              background: 'var(--vscode-button-background, #4338ca)',
+              background: 'var(--r-accent, #4338ca)',
               color: 'var(--vscode-button-foreground, #fff)',
               border: 'none',
               padding: '6px 16px',

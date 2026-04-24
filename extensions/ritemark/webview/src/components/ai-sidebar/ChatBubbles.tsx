@@ -4,7 +4,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { FileText } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import type { FileAttachment } from './types';
 
@@ -34,8 +34,8 @@ export function UserPromptBubble({ children, attachments, activeFilePath }: User
     >
       {/* Active file context indicator */}
       {activeFilePath && (
-        <div className="flex items-center gap-1 mb-1.5 text-[10px] text-[var(--vscode-descriptionForeground)]">
-          <FileText size={10} className="shrink-0" />
+        <div className="flex items-center gap-1 mb-1.5 text-[10px] text-[var(--r-ink-muted)]">
+          <Icon name="file-text" size={12} className="shrink-0" />
           <span className="truncate" title={activeFilePath}>
             Context: {displayFileName(activeFilePath)}
           </span>
@@ -49,12 +49,12 @@ export function UserPromptBubble({ children, attachments, activeFilePath }: User
                 key={att.id}
                 src={att.thumbnail}
                 alt={att.name}
-                className="w-16 h-16 object-cover rounded border border-[var(--vscode-panel-border)]"
+                className="w-16 h-16 object-cover rounded border border-[var(--r-hairline)]"
               />
             ) : (
               <span
                 key={att.id}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border border-[var(--vscode-panel-border)] text-[var(--vscode-descriptionForeground)]"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border border-[var(--r-hairline)] text-[var(--r-ink-muted)]"
               >
                 {att.name}
               </span>

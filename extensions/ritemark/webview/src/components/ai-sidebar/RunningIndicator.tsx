@@ -3,7 +3,7 @@
  * Shows current status and running subagent count.
  */
 
-import { Loader2, Bot } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import type { AgentProgress, SubagentProgress } from './types';
 
 interface RunningIndicatorProps {
@@ -38,12 +38,12 @@ export function RunningIndicator({ activities, subagents }: RunningIndicatorProp
   const runningSubagents = subagents?.filter((s) => s.status === 'running').length || 0;
 
   return (
-    <div className="flex items-center gap-2 py-1 text-[11px] text-[var(--vscode-descriptionForeground)]">
-      <Loader2 size={13} className="shrink-0 animate-spin" />
+    <div className="flex items-center gap-2 py-1 text-[11px] text-[var(--r-ink-muted)]">
+      <Icon name="circle-notch" size={14} className="shrink-0 animate-spin" />
       <span className="truncate flex-1">{text}</span>
       {runningSubagents > 0 && (
         <span className="flex items-center gap-1 shrink-0 text-[var(--vscode-progressBar-background)]">
-          <Bot size={11} />
+          <Icon name="robot" size={12} />
           <span>{runningSubagents}</span>
         </span>
       )}

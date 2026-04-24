@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Calendar } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 import type { PropertyType } from './PropertiesPanel'
 import { TagsInput } from './TagsInput'
 import { StatusSelect } from './StatusSelect'
@@ -141,7 +141,7 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
           <div
             onClick={startEditing}
             className={`w-full px-2 py-1 text-sm cursor-text hover:bg-white rounded transition-colors ${
-              !value ? 'text-gray-400 italic' : 'text-gray-900'
+              !value ? 'text-ink-faint italic' : 'text-ink-strong'
             }`}
           >
             {formatDisplayValue()}
@@ -151,12 +151,12 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
       case 'date':
         return (
           <div className="flex-1 flex items-center gap-2">
-            <Calendar size={14} className="text-gray-400" />
+            <Icon name="calendar" size={14} className="text-ink-faint" />
             <input
               type="date"
               value={typeof value === 'string' ? value : ''}
               onChange={(e) => onChange(e.target.value)}
-              className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer"
+              className="flex-1 px-2 py-1 text-sm border border-hairline rounded hover:border-hairline-strong focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer"
             />
           </div>
         )
@@ -179,7 +179,7 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
 
       default:
         return (
-          <span className="flex-1 px-2 py-1 text-sm text-gray-900">
+          <span className="flex-1 px-2 py-1 text-sm text-ink-strong">
             {String(value)}
           </span>
         )
@@ -189,7 +189,7 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
   return (
     <div className={`flex gap-2 py-1.5 group ${needsMultiline ? 'items-start' : 'items-center'}`}>
       {/* Label */}
-      <span className={`w-24 text-xs font-medium text-gray-500 uppercase tracking-wide flex-shrink-0 ${needsMultiline ? 'pt-1' : ''}`}>
+      <span className={`w-24 text-xs font-medium text-ink-muted uppercase tracking-wide flex-shrink-0 ${needsMultiline ? 'pt-1' : ''}`}>
         {label}
       </span>
 
@@ -201,10 +201,10 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
       {/* Delete button */}
       <button
         onClick={onDelete}
-        className={`p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ${needsMultiline ? 'mt-1' : ''}`}
+        className={`p-1 text-ink-faint hover:text-ritemark-error opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ${needsMultiline ? 'mt-1' : ''}`}
         title={`Remove ${label}`}
       >
-        <X size={14} />
+        <Icon name="x" size={14} />
       </button>
     </div>
   )

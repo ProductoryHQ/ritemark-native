@@ -524,8 +524,8 @@ function App() {
 
   if (!isReady) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
-        <div className="text-[var(--vscode-foreground)]">Loading...</div>
+      <div className="flex items-center justify-center h-screen bg-background">
+        <div className="text-foreground">Loading...</div>
       </div>
     )
   }
@@ -579,7 +579,7 @@ function App() {
 
   // Default: Markdown editor
   return (
-    <div className="h-screen bg-[var(--vscode-editor-background)] flex flex-col">
+    <div className="h-screen bg-surface flex flex-col">
       {/* Document Header - Sticky with Properties and Export buttons */}
       <DocumentHeader
         onPropertiesClick={handlePropertiesClick}

@@ -9,7 +9,7 @@
 
 import { NodeViewWrapper } from '@tiptap/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ImageIcon } from 'lucide-react'
+import { Icon } from './ui/Icon'
 import { sendToExtension } from '../bridge'
 import {
   Dialog,
@@ -234,16 +234,16 @@ export function ResizableImage({ node, selected }: ResizableImageProps) {
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog && pendingSize !== null} onOpenChange={(open) => { if (!open) handleCancelResize() }}>
         <DialogContent className="max-w-[360px]">
-          <DialogHeader icon={<ImageIcon size={18} />} onClose={handleCancelResize}>
+          <DialogHeader icon={<Icon name="image" size={20} />} onClose={handleCancelResize}>
             <DialogTitle>Resize Image</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <p className="text-sm text-[var(--vscode-foreground)] m-0 mb-3">
+            <p className="text-sm text-[var(--r-ink-strong)] m-0 mb-3">
               This will permanently resize the image file from{' '}
               <strong>{originalSize?.width} × {originalSize?.height}</strong> to{' '}
               <strong>{pendingSize?.width} × {pendingSize?.height}</strong>.
             </p>
-            <p className="text-sm font-medium text-[var(--vscode-errorForeground,#f48771)] m-0">
+            <p className="text-sm font-medium text-[var(--r-error,#f48771)] m-0">
               This action cannot be undone.
             </p>
           </DialogBody>

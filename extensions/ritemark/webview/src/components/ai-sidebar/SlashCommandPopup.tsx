@@ -10,33 +10,22 @@
  */
 
 import { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
-import {
-  Trash2,
-  Plus,
-  History,
-  Minimize2,
-  HelpCircle,
-  Settings,
-  Square,
-  DollarSign,
-  Sparkles,
-  Terminal,
-} from 'lucide-react';
+import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { type SlashCommand, filterCommands, mergeCommands } from './slashCommands';
 import { useAISidebarStore } from './store';
 
-// Map icon names to components
-const ICON_MAP: Record<string, React.ComponentType<any>> = {
-  Trash2,
-  Plus,
-  History,
-  Minimize2,
-  HelpCircle,
-  Settings,
-  Square,
-  DollarSign,
-  Sparkles,
-  Terminal,
+// Map lucide icon names (as stored in SlashCommand.icon) to Phosphor icon names
+const ICON_MAP: Record<string, PhosphorIconName> = {
+  Trash2: 'trash',
+  Plus: 'plus',
+  History: 'clock-counter-clockwise',
+  Minimize2: 'arrows-in',
+  HelpCircle: 'question',
+  Settings: 'gear',
+  Square: 'square',
+  DollarSign: 'currency-dollar',
+  Sparkles: 'star-four',
+  Terminal: 'terminal',
 };
 
 export interface SlashCommandPopupHandle {
@@ -119,7 +108,7 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
           className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 min-w-[240px]"
           style={{ bottom: '100%', left: position.left, marginBottom: 4 }}
         >
-          <div className="px-3 py-2 text-xs text-[var(--vscode-descriptionForeground)]">
+          <div className="px-3 py-2 text-xs text-[var(--r-ink-muted)]">
             No commands found
           </div>
         </div>
@@ -137,31 +126,32 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
       >
         {builtinCommands.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-[var(--vscode-descriptionForeground)] border-b border-[var(--vscode-editorWidget-border)]">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-[var(--r-ink-muted)] border-b border-[var(--vscode-editorWidget-border)]">
               Commands
             </div>
             {builtinCommands.map((cmd) => {
               const idx = flatIndex++;
-              const IconComponent = ICON_MAP[cmd.icon] || HelpCircle;
+              const iconName = ICON_MAP[cmd.icon] || 'question';
               return (
                 <button
                   key={cmd.id}
                   data-cmd-item
-                  className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--vscode-list-hoverBackground)] ${
+                  className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--r-surface-soft)] ${
                     idx === selectedIndex
-                      ? 'bg-[var(--vscode-list-activeSelectionBackground)] text-[var(--vscode-list-activeSelectionForeground)]'
+                      ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)]'
                       : ''
                   }`}
                   onClick={() => onSelect(cmd)}
                   onMouseEnter={() => setSelectedIndex(idx)}
                 >
-                  <IconComponent
+                  <Icon
+                    name={iconName}
                     size={16}
-                    className="mt-0.5 shrink-0 text-[var(--vscode-symbolIcon-functionForeground)]"
+                    className="mt-0.5 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium">/{cmd.id}</span>
-                    <div className="text-xs text-[var(--vscode-descriptionForeground)] truncate">
+                    <div className="text-xs text-[var(--r-ink-muted)] truncate">
                       {cmd.description}
                     </div>
                   </div>
@@ -172,31 +162,32 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
         )}
         {customCommands.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-[var(--vscode-descriptionForeground)] border-b border-[var(--vscode-editorWidget-border)]">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-[var(--r-ink-muted)] border-b border-[var(--vscode-editorWidget-border)]">
               Project Commands
             </div>
             {customCommands.map((cmd) => {
               const idx = flatIndex++;
-              const IconComponent = ICON_MAP[cmd.icon] || Terminal;
+              const iconName = ICON_MAP[cmd.icon] || 'terminal';
               return (
                 <button
                   key={cmd.id}
                   data-cmd-item
-                  className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--vscode-list-hoverBackground)] ${
+                  className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--r-surface-soft)] ${
                     idx === selectedIndex
-                      ? 'bg-[var(--vscode-list-activeSelectionBackground)] text-[var(--vscode-list-activeSelectionForeground)]'
+                      ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)]'
                       : ''
                   }`}
                   onClick={() => onSelect(cmd)}
                   onMouseEnter={() => setSelectedIndex(idx)}
                 >
-                  <IconComponent
+                  <Icon
+                    name={iconName}
                     size={16}
-                    className="mt-0.5 shrink-0 text-[var(--vscode-symbolIcon-classForeground)]"
+                    className="mt-0.5 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium">/{cmd.id}</span>
-                    <div className="text-xs text-[var(--vscode-descriptionForeground)] truncate">
+                    <div className="text-xs text-[var(--r-ink-muted)] truncate">
                       {cmd.description}
                     </div>
                   </div>

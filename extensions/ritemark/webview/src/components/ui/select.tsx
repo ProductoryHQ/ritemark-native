@@ -6,7 +6,7 @@
 
 import React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { ChevronDown, Check } from 'lucide-react';
+import { Icon } from './Icon';
 import { cn } from '../../lib/utils';
 
 const Select = SelectPrimitive.Root;
@@ -23,9 +23,9 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       'flex h-8 w-full items-center justify-between rounded px-3 py-1.5 text-sm',
-      'bg-[var(--vscode-input-background)]',
-      'text-[var(--vscode-input-foreground)]',
-      'border border-[var(--vscode-input-border)]',
+      'bg-surface-muted',
+      'text-ink-strong',
+      'border border-hairline-strong',
       'focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]',
       'disabled:cursor-not-allowed disabled:opacity-50',
       '[&>span]:line-clamp-1',
@@ -35,7 +35,7 @@ const SelectTrigger = React.forwardRef<
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
+      <Icon name="caret-down" size={16} className="opacity-50" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -50,9 +50,9 @@ const SelectContent = React.forwardRef<
       ref={ref}
       className={cn(
         'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md shadow-md',
-        'bg-[var(--vscode-dropdown-background)]',
-        'border border-[var(--vscode-dropdown-border)]',
-        'text-[var(--vscode-dropdown-foreground)]',
+        'bg-surface',
+        'border border-hairline',
+        'text-ink-strong',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -87,7 +87,7 @@ const SelectLabel = React.forwardRef<
     ref={ref}
     className={cn(
       'px-2 py-1.5 text-sm font-semibold',
-      'text-[var(--vscode-descriptionForeground)]',
+      'text-ink-muted',
       className
     )}
     {...props}
@@ -103,8 +103,8 @@ const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none',
-      'text-[var(--vscode-dropdown-foreground)]',
-      'focus:bg-[var(--vscode-list-activeSelectionBackground)] focus:text-[var(--vscode-list-activeSelectionForeground)]',
+      'text-ink-strong',
+      'focus:bg-accent-soft focus:text-accent-deep',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
@@ -112,7 +112,7 @@ const SelectItem = React.forwardRef<
   >
     <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
+        <Icon name="check" size={16} />
       </SelectPrimitive.ItemIndicator>
     </span>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
@@ -128,7 +128,7 @@ const SelectSeparator = React.forwardRef<
     ref={ref}
     className={cn(
       '-mx-1 my-1 h-px',
-      'bg-[var(--vscode-panel-border)]',
+      'bg-hairline',
       className
     )}
     {...props}

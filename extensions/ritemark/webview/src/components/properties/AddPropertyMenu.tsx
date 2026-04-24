@@ -80,19 +80,19 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
   return (
     <div
       ref={menuRef}
-      className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+      className="absolute right-0 top-full mt-1 w-56 bg-white border border-hairline rounded-lg shadow-lg z-50"
     >
       {/* Common properties */}
       {availableProperties.length > 0 && (
         <div className="p-2">
-          <div className="px-2 py-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <div className="px-2 py-1 text-xs font-medium text-ink-muted uppercase tracking-wide">
             Common
           </div>
           {availableProperties.map(prop => (
             <button
               key={prop.key}
               onClick={() => onAdd(prop.key, prop.type)}
-              className="w-full px-2 py-1.5 text-sm text-left text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              className="w-full px-2 py-1.5 text-sm text-left text-ink-strong hover:bg-surface-soft rounded transition-colors"
             >
               {prop.label}
             </button>
@@ -102,12 +102,12 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
 
       {/* Divider */}
       {availableProperties.length > 0 && (
-        <div className="border-t border-gray-200" />
+        <div className="border-t border-hairline" />
       )}
 
       {/* Custom property */}
       <div className="p-2">
-        <div className="px-2 py-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
+        <div className="px-2 py-1 text-xs font-medium text-ink-muted uppercase tracking-wide">
           Custom
         </div>
         {showCustomInput ? (
@@ -122,10 +122,10 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
               }}
               onKeyDown={handleKeyDown}
               placeholder="Property name"
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-2 py-1.5 text-sm border border-hairline-strong rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {error && (
-              <p className="text-xs text-red-500 mt-1">{error}</p>
+              <p className="text-xs text-ritemark-error mt-1">{error}</p>
             )}
             <div className="flex gap-2 mt-2">
               <button
@@ -134,7 +134,7 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
                   setCustomKey('')
                   setError('')
                 }}
-                className="flex-1 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                className="flex-1 px-2 py-1 text-xs text-ink-body border border-hairline-strong rounded hover:bg-surface-muted"
               >
                 Cancel
               </button>
@@ -149,7 +149,7 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
         ) : (
           <button
             onClick={() => setShowCustomInput(true)}
-            className="w-full px-2 py-1.5 text-sm text-left text-gray-700 hover:bg-gray-100 rounded transition-colors"
+            className="w-full px-2 py-1.5 text-sm text-left text-ink-strong hover:bg-surface-soft rounded transition-colors"
           >
             Custom field...
           </button>

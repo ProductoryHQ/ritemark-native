@@ -72,7 +72,7 @@ export function AgentSelector() {
   }
 
   return (
-    <div className="px-3 py-2 border-b border-[var(--vscode-panel-border)]">
+    <div className="px-3 py-2 border-b border-[var(--r-hairline)]">
       <Select value={currentValue} onValueChange={handleChange}>
         <SelectTrigger className="h-7 text-xs">
           <span className="truncate">{triggerLabel}</span>

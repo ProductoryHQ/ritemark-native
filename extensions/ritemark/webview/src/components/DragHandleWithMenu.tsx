@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { type Editor as TipTapEditor } from '@tiptap/react'
-import { Plus } from 'lucide-react'
+import { Icon } from './ui/Icon'
 import { BlockMenu } from './BlockMenu'
 
 interface DragHandleWithMenuProps {
@@ -81,7 +81,7 @@ export function DragHandleWithMenu({ editor }: DragHandleWithMenuProps) {
         title="Add block"
         aria-label="Add block"
       >
-        <Plus size={16} />
+        <Icon name="plus" size={16} />
       </button>
 
       {/* Block insertion menu */}

@@ -3,7 +3,7 @@
  */
 
 import { useRef, useEffect, useCallback } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import { EmptyState } from './EmptyState';
 import { RunningIndicator } from './RunningIndicator';
@@ -62,9 +62,9 @@ export function AgentView() {
           <div key={turn.id} className="space-y-2">
             {/* Compaction banner — shown above the turn where compaction happened */}
             {compactedEvent && (
-              <div className="flex items-start gap-2 px-2.5 py-2 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)]" style={{ fontSize: 'var(--chat-font-size, 13px)' }}>
-                <RefreshCw size={13} className="shrink-0 mt-0.5 text-[var(--vscode-descriptionForeground)]" />
-                <span className="text-[var(--vscode-descriptionForeground)]">
+              <div className="flex items-start gap-2 px-2.5 py-2 rounded border border-[var(--r-hairline)] bg-[var(--vscode-editorWidget-background)]" style={{ fontSize: 'var(--chat-font-size, 13px)' }}>
+                <Icon name="arrows-clockwise" size={14} className="shrink-0 mt-0.5 text-[var(--r-ink-muted)]" />
+                <span className="text-[var(--r-ink-muted)]">
                   {compactedEvent.message}
                 </span>
               </div>

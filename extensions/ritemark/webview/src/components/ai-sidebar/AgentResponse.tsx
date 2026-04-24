@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { AlertCircle, AlertTriangle, Check, X, RotateCcw } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
@@ -50,7 +50,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
       <div style={chatFontStyle}>
         <div className="rounded border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] p-3 space-y-2">
           <div className="flex items-start gap-2 text-[var(--vscode-editorWarning-foreground)]">
-            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <Icon name="warning" size={14} className="shrink-0 mt-0.5" />
             <div className="space-y-1">
               <div className="font-medium">Conversation exceeded context window limit</div>
               <div className="text-[11px] opacity-80">
@@ -61,9 +61,9 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           <div className="flex gap-2 ml-[22px]">
             <button
               onClick={() => startNewConversation()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
             >
-              <RotateCcw size={11} />
+              <Icon name="arrow-counter-clockwise" size={12} />
               Start new chat
             </button>
           </div>
@@ -77,8 +77,8 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   if (result.error) {
     return (
       <div style={chatFontStyle}>
-        <div className="flex items-start gap-2 text-[var(--vscode-errorForeground)]">
-          <AlertCircle size={14} className="shrink-0 mt-0.5" />
+        <div className="flex items-start gap-2 text-[var(--r-error)]">
+          <Icon name="warning-circle" size={14} className="shrink-0 mt-0.5" />
           <span>{result.error}</span>
         </div>
         <ActivityDetails activities={activities} metrics={result.metrics} />
@@ -106,8 +106,8 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
       {/* Plan preview card */}
       {needsApproval && displayPlanText && (
-        <div className="mt-2 px-3 py-2 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)] max-h-[300px] overflow-y-auto">
-          <div className="text-[10px] font-medium text-[var(--vscode-descriptionForeground)] uppercase tracking-wide mb-1.5">Plan</div>
+        <div className="mt-2 px-3 py-2 rounded border border-[var(--r-hairline)] bg-[var(--vscode-editorWidget-background)] max-h-[300px] overflow-y-auto">
+          <div className="text-[10px] font-medium text-[var(--r-ink-muted)] uppercase tracking-wide mb-1.5">Plan</div>
           <div className="text-[12px]">
             <RenderedMarkdown content={displayPlanText} />
           </div>
@@ -120,9 +120,9 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           <div className="flex gap-2">
             <button
               onClick={() => approvePlan(turn.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
             >
-              <Check size={12} />
+              <Icon name="check" size={12} />
               Approve plan
             </button>
             <button
@@ -135,7 +135,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:opacity-80"
             >
-              <X size={12} />
+              <Icon name="x" size={12} />
               {showRejectInput ? 'Send feedback' : 'Reject'}
             </button>
           </div>
@@ -159,13 +159,13 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
       {/* Approved/rejected label */}
       {turn.isPlan && turn.planHandled && (
-        <div className="mt-2 text-[10px] text-[var(--vscode-descriptionForeground)] italic">
+        <div className="mt-2 text-[10px] text-[var(--r-ink-muted)] italic">
           {turn.planDecision === 'rejected' ? 'Plan sent back for revision' : 'Plan approved'}
         </div>
       )}
 
       {/* Summary line: files + duration + cost */}
-      <div className="mt-2 text-[10px] text-[var(--vscode-descriptionForeground)] flex flex-wrap items-center gap-x-2">
+      <div className="mt-2 text-[10px] text-[var(--r-ink-muted)] flex flex-wrap items-center gap-x-2">
         {result.filesModified.length > 0 && (
           <span>Modified {result.filesModified.length} file{result.filesModified.length !== 1 ? 's' : ''}</span>
         )}

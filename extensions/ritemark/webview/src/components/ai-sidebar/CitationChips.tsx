@@ -2,7 +2,7 @@
  * CitationChips — clickable RAG source badges.
  */
 
-import { FileText } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import type { RAGCitation } from './types';
 
@@ -24,7 +24,7 @@ export function CitationChips({ citations }: CitationChipsProps) {
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)] hover:opacity-80 cursor-pointer border-none"
           title={c.snippet}
         >
-          <FileText size={10} />
+          <Icon name="file-text" size={12} />
           {c.citation}
         </button>
       ))}

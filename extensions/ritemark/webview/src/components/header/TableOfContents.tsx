@@ -95,7 +95,7 @@ export function TableOfContents({ editor, anchorRef, onClose }: TableOfContentsP
           max-height: 320px;
           overflow-y: auto;
           background: var(--vscode-editor-background);
-          border: 1px solid var(--vscode-panel-border);
+          border: 1px solid var(--r-hairline);
           border-radius: 8px;
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
           padding: 4px;
@@ -110,7 +110,7 @@ export function TableOfContents({ editor, anchorRef, onClose }: TableOfContentsP
         .toc-empty {
           padding: 16px 12px;
           font-size: 12px;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           text-align: center;
           font-style: italic;
         }
@@ -134,7 +134,7 @@ export function TableOfContents({ editor, anchorRef, onClose }: TableOfContentsP
         }
 
         .toc-item:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .toc-item-text {
@@ -146,7 +146,7 @@ export function TableOfContents({ editor, anchorRef, onClose }: TableOfContentsP
 
         /* H1 - prominent */
         .toc-item-h1 {
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           font-weight: 500;
           font-size: 13px;
           padding-left: 10px;
@@ -154,7 +154,7 @@ export function TableOfContents({ editor, anchorRef, onClose }: TableOfContentsP
 
         /* H2 - muted, indented */
         .toc-item-h2 {
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           font-weight: 400;
           font-size: 12px;
           padding-left: 22px;
@@ -162,7 +162,7 @@ export function TableOfContents({ editor, anchorRef, onClose }: TableOfContentsP
 
         /* H3 - more muted, more indented, italic */
         .toc-item-h3 {
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           font-weight: 400;
           font-size: 12px;
           font-style: italic;
@@ -172,7 +172,7 @@ export function TableOfContents({ editor, anchorRef, onClose }: TableOfContentsP
 
         /* H4-H6 - deepest indent */
         .toc-item-h4, .toc-item-h5, .toc-item-h6 {
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           font-weight: 400;
           font-size: 11px;
           font-style: italic;

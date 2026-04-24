@@ -7,7 +7,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { Check, X, Minus, Loader2, Download, RefreshCw, LogIn, Key, Rocket } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import type { OnboardingDependency, OnboardingInstallState, OnboardingStatus } from './types';
 
@@ -92,7 +92,7 @@ function ChecklistStep({
         </p>
       </div>
 
-      <div className="rounded-xl border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-4 space-y-3">
+      <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4 space-y-3">
         <div className="text-xs font-medium opacity-60 uppercase tracking-wide">Requirements</div>
 
         <DependencyRow
@@ -112,7 +112,7 @@ function ChecklistStep({
 
         />
 
-        <div className="border-t border-[var(--vscode-panel-border)] my-2" />
+        <div className="border-t border-[var(--r-hairline)] my-2" />
         <div className="text-xs font-medium opacity-60 uppercase tracking-wide">AI Assistants</div>
 
         <DependencyRow
@@ -141,9 +141,9 @@ function ChecklistStep({
         </p>
         <button
           onClick={onRecheck}
-          className="inline-flex items-center gap-1.5 text-xs text-[var(--vscode-textLink-foreground)] hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs text-[var(--r-accent)] hover:underline"
         >
-          <RefreshCw className="h-3 w-3" />
+          <Icon name="arrows-clockwise" size={12} />
           Re-check
         </button>
       </div>
@@ -180,12 +180,12 @@ function AuthenticateStep({
       </div>
 
       {/* Compact checklist showing current state */}
-      <div className="rounded-xl border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-4 space-y-2">
+      <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4 space-y-2">
         <div className="text-xs font-medium opacity-60 uppercase tracking-wide">Requirements</div>
         <CompactRow label="Git" installed={status.gitInstalled} />
         <CompactRow label="Node.js" installed={status.nodeInstalled} />
 
-        <div className="border-t border-[var(--vscode-panel-border)] my-2" />
+        <div className="border-t border-[var(--r-hairline)] my-2" />
         <div className="text-xs font-medium opacity-60 uppercase tracking-wide">AI Assistants</div>
         <CompactRow
           label="Claude"
@@ -204,18 +204,18 @@ function AuthenticateStep({
 
       {/* Auth cards for installed CLIs — show all that need auth */}
       {status.claudeCliInstalled && !status.claudeCliAuthenticated && (
-        <div className="rounded-xl border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-4">
+        <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
           <div className="text-sm font-semibold mb-1">Sign in to Claude</div>
           <p className="text-xs leading-5 opacity-75 mb-3">
             Connect your Claude.ai account to get started.
           </p>
           <div className="flex flex-wrap gap-2">
             <ActionButton onClick={onLoginClaude}>
-              <LogIn className="h-3.5 w-3.5" />
+              <Icon name="sign-in" size={14} />
               Sign in with Claude.ai
             </ActionButton>
             <SecondaryButton onClick={onApiKey}>
-              <Key className="h-3.5 w-3.5" />
+              <Icon name="key" size={14} />
               Use API key
             </SecondaryButton>
           </div>
@@ -223,14 +223,14 @@ function AuthenticateStep({
       )}
 
       {status.codexCliInstalled && !status.codexCliAuthenticated && (
-        <div className="rounded-xl border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-4">
+        <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
           <div className="text-sm font-semibold mb-1">Sign in to Codex</div>
           <p className="text-xs leading-5 opacity-75 mb-3">
             Connect your ChatGPT account to get started.
           </p>
           <div className="flex flex-wrap gap-2">
             <ActionButton onClick={onLoginCodex}>
-              <LogIn className="h-3.5 w-3.5" />
+              <Icon name="sign-in" size={14} />
               Sign in with ChatGPT
             </ActionButton>
           </div>
@@ -240,9 +240,9 @@ function AuthenticateStep({
       <div className="flex justify-end">
         <button
           onClick={onRecheck}
-          className="inline-flex items-center gap-1.5 text-xs text-[var(--vscode-textLink-foreground)] hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs text-[var(--r-accent)] hover:underline"
         >
-          <RefreshCw className="h-3 w-3" />
+          <Icon name="arrows-clockwise" size={12} />
           Re-check
         </button>
       </div>
@@ -268,14 +268,14 @@ function ReadyStep({
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-5 text-center py-8">
       <div className="w-10 h-10 rounded-full bg-[var(--vscode-testing-iconPassed)]/20 flex items-center justify-center mb-3">
-        <Check size={20} className="text-[var(--vscode-testing-iconPassed)]" />
+        <Icon name="check" size={20} className="text-[var(--vscode-testing-iconPassed)]" />
       </div>
       <h3 className="text-sm font-semibold mb-1.5">You're all set!</h3>
-      <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-4">
+      <p className="text-xs text-[var(--r-ink-muted)] mb-4">
         {agentName} is ready to help you with your documents.
       </p>
       <ActionButton onClick={onGetStarted}>
-        <Rocket className="h-3.5 w-3.5" />
+        <Icon name="rocket" size={14} />
         Get Started
       </ActionButton>
     </div>
@@ -325,9 +325,9 @@ function DependencyRow({
         ) : (
           <button
             onClick={onInstall}
-            className="inline-flex items-center gap-1 text-xs text-[var(--vscode-textLink-foreground)] hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-[var(--r-accent)] hover:underline"
           >
-            <Download className="h-3 w-3" />
+            <Icon name="download" size={12} />
             Install
           </button>
         )}
@@ -357,11 +357,11 @@ function CompactRow({
     <div className="flex items-center justify-between py-0.5">
       <div className="flex items-center gap-2">
         {installed ? (
-          <Check className="h-3.5 w-3.5 text-[var(--vscode-testing-iconPassed)]" />
+          <Icon name="check" size={14} className="text-[var(--vscode-testing-iconPassed)]" />
         ) : optional ? (
-          <Minus className="h-3.5 w-3.5 opacity-30" />
+          <Icon name="minus" size={14} className="opacity-30" />
         ) : (
-          <X className="h-3.5 w-3.5 text-[var(--vscode-testing-iconFailed)]" />
+          <Icon name="x" size={14} className="text-[var(--vscode-testing-iconFailed)]" />
         )}
         <span className="text-xs">{label}</span>
       </div>
@@ -374,9 +374,9 @@ function CompactRow({
         {onInstall && !installed && !isInstalling && (
           <button
             onClick={onInstall}
-            className="inline-flex items-center gap-1 text-xs text-[var(--vscode-textLink-foreground)] hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-[var(--r-accent)] hover:underline"
           >
-            <Download className="h-3 w-3" />
+            <Icon name="download" size={12} />
             Install
           </button>
         )}
@@ -398,15 +398,15 @@ function StatusIcon({
   failed: boolean;
 }) {
   if (installing) {
-    return <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--vscode-textLink-foreground)]" />;
+    return <Icon name="circle-notch" size={14} className="animate-spin text-[var(--r-accent)]" />;
   }
   if (installed) {
-    return <Check className="h-3.5 w-3.5 text-[var(--vscode-testing-iconPassed)]" />;
+    return <Icon name="check" size={14} className="text-[var(--vscode-testing-iconPassed)]" />;
   }
   if (failed) {
-    return <X className="h-3.5 w-3.5 text-[var(--vscode-testing-iconFailed)]" />;
+    return <Icon name="x" size={14} className="text-[var(--vscode-testing-iconFailed)]" />;
   }
-  return <X className="h-3.5 w-3.5 opacity-40" />;
+  return <Icon name="x" size={14} className="opacity-40" />;
 }
 
 // ── Shared buttons ──
@@ -424,7 +424,7 @@ function ActionButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-md bg-[var(--vscode-button-background)] px-3 py-2 text-xs font-medium text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-md bg-[var(--r-accent)] px-3 py-2 text-xs font-medium text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>

@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowUpRight, ChevronDown, Table2, Grid3X3, RotateCw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 import { defaultSpreadsheetApp, isMac } from '../../hooks/usePlatform'
 
 interface SpreadsheetToolbarProps {
@@ -77,7 +77,7 @@ export function SpreadsheetToolbar({
             aria-label="File changed on disk - click to refresh"
             title="File changed on disk - click to reload"
           >
-            <RotateCw size={16} />
+            <Icon name="arrow-clockwise" size={16} />
             <span className="refresh-text">Refresh</span>
             <span className="refresh-badge" />
           </button>
@@ -93,7 +93,7 @@ export function SpreadsheetToolbar({
               aria-label={primaryLabel}
               title={primaryLabel}
             >
-              <ArrowUpRight size={16} />
+              <Icon name="arrow-up-right" size={16} />
               <span className="split-btn-text">{primaryLabel}</span>
             </button>
 
@@ -105,7 +105,7 @@ export function SpreadsheetToolbar({
                 aria-label="More options"
                 title="More options"
               >
-                <ChevronDown size={14} />
+                <Icon name="caret-down" size={14} />
               </button>
             )}
           </div>
@@ -121,7 +121,7 @@ export function SpreadsheetToolbar({
                 }}
               >
                 {/* Table2 for Excel, Grid3X3 for Numbers */}
-                {secondaryLabel.includes('Excel') ? <Table2 size={14} /> : <Grid3X3 size={14} />}
+                {secondaryLabel.includes('Excel') ? <Icon name="table" size={14} /> : <Icon name="grid-nine" size={14} />}
                 <span>{secondaryLabel}</span>
               </button>
             </div>
@@ -138,7 +138,7 @@ export function SpreadsheetToolbar({
           right: 0;
           height: 40px;
           background: var(--vscode-editor-background);
-          border-bottom: 1px solid var(--vscode-panel-border);
+          border-bottom: 1px solid var(--r-hairline);
           z-index: 60;
         }
 
@@ -153,7 +153,7 @@ export function SpreadsheetToolbar({
         /* Filename display */
         .toolbar-filename {
           font-size: 13px;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           font-weight: 500;
         }
 
@@ -177,7 +177,7 @@ export function SpreadsheetToolbar({
           align-items: center;
           border: none;
           background: transparent;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           font-size: 13px;
           font-family: var(--ritemark-ui-font-family);
           cursor: pointer;
@@ -192,26 +192,26 @@ export function SpreadsheetToolbar({
         }
 
         .split-btn-primary:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .split-btn-primary:active {
-          background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
+          background: var(--r-surface-muted, var(--r-surface-soft));
         }
 
         /* Dropdown toggle */
         .split-btn-dropdown {
           padding: 6px 6px;
-          border-left: 1px solid var(--vscode-panel-border);
+          border-left: 1px solid var(--r-hairline);
           border-radius: 0 6px 6px 0;
         }
 
         .split-btn-dropdown:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .split-btn-dropdown:active {
-          background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
+          background: var(--r-surface-muted, var(--r-surface-soft));
         }
 
         /* When no secondary option, round all corners */
@@ -279,7 +279,7 @@ export function SpreadsheetToolbar({
           border: none;
           border-radius: 6px;
           background: transparent;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           font-size: 13px;
           font-family: var(--ritemark-ui-font-family);
           cursor: pointer;
@@ -287,7 +287,7 @@ export function SpreadsheetToolbar({
         }
 
         .refresh-button:hover:not(:disabled) {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .refresh-button:disabled {

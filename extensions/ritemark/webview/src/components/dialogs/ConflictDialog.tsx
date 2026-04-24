@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 import {
   Dialog,
   DialogContent,
@@ -34,21 +34,21 @@ export function ConflictDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onCancel() }}>
       <DialogContent className="max-w-[440px]">
-        <DialogHeader icon={<AlertTriangle size={18} className="text-[var(--vscode-editorWarning-foreground)]" />} onClose={onCancel}>
+        <DialogHeader icon={<Icon name="warning" size={20} className="text-[var(--vscode-editorWarning-foreground)]" />} onClose={onCancel}>
           <DialogTitle>{isDiskConflict ? 'Unsaved Changes Conflict' : 'Unsaved Changes'}</DialogTitle>
         </DialogHeader>
 
         <DialogBody>
           {isDiskConflict ? (
-            <div className="text-sm text-[var(--vscode-descriptionForeground)] leading-relaxed space-y-3">
+            <div className="text-sm text-[var(--r-ink-muted)] leading-relaxed space-y-3">
               <p className="m-0">You have unsaved edits in Ritemark.</p>
               <p className="m-0">
-                The file <strong className="text-[var(--vscode-foreground)]">{filename}</strong> has also been modified on disk by another program.
+                The file <strong className="text-[var(--r-ink-strong)]">{filename}</strong> has also been modified on disk by another program.
               </p>
               <p className="m-0">Refreshing will discard your changes and load the version from disk.</p>
             </div>
           ) : (
-            <div className="text-sm text-[var(--vscode-descriptionForeground)] leading-relaxed space-y-3">
+            <div className="text-sm text-[var(--r-ink-muted)] leading-relaxed space-y-3">
               <p className="m-0">You have unsaved changes.</p>
               <p className="m-0">Refreshing will discard them.</p>
             </div>

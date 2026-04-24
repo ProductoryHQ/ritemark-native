@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Search } from 'lucide-react'
+import { Icon } from './ui/Icon'
 
 export interface Language {
   code: string
@@ -80,13 +80,13 @@ export function LanguagePickerModal({ isOpen, onClose, onSelect, currentLanguage
         <div className="language-picker-header">
           <h3>Select Language</h3>
           <button className="close-btn" onClick={onClose} aria-label="Close">
-            <X size={18} />
+            <Icon name="x" size={20} />
           </button>
         </div>
 
         {/* Search */}
         <div className="language-picker-search">
-          <Search size={16} className="search-icon" />
+          <Icon name="magnifying-glass" size={16} className="search-icon" />
           <input
             type="text"
             placeholder="Search languages..."
@@ -135,7 +135,7 @@ export function LanguagePickerModal({ isOpen, onClose, onSelect, currentLanguage
           width: 400px;
           max-height: 600px;
           background: var(--vscode-editor-background);
-          border: 1px solid var(--vscode-panel-border);
+          border: 1px solid var(--r-hairline);
           border-radius: 8px;
           display: flex;
           flex-direction: column;
@@ -148,20 +148,20 @@ export function LanguagePickerModal({ isOpen, onClose, onSelect, currentLanguage
           align-items: center;
           justify-content: space-between;
           padding: 16px;
-          border-bottom: 1px solid var(--vscode-panel-border);
+          border-bottom: 1px solid var(--r-hairline);
         }
 
         .language-picker-header h3 {
           margin: 0;
           font-size: 14px;
           font-weight: 600;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
         }
 
         .close-btn {
           background: transparent;
           border: none;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           cursor: pointer;
           padding: 4px;
           border-radius: 4px;
@@ -171,14 +171,14 @@ export function LanguagePickerModal({ isOpen, onClose, onSelect, currentLanguage
         }
 
         .close-btn:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         /* Search */
         .language-picker-search {
           position: relative;
           padding: 12px 16px;
-          border-bottom: 1px solid var(--vscode-panel-border);
+          border-bottom: 1px solid var(--r-hairline);
         }
 
         .search-icon {
@@ -193,10 +193,10 @@ export function LanguagePickerModal({ isOpen, onClose, onSelect, currentLanguage
         .language-picker-search input {
           width: 100%;
           padding: 8px 12px 8px 32px;
-          background: var(--vscode-input-background);
-          border: 1px solid var(--vscode-input-border);
+          background: var(--r-surface-muted);
+          border: 1px solid var(--r-hairline-strong);
           border-radius: 4px;
-          color: var(--vscode-input-foreground);
+          color: var(--r-ink-strong);
           font-size: 13px;
           font-family: var(--ritemark-ui-font-family);
         }
@@ -239,31 +239,31 @@ export function LanguagePickerModal({ isOpen, onClose, onSelect, currentLanguage
         }
 
         .language-item:hover {
-          background: var(--vscode-list-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .language-item.active {
-          background: var(--vscode-list-activeSelectionBackground);
-          color: var(--vscode-list-activeSelectionForeground);
+          background: var(--r-accent-soft);
+          color: var(--r-accent-deep);
         }
 
         .language-name {
           font-size: 13px;
           font-weight: 500;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
         }
 
         .language-item.active .language-name {
-          color: var(--vscode-list-activeSelectionForeground);
+          color: var(--r-accent-deep);
         }
 
         .language-native {
           font-size: 12px;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
         }
 
         .language-item.active .language-native {
-          color: var(--vscode-list-activeSelectionForeground);
+          color: var(--r-accent-deep);
           opacity: 0.8;
         }
       `}</style>

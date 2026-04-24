@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Mic, Mic2, Loader2, AlertTriangle, ChevronDown } from 'lucide-react'
+import { Icon } from './ui/Icon'
 import { useVoiceDictation, type DictationState } from '../hooks/useVoiceDictation'
 import { LanguagePickerModal, WHISPER_LANGUAGES } from './LanguagePickerModal'
 import { DictationSettingsModal } from './DictationSettingsModal'
@@ -132,26 +132,26 @@ export function VoiceDictationButton() {
     switch (state) {
       case 'idle':
         return {
-          icon: <Mic size={16} />,
-          color: 'var(--vscode-foreground)',
+          icon: <Icon name="microphone" size={16} />,
+          color: 'var(--r-ink-strong)',
           title: `Start dictation (${getLanguageName(lastLanguage)})`
         }
       case 'listening':
         return {
-          icon: <Mic2 size={16} />,
-          color: '#ef4444',
+          icon: <Icon name="microphone" size={16} />,
+          color: 'var(--r-error)',
           title: `Dictating in ${getLanguageName(currentLanguage || lastLanguage)} - click to stop`
         }
       case 'processing':
         return {
-          icon: <Loader2 size={16} className="dictation-spinner" />,
-          color: '#3b82f6',
+          icon: <Icon name="circle-notch" size={16} className="dictation-spinner" />,
+          color: 'var(--r-accent)',
           title: 'Processing transcription...'
         }
       case 'error':
         return {
-          icon: <AlertTriangle size={16} />,
-          color: '#f59e0b',
+          icon: <Icon name="warning" size={16} />,
+          color: 'var(--r-warning)',
           title: error || 'Dictation error - click to retry'
         }
     }
@@ -164,7 +164,7 @@ export function VoiceDictationButton() {
     <div className="dictation-split-btn" ref={dropdownRef}>
       {/* Primary button - start/stop dictation */}
       <button
-        className="dictation-primary"
+        className={`dictation-primary ${state === 'listening' ? 'dictation-primary-listening' : ''}`}
         onClick={handlePrimaryClick}
         title={title}
         style={{ color }}
@@ -181,9 +181,9 @@ export function VoiceDictationButton() {
         onClick={handleDropdownClick}
         title="Select language"
         disabled={isActive}
-        style={{ color: isActive ? 'var(--vscode-disabledForeground)' : 'var(--vscode-foreground)' }}
+        style={{ color: isActive ? 'var(--r-ink-disabled)' : 'var(--r-ink-strong)' }}
       >
-        <ChevronDown size={12} />
+        <Icon name="caret-down" size={12} />
       </button>
 
       {/* Language dropdown */}
@@ -232,7 +232,7 @@ export function VoiceDictationButton() {
         }
 
         .dictation-split-btn:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .dictation-primary {
@@ -267,7 +267,7 @@ export function VoiceDictationButton() {
         }
 
         .dictation-split-btn:hover .dictation-dropdown-trigger {
-          border-left-color: var(--vscode-widget-border, rgba(128,128,128,0.3));
+          border-left-color: var(--r-hairline, rgba(128,128,128,0.3));
         }
 
         .dictation-dropdown-trigger:disabled {
@@ -276,7 +276,7 @@ export function VoiceDictationButton() {
         }
 
         .dictation-split-btn:active {
-          background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
+          background: var(--r-surface-muted, var(--r-surface-soft));
         }
 
         .dictation-dropdown {
@@ -285,8 +285,8 @@ export function VoiceDictationButton() {
           right: 0;
           margin-top: 4px;
           min-width: 160px;
-          background: var(--vscode-dropdown-background, var(--vscode-editor-background));
-          border: 1px solid var(--vscode-dropdown-border, var(--vscode-widget-border));
+          background: var(--r-surface, var(--vscode-editor-background));
+          border: 1px solid var(--r-hairline);
           border-radius: 6px;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
           z-index: 1000;
@@ -297,7 +297,7 @@ export function VoiceDictationButton() {
           padding: 8px 12px 4px;
           font-size: 11px;
           font-weight: 600;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
@@ -313,23 +313,23 @@ export function VoiceDictationButton() {
           cursor: pointer;
           font-size: 13px;
           font-family: inherit;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           text-align: left;
           transition: background-color 0.1s ease;
         }
 
         .dictation-dropdown-item:hover {
-          background: var(--vscode-list-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .dictation-dropdown-item.active {
-          background: var(--vscode-list-activeSelectionBackground);
-          color: var(--vscode-list-activeSelectionForeground);
+          background: var(--r-accent-soft);
+          color: var(--r-accent-deep);
         }
 
         .dictation-dropdown-code {
           font-size: 11px;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           font-weight: 500;
         }
 
@@ -340,18 +340,18 @@ export function VoiceDictationButton() {
 
         .dictation-dropdown-divider {
           height: 1px;
-          background: var(--vscode-widget-border, rgba(128,128,128,0.3));
+          background: var(--r-hairline, rgba(128,128,128,0.3));
           margin: 4px 0;
         }
 
         .dictation-dropdown-more,
         .dictation-dropdown-settings {
-          color: var(--vscode-textLink-foreground);
+          color: var(--r-accent);
           font-size: 12px;
         }
 
         /* Pulsing animation for listening state */
-        .dictation-primary:has(.lucide-mic-2) {
+        .dictation-primary-listening {
           animation: pulse-dictation 2s ease-in-out infinite;
         }
 
@@ -397,7 +397,7 @@ export function VoiceDictationButton() {
           <div className="mic-permission-backdrop" onClick={() => setShowMicPermission(false)}>
             <div className="mic-permission-modal" onClick={(e) => e.stopPropagation()}>
               <div className="mic-permission-icon">
-                <Mic size={24} />
+                <Icon name="microphone" size={20} />
               </div>
               <h3 className="mic-permission-title">Microphone Access Required</h3>
               <p className="mic-permission-text">
@@ -441,7 +441,7 @@ export function VoiceDictationButton() {
               width: 340px;
               max-width: 90vw;
               background: var(--vscode-editor-background);
-              border: 1px solid var(--vscode-panel-border);
+              border: 1px solid var(--r-hairline);
               border-radius: 12px;
               box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
               padding: 24px;
@@ -454,29 +454,29 @@ export function VoiceDictationButton() {
               width: 48px;
               height: 48px;
               border-radius: 50%;
-              background: var(--vscode-toolbar-hoverBackground);
-              color: var(--vscode-foreground);
+              background: var(--r-surface-soft);
+              color: var(--r-ink-strong);
               margin-bottom: 12px;
             }
             .mic-permission-title {
               font-size: 16px;
               font-weight: 600;
-              color: var(--vscode-foreground);
+              color: var(--r-ink-strong);
               margin: 0 0 8px;
             }
             .mic-permission-text {
               font-size: 13px;
-              color: var(--vscode-descriptionForeground);
+              color: var(--r-ink-muted);
               margin: 0 0 16px;
             }
             .mic-permission-steps {
               text-align: left;
-              background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.1));
+              background: var(--r-surface-soft, rgba(128,128,128,0.1));
               border-radius: 8px;
               padding: 12px 16px;
               margin-bottom: 20px;
               font-size: 13px;
-              color: var(--vscode-foreground);
+              color: var(--r-ink-strong);
             }
             .mic-permission-steps p {
               margin: 0 0 4px;
@@ -493,7 +493,7 @@ export function VoiceDictationButton() {
               padding: 8px 16px;
               border: none;
               border-radius: 6px;
-              background: var(--vscode-button-background);
+              background: var(--r-accent);
               color: var(--vscode-button-foreground);
               font-size: 13px;
               font-weight: 500;
@@ -505,16 +505,16 @@ export function VoiceDictationButton() {
             }
             .mic-permission-btn-secondary {
               padding: 8px 16px;
-              border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-widget-border));
+              border: 1px solid var(--r-hairline);
               border-radius: 6px;
               background: transparent;
-              color: var(--vscode-foreground);
+              color: var(--r-ink-strong);
               font-size: 13px;
               cursor: pointer;
               transition: background-color 0.15s ease;
             }
             .mic-permission-btn-secondary:hover {
-              background: var(--vscode-toolbar-hoverBackground);
+              background: var(--r-surface-soft);
             }
           `}</style>
         </>

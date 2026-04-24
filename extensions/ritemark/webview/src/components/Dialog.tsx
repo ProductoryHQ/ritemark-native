@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react'
-import { X } from 'lucide-react'
+import { Icon } from './ui/Icon'
 
 interface DialogProps {
   isOpen: boolean
@@ -75,7 +75,7 @@ export function Dialog({
               aria-label="Close"
               title="Close"
             >
-              <X size={16} />
+              <Icon name="x" size={16} />
             </button>
           </div>
 
@@ -98,7 +98,8 @@ export function Dialog({
         .dialog-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(30, 27, 75, 0.45);
+          backdrop-filter: blur(6px);
           z-index: 9999;
           display: flex;
           align-items: center;
@@ -117,7 +118,7 @@ export function Dialog({
           max-width: 90vw;
           max-height: 80vh;
           background: var(--vscode-editor-background);
-          border: 1px solid var(--vscode-panel-border);
+          border: 1px solid var(--r-hairline);
           border-radius: 12px;
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
           z-index: 10000;
@@ -143,14 +144,14 @@ export function Dialog({
           align-items: center;
           justify-content: space-between;
           padding: 12px 16px;
-          border-bottom: 1px solid var(--vscode-panel-border);
+          border-bottom: 1px solid var(--r-hairline);
         }
 
         .dialog-header-left {
           display: flex;
           align-items: center;
           gap: 8px;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
         }
 
         .dialog-header-left svg {
@@ -161,7 +162,7 @@ export function Dialog({
         .dialog-title {
           font-size: 13px;
           font-weight: 600;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           margin: 0;
           letter-spacing: -0.01em;
         }
@@ -175,14 +176,14 @@ export function Dialog({
           border: none;
           border-radius: 4px;
           background: transparent;
-          color: var(--vscode-descriptionForeground);
+          color: var(--r-ink-muted);
           cursor: pointer;
           transition: background-color 0.15s ease, color 0.15s ease;
         }
 
         .dialog-close:hover {
-          background: var(--vscode-toolbar-hoverBackground);
-          color: var(--vscode-foreground);
+          background: var(--r-surface-soft);
+          color: var(--r-ink-strong);
         }
 
         /* Content */
@@ -198,7 +199,7 @@ export function Dialog({
           justify-content: flex-end;
           gap: 8px;
           padding: 16px;
-          border-top: 1px solid var(--vscode-panel-border);
+          border-top: 1px solid var(--r-hairline);
         }
 
         /* Button styles for use in dialogs */
@@ -213,7 +214,7 @@ export function Dialog({
         }
 
         .dialog-btn-primary {
-          background: var(--vscode-button-background);
+          background: var(--r-accent);
           color: var(--vscode-button-foreground);
         }
 
@@ -231,7 +232,7 @@ export function Dialog({
         }
 
         .dialog-btn-danger {
-          background: var(--vscode-errorForeground, #ef4444);
+          background: var(--r-error);
           color: white;
         }
 

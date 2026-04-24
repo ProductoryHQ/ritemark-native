@@ -25,6 +25,21 @@ import {
 } from '../agent';
 import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
 
+const RITEMARK_THEMES = [
+  {
+    id: 'ritemark-light',
+    label: 'Ritemark Light',
+    description: 'Bright document surface with indigo accents',
+    kind: 'light' as const,
+  },
+  {
+    id: 'ritemark-dark',
+    label: 'Ritemark Dark',
+    description: 'Slate editor surface with restrained indigo accents',
+    kind: 'dark' as const,
+  },
+];
+
 export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   public static readonly viewType = 'ritemark.settings';
 
@@ -116,6 +131,21 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         if (message.key && message.value !== undefined) {
           await config.update(message.key, message.value, vscode.ConfigurationTarget.Global);
           // Send updated settings back
+          await this.sendCurrentSettings(webview);
+        }
+        break;
+
+      case 'theme:set':
+        if (typeof message.value === 'string' && RITEMARK_THEMES.some(theme => theme.id === message.value)) {
+          const workbenchConfig = vscode.workspace.getConfiguration('workbench');
+          const windowConfig = vscode.workspace.getConfiguration('window');
+          await windowConfig.update('autoDetectColorScheme', false, vscode.ConfigurationTarget.Global);
+          await workbenchConfig.update('colorTheme', message.value, vscode.ConfigurationTarget.Global);
+          if (message.value === 'ritemark-light') {
+            await workbenchConfig.update('preferredLightColorTheme', message.value, vscode.ConfigurationTarget.Global);
+          } else {
+            await workbenchConfig.update('preferredDarkColorTheme', message.value, vscode.ConfigurationTarget.Global);
+          }
           await this.sendCurrentSettings(webview);
         }
         break;
@@ -268,6 +298,16 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    */
   private async sendCurrentSettings(webview: vscode.Webview): Promise<void> {
     const config = vscode.workspace.getConfiguration('ritemark');
+    const workbenchConfig = vscode.workspace.getConfiguration('workbench');
+    const windowConfig = vscode.workspace.getConfiguration('window');
+    const autoDetectColorScheme = windowConfig.get('autoDetectColorScheme', false);
+    const configuredTheme = workbenchConfig.get('colorTheme', 'ritemark-light');
+    const activeTheme = autoDetectColorScheme
+      ? vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark ||
+          vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.HighContrast
+        ? 'ritemark-dark'
+        : 'ritemark-light'
+      : configuredTheme;
 
     // Get API keys (masked)
     const openaiKey = await this.context.secrets.get('openai-api-key');
@@ -353,6 +393,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
         updateCenter,
+
+        // Appearance
+        currentTheme: activeTheme,
+        availableThemes: RITEMARK_THEMES,
 
         // AI Model
         aiModel: config.get('ai.model', DEFAULT_MODELS.assistant),

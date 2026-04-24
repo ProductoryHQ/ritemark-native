@@ -439,9 +439,9 @@
       "outline.showVariables": false,
       "outline.showFunctions": false,
       "timeline.showUncommittedChanges": false,
-      "window.autoDetectColorScheme": false,
+      "window.autoDetectColorScheme": true,
       "workbench.preferredLightColorTheme": "ritemark-light",
-      "workbench.preferredDarkColorTheme": "ritemark-light",
+      "workbench.preferredDarkColorTheme": "ritemark-dark",
       "chat.commandCenter.enabled": false,
       "chat.agent.enabled": false,
       "github.copilot.enable": {
@@ -458,6 +458,12 @@
         "label": "Ritemark Light",
         "uiTheme": "vs",
         "path": "./themes/ritemark-light.json"
+      },
+      {
+        "id": "ritemark-dark",
+        "label": "Ritemark Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/ritemark-dark.json"
       }
     ],
     "iconThemes": [

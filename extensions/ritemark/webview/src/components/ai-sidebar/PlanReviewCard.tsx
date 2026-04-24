@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, ClipboardList, X } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { extractPlanDisplayText } from './planText';
 
@@ -33,17 +33,17 @@ export function PlanReviewCard({
       className="rounded border px-3 py-3 space-y-4"
       style={{
         background: 'var(--vscode-input-background)',
-        borderColor: 'var(--vscode-panel-border)',
+        borderColor: 'var(--r-hairline)',
       }}
     >
-      <div className="flex items-center gap-2 text-[11px] text-[var(--vscode-descriptionForeground)]">
-        <ClipboardList size={13} className="shrink-0" />
+      <div className="flex items-center gap-2 text-[11px] text-[var(--r-ink-muted)]">
+        <Icon name="clipboard-text" size={14} className="shrink-0" />
         <span>{title}</span>
       </div>
 
       {displayText && (
-        <div className="rounded border px-3 py-2 max-h-[300px] overflow-y-auto border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)]">
-          <div className="text-[10px] font-medium text-[var(--vscode-descriptionForeground)] uppercase tracking-wide mb-1.5">
+        <div className="rounded border px-3 py-2 max-h-[300px] overflow-y-auto border-[var(--r-hairline)] bg-[var(--vscode-editorWidget-background)]">
+          <div className="text-[10px] font-medium text-[var(--r-ink-muted)] uppercase tracking-wide mb-1.5">
             Plan
           </div>
           <div style={{ fontSize: 'var(--chat-font-size, 13px)' }}>
@@ -55,9 +55,9 @@ export function PlanReviewCard({
       <div className="flex gap-2">
         <button
           onClick={onApprove}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
         >
-          <Check size={12} />
+          <Icon name="check" size={12} />
           {approveLabel}
         </button>
         <button
@@ -74,7 +74,7 @@ export function PlanReviewCard({
           }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:opacity-80"
         >
-          <X size={12} />
+          <Icon name="x" size={12} />
           {allowFeedback && showRejectInput ? 'Send feedback' : rejectLabel}
         </button>
       </div>

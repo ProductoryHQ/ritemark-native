@@ -1,6 +1,6 @@
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
 import { useState, useEffect, useRef } from 'react'
-import { Link2, Check, X, List, ListOrdered, ListChecks, ExternalLink, Quote, Code } from 'lucide-react'
+import { Icon } from './ui/Icon'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
 import { modKey } from '@/hooks/usePlatform'
@@ -199,13 +199,13 @@ export function FormattingBubbleMenu({
           return true
         }}
       >
-        <div className="flex items-center gap-1 bg-white border border-gray-300 rounded shadow-lg p-2">
+        <div className="flex items-center gap-1 bg-white border border-hairline-strong rounded shadow-lg p-2">
           {/* Bold Button - Keyboard: Ctrl+B / Cmd+B */}
           <button
             onMouseDown={(e) => e.preventDefault()} // Prevents editor from losing focus
             onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-gray-100 transition-colors ${
-              editor.isActive('bold') ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
+              editor.isActive('bold') ? 'bg-surface-soft' : ''
             }`}
             title="Bold (Ctrl+B)"
           >
@@ -216,8 +216,8 @@ export function FormattingBubbleMenu({
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`px-3 py-1 rounded text-sm italic hover:bg-gray-100 transition-colors ${
-              editor.isActive('italic') ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm italic hover:bg-surface-soft transition-colors ${
+              editor.isActive('italic') ? 'bg-surface-soft' : ''
             }`}
             title="Italic (Ctrl+I)"
           >
@@ -225,14 +225,14 @@ export function FormattingBubbleMenu({
           </button>
 
           {/* Visual divider between text styles and headings */}
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-hairline-strong mx-1" />
 
           {/* Heading 1 Button - Large heading */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-gray-100 transition-colors ${
-              editor.isActive('heading', { level: 1 }) ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
+              editor.isActive('heading', { level: 1 }) ? 'bg-surface-soft' : ''
             }`}
             title="Heading 1"
           >
@@ -243,8 +243,8 @@ export function FormattingBubbleMenu({
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-gray-100 transition-colors ${
-              editor.isActive('heading', { level: 2 }) ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
+              editor.isActive('heading', { level: 2 }) ? 'bg-surface-soft' : ''
             }`}
             title="Heading 2"
           >
@@ -255,8 +255,8 @@ export function FormattingBubbleMenu({
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-gray-100 transition-colors ${
-              editor.isActive('heading', { level: 3 }) ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
+              editor.isActive('heading', { level: 3 }) ? 'bg-surface-soft' : ''
             }`}
             title="Heading 3"
           >
@@ -264,81 +264,81 @@ export function FormattingBubbleMenu({
           </button>
 
           {/* Visual divider between headings and lists */}
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-hairline-strong mx-1" />
 
           {/* Bullet List Button - Toggle on/off */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
-              editor.isActive('bulletList') ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+              editor.isActive('bulletList') ? 'bg-surface-soft' : ''
             }`}
             title="Bullet List"
           >
-            <List size={16} />
+            <Icon name="list" size={16} />
           </button>
 
           {/* Ordered List Button - Toggle on/off */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
-              editor.isActive('orderedList') ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+              editor.isActive('orderedList') ? 'bg-surface-soft' : ''
             }`}
             title="Numbered List"
           >
-            <ListOrdered size={16} />
+            <Icon name="list-numbers" size={16} />
           </button>
 
           {/* Task List Button - Toggle on/off */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleTaskList().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
-              editor.isActive('taskList') ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+              editor.isActive('taskList') ? 'bg-surface-soft' : ''
             }`}
             title="Task List"
           >
-            <ListChecks size={16} />
+            <Icon name="list-checks" size={16} />
           </button>
 
           {/* Visual divider before blockquote and link */}
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-hairline-strong mx-1" />
 
           {/* Blockquote Button - Toggle on/off */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
-              editor.isActive('blockquote') ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+              editor.isActive('blockquote') ? 'bg-surface-soft' : ''
             }`}
             title="Blockquote"
           >
-            <Quote size={16} />
+            <Icon name="quotes" size={16} />
           </button>
 
           {/* Code Block Button - Toggle on/off */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
-              editor.isActive('codeBlock') ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+              editor.isActive('codeBlock') ? 'bg-surface-soft' : ''
             }`}
             title="Code Block"
           >
-            <Code size={16} />
+            <Icon name="code" size={16} />
           </button>
 
           {/* Link Button - Keyboard: Cmd+K / Ctrl+K */}
           <button
             onClick={handleOpenLinkDialog}
             onMouseDown={(e) => e.preventDefault()}
-            className={`px-3 py-1 rounded text-sm hover:bg-gray-100 transition-colors flex items-center ${
-              editor.isActive('link') ? 'bg-gray-200' : ''
+            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+              editor.isActive('link') ? 'bg-surface-soft' : ''
             }`}
             title={`Add/Edit Link (${modKey}+K)`}
           >
-            <Link2 size={16} />
+            <Icon name="link-simple" size={16} />
           </button>
         </div>
       </BubbleMenu>
@@ -382,16 +382,16 @@ export function FormattingBubbleMenu({
                         const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
                         openExternalUrl(url)
                       }}
-                      className="px-3 py-2 border rounded text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="px-3 py-2 border rounded text-ink-muted hover:text-ink-strong hover:bg-surface-muted transition-colors"
                       title={`Open in browser (${modKey}+click also works)`}
                     >
-                      <ExternalLink size={16} />
+                      <Icon name="arrow-square-out" size={16} />
                     </button>
                   )}
                 </div>
                 {/* Inline validation error message */}
                 {urlError && (
-                  <p className="text-sm text-red-500 mt-1">{urlError}</p>
+                  <p className="text-sm text-ritemark-error mt-1">{urlError}</p>
                 )}
               </div>
               <div className="flex gap-2 justify-end">
@@ -401,7 +401,7 @@ export function FormattingBubbleMenu({
                     onClick={handleRemoveLink}
                     variant="destructive"
                   >
-                    <X />
+                    <Icon name="x" size={20} />
                     Remove
                   </Button>
                 )}
@@ -416,7 +416,7 @@ export function FormattingBubbleMenu({
                   onClick={handleSetLink}
                   variant="default"
                 >
-                  <Check />
+                  <Icon name="check" size={20} />
                   {editor.isActive('link') ? 'Update' : 'Add'}
                 </Button>
               </div>

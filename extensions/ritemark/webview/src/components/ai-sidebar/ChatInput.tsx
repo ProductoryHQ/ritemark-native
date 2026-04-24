@@ -5,7 +5,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Send, Square, X, Paperclip, FileText, FileImage, File, Bot } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
@@ -626,8 +626,8 @@ export function ChatInput() {
   return (
     <div
       ref={containerRef}
-      className={`relative px-3 py-2.5 border-t border-[var(--vscode-panel-border)] ${
-        isDragOver ? 'bg-[var(--vscode-list-hoverBackground)]' : ''
+      className={`relative px-3 py-2.5 border-t border-[var(--r-hairline)] ${
+        isDragOver ? 'bg-[var(--r-surface-soft)]' : ''
       }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -636,8 +636,8 @@ export function ChatInput() {
       {/* Drag overlay indicator */}
       {isDragOver && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--vscode-editor-background)]/90 border-2 border-dashed border-[var(--vscode-focusBorder)] rounded pointer-events-none">
-          <div className="flex items-center gap-2 text-sm text-[var(--vscode-foreground)]">
-            <File size={18} />
+          <div className="flex items-center gap-2 text-sm text-[var(--r-ink-strong)]">
+            <Icon name="file" size={20} />
             Drop files or folders here
           </div>
         </div>
@@ -671,18 +671,18 @@ export function ChatInput() {
           {/* Active file context chip (auto, dimmer style) */}
           {showActiveFileChip && (
             <div
-              className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] bg-[var(--vscode-badge-background)]/50 text-[var(--vscode-descriptionForeground)]"
+              className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] bg-[var(--vscode-badge-background)]/50 text-[var(--r-ink-muted)]"
             >
-              <FileText size={10} className="shrink-0" />
+              <Icon name="file-text" size={12} className="shrink-0" />
               <span className="truncate max-w-[120px]" title={activeFilePath!}>
                 {getDisplayPath(activeFilePath!)}
               </span>
               <button
                 onClick={() => setHideActiveFile(true)}
-                className="shrink-0 hover:text-[var(--vscode-errorForeground)]"
+                className="shrink-0 hover:text-[var(--r-error)]"
                 title="Remove from context"
               >
-                <X size={10} />
+                <Icon name="x" size={12} />
               </button>
             </div>
           )}
@@ -692,16 +692,16 @@ export function ChatInput() {
               key={chip.id}
               className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]"
             >
-              <File size={10} className="shrink-0" />
+              <Icon name="file" size={12} className="shrink-0" />
               <span className="truncate max-w-[120px]" title={chip.path}>
                 {getDisplayPath(chip.path)}
               </span>
               <button
                 onClick={() => removePathChip(chip.id)}
-                className="shrink-0 hover:text-[var(--vscode-errorForeground)]"
+                className="shrink-0 hover:text-[var(--r-error)]"
                 title="Remove"
               >
-                <X size={10} />
+                <Icon name="x" size={12} />
               </button>
             </div>
           ))}
@@ -712,7 +712,7 @@ export function ChatInput() {
       {attachments.length > 0 && (
         <div className="flex gap-1.5 mb-2 flex-wrap">
           {attachments.map((att) => (
-            <div key={att.id} className="relative group rounded overflow-hidden border border-[var(--vscode-panel-border)] bg-[var(--vscode-input-background)]">
+            <div key={att.id} className="relative group rounded overflow-hidden border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]">
               {att.kind === 'image' && att.thumbnail ? (
                 <div className="w-14 h-14">
                   <img
@@ -724,11 +724,11 @@ export function ChatInput() {
               ) : (
                 <div className="flex items-center gap-1.5 px-2 py-1.5 max-w-[160px]">
                   {att.kind === 'pdf' ? (
-                    <FileText size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+                    <Icon name="file-text" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
                   ) : (
-                    <FileImage size={14} className="shrink-0 text-[var(--vscode-descriptionForeground)]" />
+                    <Icon name="file-image" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
                   )}
-                  <span className="text-[10px] text-[var(--vscode-descriptionForeground)] truncate">
+                  <span className="text-[10px] text-[var(--r-ink-muted)] truncate">
                     {att.name}
                   </span>
                 </div>
@@ -738,7 +738,7 @@ export function ChatInput() {
                 className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-black/60 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Remove"
               >
-                <X size={10} />
+                <Icon name="x" size={12} />
               </button>
             </div>
           ))}
@@ -756,7 +756,7 @@ export function ChatInput() {
                 key={m.start}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[var(--vscode-symbolIcon-classForeground)]/10 text-[var(--vscode-symbolIcon-classForeground)]"
               >
-                <Bot size={10} />
+                <Icon name="robot" size={12} />
                 {agent.name}
               </div>
             );
@@ -779,10 +779,10 @@ export function ChatInput() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
-              className="flex items-center justify-center w-8 h-8 rounded text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] hover:bg-[var(--vscode-input-background)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              className="flex items-center justify-center w-8 h-8 rounded text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--vscode-input-background)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
               title="Attach files"
             >
-              <Paperclip size={14} />
+              <Icon name="paperclip" size={14} />
             </button>
           </>
         )}
@@ -804,16 +804,16 @@ export function ChatInput() {
             className="flex items-center justify-center w-8 h-8 rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:opacity-80 shrink-0"
             title="Stop"
           >
-            <Square size={14} />
+            <Icon name="square" size={14} />
           </button>
         ) : (
           <button
             onClick={handleSend}
             disabled={!value.trim() || !isOnline}
-            className="flex items-center justify-center w-8 h-8 rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="flex items-center justify-center w-8 h-8 rounded bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
             title={sendTitle}
           >
-            <Send size={14} />
+            <Icon name="paper-plane-right" size={14} />
           </button>
         )}
       </div>

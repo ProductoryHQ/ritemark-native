@@ -2,33 +2,33 @@
  * ActivityCard — compact activity entry with icon + one line.
  */
 
-import { Brain, Search, FileText, Terminal, Sparkles, AlertCircle, Play, Bot, CheckCircle } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import type { AgentProgress } from './types';
 
 const iconMap: Record<string, React.ReactNode> = {
-  Glob: <Search size={13} />,
-  Grep: <Search size={13} />,
-  Read: <FileText size={13} />,
-  Write: <FileText size={13} />,
-  Edit: <FileText size={13} />,
-  Bash: <Terminal size={13} />,
-  WebSearch: <Search size={13} />,
-  WebFetch: <Search size={13} />,
-  Agent: <Bot size={13} />,
-  Task: <Bot size={13} />,
+  Glob: <Icon name="magnifying-glass" size={14} />,
+  Grep: <Icon name="magnifying-glass" size={14} />,
+  Read: <Icon name="file-text" size={14} />,
+  Write: <Icon name="file-text" size={14} />,
+  Edit: <Icon name="file-text" size={14} />,
+  Bash: <Icon name="terminal" size={14} />,
+  WebSearch: <Icon name="magnifying-glass" size={14} />,
+  WebFetch: <Icon name="magnifying-glass" size={14} />,
+  Agent: <Icon name="robot" size={14} />,
+  Task: <Icon name="robot" size={14} />,
 };
 
 function getActivityIcon(activity: AgentProgress) {
-  if (activity.type === 'thinking') return <Brain size={13} />;
-  if (activity.type === 'init') return <Play size={13} />;
-  if (activity.type === 'error') return <AlertCircle size={13} />;
-  if (activity.type === 'done') return <Sparkles size={13} />;
-  if (activity.type === 'text') return <Sparkles size={13} />;
-  if (activity.type === 'subagent_start') return <Bot size={13} className="text-[var(--vscode-progressBar-background)]" />;
-  if (activity.type === 'subagent_progress') return <Bot size={13} className="text-[var(--vscode-progressBar-background)]" />;
-  if (activity.type === 'subagent_done') return <CheckCircle size={13} className="text-green-500" />;
+  if (activity.type === 'thinking') return <Icon name="brain" size={14} />;
+  if (activity.type === 'init') return <Icon name="play" size={14} />;
+  if (activity.type === 'error') return <Icon name="warning-circle" size={14} />;
+  if (activity.type === 'done') return <Icon name="star-four" size={14} />;
+  if (activity.type === 'text') return <Icon name="star-four" size={14} />;
+  if (activity.type === 'subagent_start') return <Icon name="robot" size={14} className="text-[var(--vscode-progressBar-background)]" />;
+  if (activity.type === 'subagent_progress') return <Icon name="robot" size={14} className="text-[var(--vscode-progressBar-background)]" />;
+  if (activity.type === 'subagent_done') return <Icon name="check-circle" size={14} className="text-green-500" />;
   if (activity.tool && iconMap[activity.tool]) return iconMap[activity.tool];
-  return <Terminal size={13} />;
+  return <Icon name="terminal" size={14} />;
 }
 
 function getActivityLabel(activity: AgentProgress): string {
@@ -54,8 +54,8 @@ export function ActivityCard({ activity }: ActivityCardProps) {
       <span className="shrink-0 mt-0.5 opacity-50">
         {getActivityIcon(activity)}
       </span>
-      <span className="text-[var(--vscode-descriptionForeground)]">
-        <span className="font-medium text-[var(--vscode-foreground)]">
+      <span className="text-[var(--r-ink-muted)]">
+        <span className="font-medium text-[var(--r-ink-strong)]">
           {getActivityLabel(activity)}
         </span>
         {activity.message && (

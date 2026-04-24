@@ -3,6 +3,49 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 
+function parseHexColor(value: string): [number, number, number] | null {
+  const hex = value.trim()
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex)
+  if (!match) return null
+
+  const normalized = match[1].length === 3
+    ? match[1].split('').map((char) => char + char).join('')
+    : match[1]
+
+  return [
+    parseInt(normalized.slice(0, 2), 16),
+    parseInt(normalized.slice(2, 4), 16),
+    parseInt(normalized.slice(4, 6), 16),
+  ]
+}
+
+function isDarkColor(value: string): boolean {
+  const rgb = parseHexColor(value)
+  if (!rgb) return false
+
+  const [red, green, blue] = rgb.map((channel) => {
+    const normalized = channel / 255
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4
+  })
+
+  return (0.2126 * red + 0.7152 * green + 0.0722 * blue) < 0.18
+}
+
+function syncRitemarkThemeClass() {
+  const body = document.body
+  const classList = body.classList
+  const themeKind = body.getAttribute('data-vscode-theme-kind') ?? ''
+  const editorBackground = getComputedStyle(body).getPropertyValue('--vscode-editor-background')
+  const shouldUseDarkTokens =
+    classList.contains('vscode-dark') ||
+    themeKind.toLowerCase().includes('dark') ||
+    isDarkColor(editorBackground)
+
+  classList.toggle('ritemark-dark', shouldUseDarkTokens)
+}
+
 // Lazy load FlowEditor to avoid loading React Flow for markdown files
 const FlowEditor = lazy(() =>
   import('./components/flows/FlowEditor').then((m) => ({ default: m.FlowEditor }))
@@ -30,9 +73,15 @@ const editorType = rootElement.getAttribute('data-editor-type')
 // Debug logging
 console.log('[Ritemark] Initializing editor, type:', editorType)
 
+syncRitemarkThemeClass()
+new MutationObserver(syncRitemarkThemeClass).observe(document.body, {
+  attributes: true,
+  attributeFilter: ['class', 'data-vscode-theme-kind', 'style'],
+})
+
 // Sidebar panels use sideBar background (grey) instead of editor background (white)
-if (editorType === 'flows-panel' || editorType === 'ai-sidebar') {
-  document.body.style.backgroundColor = 'var(--vscode-sideBar-background)'
+if (editorType === 'flows-panel' || editorType === 'ai-sidebar' || editorType === 'settings') {
+  document.body.style.backgroundColor = 'var(--r-surface-muted)'
 }
 
 // Loading fallback
@@ -43,8 +92,8 @@ const LoadingFallback = () => (
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'var(--vscode-editor-background)',
-      color: 'var(--vscode-editor-foreground)',
+      background: 'var(--background)',
+      color: 'var(--foreground)',
     }}
   >
     Loading...
