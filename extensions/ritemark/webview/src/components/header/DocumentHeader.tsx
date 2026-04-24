@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText, Download, RotateCw, List } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 import { VoiceDictationButton } from '../VoiceDictationButton'
 
 interface Features {
@@ -49,7 +49,7 @@ export function DocumentHeader({
             aria-pressed={contentsActive}
             title={contentsActive ? 'Hide table of contents' : 'Contents'}
           >
-            <List size={16} />
+            <Icon name="list" size={16} />
             <span className="header-btn-text">Contents</span>
           </button>
         )}
@@ -61,7 +61,7 @@ export function DocumentHeader({
           aria-label="Open properties"
           title="Properties"
         >
-          <FileText size={16} />
+          <Icon name="file-text" size={16} />
           <span className="header-btn-text">Properties</span>
         </button>
 
@@ -79,7 +79,7 @@ export function DocumentHeader({
             aria-label="File changed on disk - click to refresh"
             title="File changed on disk - click to reload"
           >
-            <RotateCw size={16} />
+            <Icon name="arrow-clockwise" size={16} />
             <span className="header-btn-text">Refresh</span>
             <span className="refresh-badge" />
           </button>
@@ -92,7 +92,7 @@ export function DocumentHeader({
           aria-label="Export document"
           title="Export"
         >
-          <Download size={16} />
+          <Icon name="download" size={16} />
           <span className="header-btn-text">Export</span>
         </button>
       </div>
@@ -106,7 +106,7 @@ export function DocumentHeader({
           right: 0;
           height: 40px;
           background: var(--vscode-editor-background);
-          border-bottom: 1px solid var(--vscode-panel-border);
+          border-bottom: 1px solid var(--r-hairline);
           z-index: 60;
         }
 
@@ -126,7 +126,7 @@ export function DocumentHeader({
           border: none;
           border-radius: 6px;
           background: transparent;
-          color: var(--vscode-foreground);
+          color: var(--r-ink-strong);
           font-size: 13px;
           font-family: var(--ritemark-ui-font-family);
           cursor: pointer;
@@ -134,12 +134,12 @@ export function DocumentHeader({
         }
 
         .header-btn:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+          background: var(--r-surface-soft);
         }
 
         .header-btn:active,
         .header-btn.is-active {
-          background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
+          background: var(--r-surface-muted, var(--r-surface-soft));
         }
 
         /* Button text - hidden on narrow viewports */

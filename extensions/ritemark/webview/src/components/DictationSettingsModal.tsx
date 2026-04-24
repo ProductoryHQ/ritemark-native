@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings, Trash2, HardDrive } from 'lucide-react'
+import { Icon } from './ui/Icon'
 import { sendToExtension, onMessage } from '../bridge'
 import {
   Dialog,
@@ -139,24 +139,24 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent>
-        <DialogHeader icon={<Settings size={18} />} onClose={onClose}>
+        <DialogHeader icon={<Icon name="gear" size={20} />} onClose={onClose}>
           <DialogTitle>Dictation Settings</DialogTitle>
         </DialogHeader>
 
         <DialogBody>
           {/* Model Section */}
           <div className="mb-6">
-            <div className="text-[11px] font-semibold text-[var(--vscode-descriptionForeground)] uppercase tracking-wider mb-3">MODEL</div>
-            <div className="flex items-center justify-between p-3 bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)] rounded-lg">
+            <div className="text-[11px] font-semibold text-[var(--r-ink-muted)] uppercase tracking-wider mb-3">MODEL</div>
+            <div className="flex items-center justify-between p-3 bg-[var(--r-surface-muted)] border border-[var(--r-hairline-strong)] rounded-lg">
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--vscode-foreground)]">
-                  <HardDrive size={14} />
+                <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--r-ink-strong)]">
+                  <Icon name="hard-drive" size={14} />
                   {modelStatus?.modelName || 'Loading...'}
                   {modelStatus?.modelSizeDisplay && (
-                    <span className="font-normal text-[var(--vscode-descriptionForeground)]">({modelStatus.modelSizeDisplay})</span>
+                    <span className="font-normal text-[var(--r-ink-muted)]">({modelStatus.modelSizeDisplay})</span>
                   )}
                 </div>
-                <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+                <div className="text-xs text-[var(--r-ink-muted)]">
                   {modelStatus === null ? (
                     'Checking...'
                   ) : modelStatus.downloaded ? (
@@ -168,20 +168,20 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
               </div>
               {modelStatus?.downloaded && !showConfirmRemove && (
                 <button
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-[var(--vscode-input-border)] rounded-md text-xs text-[var(--vscode-errorForeground,#ef4444)] cursor-pointer transition-colors hover:bg-[rgba(239,68,68,0.1)] hover:border-[var(--vscode-errorForeground,#ef4444)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-[var(--r-hairline-strong)] rounded-md text-xs text-[var(--r-error,#ef4444)] cursor-pointer transition-colors hover:bg-[rgba(239,68,68,0.1)] hover:border-[var(--r-error,#ef4444)] disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleRemoveClick}
                   disabled={isRemoving || modelStatus.isDictationActive}
                   title={modelStatus.isDictationActive ? 'Stop dictation first' : 'Remove model'}
                 >
-                  <Trash2 size={14} />
+                  <Icon name="trash" size={14} />
                   {isRemoving ? 'Removing...' : modelStatus.isDictationActive ? 'In use' : 'Remove'}
                 </button>
               )}
               {showConfirmRemove && (
-                <div className="flex items-center gap-2 text-xs text-[var(--vscode-foreground)]">
+                <div className="flex items-center gap-2 text-xs text-[var(--r-ink-strong)]">
                   <span>Delete?</span>
-                  <button className="px-2.5 py-1 rounded bg-[var(--vscode-errorForeground,#ef4444)] text-white text-xs border-none cursor-pointer hover:opacity-90" onClick={handleConfirmRemove}>Yes</button>
-                  <button className="px-2.5 py-1 rounded bg-transparent text-[var(--vscode-foreground)] text-xs border border-[var(--vscode-input-border)] cursor-pointer hover:bg-[var(--vscode-toolbar-hoverBackground)]" onClick={handleCancelRemove}>No</button>
+                  <button className="px-2.5 py-1 rounded bg-[var(--r-error,#ef4444)] text-white text-xs border-none cursor-pointer hover:opacity-90" onClick={handleConfirmRemove}>Yes</button>
+                  <button className="px-2.5 py-1 rounded bg-transparent text-[var(--r-ink-strong)] text-xs border border-[var(--r-hairline-strong)] cursor-pointer hover:bg-[var(--r-surface-soft)]" onClick={handleCancelRemove}>No</button>
                 </div>
               )}
             </div>
@@ -189,13 +189,13 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
 
           {/* Audio Processing Section */}
           <div>
-            <div className="text-[11px] font-semibold text-[var(--vscode-descriptionForeground)] uppercase tracking-wider mb-3">AUDIO PROCESSING</div>
+            <div className="text-[11px] font-semibold text-[var(--r-ink-muted)] uppercase tracking-wider mb-3">AUDIO PROCESSING</div>
 
             {/* Chunk Duration */}
-            <div className="flex items-start justify-between py-3 border-b border-[var(--vscode-panel-border)]">
+            <div className="flex items-start justify-between py-3 border-b border-[var(--r-hairline)]">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[13px] font-medium text-[var(--vscode-foreground)]">Chunk duration</span>
-                <span className="text-[11px] text-[var(--vscode-descriptionForeground)]">How often audio is sent for transcription</span>
+                <span className="text-[13px] font-medium text-[var(--r-ink-strong)]">Chunk duration</span>
+                <span className="text-[11px] text-[var(--r-ink-muted)]">How often audio is sent for transcription</span>
               </div>
               <div className="flex gap-2">
                 {([3000, 5000, 10000] as const).map((duration) => (
@@ -207,17 +207,17 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
                       checked={settings.chunkDuration === duration}
                       onChange={() => updateSettings({ chunkDuration: duration })}
                     />
-                    <span className="text-[13px] text-[var(--vscode-foreground)]">{duration / 1000}s</span>
+                    <span className="text-[13px] text-[var(--r-ink-strong)]">{duration / 1000}s</span>
                   </label>
                 ))}
               </div>
             </div>
 
             {/* VAD Toggle */}
-            <div className="flex items-start justify-between py-3 border-b border-[var(--vscode-panel-border)] opacity-60">
+            <div className="flex items-start justify-between py-3 border-b border-[var(--r-hairline)] opacity-60">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[13px] font-medium text-[var(--vscode-foreground)]">Voice Activity Detection</span>
-                <span className="text-[11px] text-[var(--vscode-descriptionForeground)]">Only transcribe when speech is detected</span>
+                <span className="text-[13px] font-medium text-[var(--r-ink-strong)]">Voice Activity Detection</span>
+                <span className="text-[11px] text-[var(--r-ink-muted)]">Only transcribe when speech is detected</span>
               </div>
               <span className="text-[11px] px-2 py-1 bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)] rounded">Coming soon</span>
             </div>
@@ -225,8 +225,8 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
             {/* Noise Reduction Toggle */}
             <div className="flex items-start justify-between py-3 opacity-60">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[13px] font-medium text-[var(--vscode-foreground)]">Noise Reduction</span>
-                <span className="text-[11px] text-[var(--vscode-descriptionForeground)]">Filter background noise before transcription</span>
+                <span className="text-[13px] font-medium text-[var(--r-ink-strong)]">Noise Reduction</span>
+                <span className="text-[11px] text-[var(--r-ink-muted)]">Filter background noise before transcription</span>
               </div>
               <span className="text-[11px] px-2 py-1 bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)] rounded">Coming soon</span>
             </div>

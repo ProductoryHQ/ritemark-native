@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useCallback, useState, useRef } from 'react';
-import { AlertTriangle, Clock3, X } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { NodePalette } from './NodePalette';
 import { FlowCanvas } from './FlowCanvas';
 import { NodeConfigPanel } from './NodeConfigPanel';
@@ -280,10 +280,10 @@ export function FlowEditor() {
     return (
       <div className="h-full flex items-center justify-center bg-[var(--vscode-editor-background)]">
         <div className="max-w-md p-6 text-center">
-          <div className="text-[var(--vscode-errorForeground)] text-lg mb-2">
+          <div className="text-[var(--r-error)] text-lg mb-2">
             Error Loading Flow
           </div>
-          <div className="text-sm text-[var(--vscode-descriptionForeground)] mb-4">
+          <div className="text-sm text-[var(--r-ink-muted)] mb-4">
             {error}
           </div>
           <Button
@@ -303,7 +303,7 @@ export function FlowEditor() {
   return (
     <div className="h-full flex flex-col bg-[var(--vscode-editor-background)]">
       {/* Header */}
-      <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)]">
+      <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)]">
         <Input
           value={localName}
           onChange={(e) => setLocalName(e.target.value)}
@@ -338,10 +338,10 @@ export function FlowEditor() {
             onClick={openFlowSettings}
             className="gap-2"
           >
-            <Clock3 size={14} />
+            <Icon name="clock" size={14} />
             <span>{formatScheduleSummary(flowSchedule)}</span>
             {flowSchedule?.enabled && (
-              <span className="text-xs text-[var(--vscode-descriptionForeground)]">
+              <span className="text-xs text-[var(--r-ink-muted)]">
                 {formatScheduleDateTime(nextScheduledRun)}
               </span>
             )}
@@ -356,7 +356,7 @@ export function FlowEditor() {
             onClick={() => setShowWarnings(!showWarnings)}
             className="flex items-center gap-1.5 text-[var(--vscode-editorWarning-foreground)]"
           >
-            <AlertTriangle size={14} />
+            <Icon name="warning" size={14} />
             {validationWarnings.length} warning
             {validationWarnings.length > 1 ? 's' : ''}
           </Button>
@@ -369,10 +369,10 @@ export function FlowEditor() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm font-medium text-[var(--vscode-inputValidation-warningForeground)] mb-1">
-                <AlertTriangle size={14} />
+                <Icon name="warning" size={14} />
                 Validation Warnings
               </div>
-              <ul className="text-xs text-[var(--vscode-foreground)] space-y-0.5 ml-5">
+              <ul className="text-xs text-[var(--r-ink-strong)] space-y-0.5 ml-5">
                 {validationWarnings.map((warning, i) => (
                   <li key={i}>{warning}</li>
                 ))}
@@ -382,9 +382,9 @@ export function FlowEditor() {
               variant="ghost"
               size="sm"
               onClick={() => setShowWarnings(false)}
-              className="text-[var(--vscode-foreground)]"
+              className="text-[var(--r-ink-strong)]"
             >
-              <X size={14} />
+              <Icon name="x" size={14} />
             </Button>
           </div>
         </div>

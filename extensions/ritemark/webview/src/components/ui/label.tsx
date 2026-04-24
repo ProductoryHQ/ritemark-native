@@ -17,7 +17,7 @@ export const Label = React.forwardRef<HTMLLabelElement, LabelProps>(
         ref={ref}
         className={cn(
           'text-sm font-medium leading-none',
-          'text-[var(--vscode-foreground)]',
+          'text-[var(--r-ink-strong)]',
           'peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
           className
         )}

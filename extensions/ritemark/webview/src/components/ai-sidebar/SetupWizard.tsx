@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Key, Loader2, LogIn, RefreshCw, Wrench } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { EnvironmentStatusNotice } from './EnvironmentStatusNotice';
 import { useAISidebarStore } from './store';
 
@@ -61,21 +61,21 @@ export function SetupWizard() {
 
   return (
     <div className="flex-1 overflow-y-auto px-3 py-4">
-      <div className="rounded-xl border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-4">
+      <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 shrink-0">
             {setupInProgress && (needsInstall || isBroken) ? (
-              <Loader2 className="h-5 w-5 animate-spin opacity-60" />
+              <Icon name="circle-notch" size={20} className="animate-spin opacity-60" />
             ) : isBroken ? (
-              <AlertTriangle className="h-5 w-5 text-[var(--vscode-testing-iconFailed)]" />
+              <Icon name="warning" size={20} className="text-[var(--vscode-testing-iconFailed)]" />
             ) : loginInProgress ? (
-              <Loader2 className="h-5 w-5 animate-spin text-[var(--vscode-textLink-foreground)]" />
+              <Icon name="circle-notch" size={20} className="animate-spin text-[var(--r-accent)]" />
             ) : isReady ? (
-              <CheckCircle2 className="h-5 w-5 text-[var(--vscode-testing-iconPassed)]" />
+              <Icon name="check-circle" size={20} className="text-[var(--vscode-testing-iconPassed)]" />
             ) : needsAuth ? (
-              <LogIn className="h-5 w-5 text-[var(--vscode-textLink-foreground)]" />
+              <Icon name="sign-in" size={20} className="text-[var(--r-accent)]" />
             ) : (
-              <Wrench className="h-5 w-5 text-[var(--vscode-textLink-foreground)]" />
+              <Icon name="wrench" size={20} className="text-[var(--r-accent)]" />
             )}
           </div>
 
@@ -84,7 +84,7 @@ export function SetupWizard() {
             <p className="mt-1 text-xs leading-5 opacity-75">{description}</p>
 
             {setupError && (
-              <div className="mt-3 rounded-lg border border-[var(--vscode-inputValidation-errorBorder)]/40 bg-[var(--vscode-inputValidation-errorBackground)]/20 px-3 py-2 text-xs leading-5 text-[var(--vscode-errorForeground)] break-words">
+              <div className="mt-3 rounded-lg border border-[var(--vscode-inputValidation-errorBorder)]/40 bg-[var(--vscode-inputValidation-errorBackground)]/20 px-3 py-2 text-xs leading-5 text-[var(--r-error)] break-words">
                 {setupError}
               </div>
             )}
@@ -94,56 +94,56 @@ export function SetupWizard() {
             <div className="mt-4 flex flex-wrap gap-2">
               {needsInstall && !installBlockedByEnvironment && (
                 <PrimaryButton onClick={startInstall} disabled={setupInProgress}>
-                  {setupInProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+                  {setupInProgress ? <Icon name="circle-notch" size={14} className="animate-spin" /> : <Icon name="wrench" size={14} />}
                   Install Claude
                 </PrimaryButton>
               )}
 
               {isBroken && setupStatus.repairAction !== 'reload' && !installBlockedByEnvironment && (
                 <PrimaryButton onClick={startInstall} disabled={setupInProgress}>
-                  {setupInProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+                  {setupInProgress ? <Icon name="circle-notch" size={14} className="animate-spin" /> : <Icon name="wrench" size={14} />}
                   Repair Claude
                 </PrimaryButton>
               )}
 
               {setupStatus.repairAction === 'reload' && (
                 <PrimaryButton onClick={reloadWindow}>
-                  <RefreshCw className="h-3.5 w-3.5" />
+                  <Icon name="arrows-clockwise" size={14} />
                   Reload Window
                 </PrimaryButton>
               )}
 
               {needsAuth && !loginBlockedByEnvironment && (
                 <PrimaryButton onClick={startLogin} disabled={offlineBlocked}>
-                  <LogIn className="h-3.5 w-3.5" />
+                  <Icon name="sign-in" size={14} />
                   Sign in with Claude.ai
                 </PrimaryButton>
               )}
 
               {installOrRepairStep && missingGit && (
                 <SecondaryButton onClick={openGitDownload}>
-                  <Wrench className="h-3.5 w-3.5" />
+                  <Icon name="wrench" size={14} />
                   Get Git for Windows
                 </SecondaryButton>
               )}
 
               {installOrRepairStep && missingNode && (
                 <SecondaryButton onClick={openNodeDownload}>
-                  <Wrench className="h-3.5 w-3.5" />
+                  <Icon name="wrench" size={14} />
                   Get Node.js
                 </SecondaryButton>
               )}
 
               {needsAuth && (
                 <SecondaryButton onClick={openApiKeySettings}>
-                  <Key className="h-3.5 w-3.5" />
+                  <Icon name="key" size={14} />
                   Use API key instead
                 </SecondaryButton>
               )}
 
               {isReady && (
                 <PrimaryButton onClick={dismissWelcome}>
-                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <Icon name="check-circle" size={14} />
                   Get Started
                 </PrimaryButton>
               )}
@@ -160,7 +160,7 @@ export function SetupWizard() {
             {(needsInstall || needsAuth) && (
               <button
                 onClick={configureApiKey}
-                className="mt-3 text-xs text-[var(--vscode-textLink-foreground)] hover:underline"
+                className="mt-3 text-xs text-[var(--r-accent)] hover:underline"
               >
                 Prefer using an Anthropic API key?
               </button>
@@ -168,7 +168,7 @@ export function SetupWizard() {
 
             {(setupStatus.binaryPath || setupStatus.cliVersion || setupStatus.diagnostics.length > 0) && (
               <details className="mt-4">
-                <summary className="cursor-pointer list-none text-xs font-medium text-[var(--vscode-textLink-foreground)] hover:underline">
+                <summary className="cursor-pointer list-none text-xs font-medium text-[var(--r-accent)] hover:underline">
                   Technical details
                 </summary>
                 <div className="mt-2 space-y-1.5 text-xs leading-5 opacity-75">
@@ -204,7 +204,7 @@ function PrimaryButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-md bg-[var(--vscode-button-background)] px-3 py-2 text-xs font-medium text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-md bg-[var(--r-accent)] px-3 py-2 text-xs font-medium text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>

@@ -6,7 +6,7 @@
  */
 
 import { memo } from 'react';
-import { FileText, File } from 'lucide-react';
+import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 interface InputNodeData {
   label: string;
@@ -26,7 +26,7 @@ function InputNodeComponent({ data, selected }: InputNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={isFile ? <File size={16} /> : <FileText size={16} />}
+      icon={isFile ? <Icon name="file" size={16} /> : <Icon name="file-text" size={16} />}
       selected={selected}
       showTargetHandle={false}
       headerColor="var(--vscode-inputValidation-infoBackground)"

@@ -2,7 +2,7 @@
  * WidgetPreview — edit preview with Apply/Discard buttons.
  */
 
-import { Check, X } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import type { WidgetData } from './types';
 
@@ -23,16 +23,16 @@ export function WidgetPreview({ widget, messageId }: WidgetPreviewProps) {
       <div className="flex gap-2 mt-2">
         <button
           onClick={() => applyWidget(widget)}
-          className="inline-flex items-center gap-1 px-3 py-1 text-[11px] rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] border-none cursor-pointer"
+          className="inline-flex items-center gap-1 px-3 py-1 text-[11px] rounded bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] border-none cursor-pointer"
         >
-          <Check size={12} />
+          <Icon name="check" size={12} />
           Apply
         </button>
         <button
           onClick={() => discardWidget(messageId)}
           className="inline-flex items-center gap-1 px-3 py-1 text-[11px] rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] border-none cursor-pointer"
         >
-          <X size={12} />
+          <Icon name="x" size={12} />
           Discard
         </button>
       </div>

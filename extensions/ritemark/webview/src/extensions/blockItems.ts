@@ -3,35 +3,31 @@
  * Single source of truth for all insertable block types.
  */
 
-import type { LucideIcon } from 'lucide-react'
-import {
-  Pilcrow, Heading1, Heading2, Heading3, List, ListOrdered,
-  CheckSquare, Quote, Code, Table, Image, GitBranch, Minus,
-} from 'lucide-react'
+import type { PhosphorIconName } from '../components/ui/Icon'
 import { sendToExtension, emitInternalEvent } from '../bridge'
 
 export interface BlockItemDef {
   title: string
   description: string
-  icon: LucideIcon
+  icon: PhosphorIconName
   nodeType: string
   attrs?: Record<string, unknown>
 }
 
 export const blockItems: BlockItemDef[] = [
-  { title: 'Text', description: 'Plain text paragraph', icon: Pilcrow, nodeType: 'paragraph' },
-  { title: 'Heading 1', description: 'Large heading', icon: Heading1, nodeType: 'heading', attrs: { level: 1 } },
-  { title: 'Heading 2', description: 'Medium heading', icon: Heading2, nodeType: 'heading', attrs: { level: 2 } },
-  { title: 'Heading 3', description: 'Small heading', icon: Heading3, nodeType: 'heading', attrs: { level: 3 } },
-  { title: 'Bullet List', description: 'Create a bulleted list', icon: List, nodeType: 'bulletList' },
-  { title: 'Numbered List', description: 'Create a numbered list', icon: ListOrdered, nodeType: 'orderedList' },
-  { title: 'Task List', description: 'Create a checklist', icon: CheckSquare, nodeType: 'taskList' },
-  { title: 'Quote', description: 'Insert a blockquote', icon: Quote, nodeType: 'blockquote' },
-  { title: 'Code Block', description: 'Insert a code block', icon: Code, nodeType: 'codeBlock' },
-  { title: 'Table', description: 'Insert a 3×3 table', icon: Table, nodeType: 'table' },
-  { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: GitBranch, nodeType: 'mermaid' },
-  { title: 'Image', description: 'Insert an image from file', icon: Image, nodeType: 'image' },
-  { title: 'Divider', description: 'Horizontal rule', icon: Minus, nodeType: 'horizontalRule' },
+  { title: 'Text', description: 'Plain text paragraph', icon: 'paragraph', nodeType: 'paragraph' },
+  { title: 'Heading 1', description: 'Large heading', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 } },
+  { title: 'Heading 2', description: 'Medium heading', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 } },
+  { title: 'Heading 3', description: 'Small heading', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 } },
+  { title: 'Bullet List', description: 'Create a bulleted list', icon: 'list', nodeType: 'bulletList' },
+  { title: 'Numbered List', description: 'Create a numbered list', icon: 'list-numbers', nodeType: 'orderedList' },
+  { title: 'Task List', description: 'Create a checklist', icon: 'check-square', nodeType: 'taskList' },
+  { title: 'Quote', description: 'Insert a blockquote', icon: 'quotes', nodeType: 'blockquote' },
+  { title: 'Code Block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock' },
+  { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table' },
+  { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid' },
+  { title: 'Image', description: 'Insert an image from file', icon: 'image', nodeType: 'image' },
+  { title: 'Divider', description: 'Horizontal rule', icon: 'minus', nodeType: 'horizontalRule' },
 ]
 
 /**

@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { Bot } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { type AgentDefinition, filterAgents } from './agentRegistry';
 import { useAISidebarStore } from './store';
 
@@ -82,7 +82,7 @@ export const AgentMentionPopup = forwardRef<AgentMentionPopupHandle, AgentMentio
           className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 min-w-[240px]"
           style={{ bottom: '100%', left: position.left, marginBottom: 4 }}
         >
-          <div className="px-3 py-2 text-xs text-[var(--vscode-descriptionForeground)]">
+          <div className="px-3 py-2 text-xs text-[var(--r-ink-muted)]">
             No agents found
           </div>
         </div>
@@ -98,21 +98,22 @@ export const AgentMentionPopup = forwardRef<AgentMentionPopupHandle, AgentMentio
         {agents.map((agent, index) => (
           <button
             key={agent.id}
-            className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--vscode-list-hoverBackground)] ${
+            className={`w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-[var(--r-surface-soft)] ${
               index === selectedIndex
-                ? 'bg-[var(--vscode-list-activeSelectionBackground)] text-[var(--vscode-list-activeSelectionForeground)]'
+                ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)]'
                 : ''
             }`}
             onClick={() => onSelect(agent)}
             onMouseEnter={() => setSelectedIndex(index)}
           >
-            <Bot
+            <Icon
+              name="robot"
               size={16}
-              className="mt-0.5 shrink-0 text-[var(--vscode-symbolIcon-classForeground)]"
+              className="mt-0.5 shrink-0"
             />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">{agent.name}</div>
-              <div className="text-xs text-[var(--vscode-descriptionForeground)] truncate">
+              <div className="text-xs text-[var(--r-ink-muted)] truncate">
                 {agent.description}
               </div>
             </div>

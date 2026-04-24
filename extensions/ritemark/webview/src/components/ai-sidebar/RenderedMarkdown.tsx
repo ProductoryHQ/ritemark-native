@@ -68,7 +68,7 @@ export const markdownStyles = `
 .rendered-markdown {
   font-size: var(--chat-font-size, 13px);
   line-height: 1.6;
-  color: var(--vscode-foreground);
+  color: var(--r-ink-strong);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -102,7 +102,7 @@ export const markdownStyles = `
 
 /* Links */
 .rendered-markdown a {
-  color: var(--vscode-textLink-foreground);
+  color: var(--r-accent);
   text-decoration: none;
 }
 .rendered-markdown a:hover {
@@ -127,7 +127,7 @@ export const markdownStyles = `
 .rendered-markdown > code:hover {
   cursor: pointer;
   text-decoration: underline;
-  color: var(--vscode-textLink-foreground);
+  color: var(--r-accent);
 }
 
 /* Code blocks */
@@ -168,7 +168,7 @@ export const markdownStyles = `
 }
 .rendered-markdown th,
 .rendered-markdown td {
-  border: 1px solid var(--vscode-panel-border);
+  border: 1px solid var(--r-hairline);
   padding: 4px 8px;
   text-align: left;
 }
@@ -185,13 +185,13 @@ export const markdownStyles = `
   margin: 8px 0;
   padding: 4px 12px;
   border-left: 3px solid var(--vscode-textBlockQuote-border);
-  color: var(--vscode-descriptionForeground);
+  color: var(--r-ink-muted);
 }
 
 /* Horizontal rules */
 .rendered-markdown hr {
   border: none;
-  border-top: 1px solid var(--vscode-panel-border);
+  border-top: 1px solid var(--r-hairline);
   margin: 12px 0;
 }
 

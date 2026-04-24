@@ -10,7 +10,7 @@
 
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
 import { useState, useCallback, useEffect, useId, useRef } from 'react'
-import { Copy, Check, Code, Eye } from 'lucide-react'
+import { Icon } from './ui/Icon'
 import { renderMermaid } from '../lib/mermaid'
 
 interface CodeBlockWithCopyProps {
@@ -102,12 +102,12 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
           >
             {showCode ? (
               <>
-                <Eye size={14} />
+                <Icon name="eye" size={14} />
                 <span>Diagram</span>
               </>
             ) : (
               <>
-                <Code size={14} />
+                <Icon name="code" size={14} />
                 <span>Code</span>
               </>
             )}
@@ -122,12 +122,12 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
           >
             {copied ? (
               <>
-                <Check size={14} />
+                <Icon name="check" size={14} />
                 <span>Copied!</span>
               </>
             ) : (
               <>
-                <Copy size={14} />
+                <Icon name="copy" size={14} />
                 <span>Copy</span>
               </>
             )}
@@ -183,12 +183,12 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
       >
         {copied ? (
           <>
-            <Check size={14} />
+            <Icon name="check" size={14} />
             <span>Copied!</span>
           </>
         ) : (
           <>
-            <Copy size={14} />
+            <Icon name="copy" size={14} />
             <span>Copy</span>
           </>
         )}

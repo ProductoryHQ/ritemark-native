@@ -6,22 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import {
-  Play,
-  Loader2,
-  CheckCircle,
-  XCircle,
-  ChevronDown,
-  ChevronRight,
-  X,
-  Sparkles,
-  Image,
-  Save,
-  Zap,
-  AlertTriangle,
-  FolderOpen,
-  Terminal,
-} from 'lucide-react';
+import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -46,13 +31,13 @@ interface ExecutionPanelProps {
 }
 
 // Node type icons
-const nodeIcons: Record<string, typeof Sparkles> = {
-  'trigger': Zap,
-  'llm-prompt': Sparkles,
-  'image-prompt': Image,
-  'save-file': Save,
-  'claude-code': Terminal,
-  'codex': Terminal,
+const nodeIcons: Record<string, PhosphorIconName> = {
+  'trigger': 'lightning',
+  'llm-prompt': 'star-four',
+  'image-prompt': 'image',
+  'save-file': 'floppy-disk',
+  'claude-code': 'terminal',
+  'codex': 'terminal',
 };
 
 export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
@@ -208,22 +193,22 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
   const getStatusIcon = (status: ExecutionStep['status']) => {
     switch (status) {
       case 'pending':
-        return <div className="w-5 h-5 rounded-full border-2 border-[var(--vscode-descriptionForeground)]" />;
+        return <div className="w-5 h-5 rounded-full border-2 border-[var(--r-ink-muted)]" />;
       case 'running':
-        return <Loader2 className="w-5 h-5 animate-spin text-[var(--vscode-progressBar-foreground)]" />;
+        return <Icon name="circle-notch" size={20} className="animate-spin text-[var(--vscode-progressBar-foreground)]" />;
       case 'complete':
-        return <CheckCircle className="w-5 h-5 text-[var(--vscode-testing-iconPassed)]" />;
+        return <Icon name="check-circle" size={20} className="text-[var(--vscode-testing-iconPassed)]" />;
       case 'error':
-        return <XCircle className="w-5 h-5 text-[var(--vscode-testing-iconFailed)]" />;
+        return <Icon name="x-circle" size={20} className="text-[var(--vscode-testing-iconFailed)]" />;
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--vscode-panel-border)]">
+    <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--vscode-panel-border)]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--r-hairline)]">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-sm text-[var(--vscode-foreground)]">
+          <span className="font-medium text-sm text-[var(--r-ink-strong)]">
             {phase === 'input' ? 'Run Flow' : 'Results'}
           </span>
           {phase === 'complete' && (
@@ -243,7 +228,7 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
           onClick={onClose}
           className="h-6 w-6 p-0"
         >
-          <X className="h-4 w-4" />
+          <Icon name="x" size={16} />
         </Button>
       </div>
 
@@ -255,11 +240,11 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
             {/* Validation Errors */}
             {!canRun && (
               <div className="p-3 rounded bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)]">
-                <div className="flex items-center gap-2 text-sm font-medium text-[var(--vscode-errorForeground)] mb-2">
-                  <AlertTriangle size={16} />
+                <div className="flex items-center gap-2 text-sm font-medium text-[var(--r-error)] mb-2">
+                  <Icon name="warning" size={16} />
                   Cannot Run Flow
                 </div>
-                <ul className="text-xs text-[var(--vscode-errorForeground)] space-y-1 ml-6">
+                <ul className="text-xs text-[var(--r-error)] space-y-1 ml-6">
                   {validationErrors.map((err, i) => (
                     <li key={i}>{err}</li>
                   ))}
@@ -269,14 +254,14 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
 
             {canRun && flow.inputs.length > 0 ? (
               <>
-                <p className="text-xs text-[var(--vscode-descriptionForeground)]">
+                <p className="text-xs text-[var(--r-ink-muted)]">
                   Enter the required inputs to run this flow.
                 </p>
                 {flow.inputs.map((input) => (
                   <div key={input.id} className="space-y-1.5">
                     <Label htmlFor={input.id} className="text-xs">
                       {input.label}
-                      {input.required && <span className="text-[var(--vscode-errorForeground)] ml-1">*</span>}
+                      {input.required && <span className="text-[var(--r-error)] ml-1">*</span>}
                     </Label>
                     {input.type === 'file' ? (
                       <div className="flex gap-2">
@@ -303,7 +288,7 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
                           }}
                           className="px-3"
                         >
-                          <FolderOpen className="w-4 h-4" />
+                          <Icon name="folder-open" size={16} />
                         </Button>
                       </div>
                     ) : (
@@ -321,14 +306,14 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
                 ))}
               </>
             ) : canRun ? (
-              <p className="text-xs text-[var(--vscode-descriptionForeground)]">
+              <p className="text-xs text-[var(--r-ink-muted)]">
                 This flow has no inputs. Click Run to execute.
               </p>
             ) : null}
 
             {canRun && (
               <Button onClick={handleRun} className="w-full mt-4">
-                <Play className="w-4 h-4 mr-2" />
+                <Icon name="play" size={16} className="mr-2" />
                 Run Flow
               </Button>
             )}
@@ -339,7 +324,7 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
         {(phase === 'running' || phase === 'complete' || phase === 'error') && (
           <div className="space-y-1">
             {steps.map((step) => {
-              const Icon = nodeIcons[step.type] || Sparkles;
+              const nodeIconName: PhosphorIconName = nodeIcons[step.type] || 'star-four';
               const isExpanded = expandedSteps.has(step.nodeId);
               const hasContent = step.output || step.error;
 
@@ -350,33 +335,33 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
                     disabled={!hasContent}
                     className={`w-full flex items-center gap-3 px-2 py-2.5 rounded-md text-left transition-colors ${
                       hasContent
-                        ? 'hover:bg-[var(--vscode-list-hoverBackground)] cursor-pointer'
+                        ? 'hover:bg-[var(--r-surface-soft)] cursor-pointer'
                         : 'cursor-default'
                     }`}
                   >
                     {getStatusIcon(step.status)}
-                    <Icon className="w-4 h-4 text-[var(--vscode-descriptionForeground)]" />
-                    <span className="flex-1 text-sm text-[var(--vscode-foreground)] truncate">
+                    <Icon name={nodeIconName} size={16} className="text-[var(--r-ink-muted)]" />
+                    <span className="flex-1 text-sm text-[var(--r-ink-strong)] truncate">
                       {step.label}
                     </span>
                     {hasContent && (
                       isExpanded
-                        ? <ChevronDown className="w-4 h-4 text-[var(--vscode-descriptionForeground)]" />
-                        : <ChevronRight className="w-4 h-4 text-[var(--vscode-descriptionForeground)]" />
+                        ? <Icon name="caret-down" size={16} className="text-[var(--r-ink-muted)]" />
+                        : <Icon name="caret-right" size={16} className="text-[var(--r-ink-muted)]" />
                     )}
                   </button>
 
                   {/* Claude Code Live Progress */}
                   {step.type === 'claude-code' && step.status === 'running' && step.progress && step.progress.length > 0 && (
-                    <div className="ml-10 mr-2 mb-2 p-2 rounded bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+                    <div className="ml-10 mr-2 mb-2 p-2 rounded bg-[var(--vscode-editor-background)] border border-[var(--r-hairline)]">
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {step.progress.map((p, i) => (
                           <div key={i} className="flex items-start gap-2 text-xs">
-                            {p.type === 'init' && <Terminal className="w-3 h-3 mt-0.5 text-[var(--vscode-terminal-ansiBlue)]" />}
-                            {p.type === 'tool_use' && <Zap className="w-3 h-3 mt-0.5 text-[var(--vscode-terminal-ansiYellow)]" />}
-                            {p.type === 'thinking' && <Sparkles className="w-3 h-3 mt-0.5 text-[var(--vscode-terminal-ansiMagenta)]" />}
-                            {p.type === 'done' && <CheckCircle className="w-3 h-3 mt-0.5 text-[var(--vscode-testing-iconPassed)]" />}
-                            <span className="text-[var(--vscode-descriptionForeground)] leading-tight">{p.message}</span>
+                            {p.type === 'init' && <Icon name="terminal" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiBlue)]" />}
+                            {p.type === 'tool_use' && <Icon name="lightning" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiYellow)]" />}
+                            {p.type === 'thinking' && <Icon name="star-four" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiMagenta)]" />}
+                            {p.type === 'done' && <Icon name="check-circle" size={12} className="mt-0.5 text-[var(--vscode-testing-iconPassed)]" />}
+                            <span className="text-[var(--r-ink-muted)] leading-tight">{p.message}</span>
                           </div>
                         ))}
                       </div>
@@ -385,13 +370,13 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
 
                   {/* Expanded Content */}
                   {isExpanded && hasContent && (
-                    <div className="ml-10 mr-2 mb-2 p-3 rounded bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)]">
+                    <div className="ml-10 mr-2 mb-2 p-3 rounded bg-[var(--vscode-editor-background)] border border-[var(--r-hairline)]">
                       {step.error ? (
-                        <p className="text-xs text-[var(--vscode-errorForeground)] whitespace-pre-wrap">
+                        <p className="text-xs text-[var(--r-error)] whitespace-pre-wrap">
                           {step.error}
                         </p>
                       ) : (
-                        <p className="text-xs text-[var(--vscode-foreground)] whitespace-pre-wrap max-h-48 overflow-y-auto">
+                        <p className="text-xs text-[var(--r-ink-strong)] whitespace-pre-wrap max-h-48 overflow-y-auto">
                           {typeof step.output === 'string'
                             ? step.output.substring(0, 500) + (step.output.length > 500 ? '...' : '')
                             : JSON.stringify(step.output, null, 2)}
@@ -406,7 +391,7 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
             {/* Error Message */}
             {phase === 'error' && errorMessage && (
               <div className="mt-4 p-3 rounded bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)]">
-                <p className="text-xs text-[var(--vscode-errorForeground)]">{errorMessage}</p>
+                <p className="text-xs text-[var(--r-error)]">{errorMessage}</p>
               </div>
             )}
 

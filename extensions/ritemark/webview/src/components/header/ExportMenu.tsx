@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { FileText, FileType, Clipboard, Check } from 'lucide-react'
+import { Icon } from '../ui/Icon'
 
 interface ExportMenuProps {
   isOpen: boolean
@@ -125,11 +125,11 @@ export function ExportMenu({
         }}
       >
         <button className="export-menu-item" onClick={() => handleExportPDF('clean')}>
-          <FileText size={16} className="export-menu-icon" />
+          <Icon name="file-text" size={16} className="export-menu-icon" />
           <span>Export PDF</span>
         </button>
         <button className="export-menu-item" onClick={() => handleExportWord('clean')}>
-          <FileType size={16} className="export-menu-icon" />
+          <Icon name="file-doc" size={16} className="export-menu-icon" />
           <span>Export Word</span>
         </button>
 
@@ -141,12 +141,12 @@ export function ExportMenu({
         >
           {copied ? (
             <>
-              <Check size={16} className="export-menu-icon" />
+              <Icon name="check" size={16} className="export-menu-icon" />
               <span>Copied!</span>
             </>
           ) : (
             <>
-              <Clipboard size={16} className="export-menu-icon" />
+              <Icon name="clipboard" size={16} className="export-menu-icon" />
               <span>Copy as Markdown</span>
             </>
           )}
@@ -211,11 +211,11 @@ export function ExportMenu({
 
         /* Success state for copy feedback */
         .export-menu-item-success {
-          color: #4ade80 !important;
+          color: var(--r-success) !important;
         }
 
         .export-menu-item-success:hover {
-          color: #4ade80 !important;
+          color: var(--r-success) !important;
         }
 
         .export-menu-icon {

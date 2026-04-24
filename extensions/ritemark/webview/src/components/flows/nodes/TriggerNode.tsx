@@ -7,7 +7,7 @@
  */
 
 import { memo } from 'react';
-import { Zap, FileText, File } from 'lucide-react';
+import { Icon } from '../../ui/Icon';
 import { Handle, Position } from '@xyflow/react';
 import { cn } from '../../../lib/utils';
 import type { FlowInput } from '../stores/flowEditorStore';
@@ -33,14 +33,14 @@ function TriggerNodeComponent({ id, data, selected }: TriggerNodeProps) {
       className={cn(
         'min-w-[220px] rounded-lg border shadow-sm',
         'bg-[var(--vscode-editor-background)]',
-        'border-[var(--vscode-panel-border)]',
+        'border-[var(--r-hairline)]',
         selected && 'ring-2 ring-[var(--vscode-focusBorder)]'
       )}
     >
       {/* Header - Blue for Trigger */}
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-b border-[var(--vscode-panel-border)]"
-        style={{ background: '#2563eb' }}
+        className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-b border-[var(--r-hairline)]"
+        style={{ background: 'var(--r-accent)' }}
       >
         {/* Execution step badge */}
         {executionStep !== undefined && (
@@ -48,7 +48,7 @@ function TriggerNodeComponent({ id, data, selected }: TriggerNodeProps) {
             {executionStep}
           </span>
         )}
-        <Zap className="text-white opacity-80" size={16} />
+        <Icon name="lightning" className="text-white opacity-80" size={16} />
         <span className="text-sm font-medium text-white truncate">
           {data.label || 'Trigger'}
         </span>
@@ -57,7 +57,7 @@ function TriggerNodeComponent({ id, data, selected }: TriggerNodeProps) {
       {/* Content - List of inputs */}
       <div className="p-3">
         {inputs.length === 0 ? (
-          <div className="text-xs text-[var(--vscode-descriptionForeground)] italic">
+          <div className="text-xs text-[var(--r-ink-muted)] italic">
             No inputs configured
           </div>
         ) : (
@@ -68,23 +68,23 @@ function TriggerNodeComponent({ id, data, selected }: TriggerNodeProps) {
                 className="flex items-center gap-2 text-sm"
               >
                 {input.type === 'text' ? (
-                  <FileText size={14} className="text-[var(--vscode-descriptionForeground)]" />
+                  <Icon name="file-text" size={14} className="text-[var(--r-ink-muted)]" />
                 ) : (
-                  <File size={14} className="text-[var(--vscode-descriptionForeground)]" />
+                  <Icon name="file" size={14} className="text-[var(--r-ink-muted)]" />
                 )}
-                <span className="text-[var(--vscode-foreground)] truncate flex-1">
+                <span className="text-[var(--r-ink-strong)] truncate flex-1">
                   {input.label}
                 </span>
                 {input.required && (
-                  <span className="text-[var(--vscode-errorForeground)] text-xs">*</span>
+                  <span className="text-[var(--r-error)] text-xs">*</span>
                 )}
               </div>
             ))}
           </div>
         )}
 
-        <div className="mt-2 pt-2 border-t border-[var(--vscode-panel-border)]">
-          <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+        <div className="mt-2 pt-2 border-t border-[var(--r-hairline)]">
+          <div className="text-xs text-[var(--r-ink-muted)]">
             {inputs.length} input{inputs.length !== 1 ? 's' : ''}
           </div>
         </div>
@@ -94,7 +94,7 @@ function TriggerNodeComponent({ id, data, selected }: TriggerNodeProps) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!w-3 !h-3 !bg-[var(--vscode-button-background)] !border-[var(--vscode-panel-border)]"
+        className="!w-3 !h-3 !bg-[var(--r-accent)] !border-[var(--r-hairline)]"
       />
     </div>
   );

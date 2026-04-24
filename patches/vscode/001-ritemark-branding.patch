@@ -65,7 +65,16 @@ diff --git a/src/vs/code/electron-browser/workbench/workbench.ts b/src/vs/code/e
 index 767fbe08db3..1fab5250d26 100644
 --- a/src/vs/code/electron-browser/workbench/workbench.ts
 +++ b/src/vs/code/electron-browser/workbench/workbench.ts
-@@ -75,6 +75,10 @@
+@@ -69,13 +69,17 @@
+ 		} else if (configuration.autoDetectColorScheme) {
+ 			if (configuration.colorScheme.dark) {
+ 				baseTheme = 'vs-dark';
+-				shellBackground = '#1E1E1E';
+-				shellForeground = '#CCCCCC';
++				shellBackground = '#1E1B4B';
++				shellForeground = '#F8FAFC';
+ 			} else {
+ 				baseTheme = 'vs';
  				shellBackground = '#FFFFFF';
  				shellForeground = '#000000';
  			}

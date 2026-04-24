@@ -20,31 +20,132 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* Lucide icons: 1px stroke for lighter, refined look */
-svg.lucide {
-  stroke-width: 1px !important;
-}
-
-/* VS Code theme variables are available in webview */
+/* Ritemark design tokens. VS Code vars remain fallbacks for unowned chrome. */
 :root {
   --ritemark-ui-font-family: 'Sofia Sans', var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   --ritemark-editor-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --background: var(--vscode-editor-background, #1e1e1e);
-  --foreground: var(--vscode-foreground, #cccccc);
-  --muted: var(--vscode-input-background, #3c3c3c);
-  --muted-foreground: var(--vscode-descriptionForeground, #8c8c8c);
-  --border: var(--vscode-panel-border, #3c3c3c);
-  --input: var(--vscode-input-border, #3c3c3c);
-  --ring: var(--vscode-focusBorder, #007fd4);
-  --primary: var(--vscode-button-background, #4338ca);
-  --primary-foreground: var(--vscode-button-foreground, #ffffff);
-  --secondary: var(--vscode-button-secondaryBackground, #3a3d41);
-  --secondary-foreground: var(--vscode-button-secondaryForeground, #cccccc);
-  --accent: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
-  --accent-foreground: var(--vscode-foreground, #cccccc);
-  --destructive: var(--vscode-errorForeground, #f44747);
+
+  --ritemark-surface: #ffffff;
+  --ritemark-surface-muted: #f8fafc;
+  --ritemark-surface-soft: #f1f5f9;
+  --ritemark-hairline: #e2e8f0;
+  --ritemark-hairline-strong: #cbd5e1;
+  --ritemark-ink-strong: #1e1b4b;
+  --ritemark-ink-body: #475569;
+  --ritemark-ink-muted: #64748b;
+  --ritemark-ink-faint: #94a3b8;
+  --ritemark-ink-disabled: #cbd5e1;
+  --ritemark-indigo: #4338ca;
+  --ritemark-indigo-deep: #3730a3;
+  --ritemark-indigo-darker: #312e81;
+  --ritemark-indigo-soft: #e0e7ff;
+  --ritemark-indigo-fainter: #c7d2fe;
+  --ritemark-success: #22c55e;
+  --ritemark-success-soft: #dcfce7;
+  --ritemark-warning: #f59e0b;
+  --ritemark-warning-soft: #fef3c7;
+  --ritemark-error: #ef4444;
+  --ritemark-error-soft: #fee2e2;
+
+  --ritemark-dark-surface: #0F172A;
+  --ritemark-dark-surface-muted: #020617;
+  --ritemark-dark-surface-soft: #1E293B;
+  --ritemark-dark-hairline: #1E293B;
+  --ritemark-dark-hairline-strong: #334155;
+  --ritemark-dark-ink-strong: #f8fafc;
+  --ritemark-dark-ink-body: #CBD5E1;
+  --ritemark-dark-ink-muted: #94a3b8;
+  --ritemark-dark-ink-faint: #64748b;
+  --ritemark-dark-ink-disabled: #475569;
+  --ritemark-dark-indigo: #818cf8;
+  --ritemark-dark-indigo-deep: #6366f1;
+  --ritemark-dark-indigo-darker: #4f46e5;
+  --ritemark-dark-indigo-soft: rgba(129, 140, 248, 0.16);
+  --ritemark-dark-indigo-fainter: rgba(129, 140, 248, 0.28);
+  --ritemark-dark-success: #4ade80;
+  --ritemark-dark-success-soft: rgba(34, 197, 94, 0.18);
+  --ritemark-dark-warning: #fbbf24;
+  --ritemark-dark-warning-soft: rgba(245, 158, 11, 0.18);
+  --ritemark-dark-error: #f87171;
+  --ritemark-dark-error-soft: rgba(239, 68, 68, 0.18);
+
+  --ritemark-radius-sm: 4px;
+  --ritemark-radius-md: 6px;
+  --ritemark-radius-lg: 10px;
+  --ritemark-radius-pill: 999px;
+  --ritemark-shadow-indigo-sm: 0 4px 6px -1px rgba(67, 56, 202, 0.25);
+  --ritemark-shadow-indigo-md: 0 8px 20px -4px rgba(67, 56, 202, 0.35);
+  --ritemark-shadow-lg: 0 10px 15px -3px rgba(30, 27, 75, 0.1), 0 4px 6px -4px rgba(30, 27, 75, 0.08);
+  --ritemark-ring-color: rgba(67, 56, 202, 0.1);
+  --ritemark-ring-color-dark: rgba(129, 140, 248, 0.25);
+
+  --r-surface: var(--ritemark-surface);
+  --r-surface-muted: var(--ritemark-surface-muted);
+  --r-surface-soft: var(--ritemark-surface-soft);
+  --r-hairline: var(--ritemark-hairline);
+  --r-hairline-strong: var(--ritemark-hairline-strong);
+  --r-ink-strong: var(--ritemark-ink-strong);
+  --r-ink-body: var(--ritemark-ink-body);
+  --r-ink-muted: var(--ritemark-ink-muted);
+  --r-ink-faint: var(--ritemark-ink-faint);
+  --r-ink-disabled: var(--ritemark-ink-disabled);
+  --r-accent: var(--ritemark-indigo);
+  --r-accent-deep: var(--ritemark-indigo-deep);
+  --r-accent-darker: var(--ritemark-indigo-darker);
+  --r-accent-soft: var(--ritemark-indigo-soft);
+  --r-accent-fainter: var(--ritemark-indigo-fainter);
+  --r-success: var(--ritemark-success);
+  --r-success-soft: var(--ritemark-success-soft);
+  --r-warning: var(--ritemark-warning);
+  --r-warning-soft: var(--ritemark-warning-soft);
+  --r-error: var(--ritemark-error);
+  --r-error-soft: var(--ritemark-error-soft);
+  --r-ring-color: var(--ritemark-ring-color);
+
+  --background: var(--r-surface);
+  --foreground: var(--r-ink-strong);
+  --muted: var(--r-surface-soft);
+  --muted-foreground: var(--r-ink-muted);
+  --border: var(--r-hairline);
+  --input: var(--r-hairline-strong);
+  --ring: var(--r-accent);
+  --primary: var(--r-accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--r-surface-soft);
+  --secondary-foreground: var(--r-ink-strong);
+  --accent: var(--r-accent-soft);
+  --accent-foreground: var(--r-ink-strong);
+  --destructive: var(--r-error);
   --destructive-foreground: #ffffff;
-  --radius: 0.375rem;
+  --radius: var(--ritemark-radius-md);
+}
+
+body.vscode-dark,
+body.ritemark-dark,
+body[data-vscode-theme-kind='vscode-dark'],
+.dark {
+  --r-surface: var(--ritemark-dark-surface);
+  --r-surface-muted: var(--ritemark-dark-surface-muted);
+  --r-surface-soft: var(--ritemark-dark-surface-soft);
+  --r-hairline: var(--ritemark-dark-hairline);
+  --r-hairline-strong: var(--ritemark-dark-hairline-strong);
+  --r-ink-strong: var(--ritemark-dark-ink-strong);
+  --r-ink-body: var(--ritemark-dark-ink-body);
+  --r-ink-muted: var(--ritemark-dark-ink-muted);
+  --r-ink-faint: var(--ritemark-dark-ink-faint);
+  --r-ink-disabled: var(--ritemark-dark-ink-disabled);
+  --r-accent: var(--ritemark-dark-indigo);
+  --r-accent-deep: var(--ritemark-dark-indigo-deep);
+  --r-accent-darker: var(--ritemark-dark-indigo-darker);
+  --r-accent-soft: var(--ritemark-dark-indigo-soft);
+  --r-accent-fainter: var(--ritemark-dark-indigo-fainter);
+  --r-success: var(--ritemark-dark-success);
+  --r-success-soft: var(--ritemark-dark-success-soft);
+  --r-warning: var(--ritemark-dark-warning);
+  --r-warning-soft: var(--ritemark-dark-warning-soft);
+  --r-error: var(--ritemark-dark-error);
+  --r-error-soft: var(--ritemark-dark-error-soft);
+  --r-ring-color: var(--ritemark-ring-color-dark);
 }
 
 body {

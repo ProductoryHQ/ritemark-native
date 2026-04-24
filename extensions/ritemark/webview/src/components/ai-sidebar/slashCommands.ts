@@ -23,7 +23,7 @@ export interface SlashCommand {
   id: string;
   name: string;
   description: string;
-  icon: string; // lucide-react icon name
+  icon: string; // icon name (legacy Lucide PascalCase; mapped to Phosphor in SlashCommandPopup)
   action: CommandAction;
   /** For custom commands, the source directory */
   source?: 'commands' | 'skills';

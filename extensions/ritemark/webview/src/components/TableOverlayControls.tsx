@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Icon } from './ui/Icon'
 
 interface TableInfo {
   tableRect: DOMRect
@@ -219,7 +219,7 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
                     }}
                     title="Add row above"
                   >
-                    <Plus size={14} />
+                    <Icon name="plus" size={14} />
                   </button>
                   <button
                     onClick={(e) => {
@@ -251,7 +251,7 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
                     title="Delete row"
                     className="destructive"
                   >
-                    <Trash2 size={14} />
+                    <Icon name="trash" size={14} />
                   </button>
                 </div>
               )}
@@ -301,7 +301,7 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
                     }}
                     title="Add column left"
                   >
-                    <Plus size={14} />
+                    <Icon name="plus" size={14} />
                   </button>
                   <button
                     onClick={(e) => {
@@ -333,7 +333,7 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
                     title="Delete column"
                     className="destructive"
                   >
-                    <Trash2 size={14} />
+                    <Icon name="trash" size={14} />
                   </button>
                 </div>
               )}
@@ -369,8 +369,8 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
 
         .handle-buttons button {
           padding: 4px;
-          background: white;
-          border: 1px solid #d1d5db;
+          background: var(--r-surface);
+          border: 1px solid var(--r-hairline);
           border-radius: 4px;
           cursor: pointer;
           display: flex;
@@ -379,12 +379,12 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
         }
 
         .handle-buttons button:hover {
-          background: #f9fafb;
+          background: var(--r-surface-muted);
         }
 
         .handle-buttons button.destructive:hover {
-          background: #fef2f2;
-          color: #dc2626;
+          background: var(--r-error-soft);
+          color: var(--r-error);
         }
 
         /* Column handles */

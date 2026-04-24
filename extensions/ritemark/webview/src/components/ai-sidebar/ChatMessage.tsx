@@ -3,7 +3,7 @@
  * Uses --chat-font-size CSS variable for dynamic font sizing.
  */
 
-import { AlertCircle } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { CitationChips } from './CitationChips';
 import { WidgetPreview } from './WidgetPreview';
@@ -31,10 +31,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
   if (message.role === 'error') {
     return (
       <div
-        className="flex items-start gap-2 text-[var(--vscode-errorForeground)]"
+        className="flex items-start gap-2 text-[var(--r-error)]"
         style={chatFontStyle}
       >
-        <AlertCircle size={14} className="shrink-0 mt-0.5" />
+        <Icon name="warning-circle" size={14} className="shrink-0 mt-0.5" />
         <span>{message.content}</span>
       </div>
     );
@@ -59,7 +59,7 @@ export function StreamingMessage({ content }: { content: string }) {
   return (
     <div style={chatFontStyle}>
       <RenderedMarkdown content={content} />
-      <span className="inline-block w-0.5 h-3.5 bg-[var(--vscode-foreground)] ml-0.5 animate-pulse" />
+      <span className="inline-block w-0.5 h-3.5 bg-[var(--r-ink-strong)] ml-0.5 animate-pulse" />
     </div>
   );
 }
@@ -70,7 +70,7 @@ export function StreamingMessage({ content }: { content: string }) {
 export function ThinkingIndicator() {
   return (
     <div
-      className="text-[var(--vscode-descriptionForeground)] animate-pulse"
+      className="text-[var(--r-ink-muted)] animate-pulse"
       style={chatFontStyle}
     >
       Searching & thinking...

@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import type { AgentEnvironmentStatus } from './types';
 
 export function EnvironmentStatusNotice({
@@ -11,13 +11,13 @@ export function EnvironmentStatusNotice({
   }
 
   return (
-    <div className="mt-3 rounded-lg border border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)]/60 px-3 py-2">
+    <div className="mt-3 rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)]/60 px-3 py-2">
       <div className="flex items-start gap-2">
         <div className="mt-0.5 shrink-0">
           {environmentStatus.restartRequired ? (
-            <RefreshCw className="h-4 w-4 text-[var(--vscode-textLink-foreground)]" />
+            <Icon name="arrows-clockwise" size={16} className="text-[var(--r-accent)]" />
           ) : (
-            <AlertTriangle className="h-4 w-4 text-[var(--vscode-testing-iconFailed)]" />
+            <Icon name="warning" size={16} className="text-[var(--vscode-testing-iconFailed)]" />
           )}
         </div>
         <div className="min-w-0 flex-1">

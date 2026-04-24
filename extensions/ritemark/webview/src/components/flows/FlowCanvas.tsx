@@ -15,7 +15,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import ELK from 'elkjs/lib/elk.bundled.js';
-import { LayoutGrid, Play } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { nodeTypes } from './nodes';
 import { useFlowEditorStore } from './stores/flowEditorStore';
 import { Button } from '../ui/button';
@@ -175,14 +175,14 @@ function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
         }}
       >
         <Background
-          color="var(--vscode-panel-border)"
+          color="var(--r-hairline)"
           gap={20}
           size={1}
         />
         <Controls
           style={{
             background: 'var(--vscode-sideBar-background)',
-            border: '1px solid var(--vscode-panel-border)',
+            border: '1px solid var(--r-hairline)',
             borderRadius: '4px',
           }}
         />
@@ -196,7 +196,7 @@ function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
           onClick={onAutoLayout}
           className="flex items-center gap-1.5"
         >
-          <LayoutGrid size={14} />
+          <Icon name="squares-four" size={14} />
           Auto-arrange
         </Button>
         {onRunFlow && (
@@ -205,7 +205,7 @@ function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
             onClick={onRunFlow}
             className="flex items-center gap-1.5"
           >
-            <Play size={14} />
+            <Icon name="play" size={14} />
             Run Flow
           </Button>
         )}
@@ -216,7 +216,7 @@ function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
       {/* Empty state */}
       {nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center text-[var(--vscode-descriptionForeground)]">
+          <div className="text-center text-[var(--r-ink-muted)]">
             <p className="text-lg mb-2">Empty Flow</p>
             <p className="text-sm">Drag nodes from the left panel to get started</p>
           </div>

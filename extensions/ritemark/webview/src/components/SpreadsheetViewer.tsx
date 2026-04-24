@@ -377,7 +377,7 @@ export function SpreadsheetViewer({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
-        <div className="text-[var(--vscode-foreground)]">Parsing {filename}...</div>
+        <div className="text-[var(--r-ink-strong)]">Parsing {filename}...</div>
       </div>
     )
   }
@@ -387,15 +387,15 @@ export function SpreadsheetViewer({
     const sizeMB = sizeBytes ? (sizeBytes / (1024 * 1024)).toFixed(1) : '?'
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-[var(--vscode-editor-background)] gap-4">
-        <div className="text-[var(--vscode-foreground)] text-center">
+        <div className="text-[var(--r-ink-strong)] text-center">
           <div className="text-lg font-semibold mb-2">Large File Warning</div>
-          <div className="text-[var(--vscode-descriptionForeground)]">
+          <div className="text-[var(--r-ink-muted)]">
             {filename} is {sizeMB}MB. Parsing large files may take a moment.
           </div>
         </div>
         <button
           onClick={() => setProceedWithLargeFile(true)}
-          className="px-4 py-2 bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)]"
+          className="px-4 py-2 bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)]"
         >
           Continue Anyway
         </button>
@@ -407,10 +407,10 @@ export function SpreadsheetViewer({
   if (parsedData?.error) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-[var(--vscode-editor-background)] gap-2">
-        <div className="text-[var(--vscode-errorForeground)] font-semibold">
+        <div className="text-[var(--r-error)] font-semibold">
           Failed to open {filename}
         </div>
-        <div className="text-[var(--vscode-descriptionForeground)] text-sm">
+        <div className="text-[var(--r-ink-muted)] text-sm">
           {parsedData.error}
         </div>
       </div>
@@ -421,7 +421,7 @@ export function SpreadsheetViewer({
   if (!parsedData || parsedData.rows.length === 0) {
     return (
       <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
-        <div className="text-[var(--vscode-descriptionForeground)]">
+        <div className="text-[var(--r-ink-muted)]">
           {filename} is empty
         </div>
       </div>
@@ -459,10 +459,10 @@ export function SpreadsheetViewer({
         />
 
       {/* Status bar */}
-      <div className="flex items-center justify-between px-3 py-1 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] text-xs text-[var(--vscode-descriptionForeground)]">
+      <div className="flex items-center justify-between px-3 py-1 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] text-xs text-[var(--r-ink-muted)]">
         <span>
           {isEditable && (
-            <span className="text-[var(--vscode-textLink-foreground)]">
+            <span className="text-[var(--r-accent)]">
               (click cell to edit)
             </span>
           )}
@@ -479,15 +479,15 @@ export function SpreadsheetViewer({
 
       {/* Sheet selector (Excel only, if multiple sheets) */}
       {fileType === 'xlsx' && cachedWorkbook && cachedWorkbook.SheetNames.length > 1 && (
-        <div className="flex gap-1 px-2 py-1 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] overflow-x-auto">
+        <div className="flex gap-1 px-2 py-1 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] overflow-x-auto">
           {cachedWorkbook.SheetNames.map(sheetName => (
             <button
               key={sheetName}
               onClick={() => handleSheetChange(sheetName)}
               className={`px-3 py-1 text-xs rounded transition-colors ${
                 sheetName === selectedSheet
-                  ? 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] font-medium'
-                  : 'bg-transparent text-[var(--vscode-foreground)] hover:bg-[var(--vscode-list-hoverBackground)]'
+                  ? 'bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] font-medium'
+                  : 'bg-transparent text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]'
               }`}
             >
               {sheetName}
