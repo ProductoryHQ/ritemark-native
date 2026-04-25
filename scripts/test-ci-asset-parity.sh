@@ -54,16 +54,16 @@ if [ -f "$PROJECT_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/codicon.tt
 fi
 
 # Simulate CI: extension deps live inside vscode/extensions/ritemark, not repo root.
-mkdir -p "$TMP_ROOT/vscode/extensions/ritemark/node_modules/lucide-static/font"
-cp "$PROJECT_ROOT/extensions/ritemark/node_modules/lucide-static/font/lucide.woff2" \
-   "$TMP_ROOT/vscode/extensions/ritemark/node_modules/lucide-static/font/"
+mkdir -p "$TMP_ROOT/vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/light"
+cp "$PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2" \
+   "$TMP_ROOT/vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/"
 
 (cd "$TMP_ROOT" && bash ./scripts/apply-patches.sh >/dev/null)
 
 for path in \
   "$TMP_ROOT/vscode/src/vs/workbench/browser/media/fonts/SofiaSans-latin.woff2" \
   "$TMP_ROOT/vscode/src/vs/workbench/browser/media/fonts/SofiaSans-latin-ext.woff2" \
-  "$TMP_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/lucide.woff2"
+  "$TMP_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
 do
   if [ ! -f "$path" ]; then
     echo "ERROR: Missing expected asset: $path"

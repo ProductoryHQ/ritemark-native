@@ -194,9 +194,9 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     # Copy custom font assets required by patched workbench CSS
     UI_FONT_SRC_DIR="$ROOT_DIR/extensions/ritemark/webview/src/assets/fonts"
-    LUCIDE_FONT_SRC="$VSCODE_DIR/extensions/ritemark/node_modules/lucide-static/font/lucide.woff2"
-    if [ ! -f "$LUCIDE_FONT_SRC" ]; then
-        LUCIDE_FONT_SRC="$ROOT_DIR/extensions/ritemark/node_modules/lucide-static/font/lucide.woff2"
+    PHOSPHOR_FONT_SRC="$VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2"
+    if [ ! -f "$PHOSPHOR_FONT_SRC" ]; then
+        PHOSPHOR_FONT_SRC="$ROOT_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2"
     fi
 
     if [ -f "$UI_FONT_SRC_DIR/SofiaSans-latin.woff2" ] && [ -f "$UI_FONT_SRC_DIR/SofiaSans-latin-ext.woff2" ]; then
@@ -209,13 +209,13 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
         echo -e "${YELLOW}Sofia Sans font files missing; skipping font copy${NC}"
     fi
 
-    if [ -f "$LUCIDE_FONT_SRC" ]; then
-        echo -n "Copying Lucide icon font... "
+    if [ -f "$PHOSPHOR_FONT_SRC" ]; then
+        echo -n "Copying Phosphor 200 icon font... "
         mkdir -p "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon"
-        cp "$LUCIDE_FONT_SRC" "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon/lucide.woff2"
+        cp "$PHOSPHOR_FONT_SRC" "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
         echo -e "${GREEN}Done${NC}"
     else
-        echo -e "${YELLOW}Lucide font file missing; skipping icon font copy${NC}"
+        echo -e "${YELLOW}Phosphor 200 font file missing; skipping icon font copy${NC}"
     fi
 
     # Copy product.json if it exists (for branding)

@@ -47,15 +47,16 @@ diff --git a/src/vs/base/browser/ui/codicons/codicon/codicon.css b/src/vs/base/b
 index 02154e77b68..e1381cd7710 100644
 --- a/src/vs/base/browser/ui/codicons/codicon/codicon.css
 +++ b/src/vs/base/browser/ui/codicons/codicon/codicon.css
-@@ -9,6 +9,13 @@
+@@ -9,6 +9,14 @@
  	src: url("./codicon.ttf?5d4d76ab2ce5108968ad644d591a16a6") format("truetype");
  }
  
-+/* RiteMark: Lucide icon font for sidebar and panel icons */
++/* RiteMark: Phosphor 200 icon font for sidebar and panel icons */
 +@font-face {
-+	font-family: "lucide";
++	font-family: "phosphor";
 +	font-display: block;
-+	src: url("./lucide.woff2") format("woff2");
++	font-weight: 200;
++	src: url("./phosphor.woff2") format("woff2");
 +}
 +
  .codicon[class*='codicon-'] {
@@ -160,46 +161,47 @@ diff --git a/src/vs/platform/theme/common/iconRegistry.ts b/src/vs/platform/them
 index 9feac0c4ca4..6ccd27e0778 100644
 --- a/src/vs/platform/theme/common/iconRegistry.ts
 +++ b/src/vs/platform/theme/common/iconRegistry.ts
-@@ -319,6 +319,44 @@ function initialize() {
+@@ -319,6 +319,45 @@ function initialize() {
  }
  initialize();
  
-+// RiteMark: Lucide icon font registration
-+const LucideIcons = {
-+	folder: 0xe0d7, folderOpen: 0xe247, files: 0xe0cf, file: 0xe0c0,
-+	fileText: 0xe0cc, search: 0xe151, gitBranch: 0xe0e2, settings: 0xe154,
-+	user: 0xe19f, sparkle: 0xe47e, bookOpen: 0xe05f, fileOutput: 0xe0c8,
-+	terminal: 0xe181, triangleAlert: 0xe193, clock: 0xe087, list: 0xe106,
++// RiteMark: Phosphor 200 icon font registration
++const PhosphorIcons = {
++	folder: 0xe24a, folderOpen: 0xe256, files: 0xe710, file: 0xe230,
++	fileText: 0xe23a, search: 0xe30c, gitBranch: 0xe278, settings: 0xe270,
++	user: 0xe4c4, sparkle: 0xe6a4, bookOpen: 0xe0e6, fileOutput: 0xe61e,
++	terminal: 0xe47e, triangleAlert: 0xe4e0, clock: 0xe19a, list: 0xe2f0,
 +} as const;
 +
-+const lucideFontDefinition: IconFontDefinition = {
-+	src: [{ location: URI.parse('lucide.woff2'), format: 'woff2' }]
++const phosphorFontDefinition: IconFontDefinition = {
++	weight: '200',
++	src: [{ location: URI.parse('phosphor.woff2'), format: 'woff2' }]
 +};
-+iconRegistry.registerIconFont('lucide', lucideFontDefinition);
++iconRegistry.registerIconFont('phosphor', phosphorFontDefinition);
 +
-+const lucideFont: IconFontContribution = { id: 'lucide', definition: lucideFontDefinition };
-+for (const [name, code] of Object.entries(LucideIcons)) {
++const phosphorFont: IconFontContribution = { id: 'phosphor', definition: phosphorFontDefinition };
++for (const [name, code] of Object.entries(PhosphorIcons)) {
 +	const fontCharacter = '\\' + code.toString(16);
-+	iconRegistry.registerIcon(`lucide-${name}`, { font: lucideFont, fontCharacter });
++	iconRegistry.registerIcon(`phosphor-${name}`, { font: phosphorFont, fontCharacter });
 +}
 +
-+export const Lucide = {
-+	folder: { id: 'lucide-folder' } as ThemeIcon,
-+	folderOpen: { id: 'lucide-folderOpen' } as ThemeIcon,
-+	files: { id: 'lucide-files' } as ThemeIcon,
-+	file: { id: 'lucide-file' } as ThemeIcon,
-+	fileText: { id: 'lucide-fileText' } as ThemeIcon,
-+	search: { id: 'lucide-search' } as ThemeIcon,
-+	gitBranch: { id: 'lucide-gitBranch' } as ThemeIcon,
-+	settings: { id: 'lucide-settings' } as ThemeIcon,
-+	user: { id: 'lucide-user' } as ThemeIcon,
-+	sparkle: { id: 'lucide-sparkle' } as ThemeIcon,
-+	bookOpen: { id: 'lucide-bookOpen' } as ThemeIcon,
-+	fileOutput: { id: 'lucide-fileOutput' } as ThemeIcon,
-+	terminal: { id: 'lucide-terminal' } as ThemeIcon,
-+	triangleAlert: { id: 'lucide-triangleAlert' } as ThemeIcon,
-+	clock: { id: 'lucide-clock' } as ThemeIcon,
-+	list: { id: 'lucide-list' } as ThemeIcon,
++export const Phosphor = {
++	folder: { id: 'phosphor-folder' } as ThemeIcon,
++	folderOpen: { id: 'phosphor-folderOpen' } as ThemeIcon,
++	files: { id: 'phosphor-files' } as ThemeIcon,
++	file: { id: 'phosphor-file' } as ThemeIcon,
++	fileText: { id: 'phosphor-fileText' } as ThemeIcon,
++	search: { id: 'phosphor-search' } as ThemeIcon,
++	gitBranch: { id: 'phosphor-gitBranch' } as ThemeIcon,
++	settings: { id: 'phosphor-settings' } as ThemeIcon,
++	user: { id: 'phosphor-user' } as ThemeIcon,
++	sparkle: { id: 'phosphor-sparkle' } as ThemeIcon,
++	bookOpen: { id: 'phosphor-bookOpen' } as ThemeIcon,
++	fileOutput: { id: 'phosphor-fileOutput' } as ThemeIcon,
++	terminal: { id: 'phosphor-terminal' } as ThemeIcon,
++	triangleAlert: { id: 'phosphor-triangleAlert' } as ThemeIcon,
++	clock: { id: 'phosphor-clock' } as ThemeIcon,
++	list: { id: 'phosphor-list' } as ThemeIcon,
 +};
 +
  export const iconsSchemaId = 'vscode://schemas/icons';

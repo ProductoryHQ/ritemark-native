@@ -158,3 +158,13 @@ If no designer input arrives before Phase 3:
 - Tree selected state uses theme keys only; escalate to designer if approximation looks wrong.
 - Activity bar hover gets subtle `surface-soft` background fill.
 - Right Agent Chat Panel stays unchanged; no auxiliary strip redesign.
+
+## Jarmo Decisions — 2026-04-24
+
+All three previously-defaulted designer items accepted as written:
+
+- **Q8** Tab unfocused active state → hairline grey (accepted).
+- **Q9** Status bar semantic intensity → quiet pattern, icon/text color only, full fills only for blocking errors (accepted).
+- **Q11** Chrome focus rings → VS Code native `focusBorder` theme key (already indigo), no custom glow patch (accepted).
+
+All other defaulted items (Q2 button order, Q4 Flow icon, Q13 hover, Q14 collapsed, Q15 auxiliary strip) also accepted as written. Q2 button order is carried forward as a proposed default; final order to be locked by Phase 4 live-app QA walk (see sprint-plan.md Phase 4).
