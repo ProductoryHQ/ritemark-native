@@ -431,7 +431,9 @@
       "workbench.sideBar.location": "left",
       "workbench.colorTheme": "ritemark-light",
       "workbench.iconTheme": "ritemark-icons",
-      "workbench.activityBar.location": "top",
+      "workbench.productIconTheme": "ritemark-product-icons",
+      "workbench.activityBar.location": "default",
+      "workbench.editor.editorActionsLocation": "hidden",
       "extensions.ignoreRecommendations": true,
       "workbench.tips.enabled": false,
       "debug.showInStatusBar": "never",
@@ -471,6 +473,13 @@
         "id": "ritemark-icons",
         "label": "Ritemark Icons",
         "path": "./fileicons/ritemark-icon-theme.json"
+      }
+    ],
+    "productIconThemes": [
+      {
+        "id": "ritemark-product-icons",
+        "label": "Ritemark Product Icons",
+        "path": "./producticons/ritemark-product-icon-theme.json"
       }
     ],
     "keybindings": [
@@ -514,11 +523,12 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@phosphor-icons/core": "^2.1.1",
+    "@phosphor-icons/web": "^2.1.2",
     "@types/node": "^24.10.8",
     "@types/papaparse": "^5.5.2",
     "@types/turndown": "^5.0.5",
     "@types/vscode": "^1.94.0",
-    "lucide-static": "^0.555.0",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"
   }
