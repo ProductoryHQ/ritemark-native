@@ -1,0 +1,45 @@
+{
+  "fonts": [
+    {
+      "id": "phosphor-200",
+      "src": [
+        {
+          "path": "../node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2",
+          "format": "woff2"
+        }
+      ],
+      "weight": "200",
+      "style": "normal"
+    }
+  ],
+  "iconDefinitions": {
+    "explorer-view-icon": {
+      "fontId": "phosphor-200",
+      "fontCharacter": "\\e256"
+    },
+    "search-view-icon": {
+      "fontId": "phosphor-200",
+      "fontCharacter": "\\e30c"
+    },
+    "source-control-view-icon": {
+      "fontId": "phosphor-200",
+      "fontCharacter": "\\e278"
+    },
+    "extensions-view-icon": {
+      "fontId": "phosphor-200",
+      "fontCharacter": "\\e596"
+    },
+    "accounts-view-bar-icon": {
+      "fontId": "phosphor-200",
+      "fontCharacter": "\\e4c2"
+    },
+    "settings-view-bar-icon": {
+      "fontId": "phosphor-200",
+      "fontCharacter": "\\e270"
+    },
+    "workspace-trust-banner": {
+      "fontId": "phosphor-200",
+      "fontCharacter": "\\e40a"
+    }
+  }
+}
