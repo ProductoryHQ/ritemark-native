@@ -9,6 +9,7 @@ cd "$PROJECT_ROOT"
 
 echo "Running Codex QA validation..."
 "$PROJECT_ROOT/.claude/hooks/pre-commit-validator.sh"
+"$PROJECT_ROOT/scripts/validate-chrome-fast.sh"
 
 CHANGED_FILES="$(
   {

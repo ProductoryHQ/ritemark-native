@@ -110,16 +110,14 @@ The following layout rules are enforced by patch 002 and must remain true:
 | Ritemark AI panel | Right sidebar (auxiliary bar) | `viewDescriptorService.ts`: deletes cached override for `workbench.view.extension.ritemark-ai` |
 | Terminal | Right sidebar (auxiliary bar) | `terminal.contribution.ts`: `ViewContainerLocation.AuxiliaryBar` |
 | Terminal editor area | Never used in Ritemark | `terminalConfigurationService.ts`: ignores `terminal.integrated.defaultLocation = editor`; `terminalEditorSerializer.ts`: restores old terminal editors into the terminal view instead of editor tabs |
-| Titlebar icons | Only: left sidebar toggle, right sidebar toggle, settings gear | `layoutActions.ts` (custom LayoutControlMenu), `titlebarPart.ts` (accounts/gear hidden), `panelActions.ts` (panel toggle hidden) |
-| Accounts icon | Hidden from titlebar | `titlebarPart.ts`: activity actions block commented out |
-| Panel toggle | Hidden from titlebar | `panelActions.ts`: LayoutControlMenu registration commented out |
+| Titlebar action toolbar | Right side of titlebar; canonical icon list owned by patches 002 + 003 — see those patch headers, not this file | `titlebarPart.ts` toolbar position + chat/activity menu suppressions |
 | `auxiliarybar` in package.json | Supported by core | `viewsExtensionPoint.ts`: `case 'auxiliarybar'` added |
 
 **Key technical facts for layout work:**
 - Extension container IDs get prefixed: `ritemark-ai` → `workbench.view.extension.ritemark-ai`
 - VS Code caches view positions in SQLite (`views.customizations`). Package.json is only the default.
 - Terminal placement is controlled by more than layout. Guard against all three paths: view container location, `terminal.integrated.defaultLocation`, and terminal editor restore/serialization.
-- Titlebar icons come from TWO sources: `LayoutControlMenu` (layout toggles) AND `titlebarPart.ts` (accounts/settings gear). Both must be patched.
+- Chat icon is a moving target: every upstream sync may add a new entry surface (`MenuId.TitleBar`, `MenuId.CommandCenter`, etc.). On each sync, re-grep for `Codicon.chatSparkle` registrations and extend patch 003 if needed.
 - When commenting out code in VS Code patches, **ALWAYS remove unused imports** — build fails after 22 min otherwise.
 
 ### NEVER Remove, Stub, or Disable Existing Features

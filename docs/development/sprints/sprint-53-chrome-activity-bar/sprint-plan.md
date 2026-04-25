@@ -30,7 +30,7 @@ Strategic framing: `docs-internal/design/ritemark-ui.pen` implementation-roadmap
 - [ ] Chrome icon system — VS Code chrome/activity-bar no longer registers or ships Lucide icon font assets; existing chrome icons and activity-bar static SVGs use the Sprint 52 Phosphor mapping
 - [ ] Existing Flow button — preserved in the vertical activity bar; no new Flows feature work beyond keeping the existing button reachable and styled
 - [ ] Right Agent Chat Panel — remains on the right auxiliary side exactly as-is; Sprint 53 must not implement Agent Library or move Agent Chat into the activity bar
-- [ ] Titlebar — layout-controls menu contains exactly three items (left sidebar toggle, right sidebar toggle, settings gear); no drift; no accounts icon; no panel-toggle icon
+- [x] Titlebar — layout-controls toolbar on the right side contains exactly two items (left sidebar toggle, right sidebar toggle); settings gear moved to ActivityBar bottom; no chat icon; no accounts icon; no panel-toggle icon. Inactive state uses ink-disabled token, active uses indigo accent with no background fill. See `notes/titlebar-actions-cleanup.md`.
 - [ ] Tabs — active tab has a 2px indigo top border; inactive tabs use `--r-ink-muted` text on `--r-surface-muted` background; hairline divider matches `--r-hairline`
 - [ ] Status bar — background `--r-surface-muted` in light and rebalanced neutral-slate muted surface in dark, foreground `--r-ink-body`, interactive segments (item hover, warning / error) use Ritemark semantic colors; not VS Code blue
 - [ ] Explorer sidebar — active row uses the closest VS Code-supported mapping to `ritemark-sidebar-item.is-active`; no CSS hacks that fight tree rendering
@@ -43,15 +43,18 @@ Strategic framing: `docs-internal/design/ritemark-ui.pen` implementation-roadmap
 
 | Deliverable | Description | Phase | Status |
 | --- | --- | --- | --- |
-| Chrome audit | Inventory current state of titlebar, tabs, status bar, activity bar, Explorer sidebar vs design skill rules | 1 | TODO |
-| Patch delta plan | Which of patches 001, 002, 003 get extended; no new patch numbers | 2 | TODO |
-| Theme JSON delta | Keys added / changed in `extensions/ritemark/themes/ritemark-light.json` + `extensions/ritemark/themes/ritemark-dark.json` | 2 | TODO |
-| Chrome icon migration plan | Current Lucide font registration, `lucide-static` dependency, `apply-patches.sh` font copy, and static activity-bar SVGs mapped to Phosphor replacements | 2 | TODO |
-| Activity-bar layout plan | Move current horizontal activity bar to vertical rail left of sidebar; preserve existing buttons including Flow | 2 | PARTIAL — target clarified; current implementation audit still TODO |
+| Chrome audit | Inventory current state of titlebar, tabs, status bar, activity bar, Explorer sidebar vs design skill rules. Filed at `research/chrome-audit.md` (2026-04-24) covering patch baselines, 73 theme keys, 4 Lucide chrome footprints, 2 view containers, 5 SVG assets, titlebar invariant verification. | 1 | DONE |
+| Patch delta plan | Which of patches 001, 002, 003 get extended; no new patch numbers | 2 | DONE — Phase 3 lands in package.json + patch 001 + asset-copy scripts; patch 002 remains validation-only unless live QA reveals a layout regression |
+| Theme JSON delta | Keys added / changed in `extensions/ritemark/themes/ritemark-light.json` + `extensions/ritemark/themes/ritemark-dark.json` | 2 | DONE — current Sprint 52 chrome token set already covers Sprint 53 target keys; Phase 3 validates values rather than adding new theme-key families |
+| Chrome icon migration plan | Current Lucide font registration, `lucide-static` dependency, `apply-patches.sh` font copy, and static activity-bar SVGs mapped to Phosphor replacements | 2 | DONE — Phosphor web font path chosen; static activity-bar SVGs remain in scope for normalization |
+| Activity-bar layout plan | Move current horizontal activity bar to vertical rail left of sidebar; preserve existing buttons including Flow | 2 | DONE — use native left rail via `workbench.activityBar.location = "default"` and verify existing Flow button survives the move |
+| Activity-bar bottom actions | Hide Accounts/User until login exists; wire bottom Settings to branded Ritemark Settings; normalize Settings/Product Icon font path | 3 | DONE — see `notes/activitybar-bottom-actions.md` |
+| Chrome fast validation | Add a fast pre-compile guard for VS Code chrome patch/icon TypeScript drift | 3 | DONE — see `notes/chrome-fast-validation.md` |
+| Titlebar action polish | Remove chat icon from titlebar (patch 003), restore action toolbar to right side (revert leftContent hunk in patch 002), restyle active/inactive states with Indigo-Editorial tokens (patch 002 CSS), trim CLAUDE.md Layout Invariants table | 3 | DONE — see `notes/titlebar-actions-cleanup.md` |
 | Agent Chat invariant | Right Agent Chat Panel stays unchanged; no Sprint 54 Agent feature implementation in Sprint 53 | 2 | DONE — user clarified |
-| Designer questions | UI decisions posted, resolved/defaulted, and corrected after user clarification | 2 | PARTIAL — stale Agent-slot interpretation superseded |
+| Designer questions | UI decisions posted, resolved/defaulted, and corrected after user clarification | 2 | DONE — defaults accepted 2026-04-24 and Phase 3 approved by user instruction to proceed |
 | Keyboard-map draft | Proposed navigation paths before implementation | 2 | TODO |
-| **Approval gate** | Jarmo approves audit + plan, with designer questions resolved or explicitly deferred, before Phase 3 starts | 2→3 | BLOCKING |
+| **Approval gate** | Jarmo approves audit + plan, with designer questions resolved or explicitly deferred, before Phase 3 starts | 2→3 | DONE — satisfied by user instruction on 2026-04-24: “proceed with implementation of sprint-53” |
 | Theme JSON updates | Status bar, tabs, activity bar theme keys landed | 3 | TODO |
 | Chrome icon migration | Patch 001 and related asset-copy scripts updated away from Lucide; activity-bar static SVGs replaced with Phosphor-aligned assets; unused Lucide dependency removed if no longer needed | 3 | TODO |
 | Patch 002 updates | Activity-bar placement/orientation migration, right Agent Chat Panel invariant confirmation | 3 | TODO |
@@ -96,25 +99,25 @@ Strategic framing: `docs-internal/design/ritemark-ui.pen` implementation-roadmap
 
 ### Phase 1: Audit
 
-- [ ] Screenshot every chrome surface in light + dark; compare against `.claude/skills/ritemark-design/preview/`
-- [ ] Walk `extensions/ritemark/themes/ritemark-light.json` and `extensions/ritemark/themes/ritemark-dark.json`; list every `tab.*`, `statusBar.*`, `activityBar.*`, `activityBarTop.*`, `sideBar.*`, `list.*`, and `tree.*` key currently set; flag gaps vs skill rules
-- [ ] Inspect patch 002: what's already wired for activity bar / auxiliary bar / titlebar; what's drift-prone
-- [ ] Inspect patch 001 + `scripts/apply-patches.sh`: list every Lucide font registration, `lucide.woff2` copy, `lucide-*` ThemeIcon, and static SVG activity-bar asset still in use
-- [ ] Inventory current activity-bar + auxiliary-bar view containers and identify the existing Flow button; do not add an Agents feature slot
-- [ ] Compare attached target layout and `docs-internal/design/ritemark-ui.pen` chrome frame against the current app; document where the current horizontal activity bar must move
-- [ ] Keyboard-navigate the full chrome today; document failures (dead ends, missing tab stops, invisible focus)
-- [ ] Contrast-check current chrome colors against WCAG AA
-- [ ] Produce `research/chrome-audit.md`
+- [ ] Screenshot every chrome surface in light + dark; compare against `.claude/skills/ritemark-design/preview/` (PARTIAL — preview HTMLs have no chrome surface; `chrome.html` preview is a new Phase 5 deliverable)
+- [x] Walk `extensions/ritemark/themes/ritemark-light.json` and `extensions/ritemark/themes/ritemark-dark.json`; list every `tab.*`, `statusBar.*`, `activityBar.*`, `activityBarTop.*`, `sideBar.*`, `list.*`, and `tree.*` key currently set; flag gaps vs skill rules (73 keys, full light/dark symmetry — see `research/chrome-audit.md` §2)
+- [x] Inspect patch 002: what's already wired for activity bar / auxiliary bar / titlebar; what's drift-prone (22 files; 8 chrome-relevant — see `research/chrome-audit.md` §1)
+- [x] Inspect patch 001 + `scripts/apply-patches.sh`: list every Lucide font registration, `lucide.woff2` copy, `lucide-*` ThemeIcon, and static SVG activity-bar asset still in use (4 Lucide footprints: font-face CSS, iconRegistry.ts 20-icon registration, apply-patches.sh copy, lucide-static dep — see `research/chrome-audit.md` §3)
+- [x] Inventory current activity-bar + auxiliary-bar view containers and identify the existing Flow button; do not add an Agents feature slot (2 view containers: `ritemark-flows` on activitybar, `ritemark-ai` on auxiliarybar — see `research/chrome-audit.md` §4)
+- [ ] Compare attached target layout and `docs-internal/design/ritemark-ui.pen` chrome frame against the current app; document where the current horizontal activity bar must move (PENDING — needs live dev-mode walk)
+- [ ] Keyboard-navigate the full chrome today; document failures (dead ends, missing tab stops, invisible focus) (DEFERRED to Phase 4 keyboard audit — live app needed)
+- [ ] Contrast-check current chrome colors against WCAG AA (DEFERRED to Phase 5 accessibility sweep — mathematical check against theme JSONs)
+- [x] Produce `research/chrome-audit.md`
 
 ### Phase 2: Plan — GATE BEFORE PHASE 3
 
 - [ ] Decide exact theme key deltas (add / change / leave) for `tab.*`, `statusBar.*`, `activityBar.*`
 - [x] Decide activity-bar layout direction: move current horizontal-over-sidebar activity bar to vertical rail left of sidebar
-- [ ] Decide exact migrated button order from current app + attached target layout; preserve existing Flow button; do not add Agents
+- [x] Decide exact migrated button order — Jarmo 2026-04-24: accept `designer-questions.md` Q2 table as proposed default; final lock deferred to Phase 4 live-app QA walk. Phase 3 proceeds with the Q2 proposed order; if Phase 4 QA reveals a mismatch, adjust and re-run Phase 3 theme/patch steps for button order only.
 - [ ] Decide hover/selected/focus treatment for the vertical activity bar using current button set
 - [x] Post `notes/designer-questions.md` questions and record answers / deferrals in this sprint folder
 - [ ] Decide patch delta: which patches get extended, in what order; ensure no new patch numbers
-- [ ] Decide Phosphor replacement path for chrome icons: web font, static SVG assets, or existing VS Code ThemeIcon substitutions; document the choice before editing patches
+- [x] Decide Phosphor replacement path for chrome icons — **OPTION (a) Phosphor web font** chosen by Jarmo 2026-04-24. Ship `phosphor.woff2` the same way `lucide.woff2` is currently registered (iconRegistry.ts font + codicon.css @font-face + apply-patches.sh copy). Rename 20 `lucide-*` ThemeIcons to `phosphor-*` equivalents via the Sprint 52 `notes/icons-usage.md` mapping.
 - [ ] Draft `notes/keyboard-map.md` with proposed paths
 - [ ] **APPROVAL GATE**: Jarmo reviews audit + plan, including designer answers / deferrals. Explicit "approved" required. No patch changes until then.
 
@@ -163,7 +166,7 @@ Strategic framing: `docs-internal/design/ritemark-ui.pen` implementation-roadmap
 ## Invariants This Sprint Must Uphold
 
 1. **Never stub or disable existing features** — Explorer, Terminal, Search (keyboard-accessible via Cmd+F per sprint 47), Git (if present) all remain fully functional
-2. **Layout invariants from CLAUDE.md** — Ritemark AI panel stays on auxiliary bar, Terminal stays on auxiliary bar, titlebar stays at three items (left sidebar, right sidebar, settings gear), accounts icon stays hidden, panel toggle stays hidden
+2. **Layout invariants from CLAUDE.md** — Ritemark AI panel stays on auxiliary bar, Terminal stays on auxiliary bar, titlebar stays at two items (left sidebar toggle, right sidebar toggle), settings gear lives in ActivityBar bottom (not titlebar), accounts/chat/panel-toggle icons stay hidden
 3. **Patch discipline** — no new patch numbers; all changes land inside patches 001-006
 4. **Unused-import hygiene** — VS Code build is strict; any patch line that removes a call must also remove the import
 5. **Theme switch is runtime-safe** — light ↔ dark at runtime works with no reload required
@@ -184,6 +187,10 @@ Strategic framing: `docs-internal/design/ritemark-ui.pen` implementation-roadmap
 | Keyboard map has hidden gaps | MEDIUM | Phase 1 manual walk; Phase 4 keyboard audit; Phase 6 manual QA; three independent passes |
 | Contrast sweep finds WCAG AA failures in existing tokens | MEDIUM | If found, Sprint 52 tokens are re-evaluated; fallback is to darken foreground on affected surfaces |
 | Sprint 54 Agents work leaks into Sprint 53 | HIGH | Agent Library / Agents feature is explicitly out of scope; only preserve current Agent Chat Panel |
+| SQLite `views.customizations` cache overrides new activity-bar layout | HIGH | VS Code caches view-container positions per-user in `views.customizations` (SQLite). Package.json is the default only; cached positions win. Mitigation: include a one-shot cache-clear in Phase 3 patch + document the manual developer reset (`rm ~/Library/Application\ Support/Ritemark/User/globalStorage/state.vscdb`); add cache-clear verification to Phase 6 manual QA. |
+| Upstream VS Code submodule bump mid-sprint | MEDIUM | The 2026-03-22 patch-consolidation disaster was triggered during a bump. Freeze `vscode/` submodule at the current SHA (VS Code 1.109.5) for the full duration of Sprint 53. If an unavoidable security bump arrives, run `./scripts/apply-patches.sh --dry-run` + full compile + manual smoke test before any Sprint 53 chrome work resumes. Record the pre-sprint submodule SHA in `notes/validation-log.md` at Phase 6. |
+| Patch 001/002 file count drifts silently (PATCH-RULES §8) | HIGH | Baseline recorded in `research/chrome-audit.md`: patch 001 = 14 files, patch 002 = 22 files, patch 003 = 14 files. Before and after each patch edit, re-run `grep '^diff --git' patches/vscode/NNN-*.patch \| wc -l` and record in `notes/validation-log.md`. Hard-fail if a patch silently loses files. |
+| Lucide chrome residue not fully removed | HIGH | Chrome still has 4 Lucide footprints: font-face CSS block in patch 001, `iconRegistry.ts` 20-icon registration, `scripts/apply-patches.sh` font copy, `lucide-static` dep. All four must come out in Phase 3; Phase 6 grep `grep -r "lucide" patches/ scripts/ extensions/ritemark/package.json` must return empty. |
 
 ## Key Research
 
@@ -215,6 +222,24 @@ Strategic framing: `docs-internal/design/ritemark-ui.pen` implementation-roadmap
 
 ## Status
 
-**Current Phase:** Preparation — user clarification applied; implementation still blocked on a dedicated Sprint 53 branch
-**Current Branch:** TBD (proposed: `feat/sprint-53-chrome-activity-bar`)
-**Next Gate:** Phase 1 chrome audit + remaining designer defaults confirmed or accepted
+**Current Phase:** Closing — implementation complete, ready for commits per sprint procedure.
+**Current Branch:** `feat/sprint-53-chrome-activity-bar` (branched from `main` @ `45863aa`)
+**QA Status:** `qa-validator` PASS (2026-04-25) — all 6 patches apply cleanly, TypeScript clean, layout invariants intact, no unused-import build-breakers. `validate-chrome-fast.sh` PASS.
+
+**Phase 3 decisions resolved 2026-04-24:**
+- Lucide chrome migration path: **(a) Phosphor web font** (ship `phosphor.woff2`, rename 20 ThemeIcons).
+- Activity-bar orientation: **`package.json:434` `"workbench.activityBar.location"` = `"default"`** (one-line change, no patch 002 work).
+- Button order: **accept `designer-questions.md` Q2 proposed table as default**, lock in Phase 4 live-app QA.
+- Designer Q8/Q9/Q11: **all three defaults accepted** (hairline-grey unfocused active tab, quiet status bar semantics, VS Code native `focusBorder` without custom glow).
+
+**Final session 2026-04-25 — titlebar polish:**
+- Settings gear removed from titlebar (already moved to ActivityBar bottom in patch 002 working-tree edits earlier in sprint; this session confirmed it via fresh dev build after stale-`out/` discovery).
+- Chat icon (`codicon-chat-sparkle`) removed via patch 003 — neutralized two `MenuRegistry.appendMenuItem` blocks in `agentSessionsExperiments.contribution.ts`. Whack-a-mole pattern documented.
+- Action toolbar restored to right side of titlebar — removed an unexplained `rightContent → leftContent` hunk from patch 002. Upstream `rightContent` behavior now preserved.
+- Active/inactive button styling restyled in `titlebarpart.css` — inactive uses `--ritemark-ink-disabled`, active uses `--ritemark-indigo` foreground with no background fill.
+- CLAUDE.md Layout Invariants table trimmed — over-specific icon-by-icon enumeration replaced with single rule pointing to patches 002+003 as canonical owners; chat-whack-a-mole warning added to upstream-sync notes.
+
+**Deferred (out of this sprint, not blockers):**
+- Keyboard map (`notes/keyboard-map.md`) — pending live-app keyboard audit.
+- Visual regression harness chrome baselines.
+- Phase 5 accessibility/contrast sweep.
