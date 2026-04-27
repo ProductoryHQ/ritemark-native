@@ -154,9 +154,10 @@ export function activate(context: vscode.ExtensionContext) {
     }
   })();
 
-  // Focus AI panel — extension containers register after core, so terminal briefly shows first.
-  // The terminal no longer steals focus back (showPanel removed), so this is a clean one-shot.
-  vscode.commands.executeCommand('ritemark.unifiedView.focus');
+  // Focus AI panel after extension views register (terminal init finishes first and grabs focus).
+  setTimeout(() => {
+    vscode.commands.executeCommand('ritemark.unifiedView.focus');
+  }, 4000);
 
   // Initialize API key manager (must be first)
   initAPIKeyManager(context);
