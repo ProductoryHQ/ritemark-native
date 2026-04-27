@@ -95,7 +95,30 @@ cp -r "$ROOT_DIR/extensions/ritemark" "$ROOT_DIR/vscode/extensions/"
 
 # Apply branding
 echo "[3/5] Applying branding..."
-cp "$ROOT_DIR/branding/product.json" "$ROOT_DIR/vscode/product.json"
+if [ -f "$ROOT_DIR/branding/product.json" ] && [ -f "$ROOT_DIR/vscode/product.json" ]; then
+    node -e '
+        const fs = require("fs");
+        const cp = require("child_process");
+        const vscodePath = process.argv[1];
+        const brandingPath = process.argv[2];
+        const vscodeDir = process.argv[3];
+        const vscodeProduct = JSON.parse(fs.readFileSync(vscodePath, "utf8"));
+        const brandingProduct = JSON.parse(fs.readFileSync(brandingPath, "utf8"));
+        const merged = { ...vscodeProduct, ...brandingProduct };
+        let upstreamProduct = {};
+        try {
+            upstreamProduct = JSON.parse(cp.execSync(`git -C "${vscodeDir}" show 1.117.0:product.json`, { encoding: "utf8" }));
+        } catch {
+            upstreamProduct = {};
+        }
+        for (const key of ["defaultChatAgent", "trustedExtensionAuthAccess", "onboardingKeymaps", "onboardingThemes"]) {
+            if (merged[key] === undefined && upstreamProduct[key] !== undefined) {
+                merged[key] = upstreamProduct[key];
+            }
+        }
+        fs.writeFileSync(vscodePath, JSON.stringify(merged, null, "\t") + "\n");
+    ' "$ROOT_DIR/vscode/product.json" "$ROOT_DIR/branding/product.json" "$ROOT_DIR/vscode"
+fi
 
 # Build macOS app
 echo "[4/5] Building macOS app (this takes a while)..."

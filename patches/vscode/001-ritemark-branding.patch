@@ -236,7 +236,7 @@ index 13ff7948e88..5da9f9d3e65 100644
  
 +/* RiteMark: Custom UI font */
 +:root {
-+	--ritemark-ui-font-family: "Sofia Sans", ;
++	--ritemark-ui-font-family: "Sofia Sans";
 +}
 +
 +/* RiteMark: Sofia Sans font-face declarations */
@@ -265,22 +265,22 @@ index 13ff7948e88..5da9f9d3e65 100644
 -.monaco-workbench.mac:lang(zh-Hant) { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
 -.monaco-workbench.mac:lang(ja) { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
 -.monaco-workbench.mac:lang(ko) { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
-+.monaco-workbench.mac { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, sans-serif; }
-+.monaco-workbench.mac:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; }
-+.monaco-workbench.mac:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
-+.monaco-workbench.mac:lang(ja) { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
-+.monaco-workbench.mac:lang(ko) { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
++.monaco-workbench.mac { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, sans-serif; }
++.monaco-workbench.mac:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; }
++.monaco-workbench.mac:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
++.monaco-workbench.mac:lang(ja) { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
++.monaco-workbench.mac:lang(ko) { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
  
 -.monaco-workbench.windows { font-family: "Segoe WPC", "Segoe UI", sans-serif; }
 -.monaco-workbench.windows:lang(zh-Hans) { font-family: "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
 -.monaco-workbench.windows:lang(zh-Hant) { font-family: "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
 -.monaco-workbench.windows:lang(ja) { font-family: "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
 -.monaco-workbench.windows:lang(ko) { font-family: "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
-+.monaco-workbench.windows { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", sans-serif; }
-+.monaco-workbench.windows:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
-+.monaco-workbench.windows:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
-+.monaco-workbench.windows:lang(ja) { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
-+.monaco-workbench.windows:lang(ko) { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
++.monaco-workbench.windows { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", sans-serif; }
++.monaco-workbench.windows:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
++.monaco-workbench.windows:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
++.monaco-workbench.windows:lang(ja) { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
++.monaco-workbench.windows:lang(ko) { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
  
  /* Linux: add `system-ui` as first font and not `Ubuntu` to allow other distribution pick their standard OS font */
 -.monaco-workbench.linux { font-family: system-ui, "Ubuntu", "Droid Sans", sans-serif; }
@@ -288,11 +288,11 @@ index 13ff7948e88..5da9f9d3e65 100644
 -.monaco-workbench.linux:lang(zh-Hant) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
 -.monaco-workbench.linux:lang(ja) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
 -.monaco-workbench.linux:lang(ko) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
-+.monaco-workbench.linux { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", sans-serif; }
-+.monaco-workbench.linux:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", sans-serif; }
-+.monaco-workbench.linux:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
-+.monaco-workbench.linux:lang(ja) { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
-+.monaco-workbench.linux:lang(ko) { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
++.monaco-workbench.linux { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", sans-serif; }
++.monaco-workbench.linux:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", sans-serif; }
++.monaco-workbench.linux:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
++.monaco-workbench.linux:lang(ja) { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
++.monaco-workbench.linux:lang(ko) { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
  
  .monaco-workbench.mac { --monaco-monospace-font: "SF Mono", Monaco, Menlo, Courier, monospace; }
  .monaco-workbench.windows { --monaco-monospace-font: Consolas, "Courier New", monospace; }
@@ -1357,3 +1357,32 @@ index 00000000000..22c318c5776
 +.monaco-workbench .part.editor > .content .gettingStartedContainer.height-constrained .learn-ritemark {
 +	gap: 14px;
 +}
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedInput.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedInput.ts
+index a255e8459d0..2be66c9816c 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedInput.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedInput.ts
+@@ -7,11 +7,12 @@ import './media/gettingStarted.css';
+ import { localize } from '../../../../nls.js';
+ import { EditorInput } from '../../../common/editor/editorInput.js';
+ import { URI } from '../../../../base/common/uri.js';
+-import { Schemas } from '../../../../base/common/network.js';
++import { FileAccess, Schemas } from '../../../../base/common/network.js';
+ import { IUntypedEditorInput } from '../../../common/editor.js';
+ import { IEditorOptions } from '../../../../platform/editor/common/editor.js';
+ 
+ export const gettingStartedInputTypeId = 'workbench.editors.gettingStartedInput';
++const gettingStartedEditorIcon = FileAccess.asBrowserUri('vs/workbench/browser/media/code-icon.svg');
+ 
+ export interface GettingStartedEditorOptions extends IEditorOptions {
+ 	selectedCategory?: string;
+@@ -81,6 +82,10 @@ export class GettingStartedInput extends EditorInput {
+ 		return this.walkthroughPageTitle ? localize('walkthroughPageTitle', 'Walkthrough: {0}', this.walkthroughPageTitle) : localize('getStarted', "Welcome");
+ 	}
+ 
++	override getIcon(): URI {
++		return gettingStartedEditorIcon;
++	}
++
+ 	get selectedCategory() {
+ 		return this._selectedCategory;
+ 	}

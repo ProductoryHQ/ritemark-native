@@ -218,10 +218,31 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
         echo -e "${YELLOW}Phosphor 200 font file missing; skipping icon font copy${NC}"
     fi
 
-    # Copy product.json if it exists (for branding)
-    if [ -f "$BRANDING_DIR/product.json" ]; then
-        echo -n "Copying product.json... "
-        cp "$BRANDING_DIR/product.json" "$VSCODE_DIR/product.json"
+    # Merge branding product overlay onto current product.json
+    if [ -f "$BRANDING_DIR/product.json" ] && [ -f "$VSCODE_DIR/product.json" ]; then
+        echo -n "Merging product.json branding overlay... "
+        node -e '
+            const fs = require("fs");
+            const cp = require("child_process");
+            const vscodePath = process.argv[1];
+            const brandingPath = process.argv[2];
+            const vscodeDir = process.argv[3];
+            const vscodeProduct = JSON.parse(fs.readFileSync(vscodePath, "utf8"));
+            const brandingProduct = JSON.parse(fs.readFileSync(brandingPath, "utf8"));
+            const merged = { ...vscodeProduct, ...brandingProduct };
+            let upstreamProduct = {};
+            try {
+                upstreamProduct = JSON.parse(cp.execSync(`git -C "${vscodeDir}" show 1.117.0:product.json`, { encoding: "utf8" }));
+            } catch {
+                upstreamProduct = {};
+            }
+            for (const key of ["defaultChatAgent", "trustedExtensionAuthAccess", "onboardingKeymaps", "onboardingThemes"]) {
+                if (merged[key] === undefined && upstreamProduct[key] !== undefined) {
+                    merged[key] = upstreamProduct[key];
+                }
+            }
+            fs.writeFileSync(vscodePath, JSON.stringify(merged, null, "\t") + "\n");
+        ' "$VSCODE_DIR/product.json" "$BRANDING_DIR/product.json" "$VSCODE_DIR"
         echo -e "${GREEN}Done${NC}"
     fi
 

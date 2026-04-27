@@ -115,8 +115,29 @@ echo ""
 echo -e "${YELLOW}Step 5: Copying branding...${NC}"
 cd "$ROOT_DIR"
 if [ -f "branding/product.json" ]; then
-    cp "branding/product.json" "$VSCODE_DIR/product.json"
-    echo "  Copied product.json"
+    node -e '
+        const fs = require("fs");
+        const cp = require("child_process");
+        const vscodePath = process.argv[1];
+        const brandingPath = process.argv[2];
+        const vscodeDir = process.argv[3];
+        const vscodeProduct = JSON.parse(fs.readFileSync(vscodePath, "utf8"));
+        const brandingProduct = JSON.parse(fs.readFileSync(brandingPath, "utf8"));
+        const merged = { ...vscodeProduct, ...brandingProduct };
+        let upstreamProduct = {};
+        try {
+            upstreamProduct = JSON.parse(cp.execSync(`git -C "${vscodeDir}" show 1.117.0:product.json`, { encoding: "utf8" }));
+        } catch {
+            upstreamProduct = {};
+        }
+        for (const key of ["defaultChatAgent", "trustedExtensionAuthAccess", "onboardingKeymaps", "onboardingThemes"]) {
+            if (merged[key] === undefined && upstreamProduct[key] !== undefined) {
+                merged[key] = upstreamProduct[key];
+            }
+        }
+        fs.writeFileSync(vscodePath, JSON.stringify(merged, null, "\t") + "\n");
+    ' "$VSCODE_DIR/product.json" "$ROOT_DIR/branding/product.json" "$VSCODE_DIR"
+    echo "  Merged product.json branding overlay"
 fi
 
 # Copy Windows icon resources (taskbar, Start menu tiles)
