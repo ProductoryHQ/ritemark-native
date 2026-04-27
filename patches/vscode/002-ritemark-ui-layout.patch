@@ -253,7 +253,23 @@ diff --git a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
 index 8cc8ca0e484..79ee57744f1 100644
 --- a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
 +++ b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
-@@ -12,7 +12,7 @@
+@@ -3,9 +3,15 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+
+ .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item {
+ 	display: block;
+ 	position: relative;
++	margin-bottom: 6px;
++}
++
++/* Ritemark: remove last item's margin to keep visual rhythm at section end */
++.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item:last-child {
++	margin-bottom: 0;
+ }
+
+ .monaco-workbench .activitybar > .content .composite-bar > .monaco-action-bar .action-item::before,
+@@ -12,7 +18,7 @@
  .monaco-workbench .activitybar > .content .composite-bar > .monaco-action-bar .action-item::after {
  	position: absolute;
  	content: '';
@@ -262,7 +278,7 @@ index 8cc8ca0e484..79ee57744f1 100644
  	height: 2px;
  	display: none;
  	background-color: transparent;
-@@ -46,25 +46,41 @@
+@@ -46,25 +52,41 @@
  	z-index: 1;
  	display: flex;
  	overflow: hidden;
@@ -310,7 +326,7 @@ index 8cc8ca0e484..79ee57744f1 100644
  .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item.active .action-label.codicon,
  .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item:focus .action-label.codicon,
  .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item:hover .action-label.codicon {
-@@ -84,7 +100,7 @@
+@@ -84,7 +106,7 @@
  	top: 0;
  	height: 100%;
  	width: 0;
@@ -319,7 +335,7 @@ index 8cc8ca0e484..79ee57744f1 100644
  }
  
  .monaco-workbench.hc-black .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item.checked .active-item-indicator:before,
-@@ -157,8 +173,8 @@
+@@ -157,8 +179,8 @@
  
  .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .badge .badge-content {
  	position: absolute;
@@ -330,7 +346,7 @@ index 8cc8ca0e484..79ee57744f1 100644
  	font-size: 9px;
  	font-weight: 600;
  	min-width: 8px;
-@@ -174,8 +190,8 @@
+@@ -174,8 +196,8 @@
  	font-weight: 600;
  	font-size: 9px;
  	line-height: 10px;
