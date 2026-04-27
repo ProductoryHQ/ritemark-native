@@ -2,7 +2,7 @@
   "nameShort": "Ritemark",
   "nameLong": "Ritemark",
   "applicationName": "ritemark",
-  "ritemarkVersion": "1.5.4",
+  "ritemarkVersion": "1.6.0",
   "posthogProjectApiKey": "phc_DEkVFsXXTFVZjCrlIHO51GeShdHU8YIXOZmCHy4XIAQ",
   "posthogHost": "https://eu.i.posthog.com",
   "dataFolderName": ".ritemark",
