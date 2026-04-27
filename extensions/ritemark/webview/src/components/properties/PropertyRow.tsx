@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Icon } from '../ui/Icon'
-import type { PropertyType } from './PropertiesPanel'
+import type { PropertyType } from './types'
 import { TagsInput } from './TagsInput'
 import { StatusSelect } from './StatusSelect'
 
@@ -13,11 +13,8 @@ interface PropertyRowProps {
   onDelete: () => void
 }
 
-// Check if text is long enough to need multiline treatment
-const isLongText = (value: unknown): boolean => {
-  if (typeof value !== 'string') return false
-  return value.length > 80 || value.includes('\n')
-}
+const inputClasses =
+  'w-full rounded-md border border-hairline-strong bg-surface-muted px-2 py-1.5 text-[12px] text-ink-strong placeholder:text-ink-faint outline-none focus:ring-1 focus:ring-[--r-accent]'
 
 export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onChange, onDelete }: PropertyRowProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -25,9 +22,6 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
   const inputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const needsMultiline = type === 'text' && isLongText(value)
-
-  // Start editing with current value
   const startEditing = () => {
     if (type === 'text' || type === 'date') {
       setEditValue(String(value || ''))
@@ -35,31 +29,23 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
     }
   }
 
-  // Focus input when editing starts
   useEffect(() => {
-    if (isEditing) {
-      if (needsMultiline && textareaRef.current) {
-        textareaRef.current.focus()
-        textareaRef.current.select()
-        // Auto-resize textarea
-        textareaRef.current.style.height = 'auto'
-        textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
-      } else if (inputRef.current) {
-        inputRef.current.focus()
-        inputRef.current.select()
-      }
+    if (!isEditing) return
+    const el = textareaRef.current || inputRef.current
+    if (el) { el.focus(); el.select() }
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
     }
-  }, [isEditing, needsMultiline])
+  }, [isEditing])
 
-  // Save on blur or Enter
   const handleSave = () => {
     onChange(editValue)
     setIsEditing(false)
   }
 
-  // Cancel on Escape, save on Enter (or Cmd+Enter for textarea)
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (!needsMultiline || e.metaKey || e.ctrlKey)) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || type !== 'text')) {
       e.preventDefault()
       handleSave()
     } else if (e.key === 'Escape') {
@@ -67,145 +53,86 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
     }
   }
 
-  // Auto-resize textarea on input
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditValue(e.target.value)
-    e.target.style.height = 'auto'
-    e.target.style.height = e.target.scrollHeight + 'px'
-  }
-
-  // Format value for display
-  const formatDisplayValue = (): string => {
-    if (value === null || value === undefined || value === '') {
-      return '(empty)'
-    }
-
-    if (type === 'date' && typeof value === 'string') {
-      // Format date nicely
-      try {
-        const date = new Date(value)
-        return date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })
-      } catch {
-        return String(value)
-      }
-    }
-
-    if (type === 'tags' && Array.isArray(value)) {
-      return value.length === 0 ? '(no tags)' : value.join(', ')
+  const renderControl = () => {
+    if (type === 'tags') {
+      return <TagsInput tags={Array.isArray(value) ? value.map(String) : []} onChange={(tags) => onChange(tags)} />
     }
 
     if (type === 'status') {
-      return String(value).charAt(0).toUpperCase() + String(value).slice(1)
+      return <StatusSelect value={String(value || 'draft')} onChange={(s) => onChange(s)} />
     }
 
-    return String(value)
-  }
-
-  // Render input based on type
-  const renderInput = () => {
-    switch (type) {
-      case 'text':
-        if (isEditing) {
-          // Use textarea for long text
-          if (needsMultiline || (editValue && editValue.length > 80)) {
-            return (
-              <textarea
-                ref={textareaRef}
-                value={editValue}
-                onChange={handleTextareaChange}
-                onBlur={handleSave}
-                onKeyDown={handleKeyDown}
-                rows={3}
-                className="w-full px-2 py-1 text-sm border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none overflow-hidden"
-                placeholder="Enter text... (Cmd+Enter to save)"
-              />
-            )
-          }
-          return (
-            <input
-              ref={inputRef}
-              type="text"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={handleSave}
-              onKeyDown={handleKeyDown}
-              className="w-full px-2 py-1 text-sm border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            />
-          )
-        }
-        return (
-          <div
-            onClick={startEditing}
-            className={`w-full px-2 py-1 text-sm cursor-text hover:bg-white rounded transition-colors ${
-              !value ? 'text-ink-faint italic' : 'text-ink-strong'
-            }`}
-          >
-            {formatDisplayValue()}
-          </div>
-        )
-
-      case 'date':
-        return (
-          <div className="flex-1 flex items-center gap-2">
-            <Icon name="calendar" size={14} className="text-ink-faint" />
-            <input
-              type="date"
-              value={typeof value === 'string' ? value : ''}
-              onChange={(e) => onChange(e.target.value)}
-              className="flex-1 px-2 py-1 text-sm border border-hairline rounded hover:border-hairline-strong focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer"
-            />
-          </div>
-        )
-
-      case 'tags':
-        return (
-          <TagsInput
-            tags={Array.isArray(value) ? value.map(String) : []}
-            onChange={(tags) => onChange(tags)}
-          />
-        )
-
-      case 'status':
-        return (
-          <StatusSelect
-            value={String(value || 'draft')}
-            onChange={(status) => onChange(status)}
-          />
-        )
-
-      default:
-        return (
-          <span className="flex-1 px-2 py-1 text-sm text-ink-strong">
-            {String(value)}
-          </span>
-        )
+    if (type === 'date') {
+      return (
+        <input
+          type="date"
+          value={typeof value === 'string' ? value : ''}
+          onChange={(e) => onChange(e.target.value)}
+          className={inputClasses + ' cursor-pointer'}
+        />
+      )
     }
+
+    // text type
+    if (isEditing) {
+      const isLong = String(editValue).length > 40 || String(editValue).includes('\n')
+      if (isLong) {
+        return (
+          <textarea
+            ref={textareaRef}
+            value={editValue}
+            onChange={(e) => {
+              setEditValue(e.target.value)
+              e.target.style.height = 'auto'
+              e.target.style.height = e.target.scrollHeight + 'px'
+            }}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            rows={2}
+            className={inputClasses + ' resize-none overflow-hidden'}
+          />
+        )
+      }
+      return (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className={inputClasses}
+        />
+      )
+    }
+
+    return (
+      <div
+        onClick={startEditing}
+        className={`w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-[12px] cursor-text hover:border-hairline-strong transition-colors break-words ${
+          !value ? 'text-ink-faint italic' : 'text-ink-strong'
+        }`}
+      >
+        {value ? String(value) : '(empty)'}
+      </div>
+    )
   }
 
   return (
-    <div className={`flex gap-2 py-1.5 group ${needsMultiline ? 'items-start' : 'items-center'}`}>
-      {/* Label */}
-      <span className={`w-24 text-xs font-medium text-ink-muted uppercase tracking-wide flex-shrink-0 ${needsMultiline ? 'pt-1' : ''}`}>
-        {label}
-      </span>
-
-      {/* Value / Input */}
-      <div className="flex-1 min-w-0">
-        {renderInput()}
+    <div className="flex flex-col gap-1 group min-w-0">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.4px] text-ink-muted">
+          {label}
+        </span>
+        <button
+          onClick={onDelete}
+          className="p-0.5 text-ink-faint hover:text-[var(--r-error)] opacity-0 group-hover:opacity-100 transition-opacity"
+          title={`Remove ${label}`}
+        >
+          <Icon name="x" size={12} />
+        </button>
       </div>
-
-      {/* Delete button */}
-      <button
-        onClick={onDelete}
-        className={`p-1 text-ink-faint hover:text-ritemark-error opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ${needsMultiline ? 'mt-1' : ''}`}
-        title={`Remove ${label}`}
-      >
-        <Icon name="x" size={14} />
-      </button>
+      <div className="min-w-0">{renderControl()}</div>
     </div>
   )
 }

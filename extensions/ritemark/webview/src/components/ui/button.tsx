@@ -18,6 +18,10 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-surface-soft",
         ghost:
           "hover:bg-surface-soft hover:text-ink-strong",
+        toolbar:
+          "border border-hairline bg-surface text-ink-strong font-medium " +
+          "hover:bg-surface-soft " +
+          "data-[state=active]:bg-[--r-accent-soft] data-[state=active]:text-[--r-accent] data-[state=active]:border-[--r-accent-soft] data-[state=active]:font-semibold",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

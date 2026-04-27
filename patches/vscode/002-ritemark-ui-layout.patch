@@ -87,18 +87,18 @@ index fea736cad03..2e16b48afde 100644
 +	group: '9_advanced',
 +	title: localize('miViewAdvanced', "Advanced"),
 +	submenu: MenuId.MenubarViewMenuAdvanced,
-+	order: 1
-+});
-+
+ 	order: 1
+ });
+ 
 +MenuRegistry.appendMenuItem(MenuId.MenubarViewMenuAdvanced, {
 +	group: '1_views',
 +	command: {
 +		id: 'workbench.view.scm',
 +		title: localize('miViewSCMAdvanced', "Source Control"),
 +	},
- 	order: 1
- });
- 
++	order: 1
++});
++
 +MenuRegistry.appendMenuItem(MenuId.MenubarViewMenuAdvanced, {
 +	group: '1_views',
 +	command: {
@@ -193,97 +193,21 @@ index f17465a5e4a..6dbeda329ca 100644
  	display: flex;
  	box-sizing: border-box;
  	overflow: hidden;
-diff --git a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
-index 8cc8ca0e484..a4b8492d58d 100644
---- a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
-+++ b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
-@@ -12,7 +12,7 @@
- .monaco-workbench .activitybar > .content .composite-bar > .monaco-action-bar .action-item::after {
- 	position: absolute;
- 	content: '';
--	width: 48px;
-+	width: 40px;
- 	height: 2px;
- 	display: none;
- 	background-color: transparent;
-@@ -46,8 +46,8 @@
- 	z-index: 1;
- 	display: flex;
- 	overflow: hidden;
--	width: 48px;
--	height: 48px;
-+	width: 40px;
-+	height: 40px;
- 	margin-right: 0;
- 	box-sizing: border-box;
+diff --git a/src/vs/workbench/browser/part.ts b/src/vs/workbench/browser/part.ts
+index d66a8f5f0ee..65011fd204a 100644
+--- a/src/vs/workbench/browser/part.ts
++++ b/src/vs/workbench/browser/part.ts
+@@ -201,8 +201,8 @@ export abstract class Part<MementoType extends object = object> extends Componen
  
-@@ -56,15 +56,21 @@
- .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label:not(.codicon) {
- 	font-size: 15px;
- 	line-height: 40px;
--	padding: 0 0 0 48px;
-+	padding: 0 0 0 40px;
- }
+ class PartLayout {
  
- .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label.codicon {
--	font-size: 24px;
-+	font-size: 16px;
- 	align-items: center;
- 	justify-content: center;
- }
+-	private static readonly HEADER_HEIGHT = 35;
+-	private static readonly TITLE_HEIGHT = 35;
++	private static readonly HEADER_HEIGHT = 40; // Ritemark: taller tab bar
++	private static readonly TITLE_HEIGHT = 40; // Ritemark: taller tab bar
+ 	private static readonly Footer_HEIGHT = 35;
  
-+.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label.uri-icon {
-+	background-position: center;
-+	background-repeat: no-repeat;
-+	background-size: 16px;
-+}
-+
- .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item.active .action-label.codicon,
- .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item:focus .action-label.codicon,
- .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item:hover .action-label.codicon {
-@@ -157,8 +163,8 @@
- 
- .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .badge .badge-content {
- 	position: absolute;
--	top: 24px;
--	right: 8px;
-+	top: 20px;
-+	right: 5px;
- 	font-size: 9px;
- 	font-weight: 600;
- 	min-width: 8px;
-@@ -174,8 +180,8 @@
- 	font-weight: 600;
- 	font-size: 9px;
- 	line-height: 10px;
--	top: 24px;
--	right: 6px;
-+	top: 20px;
-+	right: 4px;
- 	padding: 2px 3px;
- 	border-radius: 7px;
- 	background-color: var(--vscode-profileBadge-background);
-diff --git a/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css b/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
-index d90cd70e2f8..00000000000 100644
---- a/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
-+++ b/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
-@@ -4,7 +4,7 @@
-  *--------------------------------------------------------------------------------------------*/
- 
- .monaco-workbench .part.activitybar {
--	width: 48px;
-+	width: 40px;
- 	height: 100%;
- }
- 
-@@ -48,6 +48,7 @@
- 
- .monaco-workbench .activitybar > .content > .composite-bar {
- 	margin-bottom: auto;
-+	padding-top: 12px;
- }
- 
- /** Menu Bar */
+ 	private headerVisible: boolean = false;
 diff --git a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
 index 080b6871061..557a976031e 100644
 --- a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
@@ -325,21 +249,128 @@ index 080b6871061..557a976031e 100644
  			colors: (theme: IColorTheme) => ({
  				activeForegroundColor: theme.getColor(ACTIVITY_BAR_FOREGROUND),
  				inactiveForegroundColor: theme.getColor(ACTIVITY_BAR_INACTIVE_FOREGROUND),
-diff --git a/src/vs/workbench/browser/part.ts b/src/vs/workbench/browser/part.ts
-index d66a8f5f0ee..65011fd204a 100644
---- a/src/vs/workbench/browser/part.ts
-+++ b/src/vs/workbench/browser/part.ts
-@@ -201,8 +201,8 @@ export abstract class Part<MementoType extends object = object> extends Componen
+diff --git a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
+index 8cc8ca0e484..79ee57744f1 100644
+--- a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
++++ b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
+@@ -12,7 +12,7 @@
+ .monaco-workbench .activitybar > .content .composite-bar > .monaco-action-bar .action-item::after {
+ 	position: absolute;
+ 	content: '';
+-	width: 48px;
++	width: 28px;
+ 	height: 2px;
+ 	display: none;
+ 	background-color: transparent;
+@@ -46,25 +46,41 @@
+ 	z-index: 1;
+ 	display: flex;
+ 	overflow: hidden;
+-	width: 48px;
+-	height: 48px;
++	width: 28px;
++	height: 28px;
+ 	margin-right: 0;
+ 	box-sizing: border-box;
+-
+ }
  
- class PartLayout {
+ .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label:not(.codicon) {
+ 	font-size: 15px;
+-	line-height: 40px;
+-	padding: 0 0 0 48px;
++	line-height: 28px;
++	padding: 0 0 0 28px;
+ }
  
--	private static readonly HEADER_HEIGHT = 35;
--	private static readonly TITLE_HEIGHT = 35;
-+	private static readonly HEADER_HEIGHT = 40; // Ritemark: taller tab bar
-+	private static readonly TITLE_HEIGHT = 40; // Ritemark: taller tab bar
- 	private static readonly Footer_HEIGHT = 35;
+ .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label.codicon {
+-	font-size: 24px;
++	font-size: 16px;
+ 	align-items: center;
+ 	justify-content: center;
+ }
  
- 	private headerVisible: boolean = false;
++.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label.uri-icon {
++	background-position: center;
++	background-repeat: no-repeat;
++	background-size: 16px;
++}
++
++.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item.checked .active-item-indicator {
++	z-index: 0;
++	background-color: var(--vscode-activityBar-activeBackground, rgba(67, 56, 202, 0.1));
++	border-radius: 8px;
++	width: 28px;
++	height: 28px;
++	top: 50%;
++	transform: translateY(-50%);
++	bottom: auto;
++}
++
+ .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item.active .action-label.codicon,
+ .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item:focus .action-label.codicon,
+ .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item:hover .action-label.codicon {
+@@ -84,7 +100,7 @@
+ 	top: 0;
+ 	height: 100%;
+ 	width: 0;
+-	border-left: 2px solid;
++	border-left: none;
+ }
+ 
+ .monaco-workbench.hc-black .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item.checked .active-item-indicator:before,
+@@ -157,8 +173,8 @@
+ 
+ .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .badge .badge-content {
+ 	position: absolute;
+-	top: 24px;
+-	right: 8px;
++	top: 14px;
++	right: -2px;
+ 	font-size: 9px;
+ 	font-weight: 600;
+ 	min-width: 8px;
+@@ -174,8 +190,8 @@
+ 	font-weight: 600;
+ 	font-size: 9px;
+ 	line-height: 10px;
+-	top: 24px;
+-	right: 6px;
++	top: 14px;
++	right: -2px;
+ 	padding: 2px 3px;
+ 	border-radius: 7px;
+ 	background-color: var(--vscode-profileBadge-background);
+diff --git a/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css b/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
+index abe1427ca20..9ecf397391b 100644
+--- a/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
++++ b/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
+@@ -4,7 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ .monaco-workbench .part.activitybar {
+-	width: 48px;
++	width: 40px;
+ 	height: 100%;
+ }
+ 
+@@ -50,6 +50,16 @@
+ 
+ .monaco-workbench .activitybar > .content > .composite-bar {
+ 	margin-bottom: auto;
++	padding-top: 12px;
++	padding-left: 6px;
++	padding-right: 6px;
++}
++
++/** Global Actions (settings, accounts) — match composite-bar padding */
++.monaco-workbench .activitybar > .content > div:not(.composite-bar) {
++	padding-left: 6px;
++	padding-right: 6px;
++	padding-bottom: 8px;
+ }
+ 
+ /** Menu Bar */
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 index 5abfb88dd9c..704960be90f 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
@@ -424,6 +455,64 @@ index 5abfb88dd9c..704960be90f 100644
  		id: MenuId.ViewContainerTitleContext,
  		item: {
  			group: '3_workbench_layout_move',
+diff --git a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
+index aec3de2d96d..40753c7e66b 100644
+--- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
++++ b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
+@@ -105,3 +105,53 @@
+ .monaco-workbench .auxiliarybar.pane-composite-part > .title.has-composite-bar > .title-actions .monaco-action-bar .action-item {
+ 	max-width: 150px;
+ }
++
++/* Ritemark: Activity bar icon style for auxiliary bar icon tabs */
++
++/* Icon label container — match activity bar 28x28 */
++.monaco-workbench .part.auxiliarybar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon .action-label:not(.codicon-more),
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon .action-label:not(.codicon-more) {
++	position: relative;
++	z-index: 1;
++	width: 28px;
++	height: 28px;
++	display: flex;
++	align-items: center;
++	justify-content: center;
++}
++
++/* Codicon icons — reset absolute positioning from base rule, let flex center them */
++.monaco-workbench .part.auxiliarybar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon .action-label.codicon:not(.codicon-more)::before,
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon .action-label.codicon:not(.codicon-more)::before {
++	position: static;
++	font-size: 16px;
++}
++
++/* URI icons (SVG from extensions) — center 16px icon in 28px container */
++.monaco-workbench .part.auxiliarybar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon .action-label.uri-icon,
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon .action-label.uri-icon {
++	background-size: 16px !important;
++	background-position: center !important;
++	background-repeat: no-repeat !important;
++}
++
++/* Override checked background from paneCompositePart — let active-item-indicator handle it */
++.monaco-workbench .part.auxiliarybar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked,
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked {
++	background-color: transparent !important;
++	border-radius: 0;
++}
++
++/* Active indicator: rounded-rect background matching activity bar */
++.monaco-workbench .part.auxiliarybar > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked .active-item-indicator,
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked .active-item-indicator {
++	z-index: 0;
++	background-color: var(--vscode-activityBar-activeBackground, rgba(67, 56, 202, 0.1));
++	border-radius: 8px;
++	width: 28px;
++	height: 28px;
++	top: 50%;
++	left: 50%;
++	transform: translate(-50%, -50%);
++	bottom: auto;
++}
 diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
 index b0a44e2c23a..01070bb9145 100644
 --- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
@@ -450,6 +539,105 @@ index 8eff5df9389..92917d018b6 100644
  }
  
  .monaco-workbench .part.editor > .content .editor-group-container.empty.locked > .editor-group-container-toolbar,
+diff --git a/src/vs/workbench/browser/parts/globalCompositeBar.ts b/src/vs/workbench/browser/parts/globalCompositeBar.ts
+index 48220d63dc3..d5b081e981f 100644
+--- a/src/vs/workbench/browser/parts/globalCompositeBar.ts
++++ b/src/vs/workbench/browser/parts/globalCompositeBar.ts
+@@ -53,7 +53,6 @@ export class GlobalCompositeBar extends Disposable {
+ 	readonly element: HTMLElement;
+ 
+ 	private readonly globalActivityAction = this._register(new Action(GLOBAL_ACTIVITY_ID));
+-	private readonly accountAction = this._register(new Action(ACCOUNTS_ACTIVITY_ID));
+ 	private readonly globalActivityActionBar: ActionBar;
+ 
+ 	constructor(
+@@ -102,10 +101,6 @@ export class GlobalCompositeBar extends Disposable {
+ 			preventLoopNavigation: true
+ 		}));
+ 
+-		if (this.accountsVisibilityPreference) {
+-			this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
+-		}
+-
+ 		this.globalActivityActionBar.push(this.globalActivityAction);
+ 
+ 		this.registerListeners();
+@@ -132,27 +127,15 @@ export class GlobalCompositeBar extends Disposable {
+ 	}
+ 
+ 	getContextMenuActions(): IAction[] {
+-		return [toAction({ id: 'toggleAccountsVisibility', label: localize('accounts', "Accounts"), checked: this.accountsVisibilityPreference, run: () => this.accountsVisibilityPreference = !this.accountsVisibilityPreference })];
++		return [];
+ 	}
+ 
+ 	private toggleAccountsActivity() {
+-		if (this.globalActivityActionBar.length() === 2 && this.accountsVisibilityPreference) {
+-			return;
+-		}
+ 		if (this.globalActivityActionBar.length() === 2) {
+ 			this.globalActivityActionBar.pull(GlobalCompositeBar.ACCOUNTS_ACTION_INDEX);
+-		} else {
+-			this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
+ 		}
+ 	}
+ 
+-	private get accountsVisibilityPreference(): boolean {
+-		return isAccountsActionVisible(this.storageService);
+-	}
+-
+-	private set accountsVisibilityPreference(value: boolean) {
+-		setAccountsActionVisible(this.storageService, value);
+-	}
+ }
+ 
+ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionViewItem {
+@@ -233,7 +216,7 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
+ 		return this.contextMenuActionsProvider();
+ 	}
+ 
+-	private async run(): Promise<void> {
++	protected async run(): Promise<void> {
+ 		const disposables = new DisposableStore();
+ 		const menu = disposables.add(this.menuService.createMenu(this.menuId, this.contextKeyService));
+ 		const actions = await this.resolveMainMenuActions(menu, disposables);
+@@ -600,6 +583,7 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
+ 		@IKeybindingService keybindingService: IKeybindingService,
+ 		@IInstantiationService instantiationService: IInstantiationService,
+ 		@IActivityService activityService: IActivityService,
++		@ICommandService private readonly commandService: ICommandService,
+ 	) {
+ 		const action = instantiationService.createInstance(CompositeBarAction, {
+ 			id: GLOBAL_ACTIVITY_ID,
+@@ -657,6 +641,10 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
+ 	protected override computeTitle(): string {
+ 		return this.userDataProfileService.currentProfile.isDefault ? super.computeTitle() : localize('manage profile', "Manage {0} (Profile)", this.userDataProfileService.currentProfile.name);
+ 	}
++
++	protected override async run(): Promise<void> {
++		await this.commandService.executeCommand('ritemark.aiSettings');
++	}
+ }
+ 
+ export class SimpleAccountActivityActionViewItem extends AccountsActivityActionViewItem {
+@@ -711,7 +699,8 @@ export class SimpleGlobalActivityActionViewItem extends GlobalActivityActionView
+ 		@IKeybindingService keybindingService: IKeybindingService,
+ 		@IInstantiationService instantiationService: IInstantiationService,
+ 		@IActivityService activityService: IActivityService,
+-		@IStorageService storageService: IStorageService
++		@IStorageService storageService: IStorageService,
++		@ICommandService commandService: ICommandService
+ 	) {
+ 		super(() => simpleActivityContextMenuActions(storageService, false),
+ 			{
+@@ -722,7 +711,7 @@ export class SimpleGlobalActivityActionViewItem extends GlobalActivityActionView
+ 				}),
+ 				hoverOptions,
+ 				compact: true,
+-			}, () => undefined, userDataProfileService, themeService, hoverService, menuService, contextMenuService, contextKeyService, configurationService, environmentService, keybindingService, instantiationService, activityService);
++			}, () => undefined, userDataProfileService, themeService, hoverService, menuService, contextMenuService, contextKeyService, configurationService, environmentService, keybindingService, instantiationService, activityService, commandService);
+ 	}
+ }
+ 
 diff --git a/src/vs/workbench/browser/parts/media/paneCompositePart.css b/src/vs/workbench/browser/parts/media/paneCompositePart.css
 index 8ec76362dd0..a9f89faa4f4 100644
 --- a/src/vs/workbench/browser/parts/media/paneCompositePart.css
@@ -493,10 +681,40 @@ index 8ec76362dd0..a9f89faa4f4 100644
  }
  
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index a452575cf9e..7dff19825ee 100644
+index a452575cf9e..4913d991797 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
-@@ -451,9 +451,34 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+@@ -18,7 +18,7 @@ import { IPaneCompositeBarOptions, PaneCompositeBar } from './paneCompositeBar.j
+ import { Dimension, EventHelper, trackFocus, $, addDisposableListener, EventType, prepend, getWindow } from '../../../base/browser/dom.js';
+ import { Registry } from '../../../platform/registry/common/platform.js';
+ import { INotificationService } from '../../../platform/notification/common/notification.js';
+-import { IStorageService } from '../../../platform/storage/common/storage.js';
++import { IStorageService, StorageScope } from '../../../platform/storage/common/storage.js';
+ import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
+ import { IKeybindingService } from '../../../platform/keybinding/common/keybinding.js';
+ import { IThemeService } from '../../../platform/theme/common/themeService.js';
+@@ -167,6 +167,11 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+ 			registryId = Extensions.Auxiliary;
+ 			globalActionsMenuId = MenuId.AuxiliaryBarTitle;
+ 		}
++		// Ritemark: auxiliary bar always starts on AI panel
++		if (partId === Parts.AUXILIARYBAR_PART) {
++			storageService.remove(activePaneCompositeSettingsKey, StorageScope.WORKSPACE);
++		}
++
+ 		super(
+ 			notificationService,
+ 			storageService,
+@@ -178,7 +183,7 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+ 			themeService,
+ 			Registry.as<PaneCompositeRegistry>(registryId),
+ 			activePaneCompositeSettingsKey,
+-			viewDescriptorService.getDefaultViewContainer(location)?.id || '',
++			partId === Parts.AUXILIARYBAR_PART ? 'workbench.view.extension.ritemark-ai' : (viewDescriptorService.getDefaultViewContainer(location)?.id || ''),
+ 			nameForTelemetry,
+ 			compositeCSSClass,
+ 			titleForegroundColor,
+@@ -451,9 +456,34 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
  	protected override createHeaderArea(): HTMLElement {
  		const headerArea = super.createHeaderArea();
  
@@ -762,7 +980,7 @@ index 982f5a620df..dc50bd29ac0 100644
 +	display: none;
 +}
 diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-index 743f9e6ee8b..b9b68a3d54c 100644
+index 743f9e6ee8b..e9656e1da21 100644
 --- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 @@ -33,7 +33,8 @@ import { CommandCenterControl } from './commandCenterControl.js';
@@ -858,7 +1076,7 @@ index db5712fe9b0..0ea986538c2 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 +++ b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 @@ -16,13 +16,14 @@
-
+ 
  .explorer-folders-view .explorer-item,
  .explorer-folders-view .editor-group {
 -	height: 22px;
@@ -866,13 +1084,13 @@ index db5712fe9b0..0ea986538c2 100644
 +	height: 28px;
 +	line-height: 28px;
  }
-
+ 
  .explorer-folders-view .explorer-item {
  	display: flex; /* this helps showing the overflow ellipsis (...) even though we use display:inline-block for the labels */
  	flex-wrap: nowrap;
 +	align-items: center;
  }
-
+ 
  .explorer-folders-view .explorer-item > a,
 @@ -106,3 +107,16 @@
  .monaco-workbench.context-menu-visible .explorer-folders-view.highlight .monaco-list-row {
@@ -891,19 +1109,6 @@ index db5712fe9b0..0ea986538c2 100644
 +	box-shadow: inset 2px 0 0 0 var(--vscode-list-focusAndSelectionOutline, var(--vscode-focusBorder, #4338CA)) !important;
 +	outline: none !important;
 +}
-diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-index a4a00dfa7ea..11218ba3a85 100644
---- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-+++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-@@ -77,7 +77,7 @@ import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.j
-
- export class ExplorerDelegate implements IListVirtualDelegate<ExplorerItem> {
-
--	static readonly ITEM_HEIGHT = 22;
-+	static readonly ITEM_HEIGHT = 28;
-
- 	getHeight(element: ExplorerItem): number {
- 		return ExplorerDelegate.ITEM_HEIGHT;
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 index 5b115684ac0..9ca4a048788 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerView.ts
@@ -936,8 +1141,21 @@ index 5b115684ac0..9ca4a048788 100644
  			metadata: {
  				description: nls.localize2('collapseExplorerFoldersMetadata', "Folds all folders in the Explorer.")
  			}
+diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
+index a4a00dfa7ea..11218ba3a85 100644
+--- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
++++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
+@@ -77,7 +77,7 @@ import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.j
+ 
+ export class ExplorerDelegate implements IListVirtualDelegate<ExplorerItem> {
+ 
+-	static readonly ITEM_HEIGHT = 22;
++	static readonly ITEM_HEIGHT = 28;
+ 
+ 	getHeight(element: ExplorerItem): number {
+ 		return ExplorerDelegate.ITEM_HEIGHT;
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-index 40b580ef0f0..61faac24cdc 100644
+index 40b580ef0f0..a7406e4b026 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 @@ -4,7 +4,6 @@
@@ -965,7 +1183,7 @@ index 40b580ef0f0..61faac24cdc 100644
 +	hideIfEmpty: false, // Ritemark: keep terminal tab visible
  	order: 3,
 -}, ViewContainerLocation.Panel, { doNotRegisterOpenCommand: true, isDefault: true });
-+}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: true }); // Ritemark: moved to auxiliary bar
++}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: false }); // Ritemark: auxiliary bar, AI panel is default
  Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
@@ -1080,6 +1298,21 @@ index b0544972b48..5fa4969adc5 100644
  }
  
  function isDeserializedTerminalEditorInput(obj: unknown): obj is IDeserializedTerminalEditorInput {
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalView.ts b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
+index 9a745727415..97b8e1acd96 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalView.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
+@@ -219,10 +219,6 @@ export class TerminalViewPane extends ViewPane {
+ 					this._onDidChangeViewWelcomeState.fire();
+ 				}
+ 				this._initializeTerminal(false);
+-				// we don't know here whether or not it should be focused, so
+-				// defer focusing the panel to the focus() call
+-				// to prevent overriding preserveFocus for extensions
+-				this._terminalGroupService.showPanel(false);
+ 			} else {
+ 				for (const instance of this._terminalGroupService.instances) {
+ 					instance.resetFocusContextKey();
 diff --git a/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts b/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
 index 206b113186c..ea5b8e7255c 100644
 --- a/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
@@ -1137,105 +1370,6 @@ index 206b113186c..ea5b8e7255c 100644
  	suite('getFont', () => {
  		test('fontFamily', () => {
  			const terminalConfigurationService = createTerminalConfigationService({
-diff --git a/src/vs/workbench/browser/parts/globalCompositeBar.ts b/src/vs/workbench/browser/parts/globalCompositeBar.ts
-index 48220d63dc3..d5b081e981f 100644
---- a/src/vs/workbench/browser/parts/globalCompositeBar.ts
-+++ b/src/vs/workbench/browser/parts/globalCompositeBar.ts
-@@ -53,7 +53,6 @@ export class GlobalCompositeBar extends Disposable {
- 	readonly element: HTMLElement;
- 
- 	private readonly globalActivityAction = this._register(new Action(GLOBAL_ACTIVITY_ID));
--	private readonly accountAction = this._register(new Action(ACCOUNTS_ACTIVITY_ID));
- 	private readonly globalActivityActionBar: ActionBar;
- 
- 	constructor(
-@@ -102,10 +101,6 @@ export class GlobalCompositeBar extends Disposable {
- 			preventLoopNavigation: true
- 		}));
- 
--		if (this.accountsVisibilityPreference) {
--			this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
--		}
--
- 		this.globalActivityActionBar.push(this.globalActivityAction);
- 
- 		this.registerListeners();
-@@ -132,27 +127,15 @@ export class GlobalCompositeBar extends Disposable {
- 	}
- 
- 	getContextMenuActions(): IAction[] {
--		return [toAction({ id: 'toggleAccountsVisibility', label: localize('accounts', "Accounts"), checked: this.accountsVisibilityPreference, run: () => this.accountsVisibilityPreference = !this.accountsVisibilityPreference })];
-+		return [];
- 	}
- 
- 	private toggleAccountsActivity() {
--		if (this.globalActivityActionBar.length() === 2 && this.accountsVisibilityPreference) {
--			return;
--		}
- 		if (this.globalActivityActionBar.length() === 2) {
- 			this.globalActivityActionBar.pull(GlobalCompositeBar.ACCOUNTS_ACTION_INDEX);
--		} else {
--			this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
- 		}
- 	}
- 
--	private get accountsVisibilityPreference(): boolean {
--		return isAccountsActionVisible(this.storageService);
--	}
--
--	private set accountsVisibilityPreference(value: boolean) {
--		setAccountsActionVisible(this.storageService, value);
--	}
- }
- 
- abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionViewItem {
-@@ -233,7 +216,7 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
- 		return this.contextMenuActionsProvider();
- 	}
- 
--	private async run(): Promise<void> {
-+	protected async run(): Promise<void> {
- 		const disposables = new DisposableStore();
- 		const menu = disposables.add(this.menuService.createMenu(this.menuId, this.contextKeyService));
- 		const actions = await this.resolveMainMenuActions(menu, disposables);
-@@ -600,6 +583,7 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
- 		@IKeybindingService keybindingService: IKeybindingService,
- 		@IInstantiationService instantiationService: IInstantiationService,
- 		@IActivityService activityService: IActivityService,
-+		@ICommandService private readonly commandService: ICommandService,
- 	) {
- 		const action = instantiationService.createInstance(CompositeBarAction, {
- 			id: GLOBAL_ACTIVITY_ID,
-@@ -657,6 +641,10 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
- 	protected override computeTitle(): string {
- 		return this.userDataProfileService.currentProfile.isDefault ? super.computeTitle() : localize('manage profile', "Manage {0} (Profile)", this.userDataProfileService.currentProfile.name);
- 	}
-+
-+	protected override async run(): Promise<void> {
-+		await this.commandService.executeCommand('ritemark.aiSettings');
-+	}
- }
- 
- export class SimpleAccountActivityActionViewItem extends AccountsActivityActionViewItem {
-@@ -711,7 +699,8 @@ export class SimpleGlobalActivityActionViewItem extends GlobalActivityActionView
- 		@IKeybindingService keybindingService: IKeybindingService,
- 		@IInstantiationService instantiationService: IInstantiationService,
- 		@IActivityService activityService: IActivityService,
--		@IStorageService storageService: IStorageService
-+		@IStorageService storageService: IStorageService,
-+		@ICommandService commandService: ICommandService
- 	) {
- 		super(() => simpleActivityContextMenuActions(storageService, false),
- 			{
-@@ -722,7 +711,7 @@ export class SimpleGlobalActivityActionViewItem extends GlobalActivityActionView
- 				}),
- 				hoverOptions,
- 				compact: true,
--			}, () => undefined, userDataProfileService, themeService, hoverService, menuService, contextMenuService, contextKeyService, configurationService, environmentService, keybindingService, instantiationService, activityService);
-+			}, () => undefined, userDataProfileService, themeService, hoverService, menuService, contextMenuService, contextKeyService, configurationService, environmentService, keybindingService, instantiationService, activityService, commandService);
- 	}
- }
- 
 diff --git a/src/vs/workbench/services/userDataProfile/common/userDataProfileIcons.ts b/src/vs/workbench/services/userDataProfile/common/userDataProfileIcons.ts
 index ef3388a877f..873b2dbf292 100644
 --- a/src/vs/workbench/services/userDataProfile/common/userDataProfileIcons.ts

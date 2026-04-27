@@ -20,10 +20,14 @@ WITH_ASSETS=false
 
 for arg in "$@"; do
   case "$arg" in
-    --force-ts|--all)
+    --all)
+      FORCE_TS=true
+      WITH_ASSETS=true
+      ;;
+    --force-ts)
       FORCE_TS=true
       ;;
-    --with-assets|--all)
+    --with-assets)
       WITH_ASSETS=true
       ;;
     -h|--help)
@@ -73,9 +77,15 @@ if [ -f "$PRODUCT_ICON_THEME" ]; then
   jq empty "$PRODUCT_ICON_THEME"
 fi
 
-PHOSPHOR_SOURCE="$PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2"
+PHOSPHOR_SOURCE="$VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2"
 if [ ! -f "$PHOSPHOR_SOURCE" ]; then
-  echo "ERROR: Missing Phosphor 200 source font: $PHOSPHOR_SOURCE" >&2
+  PHOSPHOR_SOURCE="$PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2"
+fi
+
+if [ ! -f "$PHOSPHOR_SOURCE" ]; then
+  echo "ERROR: Missing Phosphor 200 source font in either supported location:" >&2
+  echo "  - $VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2" >&2
+  echo "  - $PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2" >&2
   exit 1
 fi
 

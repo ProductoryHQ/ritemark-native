@@ -4,21 +4,19 @@ interface StatusSelectProps {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  { value: 'published', label: 'Published', color: 'bg-green-100 text-green-800 border-green-200' },
+  { value: 'draft', label: 'Draft', active: 'bg-amber-50 text-amber-700 border-amber-200', inactive: 'bg-surface text-ink-muted border-hairline hover:border-hairline-strong' },
+  { value: 'published', label: 'Published', active: 'bg-emerald-50 text-emerald-700 border-emerald-200', inactive: 'bg-surface text-ink-muted border-hairline hover:border-hairline-strong' },
 ]
 
 export function StatusSelect({ value, onChange }: StatusSelectProps) {
   return (
-    <div className="flex-1 flex gap-2">
+    <div className="flex gap-1.5">
       {STATUS_OPTIONS.map(option => (
         <button
           key={option.value}
           onClick={() => onChange(option.value)}
-          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-            value === option.value
-              ? option.color
-              : 'bg-white text-ink-muted border-hairline hover:border-hairline-strong'
+          className={`px-3 py-1.5 text-[12px] font-medium rounded-lg border transition-colors ${
+            value === option.value ? option.active : option.inactive
           }`}
         >
           {option.label}

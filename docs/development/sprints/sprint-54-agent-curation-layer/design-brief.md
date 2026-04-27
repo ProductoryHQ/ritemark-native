@@ -1,202 +1,224 @@
-# Design Brief — Sprint 54: Agent Curation Layer
+# Design Brief — Sprint 54: Agent Library
 
-Audience: a designer (internal or external) who has not read the strategic docs. This brief is self-contained. By the end of it, the designer should know what to produce, for whom, and within what constraints.
+Audience: a designer or implementer who has not followed the earlier Sprint 54 framing. This brief is self-contained and reflects the *current* sprint direction.
 
-## 1. What this is, in one paragraph
+## 0. Visual references that must be followed
 
-Ritemark Native is adding a *curation layer* for AI agents. Today users of Claude Code and OpenAI Codex accumulate dozens of markdown-file "agents" and "skills" scattered across their project and home directories. Nobody has built a UI to manage this pile. This sprint ships that UI — a library view where a power user can see everything they have across vendors, find duplicates, archive orphans, and flag canonical versions, without ever losing their files. It is not a builder, not an onboarding wizard, and not a runtime. It is a file-aware management surface — closer in spirit to a package manager, a git log, or a photo library than to a traditional settings page.
+The following Sprint 54 design files are not optional inspiration. They are the concrete visual direction for this sprint and must be followed during both design refinement and implementation:
 
-## 2. The one user to design for
+- `docs/development/sprints/sprint-54-agent-curation-layer/Next-gen — Default view (Light).png`
+- `docs/development/sprints/sprint-54-agent-curation-layer/Next-gen — Agent Management view (Light).png`
+
+Use them as the primary source for:
+
+- Agent Library sidebar structure and tone
+- toolbar toggle placement and behavior
+- side-by-side Properties panel layout
+- the relationship between library selection, Properties, and the markdown editor
+
+If implementation needs to deviate from these references, the deviation should be explicitly documented in the sprint notes rather than silently improvised.
+
+## 1. What this sprint is now
+
+Sprint 54 is **not** about inventing a brand-new agent-management application inside Ritemark.
+
+It is the first step toward that direction:
+
+- surface discovered **agents** and **skills** in an **Agent Library** sidebar
+- open those markdown files in Ritemark's **existing markdown editor**
+- move **frontmatter editing** from the current dialog into the editor area as a **side-by-side Properties panel**
+- update the editor toolbar so the user can switch between **TOC** and **Properties**
+
+This is a file-native, markdown-first improvement. The core editing surface remains the existing editor.
+
+## 2. The product idea in one paragraph
+
+Ritemark already has the important primitive: a markdown editor. Agents and skills are markdown files. So instead of building a parallel custom management UI, Sprint 54 should treat those files like first-class documents. The user browses them through an **Agent Library** sidebar, opens one in the editor, and edits both body content and frontmatter from the same overall workspace. The only new UI concept is a **Properties** side panel inside the editor area, reusing the existing frontmatter-editing capability but surfacing it inline instead of in a dialog.
+
+## 3. The one user to design for
 
 **Viktor, veteran Claude Code + Codex user.**
 
-Read `docs-internal/user-flows.md` (the Viktor section) for the full scenes. The short version:
+Short version:
 
-- He has ~30 agents and ~15 skills accumulated over a year, spread across `~/.claude/agents/`, project-local `.claude/`, Codex `AGENTS.md`, and possibly `.agents/skills/`
-- He half-remembers what each one does. He is terrified of deleting anything in case something still depends on it
-- He can't find the good code-reviewer he wrote three months ago
-- His emotional state entering the app is mild dread; his win moment is seeing "32" drop to "19 canonical + 11 archived" and breathing out
-- He is not creating his first agent — he is doing archaeology on his existing pile
+- He already has a pile of agent and skill markdown files
+- He wants to inspect and refine them without losing the sense that they are just files
+- He does **not** want a flashy bespoke management experience if the existing editor already solves the job
+- He values transparency and directness over abstraction
 
-**Viktor does not need encouragement. He needs visibility, transparency, and tools.**
+His ideal feeling is: *"Good — I can see the library, open the file, edit the properties, edit the markdown, done."*
 
-## 3. Design principles (non-negotiable)
+## 4. Core design decision
 
-0. **Use the Ritemark design skill.** Before drawing, read `.claude/skills/ritemark-design/SKILL.md` and browse `.claude/skills/ritemark-design/preview/` for live token + component references. The skill is the visual vocabulary — Indigo-current palette, light + dark, shadcn-on-Indigo components, muted-tone hierarchy, density-first spacing. Every color, radius, and spacing unit in your wireframes should resolve to a token from the skill's `tokens.css`. If something the Library needs isn't in the skill yet, surface it — the skill gets extended, not ignored. Origin study: `docs-internal/analysis/design-study/`.
+### 4.1 Reuse the existing editor
 
-1. **Round-trip guarantee visible.** Every screen has an "Edit as markdown" action that opens the underlying file in Ritemark's markdown editor. This is not a power-user easter-egg — it is always visible. It is the trust signal that the UI is a view over files, not a cage around them. Full explanation: `docs-internal/round-trip-guarantee.md`.
+The center of gravity stays in the current markdown editor. Sprint 54 should not introduce a separate custom agent-details screen as the primary editing model.
 
-2. **File paths always on screen.** On every row, every dialog, every diff view — the absolute file path is visible (hover reveals full path if truncated). No hidden state. Viktor must always know which file he's looking at.
+### 4.2 Properties editing moves from dialog to side-by-side
 
-3. **No destructive operation without a preview.** Every move, delete, archive, or bulk op opens a dry-run dialog listing the exact filesystem operations about to be performed. The user must confirm. There is always an undo path (audit log + trash with recovery window).
+Ritemark already has frontmatter editing functionality. In this sprint, that capability should be brought into the main editor experience as a **side-by-side Properties panel**.
 
-4. **Density over decoration.** This is a power-user screen. Think GitHub's repo insights, Linear's list views, VS Code's source-control panel — not a marketing landing page. Scannable rows, small type weight variations, color used sparingly and functionally (vendor badges, health states).
+### 4.3 TOC and Properties are mutually exclusive
 
-5. **Honest about vendor differences.** When a field is Claude-only (`isolation: worktree`) or Codex-only (sandbox policy), show it as such with a small badge. Don't invent a "unified" field that hides the asymmetry. Don't hide vendor-specific fields — relegate them, don't bury them.
+Inside the editor region, the user can have:
 
-6. **Empty states must not feel broken.** A user with zero `.claude/` files is a legitimate state (they exist but haven't made any agents yet). The empty library should be quiet and unassuming — a single "Nothing here yet. Agents will appear as you create them" message, not a marketing card.
+1. **Markdown only**
+2. **Markdown + TOC**
+3. **Markdown + Properties**
 
-## 4. Required screens
+The **TOC panel** and **Properties panel** cannot be open at the same time. They occupy the same side slot.
 
-Deliver wireframes and interaction notes for each of these. Low-fi is fine; the goal is to enable implementation, not to produce production-ready polish.
+### 4.4 Generic markdown frontmatter editor
 
-### 4.1 Library view — populated state
+Although the sprint is driven by agents and skills, the Properties panel is a **generic markdown frontmatter editor**. It is not conceptually limited to agent files.
 
-The primary surface. Dense, sortable table of every discovered agent/skill/command.
+## 5. Design principles
 
-Must include:
-- Count banner at top ("Agents: 32 · Skills: 15 · Commands: 9")
-- Filter rail (scope, vendor, status, health)
-- Sortable columns: Name, Scope, Vendor, Last modified, Last run, Duplicates, Source (path)
-- Multi-select for bulk ops
-- Per-row actions: Edit as markdown, Open, Set canonical, View diff (if duplicate), plus Archive/Delete only when the source is writable in this sprint
-- Health badges (duplicated, broken frontmatter, stale)
-- Vendor badges (Claude, Codex, Gemini stub)
-- Canonical flag indicator
-- Footer with selection count and bulk-op menu
-- Read-only indicator on sources that cannot be mutated in this sprint (`AGENTS.md`, plugin dirs, repo-tracked vendor files)
+1. **Markdown editor stays primary.** The sprint should feel like an extension of the existing document workflow, not a detour away from it.
+2. **Files stay legible.** The user should never lose the sense that agents and skills are markdown files being edited directly.
+3. **Properties are inline, not hidden in a modal.** Frontmatter editing should feel present and immediate.
+4. **One side panel at a time.** Avoid visual clutter. TOC and Properties share the same role and should not compete.
+5. **Agent Library is a browser, not yet a full management console.** This sprint is about surfacing and editing, not about archive flows, diff tooling, or destructive bulk operations.
+6. **Generic before special-case.** The Properties panel should be described as generic frontmatter editing that happens to be especially useful for agents and skills.
 
-Consider: how does the sidebar width constraint affect column visibility? What collapses first, what stays?
+## 6. Required surfaces
 
-### 4.2 Library view — empty state
+Deliver wireframes and implementation notes for these states.
 
-A user in a fresh repo with no `.claude/` content. No excited call-to-action. Just honest quietness.
+### 6.1 Agent Library sidebar — populated state
 
-### 4.3 Duplicate diff view
-
-Side-by-side comparison of two (or more) agents with the same name in different scopes.
+The left-side library/browser for discovered markdown-based items.
 
 Must include:
-- Frontmatter comparison — differing fields highlighted
-- Body comparison — unified or split diff, user's choice
-- Metadata strip: scope, path, last modified, last run, file size, line count for each
-- Clear primary recommendation ("Project version is newer and more detailed") when the choice is obvious
-- Explicit action set: promote / demote / delete / merge manually / mark not-duplicate
-- Whatever action is picked triggers the dry-run dialog (4.5)
 
-### 4.4 Orphan / stale sweep view
+- clear title: **Agent Library**
+- summary counts for discovered categories (at minimum agents and skills; commands only if they are still part of the actual implementation scope)
+- filter/search input
+- grouped sections such as **Agents** and **Skills**
+- row metadata sufficient to distinguish items (for example vendor, scope, source, warnings)
+- clear selected state
+- ability to open an item in the markdown editor
 
-A focused view filtered to agents that haven't been invoked in 90+ days.
+Important framing: this is a **library browser / selector**, not a dense data table.
 
-Must include:
-- Heuristic explanation ("Not invoked in the last 90 days") with a learn-more
-- Per-row archive / delete / mark-active actions for writable rows only
-- Bulk archive action
-- Reassurance about reversibility ("Archived files stay under the same root and can be restored")
+### 6.2 Agent Library sidebar — empty state
 
-### 4.5 Bulk-op dry-run dialog
+Show the honest no-content state for a workspace with no discovered agent/skill files.
 
-Shown before any destructive operation commits.
+It should be quiet and practical — no onboarding campaign energy.
 
-Must include:
-- Plain-language summary of what's about to happen
-- Exact filesystem operations listed ("move `~/.claude/agents/foo.md` → `~/.claude/.archive/2026-04-22/foo.md`")
-- Count of affected files
-- Cancel and Confirm actions; Confirm is not the default focused button (prevent muscle-memory commits)
-- If operation is reversible, say so explicitly
-- If a row is read-only, do not show destructive actions; explain why instead of teasing a disabled control
+### 6.3 Editor — markdown only
 
-### 4.6 Agent detail view (provenance panel)
+The baseline state with neither TOC nor Properties open.
 
-Clicking a row opens a side panel with the agent's detail.
+Show:
 
-Must include:
-- Name, description, scope, vendor, file path
-- Provenance: created-at, created-from (template ref if any), last-invoked-at, invocation count
-- If provenance is derived from Ritemark state rather than file frontmatter, label it clearly as derived/read-only
-- Frontmatter fields visualized (common fields prominent; vendor-specific fields in a collapsible "Advanced" section)
-- Body preview (first ~10 lines; "Edit as markdown" to see all)
-- Actions: Edit as markdown, Set canonical, Duplicate, plus Archive/Delete only when the source is writable in this sprint
-- Drift warning if this is a non-canonical duplicate of a canonical agent
+- existing markdown editor as primary surface
+- toolbar controls that make the side-panel modes discoverable
 
-### 4.7 "Edit as markdown" transition
+### 6.4 Editor — TOC mode
 
-This is not a new screen — it's the handoff from the Library view into Ritemark's existing markdown editor. Design the transition:
+The existing TOC shown in the editor-side slot.
 
-- Where does the editor open? (New tab? Replace current?)
-- How does the user know they can come back to the Library?
-- Is there a visual link between the editor tab and the Library row?
-- When they save and switch back, how does the row visually acknowledge the change?
+Must communicate:
 
-### 4.8 Canonical flag surfacing
+- TOC is the current active side mode
+- the markdown document remains primary
+- the user can switch to Properties from the same toolbar area
 
-- How is a canonical agent visually distinct in the list? (Small icon? Dot? Label?)
-- Where does the "Set as canonical" action live? (Row action menu? Detail panel? Both?)
-- How is a drift warning presented on non-canonical siblings? (Inline badge? Tooltip? Separate banner?)
+### 6.5 Editor — Properties mode
 
-## 5. Reference material (inspiration, not copy)
+The new target state for this sprint.
 
-- **Cursor 3's Agents Window** — tiled multi-agent view for power users
-- **Zapier Agents "Pods" and "Needs action" filter** — grouping and focused attention patterns
-- **GitHub's repo insights / traffic tab** — dense power-user table with filters
-- **Linear's issue list** — keyboard-first, dense, sortable, multi-select
-- **VS Code's Source Control panel diff** — file-path visible, inline diff, action menu
-- **Kaleidoscope / Beyond Compare** — file-level diff UX patterns
-- **Obsidian's graph view / file-management panels** — markdown-native management UX
+Must show:
 
-The pattern to take from each is named; do not replicate any of them wholesale. This is not Cursor for agents.
+- a **Properties** side panel occupying the same slot where TOC normally appears
+- editable frontmatter fields
+- the markdown body still visible alongside it
+- clear visual continuity with the document being edited
 
-## 6. What to deliver
+Important: this should be explicitly described as **taking the existing frontmatter dialog capability and surfacing it side-by-side in the editor**.
 
-At the end of the design phase, land these in `notes/` inside the sprint folder:
+### 6.6 Toolbar toggle behavior
 
-1. Wireframes (Figma link or exported PNGs) for each required screen in 4.1–4.8
-2. Short written rationale per screen — what the screen is solving, which principles it honors, which trade-offs were made
-3. Interaction notes for destructive ops (4.3, 4.4, 4.5) — what happens on hover, confirm, cancel, keyboard shortcuts, accidental-click prevention
-4. Empty-state wireframe + write-up (4.2)
-5. Responsive / width-constrained behavior notes — Ritemark's left sidebar is narrow; the Library may need to break out into the editor area. Propose a placement decision with rationale.
-6. Dark-mode + light-mode variants where color is load-bearing
-7. A list of any *new* open questions surfaced during design that the implementation plan should address
+Design the toolbar state model.
 
-## 7. What NOT to design
+Must communicate:
 
-- No creation flow. No "New Agent" form, wizard, or template picker. Those belong to v1-C in a later sprint.
-- No templates gallery. Don't even suggest one — it's a strategic commitment that hasn't been made yet.
-- No onboarding nudges, "get started" cards, or first-run tutorials.
-- No redesign of Ritemark's markdown editor.
-- No changes to the existing AgentSelector, ChatView, or Flows UI — those must remain visually and functionally untouched.
-- No *@agent* in-document invocation. That's v1-C.
-- No push / context-triggered suggestion surface. That's v1-D.
-- No per-agent analytics dashboard beyond a simple invocation count. Dashboards are v1-D.
-- No speculation about Gemini. Stub vendor badge only.
+- how the user opens TOC
+- how the user opens Properties
+- how the user returns to markdown-only mode
+- that **TOC and Properties are mutually exclusive**
 
-If you feel an instinct to add any of these, note it in the open-questions list at the end and keep designing Option B.
+### 6.7 File selection flow
 
-## 8. Open questions you can weigh in on
+Design the flow from Agent Library row selection into the editor.
 
-These are things the implementation plan has listed as unresolved. The designer has standing to influence them:
+Must answer:
 
-1. **Placement**: is the Library a new VS Code view container (new activity-bar icon), a panel inside the existing AI sidebar, a dedicated editor tab, or some combination? Propose and defend a choice.
-2. **Column overflow**: which columns survive a narrow sidebar? What's the minimum-viable column set? When does the table break out into the editor area?
-3. **Vendor badging**: how distinct but not decorative? Small colored dot? Single-letter pill? Full-word tag? Something else?
-4. **Destructive-op friction**: how much friction is right? One confirm click is too little; typing "DELETE" is too much. Where's the sweet spot for Viktor?
-5. **Diff view density**: Kaleidoscope-like full split, or collapse unchanged frontmatter fields? If collapsing, how does the user expand?
-6. **Canonical flag icon**: ★? Pin icon? Lock icon? Or something purely non-iconic?
-7. **Audit log surfacing**: is there a UI for browsing the audit log, or is it file-only? If UI, where does it live?
+- what opens when a library item is selected
+- how the selected library item stays visually linked to the open document
+- how selection/open state behaves across tabs
 
-## 9. Success criteria for the design
+### 6.8 Generic frontmatter behavior
 
-- [ ] A developer reading the wireframes + notes can begin Phase 3 implementation without asking further design questions
-- [ ] Viktor's flow in `docs-internal/user-flows.md` is walkable end-to-end through the wireframes
-- [ ] The round-trip guarantee (`docs-internal/round-trip-guarantee.md`) is visibly honored on every screen
-- [ ] Every destructive op has an associated preview / undo affordance designed
-- [ ] Empty, partial, and populated states are all drawn
-- [ ] No feature outside Option B scope has been added
+Show or document how the Properties panel behaves for:
 
-## 10. Process
+- agent markdown files
+- skill markdown files
+- a general markdown document with frontmatter
 
-- Deliver drafts into `notes/wireframes-v1/` (or similar) inside the sprint folder
-- Expect iteration — the Phase 2 approval gate depends on both architecture and design being ready together
-- Final design ships with the `notes/architecture.md` output; both go to Jarmo for Phase 2 → 3 approval
-- Implementation does not start until Jarmo explicitly approves
+The goal is to reinforce that this is a **generic editor capability**, not a one-off agent form.
 
-## 11. Contact / context
+## 7. What this sprint is not designing
 
-- Product owner: Jarmo
-- Sprint manager: see `sprint-plan.md`
-- Strategic framing: `docs-internal/insights.md`, `docs-internal/insights-2.md`
-- Design principle (non-negotiable): `docs-internal/round-trip-guarantee.md`
-- Primary persona: Viktor, `docs-internal/user-flows.md`
-- Full v1 altitude menu (what's NOT in this sprint): `docs-internal/roadmap.md`
+- No duplicate diff workflow
+- No orphan/stale sweep workflow
+- No archive/delete bulk-op UX
+- No provenance dashboard
+- No canonical-management workflow beyond whatever minimal metadata is already naturally visible in the file/editing model
+- No new custom "agent detail" page replacing the editor
+- No creation wizard or template gallery
+- No redesign of the markdown editor itself beyond integrating the Properties mode into the existing layout and toolbar
 
-Questions welcome. Ambiguity is worse than friction — if anything in this brief is unclear, surface it immediately rather than guessing.
+Those may come later. Sprint 54 is the first-step surface.
+
+## 8. Open design questions this brief already answers
+
+These should now be treated as resolved for Sprint 54:
+
+1. **Placement**: the Agent Library should surface as a sidebar/library browser, while editing happens in the existing markdown editor.
+2. **Primary editing model**: not a new custom UI; use the markdown editor.
+3. **Frontmatter editing**: reuse the existing frontmatter editor and move it from dialog to side-by-side.
+4. **TOC coexistence**: TOC and Properties are mutually exclusive.
+
+## 9. What to deliver
+
+At minimum, deliver:
+
+1. Wireframes for the required surfaces in Section 6
+2. Short rationale per surface
+3. Toolbar interaction notes for TOC/Properties switching
+4. Empty-state notes
+5. Width/responsive notes for the sidebar and editor-side panel
+6. Any implementation-sensitive notes about generic frontmatter rendering in the Properties panel
+7. Explicit confirmation that the deliverables stay aligned with:
+   - `Next-gen — Default view (Light).png`
+   - `Next-gen — Agent Management view (Light).png`
+
+## 10. Success criteria for the design
+
+- [ ] A developer can implement Sprint 54 without assuming a brand-new management UI
+- [ ] The Agent Library is clearly framed as a sidebar browser/selector
+- [ ] The existing markdown editor is clearly framed as the primary editing surface
+- [ ] The Properties panel is clearly defined as the existing frontmatter editor moved from dialog into a side-by-side editor mode
+- [ ] TOC and Properties are clearly specified as mutually exclusive
+- [ ] The resulting design reads as generic markdown/frontmatter editing, not agent-only form building
+
+## 11. Implementation note that must be explicit
+
+The brief and sprint plan should both say this plainly:
+
+> Sprint 54 takes the frontmatter editing capability that currently lives in a dialog and implements it as a side-by-side editor mode inside the existing markdown editor.
+
+That is the core scope change.
