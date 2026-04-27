@@ -11,6 +11,15 @@ Date: 2026-04-25
 
 Recommendation at audit start: treat `1.117.0` as the practical implementation target until a `1.118.0` tag is available and confirmed. Track `1.118` as near-term follow-up intelligence, not as the first implementation target.
 
+Audit checkpoint after local spike:
+
+- `vscode/` submodule initialized successfully in the Sprint 57 worktree.
+- Local base confirmed from `vscode/package.json`: `1.109.5`.
+- Existing patch stack baseline is healthy: `6/6` patches pass `./scripts/apply-patches.sh --dry-run` on `1.109.5`.
+- Target spike on `1.117.0` produced `5` conflicting patches and `1` clean patch.
+- Clean patch on `1.117.0`: `004-ritemark-build-system.patch`.
+- Conflicted patches on `1.117.0`: `001`, `002`, `003`, `005`, `006`.
+
 ## Executive Summary
 
 There is enough user-facing value to justify a new upstream update sprint, but the value is concentrated in agentic workflows rather than traditional editor chrome.
@@ -153,6 +162,36 @@ Product stance:
 
 - Include in upgrade, but do not market unless it unlocks a visible Ritemark improvement.
 
+## User-Value Shortlist
+
+### Ship
+
+- Better agent debug/logging foundation:
+  - useful for Ritemark session diagnostics and supportability
+  - low product risk if kept mostly infrastructural
+- Background command clarity:
+  - terminal titles and system notifications for long-running tasks help users trust agent workflows
+- Image/binary context handling:
+  - strong fit for screenshot review, export QA, and multimodal document work
+- MCP / network / permission controls:
+  - valuable for trust, enterprise posture, and calmer defaults
+- Terminal reliability and browser-tooling base improvements:
+  - ship as passive platform quality, not as noisy new UI
+
+### Explore
+
+- Ritemark-owned agent activity trail or debug history UI
+- Ritemark-specific customizations / team writing policies layer
+- Using upstream carousel/browser/media primitives inside flows and review workflows
+- Selective exposure of integrated browser entry points where they clearly help content workflows
+
+### Ignore For Now
+
+- Generic Copilot positioning or marketing-style upstream AI surfaces
+- Plugin marketplace-style discovery/install flows
+- Autopilot-like autonomy that weakens Ritemark's safety or editorial control model
+- TypeScript 7 nightly / early experimental model-selection surfaces with no user-facing Ritemark value
+
 ## Specific Ritemark Watchpoints
 
 ### Terminal placement invariant
@@ -211,6 +250,38 @@ Reasons:
 
 Fallback target: `1.116.0` if `1.117.0` creates patch or build instability disproportionate to the incremental value.
 
+## Implementation Checkpoint
+
+Upgrade spike result as of 2026-04-25:
+
+- `1.117.0` patch stack repaired successfully.
+- `001` through `006` are all applied in the Sprint 57 worktree.
+- `./scripts/apply-patches.sh --dry-run` reports all patches as already applied.
+- `./scripts/validate-qa.sh` passes on the upgraded tree.
+
+Validation also surfaced two workflow-level requirements for future implementation/review work:
+
+1. `vscode/.nvmrc` now expects Node `22.22.1`.
+2. Fresh Sprint 57-style worktrees need both:
+   - `extensions/ritemark` dependencies installed
+   - `vscode/` dependencies installed
+
+## Patch Spike Summary
+
+Observed local dry-run results:
+
+| Base | Result |
+| --- | --- |
+| `1.109.5` | `6/6` patches apply cleanly |
+| `1.117.0` | `1/6` patches apply cleanly; `5/6` conflict |
+
+Initial interpretation:
+
+- The upgrade is still feasible.
+- It is not a low-touch patch refresh.
+- Most of the work is concentrated in branding/chrome/menu/startup patches rather than the build-system patch.
+- This matches the product risk profile already suspected from release-note review: upstream changed agent/titlebar/menu/welcome/terminal surfaces materially between `1.109.5` and `1.117.0`.
+
 ## Implementation Prep Checklist
 
 - [ ] Initialize `vscode/` submodule in sprint worktree.
@@ -220,10 +291,27 @@ Fallback target: `1.116.0` if `1.117.0` creates patch or build instability dispr
 - [ ] Move `vscode/` to `1.117.0`.
 - [ ] Run `./scripts/apply-patches.sh --dry-run`.
 - [ ] Classify patch failures before editing.
+- [ ] Write up patch-risk classifications for `001`, `002`, `003`, `005`, `006`.
 - [ ] Repair patches in order, smallest patch first.
 - [ ] Run compile checks relevant to VS Code shell.
 - [ ] Smoke test dev app startup, markdown editor, AI sidebar, terminal placement, About dialog, and menu cleanup.
 - [ ] Run `./scripts/validate-qa.sh` before readiness handoff.
+
+## Follow-Up Implementation Checklist
+
+1. Capture a merge-ready summary of what was preserved versus intentionally changed in `002` and `003`.
+2. Decide whether the worktree-local setup fixes should become scripted:
+   - recreate `vscode/extensions/ritemark` link automatically
+   - document or automate `extensions/ritemark` install
+   - document or automate `vscode/` install
+3. Add local workflow note that Sprint 57 upgrade work expects Node `22.22.1` from `vscode/.nvmrc`.
+4. Run targeted smoke tests for:
+   - startup and reload
+   - terminal placement invariants
+   - AI sidebar / auxiliary bar behavior
+   - About dialog and branding
+   - menu cleanup and `View > Advanced`
+5. Decide which upstream agent/media/browser capabilities become explicit Ritemark product bets in the next sprint slice.
 
 ## Source Notes
 
@@ -237,4 +325,3 @@ Fallback target: `1.116.0` if `1.117.0` creates patch or build instability dispr
 - `1.116`: https://code.visualstudio.com/updates/v1_116
 - `1.117`: https://code.visualstudio.com/updates/v1_117
 - `1.118`: https://code.visualstudio.com/updates/v1_118
-

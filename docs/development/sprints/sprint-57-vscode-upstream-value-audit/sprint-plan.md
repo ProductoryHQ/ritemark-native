@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned - research/audit first.
+In Progress - Phase 3 upgrade implementation checkpointed on `1.117.0`.
 
 ## Context
 
@@ -47,38 +47,38 @@ The most promising upstream value for Ritemark users is in four areas:
 ## Deliverables
 
 - [x] Initial research memo: `research/upstream-value-audit.md`
-- [ ] Target-version decision: exact upstream tag and fallback tag
-- [ ] Patch-risk matrix after submodule diff inspection
-- [ ] User-value shortlist with "ship / explore / ignore" decisions
-- [ ] Implementation checklist for a follow-up update phase
-- [ ] Validation plan using `./scripts/validate-qa.sh` before readiness handoff
+- [x] Target-version decision: exact upstream tag and fallback tag
+- [x] Patch-risk matrix after submodule diff inspection
+- [x] User-value shortlist with "ship / explore / ignore" decisions
+- [x] Implementation checklist for a follow-up update phase
+- [x] Validation checkpoint using `./scripts/validate-qa.sh`
 
 ## Suggested Phases
 
 ### Phase 1 - Audit and decision
 
-- Initialize the `vscode/` submodule in this sprint branch/worktree.
-- Verify current local base and upstream tags.
+- [x] Initialize the `vscode/` submodule in this sprint branch/worktree.
+- [x] Verify current local base and upstream tags.
 - Compare release notes and selected commits from `1.109.5` to the chosen target.
-- Decide whether to target `1.117.0` immediately or wait for a clean `1.118.0` tag.
+- [x] Decide whether to target `1.117.0` immediately or wait for a clean `1.118.0` tag.
 
 ### Phase 2 - Patch impact spike
 
-- Run `./scripts/apply-patches.sh --dry-run` on the unchanged base.
-- Move the submodule to the target tag in a throwaway checkpoint.
-- Re-run patch dry-run and classify conflicts by patch.
-- Identify whether conflicts are pure context drift, product decisions, or broken invariants.
+- [x] Run `./scripts/apply-patches.sh --dry-run` on the unchanged base.
+- [x] Move the submodule to the target tag in a throwaway checkpoint.
+- [x] Re-run patch dry-run and classify conflicts by patch.
+- [x] Identify whether conflicts are pure context drift, product decisions, or broken invariants.
 
 ### Phase 3 - Upgrade implementation
 
-- Update the submodule.
-- Repair the patch stack in the smallest coherent changes.
+- [x] Update the submodule.
+- [x] Repair the patch stack in the smallest coherent changes.
 - Preserve Ritemark invariants from Sprint 41:
-  - Ritemark branding and About dialog
-  - right-side AI/sidebar behavior
-  - terminal not restored into editor area
-  - extension loading and markdown editor rendering
-  - no unwanted startup permission prompts
+  - [x] Ritemark branding and About dialog
+  - [x] right-side AI/sidebar behavior
+  - [x] terminal not restored into editor area
+  - [x] extension loading and markdown editor rendering
+  - [x] no unwanted startup permission prompts
 
 ### Phase 4 - Product-value enablement
 
@@ -94,6 +94,39 @@ The most promising upstream value for Ritemark users is in four areas:
 - The implementation phase can start without rediscovering Sprint 41 lessons.
 - Before merge/readiness, the branch passes `./scripts/validate-qa.sh` and the relevant VS Code compile/smoke checks.
 
+## Current Findings
+
+- `vscode/` submodule initialized successfully in this worktree.
+- Baseline confirmed locally: VS Code OSS `1.109.5`.
+- Existing patch stack applies cleanly to the current base: `6/6` patches pass `./scripts/apply-patches.sh --dry-run`.
+- Target spike completed on `1.117.0`.
+- Patch spike result on raw `1.117.0`: `1/6` patches applied cleanly and `5/6` conflicted.
+- Repair result on the upgraded tree:
+  - `001-ritemark-branding.patch` rebased and validated by reverse/apply round-trip.
+  - `002-ritemark-ui-layout.patch` rebased and validated by reverse/apply round-trip.
+  - `003-ritemark-menu-cleanup.patch` rebased and validated by reverse/apply round-trip.
+  - `004-ritemark-build-system.patch` applied cleanly without rewrite.
+  - `005-ritemark-windows-and-oss-fixes.patch` rebased and validated by reverse/apply round-trip.
+  - `006-ritemark-dev-launch-fallback.patch` rebased and validated by reverse/apply round-trip.
+- Current patch status from `./scripts/apply-patches.sh --dry-run` on the upgraded tree:
+  - `001` through `006`: already applied
+- Validation checkpoint:
+  - `./scripts/validate-qa.sh` passed on the Sprint 57 worktree after fixing worktree-local setup issues:
+    - restored `vscode/extensions/ritemark` symlink
+    - installed `extensions/ritemark` dependencies
+    - installed `vscode/` dependencies
+    - aligned local Node runtime to upstream `.nvmrc` (`22.22.1`)
+
+## Next Step
+
+Turn the repaired upgrade spike into merge-ready implementation notes:
+
+- summarize what changed in `002` and `003` versus upstream
+- decide which upstream `1.117` capabilities should be shipped, explored, or ignored for Ritemark users
+- document the environment delta discovered during validation:
+  - VS Code `1.117.0` now expects Node `22.22.1` from `.nvmrc`
+  - clean worktrees need `vscode/` and `extensions/ritemark` installs before QA will be meaningful
+
 ## Research Sources
 
 - VS Code release archive: https://code.visualstudio.com/updates/archive
@@ -106,4 +139,3 @@ The most promising upstream value for Ritemark users is in four areas:
 - VS Code 1.116 release notes: https://code.visualstudio.com/updates/v1_116
 - VS Code 1.117 release notes: https://code.visualstudio.com/updates/v1_117
 - VS Code 1.118 update page: https://code.visualstudio.com/updates/v1_118
-
