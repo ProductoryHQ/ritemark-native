@@ -2,9 +2,10 @@
 name: pr-reviewer
 description: >
   PR review and merge agent. Invoke when user mentions: review PR, merge PR,
-  check PR, approve PR. Reviews code changes, checks for issues, and manages
-  the merge workflow. Can also be used to review incoming PRs from other contributors.
-tools: Read, Bash, Glob, Grep
+  check PR, approve PR. Reviews code changes, checks for issues, and manages the
+  merge workflow. Can also be used to review incoming PRs from other
+  contributors.
+tools: 'Read, Bash, Glob, Grep'
 model: sonnet
 ---
 

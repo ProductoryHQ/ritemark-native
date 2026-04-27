@@ -6,12 +6,19 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
+
+export type ItemScope = 'project' | 'user';
 
 export interface DiscoveredAgent {
   id: string;
   name: string;
   description: string;
+  filePath: string;
+  scope: ItemScope;
+  hasFrontmatter: boolean;
+  isMainAgent: boolean;
 }
 
 export interface DiscoveredCommand {
@@ -19,6 +26,9 @@ export interface DiscoveredCommand {
   name: string;
   description: string;
   source: 'commands' | 'skills';
+  filePath: string;
+  scope: ItemScope;
+  hasFrontmatter: boolean;
 }
 
 /**
@@ -30,7 +40,7 @@ function parseFrontmatter(content: string): Record<string, string> {
   if (!match) return {};
 
   const result: Record<string, string> = {};
-  const lines = match[1].split('\n');
+  const lines = match[1].split('\n').map(l => l.replace(/\r$/, ''));
   let currentKey = '';
   let currentValue = '';
 
@@ -44,8 +54,7 @@ function parseFrontmatter(content: string): Record<string, string> {
       }
       currentKey = kvMatch[1];
       currentValue = kvMatch[2].trim();
-      // Handle multi-line value indicator (>)
-      if (currentValue === '>') {
+      if (currentValue === '>' || currentValue === '>-' || currentValue === '|' || currentValue === '|-') {
         currentValue = '';
       }
     } else if (currentKey && line.match(/^\s+/)) {
@@ -73,25 +82,71 @@ function toDisplayName(id: string): string {
 }
 
 /**
- * Scan .claude/agents/ for sub-agent definitions.
+ * Check if a file is a CLAUDE.md (main agent config).
  */
-export function discoverAgents(workspacePath: string): DiscoveredAgent[] {
-  const agentsDir = path.join(workspacePath, '.claude', 'agents');
-  if (!fs.existsSync(agentsDir)) return [];
+function isClaudeMd(filePath: string): boolean {
+  return path.basename(filePath).toLowerCase() === 'claude.md';
+}
 
+/**
+ * Check if content has valid YAML frontmatter (between --- markers).
+ */
+function hasFrontmatterBlock(content: string): boolean {
+  return /^---\s*\n[\s\S]*?\n---/.test(content);
+}
+
+/**
+ * Scan a single .claude/ root for agent definitions.
+ * Looks in .claude/agents/ for .md files and also checks for CLAUDE.md at the root.
+ */
+function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredAgent[] {
   const agents: DiscoveredAgent[] = [];
+
+  // Check for CLAUDE.md at the .claude/ parent (project root or home dir)
+  const parentDir = path.dirname(claudeRoot);
+  const claudeMdPath = path.join(parentDir, 'CLAUDE.md');
+  if (fs.existsSync(claudeMdPath)) {
+    try {
+      const content = fs.readFileSync(claudeMdPath, 'utf-8');
+      const frontmatter = parseFrontmatter(content);
+      agents.push({
+        id: 'CLAUDE',
+        name: 'CLAUDE.md',
+        description: frontmatter.description || 'Main agent configuration',
+        filePath: claudeMdPath,
+        scope,
+        hasFrontmatter: hasFrontmatterBlock(content),
+        isMainAgent: true,
+      });
+    } catch {
+      // Skip
+    }
+  }
+
+  const agentsDir = path.join(claudeRoot, 'agents');
+  if (!fs.existsSync(agentsDir)) return agents;
 
   try {
     const files = fs.readdirSync(agentsDir).filter((f) => f.endsWith('.md'));
     for (const file of files) {
       try {
-        const content = fs.readFileSync(path.join(agentsDir, file), 'utf-8');
+        const filePath = path.join(agentsDir, file);
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const hasFm = hasFrontmatterBlock(content);
         const frontmatter = parseFrontmatter(content);
         const id = frontmatter.name || path.basename(file, '.md');
         const name = toDisplayName(id);
         const description = frontmatter.description || '';
 
-        agents.push({ id, name, description });
+        agents.push({
+          id,
+          name,
+          description,
+          filePath,
+          scope,
+          hasFrontmatter: hasFm && !!description,
+          isMainAgent: isClaudeMd(filePath),
+        });
       } catch {
         // Skip files that can't be read
       }
@@ -100,36 +155,56 @@ export function discoverAgents(workspacePath: string): DiscoveredAgent[] {
     // Directory not readable
   }
 
+  return agents;
+}
+
+/**
+ * Scan both workspace and user-level .claude/agents/ for agent definitions.
+ */
+export function discoverAgents(workspacePath: string | undefined): DiscoveredAgent[] {
+  const agents: DiscoveredAgent[] = [];
+
+  if (workspacePath) {
+    const projectClaude = path.join(workspacePath, '.claude');
+    agents.push(...discoverAgentsInRoot(projectClaude, 'project'));
+  }
+
+  const userClaude = path.join(os.homedir(), '.claude');
+  if (fs.existsSync(userClaude)) {
+    agents.push(...discoverAgentsInRoot(userClaude, 'user'));
+  }
+
   return agents.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
- * Scan .claude/commands/ and .claude/skills/ for custom slash commands.
+ * Scan a single .claude/ root for commands and skills.
  */
-export function discoverCommands(workspacePath: string): DiscoveredCommand[] {
+function discoverCommandsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredCommand[] {
   const commands: DiscoveredCommand[] = [];
-  const seen = new Set<string>();
 
   // Scan .claude/commands/*.md
-  const commandsDir = path.join(workspacePath, '.claude', 'commands');
+  const commandsDir = path.join(claudeRoot, 'commands');
   if (fs.existsSync(commandsDir)) {
     try {
       const files = fs.readdirSync(commandsDir).filter((f) => f.endsWith('.md'));
       for (const file of files) {
         try {
-          const content = fs.readFileSync(path.join(commandsDir, file), 'utf-8');
+          const filePath = path.join(commandsDir, file);
+          const content = fs.readFileSync(filePath, 'utf-8');
+          const hasFm = hasFrontmatterBlock(content);
           const frontmatter = parseFrontmatter(content);
           const id = frontmatter.name || path.basename(file, '.md');
 
-          if (!seen.has(id)) {
-            seen.add(id);
-            commands.push({
-              id,
-              name: toDisplayName(id),
-              description: frontmatter.description || extractFirstLine(content),
-              source: 'commands',
-            });
-          }
+          commands.push({
+            id,
+            name: toDisplayName(id),
+            description: frontmatter.description || extractFirstLine(content),
+            source: 'commands',
+            filePath,
+            scope,
+            hasFrontmatter: hasFm && !!(frontmatter.description),
+          });
         } catch {
           // Skip
         }
@@ -140,7 +215,7 @@ export function discoverCommands(workspacePath: string): DiscoveredCommand[] {
   }
 
   // Scan .claude/skills/*/SKILL.md
-  const skillsDir = path.join(workspacePath, '.claude', 'skills');
+  const skillsDir = path.join(claudeRoot, 'skills');
   if (fs.existsSync(skillsDir)) {
     try {
       const dirs = fs.readdirSync(skillsDir).filter((d) => {
@@ -156,27 +231,57 @@ export function discoverCommands(workspacePath: string): DiscoveredCommand[] {
           if (!fs.existsSync(skillFile)) continue;
 
           const content = fs.readFileSync(skillFile, 'utf-8');
+          const hasFm = hasFrontmatterBlock(content);
           const frontmatter = parseFrontmatter(content);
           const id = frontmatter.name || dir;
 
-          // Skills with user-invocable: false should be hidden
           if (frontmatter['user-invocable'] === 'false') continue;
 
-          if (!seen.has(id)) {
-            seen.add(id);
-            commands.push({
-              id,
-              name: toDisplayName(id),
-              description: frontmatter.description || extractFirstLine(content),
-              source: 'skills',
-            });
-          }
+          commands.push({
+            id,
+            name: toDisplayName(id),
+            description: frontmatter.description || extractFirstLine(content),
+            source: 'skills',
+            filePath: skillFile,
+            scope,
+            hasFrontmatter: hasFm && !!(frontmatter.description),
+          });
         } catch {
           // Skip
         }
       }
     } catch {
       // Directory not readable
+    }
+  }
+
+  return commands;
+}
+
+/**
+ * Scan both workspace and user-level .claude/ for commands and skills.
+ */
+export function discoverCommands(workspacePath: string | undefined): DiscoveredCommand[] {
+  const commands: DiscoveredCommand[] = [];
+  const seen = new Set<string>();
+
+  if (workspacePath) {
+    const projectClaude = path.join(workspacePath, '.claude');
+    for (const cmd of discoverCommandsInRoot(projectClaude, 'project')) {
+      if (!seen.has(cmd.id)) {
+        seen.add(cmd.id);
+        commands.push(cmd);
+      }
+    }
+  }
+
+  const userClaude = path.join(os.homedir(), '.claude');
+  if (fs.existsSync(userClaude)) {
+    for (const cmd of discoverCommandsInRoot(userClaude, 'user')) {
+      if (!seen.has(cmd.id)) {
+        seen.add(cmd.id);
+        commands.push(cmd);
+      }
     }
   }
 

@@ -10,6 +10,7 @@ import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { FlowsViewProvider } from './flows/FlowsViewProvider';
+import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
 import { FlowStorage } from './flows/FlowStorage';
 import { createFlowScheduler, FlowScheduler } from './flows/FlowScheduler';
@@ -26,6 +27,9 @@ import { registerReactionCommand } from './analytics/reactions';
 
 // Export unified view provider for editor access
 export let unifiedViewProvider: UnifiedViewProvider;
+
+// Agent Library view provider
+let agentLibraryViewProvider: AgentLibraryViewProvider | null = null;
 
 // Flows view provider
 let flowsViewProvider: FlowsViewProvider | null = null;
@@ -150,10 +154,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
   })();
 
-  // Focus Ritemark AI tab in auxiliary bar (instead of terminal).
-  // Standalone timeout — terminal init steals focus, so we re-focus after it settles.
+  // Focus AI panel after extension views register (terminal init finishes first and grabs focus).
   setTimeout(() => {
-    console.log('[Ritemark] Focusing AI view in auxiliary bar');
     vscode.commands.executeCommand('ritemark.unifiedView.focus');
   }, 4000);
 
@@ -183,6 +185,14 @@ export function activate(context: vscode.ExtensionContext) {
   unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
+      webviewOptions: { retainContextWhenHidden: true }
+    })
+  );
+
+  // Register Agent Library View Provider
+  agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(AgentLibraryViewProvider.viewType, agentLibraryViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );

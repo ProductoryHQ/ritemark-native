@@ -111,3 +111,4 @@ docs/releases/**/*.xlsx
 
 # Apple certificate requests
 *.certSigningRequest
+.claude/scheduled_tasks.lock

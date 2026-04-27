@@ -4,7 +4,8 @@ import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from '
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
 import { DOCXViewer } from './components/viewers/DOCXViewer'
-import { DocumentHeader, PropertiesModal, ExportMenu, TableOfContents } from './components/header'
+import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
+import { PropertiesSidePanel } from './components/properties'
 import { FindBar } from './components/FindBar'
 import { InlineTableOfContents } from './components/InlineTableOfContents'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
@@ -16,10 +17,10 @@ import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { DocumentProperties } from './components/properties'
 
 type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf' | 'docx'
+type SidePanel = 'none' | 'toc' | 'properties'
 
 // Minimum container width (px) at which the inline ToC panel is shown.
 // Tunable in T7 during live testing.
-const INLINE_TOC_MIN_WIDTH = 960
 
 // Dictation placeholder texts
 const LISTENING_PLACEHOLDER = '🎤 Listening...'
@@ -109,33 +110,32 @@ function App() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportButtonRef = useRef<HTMLElement | null>(null)
 
+  // Side panel state — TOC and Properties share the same slot
+  const [activePanel, setActivePanel] = useState<SidePanel>(() => {
+    try {
+      const stored = localStorage.getItem('ritemark.activePanel')
+      if (stored === 'toc' || stored === 'properties') return stored
+      // Migrate from old inlineTocEnabled preference
+      const oldPref = localStorage.getItem('ritemark.inlineTocEnabled')
+      if (oldPref === 'true') return 'toc'
+    } catch { /* ignore */ }
+    return 'none'
+  })
+
   // Find bar state
   const [showFindBar, setShowFindBar] = useState(false)
 
-  // Table of Contents state
-  const [showTOC, setShowTOC] = useState(false)
   const contentsButtonRef = useRef<HTMLButtonElement>(null)
 
   // Inline ToC state
   const editorScrollRef = useRef<HTMLDivElement>(null)
   const flexWrapperRef = useRef<HTMLDivElement>(null)
-  const [inlineTocVisible, setInlineTocVisible] = useState(false)
   const [activeHeadingPos, setActiveHeadingPos] = useState<number | null>(null)
   const [headings, setHeadings] = useState<Heading[]>([])
   // Flag flipped when handleEditorReady fires so effects depending on
   // editorRef.current actually re-run (ref mutations don't trigger re-renders).
   const [editorReady, setEditorReady] = useState(false)
-  // User preference: whether the inline ToC should render on wide screens.
-  // The Contents button acts as a toggle on wide screens (flips this pref),
-  // and as the classic dropdown trigger on narrow screens.
-  const [inlineTocEnabled, setInlineTocEnabled] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem('ritemark.inlineTocEnabled')
-      return stored === null ? true : stored === 'true'
-    } catch {
-      return true
-    }
-  })
+  // inlineTocEnabled is now derived from activePanel (see side panel state above)
 
   // File change notification state
   const [showFileChangeNotification, setShowFileChangeNotification] = useState(false)
@@ -359,27 +359,30 @@ function App() {
     sendToExtension('contentChanged', { content: newContent })
   }, [])
 
+  // Side panel toggle helper — persists choice
+  const togglePanel = useCallback((panel: SidePanel) => {
+    setActivePanel(prev => {
+      const next = prev === panel ? 'none' : panel
+      try { localStorage.setItem('ritemark.activePanel', next) } catch { /* ignore */ }
+      // Also sync old preference key for backwards compat
+      try { localStorage.setItem('ritemark.inlineTocEnabled', String(next === 'toc')) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
+
   // Header button handlers
   const handlePropertiesClick = useCallback(() => {
-    setShowPropertiesModal(true)
-  }, [])
+    togglePanel('properties')
+  }, [togglePanel])
 
   const handleExportClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     exportButtonRef.current = event.currentTarget
     setShowExportMenu(prev => !prev)
   }, [])
 
-  const handleContentsClick = useCallback(() => {
-    setShowTOC(prev => !prev)
-  }, [])
-
   const toggleInlineToc = useCallback(() => {
-    setInlineTocEnabled(prev => {
-      const next = !prev
-      try { localStorage.setItem('ritemark.inlineTocEnabled', String(next)) } catch { /* ignore */ }
-      return next
-    })
-  }, [])
+    togglePanel('toc')
+  }, [togglePanel])
 
   const handleClosePropertiesModal = useCallback(() => {
     setShowPropertiesModal(false)
@@ -434,30 +437,6 @@ function App() {
     }
   }, [])
 
-  // ResizeObserver: show/hide inline ToC based on container width.
-  // Watches the flex-row wrapper so sidebar open/close is detected correctly
-  // (sidebar shrinks the container but not the window).
-  // Depends on isReady so the effect waits until the flex wrapper is in the DOM
-  // (on first render, `<Loading />` is shown instead and flexWrapperRef is null).
-  useEffect(() => {
-    if (!isReady) return
-    const wrapper = flexWrapperRef.current
-    if (!wrapper) return
-    let timeoutId: number | null = null
-    const observer = new ResizeObserver((entries) => {
-      if (timeoutId) window.clearTimeout(timeoutId)
-      timeoutId = window.setTimeout(() => {
-        const width = entries[0].contentRect.width
-        setInlineTocVisible(width >= INLINE_TOC_MIN_WIDTH)
-      }, 50)
-    })
-    observer.observe(wrapper)
-    return () => {
-      observer.disconnect()
-      if (timeoutId) window.clearTimeout(timeoutId)
-    }
-  }, [isReady])
-
   // Scroll-spy: track which heading is currently topmost in the editor view.
   // Uses a scroll listener (not IntersectionObserver) so the active heading is
   // always well-defined — between headings, the most recently scrolled-past
@@ -465,7 +444,7 @@ function App() {
   // toggles, or the user flips the inline-ToC preference.
   useEffect(() => {
     if (!editorRef.current) return
-    if (!inlineTocVisible || !inlineTocEnabled) return
+    if (activePanel !== 'toc') return
     if (headings.length < 2) return
     const editor = editorRef.current
     // The real scroll container is the Editor's inner `.overflow-y-auto` div
@@ -508,7 +487,7 @@ function App() {
       scrollContainer.removeEventListener('scroll', onScroll)
       if (rafId !== null) cancelAnimationFrame(rafId)
     }
-  }, [inlineTocVisible, inlineTocEnabled, headings])
+  }, [activePanel, headings])
 
   // Headings refresh: rebuild headings array whenever the editor content changes.
   // Depends on editorReady (a state flag) rather than editorRef.current directly —
@@ -565,17 +544,11 @@ function App() {
     )
   }
 
-  // Contents button truth table:
-  // - 0 headings → hide (nothing to navigate to)
-  // - wide viewport + >= 2 headings → toggle inline ToC on/off
-  // - otherwise (narrow or only 1 heading) → open dropdown ToC
-  // When inline ToC is currently showing, the button renders in "active" state
-  // so the user can tell clicking will hide it.
-  const inlineTocShown = inlineTocVisible && inlineTocEnabled && headings.length >= 2
-  const contentsClick =
-    headings.length < 1 ? undefined
-    : inlineTocVisible && headings.length >= 2 ? toggleInlineToc
-    : handleContentsClick
+  // Side panel visibility derivation
+  const inlineTocShown = activePanel === 'toc' && headings.length >= 2
+  const propertiesPanelShown = activePanel === 'properties'
+
+  const contentsClick = headings.length >= 2 ? toggleInlineToc : undefined
 
   // Default: Markdown editor
   return (
@@ -587,6 +560,7 @@ function App() {
         onContentsClick={contentsClick}
         contentsButtonRef={contentsButtonRef}
         contentsActive={inlineTocShown}
+        propertiesActive={propertiesPanelShown}
         hasFileChanged={showFileChangeNotification}
         onRefresh={() => {
           setShowFileChangeNotification(false)
@@ -595,15 +569,22 @@ function App() {
         features={features}
       />
 
-      {/* Editor row — flex-row so inline ToC sits left of the scroll container */}
+      {/* Editor row — flex-row so side panel sits left of the scroll container */}
       <div ref={flexWrapperRef} className="flex-1 flex overflow-hidden" style={{ position: 'relative' }}>
-        {/* Inline Table of Contents — visible only at wide viewports and
-            when the user hasn't toggled it off via the Contents button. */}
+        {/* Inline Table of Contents — mutually exclusive with Properties */}
         {inlineTocShown && editorRef.current && (
           <InlineTableOfContents
             editor={editorRef.current}
             headings={headings}
             activeHeadingPos={activeHeadingPos}
+          />
+        )}
+
+        {/* Properties side panel — mutually exclusive with TOC */}
+        {propertiesPanelShown && (
+          <PropertiesSidePanel
+            properties={properties}
+            onChange={handlePropertiesChange}
           />
         )}
 
@@ -647,14 +628,6 @@ function App() {
         anchorElement={exportButtonRef.current}
       />
 
-      {/* Table of Contents */}
-      {showTOC && editorRef.current && (
-        <TableOfContents
-          editor={editorRef.current}
-          anchorRef={contentsButtonRef}
-          onClose={() => setShowTOC(false)}
-        />
-      )}
     </div>
   )
 }
