@@ -236,6 +236,7 @@ export interface DiscoveredAgent {
   id: string;
   name: string;
   description: string;
+  filePath: string;
 }
 
 export interface DiscoveredCommand {
@@ -243,6 +244,7 @@ export interface DiscoveredCommand {
   name: string;
   description: string;
   source: 'commands' | 'skills';
+  filePath: string;
 }
 
 // ── Codex types ──

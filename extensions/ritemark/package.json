@@ -21,6 +21,7 @@
     "onCommand:ritemark.showAIPanel",
     "onCommand:ritemark.openSearch",
     "onCustomEditor:ritemark.flowEditor",
+    "onView:ritemark.agentLibraryView",
     "onView:ritemark.flowsView",
     "onCustomEditor:ritemark.pdfViewer",
     "onCustomEditor:ritemark.docxViewer"
@@ -275,6 +276,11 @@
     "viewsContainers": {
       "activitybar": [
         {
+          "id": "ritemark-agent-library",
+          "title": "Agent Library",
+          "icon": "media/agent-library-icon.svg"
+        },
+        {
           "id": "ritemark-flows",
           "title": "Flows",
           "icon": "media/flows-icon.svg"
@@ -295,6 +301,15 @@
           "id": "ritemark.unifiedView",
           "name": "Ritemark AI",
           "contextualTitle": "Ritemark AI",
+          "visibility": "visible"
+        }
+      ],
+      "ritemark-agent-library": [
+        {
+          "type": "webview",
+          "id": "ritemark.agentLibraryView",
+          "name": "Agent Library",
+          "contextualTitle": "Agent Library",
           "visibility": "visible"
         }
       ],
