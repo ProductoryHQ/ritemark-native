@@ -154,12 +154,9 @@ export function activate(context: vscode.ExtensionContext) {
     }
   })();
 
-  // Focus Ritemark AI tab in auxiliary bar (instead of terminal).
-  // Standalone timeout — terminal init steals focus, so we re-focus after it settles.
-  setTimeout(() => {
-    console.log('[Ritemark] Focusing AI view in auxiliary bar');
-    vscode.commands.executeCommand('ritemark.unifiedView.focus');
-  }, 4000);
+  // Focus AI panel — extension containers register after core, so terminal briefly shows first.
+  // The terminal no longer steals focus back (showPanel removed), so this is a clean one-shot.
+  vscode.commands.executeCommand('ritemark.unifiedView.focus');
 
   // Initialize API key manager (must be first)
   initAPIKeyManager(context);
