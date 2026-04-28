@@ -1,70 +1,62 @@
+Ritemark Dev Launch Fallback: scripts fall back to OSS dev app if Ritemark.app missing
+Sprint 36: Lets contributors run dev mode without first running a full prod build.
+Sprint 55: Rebased onto VS Code 1.117.0
+  - Upstream renamed binary from "Electron" to "$EXE_NAME" (= product.nameShort)
+  - Fallback path updated to "Code - OSS.app/Contents/MacOS/code-oss"
+---
 diff --git a/scripts/code-cli.sh b/scripts/code-cli.sh
-index 220c34d1a7e..86ae2a4ad74 100755
+index ef466e50d07..0e8f5bebcac 100755
 --- a/scripts/code-cli.sh
 +++ b/scripts/code-cli.sh
-@@ -13,6 +13,9 @@ function code() {
- 	if [[ "$OSTYPE" == "darwin"* ]]; then
+@@ -14,6 +14,9 @@ function code() {
  		NAME=`node -p "require('./product.json').nameLong"`
- 		CODE="./.build/electron/$NAME.app/Contents/MacOS/Electron"
-+		if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/Electron" ]]; then
-+			CODE="./.build/electron/Code - OSS.app/Contents/MacOS/Electron"
+ 		EXE_NAME=`node -p "require('./product.json').nameShort"`
+ 		CODE="./.build/electron/$NAME.app/Contents/MacOS/$EXE_NAME"
++		if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/code-oss" ]]; then
++			CODE="./.build/electron/Code - OSS.app/Contents/MacOS/code-oss"
 +		fi
  	else
  		NAME=`node -p "require('./product.json').applicationName"`
  		CODE=".build/electron/$NAME"
 diff --git a/scripts/code.sh b/scripts/code.sh
-index 1ddbfce7d1a..fa24c4242d8 100755
+index 16fdefde552..ae2689c55d7 100755
 --- a/scripts/code.sh
 +++ b/scripts/code.sh
-@@ -19,6 +19,9 @@ function code() {
- 	if [[ "$OSTYPE" == "darwin"* ]]; then
+@@ -20,6 +20,9 @@ function code() {
  		NAME=`node -p "require('./product.json').nameLong"`
- 		CODE="./.build/electron/$NAME.app/Contents/MacOS/Electron"
-+		if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/Electron" ]]; then
-+			CODE="./.build/electron/Code - OSS.app/Contents/MacOS/Electron"
+ 		EXE_NAME=`node -p "require('./product.json').nameShort"`
+ 		CODE="./.build/electron/$NAME.app/Contents/MacOS/$EXE_NAME"
++		if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/code-oss" ]]; then
++			CODE="./.build/electron/Code - OSS.app/Contents/MacOS/code-oss"
 +		fi
  	else
  		NAME=`node -p "require('./product.json').applicationName"`
  		CODE=".build/electron/$NAME"
 diff --git a/scripts/node-electron.sh b/scripts/node-electron.sh
-index 102fe073e4f..d6770e7dfbf 100755
+index d95c302944f..3a73a6d6f65 100755
 --- a/scripts/node-electron.sh
 +++ b/scripts/node-electron.sh
-@@ -12,6 +12,9 @@ pushd $ROOT
- if [[ "$OSTYPE" == "darwin"* ]]; then
+@@ -13,6 +13,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
  	NAME=`node -p "require('./product.json').nameLong"`
- 	CODE="$ROOT/.build/electron/$NAME.app/Contents/MacOS/Electron"
-+	if [[ ! -x "$CODE" && -x "$ROOT/.build/electron/Code - OSS.app/Contents/MacOS/Electron" ]]; then
-+		CODE="$ROOT/.build/electron/Code - OSS.app/Contents/MacOS/Electron"
+ 	EXE_NAME=`node -p "require('./product.json').nameShort"`
+ 	CODE="$ROOT/.build/electron/$NAME.app/Contents/MacOS/$EXE_NAME"
++	if [[ ! -x "$CODE" && -x "$ROOT/.build/electron/Code - OSS.app/Contents/MacOS/code-oss" ]]; then
++		CODE="$ROOT/.build/electron/Code - OSS.app/Contents/MacOS/code-oss"
 +	fi
  else
  	NAME=`node -p "require('./product.json').applicationName"`
  	CODE="$ROOT/.build/electron/$NAME"
 diff --git a/scripts/test.sh b/scripts/test.sh
-index 9ba8dedee0f..2b8c1d96178 100755
+index 423bfec1ecf..9130ccfeb64 100755
 --- a/scripts/test.sh
 +++ b/scripts/test.sh
-@@ -10,13 +10,16 @@ fi
- 
- cd $ROOT
- 
--if [[ "$OSTYPE" == "darwin"* ]]; then
--	NAME=`node -p "require('./product.json').nameLong"`
--	CODE="./.build/electron/$NAME.app/Contents/MacOS/Electron"
--else
--	NAME=`node -p "require('./product.json').applicationName"`
--	CODE=".build/electron/$NAME"
--fi
-+	if [[ "$OSTYPE" == "darwin"* ]]; then
-+		NAME=`node -p "require('./product.json').nameLong"`
-+		CODE="./.build/electron/$NAME.app/Contents/MacOS/Electron"
-+		if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/Electron" ]]; then
-+			CODE="./.build/electron/Code - OSS.app/Contents/MacOS/Electron"
-+		fi
-+	else
-+		NAME=`node -p "require('./product.json').applicationName"`
-+		CODE=".build/electron/$NAME"
+@@ -14,6 +14,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
+ 	NAME=`node -p "require('./product.json').nameLong"`
+ 	EXE_NAME=`node -p "require('./product.json').nameShort"`
+ 	CODE="./.build/electron/$NAME.app/Contents/MacOS/$EXE_NAME"
++	if [[ ! -x "$CODE" && -x "./.build/electron/Code - OSS.app/Contents/MacOS/code-oss" ]]; then
++		CODE="./.build/electron/Code - OSS.app/Contents/MacOS/code-oss"
 +	fi
- 
- VSCODECRASHDIR=$ROOT/.build/crashes
- 
+ else
+ 	NAME=`node -p "require('./product.json').applicationName"`
+ 	CODE=".build/electron/$NAME"
