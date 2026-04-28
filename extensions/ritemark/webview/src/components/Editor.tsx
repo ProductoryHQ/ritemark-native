@@ -1154,13 +1154,15 @@ export function Editor({
         }
 
         /* Increased specificity to override Vite HMR styles in dev mode */
+        /* NOTE: bg must differ from --r-accent-soft (used for row hover) so a
+           selection inside a hovered row remains visually distinct. */
         div.wysiwyg-editor .ProseMirror.ProseMirror ::selection {
-          background: var(--r-accent-soft) !important;
+          background: rgba(67, 56, 202, 0.32) !important;
           border-radius: 2px !important;
         }
 
         div.wysiwyg-editor .ProseMirror.ProseMirror ::-moz-selection {
-          background: var(--r-accent-soft) !important;
+          background: rgba(67, 56, 202, 0.32) !important;
         }
 
         /* Code block selection: dark navy bg + white text (default white-on-light-lavender is invisible) */
@@ -1177,14 +1179,15 @@ export function Editor({
           color: #ffffff !important;
         }
 
-        /* Table cell selection: keep lavender bg + force dark text (default text inherits invisible color) */
+        /* Table cell selection: saturated indigo bg + force dark text. Must differ
+           from --r-accent-soft (row hover) so selecting text in a hovered row stays visible. */
         div.wysiwyg-editor .ProseMirror td.tiptap-table-cell ::selection,
         div.wysiwyg-editor .ProseMirror th.tiptap-table-header ::selection,
         div.wysiwyg-editor .ProseMirror td.tiptap-table-cell::selection,
         div.wysiwyg-editor .ProseMirror th.tiptap-table-header::selection,
         div.wysiwyg-editor .ProseMirror td.tiptap-table-cell *::selection,
         div.wysiwyg-editor .ProseMirror th.tiptap-table-header *::selection {
-          background: var(--r-accent-soft) !important;
+          background: rgba(67, 56, 202, 0.32) !important;
           color: var(--r-ink-strong) !important;
         }
         div.wysiwyg-editor .ProseMirror td.tiptap-table-cell ::-moz-selection,
@@ -1193,7 +1196,7 @@ export function Editor({
         div.wysiwyg-editor .ProseMirror th.tiptap-table-header::-moz-selection,
         div.wysiwyg-editor .ProseMirror td.tiptap-table-cell *::-moz-selection,
         div.wysiwyg-editor .ProseMirror th.tiptap-table-header *::-moz-selection {
-          background: var(--r-accent-soft) !important;
+          background: rgba(67, 56, 202, 0.32) !important;
           color: var(--r-ink-strong) !important;
         }
 
@@ -1368,7 +1371,7 @@ export function Editor({
         /* Enhanced mobile selection */
         @media (max-width: 768px) {
           div.wysiwyg-editor .ProseMirror.ProseMirror ::selection {
-            background: var(--r-accent-soft) !important;
+            background: rgba(67, 56, 202, 0.32) !important;
           }
         }
 
@@ -1425,7 +1428,7 @@ export function Editor({
           right: 0 !important;
           top: 0 !important;
           bottom: 0 !important;
-          background: var(--r-accent-soft) !important;
+          background: rgba(67, 56, 202, 0.18) !important;
           pointer-events: none !important;
         }
 
