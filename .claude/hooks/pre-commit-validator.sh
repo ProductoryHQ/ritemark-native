@@ -56,9 +56,13 @@ if [[ -n "$STAGED_WEBVIEW_SRC" ]]; then
 fi
 
 # Check 6: Webview bundle contains key components
+# Sentinel: 'ai-sidebar' is a stable routing key for the AI sidebar / Agent Library
+# (introduced Sprint 53, anchored Sprint 54). If this string is missing, the bundle
+# is either stale, stubbed, or has lost the AI panel — block the commit.
+# The previous sentinel ('document-header') was retired in Sprint 54's toolbar redesign.
 if [[ -f "extensions/ritemark/media/webview.js" ]]; then
-  if ! grep -q "document-header" "extensions/ritemark/media/webview.js"; then
-    echo "ERROR: webview.js missing document-header component"
+  if ! grep -q "ai-sidebar" "extensions/ritemark/media/webview.js"; then
+    echo "ERROR: webview.js missing ai-sidebar routing key (bundle stale or AI panel removed)"
     ERRORS=$((ERRORS + 1))
   fi
 fi
