@@ -4,7 +4,7 @@
       "id": "phosphor-200",
       "src": [
         {
-          "path": "../node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2",
+          "path": "./Phosphor-Light.woff2",
           "format": "woff2"
         }
       ],
