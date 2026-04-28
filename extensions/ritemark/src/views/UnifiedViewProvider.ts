@@ -1084,6 +1084,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         metrics: result.metrics,
         error: result.error,
       });
+      // Bug #33: Claude Code subprocess writes files outside VS Code's
+      // filesystem provider, so the explorer model is unaware of new files
+      // until the user manually refreshes. Nudge the explorer here.
+      this._refreshExplorerForAgentWrites(result.filesModified);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       traceClaude('bridge', 'agent-result error', { error: errorMessage });
@@ -1092,6 +1096,41 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         error: errorMessage,
       });
     }
+  }
+
+  /**
+   * Bug #33: After the Claude Code subprocess agent finishes a turn that wrote
+   * or edited files, the file explorer is often stale because the OS file
+   * watcher missed (or hasn't yet propagated) the writes from the subprocess.
+   *
+   * Nudge the explorer in two ways:
+   *   1. Stat each modified file's parent directory via vscode.workspace.fs —
+   *      this routes through VS Code's filesystem provider and forces the
+   *      explorer model to re-enumerate the directory.
+   *   2. Run the global "refresh files explorer" command as a safety net.
+   *
+   * Fire-and-forget; never block the agent-result postMessage on this.
+   */
+  private _refreshExplorerForAgentWrites(filesModified: string[] | undefined): void {
+    if (!filesModified || filesModified.length === 0) return;
+
+    const parentDirs = new Set<string>();
+    for (const file of filesModified) {
+      const parent = file.replace(/[/\\][^/\\]+$/, '');
+      if (parent && parent !== file) parentDirs.add(parent);
+    }
+
+    void Promise.all(
+      Array.from(parentDirs).map((dir) =>
+        vscode.workspace.fs
+          .stat(vscode.Uri.file(dir))
+          .then(undefined, () => undefined)
+      )
+    ).then(() =>
+      vscode.commands
+        .executeCommand('workbench.files.action.refreshFilesExplorer')
+        .then(undefined, () => undefined)
+    );
   }
 
   private _handleAgentQuestionAnswer(toolUseId: string, answers: Record<string, string>) {
