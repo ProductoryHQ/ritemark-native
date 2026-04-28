@@ -1,931 +1,13 @@
-Ritemark Branding: theme, fonts, icons, welcome page, about dialog, breadcrumbs
-Consolidates old patches: 007 (about dialog), 012 (welcome page), 014 (default theme),
-015 (Sofia Sans fonts), 020 (Lucide icons), 021 (breadcrumbs height)
+Ritemark Branding: theme, fonts (Phosphor + Sofia Sans), icons, welcome page, about dialog, breadcrumbs
+Sprint 1+: Original branding patch.
+Sprint 55: Rebased onto VS Code 1.117.0
+  - Welcome page rewrite reapplied for upstream layout/agent surface drift
+  - Brand asset includes added to gulpfile vscodeResourceIncludes (post-accessibility-signals slot)
+  - rcedit branding updated to Productory at new gulpfile line position
+  - codicon.css Phosphor font registration repositioned
+  - workbench.startupEditor default at new contribution line position
+Note: Binary fonts/icons (woff2, svg) handled by apply-patches.sh, not in this diff.
 ---
-diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
-index 358bb3acad3..3cee865b0f0 100644
---- a/build/gulpfile.vscode.ts
-+++ b/build/gulpfile.vscode.ts
-@@ -89,6 +89,10 @@ const vscodeResourceIncludes = [
- 	// Accessibility Signals
- 	'out-build/vs/platform/accessibilitySignal/browser/media/*.mp3',
- 
-+	// RiteMark: Custom fonts
-+	'out-build/media/*.woff2',
-+	'out-build/vs/workbench/browser/media/fonts/*.woff2',
-+
- 	// Welcome
- 	'out-build/vs/workbench/contrib/welcomeGettingStarted/common/media/**/*.{svg,png}',
- 
-@@ -478,11 +482,11 @@ function patchWin32DependenciesTask(destinationFolderName: string) {
- 			await rcedit(path.join(cwd, dep), {
- 				'file-version': baseVersion,
- 				'version-string': {
--					'CompanyName': 'Microsoft Corporation',
-+					'CompanyName': 'Productory',
- 					'FileDescription': product.nameLong,
- 					'FileVersion': packageJson.version,
- 					'InternalName': basename,
--					'LegalCopyright': 'Copyright (C) 2022 Microsoft. All rights reserved',
-+					'LegalCopyright': 'Copyright (C) 2025 Productory. All rights reserved',
- 					'OriginalFilename': basename,
- 					'ProductName': product.nameLong,
- 					'ProductVersion': packageJson.version,
-diff --git a/build/lib/optimize.ts b/build/lib/optimize.ts
-index f5e812e2890..02c380b5ef0 100644
---- a/build/lib/optimize.ts
-+++ b/build/lib/optimize.ts
-@@ -147,6 +147,7 @@ function bundleESMTask(opts: IBundleESMTaskOpts): NodeJS.ReadWriteStream {
- 				target: [target],
- 				loader: {
- 					'.ttf': 'file',
-+					'.woff2': 'file',
- 					'.svg': 'file',
- 					'.png': 'file',
- 					'.sh': 'file',
-diff --git a/src/vs/base/browser/ui/codicons/codicon/codicon.css b/src/vs/base/browser/ui/codicons/codicon/codicon.css
-index 02154e77b68..e1381cd7710 100644
---- a/src/vs/base/browser/ui/codicons/codicon/codicon.css
-+++ b/src/vs/base/browser/ui/codicons/codicon/codicon.css
-@@ -9,6 +9,14 @@
- 	src: url("./codicon.ttf?5d4d76ab2ce5108968ad644d591a16a6") format("truetype");
- }
- 
-+/* RiteMark: Phosphor 200 icon font for sidebar and panel icons */
-+@font-face {
-+	font-family: "phosphor";
-+	font-display: block;
-+	font-weight: 200;
-+	src: url("./phosphor.woff2") format("woff2");
-+}
-+
- .codicon[class*='codicon-'] {
- 	font: normal normal normal 16px/1 codicon;
- 	display: inline-block;
-diff --git a/src/vs/code/electron-browser/workbench/workbench.ts b/src/vs/code/electron-browser/workbench/workbench.ts
-index 767fbe08db3..1fab5250d26 100644
---- a/src/vs/code/electron-browser/workbench/workbench.ts
-+++ b/src/vs/code/electron-browser/workbench/workbench.ts
-@@ -69,13 +69,17 @@
- 		} else if (configuration.autoDetectColorScheme) {
- 			if (configuration.colorScheme.dark) {
- 				baseTheme = 'vs-dark';
--				shellBackground = '#1E1E1E';
--				shellForeground = '#CCCCCC';
-+				shellBackground = '#1E1B4B';
-+				shellForeground = '#F8FAFC';
- 			} else {
- 				baseTheme = 'vs';
- 				shellBackground = '#FFFFFF';
- 				shellForeground = '#000000';
- 			}
-+		} else {
-+			baseTheme = 'vs';
-+			shellBackground = '#FFFFFF';
-+			shellForeground = '#15141A';
- 		}
- 
- 		const style = document.createElement('style');
-@@ -93,7 +97,7 @@
- 
- 			const splash = document.createElement('div');
- 			splash.id = 'monaco-parts-splash';
--			splash.className = baseTheme ?? 'vs-dark';
-+			splash.className = baseTheme ?? 'vs';
- 
- 			if (layoutInfo.windowBorder && colorInfo.windowBorder) {
- 				const borderElement = document.createElement('div');
-diff --git a/src/vs/platform/dialogs/electron-browser/dialog.ts b/src/vs/platform/dialogs/electron-browser/dialog.ts
-index ec26804c300..b6b44623d72 100644
---- a/src/vs/platform/dialogs/electron-browser/dialog.ts
-+++ b/src/vs/platform/dialogs/electron-browser/dialog.ts
-@@ -5,13 +5,13 @@
- 
- import { fromNow } from '../../../base/common/date.js';
- import { isLinuxSnap } from '../../../base/common/platform.js';
--import { localize } from '../../../nls.js';
- import { IOSProperties } from '../../native/common/native.js';
- import { IProductService } from '../../product/common/productService.js';
- import { process } from '../../../base/parts/sandbox/electron-browser/globals.js';
- 
- export function createNativeAboutDialogDetails(productService: IProductService, osProps: IOSProperties): { title: string; details: string; detailsToCopy: string } {
--	let version = productService.version;
-+	const ritemarkVersion = (productService as IProductService & { ritemarkVersion?: string }).ritemarkVersion;
-+	let version = ritemarkVersion || productService.version;
- 	if (productService.target) {
- 		version = `${version} (${productService.target} setup)`;
- 	} else if (productService.darwinUniversalAssetId) {
-@@ -19,25 +19,28 @@ export function createNativeAboutDialogDetails(productService: IProductService,
- 	}
- 
- 	const getDetails = (useAgo: boolean): string => {
--		return localize({ key: 'aboutDetail', comment: ['Electron, Chromium, Node.js and V8 are product names that need no translation'] },
--			"Version: {0}\nCommit: {1}\nDate: {2}\nElectron: {3}\nElectronBuildId: {4}\nChromium: {5}\nNode.js: {6}\nV8: {7}\nOS: {8}",
--			version,
--			productService.commit || 'Unknown',
--			productService.date ? `${productService.date}${useAgo ? ' (' + fromNow(new Date(productService.date), true) + ')' : ''}` : 'Unknown',
--			process.versions['electron'],
--			process.versions['microsoft-build'],
--			process.versions['chrome'],
--			process.versions['node'],
--			process.versions['v8'],
--			`${osProps.type} ${osProps.arch} ${osProps.release}${isLinuxSnap ? ' snap' : ''}`
--		);
-+		const details = [
-+			`Version: ${version}`,
-+			productService.commit ? `Commit: ${productService.commit}` : undefined,
-+			productService.date ? `Date: ${productService.date}${useAgo ? ' (' + fromNow(new Date(productService.date), true) + ')' : ''}` : undefined,
-+			`Electron: ${process.versions['electron']}`,
-+			process.versions['microsoft-build'] ? `ElectronBuildId: ${process.versions['microsoft-build']}` : undefined,
-+			`Chromium: ${process.versions['chrome']}`,
-+			`Node.js: ${process.versions['node']}`,
-+			`V8: ${process.versions['v8']}`,
-+			`OS: ${osProps.type} ${osProps.arch} ${osProps.release}${isLinuxSnap ? ' snap' : ''}`
-+		].filter((detail): detail is string => !!detail);
-+
-+		return details.join('\n');
- 	};
- 
- 	const details = getDetails(true);
- 	const detailsToCopy = getDetails(false);
- 
-+	const title = productService.nameShort.replace(/ Dev$/, '');
-+
- 	return {
--		title: productService.nameLong,
-+		title: title,
- 		details: details,
- 		detailsToCopy: detailsToCopy
- 	};
-diff --git a/src/vs/platform/theme/common/iconRegistry.ts b/src/vs/platform/theme/common/iconRegistry.ts
-index 9feac0c4ca4..6ccd27e0778 100644
---- a/src/vs/platform/theme/common/iconRegistry.ts
-+++ b/src/vs/platform/theme/common/iconRegistry.ts
-@@ -319,6 +319,45 @@ function initialize() {
- }
- initialize();
- 
-+// RiteMark: Phosphor 200 icon font registration
-+const PhosphorIcons = {
-+	folder: 0xe24a, folderOpen: 0xe256, files: 0xe710, file: 0xe230,
-+	fileText: 0xe23a, search: 0xe30c, gitBranch: 0xe278, settings: 0xe270,
-+	user: 0xe4c4, sparkle: 0xe6a4, bookOpen: 0xe0e6, fileOutput: 0xe61e,
-+	terminal: 0xe47e, triangleAlert: 0xe4e0, clock: 0xe19a, list: 0xe2f0,
-+} as const;
-+
-+const phosphorFontDefinition: IconFontDefinition = {
-+	weight: '200',
-+	src: [{ location: URI.parse('phosphor.woff2'), format: 'woff2' }]
-+};
-+iconRegistry.registerIconFont('phosphor', phosphorFontDefinition);
-+
-+const phosphorFont: IconFontContribution = { id: 'phosphor', definition: phosphorFontDefinition };
-+for (const [name, code] of Object.entries(PhosphorIcons)) {
-+	const fontCharacter = '\\' + code.toString(16);
-+	iconRegistry.registerIcon(`phosphor-${name}`, { font: phosphorFont, fontCharacter });
-+}
-+
-+export const Phosphor = {
-+	folder: { id: 'phosphor-folder' } as ThemeIcon,
-+	folderOpen: { id: 'phosphor-folderOpen' } as ThemeIcon,
-+	files: { id: 'phosphor-files' } as ThemeIcon,
-+	file: { id: 'phosphor-file' } as ThemeIcon,
-+	fileText: { id: 'phosphor-fileText' } as ThemeIcon,
-+	search: { id: 'phosphor-search' } as ThemeIcon,
-+	gitBranch: { id: 'phosphor-gitBranch' } as ThemeIcon,
-+	settings: { id: 'phosphor-settings' } as ThemeIcon,
-+	user: { id: 'phosphor-user' } as ThemeIcon,
-+	sparkle: { id: 'phosphor-sparkle' } as ThemeIcon,
-+	bookOpen: { id: 'phosphor-bookOpen' } as ThemeIcon,
-+	fileOutput: { id: 'phosphor-fileOutput' } as ThemeIcon,
-+	terminal: { id: 'phosphor-terminal' } as ThemeIcon,
-+	triangleAlert: { id: 'phosphor-triangleAlert' } as ThemeIcon,
-+	clock: { id: 'phosphor-clock' } as ThemeIcon,
-+	list: { id: 'phosphor-list' } as ThemeIcon,
-+};
-+
- export const iconsSchemaId = 'vscode://schemas/icons';
- 
- const schemaRegistry = platform.Registry.as<IJSONContributionRegistry>(JSONExtensions.JSONContribution);
-diff --git a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
-index 1ebcf272816..b10f2b7c252 100644
---- a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
-+++ b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
-@@ -202,12 +202,12 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
- 	}
- 
- 	private getStoredBaseTheme(): ThemeTypeSelector {
--		const baseTheme = this.stateService.getItem<ThemeTypeSelector>(THEME_STORAGE_KEY, ThemeTypeSelector.VS_DARK).split(' ')[0];
-+		const baseTheme = this.stateService.getItem<ThemeTypeSelector>(THEME_STORAGE_KEY, ThemeTypeSelector.VS).split(' ')[0];
- 		switch (baseTheme) {
- 			case ThemeTypeSelector.VS: return ThemeTypeSelector.VS;
- 			case ThemeTypeSelector.HC_BLACK: return ThemeTypeSelector.HC_BLACK;
- 			case ThemeTypeSelector.HC_LIGHT: return ThemeTypeSelector.HC_LIGHT;
--			default: return ThemeTypeSelector.VS_DARK;
-+			default: return ThemeTypeSelector.VS;
- 		}
- 	}
- 
-diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
-index 13ff7948e88..5da9f9d3e65 100644
---- a/src/vs/workbench/browser/media/style.css
-+++ b/src/vs/workbench/browser/media/style.css
-@@ -7,26 +7,50 @@
- 
- @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
- 
-+/* RiteMark: Custom UI font */
-+:root {
-+	--ritemark-ui-font-family: "Sofia Sans", ;
-+}
-+
-+/* RiteMark: Sofia Sans font-face declarations */
-+@font-face {
-+	font-family: "Sofia Sans";
-+	font-style: normal;
-+	font-weight: 100 900;
-+	font-display: swap;
-+	src: url("./fonts/SofiaSans-latin.woff2") format("woff2");
-+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-+}
-+
-+@font-face {
-+	font-family: "Sofia Sans";
-+	font-style: normal;
-+	font-weight: 100 900;
-+	font-display: swap;
-+	src: url("./fonts/SofiaSans-latin-ext.woff2") format("woff2");
-+	unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
-+}
-+
- /* Font Families (with CJK support) */
- 
--.monaco-workbench.mac { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
--.monaco-workbench.mac:lang(zh-Hans) { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; }
--.monaco-workbench.mac:lang(zh-Hant) { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
--.monaco-workbench.mac:lang(ja) { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
--.monaco-workbench.mac:lang(ko) { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
-+.monaco-workbench.mac { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, sans-serif; }
-+.monaco-workbench.mac:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; }
-+.monaco-workbench.mac:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
-+.monaco-workbench.mac:lang(ja) { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
-+.monaco-workbench.mac:lang(ko) { font-family: var(--ritemark-ui-font-family) -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
- 
--.monaco-workbench.windows { font-family: "Segoe WPC", "Segoe UI", sans-serif; }
--.monaco-workbench.windows:lang(zh-Hans) { font-family: "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
--.monaco-workbench.windows:lang(zh-Hant) { font-family: "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
--.monaco-workbench.windows:lang(ja) { font-family: "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
--.monaco-workbench.windows:lang(ko) { font-family: "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
-+.monaco-workbench.windows { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", sans-serif; }
-+.monaco-workbench.windows:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
-+.monaco-workbench.windows:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
-+.monaco-workbench.windows:lang(ja) { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
-+.monaco-workbench.windows:lang(ko) { font-family: var(--ritemark-ui-font-family) "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
- 
- /* Linux: add `system-ui` as first font and not `Ubuntu` to allow other distribution pick their standard OS font */
--.monaco-workbench.linux { font-family: system-ui, "Ubuntu", "Droid Sans", sans-serif; }
--.monaco-workbench.linux:lang(zh-Hans) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", sans-serif; }
--.monaco-workbench.linux:lang(zh-Hant) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
--.monaco-workbench.linux:lang(ja) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
--.monaco-workbench.linux:lang(ko) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
-+.monaco-workbench.linux { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", sans-serif; }
-+.monaco-workbench.linux:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", sans-serif; }
-+.monaco-workbench.linux:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
-+.monaco-workbench.linux:lang(ja) { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
-+.monaco-workbench.linux:lang(ko) { font-family: var(--ritemark-ui-font-family) system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
- 
- .monaco-workbench.mac { --monaco-monospace-font: "SF Mono", Monaco, Menlo, Courier, monospace; }
- .monaco-workbench.windows { --monaco-monospace-font: Consolas, "Courier New", monospace; }
-diff --git a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
-index ba678499fec..3a490837e9b 100644
---- a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
-+++ b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
-@@ -217,7 +217,7 @@ const separatorIcon = registerIcon('breadcrumb-separator', Codicon.chevronRight,
- 
- export class BreadcrumbsControl {
- 
--	static readonly HEIGHT = 22;
-+	static readonly HEIGHT = 40;
- 
- 	private static readonly SCROLLBAR_SIZES = {
- 		default: 3,
-diff --git a/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css b/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
-index a24f76131a8..10bb8f074c5 100644
---- a/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
-+++ b/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
-@@ -7,23 +7,23 @@
- 
- .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control {
- 	flex: 1 100%;
--	height: 22px;
-+	height: 40px;
- 	cursor: default;
- }
- 
- .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-icon-label {
--	height: 22px;
--	line-height: 22px;
-+	height: 40px;
-+	line-height: 40px;
- }
- 
- .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-icon-label::before {
--	height: 22px; /* tweak the icon size of the editor labels when icons are enabled */
-+	height: 40px; /* tweak the icon size of the editor labels when icons are enabled */
- }
- 
- .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .outline-element-icon {
- 	padding-right: 3px;
--	height: 22px; /* tweak the icon size of the editor labels when icons are enabled */
--	line-height: 22px;
-+	height: 40px; /* tweak the icon size of the editor labels when icons are enabled */
-+	line-height: 40px;
- }
- 
- .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item {
-@@ -32,7 +32,7 @@
- 
- .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item::before {
- 	width: 16px;
--	height: 22px;
-+	height: 40px;
- 	display: flex;
- 	align-items: center;
- 	justify-content: center;
-@@ -45,3 +45,12 @@
- .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item:last-child .codicon:last-child {
- 	display: none; /* hides chevrons when last item */
- }
-+
-+/* RiteMark: Breadcrumb icon styling */
-+.monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-icon-label::before {
-+	filter: grayscale(1);
-+}
-+
-+.monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .codicon {
-+	opacity: 0.6;
-+}
-diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
-index 2b50e71fab8..bfab6d53784 100644
---- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
-+++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
-@@ -327,7 +327,7 @@ configurationRegistry.registerConfiguration({
- 				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.terminal' }, "Open a new terminal in the editor area."),
- 				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.agentSessionsWelcomePage' }, "Open the Agent Sessions Welcome page."),
- 			],
--			'default': 'welcomePage',
-+			'default': 'welcomePageInEmptyWorkbench',
- 			'description': localize('workbench.startupEditor', "Controls which editor is shown at startup, if none are restored from the previous session."),
- 			'experiment': { mode: 'auto' }
- 		},
-diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
-index 6a70526e4c7..00ef9f721d3 100644
---- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
-+++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
-@@ -10,24 +10,23 @@ import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js
- import { Button } from '../../../../base/browser/ui/button/button.js';
- import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
- import { DomScrollableElement } from '../../../../base/browser/ui/scrollbar/scrollableElement.js';
--import { Toggle } from '../../../../base/browser/ui/toggle/toggle.js';
- import { coalesce, equals } from '../../../../base/common/arrays.js';
- import { Delayer, Throttler } from '../../../../base/common/async.js';
- import { CancellationToken } from '../../../../base/common/cancellation.js';
--import { Codicon } from '../../../../base/common/codicons.js';
- import { onUnexpectedError } from '../../../../base/common/errors.js';
- import { KeyCode } from '../../../../base/common/keyCodes.js';
- import { splitRecentLabel } from '../../../../base/common/labels.js';
- import { DisposableStore, toDisposable } from '../../../../base/common/lifecycle.js';
- import { ILink, LinkedText } from '../../../../base/common/linkedText.js';
- import { parse } from '../../../../base/common/marshalling.js';
--import { Schemas, matchesScheme } from '../../../../base/common/network.js';
-+import { FileAccess, Schemas, matchesScheme } from '../../../../base/common/network.js';
- import { OS } from '../../../../base/common/platform.js';
- import { ThemeIcon } from '../../../../base/common/themables.js';
- import { assertReturnsDefined } from '../../../../base/common/types.js';
- import { URI } from '../../../../base/common/uri.js';
- import { generateUuid } from '../../../../base/common/uuid.js';
- import './media/gettingStarted.css';
-+import './media/gettingStartedGuide.css';
- import { ILanguageService } from '../../../../editor/common/languages/language.js';
- import { IMarkdownRendererService } from '../../../../platform/markdown/browser/markdownRenderer.js';
- import { localize } from '../../../../nls.js';
-@@ -47,7 +46,7 @@ import { IQuickInputService } from '../../../../platform/quickinput/common/quick
- import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
- import { firstSessionDateStorageKey, ITelemetryService, TelemetryLevel } from '../../../../platform/telemetry/common/telemetry.js';
- import { getTelemetryLevel } from '../../../../platform/telemetry/common/telemetryUtils.js';
--import { defaultButtonStyles, defaultKeybindingLabelStyles, defaultToggleStyles } from '../../../../platform/theme/browser/defaultStyles.js';
-+import { defaultButtonStyles, defaultKeybindingLabelStyles } from '../../../../platform/theme/browser/defaultStyles.js';
- import { IWindowOpenable } from '../../../../platform/window/common/window.js';
- import { IWorkspaceContextService, UNKNOWN_EMPTY_WINDOW_WORKSPACE } from '../../../../platform/workspace/common/workspace.js';
- import { IRecentFolder, IRecentWorkspace, IRecentlyOpened, IWorkspacesService, isRecentFolder, isRecentWorkspace } from '../../../../platform/workspaces/common/workspaces.js';
-@@ -75,8 +74,6 @@ import { KeybindingLabel } from '../../../../base/browser/ui/keybindingLabel/key
- import { ScrollbarVisibility } from '../../../../base/common/scrollable.js';
- 
- const SLIDE_TRANSITION_TIME_MS = 250;
--const configurationKey = 'workbench.startupEditor';
--
- export const allWalkthroughsHiddenContext = new RawContextKey<boolean>('allWalkthroughsHidden', false);
- export const inWelcomeContext = new RawContextKey<boolean>('inWelcome', false);
- 
-@@ -117,6 +114,7 @@ type GettingStartedActionEvent = {
- type RecentEntry = (IRecentFolder | IRecentWorkspace) & { id: string };
- 
- const REDUCED_MOTION_KEY = 'workbench.welcomePage.preferReducedMotion';
-+const getWelcomeMediaUri = (path: string) => FileAccess.asBrowserUri(`vs/workbench/contrib/welcomeGettingStarted/browser/media/${path}`).toString(true);
- export class GettingStartedPage extends EditorPane {
- 
- 	public static readonly ID = 'gettingStartedPage';
-@@ -465,6 +463,10 @@ export class GettingStartedPage extends EditorPane {
- 				}
- 				break;
- 			}
-+			case 'runCommand': {
-+				this.runStepCommand(`command:${argument}`);
-+				break;
-+			}
- 			case 'hideCategory': {
- 				this.hideCategory(argument);
- 				break;
-@@ -893,79 +895,104 @@ export class GettingStartedPage extends EditorPane {
- 	private async buildCategoriesSlide(preserveFocus?: boolean) {
- 
- 		this.categoriesSlideDisposables.clear();
--		const showOnStartupCheckbox = new Toggle({
--			icon: Codicon.check,
--			actionClassName: 'getting-started-checkbox',
--			isChecked: this.configurationService.getValue(configurationKey) === 'welcomePage',
--			title: localize('checkboxTitle', "When checked, this page will be shown on startup."),
--			...defaultToggleStyles
--		});
--		showOnStartupCheckbox.domNode.id = 'showOnStartup';
--		const showOnStartupLabel = $('label.caption', { for: 'showOnStartup' }, localize('welcomePage.showOnStartup', "Show welcome page on startup"));
--		const onShowOnStartupChanged = () => {
--			if (showOnStartupCheckbox.checked) {
--				this.telemetryService.publicLog2<GettingStartedActionEvent, GettingStartedActionClassification>('gettingStarted.ActionExecuted', { command: 'showOnStartupChecked', argument: undefined, walkthroughId: this.currentWalkthrough?.id });
--				this.configurationService.updateValue(configurationKey, 'welcomePage');
--			} else {
--				this.telemetryService.publicLog2<GettingStartedActionEvent, GettingStartedActionClassification>('gettingStarted.ActionExecuted', { command: 'showOnStartupUnchecked', argument: undefined, walkthroughId: this.currentWalkthrough?.id });
--				this.configurationService.updateValue(configurationKey, 'none');
--			}
--		};
--		this.categoriesSlideDisposables.add(showOnStartupCheckbox);
--		this.categoriesSlideDisposables.add(showOnStartupCheckbox.onChange(() => {
--			onShowOnStartupChanged();
--		}));
--		this.categoriesSlideDisposables.add(addDisposableListener(showOnStartupLabel, 'click', () => {
--			showOnStartupCheckbox.checked = !showOnStartupCheckbox.checked;
--			onShowOnStartupChanged();
--		}));
-+		const heroLogo = getWelcomeMediaUri('ritemark-welcome-logo-full.svg');
-+		const gettingStartedIcon = getWelcomeMediaUri('ritemark-welcome-icon-book.svg');
-+		const supportArticlesIcon = getWelcomeMediaUri('ritemark-welcome-icon-life-buoy.svg');
-+		const blogIcon = getWelcomeMediaUri('ritemark-welcome-icon-newspaper.svg');
-+
-+		const createMenu = $('div.hero-create-menu', { 'aria-hidden': 'true' },
-+			$('button.button-link.hero-create-option', { 'x-dispatch': 'runCommand:ritemark.newDocument' },
-+				$('span.codicon.codicon-file.hero-create-option-icon', {}),
-+				$('span.hero-create-option-copy', {},
-+					$('span.hero-create-option-title', {}, localize('ritemark.newDocument', "New document")),
-+					$('span.hero-create-option-description', {}, localize('ritemark.newDocumentDescription', "Blank markdown document"))
-+				)
-+			),
-+			$('button.button-link.hero-create-option', { 'x-dispatch': 'runCommand:ritemark.newTable' },
-+				$('span.codicon.codicon-table.hero-create-option-icon', {}),
-+				$('span.hero-create-option-copy', {},
-+					$('span.hero-create-option-title', {}, localize('ritemark.newTable', "New table")),
-+					$('span.hero-create-option-description', {}, localize('ritemark.newTableDescription', "CSV with 10 columns and 20 empty rows"))
-+				)
-+			),
-+			$('button.button-link.hero-create-option', { 'x-dispatch': 'runCommand:ritemark.flows.new' },
-+				$('span.codicon.codicon-graph-line.hero-create-option-icon', {}),
-+				$('span.hero-create-option-copy', {},
-+					$('span.hero-create-option-title', {}, localize('ritemark.newFlow', "New flow")),
-+					$('span.hero-create-option-description', {}, localize('ritemark.newFlowDescription', "Create a starter workflow in your project folder"))
-+				)
-+			)
-+		);
-+
-+		const createStack = $('div.hero-create-stack', {},
-+			$('div.hero-split-button', {},
-+				$('button.button-link.hero-cta.hero-cta-primary.hero-split-button-main', { 'x-dispatch': 'runCommand:ritemark.newDocument' },
-+					$('span', {}, localize('ritemark.newDocument', "New document"))
-+				),
-+				$('button.button-link.hero-cta.hero-cta-primary.hero-split-button-toggle', {
-+					'aria-label': localize('ritemark.newMenu', "Create new..."),
-+					'aria-haspopup': 'menu',
-+					'aria-expanded': 'false'
-+				},
-+					$('span.codicon.codicon-chevron-down', {})
-+				)
-+			),
-+			createMenu
-+		);
-+
-+		const heroActions = $('.hero-actions', {},
-+			createStack,
-+			$('button.button-link.hero-cta.hero-cta-secondary', { 'x-dispatch': 'openFolder' },
-+				$('span', {}, localize('ritemark.openFolder', "Open folder"))
-+			),
-+		);
-+
-+		const heroMeta = $('.hero-meta', {},
-+			$('div.learn-ritemark.learn-ritemark-inline', {},
-+				$('button.button-link', { 'x-dispatch': 'openLink:https://ritemark.app/en/support/getting-started?utm_source=ritemark_app&utm_medium=welcome&utm_campaign=sprint_43_welcome' },
-+					$('img.learn-ritemark-icon', { src: gettingStartedIcon, alt: '' }),
-+					$('span', {}, localize('ritemark.gettingStarted', "Getting started"))
-+				),
-+				$('button.button-link', { 'x-dispatch': 'openLink:https://ritemark.app/en/support/?utm_source=ritemark_app&utm_medium=welcome&utm_campaign=sprint_43_welcome' },
-+					$('img.learn-ritemark-icon', { src: supportArticlesIcon, alt: '' }),
-+					$('span', {}, localize('ritemark.supportArticles', "Support articles"))
-+				),
-+				$('button.button-link', { 'x-dispatch': 'openLink:https://ritemark.app/en/blog/?utm_source=ritemark_app&utm_medium=welcome&utm_campaign=sprint_43_welcome' },
-+					$('img.learn-ritemark-icon', { src: blogIcon, alt: '' }),
-+					$('span', {}, localize('ritemark.blog', "Blog"))
-+				),
-+			)
-+		);
- 
--		const header = $('.header', {},
--			$('h1.product-name.caption', {}, this.productService.nameLong),
--			$('p.subtitle.description', {}, localize({ key: 'gettingStarted.editingEvolved', comment: ['Shown as subtitle on the Welcome page.'] }, "Editing evolved"))
-+		const header = $('.header.hero-shell', {},
-+			$('img.hero-brand-full', { src: heroLogo, alt: localize('ritemark.brandName', "Ritemark") }),
-+			$('p.hero-tagline', {},
-+				$('span', {}, localize('ritemark.heroLead', "Write Smarter. ")),
-+				$('span.hero-tagline-accent', {}, localize('ritemark.heroAccent', "Think Faster."))
-+			),
-+			heroActions,
-+			heroMeta
- 		);
- 
- 		const leftColumn = $('.categories-column.categories-column-left', {},);
- 		const rightColumn = $('.categories-column.categories-column-right', {},);
- 
--		const startList = this.buildStartList();
- 		const recentList = this.buildRecentlyOpenedList();
--		const gettingStartedList = this.buildGettingStartedWalkthroughsList();
-+		recentList.setLimit(6);
-+		reset(leftColumn, $('.welcome-column.welcome-column-recent', {}, recentList.getDomElement()));
- 
--		const footer = $('.footer', {},
--			$('p.showOnStartup', {},
--				showOnStartupCheckbox.domNode,
--				showOnStartupLabel,
--			));
--
--		const layoutLists = () => {
--			if (gettingStartedList.itemCount) {
--				this.container.classList.remove('noWalkthroughs');
--				reset(rightColumn, gettingStartedList.getDomElement());
--			}
--			else {
--				this.container.classList.add('noWalkthroughs');
--				reset(rightColumn);
--			}
--			setTimeout(() => this.categoriesPageScrollbar?.scanDomNode(), 50);
--			layoutRecentList();
--		};
-+		this.buildStartList();
-+		this.buildGettingStartedWalkthroughsList();
- 
--		const layoutRecentList = () => {
--			if (this.container.classList.contains('noWalkthroughs')) {
--				recentList.setLimit(10);
--				reset(leftColumn, startList.getDomElement());
--				reset(rightColumn, recentList.getDomElement());
--			} else {
--				recentList.setLimit(5);
--				reset(leftColumn, startList.getDomElement(), recentList.getDomElement());
--			}
--		};
--
--		gettingStartedList.onDidChange(layoutLists);
--		layoutLists();
-+		const healthCheckSection = $('.welcome-column.welcome-column-launch-check.health-check-section', {},
-+			$('h3.category-title', {}, localize('ritemark.healthCheck', "Launch check")),
-+			$('div.health-check-items', {})
-+		);
-+		reset(rightColumn, healthCheckSection);
-+		this.populateHealthCheck(healthCheckSection.querySelector('.health-check-items')!);
- 
--		reset(this.categoriesSlide, $('.gettingStartedCategoriesContainer', {}, header, leftColumn, rightColumn, footer,));
-+		reset(this.categoriesSlide, $('.gettingStartedCategoriesContainer', {}, header, leftColumn, rightColumn));
-+		this.wireHeroCreateMenu(createStack, createMenu);
- 		this.categoriesPageScrollbar?.scanDomNode();
- 
- 		this.updateCategoryProgress();
-@@ -991,11 +1018,7 @@ export class GettingStartedPage extends EditorPane {
- 			}
- 		}
- 
--		if (this.editorInput?.showTelemetryNotice && this.productService.openToWelcomeMainPage) {
--			const telemetryNotice = $('p.telemetry-notice');
--			this.buildTelemetryFooter(telemetryNotice);
--			footer.appendChild(telemetryNotice);
--		} else if (!this.productService.openToWelcomeMainPage && this.showFeaturedWalkthrough && this.storageService.isNew(StorageScope.APPLICATION)) {
-+		if (!this.productService.openToWelcomeMainPage && this.showFeaturedWalkthrough && this.storageService.isNew(StorageScope.APPLICATION)) {
- 			const firstSessionDateString = this.storageService.get(firstSessionDateStorageKey, StorageScope.APPLICATION) || new Date().toUTCString();
- 			const daysSinceFirstSession = ((+new Date()) - (+new Date(firstSessionDateString))) / 1000 / 60 / 60 / 24;
- 			const fistContentBehaviour = daysSinceFirstSession < 1 ? 'openToFirstCategory' : 'index';
-@@ -1016,6 +1039,177 @@ export class GettingStartedPage extends EditorPane {
- 		this.setSlide('categories');
- 	}
- 
-+	private wireHeroCreateMenu(createStack: HTMLElement, createMenu: HTMLElement): void {
-+		const toggleButton = createStack.querySelector('.hero-split-button-toggle') as HTMLButtonElement | null;
-+		if (!toggleButton) {
-+			return;
-+		}
-+
-+		const closeMenu = () => {
-+			createStack.classList.remove('is-open');
-+			createMenu.setAttribute('aria-hidden', 'true');
-+			toggleButton.setAttribute('aria-expanded', 'false');
-+		};
-+
-+		const openMenu = () => {
-+			createStack.classList.add('is-open');
-+			createMenu.setAttribute('aria-hidden', 'false');
-+			toggleButton.setAttribute('aria-expanded', 'true');
-+		};
-+
-+		this.categoriesSlideDisposables.add(addDisposableListener(toggleButton, 'click', (event) => {
-+			event.preventDefault();
-+			event.stopPropagation();
-+			if (createStack.classList.contains('is-open')) {
-+				closeMenu();
-+			} else {
-+				openMenu();
-+			}
-+		}));
-+
-+		this.categoriesSlideDisposables.add(addDisposableListener(this.container, 'click', (event) => {
-+			const target = event.target as Node | null;
-+			if (target && !createStack.contains(target)) {
-+				closeMenu();
-+			}
-+		}));
-+
-+		this.categoriesSlideDisposables.add(addDisposableListener(this.container, 'keydown', (event) => {
-+			const keyboardEvent = new StandardKeyboardEvent(event);
-+			if (keyboardEvent.keyCode === KeyCode.Escape) {
-+				closeMenu();
-+			}
-+		}));
-+
-+		createMenu.querySelectorAll('.hero-create-option').forEach(option => {
-+			this.categoriesSlideDisposables.add(addDisposableListener(option, 'click', () => {
-+				closeMenu();
-+			}));
-+		});
-+	}
-+
-+	private async populateHealthCheck(container: HTMLElement): Promise<void> {
-+		const warningIconUri = getWelcomeMediaUri('ritemark-welcome-warning.svg');
-+
-+		const getHealthStatus = async () => {
-+			try {
-+				return await this.commandService.executeCommand('ritemark.getHealthStatus') as {
-+					codexAvailable: boolean;
-+					codexAuthenticated: boolean;
-+					claudeAvailable: boolean;
-+					claudeAuthenticated: boolean;
-+					nodeInstalled: boolean;
-+					nodeVersion: string | null;
-+					gitInstalled: boolean;
-+					gitVersion: string | null;
-+				} | null;
-+			} catch (error) {
-+				if (!this.extensionService.activationEventIsDone('onStartupFinished')) {
-+					await this.extensionService.activateByEvent('onStartupFinished');
-+					return await this.commandService.executeCommand('ritemark.getHealthStatus') as {
-+						codexAvailable: boolean;
-+						codexAuthenticated: boolean;
-+						claudeAvailable: boolean;
-+						claudeAuthenticated: boolean;
-+						nodeInstalled: boolean;
-+						nodeVersion: string | null;
-+						gitInstalled: boolean;
-+						gitVersion: string | null;
-+					} | null;
-+				}
-+
-+				throw error;
-+			}
-+		};
-+
-+		const renderLaunchCheckItem = (message: string, ok: boolean, action?: { label: string; run: () => void }) => {
-+			const item = $(`div.health-item.${ok ? 'health-ok' : 'health-warning'}`, {});
-+			if (ok) {
-+				item.appendChild($('span.codicon.codicon-check.launch-check-codicon'));
-+			} else {
-+				item.appendChild($('img.launch-check-icon', { src: warningIconUri, alt: '' }));
-+			}
-+
-+			const copy = $('div.launch-check-copy', {},
-+				$('span.launch-check-message', {}, message)
-+			);
-+
-+			if (action) {
-+				const button = $('button.button-link.launch-check-action', {}, action.label);
-+				addDisposableListener(button, 'click', (event) => {
-+					event.preventDefault();
-+					event.stopPropagation();
-+					action.run();
-+				});
-+				copy.appendChild(button);
-+			}
-+
-+			item.appendChild(copy);
-+			return item;
-+		};
-+
-+		container.textContent = '';
-+		container.appendChild($('div.health-loading', {}, localize('ritemark.healthLoading', "Checking...")));
-+
-+		try {
-+			const status = await getHealthStatus();
-+
-+			container.textContent = '';
-+
-+			if (!status) {
-+				container.appendChild(renderLaunchCheckItem(localize('ritemark.healthUnavailable', "Launch check unavailable."), false));
-+				return;
-+			}
-+
-+			container.appendChild(renderLaunchCheckItem(
-+				status.codexAuthenticated
-+					? localize('ritemark.chatGptReady', "ChatGPT authenticated.")
-+					: localize('ritemark.chatGptMissing', "ChatGPT not authenticated."),
-+				status.codexAuthenticated,
-+				status.codexAuthenticated ? undefined : {
-+					label: localize('ritemark.clickHereToLogIn', "Click here to log in"),
-+					run: () => { void this.commandService.executeCommand('ritemark.codexLogin'); }
-+				}
-+			));
-+
-+			container.appendChild(renderLaunchCheckItem(
-+				status.claudeAuthenticated
-+					? localize('ritemark.claudeReady', "Claude.ai authenticated.")
-+					: localize('ritemark.claudeMissing', "Claude.ai not authenticated."),
-+				status.claudeAuthenticated,
-+				status.claudeAuthenticated ? undefined : {
-+					label: localize('ritemark.clickHereToLogIn', "Click here to log in"),
-+					run: () => { void this.commandService.executeCommand('ritemark.claudeLogin'); }
-+				}
-+			));
-+
-+			container.appendChild(renderLaunchCheckItem(
-+				status.gitInstalled
-+					? localize('ritemark.gitReady', "Ritemark found Git.")
-+					: localize('ritemark.gitMissing', "Ritemark needs Git."),
-+				status.gitInstalled,
-+				status.gitInstalled ? undefined : {
-+					label: localize('ritemark.clickHereToInstall', "Click here to install"),
-+					run: () => { void this.openerService.open(URI.parse('https://git-scm.com/downloads')); }
-+				}
-+			));
-+
-+			container.appendChild(renderLaunchCheckItem(
-+				status.nodeInstalled
-+					? localize('ritemark.nodeReady', "Ritemark found Node.")
-+					: localize('ritemark.nodeMissing', "Ritemark needs Node."),
-+				status.nodeInstalled,
-+				status.nodeInstalled ? undefined : {
-+					label: localize('ritemark.clickHereToInstall', "Click here to install"),
-+					run: () => { void this.openerService.open(URI.parse('https://nodejs.org/en/download')); }
-+				}
-+			));
-+		} catch {
-+			container.textContent = '';
-+			container.appendChild(renderLaunchCheckItem(localize('ritemark.healthError', "Could not check status."), false));
-+		}
-+	}
-+
- 	private buildRecentlyOpenedList(): GettingStartedIndexList<RecentEntry> {
- 		const renderRecent = (recent: RecentEntry) => {
- 			let fullPath: string;
-@@ -1084,7 +1278,7 @@ export class GettingStartedPage extends EditorPane {
- 
- 		const recentlyOpenedList = this.recentlyOpenedList = new GettingStartedIndexList(
- 			{
--				title: localize('recent', "Recent"),
-+				title: localize('recent', "Recent files and folders"),
- 				klass: 'recently-opened',
- 				limit: 5,
- 				empty: $('.empty-recent', {},
-@@ -1267,7 +1461,7 @@ export class GettingStartedPage extends EditorPane {
- 
- 		this.layoutMarkdown?.();
- 
--		this.container.classList.toggle('height-constrained', size.height <= 600);
-+		this.container.classList.toggle('height-constrained', size.height <= 760);
- 		this.container.classList.toggle('width-constrained', size.width <= 400);
- 		this.container.classList.toggle('width-semi-constrained', size.width <= 950);
- 
-diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
-index fefdf4c9dfe..a9e5cb81d5f 100644
---- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
-+++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
-@@ -89,7 +89,7 @@
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories {
--	padding: 12px 24px;
-+	padding: 20px 28px 24px;
- }
- 
- /* duplicated until the getting-started specific setting is removed */
-@@ -106,37 +106,33 @@
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer {
- 	display: grid;
--	height: 100%;
--	max-width: 1200px;
-+	height: auto;
-+	max-width: 1120px;
- 	margin: 0 auto;
--	grid-template-rows: 25% minmax(min-content, auto) min-content;
--	grid-template-columns: 1fr 6fr 1fr 6fr 1fr;
-+	grid-template-rows: auto auto;
-+	grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.92fr);
- 	grid-template-areas:
--		".  header header header ."
--		". left-column . right-column ."
--		". footer footer footer .";
-+		"header header"
-+		"left-column right-column";
-+	gap: 20px;
-+	align-content: start;
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer.width-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer {
--	grid-template-rows: auto min-content minmax(min-content, auto) min-content;
-+	grid-template-rows: auto minmax(min-content, auto) minmax(min-content, auto);
- 	grid-template-columns: 1fr;
--	grid-template-areas: "header" "left-column" "right-column" "footer";
-+	grid-template-areas: "header" "left-column" "right-column";
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer.height-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer {
--	grid-template-rows: auto minmax(min-content, auto) min-content;
--	grid-template-areas: "header" "left-column right-column" "footer footer";
-+	grid-template-rows: auto minmax(min-content, auto);
-+	grid-template-areas: "header header" "left-column right-column";
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer.height-constrained.width-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer {
--	grid-template-rows: min-content minmax(min-content, auto) min-content;
-+	grid-template-rows: min-content minmax(min-content, auto) minmax(min-content, auto);
- 	grid-template-columns: 1fr;
--	grid-template-areas: "left-column" "right-column" "footer";
--}
--
--.monaco-workbench .part.editor > .content .gettingStartedContainer.width-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .header,
--.monaco-workbench .part.editor > .content .gettingStartedContainer.height-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .header {
--	display: none;
-+	grid-template-areas: "header" "left-column" "right-column";
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories li.showWalkthroughsEntry {
-@@ -149,31 +145,27 @@
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > * {
--	overflow: hidden;
--	text-overflow: ellipsis;
-+	overflow: visible;
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .categories-column > div {
--	margin-bottom: 32px;
-+	margin-bottom: 0;
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .categories-column-left {
- 	grid-area: left-column;
-+	align-self: start;
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .categories-column-right {
- 	grid-area: right-column;
-+	align-self: start;
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .header {
- 	grid-area: header;
--	align-self: end;
--}
--
--.monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .footer {
--	grid-area: footer;
--	justify-self: center;
--	text-align: center;
-+	align-self: start;
-+	text-align: left;
- }
- 
- .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories .categories-slide-container {
 diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css
 new file mode 100644
 index 00000000000..22c318c5776
@@ -1357,3 +439,943 @@ index 00000000000..22c318c5776
 +.monaco-workbench .part.editor > .content .gettingStartedContainer.height-constrained .learn-ritemark {
 +	gap: 14px;
 +}
+diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
+index 31188a4ce9e..b2adc95b839 100644
+--- a/build/gulpfile.vscode.ts
++++ b/build/gulpfile.vscode.ts
+@@ -95,6 +95,10 @@ const vscodeResourceIncludes = [
+ 	// Accessibility Signals
+ 	'out-build/vs/platform/accessibilitySignal/browser/media/*.mp3',
+ 
++	// RiteMark: Custom fonts
++	'out-build/media/*.woff2',
++	'out-build/vs/workbench/browser/media/fonts/*.woff2',
++
+ 	// Welcome
+ 	'out-build/vs/workbench/contrib/welcomeGettingStarted/common/media/**/*.{svg,png}',
+ 	'out-build/vs/workbench/contrib/welcomeOnboarding/browser/media/*.svg',
+diff --git a/build/lib/optimize.ts b/build/lib/optimize.ts
+index f5e812e2890..35621379bbd 100644
+--- a/build/lib/optimize.ts
++++ b/build/lib/optimize.ts
+@@ -147,6 +147,7 @@ function bundleESMTask(opts: IBundleESMTaskOpts): NodeJS.ReadWriteStream {
+ 				target: [target],
+ 				loader: {
+ 					'.ttf': 'file',
++					'.woff2': 'file',
+ 					'.svg': 'file',
+ 					'.png': 'file',
+ 					'.sh': 'file',
+@@ -284,4 +285,3 @@ function getBuildTarget() {
+ 	const tsconfigPath = path.join(REPO_ROOT_PATH, 'src', 'tsconfig.base.json');
+ 	return getTargetStringFromTsConfig(tsconfigPath);
+ }
+-
+diff --git a/src/vs/base/browser/ui/codicons/codicon/codicon.css b/src/vs/base/browser/ui/codicons/codicon/codicon.css
+index d7f257db934..6079140d7c8 100644
+--- a/src/vs/base/browser/ui/codicons/codicon/codicon.css
++++ b/src/vs/base/browser/ui/codicons/codicon/codicon.css
+@@ -9,6 +9,14 @@
+ 	src: url("./codicon.ttf") format("truetype");
+ }
+ 
++/* RiteMark: Phosphor 200 icon font for sidebar and panel icons */
++@font-face {
++	font-family: "phosphor";
++	font-display: block;
++	font-weight: 200;
++	src: url("./phosphor.woff2") format("woff2");
++}
++
+ .codicon[class*='codicon-'] {
+ 	font: normal normal normal 16px/1 codicon;
+ 	display: inline-block;
+diff --git a/src/vs/code/electron-browser/workbench/workbench.ts b/src/vs/code/electron-browser/workbench/workbench.ts
+index 767fbe08db3..b8aaa434c7d 100644
+--- a/src/vs/code/electron-browser/workbench/workbench.ts
++++ b/src/vs/code/electron-browser/workbench/workbench.ts
+@@ -68,13 +68,17 @@
+ 		} else if (configuration.autoDetectColorScheme) {
+ 			if (configuration.colorScheme.dark) {
+ 				baseTheme = 'vs-dark';
+-				shellBackground = '#1E1E1E';
+-				shellForeground = '#CCCCCC';
++				shellBackground = '#1E1B4B';
++				shellForeground = '#F8FAFC';
+ 			} else {
+ 				baseTheme = 'vs';
+ 				shellBackground = '#FFFFFF';
+ 				shellForeground = '#000000';
+ 			}
++		} else {
++			baseTheme = 'vs';
++			shellBackground = '#FFFFFF';
++			shellForeground = '#15141A';
+ 		}
+ 
+ 		const style = document.createElement('style');
+@@ -93,7 +97,7 @@
+ 
+ 			const splash = document.createElement('div');
+ 			splash.id = 'monaco-parts-splash';
+-			splash.className = baseTheme ?? 'vs-dark';
++			splash.className = baseTheme ?? 'vs';
+ 
+ 			if (layoutInfo.windowBorder && colorInfo.windowBorder) {
+ 				const borderElement = document.createElement('div');
+diff --git a/src/vs/platform/dialogs/electron-browser/dialog.ts b/src/vs/platform/dialogs/electron-browser/dialog.ts
+index ec26804c300..ce5bad99ad8 100644
+--- a/src/vs/platform/dialogs/electron-browser/dialog.ts
++++ b/src/vs/platform/dialogs/electron-browser/dialog.ts
+@@ -5,13 +5,13 @@
+ 
+ import { fromNow } from '../../../base/common/date.js';
+ import { isLinuxSnap } from '../../../base/common/platform.js';
+-import { localize } from '../../../nls.js';
+ import { IOSProperties } from '../../native/common/native.js';
+ import { IProductService } from '../../product/common/productService.js';
+ import { process } from '../../../base/parts/sandbox/electron-browser/globals.js';
+ 
+ export function createNativeAboutDialogDetails(productService: IProductService, osProps: IOSProperties): { title: string; details: string; detailsToCopy: string } {
+-	let version = productService.version;
++	const ritemarkVersion = (productService as IProductService & { ritemarkVersion?: string }).ritemarkVersion;
++	let version = ritemarkVersion || productService.version;
+ 	if (productService.target) {
+ 		version = `${version} (${productService.target} setup)`;
+ 	} else if (productService.darwinUniversalAssetId) {
+@@ -19,25 +19,28 @@ export function createNativeAboutDialogDetails(productService: IProductService,
+ 	}
+ 
+ 	const getDetails = (useAgo: boolean): string => {
+-		return localize({ key: 'aboutDetail', comment: ['Electron, Chromium, Node.js and V8 are product names that need no translation'] },
+-			"Version: {0}\nCommit: {1}\nDate: {2}\nElectron: {3}\nElectronBuildId: {4}\nChromium: {5}\nNode.js: {6}\nV8: {7}\nOS: {8}",
+-			version,
+-			productService.commit || 'Unknown',
+-			productService.date ? `${productService.date}${useAgo ? ' (' + fromNow(new Date(productService.date), true) + ')' : ''}` : 'Unknown',
+-			process.versions['electron'],
+-			process.versions['microsoft-build'],
+-			process.versions['chrome'],
+-			process.versions['node'],
+-			process.versions['v8'],
+-			`${osProps.type} ${osProps.arch} ${osProps.release}${isLinuxSnap ? ' snap' : ''}`
+-		);
++		const details = [
++			`Version: ${version}`,
++			productService.commit ? `Commit: ${productService.commit}` : undefined,
++			productService.date ? `Date: ${productService.date}${useAgo ? ' (' + fromNow(new Date(productService.date), true) + ')' : ''}` : undefined,
++			`Electron: ${process.versions['electron']}`,
++			process.versions['microsoft-build'] ? `ElectronBuildId: ${process.versions['microsoft-build']}` : undefined,
++			`Chromium: ${process.versions['chrome']}`,
++			`Node.js: ${process.versions['node']}`,
++			`V8: ${process.versions['v8']}`,
++			`OS: ${osProps.type} ${osProps.arch} ${osProps.release}${isLinuxSnap ? ' snap' : ''}`
++		].filter((detail): detail is string => !!detail);
++
++		return details.join('\n');
+ 	};
+ 
+ 	const details = getDetails(true);
+ 	const detailsToCopy = getDetails(false);
+ 
++	const title = productService.nameShort.replace(/ Dev$/, '');
++
+ 	return {
+-		title: productService.nameLong,
++		title: title,
+ 		details: details,
+ 		detailsToCopy: detailsToCopy
+ 	};
+diff --git a/src/vs/platform/theme/common/iconRegistry.ts b/src/vs/platform/theme/common/iconRegistry.ts
+index 9feac0c4ca4..52d2738d73a 100644
+--- a/src/vs/platform/theme/common/iconRegistry.ts
++++ b/src/vs/platform/theme/common/iconRegistry.ts
+@@ -319,6 +319,45 @@ function initialize() {
+ }
+ initialize();
+ 
++// RiteMark: Phosphor 200 icon font registration
++const PhosphorIcons = {
++	folder: 0xe24a, folderOpen: 0xe256, files: 0xe710, file: 0xe230,
++	fileText: 0xe23a, search: 0xe30c, gitBranch: 0xe278, settings: 0xe270,
++	user: 0xe4c4, sparkle: 0xe6a4, bookOpen: 0xe0e6, fileOutput: 0xe61e,
++	terminal: 0xe47e, triangleAlert: 0xe4e0, clock: 0xe19a, list: 0xe2f0,
++} as const;
++
++const phosphorFontDefinition: IconFontDefinition = {
++	weight: '200',
++	src: [{ location: URI.parse('phosphor.woff2'), format: 'woff2' }]
++};
++iconRegistry.registerIconFont('phosphor', phosphorFontDefinition);
++
++const phosphorFont: IconFontContribution = { id: 'phosphor', definition: phosphorFontDefinition };
++for (const [name, code] of Object.entries(PhosphorIcons)) {
++	const fontCharacter = '\\' + code.toString(16);
++	iconRegistry.registerIcon(`phosphor-${name}`, { font: phosphorFont, fontCharacter });
++}
++
++export const Phosphor = {
++	folder: { id: 'phosphor-folder' } as ThemeIcon,
++	folderOpen: { id: 'phosphor-folderOpen' } as ThemeIcon,
++	files: { id: 'phosphor-files' } as ThemeIcon,
++	file: { id: 'phosphor-file' } as ThemeIcon,
++	fileText: { id: 'phosphor-fileText' } as ThemeIcon,
++	search: { id: 'phosphor-search' } as ThemeIcon,
++	gitBranch: { id: 'phosphor-gitBranch' } as ThemeIcon,
++	settings: { id: 'phosphor-settings' } as ThemeIcon,
++	user: { id: 'phosphor-user' } as ThemeIcon,
++	sparkle: { id: 'phosphor-sparkle' } as ThemeIcon,
++	bookOpen: { id: 'phosphor-bookOpen' } as ThemeIcon,
++	fileOutput: { id: 'phosphor-fileOutput' } as ThemeIcon,
++	terminal: { id: 'phosphor-terminal' } as ThemeIcon,
++	triangleAlert: { id: 'phosphor-triangleAlert' } as ThemeIcon,
++	clock: { id: 'phosphor-clock' } as ThemeIcon,
++	list: { id: 'phosphor-list' } as ThemeIcon,
++};
++
+ export const iconsSchemaId = 'vscode://schemas/icons';
+ 
+ const schemaRegistry = platform.Registry.as<IJSONContributionRegistry>(JSONExtensions.JSONContribution);
+diff --git a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
+index 9e9258c04e8..41a30a37016 100644
+--- a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
++++ b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
+@@ -210,12 +210,12 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
+ 	}
+ 
+ 	private getStoredBaseTheme(): ThemeTypeSelector {
+-		const baseTheme = this.stateService.getItem<ThemeTypeSelector>(THEME_STORAGE_KEY, ThemeTypeSelector.VS_DARK).split(' ')[0];
++		const baseTheme = this.stateService.getItem<ThemeTypeSelector>(THEME_STORAGE_KEY, ThemeTypeSelector.VS).split(' ')[0];
+ 		switch (baseTheme) {
+ 			case ThemeTypeSelector.VS: return ThemeTypeSelector.VS;
+ 			case ThemeTypeSelector.HC_BLACK: return ThemeTypeSelector.HC_BLACK;
+ 			case ThemeTypeSelector.HC_LIGHT: return ThemeTypeSelector.HC_LIGHT;
+-			default: return ThemeTypeSelector.VS_DARK;
++			default: return ThemeTypeSelector.VS;
+ 		}
+ 	}
+ 
+diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
+index 1f6e583f5e0..20be7b0b06e 100644
+--- a/src/vs/workbench/browser/media/style.css
++++ b/src/vs/workbench/browser/media/style.css
+@@ -7,26 +7,50 @@
+ 
+ @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+ 
++/* RiteMark: Custom UI font */
++:root {
++	--ritemark-ui-font-family: "Sofia Sans";
++}
++
++/* RiteMark: Sofia Sans font-face declarations */
++@font-face {
++	font-family: "Sofia Sans";
++	font-style: normal;
++	font-weight: 100 900;
++	font-display: swap;
++	src: url("./fonts/SofiaSans-latin.woff2") format("woff2");
++	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
++}
++
++@font-face {
++	font-family: "Sofia Sans";
++	font-style: normal;
++	font-weight: 100 900;
++	font-display: swap;
++	src: url("./fonts/SofiaSans-latin-ext.woff2") format("woff2");
++	unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
++}
++
+ /* Font Families (with CJK support) */
+ 
+-.monaco-workbench.mac { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+-.monaco-workbench.mac:lang(zh-Hans) { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; }
+-.monaco-workbench.mac:lang(zh-Hant) { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
+-.monaco-workbench.mac:lang(ja) { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
+-.monaco-workbench.mac:lang(ko) { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
++.monaco-workbench.mac { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, sans-serif; }
++.monaco-workbench.mac:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; }
++.monaco-workbench.mac:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
++.monaco-workbench.mac:lang(ja) { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
++.monaco-workbench.mac:lang(ko) { font-family: var(--ritemark-ui-font-family), -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
+ 
+-.monaco-workbench.windows { font-family: "Segoe WPC", "Segoe UI", sans-serif; }
+-.monaco-workbench.windows:lang(zh-Hans) { font-family: "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
+-.monaco-workbench.windows:lang(zh-Hant) { font-family: "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
+-.monaco-workbench.windows:lang(ja) { font-family: "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
+-.monaco-workbench.windows:lang(ko) { font-family: "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
++.monaco-workbench.windows { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", sans-serif; }
++.monaco-workbench.windows:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
++.monaco-workbench.windows:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
++.monaco-workbench.windows:lang(ja) { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
++.monaco-workbench.windows:lang(ko) { font-family: var(--ritemark-ui-font-family), "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
+ 
+ /* Linux: add `system-ui` as first font and not `Ubuntu` to allow other distribution pick their standard OS font */
+-.monaco-workbench.linux { font-family: system-ui, "Ubuntu", "Droid Sans", sans-serif; }
+-.monaco-workbench.linux:lang(zh-Hans) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", sans-serif; }
+-.monaco-workbench.linux:lang(zh-Hant) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
+-.monaco-workbench.linux:lang(ja) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
+-.monaco-workbench.linux:lang(ko) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
++.monaco-workbench.linux { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", sans-serif; }
++.monaco-workbench.linux:lang(zh-Hans) { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", sans-serif; }
++.monaco-workbench.linux:lang(zh-Hant) { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
++.monaco-workbench.linux:lang(ja) { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
++.monaco-workbench.linux:lang(ko) { font-family: var(--ritemark-ui-font-family), system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
+ 
+ .monaco-workbench.mac { --monaco-monospace-font: "SF Mono", Monaco, Menlo, Courier, monospace; }
+ .monaco-workbench.windows { --monaco-monospace-font: Consolas, "Courier New", monospace; }
+diff --git a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
+index ba678499fec..3a490837e9b 100644
+--- a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
++++ b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
+@@ -217,7 +217,7 @@ const separatorIcon = registerIcon('breadcrumb-separator', Codicon.chevronRight,
+ 
+ export class BreadcrumbsControl {
+ 
+-	static readonly HEIGHT = 22;
++	static readonly HEIGHT = 40;
+ 
+ 	private static readonly SCROLLBAR_SIZES = {
+ 		default: 3,
+diff --git a/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css b/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
+index a24f76131a8..10bb8f074c5 100644
+--- a/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
++++ b/src/vs/workbench/browser/parts/editor/media/editortitlecontrol.css
+@@ -7,23 +7,23 @@
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control {
+ 	flex: 1 100%;
+-	height: 22px;
++	height: 40px;
+ 	cursor: default;
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-icon-label {
+-	height: 22px;
+-	line-height: 22px;
++	height: 40px;
++	line-height: 40px;
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-icon-label::before {
+-	height: 22px; /* tweak the icon size of the editor labels when icons are enabled */
++	height: 40px; /* tweak the icon size of the editor labels when icons are enabled */
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .outline-element-icon {
+ 	padding-right: 3px;
+-	height: 22px; /* tweak the icon size of the editor labels when icons are enabled */
+-	line-height: 22px;
++	height: 40px; /* tweak the icon size of the editor labels when icons are enabled */
++	line-height: 40px;
+ }
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item {
+@@ -32,7 +32,7 @@
+ 
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item::before {
+ 	width: 16px;
+-	height: 22px;
++	height: 40px;
+ 	display: flex;
+ 	align-items: center;
+ 	justify-content: center;
+@@ -45,3 +45,12 @@
+ .monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-breadcrumb-item:last-child .codicon:last-child {
+ 	display: none; /* hides chevrons when last item */
+ }
++
++/* RiteMark: Breadcrumb icon styling */
++.monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .monaco-icon-label::before {
++	filter: grayscale(1);
++}
++
++.monaco-workbench .part.editor > .content .editor-group-container > .title .breadcrumbs-below-tabs .breadcrumbs-control .codicon {
++	opacity: 0.6;
++}
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
+index 5a5f9180bfa..52c3ecd5db6 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
+@@ -327,7 +327,7 @@ configurationRegistry.registerConfiguration({
+ 				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.terminal' }, "Open a new terminal in the editor area."),
+ 				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.agentSessionsWelcomePage' }, "Open the Agent Sessions Welcome page. Will override the workbench secondary side bar visibility settings."),
+ 			],
+-			'default': 'welcomePage',
++			'default': 'welcomePageInEmptyWorkbench',
+ 			'description': localize('workbench.startupEditor', "Controls which editor is shown at startup, if none are restored from the previous session."),
+ 			'experiment': { mode: 'auto' }
+ 		},
+@@ -356,4 +356,3 @@ registerWorkbenchContribution2(StartupPageEditorResolverContribution.ID, Startup
+ registerWorkbenchContribution2(StartupPageRunnerContribution.ID, StartupPageRunnerContribution, WorkbenchPhase.AfterRestored);
+ 
+ AccessibleViewRegistry.register(new GettingStartedAccessibleView());
+-
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+index ada4767733a..200409ec708 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+@@ -10,24 +10,23 @@ import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js
+ import { Button } from '../../../../base/browser/ui/button/button.js';
+ import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
+ import { DomScrollableElement } from '../../../../base/browser/ui/scrollbar/scrollableElement.js';
+-import { Toggle } from '../../../../base/browser/ui/toggle/toggle.js';
+ import { coalesce, equals } from '../../../../base/common/arrays.js';
+ import { Delayer, Throttler } from '../../../../base/common/async.js';
+ import { CancellationToken } from '../../../../base/common/cancellation.js';
+-import { Codicon } from '../../../../base/common/codicons.js';
+ import { onUnexpectedError } from '../../../../base/common/errors.js';
+ import { KeyCode } from '../../../../base/common/keyCodes.js';
+ import { splitRecentLabel } from '../../../../base/common/labels.js';
+ import { DisposableStore, toDisposable } from '../../../../base/common/lifecycle.js';
+ import { ILink, LinkedText } from '../../../../base/common/linkedText.js';
+ import { parse } from '../../../../base/common/marshalling.js';
+-import { Schemas, matchesScheme } from '../../../../base/common/network.js';
++import { FileAccess, Schemas, matchesScheme } from '../../../../base/common/network.js';
+ import { OS } from '../../../../base/common/platform.js';
+ import { ThemeIcon } from '../../../../base/common/themables.js';
+ import { assertReturnsDefined } from '../../../../base/common/types.js';
+ import { URI } from '../../../../base/common/uri.js';
+ import { generateUuid } from '../../../../base/common/uuid.js';
+ import './media/gettingStarted.css';
++import './media/gettingStartedGuide.css';
+ import { ILanguageService } from '../../../../editor/common/languages/language.js';
+ import { IMarkdownRendererService } from '../../../../platform/markdown/browser/markdownRenderer.js';
+ import { localize } from '../../../../nls.js';
+@@ -47,7 +46,7 @@ import { IQuickInputService } from '../../../../platform/quickinput/common/quick
+ import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
+ import { firstSessionDateStorageKey, ITelemetryService, TelemetryLevel } from '../../../../platform/telemetry/common/telemetry.js';
+ import { getTelemetryLevel } from '../../../../platform/telemetry/common/telemetryUtils.js';
+-import { defaultButtonStyles, defaultKeybindingLabelStyles, defaultToggleStyles } from '../../../../platform/theme/browser/defaultStyles.js';
++import { defaultButtonStyles, defaultKeybindingLabelStyles } from '../../../../platform/theme/browser/defaultStyles.js';
+ import { IWindowOpenable } from '../../../../platform/window/common/window.js';
+ import { IWorkspaceContextService, UNKNOWN_EMPTY_WINDOW_WORKSPACE } from '../../../../platform/workspace/common/workspace.js';
+ import { IRecentFolder, IRecentWorkspace, IRecentlyOpened, IWorkspacesService, isRecentFolder, isRecentWorkspace } from '../../../../platform/workspaces/common/workspaces.js';
+@@ -69,14 +68,12 @@ import { IExtensionService } from '../../../services/extensions/common/extension
+ import { IHostService } from '../../../services/host/browser/host.js';
+ import { IWorkbenchThemeService } from '../../../services/themes/common/workbenchThemeService.js';
+ import { GettingStartedIndexList } from './gettingStartedList.js';
+-import { canShowAgentsBanner, createAgentsBanner } from '../../chat/browser/agentSessions/agentSessionsBanner.js';
+ import { AccessibilityVerbositySettingId } from '../../accessibility/browser/accessibilityConfiguration.js';
+ import { AccessibleViewAction } from '../../accessibility/browser/accessibleViewActions.js';
+ import { KeybindingLabel } from '../../../../base/browser/ui/keybindingLabel/keybindingLabel.js';
+ import { ScrollbarVisibility } from '../../../../base/common/scrollable.js';
+ 
+ const SLIDE_TRANSITION_TIME_MS = 250;
+-const configurationKey = 'workbench.startupEditor';
+ 
+ export const allWalkthroughsHiddenContext = new RawContextKey<boolean>('allWalkthroughsHidden', false);
+ export const inWelcomeContext = new RawContextKey<boolean>('inWelcome', false);
+@@ -118,6 +115,7 @@ type GettingStartedActionEvent = {
+ type RecentEntry = (IRecentFolder | IRecentWorkspace) & { id: string };
+ 
+ const REDUCED_MOTION_KEY = 'workbench.welcomePage.preferReducedMotion';
++const getWelcomeMediaUri = (path: string) => FileAccess.asBrowserUri(`vs/workbench/contrib/welcomeGettingStarted/browser/media/${path}`).toString(true);
+ export class GettingStartedPage extends EditorPane {
+ 
+ 	public static readonly ID = 'gettingStartedPage';
+@@ -496,6 +494,10 @@ export class GettingStartedPage extends EditorPane {
+ 				this.openerService.open(argument);
+ 				break;
+ 			}
++			case 'runCommand': {
++				this.runStepCommand(`command:${argument}`);
++				break;
++			}
+ 			default: {
+ 				console.error('Dispatch to', command, argument, 'not defined');
+ 				break;
+@@ -893,93 +895,104 @@ export class GettingStartedPage extends EditorPane {
+ 	private async buildCategoriesSlide(preserveFocus?: boolean) {
+ 
+ 		this.categoriesSlideDisposables.clear();
+-		const showOnStartupCheckbox = new Toggle({
+-			icon: Codicon.check,
+-			actionClassName: 'getting-started-checkbox',
+-			isChecked: this.configurationService.getValue(configurationKey) === 'welcomePage',
+-			title: localize('checkboxTitle', "When checked, this page will be shown on startup."),
+-			...defaultToggleStyles
+-		});
+-		showOnStartupCheckbox.domNode.id = 'showOnStartup';
+-		const showOnStartupLabel = $('label.caption', { for: 'showOnStartup' }, localize('welcomePage.showOnStartup', "Show welcome page on startup"));
+-		const onShowOnStartupChanged = () => {
+-			if (showOnStartupCheckbox.checked) {
+-				this.telemetryService.publicLog2<GettingStartedActionEvent, GettingStartedActionClassification>('gettingStarted.ActionExecuted', { command: 'showOnStartupChecked', argument: undefined, walkthroughId: this.currentWalkthrough?.id });
+-				this.configurationService.updateValue(configurationKey, 'welcomePage');
+-			} else {
+-				this.telemetryService.publicLog2<GettingStartedActionEvent, GettingStartedActionClassification>('gettingStarted.ActionExecuted', { command: 'showOnStartupUnchecked', argument: undefined, walkthroughId: this.currentWalkthrough?.id });
+-				this.configurationService.updateValue(configurationKey, 'none');
+-			}
+-		};
+-		this.categoriesSlideDisposables.add(showOnStartupCheckbox);
+-		this.categoriesSlideDisposables.add(showOnStartupCheckbox.onChange(() => {
+-			onShowOnStartupChanged();
+-		}));
+-		this.categoriesSlideDisposables.add(addDisposableListener(showOnStartupLabel, 'click', () => {
+-			showOnStartupCheckbox.checked = !showOnStartupCheckbox.checked;
+-			onShowOnStartupChanged();
+-		}));
++		const heroLogo = getWelcomeMediaUri('ritemark-welcome-logo-full.svg');
++		const gettingStartedIcon = getWelcomeMediaUri('ritemark-welcome-icon-book.svg');
++		const supportArticlesIcon = getWelcomeMediaUri('ritemark-welcome-icon-life-buoy.svg');
++		const blogIcon = getWelcomeMediaUri('ritemark-welcome-icon-newspaper.svg');
++
++		const createMenu = $('div.hero-create-menu', { 'aria-hidden': 'true' },
++			$('button.button-link.hero-create-option', { 'x-dispatch': 'runCommand:ritemark.newDocument' },
++				$('span.codicon.codicon-file.hero-create-option-icon', {}),
++				$('span.hero-create-option-copy', {},
++					$('span.hero-create-option-title', {}, localize('ritemark.newDocument', "New document")),
++					$('span.hero-create-option-description', {}, localize('ritemark.newDocumentDescription', "Blank markdown document"))
++				)
++			),
++			$('button.button-link.hero-create-option', { 'x-dispatch': 'runCommand:ritemark.newTable' },
++				$('span.codicon.codicon-table.hero-create-option-icon', {}),
++				$('span.hero-create-option-copy', {},
++					$('span.hero-create-option-title', {}, localize('ritemark.newTable', "New table")),
++					$('span.hero-create-option-description', {}, localize('ritemark.newTableDescription', "CSV with 10 columns and 20 empty rows"))
++				)
++			),
++			$('button.button-link.hero-create-option', { 'x-dispatch': 'runCommand:ritemark.flows.new' },
++				$('span.codicon.codicon-graph-line.hero-create-option-icon', {}),
++				$('span.hero-create-option-copy', {},
++					$('span.hero-create-option-title', {}, localize('ritemark.newFlow', "New flow")),
++					$('span.hero-create-option-description', {}, localize('ritemark.newFlowDescription', "Create a starter workflow in your project folder"))
++				)
++			)
++		);
+ 
+-		const header = $('.header', {},
+-			$('h1.product-name.caption', {}, this.productService.nameLong),
+-			$('p.subtitle.description', {}, localize({ key: 'gettingStarted.editingEvolved', comment: ['Shown as subtitle on the Welcome page.'] }, "Editing evolved"))
++		const createStack = $('div.hero-create-stack', {},
++			$('div.hero-split-button', {},
++				$('button.button-link.hero-cta.hero-cta-primary.hero-split-button-main', { 'x-dispatch': 'runCommand:ritemark.newDocument' },
++					$('span', {}, localize('ritemark.newDocument', "New document"))
++				),
++				$('button.button-link.hero-cta.hero-cta-primary.hero-split-button-toggle', {
++					'aria-label': localize('ritemark.newMenu', "Create new..."),
++					'aria-haspopup': 'menu',
++					'aria-expanded': 'false'
++				},
++					$('span.codicon.codicon-chevron-down', {})
++				)
++			),
++			createMenu
+ 		);
+ 
+-		const leftColumn = $('.categories-column.categories-column-left', {},);
+-		const rightColumn = $('.categories-column.categories-column-right', {},);
++		const heroActions = $('.hero-actions', {},
++			createStack,
++			$('button.button-link.hero-cta.hero-cta-secondary', { 'x-dispatch': 'openFolder' },
++				$('span', {}, localize('ritemark.openFolder', "Open folder"))
++			),
++		);
+ 
+-		const startList = this.buildStartList();
+-		const recentList = this.buildRecentlyOpenedList();
+-		const gettingStartedList = this.buildGettingStartedWalkthroughsList();
++		const heroMeta = $('.hero-meta', {},
++			$('div.learn-ritemark.learn-ritemark-inline', {},
++				$('button.button-link', { 'x-dispatch': 'openLink:https://ritemark.app/en/support/getting-started?utm_source=ritemark_app&utm_medium=welcome&utm_campaign=sprint_43_welcome' },
++					$('img.learn-ritemark-icon', { src: gettingStartedIcon, alt: '' }),
++					$('span', {}, localize('ritemark.gettingStarted', "Getting started"))
++				),
++				$('button.button-link', { 'x-dispatch': 'openLink:https://ritemark.app/en/support/?utm_source=ritemark_app&utm_medium=welcome&utm_campaign=sprint_43_welcome' },
++					$('img.learn-ritemark-icon', { src: supportArticlesIcon, alt: '' }),
++					$('span', {}, localize('ritemark.supportArticles', "Support articles"))
++				),
++				$('button.button-link', { 'x-dispatch': 'openLink:https://ritemark.app/en/blog/?utm_source=ritemark_app&utm_medium=welcome&utm_campaign=sprint_43_welcome' },
++					$('img.learn-ritemark-icon', { src: blogIcon, alt: '' }),
++					$('span', {}, localize('ritemark.blog', "Blog"))
++				),
++			)
++		);
+ 
+-		const footerChildren: HTMLElement[] = [];
+-		if (canShowAgentsBanner(this.productService)) {
+-			const agentsBanner = createAgentsBanner(
+-				{
+-					cssClass: 'getting-started-category.agents-banner',
+-					source: 'welcomePage',
+-				},
+-				this.commandService,
+-				this.telemetryService,
+-			);
+-			this.categoriesSlideDisposables.add(agentsBanner.disposables);
+-			footerChildren.push(agentsBanner.element);
+-		}
+-		footerChildren.push($('p.showOnStartup', {},
+-			showOnStartupCheckbox.domNode,
+-			showOnStartupLabel,
+-		));
++		const header = $('.header.hero-shell', {},
++			$('img.hero-brand-full', { src: heroLogo, alt: localize('ritemark.brandName', "Ritemark") }),
++			$('p.hero-tagline', {},
++				$('span', {}, localize('ritemark.heroLead', "Write Smarter. ")),
++				$('span.hero-tagline-accent', {}, localize('ritemark.heroAccent', "Think Faster."))
++			),
++			heroActions,
++			heroMeta
++		);
+ 
+-		const footer = $('.footer', {}, ...footerChildren);
++		const leftColumn = $('.categories-column.categories-column-left', {},);
++		const rightColumn = $('.categories-column.categories-column-right', {},);
+ 
+-		const layoutLists = () => {
+-			if (gettingStartedList.itemCount) {
+-				this.container.classList.remove('noWalkthroughs');
+-				reset(rightColumn, gettingStartedList.getDomElement());
+-			}
+-			else {
+-				this.container.classList.add('noWalkthroughs');
+-				reset(rightColumn);
+-			}
+-			setTimeout(() => this.categoriesPageScrollbar?.scanDomNode(), 50);
+-			layoutRecentList();
+-		};
++		const recentList = this.buildRecentlyOpenedList();
++		recentList.setLimit(6);
++		reset(leftColumn, $('.welcome-column.welcome-column-recent', {}, recentList.getDomElement()));
+ 
+-		const layoutRecentList = () => {
+-			if (this.container.classList.contains('noWalkthroughs')) {
+-				recentList.setLimit(10);
+-				reset(leftColumn, startList.getDomElement());
+-				reset(rightColumn, recentList.getDomElement());
+-			} else {
+-				recentList.setLimit(5);
+-				reset(leftColumn, startList.getDomElement(), recentList.getDomElement());
+-			}
+-		};
++		this.buildStartList();
++		this.buildGettingStartedWalkthroughsList();
+ 
+-		gettingStartedList.onDidChange(layoutLists);
+-		layoutLists();
++		const healthCheckSection = $('.welcome-column.welcome-column-launch-check.health-check-section', {},
++			$('h3.category-title', {}, localize('ritemark.healthCheck', "Launch check")),
++			$('div.health-check-items', {})
++		);
++		reset(rightColumn, healthCheckSection);
++		this.populateHealthCheck(healthCheckSection.querySelector('.health-check-items')!);
+ 
+-		reset(this.categoriesSlide, $('.gettingStartedCategoriesContainer', {}, header, leftColumn, rightColumn, footer,));
++		reset(this.categoriesSlide, $('.gettingStartedCategoriesContainer', {}, header, leftColumn, rightColumn));
++		this.wireHeroCreateMenu(createStack, createMenu);
+ 		this.categoriesPageScrollbar?.scanDomNode();
+ 
+ 		this.updateCategoryProgress();
+@@ -1005,11 +1018,7 @@ export class GettingStartedPage extends EditorPane {
+ 			}
+ 		}
+ 
+-		if (this.editorInput?.showTelemetryNotice && this.productService.openToWelcomeMainPage) {
+-			const telemetryNotice = $('p.telemetry-notice');
+-			this.buildTelemetryFooter(telemetryNotice);
+-			footer.appendChild(telemetryNotice);
+-		} else if (!this.productService.openToWelcomeMainPage && this.showFeaturedWalkthrough && this.storageService.isNew(StorageScope.APPLICATION) && !this.configurationService.getValue<boolean>('workbench.welcomePage.experimentalOnboarding')) {
++		if (!this.productService.openToWelcomeMainPage && this.showFeaturedWalkthrough && this.storageService.isNew(StorageScope.APPLICATION)) {
+ 			const firstSessionDateString = this.storageService.get(firstSessionDateStorageKey, StorageScope.APPLICATION) || new Date().toUTCString();
+ 			const daysSinceFirstSession = ((+new Date()) - (+new Date(firstSessionDateString))) / 1000 / 60 / 60 / 24;
+ 			const fistContentBehaviour = daysSinceFirstSession < 1 ? 'openToFirstCategory' : 'index';
+@@ -1030,6 +1039,177 @@ export class GettingStartedPage extends EditorPane {
+ 		this.setSlide('categories');
+ 	}
+ 
++	private wireHeroCreateMenu(createStack: HTMLElement, createMenu: HTMLElement): void {
++		const toggleButton = createStack.querySelector('.hero-split-button-toggle') as HTMLButtonElement | null;
++		if (!toggleButton) {
++			return;
++		}
++
++		const closeMenu = () => {
++			createStack.classList.remove('is-open');
++			createMenu.setAttribute('aria-hidden', 'true');
++			toggleButton.setAttribute('aria-expanded', 'false');
++		};
++
++		const openMenu = () => {
++			createStack.classList.add('is-open');
++			createMenu.setAttribute('aria-hidden', 'false');
++			toggleButton.setAttribute('aria-expanded', 'true');
++		};
++
++		this.categoriesSlideDisposables.add(addDisposableListener(toggleButton, 'click', (event) => {
++			event.preventDefault();
++			event.stopPropagation();
++			if (createStack.classList.contains('is-open')) {
++				closeMenu();
++			} else {
++				openMenu();
++			}
++		}));
++
++		this.categoriesSlideDisposables.add(addDisposableListener(this.container, 'click', (event) => {
++			const target = event.target as Node | null;
++			if (target && !createStack.contains(target)) {
++				closeMenu();
++			}
++		}));
++
++		this.categoriesSlideDisposables.add(addDisposableListener(this.container, 'keydown', (event) => {
++			const keyboardEvent = new StandardKeyboardEvent(event);
++			if (keyboardEvent.keyCode === KeyCode.Escape) {
++				closeMenu();
++			}
++		}));
++
++		createMenu.querySelectorAll('.hero-create-option').forEach(option => {
++			this.categoriesSlideDisposables.add(addDisposableListener(option, 'click', () => {
++				closeMenu();
++			}));
++		});
++	}
++
++	private async populateHealthCheck(container: HTMLElement): Promise<void> {
++		const warningIconUri = getWelcomeMediaUri('ritemark-welcome-warning.svg');
++
++		const getHealthStatus = async () => {
++			try {
++				return await this.commandService.executeCommand('ritemark.getHealthStatus') as {
++					codexAvailable: boolean;
++					codexAuthenticated: boolean;
++					claudeAvailable: boolean;
++					claudeAuthenticated: boolean;
++					nodeInstalled: boolean;
++					nodeVersion: string | null;
++					gitInstalled: boolean;
++					gitVersion: string | null;
++				} | null;
++			} catch (error) {
++				if (!this.extensionService.activationEventIsDone('onStartupFinished')) {
++					await this.extensionService.activateByEvent('onStartupFinished');
++					return await this.commandService.executeCommand('ritemark.getHealthStatus') as {
++						codexAvailable: boolean;
++						codexAuthenticated: boolean;
++						claudeAvailable: boolean;
++						claudeAuthenticated: boolean;
++						nodeInstalled: boolean;
++						nodeVersion: string | null;
++						gitInstalled: boolean;
++						gitVersion: string | null;
++					} | null;
++				}
++
++				throw error;
++			}
++		};
++
++		const renderLaunchCheckItem = (message: string, ok: boolean, action?: { label: string; run: () => void }) => {
++			const item = $(`div.health-item.${ok ? 'health-ok' : 'health-warning'}`, {});
++			if (ok) {
++				item.appendChild($('span.codicon.codicon-check.launch-check-codicon'));
++			} else {
++				item.appendChild($('img.launch-check-icon', { src: warningIconUri, alt: '' }));
++			}
++
++			const copy = $('div.launch-check-copy', {},
++				$('span.launch-check-message', {}, message)
++			);
++
++			if (action) {
++				const button = $('button.button-link.launch-check-action', {}, action.label);
++				addDisposableListener(button, 'click', (event) => {
++					event.preventDefault();
++					event.stopPropagation();
++					action.run();
++				});
++				copy.appendChild(button);
++			}
++
++			item.appendChild(copy);
++			return item;
++		};
++
++		container.textContent = '';
++		container.appendChild($('div.health-loading', {}, localize('ritemark.healthLoading', "Checking...")));
++
++		try {
++			const status = await getHealthStatus();
++
++			container.textContent = '';
++
++			if (!status) {
++				container.appendChild(renderLaunchCheckItem(localize('ritemark.healthUnavailable', "Launch check unavailable."), false));
++				return;
++			}
++
++			container.appendChild(renderLaunchCheckItem(
++				status.codexAuthenticated
++					? localize('ritemark.chatGptReady', "ChatGPT authenticated.")
++					: localize('ritemark.chatGptMissing', "ChatGPT not authenticated."),
++				status.codexAuthenticated,
++				status.codexAuthenticated ? undefined : {
++					label: localize('ritemark.clickHereToLogIn', "Click here to log in"),
++					run: () => { void this.commandService.executeCommand('ritemark.codexLogin'); }
++				}
++			));
++
++			container.appendChild(renderLaunchCheckItem(
++				status.claudeAuthenticated
++					? localize('ritemark.claudeReady', "Claude.ai authenticated.")
++					: localize('ritemark.claudeMissing', "Claude.ai not authenticated."),
++				status.claudeAuthenticated,
++				status.claudeAuthenticated ? undefined : {
++					label: localize('ritemark.clickHereToLogIn', "Click here to log in"),
++					run: () => { void this.commandService.executeCommand('ritemark.claudeLogin'); }
++				}
++			));
++
++			container.appendChild(renderLaunchCheckItem(
++				status.gitInstalled
++					? localize('ritemark.gitReady', "Ritemark found Git.")
++					: localize('ritemark.gitMissing', "Ritemark needs Git."),
++				status.gitInstalled,
++				status.gitInstalled ? undefined : {
++					label: localize('ritemark.clickHereToInstall', "Click here to install"),
++					run: () => { void this.openerService.open(URI.parse('https://git-scm.com/downloads')); }
++				}
++			));
++
++			container.appendChild(renderLaunchCheckItem(
++				status.nodeInstalled
++					? localize('ritemark.nodeReady', "Ritemark found Node.")
++					: localize('ritemark.nodeMissing', "Ritemark needs Node."),
++				status.nodeInstalled,
++				status.nodeInstalled ? undefined : {
++					label: localize('ritemark.clickHereToInstall', "Click here to install"),
++					run: () => { void this.openerService.open(URI.parse('https://nodejs.org/en/download')); }
++				}
++			));
++		} catch {
++			container.textContent = '';
++			container.appendChild(renderLaunchCheckItem(localize('ritemark.healthError', "Could not check status."), false));
++		}
++	}
++
+ 	private buildRecentlyOpenedList(): GettingStartedIndexList<RecentEntry> {
+ 		const renderRecent = (recent: RecentEntry) => {
+ 			let fullPath: string;
+@@ -1098,7 +1278,7 @@ export class GettingStartedPage extends EditorPane {
+ 
+ 		const recentlyOpenedList = this.recentlyOpenedList = new GettingStartedIndexList(
+ 			{
+-				title: localize('recent', "Recent"),
++				title: localize('recent', "Recent files and folders"),
+ 				klass: 'recently-opened',
+ 				limit: 5,
+ 				empty: $('.empty-recent', {},
+@@ -1281,7 +1461,7 @@ export class GettingStartedPage extends EditorPane {
+ 
+ 		this.layoutMarkdown?.();
+ 
+-		this.container.classList.toggle('height-constrained', size.height <= 600);
++		this.container.classList.toggle('height-constrained', size.height <= 760);
+ 		this.container.classList.toggle('width-constrained', size.width <= 400);
+ 		this.container.classList.toggle('width-semi-constrained', size.width <= 950);
+ 
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
+index c661d88076c..7d73c563b95 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
+@@ -89,7 +89,7 @@
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories {
+-	padding: 12px 24px;
++	padding: 20px 28px 24px;
+ }
+ 
+ /* duplicated until the getting-started specific setting is removed */
+@@ -106,37 +106,33 @@
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer {
+ 	display: grid;
+-	height: 100%;
+-	max-width: 1200px;
++	height: auto;
++	max-width: 1120px;
+ 	margin: 0 auto;
+-	grid-template-rows: 25% minmax(min-content, auto) min-content;
+-	grid-template-columns: 1fr 6fr 1fr 6fr 1fr;
++	grid-template-rows: auto auto;
++	grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.92fr);
+ 	grid-template-areas:
+-		".  header header header ."
+-		". left-column . right-column ."
+-		". footer footer footer .";
++		"header header"
++		"left-column right-column";
++	gap: 20px;
++	align-content: start;
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer.width-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer {
+-	grid-template-rows: auto min-content minmax(min-content, auto) min-content;
++	grid-template-rows: auto minmax(min-content, auto) minmax(min-content, auto);
+ 	grid-template-columns: 1fr;
+-	grid-template-areas: "header" "left-column" "right-column" "footer";
++	grid-template-areas: "header" "left-column" "right-column";
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer.height-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer {
+-	grid-template-rows: auto minmax(min-content, auto) min-content;
+-	grid-template-areas: "header" "left-column right-column" "footer footer";
++	grid-template-rows: auto minmax(min-content, auto);
++	grid-template-areas: "header header" "left-column right-column";
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer.height-constrained.width-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer {
+-	grid-template-rows: min-content minmax(min-content, auto) min-content;
++	grid-template-rows: min-content minmax(min-content, auto) minmax(min-content, auto);
+ 	grid-template-columns: 1fr;
+-	grid-template-areas: "left-column" "right-column" "footer";
+-}
+-
+-.monaco-workbench .part.editor > .content .gettingStartedContainer.width-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .header,
+-.monaco-workbench .part.editor > .content .gettingStartedContainer.height-constrained .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .header {
+-	display: none;
++	grid-template-areas: "header" "left-column" "right-column";
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories li.showWalkthroughsEntry {
+@@ -149,31 +145,27 @@
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > * {
+-	overflow: hidden;
+-	text-overflow: ellipsis;
++	overflow: visible;
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .categories-column > div {
+-	margin-bottom: 32px;
++	margin-bottom: 0;
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .categories-column-left {
+ 	grid-area: left-column;
++	align-self: start;
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .categories-column-right {
+ 	grid-area: right-column;
++	align-self: start;
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .header {
+ 	grid-area: header;
+-	align-self: end;
+-}
+-
+-.monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .footer {
+-	grid-area: footer;
+-	justify-self: center;
+-	text-align: center;
++	align-self: start;
++	text-align: left;
+ }
+ 
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories .categories-slide-container {
