@@ -1,3 +1,9 @@
+Ritemark UI Layout: sidebar, titlebar, tabs, explorer, panels, activity bar, terminal placement
+Sprint 38+: Original consolidated UI layout patch.
+Sprint 53: Chrome activity bar refactor (28px action labels, 40px container).
+Sprint 54: Agent Library activity bar entry, auxiliary bar chrome polish.
+Sprint 55: Rebased onto VS Code 1.117.0 (CSS var migration, compact-mode constants).
+
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..7cb8cf44871 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -22,7 +28,7 @@ index 833787070f3..7cb8cf44871 100644
  				icon,
  			}, location);
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index fea736cad03..2e16b48afde 100644
+index 86f783cefa4..b3e57918cea 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
 @@ -41,9 +41,10 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
@@ -38,7 +44,7 @@ index fea736cad03..2e16b48afde 100644
  const panelIcon = registerIcon('panel-bottom', Codicon.layoutPanel, localize('panelBottom', "Represents the bottom panel"));
  const statusBarIcon = registerIcon('statusBar', Codicon.layoutStatusbar, localize('statusBarIcon', "Represents the status bar"));
  
-@@ -168,17 +169,18 @@ export class ToggleSidebarPositionAction extends Action2 {
+@@ -169,17 +170,18 @@ export class ToggleSidebarPositionAction extends Action2 {
  
  registerAction2(ToggleSidebarPositionAction);
  
@@ -67,7 +73,7 @@ index fea736cad03..2e16b48afde 100644
  
  
  MenuRegistry.appendMenuItems([{
-@@ -271,13 +273,40 @@ registerAction2(class extends Action2 {
+@@ -272,13 +274,40 @@ registerAction2(class extends Action2 {
  	}
  });
  
@@ -111,7 +117,7 @@ index fea736cad03..2e16b48afde 100644
  // Toggle Sidebar Visibility
  
  export class ToggleSidebarVisibilityAction extends Action2 {
-@@ -299,9 +328,10 @@ export class ToggleSidebarVisibilityAction extends Action2 {
+@@ -300,9 +329,10 @@ export class ToggleSidebarVisibilityAction extends Action2 {
  			},
  			category: Categories.View,
  			f1: true,
@@ -124,7 +130,7 @@ index fea736cad03..2e16b48afde 100644
  			},
  			menu: [
  				{
-@@ -346,23 +376,19 @@ MenuRegistry.appendMenuItems([
+@@ -347,23 +377,19 @@ MenuRegistry.appendMenuItems([
  			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewContainerLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
  			order: 2
  		}
@@ -154,7 +160,7 @@ index fea736cad03..2e16b48afde 100644
  			order: 0
  		}
  	}, {
-@@ -370,19 +396,13 @@ MenuRegistry.appendMenuItems([
+@@ -371,19 +397,13 @@ MenuRegistry.appendMenuItems([
  		item: {
  			group: '2_pane_toggles',
  			command: {
@@ -194,7 +200,7 @@ index f17465a5e4a..6dbeda329ca 100644
  	box-sizing: border-box;
  	overflow: hidden;
 diff --git a/src/vs/workbench/browser/part.ts b/src/vs/workbench/browser/part.ts
-index d66a8f5f0ee..65011fd204a 100644
+index 50776ac10da..1233e89ccee 100644
 --- a/src/vs/workbench/browser/part.ts
 +++ b/src/vs/workbench/browser/part.ts
 @@ -201,8 +201,8 @@ export abstract class Part<MementoType extends object = object> extends Componen
@@ -209,38 +215,27 @@ index d66a8f5f0ee..65011fd204a 100644
  
  	private headerVisible: boolean = false;
 diff --git a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
-index 080b6871061..557a976031e 100644
+index 86c8b184706..76f32bc0688 100644
 --- a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
 +++ b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
-@@ -41,7 +41,7 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
+@@ -42,13 +42,13 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
  
  export class ActivitybarPart extends Part {
  
 -	static readonly ACTION_HEIGHT = 48;
 +	static readonly ACTION_HEIGHT = 40;
+ 	static readonly COMPACT_ACTION_HEIGHT = 32;
+ 
+-	static readonly ACTIVITYBAR_WIDTH = 48;
++	static readonly ACTIVITYBAR_WIDTH = 40;
+ 	static readonly COMPACT_ACTIVITYBAR_WIDTH = 36;
+ 
+-	static readonly ICON_SIZE = 24;
++	static readonly ICON_SIZE = 16;
+ 	static readonly COMPACT_ICON_SIZE = 16;
  
  	static readonly pinnedViewContainersKey = 'workbench.activity.pinnedViewlets2';
- 	static readonly placeholderViewContainersKey = 'workbench.activity.placeholderViewlets';
-@@ -49,8 +49,8 @@ export class ActivitybarPart extends Part {
- 
- 	//#region IView
- 
--	readonly minimumWidth: number = 48;
--	readonly maximumWidth: number = 48;
-+	readonly minimumWidth: number = 40;
-+	readonly maximumWidth: number = 40;
- 	readonly minimumHeight: number = 0;
- 	readonly maximumHeight: number = Number.POSITIVE_INFINITY;
- 
-@@ -77,14 +77,14 @@ export class ActivitybarPart extends Part {
- 			viewContainersWorkspaceStateKey: ActivitybarPart.viewContainersWorkspaceStateKey,
- 			orientation: ActionsOrientation.VERTICAL,
- 			icon: true,
--			iconSize: 24,
-+			iconSize: 16,
- 			activityHoverOptions: {
- 				position: () => this.layoutService.getSideBarPosition() === Position.LEFT ? HoverPosition.RIGHT : HoverPosition.LEFT,
- 			},
+@@ -133,7 +133,7 @@ export class ActivitybarPart extends Part {
  			preventLoopNavigation: true,
  			recomputeSizes: false,
  			fillExtraContextMenuActions: (actions, e?: MouseEvent | GestureEvent) => { },
@@ -250,13 +245,10 @@ index 080b6871061..557a976031e 100644
  				activeForegroundColor: theme.getColor(ACTIVITY_BAR_FOREGROUND),
  				inactiveForegroundColor: theme.getColor(ACTIVITY_BAR_INACTIVE_FOREGROUND),
 diff --git a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
-index 8cc8ca0e484..79ee57744f1 100644
+index a40a3515c96..646f0a42e3e 100644
 --- a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
 +++ b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
-@@ -3,9 +3,15 @@
-  *  Licensed under the MIT License. See License.txt in the project root for license information.
-  *--------------------------------------------------------------------------------------------*/
-
+@@ -6,13 +6,19 @@
  .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item {
  	display: block;
  	position: relative;
@@ -267,13 +259,12 @@ index 8cc8ca0e484..79ee57744f1 100644
 +.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-item:last-child {
 +	margin-bottom: 0;
  }
-
+ 
  .monaco-workbench .activitybar > .content .composite-bar > .monaco-action-bar .action-item::before,
-@@ -12,7 +18,7 @@
  .monaco-workbench .activitybar > .content .composite-bar > .monaco-action-bar .action-item::after {
  	position: absolute;
  	content: '';
--	width: 48px;
+-	width: var(--activity-bar-width, 48px);
 +	width: 28px;
  	height: 2px;
  	display: none;
@@ -282,8 +273,8 @@ index 8cc8ca0e484..79ee57744f1 100644
  	z-index: 1;
  	display: flex;
  	overflow: hidden;
--	width: 48px;
--	height: 48px;
+-	width: var(--activity-bar-width, 48px);
+-	height: var(--activity-bar-action-height, 48px);
 +	width: 28px;
 +	height: 28px;
  	margin-right: 0;
@@ -293,14 +284,14 @@ index 8cc8ca0e484..79ee57744f1 100644
  
  .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label:not(.codicon) {
  	font-size: 15px;
--	line-height: 40px;
--	padding: 0 0 0 48px;
+-	line-height: var(--activity-bar-action-height, 48px);
+-	padding: 0 0 0 var(--activity-bar-width, 48px);
 +	line-height: 28px;
 +	padding: 0 0 0 28px;
  }
  
  .monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label.codicon {
--	font-size: 24px;
+-	font-size: var(--activity-bar-icon-size, 24px);
 +	font-size: 16px;
  	align-items: center;
  	justify-content: center;
@@ -346,7 +337,7 @@ index 8cc8ca0e484..79ee57744f1 100644
  	font-size: 9px;
  	font-weight: 600;
  	min-width: 8px;
-@@ -174,8 +196,8 @@
+@@ -185,8 +207,8 @@
  	font-weight: 600;
  	font-size: 9px;
  	line-height: 10px;
@@ -358,37 +349,28 @@ index 8cc8ca0e484..79ee57744f1 100644
  	border-radius: 7px;
  	background-color: var(--vscode-profileBadge-background);
 diff --git a/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css b/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
-index abe1427ca20..9ecf397391b 100644
+index 568a7212980..364794d256e 100644
 --- a/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
 +++ b/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
 @@ -4,7 +4,7 @@
   *--------------------------------------------------------------------------------------------*/
  
  .monaco-workbench .part.activitybar {
--	width: 48px;
-+	width: 40px;
+-	width: var(--activity-bar-width, 48px);
++	width: var(--activity-bar-width, 40px);
  	height: 100%;
  }
  
-@@ -50,6 +50,16 @@
+@@ -59,6 +59,7 @@
  
  .monaco-workbench .activitybar > .content > .composite-bar {
  	margin-bottom: auto;
 +	padding-top: 12px;
-+	padding-left: 6px;
-+	padding-right: 6px;
-+}
-+
-+/** Global Actions (settings, accounts) — match composite-bar padding */
-+.monaco-workbench .activitybar > .content > div:not(.composite-bar) {
-+	padding-left: 6px;
-+	padding-right: 6px;
-+	padding-bottom: 8px;
  }
  
  /** Menu Bar */
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-index 5abfb88dd9c..704960be90f 100644
+index 4eefda8085b..d8453b0cbdb 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 @@ -3,6 +3,7 @@
@@ -408,23 +390,19 @@ index 5abfb88dd9c..704960be90f 100644
  import { ViewContainerLocation, ViewContainerLocationToString } from '../../../common/views.js';
  import { ActivityBarPosition, IWorkbenchLayoutService, LayoutSettings, Parts } from '../../../services/layout/browser/layoutService.js';
  import { IPaneCompositePartService } from '../../../services/panecomposite/browser/panecomposite.js';
-@@ -23,10 +24,11 @@ const maximizeIcon = registerIcon('auxiliarybar-maximize', Codicon.screenFull, l
- const restoreIcon = registerIcon('auxiliarybar-restore', Codicon.screenNormal, localize('restoreIcon', 'Icon to restore the secondary side bar.'));
+@@ -22,10 +23,7 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
+ const maximizeIcon = registerIcon('auxiliarybar-maximize', Codicon.screenFull, localize('maximizeIcon', 'Icon to maximize the secondary side bar.'));
  const closeIcon = registerIcon('auxiliarybar-close', Codicon.close, localize('closeIcon', 'Icon to close the secondary side bar.'));
  
 -const auxiliaryBarRightIcon = registerIcon('auxiliarybar-right-layout-icon', Codicon.layoutSidebarRight, localize('toggleAuxiliaryIconRight', 'Icon to toggle the secondary side bar off in its right position.'));
 -const auxiliaryBarRightOffIcon = registerIcon('auxiliarybar-right-off-layout-icon', Codicon.layoutSidebarRightOff, localize('toggleAuxiliaryIconRightOn', 'Icon to toggle the secondary side bar on in its right position.'));
 -const auxiliaryBarLeftIcon = registerIcon('auxiliarybar-left-layout-icon', Codicon.layoutSidebarLeft, localize('toggleAuxiliaryIconLeft', 'Icon to toggle the secondary side bar in its left position.'));
 -const auxiliaryBarLeftOffIcon = registerIcon('auxiliarybar-left-off-layout-icon', Codicon.layoutSidebarLeftOff, localize('toggleAuxiliaryIconLeftOn', 'Icon to toggle the secondary side bar on in its left position.'));
-+// Ritemark: commented out - not used in custom layout
-+// const auxiliaryBarRightIcon = registerIcon('auxiliarybar-right-layout-icon', Codicon.layoutSidebarRight, localize('toggleAuxiliaryIconRight', 'Icon to toggle the secondary side bar off in its right position.'));
-+// const auxiliaryBarRightOffIcon = registerIcon('auxiliarybar-right-off-layout-icon', Codicon.layoutSidebarRightOff, localize('toggleAuxiliaryIconRightOn', 'Icon to toggle the secondary side bar on in its right position.'));
-+// const auxiliaryBarLeftIcon = registerIcon('auxiliarybar-left-layout-icon', Codicon.layoutSidebarLeft, localize('toggleAuxiliaryIconLeft', 'Icon to toggle the secondary side bar in its left position.'));
-+// const auxiliaryBarLeftOffIcon = registerIcon('auxiliarybar-left-off-layout-icon', Codicon.layoutSidebarLeftOff, localize('toggleAuxiliaryIconLeftOn', 'Icon to toggle the secondary side bar on in its left position.'));
++// Ritemark: layout control icons are defined in layoutActions.ts for the custom titlebar toggle cluster.
  
  export class ToggleAuxiliaryBarAction extends Action2 {
  
-@@ -140,45 +142,8 @@ registerAction2(class FocusAuxiliaryBarAction extends Action2 {
+@@ -139,45 +137,8 @@ registerAction2(class FocusAuxiliaryBarAction extends Action2 {
  });
  
  MenuRegistry.appendMenuItems([
@@ -543,10 +521,10 @@ index b0a44e2c23a..01070bb9145 100644
  	};
  
 diff --git a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
-index 8eff5df9389..92917d018b6 100644
+index 4c7da5f5466..06c584c57ed 100644
 --- a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
 +++ b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
-@@ -154,7 +154,7 @@
+@@ -205,7 +205,7 @@
  
  .monaco-workbench .part.editor > .content .editor-group-container > .editor-group-container-toolbar {
  	display: none;
@@ -655,10 +633,10 @@ index 48220d63dc3..d5b081e981f 100644
  }
  
 diff --git a/src/vs/workbench/browser/parts/media/paneCompositePart.css b/src/vs/workbench/browser/parts/media/paneCompositePart.css
-index 8ec76362dd0..a9f89faa4f4 100644
+index fe0f2adfc11..a8d1ff5ce3c 100644
 --- a/src/vs/workbench/browser/parts/media/paneCompositePart.css
 +++ b/src/vs/workbench/browser/parts/media/paneCompositePart.css
-@@ -75,8 +75,10 @@
+@@ -83,8 +83,10 @@
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon,
  .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container >.composite-bar > .monaco-action-bar .action-item.icon {
@@ -670,7 +648,7 @@ index 8ec76362dd0..a9f89faa4f4 100644
  }
  
  
-@@ -166,7 +168,7 @@
+@@ -174,7 +176,7 @@
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label:not(.codicon-more),
  .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label:not(.codicon-more) {
@@ -679,7 +657,7 @@ index 8ec76362dd0..a9f89faa4f4 100644
  }
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item:not(.icon) .action-label,
-@@ -280,6 +282,7 @@
+@@ -288,6 +290,7 @@
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked,
  .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked {
  	background-color: var(--vscode-activityBarTop-activeBackground);
@@ -687,7 +665,7 @@ index 8ec76362dd0..a9f89faa4f4 100644
  }
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked .active-item-indicator:before,
-@@ -292,7 +295,7 @@
+@@ -300,7 +303,7 @@
  	bottom: 2px;
  	width: 100%;
  	height: 0;
@@ -697,40 +675,10 @@ index 8ec76362dd0..a9f89faa4f4 100644
  }
  
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index a452575cf9e..4913d991797 100644
+index a35c19c2a06..1f3d735a719 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
-@@ -18,7 +18,7 @@ import { IPaneCompositeBarOptions, PaneCompositeBar } from './paneCompositeBar.j
- import { Dimension, EventHelper, trackFocus, $, addDisposableListener, EventType, prepend, getWindow } from '../../../base/browser/dom.js';
- import { Registry } from '../../../platform/registry/common/platform.js';
- import { INotificationService } from '../../../platform/notification/common/notification.js';
--import { IStorageService } from '../../../platform/storage/common/storage.js';
-+import { IStorageService, StorageScope } from '../../../platform/storage/common/storage.js';
- import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
- import { IKeybindingService } from '../../../platform/keybinding/common/keybinding.js';
- import { IThemeService } from '../../../platform/theme/common/themeService.js';
-@@ -167,6 +167,11 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
- 			registryId = Extensions.Auxiliary;
- 			globalActionsMenuId = MenuId.AuxiliaryBarTitle;
- 		}
-+		// Ritemark: auxiliary bar always starts on AI panel
-+		if (partId === Parts.AUXILIARYBAR_PART) {
-+			storageService.remove(activePaneCompositeSettingsKey, StorageScope.WORKSPACE);
-+		}
-+
- 		super(
- 			notificationService,
- 			storageService,
-@@ -178,7 +183,7 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
- 			themeService,
- 			Registry.as<PaneCompositeRegistry>(registryId),
- 			activePaneCompositeSettingsKey,
--			viewDescriptorService.getDefaultViewContainer(location)?.id || '',
-+			partId === Parts.AUXILIARYBAR_PART ? 'workbench.view.extension.ritemark-ai' : (viewDescriptorService.getDefaultViewContainer(location)?.id || ''),
- 			nameForTelemetry,
- 			compositeCSSClass,
- 			titleForegroundColor,
-@@ -451,9 +456,34 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+@@ -442,9 +442,34 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
  	protected override createHeaderArea(): HTMLElement {
  		const headerArea = super.createHeaderArea();
  
@@ -766,7 +714,7 @@ index a452575cf9e..4913d991797 100644
  		const footerArea = super.createFooterArea();
  
 diff --git a/src/vs/workbench/browser/parts/panel/panelActions.ts b/src/vs/workbench/browser/parts/panel/panelActions.ts
-index 3432144229c..d6a8bc39a99 100644
+index 10fcbca0b96..18a93a0558f 100644
 --- a/src/vs/workbench/browser/parts/panel/panelActions.ts
 +++ b/src/vs/workbench/browser/parts/panel/panelActions.ts
 @@ -9,7 +9,7 @@ import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
@@ -778,20 +726,18 @@ index 3432144229c..d6a8bc39a99 100644
  import { ContextKeyExpr, ContextKeyExpression } from '../../../../platform/contextkey/common/contextkey.js';
  import { Codicon } from '../../../../base/common/codicons.js';
  import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
-@@ -25,8 +25,9 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
+@@ -24,8 +24,7 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
+ 
  const maximizeIcon = registerIcon('panel-maximize', Codicon.screenFull, localize('maximizeIcon', 'Icon to maximize a panel.'));
- const restoreIcon = registerIcon('panel-restore', Codicon.screenNormal, localize('restoreIcon', 'Icon to restore a panel.'));
  const closeIcon = registerIcon('panel-close', Codicon.close, localize('closeIcon', 'Icon to close a panel.'));
 -const panelIcon = registerIcon('panel-layout-icon', Codicon.layoutPanel, localize('togglePanelOffIcon', 'Icon to toggle the panel off when it is on.'));
 -const panelOffIcon = registerIcon('panel-layout-icon-off', Codicon.layoutPanelOff, localize('togglePanelOnIcon', 'Icon to toggle the panel on when it is off.'));
-+// Ritemark: commented out - panel toggle hidden from titlebar
-+// const panelIcon = registerIcon('panel-layout-icon', Codicon.layoutPanel, localize('togglePanelOffIcon', 'Icon to toggle the panel off when it is on.'));
-+// const panelOffIcon = registerIcon('panel-layout-icon-off', Codicon.layoutPanelOff, localize('togglePanelOnIcon', 'Icon to toggle the panel on when it is off.'));
++// Ritemark: panel layout control icon is handled in layoutActions.ts.
  
  export class TogglePanelAction extends Action2 {
  
-@@ -331,29 +332,30 @@ MenuRegistry.appendMenuItem(MenuId.PanelTitle, {
- 	when: ContextKeyExpr.and(panelMaximizationSupportedWhen, PanelMaximizedContext)
+@@ -317,30 +316,6 @@ registerAction2(class extends Action2 {
+ 	}
  });
  
 -MenuRegistry.appendMenuItems([
@@ -817,33 +763,10 @@ index 3432144229c..d6a8bc39a99 100644
 -		}
 -	}
 -]);
-+// Ritemark: commented out panel toggle from LayoutControlMenu
-+// MenuRegistry.appendMenuItems([
-+// 	{
-+// 		id: MenuId.LayoutControlMenu,
-+// 		item: {
-+// 			group: '2_pane_toggles',
-+// 			command: {
-+// 				id: TogglePanelAction.ID,
-+// 				title: localize('togglePanel', "Toggle Panel"),
-+// 				icon: panelOffIcon,
-+// 				toggled: { condition: PanelVisibleContext, icon: panelIcon }
-+// 			},
-+// 			when:
-+// 				ContextKeyExpr.and(
-+// 					IsAuxiliaryWindowContext.negate(),
-+// 					ContextKeyExpr.or(
-+// 						ContextKeyExpr.equals('config.workbench.layoutControl.type', 'toggles'),
-+// 						ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')
-+// 					)
-+// 				),
-+// 			order: 1
-+// 		}
-+// 	}
-+// ]);
- 
+-
  class MoveViewsBetweenPanelsAction extends Action2 {
  	constructor(private readonly source: ViewContainerLocation, private readonly destination: ViewContainerLocation, desc: Readonly<IAction2Options>) {
+ 		super(desc);
 diff --git a/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css b/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
 index decb51aba55..8329ebe6258 100644
 --- a/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css
@@ -874,10 +797,10 @@ index decb51aba55..8329ebe6258 100644
  
  .monaco-workbench .part.sidebar > .header-or-footer.footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked:not(:focus) .active-item-indicator:before,
 diff --git a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
-index 982f5a620df..dc50bd29ac0 100644
+index be622a4452e..2b6de990373 100644
 --- a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
 +++ b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
-@@ -374,6 +374,7 @@
+@@ -411,6 +411,7 @@
  }
  
  /* Action Tool Bar Controls */
@@ -885,7 +808,7 @@ index 982f5a620df..dc50bd29ac0 100644
  .monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container {
  	display: none;
  	padding-right: 4px;
-@@ -390,33 +391,47 @@
+@@ -427,33 +428,47 @@
  	margin-left: auto;
  }
  
@@ -933,7 +856,7 @@ index 982f5a620df..dc50bd29ac0 100644
  .monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .badge .badge-content {
  	padding: 3px 5px;
  	border-radius: 11px;
-@@ -462,3 +477,61 @@
+@@ -499,3 +514,61 @@
  	border-radius: 16px;
  	text-align: center;
  }
@@ -996,20 +919,19 @@ index 982f5a620df..dc50bd29ac0 100644
 +	display: none;
 +}
 diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-index 743f9e6ee8b..e9656e1da21 100644
+index fb96d03d3a2..044fe0be908 100644
 --- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-@@ -33,7 +33,8 @@ import { CommandCenterControl } from './commandCenterControl.js';
+@@ -33,7 +33,7 @@ import { CommandCenterControl } from './commandCenterControl.js';
  import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
- import { WorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
+ import { HiddenItemStrategy, MenuWorkbenchToolBar, WorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
  import { ACCOUNTS_ACTIVITY_ID, GLOBAL_ACTIVITY_ID } from '../../../common/activity.js';
 -import { AccountsActivityActionViewItem, isAccountsActionVisible, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
-+// Ritemark: removed isAccountsActionVisible - activity actions hidden from titlebar
 +import { AccountsActivityActionViewItem, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
  import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
  import { IEditorGroupsContainer, IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
  import { ActionRunner, IAction } from '../../../../base/common/actions.js';
-@@ -47,7 +48,8 @@ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
+@@ -47,7 +47,8 @@ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
  import { EditorCommandsContextActionRunner } from '../editor/editorTabsControl.js';
  import { IEditorCommandsContext, IEditorPartOptionsChangeEvent, IToolbarActions } from '../../../common/editor.js';
  import { CodeWindow, mainWindow } from '../../../../base/browser/window.js';
@@ -1019,7 +941,7 @@ index 743f9e6ee8b..e9656e1da21 100644
  import { IView } from '../../../../base/browser/ui/grid/grid.js';
  import { createInstantHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
  import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
-@@ -680,13 +682,14 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+@@ -703,13 +704,14 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
  			}
  
  			// --- Activity Actions (always at the end)
@@ -1042,10 +964,10 @@ index 743f9e6ee8b..e9656e1da21 100644
  			this.actionToolBar.setActions(prepareActions(actions.primary), prepareActions(actions.secondary));
  		};
 diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
-index 5ea32fb1a11..009c95717d3 100644
+index bdc603ff1a4..e0bbe7af85f 100644
 --- a/src/vs/workbench/browser/workbench.contribution.ts
 +++ b/src/vs/workbench/browser/workbench.contribution.ts
-@@ -718,7 +718,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+@@ -772,7 +772,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  					localize('layoutcontrol.type.toggles', "Shows several buttons for toggling the visibility of the panels and side bar."),
  					localize('layoutcontrol.type.both', "Shows both the dropdown and toggle buttons."),
  				],
@@ -1054,7 +976,7 @@ index 5ea32fb1a11..009c95717d3 100644
  				'description': localize('layoutControlType', "Controls whether the layout control in the custom title bar is displayed as a single menu button or with multiple UI toggles."),
  			},
  			'workbench.tips.enabled': {
-@@ -771,7 +771,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+@@ -830,7 +830,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  			},
  			[LayoutSettings.COMMAND_CENTER]: {
  				type: 'boolean',
@@ -1158,7 +1080,7 @@ index 5b115684ac0..9ca4a048788 100644
  				description: nls.localize2('collapseExplorerFoldersMetadata', "Folds all folders in the Explorer.")
  			}
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-index a4a00dfa7ea..11218ba3a85 100644
+index ed7dbe07826..ed4bdf15959 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 @@ -77,7 +77,7 @@ import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.j
@@ -1171,7 +1093,7 @@ index a4a00dfa7ea..11218ba3a85 100644
  	getHeight(element: ExplorerItem): number {
  		return ExplorerDelegate.ITEM_HEIGHT;
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-index 40b580ef0f0..a7406e4b026 100644
+index be3baf06aeb..3d0fe57d82f 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 @@ -4,7 +4,6 @@
@@ -1185,28 +1107,29 @@ index 40b580ef0f0..a7406e4b026 100644
 @@ -20,7 +19,7 @@ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContaine
  import { WorkbenchPhase, registerWorkbenchContribution2 } from '../../../common/contributions.js';
  import { EditorExtensions, IEditorFactoryRegistry } from '../../../common/editor.js';
- import { IViewContainersRegistry, IViewsRegistry, Extensions as ViewContainerExtensions, ViewContainerLocation } from '../../../common/views.js';
+ import { IViewContainersRegistry, IViewsRegistry, Extensions as ViewContainerExtensions, ViewContainerLocation, WindowVisibility } from '../../../common/views.js';
 -import { ITerminalProfileService, TERMINAL_VIEW_ID, TerminalCommandId } from '../common/terminal.js';
 +import { ITerminalProfileService, TERMINAL_VIEW_ID } from '../common/terminal.js';
  import { TerminalEditingService } from './terminalEditingService.js';
  import { registerColors } from '../common/terminalColorRegistry.js';
  import { registerTerminalConfiguration } from '../common/terminalConfiguration.js';
-@@ -109,9 +108,9 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
+@@ -111,10 +110,10 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
  	icon: terminalViewIcon,
  	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [TERMINAL_VIEW_ID, { mergeViewWithContainerWhenSingleView: true }]),
  	storageId: TERMINAL_VIEW_ID,
 -	hideIfEmpty: true,
-+	hideIfEmpty: false, // Ritemark: keep terminal tab visible
++	hideIfEmpty: false,
  	order: 3,
+ 	windowVisibility: WindowVisibility.Both
 -}, ViewContainerLocation.Panel, { doNotRegisterOpenCommand: true, isDefault: true });
-+}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: false }); // Ritemark: auxiliary bar, AI panel is default
++}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: true });
  Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
-@@ -119,15 +118,16 @@ Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews
- 	canToggleVisibility: true,
+@@ -123,15 +122,7 @@ Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews
  	canMoveView: true,
  	ctorDescriptor: new SyncDescriptor(TerminalViewPane),
+ 	windowVisibility: WindowVisibility.Both,
 -	openCommandActionDescriptor: {
 -		id: TerminalCommandId.Toggle,
 -		mnemonicTitle: nls.localize({ key: 'miToggleIntegratedTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal"),
@@ -1216,21 +1139,12 @@ index 40b580ef0f0..a7406e4b026 100644
 -		},
 -		order: 3
 -	}
-+	// RiteMark: Terminal hidden from View menu (moved to View > Advanced)
-+	// openCommandActionDescriptor: {
-+	// 	id: TerminalCommandId.Toggle,
-+	// 	mnemonicTitle: nls.localize({ key: 'miToggleIntegratedTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal"),
-+	// 	keybindings: {
-+	// 		primary: KeyMod.CtrlCmd | KeyCode.Backquote,
-+	// 		mac: { primary: KeyMod.WinCtrl | KeyCode.Backquote }
-+	// 	},
-+	// 	order: 3
-+	// }
++	// RiteMark: Terminal hidden from View menu; surfaced via Ritemark layout and View > Advanced.
  }], VIEW_CONTAINER);
  
  registerTerminalActions();
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts b/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
-index 326d159c078..f91ee8d4973 100644
+index 71dd2237254..c2d28e3536c 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
 @@ -8,6 +8,7 @@ import { Disposable, toDisposable } from '../../../../base/common/lifecycle.js';
