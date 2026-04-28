@@ -43,6 +43,11 @@
         "icon": "$(search)"
       },
       {
+        "command": "ritemark.explorer.refresh",
+        "title": "Refresh Explorer",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "ritemark.reindexDocuments",
         "title": "Ritemark: Re-index Documents"
       },
@@ -340,6 +345,11 @@
           "command": "ritemark.openSearch",
           "when": "view == workbench.explorer.fileView",
           "group": "navigation@1"
+        },
+        {
+          "command": "ritemark.explorer.refresh",
+          "when": "view == workbench.explorer.fileView",
+          "group": "navigation@2"
         },
         {
           "command": "ritemark.newChat",

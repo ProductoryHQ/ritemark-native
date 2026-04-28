@@ -1099,25 +1099,27 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Bug #33: After the Claude Code subprocess agent finishes a turn that wrote
-   * or edited files, the file explorer is often stale because the OS file
-   * watcher missed (or hasn't yet propagated) the writes from the subprocess.
+   * Bug #33: After an agent (Claude Code subprocess OR Codex) finishes a turn
+   * that wrote or edited files, the file explorer is often stale because the
+   * OS file watcher missed (or hasn't yet propagated) the writes.
    *
    * Nudge the explorer in two ways:
-   *   1. Stat each modified file's parent directory via vscode.workspace.fs —
-   *      this routes through VS Code's filesystem provider and forces the
-   *      explorer model to re-enumerate the directory.
-   *   2. Run the global "refresh files explorer" command as a safety net.
+   *   1. If we know the modified paths, stat each file's parent directory via
+   *      vscode.workspace.fs. Routing through VS Code's filesystem provider
+   *      forces the explorer to re-enumerate that directory.
+   *   2. Always run the global "refresh files explorer" command as a safety
+   *      net — covers cases where we don't know which files changed (Codex
+   *      doesn't expose a filesModified list on turn/completed).
    *
    * Fire-and-forget; never block the agent-result postMessage on this.
    */
   private _refreshExplorerForAgentWrites(filesModified: string[] | undefined): void {
-    if (!filesModified || filesModified.length === 0) return;
-
     const parentDirs = new Set<string>();
-    for (const file of filesModified) {
-      const parent = file.replace(/[/\\][^/\\]+$/, '');
-      if (parent && parent !== file) parentDirs.add(parent);
+    if (filesModified) {
+      for (const file of filesModified) {
+        const parent = file.replace(/[/\\][^/\\]+$/, '');
+        if (parent && parent !== file) parentDirs.add(parent);
+      }
     }
 
     void Promise.all(
@@ -1394,6 +1396,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         status: params.turn.status,
         error: params.turn.error ? String(params.turn.error) : undefined,
       });
+      // Bug #33: Codex apply_patch / shell tools write files outside VS Code's
+      // filesystem provider, so the explorer is often stale. The protocol
+      // doesn't expose a filesModified list on turn/completed, so issue a
+      // blanket refresh.
+      this._refreshExplorerForAgentWrites(undefined);
     });
 
     // Server-initiated requests (approvals are bidirectional RPC)
