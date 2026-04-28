@@ -1163,6 +1163,40 @@ export function Editor({
           background: var(--r-accent-soft) !important;
         }
 
+        /* Code block selection: dark navy bg + white text (default white-on-light-lavender is invisible) */
+        div.wysiwyg-editor .ProseMirror pre.tiptap-code-block ::selection,
+        div.wysiwyg-editor .ProseMirror pre.tiptap-code-block::selection,
+        div.wysiwyg-editor .ProseMirror pre.tiptap-code-block *::selection {
+          background: #3b4a6b !important;
+          color: #ffffff !important;
+        }
+        div.wysiwyg-editor .ProseMirror pre.tiptap-code-block ::-moz-selection,
+        div.wysiwyg-editor .ProseMirror pre.tiptap-code-block::-moz-selection,
+        div.wysiwyg-editor .ProseMirror pre.tiptap-code-block *::-moz-selection {
+          background: #3b4a6b !important;
+          color: #ffffff !important;
+        }
+
+        /* Table cell selection: keep lavender bg + force dark text (default text inherits invisible color) */
+        div.wysiwyg-editor .ProseMirror td.tiptap-table-cell ::selection,
+        div.wysiwyg-editor .ProseMirror th.tiptap-table-header ::selection,
+        div.wysiwyg-editor .ProseMirror td.tiptap-table-cell::selection,
+        div.wysiwyg-editor .ProseMirror th.tiptap-table-header::selection,
+        div.wysiwyg-editor .ProseMirror td.tiptap-table-cell *::selection,
+        div.wysiwyg-editor .ProseMirror th.tiptap-table-header *::selection {
+          background: var(--r-accent-soft) !important;
+          color: var(--r-ink-strong) !important;
+        }
+        div.wysiwyg-editor .ProseMirror td.tiptap-table-cell ::-moz-selection,
+        div.wysiwyg-editor .ProseMirror th.tiptap-table-header ::-moz-selection,
+        div.wysiwyg-editor .ProseMirror td.tiptap-table-cell::-moz-selection,
+        div.wysiwyg-editor .ProseMirror th.tiptap-table-header::-moz-selection,
+        div.wysiwyg-editor .ProseMirror td.tiptap-table-cell *::-moz-selection,
+        div.wysiwyg-editor .ProseMirror th.tiptap-table-header *::-moz-selection {
+          background: var(--r-accent-soft) !important;
+          color: var(--r-ink-strong) !important;
+        }
+
         /* Code block styling with dark theme */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block {
           background: #1f2937 !important;
