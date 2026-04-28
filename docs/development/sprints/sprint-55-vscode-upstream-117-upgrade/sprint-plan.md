@@ -27,6 +27,14 @@ Sprint 55 starts fresh. The source of truth for patches is `main`'s current 6-pa
 
 Upgrade the VS Code OSS submodule from 1.109.5 to 1.117.0 with all 6 Ritemark patches cleanly rebased on top, zero regressions from Sprint 54, and a production build ready for Jarmo to test.
 
+**Bug-fix scope added during Phase 3 (Jarmo approved):**
+
+- #31 — Code block selected text unreadable (white-on-light-lavender)
+- #32 — Table cell selected text invisible
+- #33 — File explorer does not refresh when AI agent creates a new file (in-process write paths only — subprocess agents may still need watcher tuning, to be assessed in Phase 4)
+
+These three small-scope bugs are folded into Sprint 55 to ship alongside the upgrade. Phase 4 validation includes verifying each fix in dev mode.
+
 ---
 
 ## Feature Flag Check
@@ -128,6 +136,13 @@ Note: do NOT remove unused imports after any VS Code file edit — build fails a
 - [ ] 6px vertical spacing between activity bar icons is intact
 - [ ] Properties side panel opens and functions correctly
 - [ ] All other v1.6.0 features confirmed working
+
+#### Bug-fix Validation (added during Phase 3)
+
+- [ ] #31: select text inside a fenced code block — selection is readable (white text on dark navy bg)
+- [ ] #32: select text inside a markdown table cell — selection is readable (dark text on lavender bg)
+- [ ] #33: run a Flow that emits a Save File or Image node into an empty `.flows/` directory; confirm the new file appears in the explorer without manual refresh
+- [ ] #33 (regression check): same scenario but with a subprocess agent (e.g. Codex CLI) writing a file — if it still doesn't refresh, leave issue open with notes; do NOT block Sprint 55 release on the subprocess case (separate watcher-tuning bug)
 
 #### CLAUDE.md Layout Invariants
 
