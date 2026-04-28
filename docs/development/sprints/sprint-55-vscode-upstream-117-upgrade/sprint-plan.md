@@ -86,39 +86,37 @@ Sprint 57 worktree location (read-only reference): `/Users/jarmotuisk/Projects/r
   - [x] `research/agent-harness-architecture-audit.md`
 - [x] Write `sprint-plan.md`
 
-### Phase 3: Patch Rebase (requires Jarmo approval to begin)
+### Phase 3: Patch Rebase (Jarmo approved — COMPLETE)
 
 Repair order (per patch-risk-matrix research — smallest risk first):
 
-- [ ] Confirm branch is `feat/sprint-55-vscode-117` and `main`'s 6 patches are present
-- [ ] Run `./scripts/apply-patches.sh --dry-run` on current base (1.109.5) — must be 6/6 clean
-- [ ] Bump `vscode/` submodule pointer to `10c8e55` (1.117.0)
-- [ ] Run `./scripts/apply-patches.sh --dry-run` on new base — classify all failures before editing anything
-- [ ] Rebase `005-ritemark-windows-and-oss-fixes.patch` (low risk)
-  - [ ] Validate via reverse/apply round-trip
-- [ ] Rebase `006-ritemark-dev-launch-fallback.patch` (low risk)
-  - [ ] Validate via reverse/apply round-trip
-- [ ] Rebase `004-ritemark-build-system.patch` (expected clean — verify)
-  - [ ] Validate via reverse/apply round-trip
-- [ ] Rebase `001-ritemark-branding.patch` (medium risk — welcome page, fonts, About dialog)
-  - [ ] Validate via reverse/apply round-trip
-  - [ ] Key areas: `build/gulpfile.vscode.ts`, `codicon.css`, `gettingStarted.contribution.ts`, `gettingStarted.ts`
-- [ ] Rebase `003-ritemark-menu-cleanup.patch` (high risk — agent/chat menu churn)
-  - [ ] Validate via reverse/apply round-trip
-  - [ ] Audit any new agent/browser entry points added in 1.110-1.117 and decide: hide or keep
-  - [ ] Ensure `defaultChatAgent` optional-guard pattern is maintained
-- [ ] Rebase `002-ritemark-ui-layout.patch` (high risk — activity bar, terminal, auxiliary bar)
-  - [ ] Validate via reverse/apply round-trip
-  - [ ] Confirm `MenuId.MenubarViewMenuAdvanced` integration point present in `actions.ts`
-  - [ ] Confirm terminal contribution wiring preserved
-  - [ ] Confirm auxiliary bar / AI sidebar placement preserved
-- [ ] Run `./scripts/apply-patches.sh --dry-run` — must show all 6 "Already applied"
-- [ ] Run `./scripts/validate-qa.sh` — must pass
-- [ ] Inspect salvageable scripts from sprint-57 (decide per-item, do NOT bulk-copy):
-  - [ ] `scripts/apply-patches.sh` enhanced validation — adopt if it adds safety without complexity
-  - [ ] `scripts/build-mac.sh` error handling — adopt if net positive
-  - [ ] `scripts/sync-dev-branding-assets.sh` — evaluate if needed for clean-worktree workflow
-  - [ ] Icon theme `weight` change (`"200"` -> `"normal"`) — adopt only if B24 check surfaces a warning
+- [x] Confirm branch is `feat/sprint-55-vscode-117` and `main`'s 6 patches are present
+- [x] Run `./scripts/apply-patches.sh --dry-run` on current base (1.109.5) — was 6/6 clean
+- [x] Bump `vscode/` submodule pointer to `10c8e55` (1.117.0) (committed in `9487dc9`)
+- [x] Run `./scripts/apply-patches.sh --dry-run` on new base — classified failures (only 002 conflicted)
+- [x] Rebase `005-ritemark-windows-and-oss-fixes.patch` (low risk) — committed in `bf218f3`
+  - [x] Validated via reverse/apply round-trip
+- [x] Rebase `006-ritemark-dev-launch-fallback.patch` (low risk) — committed in `bf218f3`
+  - [x] Validated via reverse/apply round-trip
+- [x] Rebase `004-ritemark-build-system.patch` (applied cleanly, no rebase needed)
+  - [x] Validated via reverse/apply round-trip
+- [x] Rebase `001-ritemark-branding.patch` (medium risk) — committed in `bf218f3`
+  - [x] Validated via reverse/apply round-trip
+- [x] Rebase `003-ritemark-menu-cleanup.patch` (high risk) — committed in `bf218f3`
+  - [x] Validated via reverse/apply round-trip
+- [x] Rebase `002-ritemark-ui-layout.patch` (high risk) — committed in `9487dc9`
+  - [x] Validated via reverse/apply round-trip (forward + reverse + status clean)
+  - [x] Sprint 54 chrome invariants verified: ACTION_HEIGHT=40, ACTIVITYBAR_WIDTH=40, ICON_SIZE=16, compositeSize=40, 28px action labels, 6px margin-bottom + last-child reset, active-item-indicator pill rule
+  - [x] Approach: 6 of 8 conflicting files used sprint-57 post-patched copy (no Sprint 54 contributions); 2 high-risk files (`activitybarPart.ts`, `activityaction.css`) manually merged to preserve Sprint 54 chrome on top of upstream's CSS-var migration and compact-mode constants
+- [x] Run `./scripts/apply-patches.sh --dry-run` — shows all 6 "Can apply" (clean tree) / 6/6 OK
+- [ ] Run `./scripts/validate-qa.sh` — STALE CHECK (see note below); pre-existing on `main`
+- [ ] Inspect salvageable scripts from sprint-57 (deferred to Phase 4 / future sprint):
+  - [ ] `scripts/apply-patches.sh` enhanced validation
+  - [ ] `scripts/build-mac.sh` error handling
+  - [ ] `scripts/sync-dev-branding-assets.sh`
+  - [ ] Icon theme `weight` change (`"200"` -> `"normal"`)
+
+**Note on `validate-qa.sh`:** The pre-commit-validator hook contains a stale assertion (`webview.js missing document-header component`) that fails on this branch AND on `main`. The `document-header` component was removed in Sprint 54's toolbar redesign (commit `7d08a9f`), but `.claude/hooks/pre-commit-validator.sh` was not updated to reflect the new invariant. This is a pre-existing maintenance issue, NOT a Sprint 55 regression. Recommend updating the hook to assert a current component name (e.g. one of the Sprint 54 toolbar/properties-panel anchors) as a separate change.
 
 Note: do NOT remove unused imports after any VS Code file edit — build fails after 22 min otherwise.
 
@@ -220,9 +218,21 @@ Key findings from sprint-57:
 
 ## Status
 
-**Current Phase:** 2 (PLAN)
-**Approval Required:** YES — Phase 3 cannot begin without Jarmo's approval
+**Current Phase:** 4 (VALIDATION) — handed off to Jarmo
+**Approval Required:** Phase 4 dev-mode + Sprint 54 regression checks; Phase 5 production build/DMG
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan
+- [x] Jarmo approved Phase 3 patch rebase work ("approved - proceed")
+
+## Phase 3 Handoff Summary
+
+All 6 patches now apply cleanly on VS Code 1.117.0. Two commits on this branch advance Sprint 55:
+
+- `bf218f3` — patches 001, 003, 005, 006 rebased onto 1.117.0 (4 simpler rebases done first)
+- `9487dc9` — patch 002 rebased + submodule bump to 1.117.0 (`10c8e55`)
+
+`./scripts/apply-patches.sh --dry-run` reports 6/6 OK on a clean 1.117.0 tree. Round-trip validation passes on every patch. Sprint 54 chrome invariants (Agent Library entry, 6px icon spacing, 28px action labels, active-item-indicator pill, 40px container) are preserved in the rebased patches.
+
+**Jarmo, Phase 4 next:** apply patches, launch dev mode, run the Sprint 54 regression checklist below. Build and DMG (Phase 5) per CLAUDE.md when validation passes.
