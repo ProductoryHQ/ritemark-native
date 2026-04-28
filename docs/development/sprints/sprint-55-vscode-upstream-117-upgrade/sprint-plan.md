@@ -109,14 +109,14 @@ Repair order (per patch-risk-matrix research — smallest risk first):
   - [x] Sprint 54 chrome invariants verified: ACTION_HEIGHT=40, ACTIVITYBAR_WIDTH=40, ICON_SIZE=16, compositeSize=40, 28px action labels, 6px margin-bottom + last-child reset, active-item-indicator pill rule
   - [x] Approach: 6 of 8 conflicting files used sprint-57 post-patched copy (no Sprint 54 contributions); 2 high-risk files (`activitybarPart.ts`, `activityaction.css`) manually merged to preserve Sprint 54 chrome on top of upstream's CSS-var migration and compact-mode constants
 - [x] Run `./scripts/apply-patches.sh --dry-run` — shows all 6 "Can apply" (clean tree) / 6/6 OK
-- [ ] Run `./scripts/validate-qa.sh` — STALE CHECK (see note below); pre-existing on `main`
+- [x] Run `./scripts/validate-qa.sh` — passes (after replacing stale `document-header` sentinel with `ai-sidebar`)
 - [ ] Inspect salvageable scripts from sprint-57 (deferred to Phase 4 / future sprint):
   - [ ] `scripts/apply-patches.sh` enhanced validation
   - [ ] `scripts/build-mac.sh` error handling
   - [ ] `scripts/sync-dev-branding-assets.sh`
   - [ ] Icon theme `weight` change (`"200"` -> `"normal"`)
 
-**Note on `validate-qa.sh`:** The pre-commit-validator hook contains a stale assertion (`webview.js missing document-header component`) that fails on this branch AND on `main`. The `document-header` component was removed in Sprint 54's toolbar redesign (commit `7d08a9f`), but `.claude/hooks/pre-commit-validator.sh` was not updated to reflect the new invariant. This is a pre-existing maintenance issue, NOT a Sprint 55 regression. Recommend updating the hook to assert a current component name (e.g. one of the Sprint 54 toolbar/properties-panel anchors) as a separate change.
+**Note on `validate-qa.sh` hook fix:** The pre-commit-validator hook had a stale assertion (`webview.js missing document-header component`) — that component was removed in Sprint 54's toolbar redesign (commit `7d08a9f`) but the hook was never updated. Replaced the sentinel with `ai-sidebar` (a stable routing key for the AI sidebar / Agent Library, anchored in v1.6.0) in commit alongside Phase 3 work. `validate-qa.sh` now passes.
 
 Note: do NOT remove unused imports after any VS Code file edit — build fails after 22 min otherwise.
 
