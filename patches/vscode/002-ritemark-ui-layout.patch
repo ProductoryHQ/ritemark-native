@@ -3,7 +3,6 @@ Sprint 38+: Original consolidated UI layout patch.
 Sprint 53: Chrome activity bar refactor (28px action labels, 40px container).
 Sprint 54: Agent Library activity bar entry, auxiliary bar chrome polish.
 Sprint 55: Rebased onto VS Code 1.117.0 (CSS var migration, compact-mode constants).
-
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..7cb8cf44871 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -349,7 +348,7 @@ index a40a3515c96..646f0a42e3e 100644
  	border-radius: 7px;
  	background-color: var(--vscode-profileBadge-background);
 diff --git a/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css b/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
-index 568a7212980..364794d256e 100644
+index 568a7212980..4f53ff1e855 100644
 --- a/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
 +++ b/src/vs/workbench/browser/parts/activitybar/media/activitybarpart.css
 @@ -4,7 +4,7 @@
@@ -357,15 +356,24 @@ index 568a7212980..364794d256e 100644
  
  .monaco-workbench .part.activitybar {
 -	width: var(--activity-bar-width, 48px);
-+	width: var(--activity-bar-width, 40px);
++	width: 40px;
  	height: 100%;
  }
  
-@@ -59,6 +59,7 @@
+@@ -59,6 +59,16 @@
  
  .monaco-workbench .activitybar > .content > .composite-bar {
  	margin-bottom: auto;
 +	padding-top: 12px;
++	padding-left: 6px;
++	padding-right: 6px;
++}
++
++/** Global Actions (settings, accounts) — match composite-bar padding */
++.monaco-workbench .activitybar > .content > div:not(.composite-bar) {
++	padding-left: 6px;
++	padding-right: 6px;
++	padding-bottom: 8px;
  }
  
  /** Menu Bar */
@@ -675,10 +683,40 @@ index fe0f2adfc11..a8d1ff5ce3c 100644
  }
  
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index a35c19c2a06..1f3d735a719 100644
+index a35c19c2a06..8f1b32bed53 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
-@@ -442,9 +442,34 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+@@ -18,7 +18,7 @@ import { IPaneCompositeBarOptions, PaneCompositeBar } from './paneCompositeBar.j
+ import { Dimension, EventHelper, trackFocus, $, addDisposableListener, EventType, prepend, getWindow } from '../../../base/browser/dom.js';
+ import { Registry } from '../../../platform/registry/common/platform.js';
+ import { INotificationService } from '../../../platform/notification/common/notification.js';
+-import { IStorageService } from '../../../platform/storage/common/storage.js';
++import { IStorageService, StorageScope } from '../../../platform/storage/common/storage.js';
+ import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
+ import { IKeybindingService } from '../../../platform/keybinding/common/keybinding.js';
+ import { IThemeService } from '../../../platform/theme/common/themeService.js';
+@@ -156,6 +156,11 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+ 		@IExtensionService private readonly extensionService: IExtensionService,
+ 		@IMenuService protected readonly menuService: IMenuService,
+ 	) {
++		// Ritemark: auxiliary bar always starts on AI panel
++		if (partId === Parts.AUXILIARYBAR_PART) {
++			storageService.remove(activePaneCompositeSettingsKey, StorageScope.WORKSPACE);
++		}
++
+ 		super(
+ 			notificationService,
+ 			storageService,
+@@ -167,7 +172,7 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+ 			themeService,
+ 			Registry.as<PaneCompositeRegistry>(registryId),
+ 			activePaneCompositeSettingsKey,
+-			viewDescriptorService.getDefaultViewContainer(location)?.id || '',
++			partId === Parts.AUXILIARYBAR_PART ? 'workbench.view.extension.ritemark-ai' : (viewDescriptorService.getDefaultViewContainer(location)?.id || ''),
+ 			nameForTelemetry,
+ 			compositeCSSClass,
+ 			titleForegroundColor,
+@@ -442,9 +447,34 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
  	protected override createHeaderArea(): HTMLElement {
  		const headerArea = super.createHeaderArea();
  
@@ -1093,7 +1131,7 @@ index ed7dbe07826..ed4bdf15959 100644
  	getHeight(element: ExplorerItem): number {
  		return ExplorerDelegate.ITEM_HEIGHT;
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-index be3baf06aeb..3d0fe57d82f 100644
+index be3baf06aeb..7a35b17312f 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 @@ -4,7 +4,6 @@
@@ -1118,11 +1156,11 @@ index be3baf06aeb..3d0fe57d82f 100644
  	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [TERMINAL_VIEW_ID, { mergeViewWithContainerWhenSingleView: true }]),
  	storageId: TERMINAL_VIEW_ID,
 -	hideIfEmpty: true,
-+	hideIfEmpty: false,
++	hideIfEmpty: false, // Ritemark: keep terminal tab visible
  	order: 3,
  	windowVisibility: WindowVisibility.Both
 -}, ViewContainerLocation.Panel, { doNotRegisterOpenCommand: true, isDefault: true });
-+}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: true });
++}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: false }); // Ritemark: auxiliary bar, AI panel is default
  Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
  	id: TERMINAL_VIEW_ID,
  	name: nls.localize2('terminal', "Terminal"),
