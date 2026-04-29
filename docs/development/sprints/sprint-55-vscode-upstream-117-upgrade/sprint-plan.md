@@ -137,12 +137,17 @@ Note: do NOT remove unused imports after any VS Code file edit — build fails a
 - [ ] Properties side panel opens and functions correctly
 - [ ] All other v1.6.0 features confirmed working
 
-#### Bug-fix Validation (added during Phase 3)
+#### Bug-fix Validation (added during Phase 3 — code complete; runtime confirmed during dev mode)
 
-- [ ] #31: select text inside a fenced code block — selection is readable (white text on dark navy bg)
-- [ ] #32: select text inside a markdown table cell — selection is readable (dark text on lavender bg)
-- [ ] #33: run a Flow that emits a Save File or Image node into an empty `.flows/` directory; confirm the new file appears in the explorer without manual refresh
-- [ ] #33 (regression check): same scenario but with a subprocess agent (e.g. Codex CLI) writing a file — if it still doesn't refresh, leave issue open with notes; do NOT block Sprint 55 release on the subprocess case (separate watcher-tuning bug)
+- [x] #31: code block text selection now readable (`b841e56`) — confirmed in dev mode
+- [x] #32: table cell text selection now readable (`b841e56` + `df51880` follow-up after row-hover/selection-bg conflict was caught) — confirmed in dev mode
+- [x] #33 in-process Flow writes routed through `vscode.workspace.fs` (`796c1a6`)
+- [x] #33 Claude Code subprocess post-turn explorer nudge (`df4c587`) — confirmed in dev mode by Jarmo
+- [x] #33 Codex agent post-turn refresh + manual Refresh button on Explorer title (`2a9c64e`)
+
+**Known follow-ups (NOT release blockers):**
+- Flow Claude Code node runs (`ClaudeCodeNodeExecutor` → `FlowEditorProvider`) bypass `UnifiedViewProvider` and don't get the post-turn nudge. Cheap to add when reported.
+- Codex post-turn refresh uses the blanket `workbench.files.action.refreshFilesExplorer` command (not targeted parent-directory `stat()`), because the Codex protocol does not expose a `filesModified` list on `turn/completed`. Targeted stats can be added by collecting paths from `item/fileChange/requestApproval` payloads if the blanket refresh proves insufficient.
 
 #### CLAUDE.md Layout Invariants
 
@@ -233,13 +238,15 @@ Key findings from sprint-57:
 
 ## Status
 
-**Current Phase:** 4 (VALIDATION) — handed off to Jarmo
-**Approval Required:** Phase 4 dev-mode + Sprint 54 regression checks; Phase 5 production build/DMG
+**Current Phase:** Phase 3 + bug-fix scope complete. Branch ready for PR. Phase 4 (Sprint 54 regression checks + branding/menu/extension invariants) and Phase 5 (production build + DMG) remain on Jarmo.
+**Approval Required:** Phase 4 dev-mode validation; Phase 5 production build/DMG
 
 ## Approval
 
 - [x] Jarmo approved this sprint plan
 - [x] Jarmo approved Phase 3 patch rebase work ("approved - proceed")
+- [x] Jarmo approved bug-fix scope additions (#31, #32, #33)
+- [x] Jarmo confirmed sprint complete and PR-ready ("minu arust on see sprint kena ja valmis")
 
 ## Phase 3 Handoff Summary
 
