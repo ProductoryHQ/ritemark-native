@@ -1,8 +1,8 @@
-# Sprint 01 Research: Windows Onboarding Probleemid
+# Sprint 57 Research: Windows Onboarding Probleemid
 
 ## Allikas
 
-Plaan: `/root/.claude/plans/windows-puhas-masin-esmainstall-immutable-flute.md`  
+Plaan: `/root/.claude/plans/windows-puhas-masin-esmainstall-immutable-flute.md`
 Uuritud: 2026-04-29
 
 ## Leitud probleemid (Jarmo test, puhas Windows masin)

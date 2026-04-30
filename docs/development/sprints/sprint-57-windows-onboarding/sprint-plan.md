@@ -1,4 +1,4 @@
-# Sprint 01: Windows Onboarding Fix + Arhitektuurne Hindamine
+# Sprint 57: Windows Onboarding Fix + Arhitektuurne Hindamine
 
 ## Eesmärk
 
@@ -101,7 +101,7 @@ Strateegiline küsimus: kas jätkata VS Code OSS forki kujul või teha tugev era
 ## Sprindi struktuur ja ajakava
 
 ```
-Sprint 01
+Sprint 57
 ├── Phase 1: Quick wins          (1–2 päeva)
 │   ├── 1A: Workspace Trust fix  (30 min)
 │   ├── 1B: Auth validation      (2–4 tundi)
