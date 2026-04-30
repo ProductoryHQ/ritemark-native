@@ -2,9 +2,9 @@
 
 ## Goal
 
-Take Ritemark from *"you can browse and edit agents/skills"* (shipped 1.6.0 / Sprint 54) to **"you can create, fork, and validate them"** — the first complete authoring loop — without yet committing to the more speculative moves (capture-from-conversation, description coach, template gallery, builder agent).
+Take Ritemark from *"you can browse and edit agents/skills"* (shipped 1.6.0 / Sprint 54) to **"you can create and fork them"** — the table-stakes creation surface — without yet committing to the more speculative or as-yet-underspecified moves (a test loop, capture-from-conversation, description coach, template gallery, builder agent).
 
-This sprint ships the table-stakes creation surface, plus the one Tier-3 affordance that makes creation honest rather than faith-based: an inline test loop.
+This sprint ships the obvious-fix creation surface only. The inline test loop (*Try it*) is parked for a follow-up sprint; it still needs a clearer answer to "what exactly does it run against, and how, given the runtime we have."
 
 ## Why This Sprint Exists
 
@@ -20,7 +20,7 @@ Concretely, today the library:
 
 None of this is interesting design work. It is missing functionality, and shipping it unblocks every more interesting move that follows.
 
-The deliberate scope cut for this sprint: ship the obvious fixes plus the one non-obvious move that gives authoring real feedback (*Try it*). Defer the bigger novel moves — capture-from-conversation, description-quality coach, template chooser, builder agent — until after the basic loop is in users' hands and we can see which of them actually pulls.
+The deliberate scope cut for this sprint: ship only the obvious fixes and obvious enhancements. Defer everything that requires a real product decision — *Try it*, capture-from-conversation, description-quality coach, template chooser, builder agent — until after the basic creation surface is in users' hands and we can see which of them actually pulls.
 
 ## Sprint Positioning
 
@@ -60,16 +60,11 @@ It is **not**:
 | 9 | Starter pack — 3–5 exemplary skills/agents seeded into `~/.claude/` on first run | Solves cold-start; teaches by example. |
 | 10 | Alphabetical / recently-modified sort in the sidebar | Trivial; matters above ~30 files. |
 
-### Tier 3 — The one promotion: a test loop
-
-| # | Move | Why this one and not the others |
-|---|---|---|
-| 11 | *Try it* button in the Properties panel — runs the helper against the current document or a paste-buffer, shows what would happen | Without this, every other authoring affordance is faith-based. The test loop is what makes the rest honest. |
-
 ## Out of Scope (deliberately)
 
 | Item | Why deferred |
 |---|---|
+| *Try it* test loop in the Properties panel | High-leverage move (it makes authoring feedback-driven instead of faith-based) but still needs thought on what it runs against, how the runtime invokes a single helper one-shot against arbitrary input, and how the output is rendered. Own sprint once that's settled. |
 | Capture-from-conversation (*Save approach as skill* from chat) | Highest novelty + cost in the family. Several open product decisions (what is being bottled, deterministic vs LLM distillation, default scope) need to be settled before build. Own sprint. |
 | Description-quality coach | High leverage, but only earns its keep once authoring volume is real enough to surface the silent-failure mode. Wait for telemetry. |
 | Template chooser / template gallery | Premature curation. Ship the starter pack (#9) first; let actual usage signal what templates would even be. |
@@ -86,7 +81,6 @@ It is **not**:
 - [ ] New files arrive with valid frontmatter scaffolding.
 - [ ] Files added externally appear in the sidebar without manual refresh.
 - [ ] On first run with an empty `~/.claude/`, the starter pack is seeded.
-- [ ] The Properties panel exposes a *Try it* run that returns visible output for the active helper against the current document or a paste-buffer.
 - [ ] The Sprint 54 invariants remain intact — file-first truth, generic frontmatter editing, TOC/Properties exclusivity, no regressions in editor / chat / Flows.
 
 ## Open Product Decisions to Resolve in Phase 1
@@ -95,27 +89,24 @@ These are not analysis-doc gaps — they are decisions this sprint must make bef
 
 1. **Default scope for new files** — project (`.claude/`) or user (`~/.claude/`)? Lean: project, with a one-click promote.
 2. **Skill vs agent at the create moment** — ask up front, or infer from intent questions? Lean: ask, but with plain-language labels (*"Always behave a certain way" / "Run something in the background"*).
-3. **What "Try it" runs against** — current open document, paste-buffer, or both with a toggle? Lean: both.
-4. **Starter pack contents** — which 3–5 helpers ship as the first-run seed, and where do they live in the repo? Lean: a curated set under `extensions/ritemark/starter-pack/` copied on activation.
-5. **Delete safety** — trash to a recoverable folder, or hard-delete with confirm? Lean: trash, recoverable, no audit log yet.
+3. **Starter pack contents** — which 3–5 helpers ship as the first-run seed, and where do they live in the repo? Lean: a curated set under `extensions/ritemark/starter-pack/` copied on activation.
+4. **Delete safety** — trash to a recoverable folder, or hard-delete with confirm? Lean: trash, recoverable, no audit log yet.
 
 ## Phases
 
 | Phase | Focus | Approval gate |
 |---|---|---|
-| 1. Decisions + spec | Settle the five open product decisions; write `creation-spec.md`, `try-it-spec.md`, `starter-pack.md` under this sprint folder. | Jarmo signs the specs |
+| 1. Decisions + spec | Settle the four open product decisions; write `creation-spec.md` and `starter-pack.md` under this sprint folder. | Jarmo signs the specs |
 | 2. Implementation — Tier 1 | Empty state, `+`, row menu, *New blank* command, file watcher. | qa-validator |
 | 3. Implementation — Tier 2 | Skeleton, duplicate, scope move, starter pack, sort. | qa-validator |
-| 4. Implementation — Tier 3 | *Try it* test loop in Properties panel. | qa-validator |
-| 5. Validation | Build, smoke test, confirm no regressions in Sprint 54 surfaces. | qa-validator + Jarmo manual test |
+| 4. Validation | Build, smoke test, confirm no regressions in Sprint 54 surfaces. | qa-validator + Jarmo manual test |
 
 ## Risks
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| Scope drifts to include capture-from-conversation | HIGH | Out-of-scope list explicit; reject in PR review. |
+| Scope drifts to include *Try it* or capture-from-conversation | HIGH | Out-of-scope list explicit; reject in PR review. |
 | Starter pack becomes a maintenance burden | MEDIUM | Cap at 5; treat as exemplars, not curation. |
-| *Try it* requires architecture changes in the agent runtime | MEDIUM | Phase 1 validates the runtime supports a one-shot helper invocation against arbitrary input. If not, *Try it* defers to Sprint 57. |
 | Skeleton schema diverges from upstream Claude Code skill/agent format | MEDIUM | Treat the schema as canonical to upstream; re-derive on each upstream sync. |
 | *Skill vs agent* creation choice confuses non-Viktor users | LOW | Sprint targets Viktor + the halfway user. Newbie-friendly creation is later. |
 
@@ -133,13 +124,12 @@ These are not analysis-doc gaps — they are decisions this sprint must make bef
 |---|---|
 | `extensions/ritemark/src/views/AgentLibraryViewProvider.ts` | Sidebar host. `+`, empty-state buttons, row context menu wire here. |
 | `extensions/ritemark/src/agent/discovery.ts` | Discovery; gains file-watcher integration. |
-| `extensions/ritemark/webview/src/components/properties/PropertiesSidePanel.tsx` | *Try it* lives here. |
 | `extensions/ritemark/webview/src/components/properties/AddPropertyMenu.tsx` | Existing primitive likely reused for skeleton injection. |
 | *(new)* `extensions/ritemark/starter-pack/` | Seeded on first run. |
-| *(new)* `docs/development/sprints/sprint-56-agent-authoring-loop/{creation-spec,try-it-spec,starter-pack}.md` | Phase 1 deliverables. |
+| *(new)* `docs/development/sprints/sprint-56-agent-authoring-loop/{creation-spec,starter-pack}.md` | Phase 1 deliverables. |
 
 ## Status
 
 **Current Phase:** Phase 1 — decisions + spec drafting
 **Current Branch:** `claude/design-agents-skills-ui-ARdo7`
-**Next Step:** Resolve the five open product decisions with Jarmo, then draft `creation-spec.md`, `try-it-spec.md`, `starter-pack.md` under this folder before any implementation begins.
+**Next Step:** Resolve the four open product decisions with Jarmo, then draft `creation-spec.md` and `starter-pack.md` under this folder before any implementation begins.
