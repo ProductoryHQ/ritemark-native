@@ -7,7 +7,21 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import type { FlowNode, ExecutionContext } from '../types';
+
+/**
+ * Write a file via VS Code's filesystem API so the explorer model is
+ * notified (fires onDidCreate/onDidChange). Direct `fs.writeFile` only
+ * surfaces via the OS file watcher, which can lag or miss writes inside
+ * newly-created subdirectories. See bug #33.
+ */
+async function writeFileVSCode(
+  outputPath: string,
+  data: Uint8Array
+): Promise<void> {
+  await vscode.workspace.fs.writeFile(vscode.Uri.file(outputPath), data);
+}
 
 /**
  * Save File Node configuration
@@ -157,7 +171,7 @@ export async function executeSaveFileNode(
     case 'markdown':
     case 'csv': {
       const content = String(sourceOutput);
-      await fs.writeFile(outputPath, content, 'utf-8');
+      await writeFileVSCode(outputPath, Buffer.from(content, 'utf-8'));
       size = Buffer.byteLength(content, 'utf-8');
       break;
     }
@@ -169,7 +183,7 @@ export async function executeSaveFileNode(
         if (imageResult.localPath) {
           // Copy image to output location
           const sourceBuffer = await fs.readFile(imageResult.localPath);
-          await fs.writeFile(outputPath, sourceBuffer);
+          await writeFileVSCode(outputPath, sourceBuffer);
           size = sourceBuffer.length;
         } else {
           throw new Error('Image source has no local path');
@@ -181,7 +195,7 @@ export async function executeSaveFileNode(
           throw new Error(`Failed to download image: ${response.statusText}`);
         }
         const buffer = Buffer.from(await response.arrayBuffer());
-        await fs.writeFile(outputPath, buffer);
+        await writeFileVSCode(outputPath, buffer);
         size = buffer.length;
       } else {
         throw new Error('Invalid image source');

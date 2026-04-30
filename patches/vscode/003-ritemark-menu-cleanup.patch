@@ -1,17 +1,26 @@
+Ritemark Menu Cleanup: hide VS Code dev features (chat, debug, go menu, emmet, extensions marketplace)
+Sprint 1+: Original menu cleanup.
+Sprint 55: Rebased onto VS Code 1.117.0
+  - Optional-guard fixes around defaultChatAgent (upstream now allows null)
+  - Removal of generic top-level Go / Run / Terminal surfaces
+  - Hiding upstream chat status/titlebar entry points
+  - Disabling chat view registration in favor of Ritemark-owned surfaces
+  - Removing classic Edit-menu items that conflict with the document-first UI
+  - Added MenuId.MenubarViewMenuAdvanced wiring (for View > Advanced submenu)
+---
 diff --git a/src/vs/editor/contrib/comment/browser/comment.ts b/src/vs/editor/contrib/comment/browser/comment.ts
-index 4b2a1461b9a..ff2978436f6 100644
+index 4b2a1461b9a..213d0674001 100644
 --- a/src/vs/editor/contrib/comment/browser/comment.ts
 +++ b/src/vs/editor/contrib/comment/browser/comment.ts
-@@ -5,7 +5,7 @@
+@@ -5,7 +5,6 @@
  
  import { KeyChord, KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
  import * as nls from '../../../../nls.js';
 -import { MenuId } from '../../../../platform/actions/common/actions.js';
-+// RiteMark: MenuId import removed - menu items disabled
  import { KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
  import { ICodeEditor } from '../../../browser/editorBrowser.js';
  import { EditorAction, IActionOptions, registerEditorAction, ServicesAccessor } from '../../../browser/editorExtensions.js';
-@@ -89,12 +89,6 @@ class ToggleCommentLineAction extends CommentLineAction {
+@@ -89,12 +88,6 @@ class ToggleCommentLineAction extends CommentLineAction {
  				primary: KeyMod.CtrlCmd | KeyCode.Slash,
  				weight: KeybindingWeight.EditorContrib
  			},
@@ -24,7 +33,7 @@ index 4b2a1461b9a..ff2978436f6 100644
  			canTriggerInlineEdits: true,
  		});
  	}
-@@ -145,12 +139,6 @@ class BlockCommentAction extends EditorAction {
+@@ -145,12 +138,6 @@ class BlockCommentAction extends EditorAction {
  				linux: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyA },
  				weight: KeybindingWeight.EditorContrib
  			},
@@ -38,22 +47,22 @@ index 4b2a1461b9a..ff2978436f6 100644
  		});
  	}
 diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
-index eb075cad63e..78384a113eb 100644
+index 910c40db359..861a8cda935 100644
 --- a/src/vs/platform/actions/common/actions.ts
 +++ b/src/vs/platform/actions/common/actions.ts
-@@ -130,6 +130,7 @@ export class MenuId {
+@@ -134,6 +134,7 @@ export class MenuId {
  	static readonly MenubarTerminalMenu = new MenuId('MenubarTerminalMenu');
  	static readonly MenubarTerminalSuggestStatusMenu = new MenuId('MenubarTerminalSuggestStatusMenu');
  	static readonly MenubarViewMenu = new MenuId('MenubarViewMenu');
-+	static readonly MenubarViewMenuAdvanced = new MenuId('MenubarViewMenuAdvanced'); // Ritemark: Advanced submenu
++	static readonly MenubarViewMenuAdvanced = new MenuId('MenubarViewMenuAdvanced');
  	static readonly MenubarHomeMenu = new MenuId('MenubarHomeMenu');
  	static readonly OpenEditorsContext = new MenuId('OpenEditorsContext');
  	static readonly OpenEditorsContextShare = new MenuId('OpenEditorsContextShare');
 diff --git a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts b/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
-index e9595bd406a..e1d2c008227 100644
+index 04763c87d10..9714a04c4ef 100644
 --- a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
 +++ b/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
-@@ -939,7 +939,7 @@ export abstract class AbstractExtensionManagementService extends CommontExtensio
+@@ -953,7 +953,7 @@ export abstract class AbstractExtensionManagementService extends CommontExtensio
  		if (checked.indexOf(extension) !== -1) {
  			return [];
  		}
@@ -63,10 +72,10 @@ index e9595bd406a..e1d2c008227 100644
  		}
  		checked.push(extension);
 diff --git a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
-index 40349546ec8..f6a753e49df 100644
+index a87ed6646f4..d1ef73e6774 100644
 --- a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
 +++ b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
-@@ -1160,10 +1160,11 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+@@ -1170,10 +1170,11 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
  
  			const result: IGalleryExtension[] = [];
  			let defaultChatAgentExtension: IGalleryExtension | undefined;
@@ -79,7 +88,7 @@ index 40349546ec8..f6a753e49df 100644
  					defaultChatAgentExtension = extension;
  				} else {
  					result.push(extension);
-@@ -1991,15 +1992,18 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+@@ -2005,15 +2006,18 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
  			}
  		}
  
@@ -92,9 +101,9 @@ index 40349546ec8..f6a753e49df 100644
 -				preRelease: this.productService.quality !== 'stable'
 -			}
 -		};
-+		const _deprecatedId = this.productService.defaultChatAgent?.extensionId?.toLowerCase();
-+		if (_deprecatedId) {
-+			deprecated[_deprecatedId] = {
++		const defaultChatAgentDeprecatedId = this.productService.defaultChatAgent?.extensionId?.toLowerCase();
++		if (defaultChatAgentDeprecatedId) {
++			deprecated[defaultChatAgentDeprecatedId] = {
 +				disallowInstall: true,
 +				extension: {
 +					id: this.productService.defaultChatAgent?.chatExtensionId,
@@ -108,11 +117,11 @@ index 40349546ec8..f6a753e49df 100644
  		return { malicious, deprecated, search, autoUpdate };
  	}
 diff --git a/src/vs/workbench/browser/parts/editor/editor.contribution.ts b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
-index 14235489654..be6bcf0164b 100644
+index 7d24435fc9e..949dc2a9613 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.contribution.ts
 +++ b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
-@@ -686,13 +686,13 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
- 	order: 1,
+@@ -693,14 +693,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	when: IsSessionsWindowContext.negate()
  });
  
 -// Layout menu
@@ -120,23 +129,18 @@ index 14235489654..be6bcf0164b 100644
 -	group: '2_appearance',
 -	title: localize({ key: 'miEditorLayout', comment: ['&& denotes a mnemonic'] }, "Editor &&Layout"),
 -	submenu: MenuId.MenubarLayoutMenu,
--	order: 2
+-	order: 2,
+-	when: IsSessionsWindowContext.negate()
 -});
-+// RiteMark: Editor Layout submenu removed - not relevant for markdown editing
-+// MenuRegistry.appendMenuItem(MenuId.MenubarViewMenu, {
-+// 	group: '2_appearance',
-+// 	title: localize({ key: 'miEditorLayout', comment: ['&& denotes a mnemonic'] }, "Editor &&Layout"),
-+// 	submenu: MenuId.MenubarLayoutMenu,
-+// 	order: 2
-+// });
++// RiteMark: remove Editor Layout from the main View menu.
  
  MenuRegistry.appendMenuItem(MenuId.MenubarLayoutMenu, {
  	group: '1_split',
 diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-index 92fe6a17377..43193d7dcc5 100644
+index 2c1d45ea6aa..21eefbc0fd7 100644
 --- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-@@ -85,25 +85,27 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+@@ -85,25 +85,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	order: 4
  });
  
@@ -159,70 +163,93 @@ index 92fe6a17377..43193d7dcc5 100644
 -	},
 -	order: 7
 -});
-+// RiteMark: Go menu removed - code navigation not relevant for markdown editing
-+// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
-+// 	submenu: MenuId.MenubarGoMenu,
-+// 	title: {
-+// 		value: 'Go',
-+// 		original: 'Go',
-+// 		mnemonicTitle: localize({ key: 'mGoto', comment: ['&& denotes a mnemonic'] }, "&&Go")
-+// 	},
-+// 	order: 5
-+// });
-+
-+// RiteMark: Terminal menu removed - terminal is accessible from sidebar
-+// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
-+// 	submenu: MenuId.MenubarTerminalMenu,
-+// 	title: {
-+// 		value: 'Terminal',
-+// 		original: 'Terminal',
-+// 		mnemonicTitle: localize({ key: 'mTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal")
-+// 	},
-+// 	order: 7
-+// });
++// RiteMark: Go and Terminal menus are intentionally hidden from the top-level menubar.
  
  MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	submenu: MenuId.MenubarHelpMenu,
+diff --git a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
+index 8b8e25bb3d1..8f56387817e 100644
+--- a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
++++ b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
+@@ -10,7 +10,6 @@ import { EnterAgentSessionProjectionAction, ExitAgentSessionProjectionAction, To
+ import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../../../common/contributions.js';
+ import { AgentTitleBarStatusRendering } from './agentTitleBarStatusWidget.js';
+ import { AgentTitleBarStatusService, IAgentTitleBarStatusService } from './agentTitleBarStatusService.js';
+-import { Codicon } from '../../../../../../base/common/codicons.js';
+ import { localize } from '../../../../../../nls.js';
+ import { ContextKeyExpr } from '../../../../../../platform/contextkey/common/contextkey.js';
+ import { ProductQualityContext } from '../../../../../../platform/contextkey/common/contextkeys.js';
+@@ -243,34 +242,7 @@ registerSingleton(IAgentTitleBarStatusService, AgentTitleBarStatusService, Insta
+ registerWorkbenchContribution2(AgentTitleBarStatusRendering.ID, AgentTitleBarStatusRendering, WorkbenchPhase.AfterRestored);
+ registerWorkbenchContribution2(AgentSessionReadyContribution.ID, AgentSessionReadyContribution, WorkbenchPhase.AfterRestored);
+ 
+-// Register Agent Status as a menu item in the command center (alongside the search box, not replacing it)
+-MenuRegistry.appendMenuItem(MenuId.CommandCenter, {
+-	submenu: MenuId.AgentsTitleBarControlMenu,
+-	title: localize('agentsControl', "Agents"),
+-	icon: Codicon.chatSparkle,
+-	when: ContextKeyExpr.and(
+-		ChatContextKeys.enabled,
+-		ContextKeyExpr.notEquals(`config.${ChatConfiguration.AgentStatusEnabled}`, 'hidden'),
+-		ContextKeyExpr.notEquals(`config.${ChatConfiguration.AgentStatusEnabled}`, false)
+-	),
+-	order: 10002 // to the right of the chat button
+-});
+-
+-// Add to the global title bar if command center is disabled
+-MenuRegistry.appendMenuItem(MenuId.TitleBar, {
+-	submenu: MenuId.ChatTitleBarMenu,
+-	title: localize('title4', "Chat"),
+-	group: 'navigation',
+-	icon: Codicon.chatSparkle,
+-	when: ContextKeyExpr.and(
+-		ChatContextKeys.supported,
+-		ContextKeyExpr.and(
+-			ChatContextKeys.Setup.hidden.negate(),
+-		),
+-		ContextKeyExpr.has('config.window.commandCenter').negate(),
+-	),
+-	order: 1
+-});
++// RiteMark: hide upstream chat entry points from the command center and title bar.
+ 
+ // Register a placeholder action to the submenu so it appears (required for submenus)
+ MenuRegistry.appendMenuItem(MenuId.AgentsTitleBarControlMenu, {
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-index ddb5df41847..7364dd113b7 100644
+index 8ac8f531427..e4067aea77d 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-@@ -45,8 +45,10 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
+@@ -45,7 +45,7 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
  	storageId: ChatViewContainerId,
  	hideIfEmpty: true,
  	order: 1,
 -}, ViewContainerLocation.AuxiliaryBar, { isDefault: true, doNotRegisterOpenCommand: true });
-+}, ViewContainerLocation.AuxiliaryBar, { isDefault: false, doNotRegisterOpenCommand: true }); // RiteMark: isDefault=false to prevent Chat icon in title bar
++}, ViewContainerLocation.AuxiliaryBar, { isDefault: false, doNotRegisterOpenCommand: true });
  
-+// RiteMark: Chat view fully disabled — descriptor and registration commented out
-+void chatViewContainer;
  const chatViewDescriptor: IViewDescriptor = {
  	id: ChatViewId,
- 	containerIcon: chatViewContainer.icon,
-@@ -68,16 +70,12 @@ const chatViewDescriptor: IViewDescriptor = {
+@@ -68,16 +68,10 @@ const chatViewDescriptor: IViewDescriptor = {
  		order: 1
  	},
  	ctorDescriptor: new SyncDescriptor(ChatViewPane),
 -	when: ContextKeyExpr.or(
--		ContextKeyExpr.or(
--			ChatContextKeys.Setup.hidden,
--			ChatContextKeys.Setup.disabled
--		)?.negate(),
+-		ContextKeyExpr.and(
+-			ChatContextKeys.Setup.hidden.negate(),
+-			ChatContextKeys.Setup.disabledInWorkspace.negate(),
+-		),
 -		ChatContextKeys.panelParticipantRegistered,
 -		ChatContextKeys.extensionInvalid
 -	)
-+	// RiteMark: Hide Chat view — Ritemark uses its own AI sidebar
 +	when: ContextKeyExpr.equals('ritemark.chatDisabled', 'true')
  };
 -Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
-+// RiteMark: Don't register Chat view — prevents the Chat icon from appearing in title bar
-+// Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
++void chatViewContainer;
 +void chatViewDescriptor;
  
  const chatParticipantExtensionPoint = extensionsRegistry.ExtensionsRegistry.registerExtensionPoint<IRawChatParticipantContribution[]>({
  	extensionPoint: 'chatParticipants',
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
-index 0e1160d71e4..4c05008524e 100644
+index bbce59557f4..4bacd71205f 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 @@ -7,7 +7,7 @@ import './media/chatStatus.css';
@@ -230,20 +257,20 @@ index 0e1160d71e4..4c05008524e 100644
  import { localize } from '../../../../../nls.js';
  import { IWorkbenchContribution } from '../../../../common/contributions.js';
 -import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, ShowTooltipCommand, StatusbarAlignment, StatusbarEntryKind } from '../../../../services/statusbar/browser/statusbar.js';
-+import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, ShowTooltipCommand, StatusbarEntryKind } from '../../../../services/statusbar/browser/statusbar.js'; // RiteMark: StatusbarAlignment removed — unused
++import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, ShowTooltipCommand, StatusbarEntryKind } from '../../../../services/statusbar/browser/statusbar.js';
  import { ChatEntitlement, ChatEntitlementService, IChatEntitlementService, isProUser } from '../../../../services/chat/common/chatEntitlementService.js';
  import { CancellationToken } from '../../../../../base/common/cancellation.js';
  import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
-@@ -36,7 +36,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+@@ -37,7 +37,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  	constructor(
  		@IChatEntitlementService private readonly chatEntitlementService: ChatEntitlementService,
  		@IInstantiationService private readonly instantiationService: IInstantiationService,
 -		@IStatusbarService private readonly statusbarService: IStatusbarService,
-+		@IStatusbarService private readonly _statusbarService: IStatusbarService, // RiteMark: prefixed — unused with Copilot status bar disabled
++		@IStatusbarService private readonly _statusbarService: IStatusbarService,
  		@IEditorService private readonly editorService: IEditorService,
  		@IConfigurationService private readonly configurationService: IConfigurationService,
  		@IInlineCompletionsService private readonly completionsService: IInlineCompletionsService,
-@@ -52,18 +52,10 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+@@ -53,18 +53,9 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  	}
  
  	private update(): void {
@@ -259,31 +286,39 @@ index 0e1160d71e4..4c05008524e 100644
 -			this.entry?.dispose();
 -			this.entry = undefined;
 -		}
-+		// RiteMark: Hide Copilot status bar entry — Ritemark uses its own AI integration
 +		this.entry?.dispose();
 +		this.entry = undefined;
-+		void this._getEntryProps; // suppress unused-private-method build error
++		void this._getEntryProps;
  	}
  
  	private registerListeners(): void {
-@@ -104,7 +96,8 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+@@ -105,7 +96,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  		}
  	}
  
 -	private getEntryProps(): IStatusbarEntry {
-+	// RiteMark: method retained to avoid cascading unused-import errors from strict build
 +	private _getEntryProps(): IStatusbarEntry { void this._statusbarService;
  		let text = '$(copilot)';
  		let ariaLabel = localize('chatStatusAria', "Copilot status");
  		let kind: StatusbarEntryKind | undefined;
 diff --git a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
-index 7b2cbce78b2..dea3adcac13 100644
+index 866c7bc8d33..f792a193d5a 100644
 --- a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
 +++ b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
-@@ -258,15 +258,15 @@ if (isMacintosh) {
+@@ -21,7 +21,7 @@ import { IQuickAccessRegistry, Extensions as QuickAccessExtensions } from '../..
+ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { EditorPaneDescriptor, IEditorPaneRegistry } from '../../../browser/editor.js';
+ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
+-import { FocusedViewContext, IsSessionsWindowContext } from '../../../common/contextkeys.js';
++import { FocusedViewContext } from '../../../common/contextkeys.js';
+ import { IWorkbenchContributionsRegistry, Extensions as WorkbenchExtensions, WorkbenchPhase, registerWorkbenchContribution2 } from '../../../common/contributions.js';
+ import { EditorExtensions } from '../../../common/editor.js';
+ import { IViewContainersRegistry, IViewsRegistry, ViewContainer, ViewContainerLocation, Extensions as ViewExtensions } from '../../../common/views.js';
+@@ -257,17 +257,7 @@ if (isMacintosh) {
+ 
  MenuRegistry.appendMenuItem(MenuId.EditorTitle, { submenu: MenuId.EditorTitleRun, isSplitButton: { togglePrimaryAction: true }, title: nls.localize2('run', "Run or Debug..."), icon: icons.debugRun, group: 'navigation', order: -1 });
  
- // Debug menu
+-// Debug menu
 -
 -MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 -	submenu: MenuId.MenubarDebugMenu,
@@ -291,52 +326,46 @@ index 7b2cbce78b2..dea3adcac13 100644
 -		...nls.localize2('runMenu', "Run"),
 -		mnemonicTitle: nls.localize({ key: 'mRun', comment: ['&& denotes a mnemonic'] }, "&&Run")
 -	},
--	order: 6
+-	order: 6,
+-	when: IsSessionsWindowContext.negate()
 -});
-+// RiteMark: Hide Run/Debug menu - not needed for writing app
-+// MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
-+// 	submenu: MenuId.MenubarDebugMenu,
-+// 	title: {
-+// 		...nls.localize2('runMenu', "Run"),
-+// 		mnemonicTitle: nls.localize({ key: 'mRun', comment: ['&& denotes a mnemonic'] }, "&&Run")
-+// 	},
-+// 	order: 6
-+// });
++// RiteMark: hide Run/Debug from the top-level menubar.
  
  MenuRegistry.appendMenuItem(MenuId.MenubarDebugMenu, {
  	group: '1_debug',
-@@ -463,6 +463,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
+@@ -464,6 +454,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
  	icon: icons.runViewIcon,
  	alwaysUseContainerInfo: true,
  	order: 3,
-+	hideIfEmpty: true, // RiteMark: Hide when not debugging
++	hideIfEmpty: true,
  }, ViewContainerLocation.Sidebar);
  
  // Register default debug views
-@@ -471,7 +472,8 @@ viewsRegistry.registerViews([{ id: VARIABLES_VIEW_ID, name: nls.localize2('varia
+@@ -472,7 +463,7 @@ viewsRegistry.registerViews([{ id: VARIABLES_VIEW_ID, name: nls.localize2('varia
  viewsRegistry.registerViews([{ id: WATCH_VIEW_ID, name: nls.localize2('watch', "Watch"), containerIcon: icons.watchViewIcon, ctorDescriptor: new SyncDescriptor(WatchExpressionsView), order: 20, weight: 10, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusWatchView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
  viewsRegistry.registerViews([{ id: CALLSTACK_VIEW_ID, name: nls.localize2('callStack', "Call Stack"), containerIcon: icons.callStackViewIcon, ctorDescriptor: new SyncDescriptor(CallStackView), order: 30, weight: 30, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusCallStackView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
  viewsRegistry.registerViews([{ id: BREAKPOINTS_VIEW_ID, name: nls.localize2('breakpoints', "Breakpoints"), containerIcon: icons.breakpointsViewIcon, ctorDescriptor: new SyncDescriptor(BreakpointsView), order: 40, weight: 20, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusBreakpointsView' }, when: ContextKeyExpr.or(CONTEXT_BREAKPOINTS_EXIST, CONTEXT_DEBUG_UX.isEqualTo('default'), CONTEXT_HAS_DEBUGGED) }], viewContainer);
 -viewsRegistry.registerViews([{ id: WelcomeView.ID, name: WelcomeView.LABEL, containerIcon: icons.runViewIcon, ctorDescriptor: new SyncDescriptor(WelcomeView), order: 1, weight: 40, canToggleVisibility: true, when: CONTEXT_DEBUG_UX.isEqualTo('simple') }], viewContainer);
-+// RiteMark: Hide debug welcome view - changed 'simple' to 'never-show' to prevent Run and Debug from appearing in activity bar
 +viewsRegistry.registerViews([{ id: WelcomeView.ID, name: WelcomeView.LABEL, containerIcon: icons.runViewIcon, ctorDescriptor: new SyncDescriptor(WelcomeView), order: 1, weight: 40, canToggleVisibility: true, when: CONTEXT_DEBUG_UX.isEqualTo('never-show') }], viewContainer);
  viewsRegistry.registerViews([{ id: LOADED_SCRIPTS_VIEW_ID, name: nls.localize2('loadedScripts', "Loaded Scripts"), containerIcon: icons.loadedScriptsViewIcon, ctorDescriptor: new SyncDescriptor(LoadedScriptsView), order: 35, weight: 5, canToggleVisibility: true, canMoveView: true, collapsed: true, when: ContextKeyExpr.and(CONTEXT_LOADED_SCRIPTS_SUPPORTED, CONTEXT_DEBUG_UX.isEqualTo('default')) }], viewContainer);
  
  // Register disassembly view
 diff --git a/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts b/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
-index 59e1c903fdd..033df2f485a 100644
+index ba98845660f..b465da5a1d6 100644
 --- a/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
 +++ b/src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts
-@@ -9,7 +9,7 @@ import { EditorContextKeys } from '../../../../../editor/common/editorContextKey
+@@ -8,10 +8,7 @@ import { registerEditorAction } from '../../../../../editor/browser/editorExtens
+ import { EditorContextKeys } from '../../../../../editor/common/editorContextKeys.js';
  import { KeyCode } from '../../../../../base/common/keyCodes.js';
  import { ContextKeyExpr } from '../../../../../platform/contextkey/common/contextkey.js';
+-import { IsSessionsWindowContext } from '../../../../common/contextkeys.js';
  import { KeybindingWeight } from '../../../../../platform/keybinding/common/keybindingsRegistry.js';
 -import { MenuId } from '../../../../../platform/actions/common/actions.js';
-+// RiteMark: MenuId import removed - menu item disabled
- 
+-
  class ExpandAbbreviationAction extends EmmetEditorAction {
  
-@@ -27,12 +27,6 @@ class ExpandAbbreviationAction extends EmmetEditorAction {
+ 	constructor() {
+@@ -28,13 +25,6 @@ class ExpandAbbreviationAction extends EmmetEditorAction {
  					ContextKeyExpr.has('config.emmet.triggerExpansionOnTab')
  				),
  				weight: KeybindingWeight.EditorContrib
@@ -345,24 +374,24 @@ index 59e1c903fdd..033df2f485a 100644
 -				menuId: MenuId.MenubarEditMenu,
 -				group: '5_insert',
 -				title: nls.localize({ key: 'miEmmetExpandAbbreviation', comment: ['&& denotes a mnemonic'] }, "Emmet: E&&xpand Abbreviation"),
--				order: 3
+-				order: 3,
+-				when: IsSessionsWindowContext.negate()
  			}
  		});
  
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-index 6956d7918b3..84f6834ee2d 100644
+index 69bec710f50..85428bd9858 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
 +++ b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-@@ -8,7 +8,7 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
+@@ -8,7 +8,6 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
  import { IStringDictionary } from '../../../../base/common/collections.js';
  import { onUnexpectedError } from '../../../../base/common/errors.js';
  import { Event } from '../../../../base/common/event.js';
 -import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
-+// RiteMark: KeyMod, KeyCode removed - unused after hiding Extensions menu item
  import { mnemonicButtonLabel } from '../../../../base/common/labels.js';
  import { Disposable, DisposableStore, IDisposable, isDisposable } from '../../../../base/common/lifecycle.js';
  import { Schemas } from '../../../../base/common/network.js';
-@@ -115,12 +115,13 @@ export const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainer
+@@ -116,12 +115,6 @@ export const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainer
  	{
  		id: VIEWLET_ID,
  		title: localize2('extensions', "Extensions"),
@@ -372,21 +401,14 @@ index 6956d7918b3..84f6834ee2d 100644
 -			keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyX },
 -			order: 4,
 -		},
-+		// RiteMark: Remove Extensions from View menu - marketplace is hidden
-+		// openCommandActionDescriptor: {
-+		// 	id: VIEWLET_ID,
-+		// 	mnemonicTitle: localize({ key: 'miViewExtensions', comment: ['&& denotes a mnemonic'] }, "E&&xtensions"),
-+		// 	keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyX },
-+		// 	order: 4,
-+		// },
  		ctorDescriptor: new SyncDescriptor(ExtensionsViewPaneContainer),
  		icon: extensionsViewIcon,
  		order: 4,
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
-index 23ea0f7354a..b717811344e 100644
+index 49b3ec6a6eb..021fdb0a86d 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
 +++ b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
-@@ -2684,7 +2684,7 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
+@@ -2758,7 +2758,7 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
  		}
  
  		const extensionsToUninstall: UninstallExtensionInfo[] = [{ extension: extension.local }];
@@ -396,10 +418,10 @@ index 23ea0f7354a..b717811344e 100644
  				if (packExtension.local && !extensionsToUninstall.some(e => areSameExtensions(e.extension.identifier, packExtension.identifier))) {
  					extensionsToUninstall.push({ extension: packExtension.local });
 diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
-index d4c780d04ea..731b1f3828a 100644
+index be4e0b92675..74411f69174 100644
 --- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
 +++ b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
-@@ -99,8 +99,8 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
+@@ -101,8 +101,8 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
  		this._register(allowedExtensionsService.onDidChangeAllowedExtensionsConfigValue(() => this._onDidChangeExtensions([], [], false)));
  
  		// Extension unification
@@ -425,89 +447,3 @@ index 16802452df2..be2ca64f668 100644
  		const relevantExtensions = [this._completionsExtensionId, this._chatExtensionId].filter((id): id is string => !!id);
  
  		this.isRunningUnificationExperiment = isRunningUnificationExperiment.bindTo(this._contextKeyService);
-diff --git a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
-index 5d7d6a35c1f..9c4a4b5ca61 100644
---- a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
-+++ b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
-@@ -10,7 +10,8 @@ import { EnterAgentSessionProjectionAction, ExitAgentSessionProjectionAction, To
- import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../../../common/contributions.js';
- import { AgentTitleBarStatusRendering } from './agentTitleBarStatusWidget.js';
- import { AgentTitleBarStatusService, IAgentTitleBarStatusService } from './agentTitleBarStatusService.js';
--import { Codicon } from '../../../../../../base/common/codicons.js';
-+// Ritemark: Codicon import removed — chat icon registrations commented out (patch 003)
-+// import { Codicon } from '../../../../../../base/common/codicons.js';
- import { localize } from '../../../../../../nls.js';
- import { ContextKeyExpr } from '../../../../../../platform/contextkey/common/contextkey.js';
- import { ProductQualityContext } from '../../../../../../platform/contextkey/common/contextkeys.js';
-@@ -222,38 +223,39 @@ registerSingleton(IAgentTitleBarStatusService, AgentTitleBarStatusService, Insta
- registerWorkbenchContribution2(AgentTitleBarStatusRendering.ID, AgentTitleBarStatusRendering, WorkbenchPhase.AfterRestored);
- registerWorkbenchContribution2(AgentSessionReadyContribution.ID, AgentSessionReadyContribution, WorkbenchPhase.AfterRestored);
- 
--// Register Agent Status as a menu item in the command center (alongside the search box, not replacing it)
--MenuRegistry.appendMenuItem(MenuId.CommandCenter, {
--	submenu: MenuId.AgentsTitleBarControlMenu,
--	title: localize('agentsControl', "Agents"),
--	icon: Codicon.chatSparkle,
--	when: ContextKeyExpr.and(
--		ChatContextKeys.enabled,
--		ContextKeyExpr.or(
--			ContextKeyExpr.has(`config.${ChatConfiguration.AgentStatusEnabled}`),
--			ContextKeyExpr.has(`config.${ChatConfiguration.UnifiedAgentsBar}`)
--		)
--	),
--	order: 10002 // to the right of the chat button
--});
--
--// Add to the global title bar if command center is disabled
--MenuRegistry.appendMenuItem(MenuId.TitleBar, {
--	submenu: MenuId.ChatTitleBarMenu,
--	title: localize('title4', "Chat"),
--	group: 'navigation',
--	icon: Codicon.chatSparkle,
--	when: ContextKeyExpr.and(
--		ChatContextKeys.supported,
--		ContextKeyExpr.and(
--			ChatContextKeys.Setup.hidden.negate(),
--			ChatContextKeys.Setup.disabled.negate()
--		),
--		ContextKeyExpr.has(`config.${ChatConfiguration.AgentStatusEnabled}`),
--		ContextKeyExpr.has('config.window.commandCenter').negate(),
--	),
--	order: 1
--});
-+// Ritemark: chat icon hidden from titlebar/commandcenter — see patch 003
-+// // Register Agent Status as a menu item in the command center (alongside the search box, not replacing it)
-+// MenuRegistry.appendMenuItem(MenuId.CommandCenter, {
-+// 	submenu: MenuId.AgentsTitleBarControlMenu,
-+// 	title: localize('agentsControl', "Agents"),
-+// 	icon: Codicon.chatSparkle,
-+// 	when: ContextKeyExpr.and(
-+// 		ChatContextKeys.enabled,
-+// 		ContextKeyExpr.or(
-+// 			ContextKeyExpr.has(`config.${ChatConfiguration.AgentStatusEnabled}`),
-+// 			ContextKeyExpr.has(`config.${ChatConfiguration.UnifiedAgentsBar}`)
-+// 		)
-+// 	),
-+// 	order: 10002 // to the right of the chat button
-+// });
-+//
-+// // Add to the global title bar if command center is disabled
-+// MenuRegistry.appendMenuItem(MenuId.TitleBar, {
-+// 	submenu: MenuId.ChatTitleBarMenu,
-+// 	title: localize('title4', "Chat"),
-+// 	group: 'navigation',
-+// 	icon: Codicon.chatSparkle,
-+// 	when: ContextKeyExpr.and(
-+// 		ChatContextKeys.supported,
-+// 		ContextKeyExpr.and(
-+// 			ChatContextKeys.Setup.hidden.negate(),
-+// 			ChatContextKeys.Setup.disabled.negate()
-+// 		),
-+// 		ContextKeyExpr.has(`config.${ChatConfiguration.AgentStatusEnabled}`),
-+// 		ContextKeyExpr.has('config.window.commandCenter').negate(),
-+// 	),
-+// 	order: 1
-+// });
- 
- // Register a placeholder action to the submenu so it appears (required for submenus)
- MenuRegistry.appendMenuItem(MenuId.AgentsTitleBarControlMenu, {
