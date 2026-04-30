@@ -66,9 +66,9 @@ It is **not**:
 |---|---|
 | *Try it* test loop in the Properties panel | High-leverage move (it makes authoring feedback-driven instead of faith-based) but still needs thought on what it runs against, how the runtime invokes a single helper one-shot against arbitrary input, and how the output is rendered. Own sprint once that's settled. |
 | Capture-from-conversation (*Save approach as skill* from chat) | Highest novelty + cost in the family. Several open product decisions (what is being bottled, deterministic vs LLM distillation, default scope) need to be settled before build. Own sprint. |
-| Description-quality coach | High leverage, but only earns its keep once authoring volume is real enough to surface the silent-failure mode. Wait for telemetry. |
+| Description-quality coach | Largely obviated by shipping `skill-creator` in the starter pack — its own guidance covers the *undertrigger* / weak-description failure mode. Revisit only if telemetry shows users skipping `/skill-creator` and producing weak descriptions anyway. |
 | Template chooser / template gallery | Premature curation. Ship the starter pack (#9) first; let actual usage signal what templates would even be. |
-| Builder agent (conversational creator) | Repositioned as a coach, not an entry point. Same gating as the description coach. |
+| Builder agent (conversational creator) | Largely obviated by shipping `skill-creator` in the starter pack — Anthropic already built this. Don't build a Ritemark-branded duplicate. The agent-creation side has no upstream equivalent; revisit only if a real need for guided agent authoring emerges. |
 | Share / install-from-URL / marketplace | Different altitude (distribution, not authoring). Park. |
 
 ## Success Criteria
@@ -89,13 +89,18 @@ These were the open product decisions for this sprint. All four are now settled 
 
 1. **Default scope for new files: project (`.claude/`).** New skills/agents land in the workspace's `.claude/` by default. A one-click promote to user scope is offered from the row context menu (Tier 1 #3).
 2. **Skill vs agent: user picks up front, by which list they create from.** The Agent Library has two visible sections — **Agents** and **Skills** — and the `+` affordance lives at each section header. Clicking the `+` next to **Skills** creates a skill; clicking the `+` next to **Agents** creates an agent. The empty state mirrors this with two buttons (*New skill*, *New agent*). No separate chooser modal.
-3. **Starter pack: ship + auto-seed.** A curated set of 3–5 starters ships under `extensions/ritemark/starter-pack/`. On first run, if `~/.claude/{agents,skills}/` is empty, the starters are copied into `~/.claude/`. Users can edit, disable, or delete them like any other file.
+3. **Starter pack: ship + auto-seed.** A curated set ships under `extensions/ritemark/starter-pack/`. On first run, if `~/.claude/{agents,skills}/` is empty, the starters are copied into `~/.claude/`. Users can edit, disable, or delete them like any other file.
+
+   **Anchor of the starter pack: Anthropic's [skill-creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator).** It is the meta-skill for building skills — it interviews the user, writes the SKILL.md, and ships its own evaluation sub-agents (`analyzer.md`, `comparator.md`, `grader.md`) for empirical skill-quality testing. Pre-installing it means the *Builder agent* and *description coach* work we'd previously deferred is largely already solved upstream — we don't need to build either; we just need to make `/skill-creator` discoverable.
+
+   **Asymmetry to note for `creation-spec.md`:** Anthropic does not ship an equivalent `agent-creator`. Creating an agent stays bare-bones (frontmatter skeleton + open in editor). Creating a skill, after this anchor lands, becomes guided. The empty agent file should mention this gap honestly — there's no upstream meta-helper to point at.
 4. **Delete safety: OS trash via the VS Code API.** Deletions use `vscode.workspace.fs.delete` with `useTrash: true`. Recovery happens via the OS trash, not an internal `.claude/.trash/` folder. Matches the rest of VS Code's delete semantics; no internal trash directory to maintain.
 
 ### Still open (lower-altitude, resolve while drafting `creation-spec.md`)
 
 - **Filename derivation when the user creates a new skill/agent.** Take the user-typed *name* and slugify it (lowercase, hyphens), or open the editor with a placeholder filename and let them rename via "Save As"?
-- **Starter pack contents.** *That* there is one is settled; *which 3–5 helpers* ship is its own small decision and is the main content of `starter-pack.md`.
+- **Starter pack contents beyond the anchor.** Anchor (`skill-creator`) is settled. *Which other 2–4 exemplars* ship alongside it is the main content of `starter-pack.md`. Candidates worth weighing: a Ritemark-flavored writing helper (e.g. outline-from-notes), a release-notes drafter, a frontmatter cleanup helper, plus possibly one well-chosen example agent so the **Agents** section isn't empty on first run.
+- **Vendoring / licensing for skill-creator.** `anthropics/skills` is public; we still need to confirm its LICENSE permits redistribution as part of an installer, settle on a vendoring strategy (snapshot at a pinned commit vs. fetch on first run), and decide how we track upstream updates. `starter-pack.md` topic.
 - **Frontmatter skeleton fields.** Minimal (`name`, `description`) or richer (`name`, `description`, `tools`, `model` placeholder)? Probably content of `creation-spec.md`.
 
 ## Phases
