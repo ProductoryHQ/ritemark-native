@@ -21,12 +21,16 @@ The Agent Library has visible sections — **AGENTS** and **SKILLS** (and **COMM
 
 Clicking the `+`:
 
-1. Inserts a new row at the top of the section, in inline-edit mode — a text input with placeholder `"Name…"` and the section's icon. No modal.
-2. The user types a display name (e.g. *"Outline from notes"*).
-3. On `Enter`: the file is created (see §3), the row is replaced by the real list item, and the file opens in the editor with the **Properties** panel auto-opened.
-4. On `Escape` or blur with empty input: the inline-edit row is removed, no file is created.
+1. Opens a modal dialog using the existing Ritemark `Dialog` primitive (`webview/src/components/Dialog.tsx`).
+2. Modal title: *"New skill"* or *"New agent"* — determined by which section's `+` was clicked.
+3. Modal body, in this order:
+   - **Name** field — single-line text input, autofocused, placeholder *"e.g. Outline from notes"*.
+   - **Scope** — two-option segmented control: *Project (this workspace)* / *User (all projects)*. Defaults to **Project**.
+4. Modal actions: **Cancel** / **Create**. *Create* is disabled while the name field is empty or whitespace-only. `Enter` confirms; `Escape` cancels.
+5. On **Create**: the file is created at the path derived from name + scope (§3), the modal closes, the file opens in the editor with the **Properties** panel auto-opened, cursor in the **Description** field.
+6. On **Cancel** or `Escape`: the modal closes; no file is created.
 
-This matches VS Code's own "New File" pattern in the file explorer — same muscle memory.
+Modal width follows the standard Ritemark dialog. Single-screen, no tabs, no "advanced" section. The modal collects only the two pieces of information needed to *create* the file; every other field is filled in via the Properties panel after.
 
 ### 1.3 Section guard
 
@@ -59,7 +63,7 @@ When the active scope tab has zero items, the sidebar replaces the file-path ins
 
 ### 2.2 Behavior
 
-Each button triggers the same flow as the corresponding section `+` (§1.2), but since there are no sections yet, the inline-edit row appears as the only row in a synthetic section header for the chosen type.
+Each button opens the same modal as the corresponding section `+` (§1.2). The modal's title reflects the type chosen (*"New skill"* / *"New agent"*); the rest of the flow is identical.
 
 ---
 
@@ -82,33 +86,48 @@ If `{slug}` already exists in the target directory, append `-2`, `-3`, … until
 
 ### 3.3 Frontmatter skeleton
 
+The skeleton includes **all known frontmatter fields**, populated with empty strings or sensible defaults. The Properties panel renders every field as a row from creation — the user sees the full schema surface and discovers capabilities (`paths`, `disable-model-invocation`, `effort`, etc.) by seeing them in the panel, not by reading docs.
+
 **Skill** (`SKILL.md`):
 
-```markdown
+```yaml
 ---
 name: {user-typed name}
-description: {empty — placeholder text below}
+description: 
+when_to_use: 
+disable-model-invocation: false
+user-invocable: true
+arguments: 
+allowed-tools: 
+paths: 
 ---
 
-<!-- Describe in plain language WHEN this skill should activate.
+<!-- Plain-language description of WHEN this skill should activate.
      Be specific. Weak descriptions are the #1 reason skills don't trigger.
      Example: "Reformats meeting notes into structured outlines with action items." -->
 ```
 
 **Agent** (`{slug}.md`):
 
-```markdown
+```yaml
 ---
 name: {user-typed name}
-description: {empty — placeholder text below}
+description: 
+tools: 
+model: 
+effort: 
+skills: 
+memory: 
 ---
 
-<!-- Describe in plain language what this agent does and when to delegate to it.
+<!-- Plain-language description of what this agent does and when to delegate to it.
      Anthropic does not publish an "agent-creator" guide; refer to
      https://code.claude.com/docs/en/sub-agents.md for the full schema. -->
 ```
 
-**Rationale for minimal skeleton:** richer skeletons (with `tools`, `model`, `paths`, `disable-model-invocation` placeholders) push schema complexity onto users at the worst moment — before they've decided what their helper does. Optional fields can be added via the existing `AddPropertyMenu.tsx` in the Properties panel after the basics are filled in.
+**Tradeoff acknowledged:** the Properties panel will show many empty fields immediately after creation. Users scroll past them and start with `name` + `description`. The benefit outweighs the visual cost: no hidden schema, no surprise capabilities, no "I didn't know I could set that" moments three weeks later.
+
+The existing `AddPropertyMenu.tsx` remains useful for adding *custom* (non-schema) properties beyond what ships in the skeleton.
 
 **Rationale for the comment block:** new files open with the Properties panel active. The body comment is what the user sees if they collapse Properties. It coaches without nagging.
 
