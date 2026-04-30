@@ -257,6 +257,18 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Manual explorer refresh — exposed as a title-bar button so users have a
+  // visible "kick the tree" affordance when fsevents misses an external change
+  // (rare but real on deep paths with spaces / unicode). Same plumbing as the
+  // automatic post-agent refresh.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.explorer.refresh', () => {
+      void vscode.commands
+        .executeCommand('workbench.files.action.refreshFilesExplorer')
+        .then(undefined, () => undefined);
+    })
+  );
+
   // Register new chat command (clears conversation)
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.newChat', () => {

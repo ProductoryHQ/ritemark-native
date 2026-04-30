@@ -18,6 +18,19 @@ import { DEFAULT_MODELS } from '../../ai/modelConfig';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
+ * Write a file via VS Code's filesystem API so the explorer model is
+ * notified. Direct `fs.writeFile` only surfaces via the OS file watcher,
+ * which can lag or miss writes inside newly-created subdirectories
+ * (e.g. .flows/images/ on first run). See bug #33.
+ */
+async function writeFileVSCode(
+  outputPath: string,
+  data: Uint8Array
+): Promise<void> {
+  await vscode.workspace.fs.writeFile(vscode.Uri.file(outputPath), data);
+}
+
+/**
  * Extension context for secret storage access
  */
 let extensionContext: vscode.ExtensionContext | null = null;
@@ -182,7 +195,7 @@ async function downloadImage(
 
   const buffer = Buffer.from(await response.arrayBuffer());
   const localPath = path.join(imagesDir, filename);
-  await fs.writeFile(localPath, buffer);
+  await writeFileVSCode(localPath, buffer);
 
   return localPath;
 }
@@ -307,7 +320,7 @@ async function generateWithOpenAI(
   if (imageResponseData?.b64_json) {
     // GPT Image models return base64 - save directly
     const buffer = Buffer.from(imageResponseData.b64_json, 'base64');
-    await fs.writeFile(localPath, buffer);
+    await writeFileVSCode(localPath, buffer);
 
     return {
       url: `file://${localPath}`,
@@ -441,7 +454,7 @@ async function generateWithGemini(
   const localPath = path.join(imagesDir, filename);
 
   const buffer = Buffer.from(imageBase64, 'base64');
-  await fs.writeFile(localPath, buffer);
+  await writeFileVSCode(localPath, buffer);
 
   return {
     url: `file://${localPath}`,
