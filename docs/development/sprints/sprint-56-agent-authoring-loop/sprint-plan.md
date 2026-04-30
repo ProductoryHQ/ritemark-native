@@ -95,6 +95,7 @@ These were the open product decisions for this sprint. All four are now settled 
 
    **Asymmetry to note for `creation-spec.md`:** Anthropic does not ship an equivalent `agent-creator`. Creating an agent stays bare-bones (frontmatter skeleton + open in editor). Creating a skill, after this anchor lands, becomes guided. The empty agent file should mention this gap honestly — there's no upstream meta-helper to point at.
 4. **Delete safety: OS trash via the VS Code API.** Deletions use `vscode.workspace.fs.delete` with `useTrash: true`. Recovery happens via the OS trash, not an internal `.claude/.trash/` folder. Matches the rest of VS Code's delete semantics; no internal trash directory to maintain.
+5. **Commands: display-only, no creation affordance.** `.claude/commands/*.md` is upstream-deprecated in favor of skills (a skill with `disable-model-invocation: true` is the modern equivalent of a command, plus a strict superset of capabilities). Existing command files continue to display in the **COMMANDS** section so users with legacy commands aren't stranded, but the sidebar ships **no `+` next to COMMANDS** and the empty state offers no *New command* button. New users author skills; existing users can still edit, duplicate, or delete their commands via the row context menu.
 
 ### Still open (lower-altitude, resolve while drafting `creation-spec.md`)
 
