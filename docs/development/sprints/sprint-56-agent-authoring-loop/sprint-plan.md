@@ -44,8 +44,8 @@ It is **not**:
 
 | # | Fix | Why |
 |---|---|---|
-| 1 | Empty state shows action buttons (*New skill*, *New agent*) instead of "add files to `.claude/`" | Current copy tells the user to open a terminal. |
-| 2 | `+` affordance in the Agent Library header | A populated library has no way to add. |
+| 1 | Empty state shows two action buttons — *New skill* and *New agent* — instead of "add files to `.claude/`" | Current copy tells the user to open a terminal. The two-button choice mirrors the two sections of the populated library. |
+| 2 | `+` affordance per section header (one next to **Agents**, one next to **Skills**) so the user picks the type by clicking the right list | A populated library has no way to add. The two existing lists are the natural affordance for "skill vs agent." |
 | 3 | Row context menu — *Duplicate*, *Reveal in Finder*, *Delete*, *Move scope* | Right-click does nothing today. |
 | 4 | "New blank skill / agent" command — creates the `.md` in the correct directory and opens it in the editor | Today the user must leave Ritemark to create a file. |
 | 5 | File watcher on `.claude/{agents,skills,commands}/` for live refresh | External adds/edits don't appear without manual reload. |
@@ -83,20 +83,26 @@ It is **not**:
 - [ ] On first run with an empty `~/.claude/`, the starter pack is seeded.
 - [ ] The Sprint 54 invariants remain intact — file-first truth, generic frontmatter editing, TOC/Properties exclusivity, no regressions in editor / chat / Flows.
 
-## Open Product Decisions to Resolve in Phase 1
+## Resolved Decisions (Jarmo, Phase 1)
 
-These are not analysis-doc gaps — they are decisions this sprint must make before implementation. Each has a recommendation; Jarmo signs.
+These were the open product decisions for this sprint. All four are now settled and should be treated as fixed for implementation.
 
-1. **Default scope for new files** — project (`.claude/`) or user (`~/.claude/`)? Lean: project, with a one-click promote.
-2. **Skill vs agent at the create moment** — ask up front, or infer from intent questions? Lean: ask, but with plain-language labels (*"Always behave a certain way" / "Run something in the background"*).
-3. **Starter pack contents** — which 3–5 helpers ship as the first-run seed, and where do they live in the repo? Lean: a curated set under `extensions/ritemark/starter-pack/` copied on activation.
-4. **Delete safety** — trash to a recoverable folder, or hard-delete with confirm? Lean: trash, recoverable, no audit log yet.
+1. **Default scope for new files: project (`.claude/`).** New skills/agents land in the workspace's `.claude/` by default. A one-click promote to user scope is offered from the row context menu (Tier 1 #3).
+2. **Skill vs agent: user picks up front, by which list they create from.** The Agent Library has two visible sections — **Agents** and **Skills** — and the `+` affordance lives at each section header. Clicking the `+` next to **Skills** creates a skill; clicking the `+` next to **Agents** creates an agent. The empty state mirrors this with two buttons (*New skill*, *New agent*). No separate chooser modal.
+3. **Starter pack: ship + auto-seed.** A curated set of 3–5 starters ships under `extensions/ritemark/starter-pack/`. On first run, if `~/.claude/{agents,skills}/` is empty, the starters are copied into `~/.claude/`. Users can edit, disable, or delete them like any other file.
+4. **Delete safety: OS trash via the VS Code API.** Deletions use `vscode.workspace.fs.delete` with `useTrash: true`. Recovery happens via the OS trash, not an internal `.claude/.trash/` folder. Matches the rest of VS Code's delete semantics; no internal trash directory to maintain.
+
+### Still open (lower-altitude, resolve while drafting `creation-spec.md`)
+
+- **Filename derivation when the user creates a new skill/agent.** Take the user-typed *name* and slugify it (lowercase, hyphens), or open the editor with a placeholder filename and let them rename via "Save As"?
+- **Starter pack contents.** *That* there is one is settled; *which 3–5 helpers* ship is its own small decision and is the main content of `starter-pack.md`.
+- **Frontmatter skeleton fields.** Minimal (`name`, `description`) or richer (`name`, `description`, `tools`, `model` placeholder)? Probably content of `creation-spec.md`.
 
 ## Phases
 
 | Phase | Focus | Approval gate |
 |---|---|---|
-| 1. Decisions + spec | Settle the four open product decisions; write `creation-spec.md` and `starter-pack.md` under this sprint folder. | Jarmo signs the specs |
+| 1. Decisions + spec | Four product decisions settled (above). Remaining work: write `creation-spec.md` and `starter-pack.md` under this sprint folder. | Jarmo signs the specs |
 | 2. Implementation — Tier 1 | Empty state, `+`, row menu, *New blank* command, file watcher. | qa-validator |
 | 3. Implementation — Tier 2 | Skeleton, duplicate, scope move, starter pack, sort. | qa-validator |
 | 4. Validation | Build, smoke test, confirm no regressions in Sprint 54 surfaces. | qa-validator + Jarmo manual test |
@@ -130,6 +136,6 @@ These are not analysis-doc gaps — they are decisions this sprint must make bef
 
 ## Status
 
-**Current Phase:** Phase 1 — decisions + spec drafting
+**Current Phase:** Phase 1 — spec drafting (the four product decisions are now settled)
 **Current Branch:** `claude/design-agents-skills-ui-ARdo7`
-**Next Step:** Resolve the four open product decisions with Jarmo, then draft `creation-spec.md` and `starter-pack.md` under this folder before any implementation begins.
+**Next Step:** Draft `creation-spec.md` and `starter-pack.md` under this folder. `creation-spec.md` covers per-section `+` affordances, the empty-state two-button layout, the new-file flow (skeleton + filename derivation), the duplicate / scope-move / delete row actions, and the file watcher. `starter-pack.md` decides which 3–5 helpers ship as seeds.
