@@ -91,7 +91,7 @@ These were the open product decisions for this sprint. All four are now settled 
 2. **Skill vs agent: user picks up front, by which list they create from.** The Agent Library has two visible sections — **Agents** and **Skills** — and the `+` affordance lives at each section header. Clicking the `+` next to **Skills** creates a skill; clicking the `+` next to **Agents** creates an agent. The empty state mirrors this with two buttons (*New skill*, *New agent*). No separate chooser modal.
 3. **Starter pack: ship + auto-seed.** A curated set ships under `extensions/ritemark/starter-pack/`. On first run, if `~/.claude/{agents,skills}/` is empty, the starters are copied into `~/.claude/`. Users can edit, disable, or delete them like any other file.
 
-   **Anchor of the starter pack: Anthropic's [skill-creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator).** It is the meta-skill for building skills — it interviews the user, writes the SKILL.md, and ships its own evaluation sub-agents (`analyzer.md`, `comparator.md`, `grader.md`) for empirical skill-quality testing. Pre-installing it means the *Builder agent* and *description coach* work we'd previously deferred is largely already solved upstream — we don't need to build either; we just need to make `/skill-creator` discoverable.
+   **Anchor of the starter pack: Anthropic's [skill-creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator), licensed Apache-2.0.** Vendored verbatim at commit `5128e186` under `extensions/ritemark/starter-pack/skills/skill-creator/`. It is the meta-skill for building skills — it interviews the user, writes the SKILL.md, and ships its own evaluation sub-agents (`analyzer.md`, `comparator.md`, `grader.md`) for empirical skill-quality testing. Pre-installing it means the *Builder agent* and *description coach* work we'd previously deferred is largely already solved upstream — we don't need to build either; we just need to make `/skill-creator` discoverable.
 
    **Asymmetry to note for `creation-spec.md`:** Anthropic does not ship an equivalent `agent-creator`. Creating an agent stays bare-bones (frontmatter skeleton + open in editor). Creating a skill, after this anchor lands, becomes guided. The empty agent file should mention this gap honestly — there's no upstream meta-helper to point at.
 4. **Delete safety: OS trash via the VS Code API.** Deletions use `vscode.workspace.fs.delete` with `useTrash: true`. Recovery happens via the OS trash, not an internal `.claude/.trash/` folder. Matches the rest of VS Code's delete semantics; no internal trash directory to maintain.
@@ -142,6 +142,9 @@ These were the open product decisions for this sprint. All four are now settled 
 
 ## Status
 
-**Current Phase:** Phase 1 — spec drafting (the four product decisions are now settled)
+**Current Phase:** Phase 2 — Tier 1 implementation in progress
 **Current Branch:** `claude/design-agents-skills-ui-ARdo7`
-**Next Step:** Draft `creation-spec.md` and `starter-pack.md` under this folder. `creation-spec.md` covers per-section `+` affordances, the empty-state two-button layout, the new-file flow (skeleton + filename derivation), the duplicate / scope-move / delete row actions, and the file watcher. `starter-pack.md` decides which 3–5 helpers ship as seeds.
+
+Phase 1 closed: five product decisions resolved, two specs written (`creation-spec.md`, `starter-pack.md`), `skill-creator` LICENSE confirmed Apache-2.0 and vendored at `5128e186`, three Ritemark-authored starters drafted (`outline-from-notes`, `frontmatter-cleanup`, `document-reviewer`).
+
+**Next Step:** Implement Tier 1 in `AgentLibraryViewProvider.ts` and `extension.ts` — empty-state buttons, per-section `+` affordances, new-file modal, row context menu, file watcher. Each item gets its own commit; `npx tsc --noEmit` must pass before each.

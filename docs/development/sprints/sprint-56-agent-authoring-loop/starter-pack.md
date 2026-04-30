@@ -53,16 +53,19 @@ This mirrors the layout of the destination directory (`~/.claude/{skills,agents}
 
 ## 3. Licensing & vendoring
 
-### 3.1 skill-creator (the anchor) — outstanding work
+### 3.1 skill-creator (the anchor) — confirmed Apache-2.0
 
-**Action item before implementation:** confirm the LICENSE on `anthropics/skills` permits redistribution as part of an installer. The repo is public and Anthropic's stated intent is that these skills be reused, but "public on GitHub" ≠ "free to redistribute in a downstream product." Phase 1 task: read the LICENSE and confirm.
+`skill-creator` ships a per-skill `LICENSE.txt` (verified at [anthropics/skills/skills/skill-creator/LICENSE.txt](https://github.com/anthropics/skills/blob/main/skills/skill-creator/LICENSE.txt)) — Apache License 2.0. The repo's README also confirms most of its skills are open-source under Apache-2.0.
 
-**Two contingencies:**
+Apache 2.0 permits redistribution of this skill as part of Ritemark's installer, including commercially. Required obligations:
 
-- **If LICENSE permits redistribution:** snapshot at a pinned commit, vendor under `extensions/ritemark/starter-pack/skills/skill-creator/`. Track the commit hash in `VERSIONS.md`. Ship.
-- **If LICENSE does not permit redistribution:** fall back to a *first-run install prompt* — empty state shows a one-click button *"Install starter pack from anthropics/skills"* that runs `claude plugins install` (if available) or shells out to `git clone` into `~/.claude/`. Network required at install time, not at runtime. Same final user experience, different distribution mechanism.
+1. Preserve the `LICENSE.txt` file unmodified inside the vendored directory.
+2. Do not modify any source file in `skill-creator/` (modified files would need a "prominent notice" — cleanest posture is a pristine snapshot).
+3. Any future Ritemark-authored derivative of skill-creator content would need its own attribution.
 
-The sprint plan and creation-spec assume the first contingency. If we land on the second, the empty state copy and seed timing change but nothing else does.
+**Vendored at:** `extensions/ritemark/starter-pack/skills/skill-creator/`
+**Pinned commit:** `5128e1865d670f5d6c9cef000e6dfc4e951fb5b9` (recorded in `VERSIONS.md`)
+**Files preserved:** SKILL.md, LICENSE.txt, agents/, assets/, eval-viewer/, references/, scripts/ — full directory verbatim.
 
 ### 3.2 Ritemark-authored starters
 
