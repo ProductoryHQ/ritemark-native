@@ -13,6 +13,11 @@ import * as os from 'os';
 import * as path from 'path';
 import { spawn, spawnSync, ChildProcess } from 'child_process';
 import { isEnabled } from '../features/featureGate';
+import {
+  findBundledAgentRuntime,
+  inferCodexRuntimeLaunchMode,
+  isBundledAgentRuntimePath,
+} from '../utils/bundledAgentRuntime';
 
 export interface CodexManagerConfig {
   onStdout?: (data: string) => void;
@@ -34,6 +39,8 @@ export interface CodexBinaryStatus {
   runtimeNodeArch: string;
   machineArch: string;
   compatibility: CodexCompatibilityStatus | null;
+  runtimeSource: CodexRuntimeSource | null;
+  launchMode: CodexLaunchMode | null;
 }
 
 export interface CodexCapabilityFlags {
@@ -49,6 +56,15 @@ export interface CodexCompatibilityStatus {
   versionInAuditedRange: boolean;
   capabilities: CodexCapabilityFlags;
   limitations: string[];
+}
+
+type CodexRuntimeSource = 'bundled' | 'system';
+type CodexLaunchMode = 'codex-cli' | 'codex-app-server';
+
+interface CodexResolvedBinary {
+  binaryPath: string;
+  runtimeSource: CodexRuntimeSource;
+  launchMode: CodexLaunchMode;
 }
 
 export class CodexManager {
@@ -68,8 +84,8 @@ export class CodexManager {
    * Check if codex binary is available in PATH
    */
   async isInstalled(): Promise<boolean> {
-    const binaryPath = await this.findBinaryPath();
-    return binaryPath !== null;
+    const binary = await this.findBinary();
+    return binary !== null;
   }
 
   /**
@@ -80,10 +96,49 @@ export class CodexManager {
    * (it's a bash shim), so we must prefer the .cmd or .exe variant.
    */
   async findBinaryPath(): Promise<string | null> {
-    // First try `which`/`where` for the active PATH
-    const fromPath = await this.findBinaryInPath();
-    if (fromPath) return fromPath;
+    const binary = await this.findBinary();
+    return binary?.binaryPath ?? null;
+  }
 
+  private async findBinary(): Promise<CodexResolvedBinary | null> {
+    const bundledAppServer = findBundledAgentRuntime('codex-app-server');
+    if (bundledAppServer) {
+      return {
+        binaryPath: bundledAppServer.path,
+        runtimeSource: 'bundled',
+        launchMode: 'codex-app-server',
+      };
+    }
+
+    const bundledCli = findBundledAgentRuntime('codex-cli');
+    if (bundledCli) {
+      return {
+        binaryPath: bundledCli.path,
+        runtimeSource: 'bundled',
+        launchMode: inferCodexRuntimeLaunchMode(bundledCli.path),
+      };
+    }
+
+    const fromPath = await this.findBinaryInPath();
+    if (fromPath) {
+      return {
+        binaryPath: fromPath,
+        runtimeSource: 'system',
+        launchMode: inferCodexRuntimeLaunchMode(fromPath),
+      };
+    }
+
+    const fallbackPath = this.findSystemFallbackBinaryPath();
+    return fallbackPath
+      ? {
+        binaryPath: fallbackPath,
+        runtimeSource: 'system',
+        launchMode: inferCodexRuntimeLaunchMode(fallbackPath),
+      }
+      : null;
+  }
+
+  private findSystemFallbackBinaryPath(): string | null {
     // Fallback: scan common install locations (nvm, Homebrew, etc.)
     if (process.platform !== 'win32') {
       const home = require('os').homedir();
@@ -173,14 +228,12 @@ export class CodexManager {
    * Check whether the codex binary exists and can actually run.
    */
   async getBinaryStatus(): Promise<CodexBinaryStatus> {
-    const binaryPath = await this.findBinaryPath();
+    const binary = await this.findBinary();
     const runtimeNodeVersion = process.version.replace(/^v/, '');
     const runtimeNodeArch = process.arch;
     const machineArch = this.getMachineArch();
-    const installNodeVersion = binaryPath ? this.extractNvmNodeVersion(binaryPath) : null;
-    const installNodeArch = binaryPath ? this.getBinaryArchitecture(binaryPath) : null;
 
-    if (!binaryPath) {
+    if (!binary) {
       return {
         available: false,
         runnable: false,
@@ -195,8 +248,14 @@ export class CodexManager {
         runtimeNodeArch,
         machineArch,
         compatibility: null,
+        runtimeSource: null,
+        launchMode: null,
       };
     }
+
+    const binaryPath = binary.binaryPath;
+    const installNodeVersion = this.extractNvmNodeVersion(binaryPath);
+    const installNodeArch = this.getBinaryArchitecture(binaryPath);
 
     return new Promise((resolve) => {
       const versionProcess = this.spawnResolvedBinary(binaryPath, ['--version']);
@@ -227,7 +286,9 @@ export class CodexManager {
             installNodeArch,
             runtimeNodeArch,
             machineArch,
-            compatibility: this.inspectCompatibility(binaryPath, match ? match[1] : null),
+            compatibility: this.inspectCompatibility(binaryPath, match ? match[1] : null, binary.launchMode),
+            runtimeSource: binary.runtimeSource,
+            launchMode: binary.launchMode,
           });
           return;
         }
@@ -247,6 +308,8 @@ export class CodexManager {
           runtimeNodeArch,
           machineArch,
           compatibility: null,
+          runtimeSource: binary.runtimeSource,
+          launchMode: binary.launchMode,
         });
       });
 
@@ -265,6 +328,8 @@ export class CodexManager {
           runtimeNodeArch,
           machineArch,
           compatibility: null,
+          runtimeSource: binary.runtimeSource,
+          launchMode: binary.launchMode,
         });
       });
     });
@@ -313,7 +378,7 @@ export class CodexManager {
     const status = await this.getBinaryStatus();
     if (!status.available) {
       throw new Error(
-        'Codex CLI is not installed. Install it with: npm install -g @openai/codex or brew install --cask codex'
+        'Codex runtime is not available. Bundle a Codex runtime with Ritemark or install Codex manually.'
       );
     }
     if (!status.runnable) {
@@ -323,7 +388,7 @@ export class CodexManager {
     return new Promise((resolve, reject) => {
       this.isShuttingDown = false;
 
-      this.process = this.spawnResolvedBinary(status.binaryPath!, ['app-server'], {
+      this.process = this.spawnResolvedBinary(status.binaryPath!, this.buildAppServerArgs(status.launchMode), {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
@@ -409,6 +474,9 @@ export class CodexManager {
 
     if (binaryPath) {
       diagnostics.push(`Binary: ${binaryPath}`);
+      if (isBundledAgentRuntimePath(binaryPath)) {
+        diagnostics.push('Runtime source: bundled with Ritemark');
+      }
     }
 
     if (installNodeVersion) {
@@ -563,7 +631,7 @@ export class CodexManager {
     return firstLine ?? 'Codex CLI failed to start.';
   }
 
-  private inspectCompatibility(binaryPath: string, version: string | null): CodexCompatibilityStatus {
+  private inspectCompatibility(binaryPath: string, version: string | null, launchMode: CodexLaunchMode): CodexCompatibilityStatus {
     const cacheKey = `${binaryPath}:${version ?? 'unknown'}`;
     const cached = CodexManager.compatibilityCache.get(cacheKey);
     if (cached) {
@@ -581,7 +649,7 @@ export class CodexManager {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-codex-protocol-'));
 
     try {
-      const result = this.spawnResolvedBinarySync(binaryPath, ['app-server', 'generate-ts', '--out', tempDir], {
+      const result = this.spawnResolvedBinarySync(binaryPath, this.buildGenerateTypesArgs(launchMode, tempDir), {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: 8000,
@@ -711,6 +779,16 @@ export class CodexManager {
     }
 
     return 0;
+  }
+
+  private buildAppServerArgs(launchMode: CodexLaunchMode | null): string[] {
+    return launchMode === 'codex-app-server' ? [] : ['app-server'];
+  }
+
+  private buildGenerateTypesArgs(launchMode: CodexLaunchMode, outputDir: string): string[] {
+    return launchMode === 'codex-app-server'
+      ? ['generate-ts', '--out', outputDir]
+      : ['app-server', 'generate-ts', '--out', outputDir];
   }
 
   /**

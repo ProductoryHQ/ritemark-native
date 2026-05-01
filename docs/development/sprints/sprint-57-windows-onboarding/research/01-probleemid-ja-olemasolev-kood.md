@@ -1,4 +1,6 @@
-# Sprint 57 Research: Windows onboarding — olemasolev kood ja probleemid
+# Sprint 57 Research 01: Windows Onboarding — olemasolev kood ja probleemid
+
+> Note: this is the first code audit. The current sprint plan re-scopes the Claude in-app login work because the Settings button and provider message path already exist in the current codebase.
 
 ## Allikas
 

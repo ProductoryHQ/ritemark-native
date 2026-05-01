@@ -1,0 +1,35 @@
+{
+  "_comment": "v1.6.1 entry block for update-feed.json. release-manager runs scripts/generate-update-feed.mjs to compute size + sha256 from actual DMG files at publish time.",
+
+  "version": "1.6.1",
+  "tagName": "v1.6.1",
+  "releaseDate": "TBD",
+  "notesSummary": "VS Code engine upgrade 1.109.5 -> 1.117.0, text selection fix, AI file-write reliability, explorer auto-refresh.",
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "assetName": "Ritemark-arm64.dmg",
+      "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.1/Ritemark-arm64.dmg",
+      "_sourceFile": "dist/Ritemark-1.6.1-darwin-arm64.dmg",
+      "_sizeNote": "TBD — release-manager will compute exact bytes",
+      "sha256": "TBD"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x64",
+      "assetName": "Ritemark-x64.dmg",
+      "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.1/Ritemark-x64.dmg",
+      "_sourceFile": "dist/Ritemark-1.6.1-darwin-x64.dmg",
+      "_sizeNote": "TBD — release-manager will compute exact bytes",
+      "sha256": "TBD"
+    },
+    {
+      "_pendingPlatform": true,
+      "platform": "win32",
+      "arch": "x64",
+      "assetName": "Ritemark-1.6.1-win32-x64-setup.exe",
+      "_note": "Windows installer not yet built."
+    }
+  ]
+}

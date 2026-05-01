@@ -4,22 +4,24 @@
 
 Esimene research voor (Doc 01) järeldas et "Codex Windowsil ei tööta, drop it." Jarmo lükkas selle õigustatult tagasi — see oli laisk, mitte first-principles. See dokument on uus uurimine kolme paralleelse research agendiga, primary sources only, GitHub URL'idega ja koodirea numbritega.
 
-**Bottom line muutub täielikult:** OpenAI ships ametlikult signed Windows binaarid igal release'il. "Drop Codex on Windows" oli vale järeldus, mis põhines ühel doc lausel. Tegelik valik on kahe arhitektuuriotsuse vahel — mõlemad teostatavad.
+**Bottom line muutub täielikult:** OpenAI ships ametlikult signed Windows binaarid. "Drop Codex on Windows" oli vale järeldus, mis põhines ühel doc lausel. Tegelik valik on kahe arhitektuuriotsuse vahel — mõlemad teostatavad, aga mõlemal on eraldi product/supportability risk.
 
 ---
 
 ## Faktid mida Doc 01 ei tea
 
-### F1. OpenAI ships native Windows binaries — every release
+### F1. OpenAI ships native Windows binaries
 
 | Tag | Date | Windows assets |
 | --- | --- | --- |
-| `rust-v0.125.0` (stable) | 2026 | `codex-x86_64-pc-windows-msvc.exe`, `codex-aarch64-pc-windows-msvc.exe`, `codex-app-server-{x64,arm64}-pc-windows-msvc.exe`, `codex-command-runner.exe`, `codex-windows-sandbox-setup.exe` |
+| `rust-v0.125.0` (stable) | 2026-04-24 | `codex-x86_64-pc-windows-msvc.exe`, `codex-aarch64-pc-windows-msvc.exe`, Windows npm packages, `codex-command-runner.exe`, `codex-windows-sandbox-setup.exe`, `codex-responses-api-proxy.exe` |
 | `rust-v0.126.0-alpha.15` | 2026-04-29 | 44 Windows artefakti (4 binaarid × 2 arch × 4 formaati) + `install.ps1` |
 
 **Allikad:**
 - https://github.com/openai/codex/releases/expanded_assets/rust-v0.125.0
 - https://github.com/openai/codex/blob/main/.github/workflows/rust-release-windows.yml — ametlik CI workflow mis builds 5 binaarid × 2 arhitektuuri, signs Azure Trusted Signing'iga.
+
+**Verification note (2026-04-30):** workflow builds `codex-app-server` for Windows, but the `rust-v0.125.0` expanded assets page checked during sprint prep did not visibly list a `codex-app-server-*-pc-windows-msvc.exe` asset. Path A must verify the exact downloadable artefact before implementation. If `codex-app-server` is not directly available for the pinned release, alternatives are bundling full `codex.exe`, consuming the npm platform package at build time, or mirroring an internally built app-server binary.
 
 **"WSL2 only" docs claim** (https://github.com/openai/codex/blob/main/docs/install.md) on **dokumendi-poliitika lause, mitte tehniline reaalsus**. Tõestus:
 1. Sama repo ships signed Windows .exe-d.
@@ -49,7 +51,7 @@ Ainus tõeline `cfg(unix)` gate workspace'is: `codex-rs/core/Cargo.toml` `[targe
 
 `codex-rs/app-server/README.md`: JSON-RPC 2.0 üle stdio (newline-delimited), websocket, või unix socket. Built-in TS schema generator: `codex app-server generate-ts --out DIR`.
 
-**Ritemark juba räägib seda protokolli** (`extensions/ritemark/src/codex/codexAppServer.ts:118+`). Released `codex-app-server-x86_64-pc-windows-msvc.exe` ON täpselt see embeddable server mida me Windowsil saaksime ship'ida.
+**Ritemark juba räägib seda protokolli** (`extensions/ritemark/src/codex/codexAppServer.ts:118+`). See teeb app-serveri bundling'u arhitektuurselt atraktiivseks, aga täpne public release artefact tuleb enne Path A implementatsiooni lukku panna.
 
 ---
 
@@ -101,14 +103,16 @@ cline/cline/src/core/api/providers/openai-codex.ts:22,380
 
 **Cline ships seda production'is** ([blog post](https://cline.bot/blog/introducing-openai-codex-oauth)) ChatGPT Plus/Pro kasutajatele.
 
+**Supportability note:** see on tugev tehniline signaal, mitte sama asi mis OpenAI ametlik public API guarantee. Path B vajab product/legal otsust, kas Ritemark võib võtta `chatgpt.com/backend-api/codex` sõltuvuseks. API-key fallback peab jääma esimese klassi teeks ka siis, kui ChatGPT OAuth valitakse.
+
 ---
 
 ## Two viable solution paths
 
-### Path A: Bundle codex-app-server.exe with Ritemark VSIX
+### Path A: Bundle Codex Runtime with Ritemark VSIX
 
 **Mida teeme:**
-- Build pipeline laeb `codex-app-server-{x86_64,aarch64}-pc-windows-msvc.exe` GitHub releases'ist
+- Build pipeline laeb valitud Codex Windows runtime artefakti GitHub releases'ist või npm platform package'ist
 - Bundle'ime per-platform .vsix'i (sama muster nagu Anthropic Claude extension teeb)
 - Spawn'ime bundled binary mitte system-installed
 - Eemaldame `npm install -g @openai/codex` täielikult
@@ -116,7 +120,7 @@ cline/cline/src/core/api/providers/openai-codex.ts:22,380
 **Plusses:**
 - Säilitab existing `codex/codexAppServer.ts` (368 LOC) + `codexProtocol.ts` (419 LOC) integration'i
 - ~1500 LOC `codexManager.ts` kustutaks (Node version repair, arch detect, nvm scan)
-- Kohene Windows tugi
+- Kohene Windows tugi, kui täpne artefact source on kinnitatud
 - Sama muster mida VS Code ise kasutab ripgrep'i jaoks
 - Säilitab OS-level sandbox (Seatbelt mac, Landlock linux, Win32 JobObjects experimentaalne)
 
@@ -125,6 +129,7 @@ cline/cline/src/core/api/providers/openai-codex.ts:22,380
 - Bundle size +30MB per platform .vsix
 - Ikka kaks subprocess'i protsessihaldus probleem
 - Pinitud OpenAI app-server protokollile (mis muutub minor version'idega)
+- Enne implementation'it vaja artefact verification: kas app-server binary on public release asset, npm package sees, või tuleb mirror/build pipeline teha
 
 **Implementation effort:** ~2 nädalat. Tagasiminek ei ole.
 
@@ -171,6 +176,8 @@ cline/cline/src/core/api/providers/openai-codex.ts:22,380
 
 ## Recommendation
 
+**Update after Jarmo decision (2026-05-01): Path A is selected for Sprint 57.** The earlier recommendation below remains useful strategic context, but it is no longer the active Sprint 57 implementation direction.
+
 **Path B (in-process replace), lähtudes:**
 
 1. **Industry consensus:** 5/6 võrreldavat projekti on in-process. Codex CLI sõltuvus on ainulaadselt Ritemarki valik, mis ei tee toodet paremaks vaid loob churning'u.
@@ -183,7 +190,13 @@ cline/cline/src/core/api/providers/openai-codex.ts:22,380
 
 5. **Strategic decoupling:** Pin'itud OpenAI avalikule API'le mitte sisemisele tooling protokollile.
 
-**Path A (bundle binary) on legitiimne fallback** kui Path B implementatsiooni risk on liiga kõrge — aga see on bandage, mitte ravim. See lükkab churning'u edasi, ei lahenda seda.
+**Path A (bundle binary) on legitiimne fallback** kui Path B implementatsiooni risk on liiga kõrge — aga ainult pärast artefact source'i kinnitamist. See lükkab churning'u edasi, ei lahenda seda.
+
+Sprint 57 active direction now:
+
+- Bundle Claude using the official Anthropic VSIX native-runtime pattern verified in `03-official-claude-vsix-inspection.md`.
+- Bundle Codex using the smallest redistributable runtime that preserves the current app-server integration.
+- Do not use global npm, `install.ps1`, or PATH detection as the happy path.
 
 ---
 
