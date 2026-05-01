@@ -1285,7 +1285,7 @@ export function Editor({
 
         /* Mermaid diagram styles */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block {
-          padding-top: 36px !important;
+          padding-top: 28px !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram {
@@ -1338,23 +1338,21 @@ export function Editor({
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-rendered-diagram {
-          display: flex !important;
-          justify-content: center !important;
-          align-items: flex-start !important;
-          padding: 16px !important;
-          min-height: 60px !important;
+          display: block !important;
+          padding: 8px !important;
           max-height: 1024px !important;
           overflow: auto !important;
           background: var(--r-surface-muted) !important;
-          border-radius: 12px !important;
+          border-radius: 8px !important;
+          text-align: center !important;
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-rendered-diagram svg {
-          max-width: 100% !important;
-          width: min(100%, 680px) !important;
-          max-height: calc(1024px - 32px) !important;
+          display: inline-block !important;
+          max-width: none !important;
+          width: auto !important;
+          max-height: calc(1024px - 16px) !important;
           height: auto !important;
-          flex-shrink: 0 !important;
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-error {
@@ -1366,6 +1364,80 @@ export function Editor({
           border-radius: 4px !important;
           margin: 8px 16px !important;
           background: var(--r-error-soft) !important;
+        }
+
+        /* Mermaid expanded view overlay (Sprint 56) */
+        .mermaid-expand-overlay {
+          position: fixed !important;
+          inset: 0 !important;
+          z-index: 1000 !important;
+          background: rgba(15, 23, 42, 0.72) !important;
+          display: flex !important;
+          flex-direction: column !important;
+          padding: 16px !important;
+          gap: 8px !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-toolbar {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: flex-end !important;
+          gap: 8px !important;
+          flex: 0 0 auto !important;
+          color: var(--r-ink-strong) !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-zoom {
+          color: rgba(255, 255, 255, 0.85) !important;
+          font-size: 12px !important;
+          font-family: var(--vscode-editor-font-family, monospace) !important;
+          padding: 4px 8px !important;
+          background: rgba(15, 23, 42, 0.6) !important;
+          border-radius: 6px !important;
+          margin-right: 4px !important;
+          min-width: 48px !important;
+          text-align: center !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-btn {
+          background: rgba(255, 255, 255, 0.92) !important;
+          border: 1px solid rgba(255, 255, 255, 0.4) !important;
+          color: var(--r-ink-strong) !important;
+          opacity: 1 !important;
+          position: static !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-btn:hover {
+          background: rgba(255, 255, 255, 1) !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-canvas {
+          flex: 1 1 auto !important;
+          overflow: auto !important;
+          background: var(--r-surface-muted) !important;
+          border-radius: 8px !important;
+          position: relative !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-stage {
+          display: inline-block !important;
+          padding: 24px !important;
+          will-change: transform !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-stage svg {
+          display: block !important;
+          max-width: none !important;
+          width: auto !important;
+          height: auto !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-hint {
+          color: rgba(255, 255, 255, 0.7) !important;
+          font-size: 11px !important;
+          text-align: center !important;
+          flex: 0 0 auto !important;
+          font-family: var(--vscode-editor-font-family, monospace) !important;
         }
 
         /* Enhanced mobile selection */

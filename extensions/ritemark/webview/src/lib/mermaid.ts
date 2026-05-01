@@ -103,7 +103,11 @@ export async function renderMermaid(id: string, source: string): Promise<string>
   mermaid.initialize(getMermaidConfig())
 
   const { svg } = await mermaid.render(id, source)
-  return svg
+  // Sprint 56: replace Mermaid's default width="100%" with explicit pixel
+  // width derived from viewBox so the inline SVG renders at its natural
+  // size and the container can scroll horizontally when wider than the
+  // editor column.
+  return ensureSvgDimensions(svg)
 }
 
 /**
@@ -112,7 +116,7 @@ export async function renderMermaid(id: string, source: string): Promise<string>
  * Mermaid SVGs often rely on CSS max-width + viewBox, which causes the
  * Image element to fall back to 300×150 (CSS default for replaced elements).
  */
-function ensureSvgDimensions(svg: string): string {
+export function ensureSvgDimensions(svg: string): string {
   const parser = new DOMParser()
   const doc = parser.parseFromString(svg, 'image/svg+xml')
   const svgEl = doc.documentElement
