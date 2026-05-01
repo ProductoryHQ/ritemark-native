@@ -1,8 +1,10 @@
-# Sprint 57 Research: Windows Onboarding Probleemid
+# Sprint 57 Research 00: Windows Onboarding Probleemid
+
+> Note: this is the initial plan summary. The current implementation-ready scope is maintained in `../sprint-plan.md`, which corrects stale assumptions found during repo review.
 
 ## Allikas
 
-Plaan: `/root/.claude/plans/windows-puhas-masin-esmainstall-immutable-flute.md`
+Plaan: `/root/.claude/plans/windows-puhas-masin-esmainstall-immutable-flute.md`  
 Uuritud: 2026-04-29
 
 ## Leitud probleemid (Jarmo test, puhas Windows masin)

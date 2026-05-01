@@ -11,6 +11,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] - 2026-04-28
+
+### Added
+- **Agent Library:** new activity-bar entry that auto-discovers `.claude/agents/`, `.claude/skills/`, and `.claude/commands/` from the workspace and the user-scope `~/.claude/` directory; click any entry to open the source `.md` file
+- **Properties side panel:** frontmatter editing (status, tags, dates, custom fields) now opens as a dedicated right-side panel instead of a modal dialog
+- **Inline Table of Contents:** sticky 220px outline rail in the editor on screens ≥960px wide, with active-heading tracking and click-to-jump
+- **Dark mode:** Ritemark Dark theme as a first-class option, auto-switching with the system color scheme
+- **Phosphor icon set:** primary navigation, document header, AI sidebar, and dialogs migrated from Codicons to Phosphor Icons
+- **CSV → Excel conversion:** "Open in Excel" on a CSV file now converts to a temporary `.xlsx` first (fixes Mac Excel UTF-8 mojibake and EU semicolon-delimiter issues)
+
+### Changed
+- **Activity bar redesign:** 28×28 icons, rounded active-state indicator, dedicated Agent Library and Flows entries
+- **Auxiliary bar tabs:** compact icon-only tabs when multiple panels are docked on the right side
+- **AI panel default placement:** reliably docks on the right on first launch, ignoring cached VS Code view positions
+- **Diagnostic noise suppressed:** markdown files no longer show red squiggles for missing link references; file tree no longer propagates editor decorations
+
+### Fixed
+- Activity bar 6px vertical spacing between icons (regression from Sprint 53)
+- Frontmatter parser handles CRLF line endings (agents written on Windows)
+- Frontmatter parser handles YAML block scalar indicators (`>`, `>-`, `|`, `|-`)
+- Phosphor font loading hardened in production builds (no brief icon-box flash at startup)
+- AI panel focus restoration timeout tightened so the chat input reliably focuses on open
+
+### Technical
+- VS Code base: 1.109.5 (no change from v1.5.3)
+- No new extension-host runtime dependencies
+- Sprints rolled up: 51 (inline ToC + CSV-to-xlsx), 52 (design foundations + Phosphor), 53 (chrome activity bar + titlebar polish, PR #29), 54 (Agent Library + Properties panel, PR #30)
+- Internal v1.5.4 build (Sprint 51 only) was never tagged; its content ships here
+
+---
+
 ## [1.3.0] - 2026-02-06
 
 ### Added
@@ -158,6 +189,7 @@ Initial release of Ritemark Native.
 
 | Version | Date | Type | Notes |
 |---------|------|------|-------|
+| 1.6.0 | 2026-04-28 | Minor | Agent Library, design refresh (Phosphor), inline ToC, dark mode, CSV→xlsx |
 | 1.3.0 | 2026-02-06 | Major | PDF/DOCX preview, CSV enhancements, Claude Code node |
 | 1.2.0 | 2026-02-02 | Major | Ritemark Flows - visual AI workflows |
 | 1.1.1 | 2026-01-30 | Minor | Image handling improvements |
