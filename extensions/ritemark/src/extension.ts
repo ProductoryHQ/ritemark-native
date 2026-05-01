@@ -197,6 +197,41 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // === File watchers for Agent Library auto-refresh ===
+  // Workspace-side: VS Code's watcher catches .claude/ changes inside the workspace.
+  if (workspacePath) {
+    const workspaceClaudeWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspacePath, '.claude/{agents,skills,commands}/**/*.md')
+    );
+    const refreshLib = () => agentLibraryViewProvider?.refresh();
+    workspaceClaudeWatcher.onDidCreate(refreshLib);
+    workspaceClaudeWatcher.onDidChange(refreshLib);
+    workspaceClaudeWatcher.onDidDelete(refreshLib);
+    context.subscriptions.push(workspaceClaudeWatcher);
+  }
+
+  // User-side: ~/.claude/ is outside the workspace, so VS Code's watcher won't see it.
+  // Use Node's fs.watch with recursive mode, falling back to polling on systems
+  // (e.g. some Linux distros) that don't support recursive watch.
+  try {
+    const userClaudeRoot = path.join(os.homedir(), '.claude');
+    if (fs.existsSync(userClaudeRoot)) {
+      try {
+        const userWatcher = fs.watch(userClaudeRoot, { recursive: true }, () => {
+          agentLibraryViewProvider?.refresh();
+        });
+        context.subscriptions.push({ dispose: () => userWatcher.close() });
+      } catch {
+        const pollInterval = setInterval(() => {
+          agentLibraryViewProvider?.refresh();
+        }, 5000);
+        context.subscriptions.push({ dispose: () => clearInterval(pollInterval) });
+      }
+    }
+  } catch {
+    // best-effort; failure here is non-fatal.
+  }
+
   // Register Flows View Provider (always register - visibility controlled by when clause in package.json)
   if (workspacePath) {
     flowsViewProvider = new FlowsViewProvider(
