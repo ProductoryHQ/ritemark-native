@@ -415,17 +415,37 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       font-size: 11px;
       color: var(--r-ink-muted);
     }
-    .search-container { padding: 0 10px 8px 10px; }
+    .search-container {
+      padding: 0 10px 8px 10px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
     .search-input-wrapper {
       display: flex;
       align-items: center;
       gap: 6px;
-      width: 100%;
+      flex: 1;
       padding: 6px 8px;
       background: var(--vscode-input-background);
       border: 1px solid var(--vscode-input-border, transparent);
       border-radius: var(--r-radius-input);
     }
+    .sort-btn {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: transparent;
+      border: 1px solid var(--r-hairline-strong);
+      border-radius: var(--r-radius-input);
+      color: var(--r-ink-muted);
+      cursor: pointer;
+      padding: 0;
+      transition: color 0.1s, border-color 0.1s, background 0.1s;
+    }
+    .sort-btn:hover { color: var(--r-accent); border-color: var(--r-accent); background: var(--r-accent-soft); }
+    .sort-btn.open { color: var(--r-accent); border-color: var(--r-accent); background: var(--r-accent-soft); }
+    .sort-btn svg { width: 13px; height: 13px; }
     .search-input-wrapper:focus-within {
       border-color: var(--r-accent);
       box-shadow: 0 0 0 3px var(--r-accent-soft);
@@ -681,6 +701,9 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       <svg class="search-icon" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round"><circle cx="116" cy="116" r="84"/><line x1="175.4" y1="175.4" x2="224" y2="224"/></svg>
       <input type="text" class="search-input" id="search" placeholder="Search" />
     </div>
+    <button class="sort-btn" id="sortBtn" title="Sort" aria-label="Sort">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="17" y2="6"/><line x1="3" y1="12" x2="13" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/></svg>
+    </button>
   </div>
   <div class="scope-tabs" id="scopeTabs">
     <div class="scope-tab active" data-scope="project" id="tabProject">Project</div>
@@ -724,6 +747,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     let selectedPath = null;
     let filter = '';
     let activeScope = 'project';
+    let sortMode = 'name'; // 'name' | 'recent'
 
     // Modal state
     let modalType = 'skill';
@@ -734,6 +758,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     const searchEl = document.getElementById('search');
     const tabProjectEl = document.getElementById('tabProject');
     const tabUserEl = document.getElementById('tabUser');
+    const sortBtnEl = document.getElementById('sortBtn');
     const backdropEl = document.getElementById('modalBackdrop');
     const modalTitleEl = document.getElementById('modalTitle');
     const modalNameEl = document.getElementById('modalNameInput');
@@ -749,6 +774,43 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
     tabProjectEl.addEventListener('click', () => { activeScope = 'project'; render(); });
     tabUserEl.addEventListener('click', () => { activeScope = 'user'; render(); });
+
+    // === Sort popover ===
+    sortBtnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rect = sortBtnEl.getBoundingClientRect();
+      showSortMenu(rect.left, rect.bottom + 4);
+    });
+    function showSortMenu(x, y) {
+      const items = [
+        { label: 'Name (A → Z)', mode: 'name' },
+        { label: 'Recently modified', mode: 'recent' },
+      ];
+      contextMenuEl.innerHTML = '';
+      for (const entry of items) {
+        const el = document.createElement('div');
+        el.className = 'context-menu-item' + (sortMode === entry.mode ? ' active' : '');
+        el.setAttribute('role', 'menuitem');
+        el.innerHTML = (sortMode === entry.mode ? '\\u2713 ' : '\\u00a0\\u00a0 ') + escapeHtml(entry.label);
+        el.addEventListener('click', () => {
+          sortMode = entry.mode;
+          sortBtnEl.classList.remove('open');
+          hideContextMenu();
+          render();
+        });
+        contextMenuEl.appendChild(el);
+      }
+      contextMenuEl.style.left = x + 'px';
+      contextMenuEl.style.top = y + 'px';
+      contextMenuEl.classList.add('open');
+      sortBtnEl.classList.add('open');
+      requestAnimationFrame(() => {
+        const rect = contextMenuEl.getBoundingClientRect();
+        if (rect.right > window.innerWidth - 4) {
+          contextMenuEl.style.left = Math.max(4, window.innerWidth - rect.width - 4) + 'px';
+        }
+      });
+    }
 
     // === Modal handlers ===
     function openModal(type) {
@@ -848,7 +910,10 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         }
       });
     }
-    function hideContextMenu() { contextMenuEl.classList.remove('open'); }
+    function hideContextMenu() {
+      contextMenuEl.classList.remove('open');
+      sortBtnEl.classList.remove('open');
+    }
     document.addEventListener('click', (e) => {
       if (!contextMenuEl.contains(e.target)) hideContextMenu();
     });
@@ -890,6 +955,16 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
     function byScope(item) { return item.scope === activeScope; }
 
+    function applySort(items) {
+      const sorted = items.slice();
+      if (sortMode === 'recent') {
+        sorted.sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0));
+      } else {
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+      }
+      return sorted;
+    }
+
     function matches(item) {
       if (!filter) return true;
       const rel = displayPath(item);
@@ -907,9 +982,9 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       const scopedAgents = agents.filter(byScope);
       const scopedSkills = skills.filter(byScope);
       const scopedCommands = commands.filter(byScope);
-      const filteredAgents = scopedAgents.filter(matches);
-      const filteredSkills = scopedSkills.filter(matches);
-      const filteredCommands = scopedCommands.filter(matches);
+      const filteredAgents = applySort(scopedAgents.filter(matches));
+      const filteredSkills = applySort(scopedSkills.filter(matches));
+      const filteredCommands = applySort(scopedCommands.filter(matches));
 
       const parts = [];
       if (agents.length) parts.push(agents.length + ' agent' + (agents.length !== 1 ? 's' : ''));

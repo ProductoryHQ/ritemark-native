@@ -113,6 +113,78 @@ async function createAndOpenWorkspaceFlow(workspacePath: string): Promise<void> 
   await flowsViewProvider?.refresh();
 }
 
+/**
+ * Seed Anthropic's skill-creator and Ritemark-authored starters into ~/.claude/
+ * on first run, so a brand-new install doesn't open to an empty Agent Library.
+ *
+ * Detection (all must be true):
+ *   - ~/.claude/skills/ is empty or absent
+ *   - ~/.claude/agents/ is empty or absent
+ *   - ~/.ritemark/starter-pack-seeded marker file does not exist
+ *
+ * The marker is the durable signal: if a user later clears their library, we
+ * do not re-seed — they own their copy. Existing files are never overwritten.
+ */
+function seedStarterPackOnFirstRun(extensionPath: string): void {
+  try {
+    const userClaudeRoot = path.join(os.homedir(), '.claude');
+    const skillsDir = path.join(userClaudeRoot, 'skills');
+    const agentsDir = path.join(userClaudeRoot, 'agents');
+    const markerPath = path.join(os.homedir(), '.ritemark', 'starter-pack-seeded');
+
+    if (fs.existsSync(markerPath)) return;
+    const skillsBusy = fs.existsSync(skillsDir) && fs.readdirSync(skillsDir).length > 0;
+    const agentsBusy = fs.existsSync(agentsDir) && fs.readdirSync(agentsDir).length > 0;
+    if (skillsBusy || agentsBusy) return;
+
+    const starterRoot = path.join(extensionPath, 'starter-pack');
+    if (!fs.existsSync(starterRoot)) return;
+
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.mkdirSync(agentsDir, { recursive: true });
+
+    const copySkills = path.join(starterRoot, 'skills');
+    if (fs.existsSync(copySkills)) {
+      for (const entry of fs.readdirSync(copySkills, { withFileTypes: true })) {
+        const target = path.join(skillsDir, entry.name);
+        if (fs.existsSync(target)) continue;
+        copyRecursive(path.join(copySkills, entry.name), target);
+      }
+    }
+    const copyAgents = path.join(starterRoot, 'agents');
+    if (fs.existsSync(copyAgents)) {
+      for (const entry of fs.readdirSync(copyAgents, { withFileTypes: true })) {
+        const target = path.join(agentsDir, entry.name);
+        if (fs.existsSync(target)) continue;
+        copyRecursive(path.join(copyAgents, entry.name), target);
+      }
+    }
+
+    fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+    fs.writeFileSync(
+      markerPath,
+      JSON.stringify({ seededAt: new Date().toISOString() }, null, 2),
+      'utf8'
+    );
+  } catch (err) {
+    // Best-effort: a failed seed should never block extension activation.
+    // Marker file is intentionally not written so the next launch retries.
+    console.warn('[Ritemark] starter-pack seed failed:', err);
+  }
+}
+
+function copyRecursive(src: string, dest: string): void {
+  const stat = fs.statSync(src);
+  if (stat.isDirectory()) {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+      copyRecursive(path.join(src, entry.name), path.join(dest, entry.name));
+    }
+  } else if (stat.isFile()) {
+    fs.copyFileSync(src, dest);
+  }
+}
+
 export function activate(context: vscode.ExtensionContext) {
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;
@@ -188,6 +260,10 @@ export function activate(context: vscode.ExtensionContext) {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );
+
+  // First-run starter-pack seeding — must run before the provider's first
+  // discovery so seeded items appear immediately in the sidebar.
+  seedStarterPackOnFirstRun(context.extensionPath);
 
   // Register Agent Library View Provider
   agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath);
