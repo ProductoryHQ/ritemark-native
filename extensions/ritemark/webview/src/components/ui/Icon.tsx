@@ -6,7 +6,10 @@
  *
  * Rules (enforced by this component):
  *  - Family: Phosphor only. No direct `PhFolderOpen` imports at call sites.
- *  - Weight: 100 (thin). Locked; cannot be overridden per-icon.
+ *  - Weight: 400 (regular). Locked; cannot be overridden per-icon. Matches the
+ *    chrome-side Phosphor weight used by patch 001 (codicon.css + iconRegistry.ts)
+ *    and the product icon theme (extensions/ritemark/producticons/) — one weight
+ *    across chrome and webview, no two-tier hierarchy.
  *  - Sizes: 12 / 14 / 16 / 20. No other values.
  *  - Tone: muted (default) / active / disabled, backed by --r-* CSS vars.
  */
@@ -231,7 +234,7 @@ export function Icon({
   return (
     <Component
       size={size}
-      weight="thin"
+      weight="regular"
       color={toneToColor[tone]}
       className={className}
       aria-hidden={hiddenFromAria}

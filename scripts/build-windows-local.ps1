@@ -179,15 +179,15 @@ if (Test-Path "$fontSrc\SofiaSans-latin.woff2") {
     Write-Host "  Sofia Sans fonts copied"
 }
 
-$phosphorSrc = Join-Path $extDest "node_modules\@phosphor-icons\web\src\light\Phosphor-Light.woff2"
+$phosphorSrc = Join-Path $extDest "node_modules\@phosphor-icons\web\src\regular\Phosphor.woff2"
 if (-not (Test-Path $phosphorSrc)) {
-    $phosphorSrc = Join-Path $ExtDir "node_modules\@phosphor-icons\web\src\light\Phosphor-Light.woff2"
+    $phosphorSrc = Join-Path $ExtDir "node_modules\@phosphor-icons\web\src\regular\Phosphor.woff2"
 }
 if (Test-Path $phosphorSrc) {
     $iconDest = Join-Path $VSCodeDir "src\vs\base\browser\ui\codicons\codicon"
     New-Item -ItemType Directory -Force -Path $iconDest | Out-Null
     Copy-Item $phosphorSrc "$iconDest\phosphor.woff2"
-    Write-Host "  Phosphor 200 icon font copied"
+    Write-Host "  Phosphor 400 (Regular) icon font copied"
 }
 
 # ------------------------------------------------------------------

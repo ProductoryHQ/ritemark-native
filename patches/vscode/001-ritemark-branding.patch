@@ -479,11 +479,11 @@ index d7f257db934..6079140d7c8 100644
  	src: url("./codicon.ttf") format("truetype");
  }
  
-+/* RiteMark: Phosphor 200 icon font for sidebar and panel icons */
++/* RiteMark: Phosphor 400 (Regular) icon font for sidebar and panel icons */
 +@font-face {
 +	font-family: "phosphor";
 +	font-display: block;
-+	font-weight: 200;
++	font-weight: 400;
 +	src: url("./phosphor.woff2") format("woff2");
 +}
 +
@@ -593,7 +593,7 @@ index 9feac0c4ca4..52d2738d73a 100644
  }
  initialize();
  
-+// RiteMark: Phosphor 200 icon font registration
++// RiteMark: Phosphor 400 (Regular) icon font registration
 +const PhosphorIcons = {
 +	folder: 0xe24a, folderOpen: 0xe256, files: 0xe710, file: 0xe230,
 +	fileText: 0xe23a, search: 0xe30c, gitBranch: 0xe278, settings: 0xe270,
@@ -602,7 +602,7 @@ index 9feac0c4ca4..52d2738d73a 100644
 +} as const;
 +
 +const phosphorFontDefinition: IconFontDefinition = {
-+	weight: '200',
++	weight: '400',
 +	src: [{ location: URI.parse('phosphor.woff2'), format: 'woff2' }]
 +};
 +iconRegistry.registerIconFont('phosphor', phosphorFontDefinition);

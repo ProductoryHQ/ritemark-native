@@ -1,44 +1,44 @@
 {
   "fonts": [
     {
-      "id": "phosphor-200",
+      "id": "phosphor-400",
       "src": [
         {
-          "path": "./Phosphor-Light.woff2",
+          "path": "./Phosphor-Regular.woff2",
           "format": "woff2"
         }
       ],
-      "weight": "200",
+      "weight": 400,
       "style": "normal"
     }
   ],
   "iconDefinitions": {
     "explorer-view-icon": {
-      "fontId": "phosphor-200",
+      "fontId": "phosphor-400",
       "fontCharacter": "\\e256"
     },
     "search-view-icon": {
-      "fontId": "phosphor-200",
+      "fontId": "phosphor-400",
       "fontCharacter": "\\e30c"
     },
     "source-control-view-icon": {
-      "fontId": "phosphor-200",
+      "fontId": "phosphor-400",
       "fontCharacter": "\\e278"
     },
     "extensions-view-icon": {
-      "fontId": "phosphor-200",
+      "fontId": "phosphor-400",
       "fontCharacter": "\\e596"
     },
     "accounts-view-bar-icon": {
-      "fontId": "phosphor-200",
+      "fontId": "phosphor-400",
       "fontCharacter": "\\e4c2"
     },
     "settings-view-bar-icon": {
-      "fontId": "phosphor-200",
+      "fontId": "phosphor-400",
       "fontCharacter": "\\e270"
     },
     "workspace-trust-banner": {
-      "fontId": "phosphor-200",
+      "fontId": "phosphor-400",
       "fontCharacter": "\\e40a"
     }
   }

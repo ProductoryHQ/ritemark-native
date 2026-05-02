@@ -2,7 +2,9 @@
 
 **Status:** Authoritative text mirror of the design source of truth.
 **Source of truth:** `docs-internal/design/ritemark-ui.pen` → frame `yq4P8` (Icon Usage Guide). If this doc and the `.pen` disagree, the `.pen` wins.
-**Ruling:** 2026-04-24 — Jarmo confirmed `.pen` is always source of truth. This supersedes the earlier sprint-52 lockdown on Lucide.
+**Rulings:**
+- 2026-04-24 — Jarmo confirmed `.pen` is always source of truth. This supersedes the earlier sprint-52 lockdown on Lucide.
+- **2026-05-02 — Default icon weight reset from 100 (thin) to 400 (regular).** Applied to chrome (patches/vscode/001 + producticons/) and webview (`Icon.tsx`). The `.pen` `yq4P8` token still reads 100 — TODO for Jarmo to bump in Pencil. Until then, treat this 2026-05-02 ruling as authoritative when the `.pen` weight conflicts.
 
 ## Library
 
@@ -19,7 +21,7 @@ All icon properties are driven by tokens defined in `docs-internal/design/ritema
 | Token | Value | Use |
 | --- | --- | --- |
 | `$icon-family` | `phosphor` | Only library. No mixing. |
-| `$icon-weight-default` | `100` (thin) | Locked. Do not override per-icon. |
+| `$icon-weight-default` | `400` (regular) | Locked. Do not override per-icon. |
 | `$icon-size-xs` | `12` | Dense chips, metadata, inline indicators. |
 | `$icon-size-sm` | `14` | Tree rows, tabs, dropdown items. |
 | `$icon-size-md` | `16` | Toolbar, titlebar, dialog headers, form-field prefixes. |
@@ -28,7 +30,7 @@ All icon properties are driven by tokens defined in `docs-internal/design/ritema
 | `$icon-color-active` | `$--r-accent` (#4338CA) | Selected / active item. |
 | `$icon-color-disabled` | `$--r-ink-disabled` (#CBD5E1) | Disabled / read-only. |
 
-No off-spec sizes. No `13`, `15`, `18`, `22`. No Duotone / Bold / Fill weights.
+No off-spec sizes. No `13`, `15`, `18`, `22`. No Thin / Light / Bold / Fill / Duotone weights.
 
 ## Component API
 
@@ -38,7 +40,7 @@ One wrapper component. Always these props.
 <Icon
   name="folder-open"        // Phosphor kebab-case name
   size={16}                 // 12 | 14 | 16 | 20 — no other values
-  weight={100}              // default; do not override
+  weight={400}              // default; do not override
   tone="muted"              // 'muted' | 'active' | 'disabled'
   aria-hidden               // or aria-label for action icons
 />
@@ -93,7 +95,7 @@ Migration steps for the webview:
 1. Add dependency: `@phosphor-icons/react`.
 2. Create `components/ui/Icon.tsx` wrapper per the API above.
 3. Replace every `lucide-react` import with the `Icon` wrapper, renaming per the table.
-4. Remove the 1-px stroke CSS override from `extensions/ritemark/webview/src/index.css` (`svg.lucide { stroke-width: 1px !important; }`) — Phosphor thin weight handles this natively.
+4. Remove the 1-px stroke CSS override from `extensions/ritemark/webview/src/index.css` (`svg.lucide { stroke-width: 1px !important; }`) — Phosphor regular weight provides the stroke styling natively.
 5. Remove `lucide-react` from `webview/package.json`.
 6. Run visual-regression against `.pen` surface frames to confirm parity.
 
@@ -107,7 +109,7 @@ Migration steps for the webview:
 
 ## Exceptions
 
-None by default. If a surface genuinely needs something Phosphor does not provide, raise it with Jarmo before drawing a custom SVG. Custom icons, if approved, must match Phosphor thin-weight (100) visual language: 1px-equivalent stroke, rounded caps, 24×24 grid.
+None by default. If a surface genuinely needs something Phosphor does not provide, raise it with Jarmo before drawing a custom SVG. Custom icons, if approved, must match Phosphor regular-weight (400) visual language: ~1.5px-equivalent stroke, rounded caps, 24×24 grid.
 
 ## How this doc stays current
 
