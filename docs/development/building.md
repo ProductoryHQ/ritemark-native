@@ -1,7 +1,5 @@
 # Building Ritemark Native Installers
 
-![](./images/image.png)
-
 This guide covers how to build distributable installers for macOS and Windows.
 
 * * *

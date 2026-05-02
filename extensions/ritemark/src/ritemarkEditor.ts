@@ -432,6 +432,16 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             );
             return;
 
+          case 'mermaid:downloadImage':
+            // Save mermaid diagram PNG via OS Save As dialog (same pattern as exportWord).
+            void trackEvent('feature_used', { feature: 'mermaid_download' });
+            this.downloadMermaidImage(
+              document,
+              (message.dataUrl as string) || '',
+              (message.filename as string) || 'mermaid-diagram.png'
+            );
+            return;
+
           case 'checkExcel':
             // Check if Excel is installed
             this.checkExcelInstalled().then(hasExcel => {
@@ -574,6 +584,43 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Use gray-matter to stringify with YAML front-matter
     return matter.stringify(content, properties);
+  }
+
+  private async downloadMermaidImage(
+    document: vscode.TextDocument,
+    dataUrl: string,
+    filename: string
+  ): Promise<void> {
+    try {
+      const matches = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (!matches) {
+        vscode.window.showErrorMessage('Mermaid download failed: invalid image data');
+        return;
+      }
+      const ext = matches[1];
+      const base64Data = matches[2];
+
+      const docName = path.basename(document.uri.fsPath, path.extname(document.uri.fsPath));
+      const safeName = filename || `${docName}-mermaid.${ext}`;
+      const defaultUri = vscode.Uri.file(
+        path.join(path.dirname(document.uri.fsPath), safeName)
+      );
+
+      const saveUri = await vscode.window.showSaveDialog({
+        defaultUri,
+        filters: { [`${ext.toUpperCase()} Image`]: [ext] },
+        title: 'Save mermaid diagram',
+        saveLabel: 'Save',
+      });
+      if (!saveUri) return;
+
+      fs.writeFileSync(saveUri.fsPath, Buffer.from(base64Data, 'base64'));
+    } catch (error) {
+      console.error('Failed to download mermaid image:', error);
+      vscode.window.showErrorMessage(
+        `Failed to save mermaid diagram: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   private async saveImage(

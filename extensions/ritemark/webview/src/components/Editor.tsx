@@ -1243,24 +1243,24 @@ export function Editor({
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-class { color: #e5c07b !important; }
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-id { color: #61afef !important; }
 
-        /* Code block copy button */
+        /* Code block copy button (icon-only, ghost button per Ritemark design) */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn {
           position: absolute !important;
           top: 8px !important;
           right: 8px !important;
-          display: flex !important;
+          display: inline-flex !important;
           align-items: center !important;
-          gap: 4px !important;
-          padding: 4px 8px !important;
-          background: rgba(255, 255, 255, 0.1) !important;
-          border: 1px solid rgba(255, 255, 255, 0.2) !important;
+          justify-content: center !important;
+          width: 28px !important;
+          height: 28px !important;
+          padding: 0 !important;
+          background: rgba(255, 255, 255, 0.08) !important;
+          border: 1px solid rgba(255, 255, 255, 0.16) !important;
           border-radius: 4px !important;
           color: var(--r-ink-faint) !important;
-          font-size: 12px !important;
-          font-family: var(--ritemark-ui-font-family) !important;
           cursor: pointer !important;
           opacity: 0 !important;
-          transition: opacity 0.2s, background 0.2s, color 0.2s !important;
+          transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s !important;
           z-index: 10 !important;
         }
 
@@ -1269,23 +1269,69 @@ export function Editor({
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:hover {
-          background: rgba(255, 255, 255, 0.2) !important;
+          background: rgba(255, 255, 255, 0.16) !important;
           color: var(--r-ink-strong) !important;
+          border-color: rgba(255, 255, 255, 0.28) !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:active {
-          background: rgba(255, 255, 255, 0.3) !important;
+          background: rgba(255, 255, 255, 0.24) !important;
         }
 
-        /* Copied state - green feedback */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible {
+          outline: none !important;
+          box-shadow: 0 0 0 4px var(--r-ring-color, rgba(67, 56, 202, 0.1)) !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:disabled {
+          opacity: 0.5 !important;
+          cursor: not-allowed !important;
+        }
+
+        /* Copied state - green feedback (icon swaps to check, color goes success) */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn.copied {
           color: var(--r-success) !important;
           opacity: 1 !important;
         }
 
+        /* Custom tooltip rendered below button on hover/focus (Ritemark style) */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn::after {
+          content: attr(data-tooltip) !important;
+          position: absolute !important;
+          top: calc(100% + 6px) !important;
+          left: 50% !important;
+          transform: translateX(-50%) translateY(-2px) !important;
+          background: var(--r-ink-strong) !important;
+          color: #FFFFFF !important;
+          padding: 4px 8px !important;
+          border-radius: 4px !important;
+          font-family: var(--ritemark-ui-font-family) !important;
+          font-size: 11px !important;
+          font-weight: 500 !important;
+          line-height: 1.4 !important;
+          white-space: nowrap !important;
+          pointer-events: none !important;
+          opacity: 0 !important;
+          transition: opacity 0.15s ease, transform 0.15s ease !important;
+          transition-delay: 0.4s !important;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18) !important;
+          z-index: 100 !important;
+        }
+
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:hover::after,
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible::after {
+          opacity: 1 !important;
+          transform: translateX(-50%) translateY(0) !important;
+        }
+
+        /* Hide tooltip when no data-tooltip attribute (safety) */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:not([data-tooltip])::after {
+          content: none !important;
+        }
+
         /* Mermaid diagram styles */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block {
-          padding-top: 36px !important;
+          padding-top: 28px !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram {
@@ -1310,7 +1356,7 @@ export function Editor({
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .mermaid-toolbar .code-copy-btn {
-          position: static !important;
+          position: relative !important;
           top: auto !important;
           right: auto !important;
           opacity: 1 !important;
@@ -1320,41 +1366,41 @@ export function Editor({
           opacity: 1 !important;
         }
 
+        /* Mermaid diagram (light surface) — ghost button per Ritemark design */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn {
-          background: rgba(255, 255, 255, 0.9) !important;
-          border: 1px solid rgba(100, 116, 139, 0.24) !important;
+          background: var(--r-surface) !important;
+          border: 1px solid var(--r-hairline) !important;
           color: var(--r-ink-muted) !important;
-          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+          box-shadow: 0 1px 2px rgba(30, 27, 75, 0.04) !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn:hover {
-          background: rgba(255, 255, 255, 1) !important;
+          background: var(--r-surface) !important;
           color: var(--r-ink-strong) !important;
-          border-color: var(--r-accent-fainter) !important;
+          border-color: var(--r-hairline-strong) !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block.mermaid-block--diagram .mermaid-toolbar .code-copy-btn:active {
-          background: rgba(238, 242, 255, 1) !important;
+          background: var(--r-accent-soft) !important;
+          border-color: var(--r-accent-fainter) !important;
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-rendered-diagram {
-          display: flex !important;
-          justify-content: center !important;
-          align-items: flex-start !important;
-          padding: 16px !important;
-          min-height: 60px !important;
+          display: block !important;
+          padding: 8px !important;
           max-height: 1024px !important;
           overflow: auto !important;
           background: var(--r-surface-muted) !important;
-          border-radius: 12px !important;
+          border-radius: 8px !important;
+          text-align: center !important;
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-rendered-diagram svg {
-          max-width: 100% !important;
-          width: min(100%, 680px) !important;
-          max-height: calc(1024px - 32px) !important;
+          display: inline-block !important;
+          max-width: none !important;
+          width: auto !important;
+          max-height: calc(1024px - 16px) !important;
           height: auto !important;
-          flex-shrink: 0 !important;
         }
 
         .wysiwyg-editor .ProseMirror .mermaid-error {
@@ -1366,6 +1412,161 @@ export function Editor({
           border-radius: 4px !important;
           margin: 8px 16px !important;
           background: var(--r-error-soft) !important;
+        }
+
+        /* Mermaid expanded view overlay (Sprint 56) */
+        .mermaid-expand-overlay {
+          position: fixed !important;
+          inset: 0 !important;
+          z-index: 1000 !important;
+          background: rgba(15, 23, 42, 0.72) !important;
+          display: flex !important;
+          flex-direction: column !important;
+          padding: 16px !important;
+          gap: 8px !important;
+        }
+
+        /* Expand toolbar — single white container holding all controls (matches native
+           FormattingBubbleMenu pattern: bg-white + hairline border + shadow + p-2) */
+        .mermaid-expand-overlay .mermaid-expand-toolbar {
+          display: inline-flex !important;
+          align-items: center !important;
+          align-self: center !important;
+          gap: 4px !important;
+          flex: 0 0 auto !important;
+          background: var(--r-surface) !important;
+          border: 1px solid var(--r-hairline-strong) !important;
+          border-radius: 10px !important;
+          box-shadow: 0 6px 24px rgba(15, 23, 42, 0.24) !important;
+          padding: 6px !important;
+          color: var(--r-ink-strong) !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-toolbar__group {
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 2px !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-toolbar__divider {
+          width: 1px !important;
+          height: 24px !important;
+          background: var(--r-hairline-strong) !important;
+          margin: 0 4px !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-zoom {
+          color: var(--r-ink-strong) !important;
+          font-size: 12px !important;
+          font-family: var(--vscode-editor-font-family, ui-monospace, monospace) !important;
+          padding: 0 10px !important;
+          background: var(--r-surface-soft) !important;
+          border-radius: 6px !important;
+          min-width: 56px !important;
+          height: 32px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          font-variant-numeric: tabular-nums !important;
+          font-weight: 500 !important;
+        }
+
+        /* Toolbar buttons — ghost style inside the white toolbar container.
+           Matches FormattingBubbleMenu native pattern: no per-button bg/border, hover
+           surface-soft. Buttons are 32×32 square with 16px Phosphor icons. */
+        .mermaid-expand-overlay .mermaid-expand-btn {
+          background: transparent !important;
+          border: none !important;
+          color: var(--r-ink-strong) !important;
+          opacity: 1 !important;
+          position: relative !important;
+          width: 36px !important;
+          height: 36px !important;
+          padding: 0 !important;
+          border-radius: 6px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          box-shadow: none !important;
+          cursor: pointer !important;
+          transition: background var(--ritemark-dur-fast, 0.12s) ease,
+                      color var(--ritemark-dur-fast, 0.12s) ease !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-btn:hover {
+          background: var(--r-surface-soft) !important;
+          color: var(--r-accent-deep, var(--r-accent)) !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-btn:active {
+          background: var(--r-accent-soft) !important;
+          color: var(--r-accent-deep, var(--r-accent)) !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-btn.copied {
+          color: var(--r-success) !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-btn:disabled {
+          background: transparent !important;
+          color: var(--r-ink-faint) !important;
+          cursor: not-allowed !important;
+        }
+
+        /* Force SVG icon to inherit button color — Icon component sets explicit color
+           via Phosphor prop; !important wins so icons follow button hover/active states. */
+        .mermaid-expand-overlay .mermaid-expand-btn svg {
+          color: inherit !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-canvas {
+          flex: 1 1 auto !important;
+          overflow: auto !important;
+          background: var(--r-surface-muted) !important;
+          border-radius: 8px !important;
+          position: relative !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-stage {
+          display: inline-block !important;
+          padding: 24px !important;
+          will-change: transform !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-stage svg {
+          display: block !important;
+          max-width: none !important;
+          width: auto !important;
+          height: auto !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-code-view {
+          display: block !important;
+          margin: 0 !important;
+          padding: 24px !important;
+          background: transparent !important;
+          color: var(--r-ink-strong) !important;
+          font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, monospace) !important;
+          font-size: 13px !important;
+          line-height: 1.6 !important;
+          white-space: pre !important;
+          tab-size: 2 !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-code-view code {
+          background: transparent !important;
+          padding: 0 !important;
+          color: inherit !important;
+          font-family: inherit !important;
+          font-size: inherit !important;
+        }
+
+        .mermaid-expand-overlay .mermaid-expand-hint {
+          color: rgba(255, 255, 255, 0.7) !important;
+          font-size: 11px !important;
+          text-align: center !important;
+          flex: 0 0 auto !important;
+          font-family: var(--vscode-editor-font-family, monospace) !important;
         }
 
         /* Enhanced mobile selection */
