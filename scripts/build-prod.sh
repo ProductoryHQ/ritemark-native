@@ -199,7 +199,7 @@ with open("'"$PRODUCT_JSON"'", "r") as f:
 data["ritemarkVersion"] = "'"$RITEMARK_VERSION"'"
 import os, pathlib
 branding = json.load(open(pathlib.Path("'"$(pwd)"'") / "branding" / "product.json"))
-for key in ("posthogProjectApiKey", "posthogHost"):
+for key in ("posthogProjectApiKey", "posthogHost", "builtInExtensionsEnabledWithAutoUpdates"):
     if key in branding:
         data[key] = branding[key]
 with open("'"$PRODUCT_JSON"'", "w") as f:
@@ -213,6 +213,21 @@ else
   echo -e "${RED}ERROR: Failed to add ritemarkVersion to product.json${NC}"
   exit 1
 fi
+echo ""
+
+# =============================================================================
+# Step 3.5: Remove unwanted built-in extensions (VS Code 1.117+)
+# Microsoft started bundling GitHub Copilot Chat + Mermaid Chat Features as
+# first-party built-in extensions. Ritemark does not ship these — they pollute
+# the activity bar with a "Chat Debug" item and inject chat tools we don't use.
+# =============================================================================
+EXTENSIONS_DIR="$APP_PATH/Contents/Resources/app/extensions"
+for unwanted_ext in copilot mermaid-chat-features; do
+  if [[ -d "$EXTENSIONS_DIR/$unwanted_ext" ]]; then
+    rm -rf "$EXTENSIONS_DIR/$unwanted_ext"
+    echo -e "${GREEN}Removed unwanted built-in extension: $unwanted_ext${NC}"
+  fi
+done
 echo ""
 
 # =============================================================================

@@ -1,0 +1,68 @@
+# RiteMark Patch: vscode-1117-compat
+#
+# Purpose: Make Ritemark workbench bootable on VS Code 1.117 base
+#
+# Why:
+#   1. onboardingVariationA.ts (NEW in 1.117) has a top-level
+#      assertDefined(product.defaultChatAgent, …) that crashes the workbench
+#      renderer at module load time when defaultChatAgent is not configured.
+#      Ritemark does not ship Microsoft Copilot onboarding, so the assertion
+#      fires every prod boot. Fix: replace the assertion with a soft fallback
+#      (`?? {}`) so the module loads. The wizard itself remains unreachable
+#      because no UI links to it.
+#
+#   2. chat.contribution.ts (NEW in 1.117) registers
+#      ChatSetupContribution + ChatTeardownContribution which add a
+#      "Chat Debug" item with a setup badge to the activity bar — even
+#      though Ritemark already gates the chat view via patch 003. Disable
+#      both contribution registrations, void the imports.
+#
+# File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
+#          src/vs/workbench/contrib/chat/browser/chat.contribution.ts
+# Created: 2026-05-02
+#
+diff --git a/src/vs/workbench/contrib/chat/browser/chat.contribution.ts b/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
+index e76d44b8645..41c3ba7a9b6 100644
+--- a/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
++++ b/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
+@@ -2107,8 +2107,13 @@ registerWorkbenchContribution2(ChatCopyActionRendering.ID, ChatCopyActionRenderi
+ registerWorkbenchContribution2(ChatImplicitContextContribution.ID, ChatImplicitContextContribution, WorkbenchPhase.Eventually);
+ registerWorkbenchContribution2(ChatViewsWelcomeHandler.ID, ChatViewsWelcomeHandler, WorkbenchPhase.BlockStartup);
+ registerWorkbenchContribution2(ChatGettingStartedContribution.ID, ChatGettingStartedContribution, WorkbenchPhase.Eventually);
+-registerWorkbenchContribution2(ChatSetupContribution.ID, ChatSetupContribution, WorkbenchPhase.BlockRestore);
+-registerWorkbenchContribution2(ChatTeardownContribution.ID, ChatTeardownContribution, WorkbenchPhase.AfterRestored);
++// Ritemark: ChatSetupContribution adds a chat icon to the activity bar (with setup badge)
++// even when chat views are disabled. ChatTeardownContribution is its sibling. Both removed
++// to keep the activity bar clean.
++// registerWorkbenchContribution2(ChatSetupContribution.ID, ChatSetupContribution, WorkbenchPhase.BlockRestore);
++// registerWorkbenchContribution2(ChatTeardownContribution.ID, ChatTeardownContribution, WorkbenchPhase.AfterRestored);
++void ChatSetupContribution;
++void ChatTeardownContribution;
+ registerWorkbenchContribution2(ChatStatusBarEntry.ID, ChatStatusBarEntry, WorkbenchPhase.BlockRestore);
+ registerWorkbenchContribution2(BuiltinToolsContribution.ID, BuiltinToolsContribution, WorkbenchPhase.Eventually);
+ registerWorkbenchContribution2(UsagesToolContribution.ID, UsagesToolContribution, WorkbenchPhase.BlockRestore);
+diff --git a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
+index e1486cb5c58..6cf78728d39 100644
+--- a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
++++ b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
+@@ -10,7 +10,6 @@ import { isCancellationError } from '../../../../base/common/errors.js';
+ import { StopWatch } from '../../../../base/common/stopwatch.js';
+ import { URI } from '../../../../base/common/uri.js';
+ import { isWindows, isMacintosh, isLinux } from '../../../../base/common/platform.js';
+-import { assertDefined } from '../../../../base/common/types.js';
+ import { FileAccess } from '../../../../base/common/network.js';
+ import { ILayoutService } from '../../../../platform/layout/browser/layoutService.js';
+ import { KeyCode } from '../../../../base/common/keyCodes.js';
+@@ -70,8 +69,10 @@ type OnboardingActionEvent = {
+ 	argument: string | undefined;
+ };
+ 
+-assertDefined(product.defaultChatAgent, 'Onboarding requires a default chat agent product configuration.');
+-const defaultChat = product.defaultChatAgent;
++// Ritemark: do not hard-assert defaultChatAgent — Ritemark ships without Microsoft Copilot
++// onboarding configuration. The module must still load so IOnboardingService is registered
++// (StartupPageRunner depends on it). The wizard itself is unreachable in Ritemark UI.
++const defaultChat = product.defaultChatAgent ?? ({} as typeof product.defaultChatAgent);
+ 
+ /**
+  * Variation A — Classic Wizard Modal
