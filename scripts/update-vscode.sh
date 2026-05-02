@@ -132,6 +132,35 @@ git checkout "$TARGET_TAG"
 echo ""
 echo -e "${CYAN}Step 4: Re-applying RiteMark patches...${NC}"
 if "$SCRIPT_DIR/apply-patches.sh"; then
+    # Step 5: Wipe stale built-in extension out/ dirs
+    # Upstream commits sometimes flip an extension to ESM (e.g. 91b02efb235 in 1.117.0
+    # for HTML/CSS/JSON language servers) by changing package.json + tsconfig but leave
+    # the existing tsc-compiled out/ alone. Gulp's incremental compile then sees fresh
+    # mtimes and skips rebuild — Node 22 loads CJS .js as ESM and the LSP server crashes.
+    # GitHub issue #41. Cheap to always wipe; the next compile recreates them.
+    echo ""
+    echo -e "${CYAN}Step 5: Wiping stale built-in extension compiled output...${NC}"
+    WIPED=0
+    # Match only first-party extension build output, e.g. extensions/<ext>/server/out
+    # and extensions/<ext>/client/out. Exclude paths under node_modules.
+    while IFS= read -r out_dir; do
+        rm -rf "$out_dir"
+        WIPED=$((WIPED + 1))
+    done < <(find "$VSCODE_DIR/extensions" -path '*/node_modules' -prune -o \
+        -type d \( -path '*/server/out' -o -path '*/client/out' \) -print 2>/dev/null)
+    echo "  Wiped $WIPED out/ dir(s) under vscode/extensions/. Will be rebuilt by 'npm run compile'."
+
+    # Step 6: Native module arch check (warn-only)
+    # GitHub issue #39 — npm install from a non-arm64 shell rebuilds native modules as
+    # x86_64, breaking dlopen at runtime. We only check here; rebuild is on the user
+    # because it's slow (10+ min) and only needed if check fails.
+    echo ""
+    echo -e "${CYAN}Step 6: Checking VS Code native module architecture...${NC}"
+    if ! "$SCRIPT_DIR/check-native-modules.sh"; then
+        echo ""
+        echo -e "${YELLOW}Warning: native modules need rebuilding (see command above).${NC}"
+    fi
+
     echo ""
     echo -e "${GREEN}========================================"
     echo "Update successful!"
@@ -141,8 +170,9 @@ if "$SCRIPT_DIR/apply-patches.sh"; then
     echo "All patches applied successfully."
     echo ""
     echo "Next steps:"
-    echo "  1. Rebuild: cd vscode && npm run compile"
-    echo "  2. Test the build"
+    echo "  1. Rebuild: arch -arm64 /bin/zsh -c \\"
+    echo "       'source \"\$HOME/.nvm/nvm.sh\" && nvm use && cd vscode && npm run compile'"
+    echo "  2. Test the build (dev mode + production)"
     echo "  3. Update submodule reference: git add vscode && git commit"
 else
     echo ""
