@@ -22,6 +22,8 @@ import {
   onClaudeStatusInvalidated,
   setAnthropicKeyAvailable,
   setClaudeLoginInProgress,
+  startClaudeLoginSubprocess,
+  type ClaudeLoginSubprocessHandle,
 } from '../agent';
 import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
 
@@ -48,6 +50,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private codexAuth: CodexAuth | null = null;
   private disposeClaudeStatusListener: (() => void) | null = null;
   private claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
+  private claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -194,6 +197,15 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         await this.startClaudeLogin(webview);
         break;
 
+      case 'claude:cancelLogin':
+        this.cancelClaudeLogin();
+        await this.sendCurrentSettings(webview);
+        break;
+
+      case 'claude:enterApiKey':
+        await this.enterAnthropicApiKey(webview);
+        break;
+
       case 'claude:logout':
         await this.logoutClaudeFromSettings(webview);
         break;
@@ -221,6 +233,14 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Refresh Codex auth status
         emitCodexStatusInvalidated('status-refresh');
         await this.sendCodexAuthStatus(webview);
+        break;
+
+      case 'codex:cancelLogin':
+        emitCodexStatusInvalidated('logout');
+        await this.sendCodexAuthStatus(webview);
+        vscode.window.showInformationMessage(
+          'ChatGPT sign-in cancelled. If a browser tab is still open, you can close it.'
+        );
         break;
 
       case 'codex:repair':
@@ -619,11 +639,80 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       return;
     }
 
+    if (this.claudeLoginSubprocess) {
+      this.claudeLoginSubprocess.kill();
+      this.claudeLoginSubprocess = null;
+    }
+
     setClaudeLoginInProgress(true);
     emitClaudeStatusInvalidated('login-started');
     this.startClaudeLoginPolling();
-    openClaudeLoginTerminal(status.binaryPath);
-    vscode.window.showInformationMessage('Finish Claude.ai sign-in in the terminal and browser. Ritemark will refresh automatically.');
+
+    this.claudeLoginSubprocess = startClaudeLoginSubprocess(status.binaryPath, {
+      onUrl: (url) => {
+        vscode.window.showInformationMessage(
+          'Sign-in opened in your browser. Authorize to finish.',
+          'Copy backup link'
+        ).then((action) => {
+          if (action === 'Copy backup link') {
+            void vscode.env.clipboard.writeText(url);
+          }
+        });
+      },
+      onComplete: () => {
+        this.claudeLoginSubprocess = null;
+        setClaudeLoginInProgress(false);
+        emitClaudeStatusInvalidated('login-finished');
+      },
+      onError: (msg) => {
+        this.claudeLoginSubprocess = null;
+        setClaudeLoginInProgress(false);
+        emitClaudeStatusInvalidated('settings-updated');
+        vscode.window.showErrorMessage(`Claude sign-in failed: ${msg}`);
+      },
+      onTimeout: () => {
+        this.claudeLoginSubprocess = null;
+        setClaudeLoginInProgress(false);
+        emitClaudeStatusInvalidated('settings-updated');
+        vscode.window.showWarningMessage('Claude sign-in timed out after 5 minutes. Please try again.');
+      },
+    });
+
+    await this.sendCurrentSettings(webview);
+  }
+
+  private cancelClaudeLogin(): void {
+    if (this.claudeLoginSubprocess) {
+      this.claudeLoginSubprocess.kill();
+      this.claudeLoginSubprocess = null;
+    }
+    setClaudeLoginInProgress(false);
+    emitClaudeStatusInvalidated('settings-updated');
+    vscode.window.showInformationMessage('Sign-in cancelled.');
+  }
+
+  private async enterAnthropicApiKey(webview: vscode.Webview): Promise<void> {
+    const key = await vscode.window.showInputBox({
+      prompt: 'Paste your Anthropic API key from console.anthropic.com',
+      password: true,
+      placeHolder: 'sk-ant-api03-...',
+      ignoreFocusOut: true,
+      validateInput: (value) => {
+        if (!value) return 'API key is required';
+        if (!value.startsWith('sk-ant-')) return 'API keys start with sk-ant-';
+        return null;
+      },
+    });
+
+    if (!key) {
+      await this.sendCurrentSettings(webview);
+      return;
+    }
+
+    await this.context.secrets.store('anthropic-api-key', key);
+    setAnthropicKeyAvailable(true);
+    emitClaudeStatusInvalidated('settings-updated');
+    vscode.window.showInformationMessage('Anthropic API key saved.');
     await this.sendCurrentSettings(webview);
   }
 

@@ -20,7 +20,8 @@ export {
   setClaudePendingReload,
   clearClaudePendingReload,
 } from './setup';
-export { installClaude, isClaudeInstallInProgress, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude, installGit, installNode, installCodexCli } from './installer';
+export { installClaude, isClaudeInstallInProgress, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude, installGit, installNode, installCodexCli, startClaudeLoginSubprocess } from './installer';
+export type { ClaudeLoginSubprocessHandle, ClaudeLoginSubprocessOptions } from './installer';
 export {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
