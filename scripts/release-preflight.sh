@@ -37,7 +37,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 EXTENSION_DIR="$PROJECT_ROOT/extensions/ritemark"
 WEBVIEW_DIR="$EXTENSION_DIR/webview"
 PATCHES_DIR="$PROJECT_ROOT/patches/vscode"
-VSCODE_TAG="1.109.5"
+VSCODE_TAG="1.117.0"
 NVMRC_PATH="$PROJECT_ROOT/vscode/.nvmrc"
 REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$NVMRC_PATH" 2>/dev/null || true)"
 
