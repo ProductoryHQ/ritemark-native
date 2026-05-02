@@ -77,15 +77,15 @@ if [ -f "$PRODUCT_ICON_THEME" ]; then
   jq empty "$PRODUCT_ICON_THEME"
 fi
 
-PHOSPHOR_SOURCE="$VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2"
+PHOSPHOR_SOURCE="$VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
 if [ ! -f "$PHOSPHOR_SOURCE" ]; then
-  PHOSPHOR_SOURCE="$PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2"
+  PHOSPHOR_SOURCE="$PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
 fi
 
 if [ ! -f "$PHOSPHOR_SOURCE" ]; then
-  echo "ERROR: Missing Phosphor 200 source font in either supported location:" >&2
-  echo "  - $VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2" >&2
-  echo "  - $PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2" >&2
+  echo "ERROR: Missing Phosphor 400 (Regular) source font in either supported location:" >&2
+  echo "  - $VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2" >&2
+  echo "  - $PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2" >&2
   exit 1
 fi
 

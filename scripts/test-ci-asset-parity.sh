@@ -54,9 +54,9 @@ if [ -f "$PROJECT_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/codicon.tt
 fi
 
 # Simulate CI: extension deps live inside vscode/extensions/ritemark, not repo root.
-mkdir -p "$TMP_ROOT/vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/light"
-cp "$PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/Phosphor-Light.woff2" \
-   "$TMP_ROOT/vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/light/"
+mkdir -p "$TMP_ROOT/vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular"
+cp "$PROJECT_ROOT/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2" \
+   "$TMP_ROOT/vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/"
 
 (cd "$TMP_ROOT" && bash ./scripts/apply-patches.sh >/dev/null)
 

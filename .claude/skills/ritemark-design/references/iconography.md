@@ -1,9 +1,11 @@
 # Iconography
 
-Ritemark uses **Phosphor Icons** and only Phosphor Icons. Weight 100 (thin), rendered through a single typed wrapper.
+Ritemark uses **Phosphor Icons** and only Phosphor Icons. Weight 400 (regular), rendered through a single typed wrapper. One weight across chrome and webview — no two-tier hierarchy.
 
 > **Source of truth:** `docs-internal/design/ritemark-ui.pen` frame `yq4P8` (Icon Usage Guide). Text mirror: `docs/development/sprints/sprint-52-design-foundations/notes/icons-usage.md`. If this doc disagrees with the `.pen`, the `.pen` wins.  
-> Ruling: 2026-04-24 — Jarmo confirmed `.pen` is always source of truth. This doc supersedes the earlier Lucide-default iconography.
+> Rulings:
+> - 2026-04-24 — Jarmo confirmed `.pen` is always source of truth. This doc supersedes the earlier Lucide-default iconography.
+> - **2026-05-02 — Weight reset from 100 (thin) to 400 (regular)**, applied to both chrome (patches/vscode/001 + producticons/) and webview (`Icon.tsx` `weight="regular"`). Sprint 52's thin-weight aesthetic was too faint at viewing distance and created an inconsistent two-tier feel between chrome and webview. The `.pen` Icon Usage Guide (`yq4P8`) needs the same weight bump — TODO for Jarmo when next in Pencil.
 
 ## Library
 
@@ -23,7 +25,7 @@ All icon properties are driven by tokens defined in `docs-internal/design/ritema
 | Token | Value | Use |
 | --- | --- | --- |
 | `$icon-family` | `phosphor` | Only library. No mixing. |
-| `$icon-weight-default` | `100` (thin) | Locked. Do not override per-icon. |
+| `$icon-weight-default` | `400` (regular) | Locked. Do not override per-icon. |
 | `$icon-size-xs` | `12` | Dense chips, metadata, inline indicators. |
 | `$icon-size-sm` | `14` | Tree rows, tabs, dropdown items. |
 | `$icon-size-md` | `16` | Toolbar, titlebar, dialog headers, form-field prefixes. |
@@ -32,7 +34,7 @@ All icon properties are driven by tokens defined in `docs-internal/design/ritema
 | `$icon-color-active` | `var(--r-accent)` (#4338CA) | Selected / active item. |
 | `$icon-color-disabled` | `var(--r-ink-disabled)` (#CBD5E1) | Disabled / read-only. |
 
-No off-spec sizes. No 13, 15, 18, 22. No Duotone / Bold / Fill weights. On marketing surfaces, extend through the `$icon-size-*` tokens — not ad-hoc pixels.
+No off-spec sizes. No 13, 15, 18, 22. No Thin / Light / Bold / Fill / Duotone weights. On marketing surfaces, extend through the `$icon-size-*` tokens — not ad-hoc pixels.
 
 ## Component API
 
@@ -59,7 +61,7 @@ Rules:
     
 4.  Active state is signaled with **color** (`tone="active"`), not with an icon swap.
     
-5.  Weight is always 100 (thin) internally. There is no prop to override.
+5.  Weight is always 400 (regular) internally. There is no prop to override.
     
 6.  `className` is passed through for structural utilities (`opacity-*`, `animate-spin`, positioning). Icon color is driven by `tone`; avoid `text-*` color classes on icons — they will be overridden by the wrapper's color prop.
     
@@ -103,7 +105,7 @@ The Ritemark logo mark (`R` in a rounded indigo square) is **not** a Phosphor ic
     
 -   **Off-spec sizes.** Only 12 / 14 / 16 / 20.
     
--   **Off-spec weights.** Weight stays 100. Duotone / Bold / Fill variants are not part of the Ritemark system.
+-   **Off-spec weights.** Weight stays 400 (regular). Thin / Light / Bold / Fill / Duotone variants are not part of the Ritemark system.
     
 -   **Emoji in UI.** No rocket, check, warning, or wrench emoji in webview, dialogs, toasts, activity bar, settings, welcome, marketing, slides, release notes. Use Phosphor equivalents (`rocket`, `check`, `warning`, `wrench`) via the `Icon` wrapper.
     
@@ -114,7 +116,7 @@ The Ritemark logo mark (`R` in a rounded indigo square) is **not** a Phosphor ic
 
 ## Exceptions
 
-None by default. If a surface genuinely needs something Phosphor does not provide, raise it with Jarmo before drawing a custom SVG. Custom icons, if approved, must match Phosphor thin-weight (100) visual language: 1px-equivalent stroke, rounded caps, 24x24 grid.
+None by default. If a surface genuinely needs something Phosphor does not provide, raise it with Jarmo before drawing a custom SVG. Custom icons, if approved, must match Phosphor regular-weight (400) visual language: ~1.5px-equivalent stroke, rounded caps, 24x24 grid.
 
 ## Migrating from Lucide (historic)
 
@@ -132,8 +134,10 @@ Ritemark previously used Lucide. The full migration map from Lucide PascalCase t
 | `lock` | `lock-simple` |
 | `edit-3` / `pencil` | `pencil-simple` |
 
-The 1px stroke CSS override (`svg.lucide { stroke-width: 1px !important }`) was removed. Phosphor's thin weight handles this natively.
+The 1px stroke CSS override (`svg.lucide { stroke-width: 1px !important }`) was removed. Phosphor's regular weight provides the stroke styling natively (no per-icon CSS needed).
 
 ## How this doc stays current
 
 This file is derived from `docs/development/sprints/sprint-52-design-foundations/notes/icons-usage.md`, which mirrors the `.pen` `yq4P8` Icon Usage Guide. When the `.pen` changes, update `notes/icons-usage.md` and this file in the same commit. The `.pen` wins on any disagreement.
+
+**Open `.pen` follow-up (as of 2026-05-02):** the weight 100 → 400 reset was applied to code (`Icon.tsx`) and patches but not yet to `.pen` `yq4P8`. Until the `.pen` is updated, treat the 2026-05-02 ruling above as the authoritative version and ignore the older `.pen` weight token where it conflicts.
