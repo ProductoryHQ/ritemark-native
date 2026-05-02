@@ -296,6 +296,86 @@ export function openClaudeLoginTerminal(binaryPath?: string): void {
   terminal.sendText(command.includes(' ') ? `"${command}"` : command);
 }
 
+export interface ClaudeLoginSubprocessHandle {
+  kill: () => void;
+}
+
+export interface ClaudeLoginSubprocessOptions {
+  onUrl?: (url: string) => void;
+  onComplete?: () => void;
+  onError?: (error: string) => void;
+  onTimeout?: () => void;
+  timeoutMs?: number;
+}
+
+const DEFAULT_LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
+const URL_REGEX = /https:\/\/claude\.com\/cai\/oauth\/authorize\?[^\s]+/;
+
+export function startClaudeLoginSubprocess(
+  binaryPath: string,
+  options: ClaudeLoginSubprocessOptions = {}
+): ClaudeLoginSubprocessHandle {
+  const { spawn } = require('child_process') as typeof import('child_process');
+  const proc = spawn(binaryPath, ['auth', 'login', '--claudeai'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env },
+  });
+
+  let urlEmitted = false;
+  let settled = false;
+
+  const settle = (cb?: () => void) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    cb?.();
+  };
+
+  const handleStdout = (chunk: Buffer) => {
+    const text = chunk.toString('utf-8');
+    if (!urlEmitted) {
+      const match = text.match(URL_REGEX);
+      if (match) {
+        urlEmitted = true;
+        options.onUrl?.(match[0]);
+      }
+    }
+  };
+
+  proc.stdout?.on('data', handleStdout);
+  proc.stderr?.on('data', handleStdout);
+
+  proc.on('exit', (code) => {
+    settle(() => {
+      if (code === 0) {
+        options.onComplete?.();
+      } else if (code !== null) {
+        options.onError?.(`Sign-in process exited with code ${code}`);
+      }
+    });
+  });
+
+  proc.on('error', (err) => {
+    settle(() => options.onError?.(err.message));
+  });
+
+  const timer = setTimeout(() => {
+    if (!settled) {
+      try { proc.kill('SIGTERM'); } catch { /* noop */ }
+      settle(() => options.onTimeout?.());
+    }
+  }, options.timeoutMs ?? DEFAULT_LOGIN_TIMEOUT_MS);
+
+  return {
+    kill: () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { proc.kill('SIGTERM'); } catch { /* noop */ }
+    },
+  };
+}
+
 export function openAnthropicKeySettings(): void {
   const vscode = getVSCode();
   vscode.commands.executeCommand('ritemark.aiSettings');
