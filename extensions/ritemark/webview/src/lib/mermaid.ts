@@ -103,7 +103,11 @@ export async function renderMermaid(id: string, source: string): Promise<string>
   mermaid.initialize(getMermaidConfig())
 
   const { svg } = await mermaid.render(id, source)
-  return svg
+  // Sprint 56: replace Mermaid's default width="100%" with explicit pixel
+  // width derived from viewBox so the inline SVG renders at its natural
+  // size and the container can scroll horizontally when wider than the
+  // editor column.
+  return ensureSvgDimensions(svg)
 }
 
 /**
@@ -112,7 +116,7 @@ export async function renderMermaid(id: string, source: string): Promise<string>
  * Mermaid SVGs often rely on CSS max-width + viewBox, which causes the
  * Image element to fall back to 300×150 (CSS default for replaced elements).
  */
-function ensureSvgDimensions(svg: string): string {
+export function ensureSvgDimensions(svg: string): string {
   const parser = new DOMParser()
   const doc = parser.parseFromString(svg, 'image/svg+xml')
   const svgEl = doc.documentElement
@@ -157,35 +161,60 @@ function ensureSvgDimensions(svg: string): string {
   return svg
 }
 
+function svgStringToDataUrl(svg: string): string {
+  // Use unescape(encodeURIComponent(...)) to safely encode unicode/non-Latin1
+  // characters into base64. btoa() alone fails on non-Latin1 input.
+  const utf8 = unescape(encodeURIComponent(svg))
+  const base64 = typeof btoa === 'function' ? btoa(utf8) : ''
+  if (base64) {
+    return `data:image/svg+xml;base64,${base64}`
+  }
+  // Fallback: URL-encoded (no base64), still self-contained.
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
 export async function renderMermaidToPngDataUrl(svg: string): Promise<string> {
   const fixedSvg = ensureSvgDimensions(svg)
-  const svgBlob = new Blob([fixedSvg], { type: 'image/svg+xml;charset=utf-8' })
-  const objectUrl = URL.createObjectURL(svgBlob)
+  // Data URL avoids VS Code webview CSP issues some users hit when loading
+  // SVG via blob: URL; data: is broadly allowed in webview img-src.
+  const dataUrl = svgStringToDataUrl(fixedSvg)
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = (event) => {
+      const detail = event instanceof Event ? event.type : String(event)
+      reject(new Error(`Failed to rasterize mermaid SVG (${detail || 'image error'})`))
+    }
+    img.src = dataUrl
+  })
+
+  const scale = 2
+  const width = Math.max(1, Math.ceil((image.naturalWidth || image.width || 1) * scale))
+  const height = Math.max(1, Math.ceil((image.naturalHeight || image.height || 1) * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Canvas 2D context unavailable')
+  }
+
+  context.scale(scale, scale)
+  context.drawImage(image, 0, 0)
 
   try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image()
-      img.onload = () => resolve(img)
-      img.onerror = () => reject(new Error('Failed to rasterize mermaid SVG'))
-      img.src = objectUrl
-    })
-
-    const scale = 2
-    const width = Math.max(1, Math.ceil((image.naturalWidth || image.width || 1) * scale))
-    const height = Math.max(1, Math.ceil((image.naturalHeight || image.height || 1) * scale))
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-
-    const context = canvas.getContext('2d')
-    if (!context) {
-      throw new Error('Canvas 2D context unavailable')
-    }
-
-    context.scale(scale, scale)
-    context.drawImage(image, 0, 0)
     return canvas.toDataURL('image/png')
-  } finally {
-    URL.revokeObjectURL(objectUrl)
+  } catch (err) {
+    // Tainted canvas — typically caused by SVG referencing cross-origin
+    // resources (web fonts, images). Surface a clear error instead of the
+    // opaque DOMException so the catch in the caller can show useful UI.
+    throw new Error(
+      `Canvas export failed (likely tainted by external resources): ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    )
   }
 }
