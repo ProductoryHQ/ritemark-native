@@ -10,8 +10,10 @@
 
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
 import { useState, useCallback, useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from './ui/Icon'
 import { renderMermaid, renderMermaidToPngDataUrl } from '../lib/mermaid'
+import { sendToExtension } from '../bridge'
 
 type ImageActionStatus = 'idle' | 'busy' | 'success' | 'error'
 
@@ -25,9 +27,25 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
-  const response = await fetch(dataUrl)
-  return response.blob()
+function dataUrlToBlob(dataUrl: string): Blob {
+  // VS Code webview CSP default-src 'none' blocks fetch(dataUrl) — manual
+  // base64 decode + Uint8Array keeps the conversion synchronous and avoids
+  // the connect-src restriction.
+  const commaIndex = dataUrl.indexOf(',')
+  if (commaIndex < 0) {
+    throw new Error('Invalid data URL')
+  }
+  const header = dataUrl.slice(0, commaIndex)
+  const payload = dataUrl.slice(commaIndex + 1)
+  const mimeMatch = header.match(/^data:([^;]+)/)
+  const mime = mimeMatch?.[1] ?? 'application/octet-stream'
+  const isBase64 = /;base64/i.test(header)
+  const binary = isBase64 ? atob(payload) : decodeURIComponent(payload)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new Blob([bytes], { type: mime })
 }
 
 function supportsImageClipboardWrite(): boolean {
@@ -135,25 +153,17 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
     setDownloadStatus('busy')
     try {
       const dataUrl = await renderMermaidToPngDataUrl(svgContent)
-      const blob = await dataUrlToBlob(dataUrl)
-      const objectUrl = URL.createObjectURL(blob)
-      try {
-        const anchor = document.createElement('a')
-        anchor.href = objectUrl
-        anchor.download = DOWNLOAD_FILENAME
-        anchor.style.display = 'none'
-        document.body.appendChild(anchor)
-        anchor.click()
-        document.body.removeChild(anchor)
-      } finally {
-        // Defer revoke so the browser has time to start the download.
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
-      }
-      setDownloadStatus('success')
+      // Delegate to extension host — same pattern as exportWord/exportPDF.
+      // Extension uses vscode.window.showSaveDialog + fs.writeFile.
+      // Browser showSaveFilePicker is blocked in cross-origin sub-frames.
+      sendToExtension('mermaid:downloadImage', {
+        dataUrl,
+        filename: DOWNLOAD_FILENAME,
+      })
+      setDownloadStatus('idle')
     } catch (err) {
-      console.error('Failed to download mermaid image:', err)
+      console.error('Failed to prepare mermaid image for download:', err)
       setDownloadStatus('error')
-    } finally {
       setTimeout(() => setDownloadStatus('idle'), IMAGE_ACTION_RESET_MS)
     }
   }, [svgContent])
@@ -183,6 +193,38 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
       canvas.scrollTop = 0
     }
   }, [])
+
+  const zoomBy = useCallback((factor: number) => {
+    const canvas = expandCanvasRef.current
+    const oldZoom = expandZoomRef.current
+    const newZoom = clamp(oldZoom * factor, EXPAND_ZOOM_MIN, EXPAND_ZOOM_MAX)
+    if (newZoom === oldZoom) return
+
+    let newScrollX = 0
+    let newScrollY = 0
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect()
+      const centerX = rect.width / 2
+      const centerY = rect.height / 2
+      const contentX = canvas.scrollLeft + centerX
+      const contentY = canvas.scrollTop + centerY
+      const ratio = newZoom / oldZoom
+      newScrollX = contentX * ratio - centerX
+      newScrollY = contentY * ratio - centerY
+    }
+
+    expandZoomRef.current = newZoom
+    setExpandZoom(newZoom)
+    if (canvas) {
+      requestAnimationFrame(() => {
+        canvas.scrollLeft = newScrollX
+        canvas.scrollTop = newScrollY
+      })
+    }
+  }, [])
+
+  const zoomIn = useCallback(() => zoomBy(1.25), [zoomBy])
+  const zoomOut = useCallback(() => zoomBy(1 / 1.25), [zoomBy])
 
   // Keep wheel handler closure in sync with the latest zoom value.
   useEffect(() => {
@@ -282,98 +324,52 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
           <button
             type="button"
             onClick={toggleView}
-            onMouseDown={(e) => e.preventDefault()}
             className="code-copy-btn mermaid-toggle-btn"
-            title={showCode ? 'Show diagram' : 'Show code'}
+            data-tooltip={showCode ? 'Show diagram' : 'Show code'}
             aria-label={showCode ? 'Show diagram' : 'Show code'}
           >
-            {showCode ? (
-              <>
-                <Icon name="eye" size={14} />
-                <span>Diagram</span>
-              </>
-            ) : (
-              <>
-                <Icon name="code" size={14} />
-                <span>Code</span>
-              </>
-            )}
+            <Icon name={showCode ? 'eye' : 'code'} size={16} />
           </button>
           <button
             type="button"
             onClick={handleCopy}
-            onMouseDown={(e) => e.preventDefault()}
             className={`code-copy-btn ${copied ? 'copied' : ''}`}
-            title={copied ? 'Copied!' : 'Copy code'}
+            data-tooltip={copied ? 'Copied!' : 'Copy code'}
             aria-label={copied ? 'Copied!' : 'Copy code'}
           >
-            {copied ? (
-              <>
-                <Icon name="check" size={14} />
-                <span>Copied!</span>
-              </>
-            ) : (
-              <>
-                <Icon name="copy" size={14} />
-                <span>Copy</span>
-              </>
-            )}
+            <Icon name={copied ? 'check' : 'copy'} size={16} />
           </button>
           {hasRenderedDiagram && (
             <>
               <button
                 type="button"
                 onClick={handleCopyImage}
-                onMouseDown={(e) => e.preventDefault()}
                 className={`code-copy-btn ${copyImageStatus === 'success' ? 'copied' : ''}`}
                 disabled={copyImageStatus === 'busy'}
-                title={copyImageLabel}
+                data-tooltip={copyImageLabel}
                 aria-label={copyImageLabel}
               >
-                {copyImageStatus === 'success' ? (
-                  <>
-                    <Icon name="check" size={14} />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Icon name="image" size={14} />
-                    <span>{copyImageStatus === 'busy' ? 'Copying…' : 'Copy image'}</span>
-                  </>
-                )}
+                <Icon name={copyImageStatus === 'success' ? 'check' : 'image'} size={16} />
               </button>
               <button
                 type="button"
                 onClick={handleDownloadImage}
-                onMouseDown={(e) => e.preventDefault()}
-                className={`code-copy-btn ${downloadStatus === 'success' ? 'copied' : ''}`}
                 disabled={downloadStatus === 'busy'}
-                title={downloadLabel}
+                className={`code-copy-btn ${downloadStatus === 'success' ? 'copied' : ''}`}
+                data-tooltip={downloadLabel}
                 aria-label={downloadLabel}
               >
-                {downloadStatus === 'success' ? (
-                  <>
-                    <Icon name="check" size={14} />
-                    <span>Downloaded</span>
-                  </>
-                ) : (
-                  <>
-                    <Icon name="download" size={14} />
-                    <span>{downloadStatus === 'busy' ? 'Saving…' : 'Download'}</span>
-                  </>
-                )}
+                <Icon name={downloadStatus === 'success' ? 'check' : 'download'} size={16} />
               </button>
               <button
                 type="button"
                 onClick={openExpand}
-                onMouseDown={(e) => e.preventDefault()}
                 ref={expandTriggerRef}
                 className="code-copy-btn"
-                title="Expand diagram"
+                data-tooltip="Expand diagram"
                 aria-label="Expand diagram"
               >
-                <Icon name="arrows-out" size={14} />
-                <span>Expand</span>
+                <Icon name="arrows-out" size={16} />
               </button>
             </>
           )}
@@ -408,8 +404,10 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
           <NodeViewContent as="code" />
         </div>
 
-        {/* Expanded view overlay (Sprint 56) */}
-        {isExpanded && svgContent && (
+        {/* Expanded view overlay (Sprint 56) — rendered via Portal to document.body
+            so position: fixed anchors to the viewport, not a transformed ancestor
+            inside ProseMirror/TipTap. */}
+        {isExpanded && svgContent && createPortal(
           <div
             className="mermaid-expand-overlay"
             role="dialog"
@@ -420,45 +418,117 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
             }}
           >
             <div className="mermaid-expand-toolbar">
-              <span className="mermaid-expand-zoom">
-                {Math.round(expandZoom * 100)}%
-              </span>
-              <button
-                type="button"
-                onClick={resetExpandZoom}
-                className="code-copy-btn mermaid-expand-btn"
-                title="Reset zoom"
-                aria-label="Reset zoom"
-              >
-                <Icon name="arrow-counter-clockwise" size={14} />
-                <span>Reset</span>
-              </button>
+              <div className="mermaid-expand-toolbar__group mermaid-expand-toolbar__zoom-group">
+                <span className="mermaid-expand-zoom" aria-live="polite">
+                  {Math.round(expandZoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={zoomOut}
+                  disabled={showCode || expandZoom <= EXPAND_ZOOM_MIN}
+                  className="code-copy-btn mermaid-expand-btn"
+                  data-tooltip="Zoom out"
+                  aria-label="Zoom out"
+                >
+                  <Icon name="minus" size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={zoomIn}
+                  disabled={showCode || expandZoom >= EXPAND_ZOOM_MAX}
+                  className="code-copy-btn mermaid-expand-btn"
+                  data-tooltip="Zoom in"
+                  aria-label="Zoom in"
+                >
+                  <Icon name="plus" size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={resetExpandZoom}
+                  disabled={showCode || expandZoom === 1}
+                  className="code-copy-btn mermaid-expand-btn"
+                  data-tooltip="Reset zoom"
+                  aria-label="Reset zoom"
+                >
+                  <Icon name="arrow-counter-clockwise" size={16} />
+                </button>
+              </div>
+              <div className="mermaid-expand-toolbar__divider" aria-hidden="true" />
+              <div className="mermaid-expand-toolbar__group mermaid-expand-toolbar__actions-group">
+                <button
+                  type="button"
+                  onClick={toggleView}
+                  className="code-copy-btn mermaid-expand-btn"
+                  data-tooltip={showCode ? 'Show diagram' : 'Show code'}
+                  aria-label={showCode ? 'Show diagram' : 'Show code'}
+                >
+                  <Icon name={showCode ? 'eye' : 'code'} size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className={`code-copy-btn mermaid-expand-btn ${copied ? 'copied' : ''}`}
+                  data-tooltip={copied ? 'Copied!' : 'Copy code'}
+                  aria-label={copied ? 'Copied!' : 'Copy code'}
+                >
+                  <Icon name={copied ? 'check' : 'copy'} size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyImage}
+                  disabled={copyImageStatus === 'busy'}
+                  className={`code-copy-btn mermaid-expand-btn ${copyImageStatus === 'success' ? 'copied' : ''}`}
+                  data-tooltip={copyImageLabel}
+                  aria-label={copyImageLabel}
+                >
+                  <Icon name={copyImageStatus === 'success' ? 'check' : 'image'} size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadImage}
+                  disabled={downloadStatus === 'busy'}
+                  className={`code-copy-btn mermaid-expand-btn ${downloadStatus === 'success' ? 'copied' : ''}`}
+                  data-tooltip={downloadLabel}
+                  aria-label={downloadLabel}
+                >
+                  <Icon name={downloadStatus === 'success' ? 'check' : 'download'} size={16} />
+                </button>
+              </div>
+              <div className="mermaid-expand-toolbar__divider" aria-hidden="true" />
               <button
                 type="button"
                 onClick={closeExpand}
-                className="code-copy-btn mermaid-expand-btn"
-                title="Close (Esc)"
+                className="code-copy-btn mermaid-expand-btn mermaid-expand-toolbar__close"
+                data-tooltip="Close (Esc)"
                 aria-label="Close expanded view"
                 autoFocus
               >
-                <Icon name="x" size={14} />
-                <span>Close</span>
+                <Icon name="x" size={16} />
               </button>
             </div>
             <div className="mermaid-expand-canvas" ref={expandCanvasRef}>
-              <div
-                className="mermaid-expand-stage"
-                style={{
-                  transform: `scale(${expandZoom})`,
-                  transformOrigin: 'top left',
-                }}
-                dangerouslySetInnerHTML={{ __html: svgContent }}
-              />
+              {showCode ? (
+                <pre className="mermaid-expand-code-view">
+                  <code>{node.textContent}</code>
+                </pre>
+              ) : (
+                <div
+                  className="mermaid-expand-stage"
+                  style={{
+                    transform: `scale(${expandZoom})`,
+                    transformOrigin: 'top left',
+                  }}
+                  dangerouslySetInnerHTML={{ __html: svgContent }}
+                />
+              )}
             </div>
-            <div className="mermaid-expand-hint" aria-hidden="true">
-              Cmd/Ctrl + Scroll to zoom · Scroll to pan · Esc to close
-            </div>
-          </div>
+            {!showCode && (
+              <div className="mermaid-expand-hint" aria-hidden="true">
+                Cmd/Ctrl + Scroll to zoom · Scroll to pan · Esc to close
+              </div>
+            )}
+          </div>,
+          document.body
         )}
       </NodeViewWrapper>
     )
@@ -476,20 +546,10 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
         onClick={handleCopy}
         onMouseDown={(e) => e.preventDefault()}
         className={`code-copy-btn ${copied ? 'copied' : ''}`}
-        title={copied ? 'Copied!' : 'Copy code'}
+        data-tooltip={copied ? 'Copied!' : 'Copy code'}
         aria-label={copied ? 'Copied!' : 'Copy code'}
       >
-        {copied ? (
-          <>
-            <Icon name="check" size={14} />
-            <span>Copied!</span>
-          </>
-        ) : (
-          <>
-            <Icon name="copy" size={14} />
-            <span>Copy</span>
-          </>
-        )}
+        <Icon name={copied ? 'check' : 'copy'} size={16} />
       </button>
       <NodeViewContent as="code" />
     </NodeViewWrapper>
