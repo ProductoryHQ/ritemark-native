@@ -471,6 +471,18 @@ index f5e812e2890..35621379bbd 100644
  	return getTargetStringFromTsConfig(tsconfigPath);
  }
 -
+diff --git a/build/next/index.ts b/build/next/index.ts
+index 1993dbf6d6f..782c0b0db67 100644
+--- a/build/next/index.ts
++++ b/build/next/index.ts
+@@ -863,6 +863,7 @@ ${tslib}`,
+ 			banner,
+ 			loader: {
+ 				'.ttf': 'file',
++				'.woff2': 'file',
+ 				'.svg': 'file',
+ 				'.png': 'file',
+ 				'.sh': 'file',
 diff --git a/src/vs/base/browser/ui/codicons/codicon/codicon.css b/src/vs/base/browser/ui/codicons/codicon/codicon.css
 index d7f257db934..6079140d7c8 100644
 --- a/src/vs/base/browser/ui/codicons/codicon/codicon.css
