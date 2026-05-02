@@ -1,4 +1,4 @@
-# Starter Pack — Sprint 56
+# Starter Pack — Sprint 58
 
 Phase 1 deliverable. Defines what ships pre-installed under `~/.claude/` on first run, where those files live in the Ritemark repo, the licensing/vendoring strategy, and how upstream updates are tracked.
 
@@ -180,4 +180,4 @@ The actual prompt text of each starter is **not** specified in this doc. That's 
 - A "restore default starters" command.
 - Localization of starter content.
 
-All of the above are reasonable future work but not for Sprint 56.
+All of the above are reasonable future work but not for Sprint 58.

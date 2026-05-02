@@ -1,6 +1,6 @@
 # Starter Pack
 
-This directory ships pre-installed helpers that get seeded into `~/.claude/` on first run when the user has no existing skills or agents. Behavior is specified in [`docs/development/sprints/sprint-56-agent-authoring-loop/starter-pack.md`](../../../docs/development/sprints/sprint-56-agent-authoring-loop/starter-pack.md).
+This directory ships pre-installed helpers that get seeded into `~/.claude/` on first run when the user has no existing skills or agents. Behavior is specified in [`docs/development/sprints/sprint-58-agent-authoring-loop/starter-pack.md`](../../../docs/development/sprints/sprint-58-agent-authoring-loop/starter-pack.md).
 
 ## What ships
 
