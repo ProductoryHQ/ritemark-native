@@ -1,4 +1,4 @@
-# Creation Spec — Sprint 56
+# Creation Spec — Sprint 58
 
 Phase 1 deliverable. Defines the new authoring affordances landing in the Agent Library and the editor: per-section `+`, empty-state buttons, new-file flow, frontmatter skeleton, row context menu, and file watcher.
 

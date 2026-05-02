@@ -1,4 +1,4 @@
-# Sprint 56: Agent Authoring Loop
+# Sprint 58: Agent Authoring Loop
 
 ## Goal
 
@@ -27,7 +27,7 @@ The deliberate scope cut for this sprint: ship only the obvious fixes and obviou
 This is **the first authoring sprint** in the Agent Curation series:
 
 - Sprint 54 — surfacing + inline editing (shipped 1.6.0)
-- **Sprint 56 — authoring loop** ← this sprint
+- **Sprint 58 — authoring loop** ← this sprint
 - Sprint 57+ — capture, coach, templates, builder (separate sprints, separate decisions)
 
 It is **not**:
@@ -138,7 +138,7 @@ These were the open product decisions for this sprint. All four are now settled 
 | `extensions/ritemark/src/agent/discovery.ts` | Discovery; gains file-watcher integration. |
 | `extensions/ritemark/webview/src/components/properties/AddPropertyMenu.tsx` | Existing primitive likely reused for skeleton injection. |
 | *(new)* `extensions/ritemark/starter-pack/` | Seeded on first run. |
-| *(new)* `docs/development/sprints/sprint-56-agent-authoring-loop/{creation-spec,starter-pack}.md` | Phase 1 deliverables. |
+| *(new)* `docs/development/sprints/sprint-58-agent-authoring-loop/{creation-spec,starter-pack}.md` | Phase 1 deliverables. |
 
 ## Status
 
