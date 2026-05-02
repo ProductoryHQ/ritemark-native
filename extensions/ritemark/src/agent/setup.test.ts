@@ -5,7 +5,7 @@
 import assert from 'assert';
 import { __testOnly } from './setup';
 
-const { deriveClaudeSetupStatus, recommendedEnvironmentAction } = __testOnly;
+const { deriveClaudeSetupStatus, recommendedEnvironmentAction, parseClaudeAuthStatusJson } = __testOnly;
 
 {
   const status = deriveClaudeSetupStatus({
@@ -126,6 +126,22 @@ const { deriveClaudeSetupStatus, recommendedEnvironmentAction } = __testOnly;
 
   assert.strictEqual(status.state, 'ready');
   assert.strictEqual(status.authMethod, 'api-key');
+}
+
+{
+  assert.strictEqual(
+    parseClaudeAuthStatusJson('{"loggedIn":false,"authMethod":"none","apiProvider":"firstParty"}'),
+    null
+  );
+  assert.strictEqual(
+    parseClaudeAuthStatusJson('{"loggedIn":true,"authMethod":"oauth","apiProvider":"firstParty"}'),
+    'claude-oauth'
+  );
+  assert.strictEqual(
+    parseClaudeAuthStatusJson('{"loggedIn":true,"authMethod":"apiKey","apiProvider":"firstParty"}'),
+    'api-key'
+  );
+  assert.strictEqual(parseClaudeAuthStatusJson('not json'), undefined);
 }
 
 {

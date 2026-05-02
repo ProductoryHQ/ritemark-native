@@ -1,0 +1,35 @@
+{
+  "_comment": "v1.6.0 entry block for update-feed.json. release-manager runs scripts/generate-update-feed.mjs which (a) computes size + sha256 from the actual DMG files and (b) merges this with the existing feed pulled from GitHub Releases. This file documents the expected shape and the SHAs we have today; the script is the source of truth at publish time.",
+
+  "version": "1.6.0",
+  "tagName": "v1.6.0",
+  "releaseDate": "2026-04-28T00:00:00.000Z",
+  "notesSummary": "Agent Library — your .claude/ agents and skills get a first-class activity-bar entry. Plus design refresh, inline Table of Contents, dark mode, and CSV→Excel encoding fix on Mac.",
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "assetName": "Ritemark-arm64.dmg",
+      "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.0/Ritemark-arm64.dmg",
+      "_sourceFile": "dist/Ritemark-1.6.0-darwin-arm64.dmg",
+      "_sizeNote": "~262 MB — release-manager will compute exact bytes",
+      "sha256": "c225ded19e49fe7124fd784e47d839bc765681095b9d363f4817211d0625262a"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x64",
+      "assetName": "Ritemark-x64.dmg",
+      "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.0/Ritemark-x64.dmg",
+      "_sourceFile": "dist/Ritemark-1.6.0-darwin-x64.dmg",
+      "_sizeNote": "~240 MB — release-manager will compute exact bytes",
+      "sha256": "c45b21144c042430f99d579ffbf65fa15e1e789a1d6b23690fa397ae20f0d58f"
+    },
+    {
+      "_pendingPlatform": true,
+      "platform": "win32",
+      "arch": "x64",
+      "assetName": "Ritemark-1.6.0-win32-x64-setup.exe",
+      "_note": "Windows installer not yet built. Add this entry after Jarmo completes the Windows build on his Windows machine. SHA256 will come from the build output."
+    }
+  ]
+}
