@@ -12,6 +12,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
 import { findBundledAgentRuntime, isBundledAgentRuntimePath } from '../utils/bundledAgentRuntime';
+import { onClaudeStatusInvalidated } from './claudeStatusEvents';
 import type {
   AgentEnvironmentStatus,
   ClaudeAuthMethod,
@@ -26,6 +27,10 @@ let hasAnthropicKeyInSecrets = false;
 let claudeLoginInProgress = false;
 let claudePendingReload = false;
 let claudePendingReloadDiagnostics: string[] = [];
+
+onClaudeStatusInvalidated(() => {
+  cachedStatus = null;
+});
 
 type SupportedPlatform = 'darwin' | 'win32';
 
@@ -346,11 +351,7 @@ function checkClaudeAuthStatus(binaryPath: string): ClaudeAuthMethod | undefined
       return stderrParsed;
     }
   } catch {
-    // Fall back to platform credential heuristics below.
-  }
-
-  if (process.env.ANTHROPIC_API_KEY || hasAnthropicKeyInSecrets) {
-    return 'api-key';
+    // CLI unreachable — caller decides on fallbacks.
   }
 
   return undefined;
@@ -360,10 +361,7 @@ function detectClaudeAuthMethod(
   platform: NodeJS.Platform = getCurrentPlatform(),
   binaryPath?: string
 ): ClaudeAuthMethod {
-  if (process.env.ANTHROPIC_API_KEY || hasAnthropicKeyInSecrets) {
-    return 'api-key';
-  }
-
+  // 1. Primary source of truth: ask the CLI directly. Returns null after `claude logout`.
   if (binaryPath) {
     const cliStatus = checkClaudeAuthStatus(binaryPath);
     if (cliStatus !== undefined) {
@@ -371,12 +369,24 @@ function detectClaudeAuthMethod(
     }
   }
 
+  // 2. Explicit user-set secret (entered via Settings UI).
+  if (hasAnthropicKeyInSecrets) {
+    return 'api-key';
+  }
+
+  // 3. Platform credential stores.
   if (platform === 'darwin' && checkKeychainAuth()) {
     return 'claude-oauth';
   }
 
   if (platform === 'win32' && checkWindowsAuth()) {
     return 'claude-oauth';
+  }
+
+  // 4. Last resort: ANTHROPIC_API_KEY env var. Weakest signal — could be set by any
+  //    parent shell or process and does not imply token validity.
+  if (process.env.ANTHROPIC_API_KEY) {
+    return 'api-key';
   }
 
   return null;

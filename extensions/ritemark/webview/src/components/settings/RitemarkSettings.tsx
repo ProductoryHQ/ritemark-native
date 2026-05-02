@@ -218,7 +218,7 @@ export function RitemarkSettings() {
   };
 
   const handleClaudeAction = (
-    type: 'claude:install' | 'claude:repair' | 'claude:login' | 'claude:logout' | 'claude:reload' | 'claude:refreshStatus'
+    type: 'claude:install' | 'claude:repair' | 'claude:login' | 'claude:logout' | 'claude:reload' | 'claude:refreshStatus' | 'claude:cancelLogin' | 'claude:enterApiKey'
   ) => {
     vscode.postMessage({ type });
   };
@@ -354,21 +354,42 @@ export function RitemarkSettings() {
           ) : settings.componentStatus.claudeCode.state === 'needs-auth' ? (
             <>
               <p className="text-xs text-ink-muted mb-3">
-                Sign in with Claude.ai to use Claude without an API key, or use your Anthropic API key instead.
+                Sign in to start using Claude. Choose Claude.ai for the simplest setup, or paste an Anthropic API key if you prefer.
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => handleClaudeAction('claude:login')}
-                  className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                 >
                   Sign in with Claude.ai
                 </button>
+                <button
+                  onClick={() => handleClaudeAction('claude:enterApiKey')}
+                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                >
+                  Use Anthropic API key
+                </button>
               </div>
+              <p className="text-xs text-ink-faint mt-3">
+                Don&apos;t have an API key? Get one at{' '}
+                <a href="https://console.anthropic.com/" className="text-accent-deep hover:underline">
+                  console.anthropic.com
+                </a>
+                .
+              </p>
             </>
           ) : settings.componentStatus.claudeCode.state === 'auth-in-progress' ? (
-            <p className="text-xs text-ink-muted mb-3">
-              Finish Claude.ai sign-in in your terminal and browser. Ritemark will refresh automatically when sign-in completes.
-            </p>
+            <>
+              <p className="text-xs text-ink-muted mb-3">
+                Sign-in opened in your browser. Authorize to finish — Ritemark will refresh automatically.
+              </p>
+              <button
+                onClick={() => handleClaudeAction('claude:cancelLogin')}
+                className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+              >
+                Cancel sign-in
+              </button>
+            </>
           ) : (
             <>
               <div className="space-y-2 mb-3 text-xs">
@@ -397,7 +418,7 @@ export function RitemarkSettings() {
                 {settings.componentStatus.claudeCode.authMethod === 'claude-oauth' && (
                   <button
                     onClick={() => handleClaudeAction('claude:logout')}
-                    className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                   >
                     Sign Out
                   </button>
@@ -405,14 +426,14 @@ export function RitemarkSettings() {
                 {settings.componentStatus.claudeCode.authMethod === 'api-key' && (
                   <button
                     onClick={() => handleClaudeAction('claude:login')}
-                    className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                   >
                     Switch to Claude.ai sign-in
                   </button>
                 )}
                 <button
                   onClick={() => handleClaudeAction('claude:refreshStatus')}
-                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                 >
                   Refresh Status
                 </button>
@@ -513,19 +534,19 @@ export function RitemarkSettings() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     onClick={() => vscode.postMessage({ type: 'codex:repair' })}
-                    className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                   >
                     Repair Codex
                   </button>
                   <button
                     onClick={() => vscode.postMessage({ type: 'updates:reload' })}
-                    className="px-4 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                   >
                     Reload Window
                   </button>
                   <button
                     onClick={() => vscode.postMessage({ type: 'codex:refreshStatus' })}
-                    className="px-4 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                   >
                     Refresh Status
                   </button>
@@ -540,24 +561,38 @@ export function RitemarkSettings() {
                   Sign in with your ChatGPT account to use Codex agents without an API key.
                   Requires ChatGPT Plus ($20/mo) or Pro ($200/mo) subscription.
                 </p>
-                <button
-                  onClick={() => {
-                    setCodexLoading(true);
-                    vscode.postMessage({ type: 'codex:startLogin' });
-                    setTimeout(() => setCodexLoading(false), 60_000);
-                  }}
-                  disabled={codexLoading}
-                  className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md disabled:opacity-50 flex items-center gap-2"
-                >
+                <div className="flex flex-wrap gap-2">
                   {codexLoading ? (
                     <>
-                      <Icon name="circle-notch" size={16} className="animate-spin" />
-                      Opening browser...
+                      <button
+                        disabled
+                        className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent opacity-70 flex items-center gap-2 cursor-default"
+                      >
+                        <Icon name="circle-notch" size={16} className="animate-spin" />
+                        Opening browser...
+                      </button>
+                      <button
+                        onClick={() => {
+                          setCodexLoading(false);
+                          vscode.postMessage({ type: 'codex:cancelLogin' });
+                        }}
+                        className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                      >
+                        Cancel sign-in
+                      </button>
                     </>
                   ) : (
-                    'Sign in with ChatGPT'
+                    <button
+                      onClick={() => {
+                        setCodexLoading(true);
+                        vscode.postMessage({ type: 'codex:startLogin' });
+                      }}
+                      className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    >
+                      Sign in with ChatGPT
+                    </button>
                   )}
-                </button>
+                </div>
                 {codexAuth.error && (
                   <div className="text-xs p-2 mt-2 rounded bg-ritemark-error-soft text-ritemark-error">
                     <span className="flex items-center gap-1">
@@ -592,7 +627,7 @@ export function RitemarkSettings() {
                 </div>
                 <button
                   onClick={() => vscode.postMessage({ type: 'codex:logout' })}
-                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                 >
                   Sign Out
                 </button>
@@ -1137,20 +1172,20 @@ export function RitemarkSettings() {
                 </button>
                 <button
                   onClick={() => handleUpdateAction('updates:skipVersion')}
-                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                 >
                   Skip This Version
                 </button>
                 <button
                   onClick={() => handleUpdateAction('updates:pause')}
-                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                 >
                   Pause 7 Days
                 </button>
                 {(settings.updateCenter.skippedVersion || settings.updateCenter.snoozeUntil) && (
                   <button
                     onClick={() => handleUpdateAction('updates:resume')}
-                    className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
+                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                   >
                     Re-enable Notifications
                   </button>
