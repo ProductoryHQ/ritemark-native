@@ -11,6 +11,8 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
+import { findBundledAgentRuntime, isBundledAgentRuntimePath } from '../utils/bundledAgentRuntime';
+import { onClaudeStatusInvalidated } from './claudeStatusEvents';
 import type {
   AgentEnvironmentStatus,
   ClaudeAuthMethod,
@@ -26,12 +28,17 @@ let claudeLoginInProgress = false;
 let claudePendingReload = false;
 let claudePendingReloadDiagnostics: string[] = [];
 
+onClaudeStatusInvalidated(() => {
+  cachedStatus = null;
+});
+
 type SupportedPlatform = 'darwin' | 'win32';
 
 interface ClaudeBinaryInspection {
   installed: boolean;
   runnable: boolean;
   path?: string;
+  authCheckPath?: string;
   version?: string;
   error?: string;
   diagnostics: string[];
@@ -43,6 +50,11 @@ interface ClaudeStatusInput {
   loginInProgress: boolean;
   pendingReload: boolean;
   pendingReloadDiagnostics: string[];
+}
+
+interface ClaudeAuthStatusJson {
+  loggedIn?: boolean;
+  authMethod?: string;
 }
 
 function isSupportedPlatform(platform: NodeJS.Platform): platform is SupportedPlatform {
@@ -135,6 +147,11 @@ function uniquePaths(paths: Array<string | null | undefined>): string[] {
 function getCandidateClaudePaths(platform: SupportedPlatform): string[] {
   const home = homedir();
   const candidates: string[] = [];
+  const bundledRuntime = findBundledAgentRuntime('claude', { platform });
+
+  if (bundledRuntime) {
+    candidates.push(bundledRuntime.path);
+  }
 
   const lookup = spawnSync(platform === 'win32' ? 'where' : 'which', ['claude'], {
     timeout: 3000,
@@ -228,9 +245,10 @@ function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): 
         installed: true,
         runnable: true,
         path: sdkPath,
+        authCheckPath: candidate,
         version,
-        diagnostics: candidatePaths[0] !== candidate || sdkPath !== candidate
-          ? [...diagnostics, `Using detected Claude path: ${sdkPath}`]
+        diagnostics: candidatePaths[0] !== candidate || sdkPath !== candidate || isBundledAgentRuntimePath(candidate)
+          ? [...diagnostics, `${isBundledAgentRuntimePath(candidate) ? 'Using bundled Claude runtime' : 'Using detected Claude path'}: ${sdkPath}`]
           : diagnostics,
       };
     }
@@ -303,7 +321,60 @@ function checkWindowsAuth(): boolean {
   }
 }
 
-function detectClaudeAuthMethod(platform: NodeJS.Platform = getCurrentPlatform()): ClaudeAuthMethod {
+function parseClaudeAuthStatusJson(output: string): ClaudeAuthMethod | undefined {
+  try {
+    const status = JSON.parse(output) as ClaudeAuthStatusJson;
+    if (status.loggedIn === false) {
+      return null;
+    }
+    if (status.loggedIn === true) {
+      return status.authMethod?.toLowerCase().includes('api')
+        ? 'api-key'
+        : 'claude-oauth';
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function checkClaudeAuthStatus(binaryPath: string): ClaudeAuthMethod | undefined {
+  try {
+    const result = runBinary(binaryPath, ['auth', 'status', '--json'], 5000);
+    const parsed = parseClaudeAuthStatusJson(result.stdout ?? '');
+    if (parsed !== undefined) {
+      return parsed;
+    }
+    const stderrParsed = parseClaudeAuthStatusJson(result.stderr ?? '');
+    if (stderrParsed !== undefined) {
+      return stderrParsed;
+    }
+  } catch {
+    // CLI unreachable — caller decides on fallbacks.
+  }
+
+  return undefined;
+}
+
+function detectClaudeAuthMethod(
+  platform: NodeJS.Platform = getCurrentPlatform(),
+  binaryPath?: string
+): ClaudeAuthMethod {
+  // 1. Primary source of truth: ask the CLI directly. Returns null after `claude logout`.
+  if (binaryPath) {
+    const cliStatus = checkClaudeAuthStatus(binaryPath);
+    if (cliStatus !== undefined) {
+      return cliStatus;
+    }
+  }
+
+  // 2. Explicit user-set secret (entered via Settings UI).
+  if (hasAnthropicKeyInSecrets) {
+    return 'api-key';
+  }
+
+  // 3. Platform credential stores.
   if (platform === 'darwin' && checkKeychainAuth()) {
     return 'claude-oauth';
   }
@@ -312,7 +383,9 @@ function detectClaudeAuthMethod(platform: NodeJS.Platform = getCurrentPlatform()
     return 'claude-oauth';
   }
 
-  if (process.env.ANTHROPIC_API_KEY || hasAnthropicKeyInSecrets) {
+  // 4. Last resort: ANTHROPIC_API_KEY env var. Weakest signal — could be set by any
+  //    parent shell or process and does not imply token validity.
+  if (process.env.ANTHROPIC_API_KEY) {
     return 'api-key';
   }
 
@@ -409,7 +482,7 @@ export async function getSetupStatus(options?: { refresh?: boolean }): Promise<S
     clearClaudePendingReload();
   }
 
-  const authMethod = binary.runnable ? detectClaudeAuthMethod() : null;
+  const authMethod = binary.runnable ? detectClaudeAuthMethod(getCurrentPlatform(), binary.authCheckPath ?? binary.path) : null;
   const status = deriveClaudeSetupStatus({
     binary,
     authMethod,
@@ -524,4 +597,5 @@ export async function getOnboardingStatus(options?: {
 export const __testOnly = {
   deriveClaudeSetupStatus,
   recommendedEnvironmentAction,
+  parseClaudeAuthStatusJson,
 };

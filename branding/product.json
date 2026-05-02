@@ -50,6 +50,7 @@
     "workbench.preferredDarkColorTheme": "ritemark-dark",
     "window.autoDetectColorScheme": true,
     "workbench.layoutControl.enabled": true,
-    "workbench.layoutControl.type": "toggles"
+    "workbench.layoutControl.type": "toggles",
+    "security.workspace.trust.enabled": false
   }
 }
