@@ -19,10 +19,10 @@ jobs:
         with:
           path: r
 
-      - name: Clone VS Code OSS (1.109.5)
+      - name: Clone VS Code OSS (1.117.0)
         run: |
-          git clone --depth 1 --branch 1.109.5 https://github.com/microsoft/vscode.git r/vscode
-          echo "VS Code 1.109.5 cloned"
+          git clone --depth 1 --branch 1.117.0 https://github.com/microsoft/vscode.git r/vscode
+          echo "VS Code 1.117.0 cloned"
 
       # =========================================================================
       # Step 2: Setup toolchain

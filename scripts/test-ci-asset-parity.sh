@@ -14,7 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VSCODE_TAG="1.109.5"
+VSCODE_TAG="1.117.0"
 VANILLA_CACHE="/tmp/vscode-vanilla-$VSCODE_TAG"
 TMP_ROOT="$(mktemp -d /tmp/ritemark-ci-assets.XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT

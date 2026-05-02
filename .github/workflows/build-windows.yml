@@ -7,7 +7,7 @@ on:
       - 'v*'
 
 env:
-  VSCODE_VERSION: '1.109.5'
+  VSCODE_VERSION: '1.117.0'
   NODE_VERSION: '22.22.0'
 
 jobs:

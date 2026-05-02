@@ -35,7 +35,7 @@ $BuildOut  = Join-Path $RootDir "VSCode-win32-x64"
 $BrandDir  = Join-Path $RootDir "branding"
 $WelcomeDest = Join-Path $BuildOut "resources\app\out\vs\workbench\contrib\welcomeGettingStarted\browser\media"
 
-$VSCodeVersion = "1.109.5"
+$VSCodeVersion = "1.117.0"
 $ElectronTarget = "30.5.1"
 
 function Write-Step($n, $msg) {
