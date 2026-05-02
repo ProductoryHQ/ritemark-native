@@ -1,17 +1,20 @@
-# Ritemark v1.6.1 — Under the Hood
+# Ritemark v1.6.1 — Foundation + Polish
 
-VS Code engine upgrade (1.109.5 -> 1.117.0) and bug fixes. No new features — just a better foundation.
+VS Code engine upgrade (1.109.5 → 1.117.0), nicer Mermaid diagrams, friendlier Claude/Codex onboarding, and a stack of bug fixes.
 
 ## Highlights
 
 - **VS Code 1.117.0** — 8 upstream releases rolled up. All 6 Ritemark patches rebased and validated.
-- **Text selection fix** — selection background in code blocks and table cells now clearly visible.
-- **AI file-write reliability** — Flow file writes route through `vscode.workspace.fs`; explorer auto-refreshes after agent writes.
-- **Explorer refresh button** — manual refresh in the explorer toolbar for cases where auto-refresh misses.
+- **Mermaid diagrams** — full-width rendering, reduced margins, horizontal scroll for oversized diagrams. New toolbar: Copy image, Download (OS Save As), and Expand with cursor-anchored Cmd/Ctrl+Scroll zoom.
+- **Claude / Codex onboarding** — bundled agent runtime, truthful auth state, terminal-free sign-in via system browser, "Use Anthropic API key" alternative path. Workspace trust prompt removed.
+- **Theme fix** — gitignored Explorer entries (e.g. `docs-internal/`, `node_modules/`) now readable in both light and dark themes.
+- **Editor fixes** — text selection visible in code blocks and table cells, AI Flow file writes route through `vscode.workspace.fs`, explorer auto-refresh after agent writes plus a manual refresh button.
 
 ## Sprints rolled up
 
-- Sprint 55 — VS Code 1.109.5 -> 1.117.0 upgrade + bug bundle
+- Sprint 55 — VS Code 1.109.5 → 1.117.0 upgrade + bug bundle
+- Sprint 56 — Mermaid diagram fixes
+- Sprint 57 — Windows onboarding (bundled agent runtime + truthful Claude auth)
 
 ## Downloads
 
@@ -26,6 +29,7 @@ VS Code engine upgrade (1.109.5 -> 1.117.0) and bug fixes. No new features — j
 ```
 TBD  Ritemark-arm64.dmg
 TBD  Ritemark-x64.dmg
+TBD  Ritemark-1.6.1-win32-x64-setup.exe
 ```
 
 ## Notarization
@@ -35,7 +39,7 @@ Both macOS DMGs are signed with a Developer ID certificate and notarized + stapl
 ## Technical
 
 - Base: VS Code OSS 1.117.0 (up from 1.109.5)
-- No new extension-host runtime dependencies
+- No breaking changes; no new extension-host runtime dependencies
 
 ## Full release notes
 
