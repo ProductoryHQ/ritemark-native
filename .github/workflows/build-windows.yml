@@ -100,23 +100,32 @@ jobs:
         run: |
           rm -f src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css 2>/dev/null || true
 
-      - name: Remove unwanted built-in extension (VS Code 1.117+)
-        # VS Code 1.117 ships GitHub Copilot Chat (extensions/copilot) as a
-        # first-party built-in extension. Ritemark does not ship it. Removing
-        # the source dir here also avoids a Windows-only build break:
-        # copilot's nested claude-agent-sdk pulls macOS-arm64 native binaries
-        # (vendor/audio-capture/arm64-darwin/audio-capture.node) that
-        # rcedit.exe cannot ingest during the win32-x64 packaging step.
-        #
-        # Note: mermaid-chat-features (also a 1.117 chat helper) is kept
-        # because gulp's hardcoded esbuild list calls its esbuild.webview.mts
-        # unconditionally. We instead drop it post-build with the same logic
-        # macOS build-prod.sh uses for both extensions.
+      - name: Strip non-Windows binaries from built-in copilot extension
+        # VS Code 1.117 ships GitHub Copilot Chat (extensions/copilot). Its
+        # nested claude-agent-sdk vendors macOS/Linux native binaries that
+        # rcedit.exe cannot ingest during the win32-x64 packaging step
+        # (audio-capture.node was the specific blocker on the prior run).
+        # We can't drop the whole copilot extension because gulp's
+        # prepareBuiltInCopilotExtensionShims hard-requires it. So we keep
+        # the extension dir but drop every non-Windows binary tree under
+        # the nested SDK's vendor/ folder.
         shell: bash
         working-directory: r/vscode
         run: |
-          rm -rf extensions/copilot
-          echo "Removed: copilot"
+          SDK_VENDOR="extensions/copilot/node_modules/@anthropic-ai/claude-agent-sdk/vendor"
+          if [ -d "$SDK_VENDOR" ]; then
+            for sub in audio-capture ripgrep; do
+              if [ -d "$SDK_VENDOR/$sub" ]; then
+                rm -rf "$SDK_VENDOR/$sub/arm64-darwin"
+                rm -rf "$SDK_VENDOR/$sub/x64-darwin"
+                rm -rf "$SDK_VENDOR/$sub/arm64-linux"
+                rm -rf "$SDK_VENDOR/$sub/x64-linux"
+                echo "Cleaned $sub: kept only $(ls $SDK_VENDOR/$sub/ 2>/dev/null || echo 'none')"
+              fi
+            done
+          else
+            echo "Copilot SDK vendor dir not present, skipping."
+          fi
 
       - name: Apply patches
         shell: bash
