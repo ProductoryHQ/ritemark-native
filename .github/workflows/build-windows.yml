@@ -187,6 +187,34 @@ jobs:
           ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
 
+      - name: Strip bundled copilot extension from output
+        # VS Code 1.117 bundles GitHub Copilot Chat as a built-in extension.
+        # gulp requires it during build, but the final Ritemark app doesn't
+        # need it. It adds ~254MB and registers a "Chat Debug" activity bar
+        # icon that conflicts with Ritemark's clean UI.
+        shell: bash
+        working-directory: r
+        run: |
+          COPILOT_EXT="VSCode-win32-x64/resources/app/extensions/copilot"
+          if [ -d "$COPILOT_EXT" ]; then
+            rm -rf "$COPILOT_EXT"
+            echo "Removed bundled copilot extension"
+          fi
+
+      - name: Hide chat activity bar icon via CSS
+        # Belt-and-suspenders: even with the copilot extension removed,
+        # VS Code core registers a "Chat" view container in the activity bar.
+        # Patch 003 disables it in source, but if the patch doesn't apply
+        # cleanly the container leaks through. This CSS rule hides it.
+        shell: bash
+        working-directory: r
+        run: |
+          CSS_FILE="VSCode-win32-x64/resources/app/out/vs/workbench/workbench.desktop.main.css"
+          if [ -f "$CSS_FILE" ]; then
+            printf '\n/* Ritemark: hide VS Code chat view container from activity bar */\n.activitybar .action-item a[class*="workbench-panel-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="workbench-panel-chat"]) { display: none !important; }\n' >> "$CSS_FILE"
+            echo "Chat activity bar CSS hide rule appended"
+          fi
+
       - name: Validate build
         shell: bash
         working-directory: r
