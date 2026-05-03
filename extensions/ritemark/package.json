@@ -9,6 +9,13 @@
     "vscode": "^1.94.0"
   },
   "main": "./out/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "Ritemark renders markdown content via TipTap and does not execute code from the workspace."
+    },
+    "virtualWorkspaces": true
+  },
   "activationEvents": [
     "*",
     "onStartupFinished",
@@ -404,7 +411,7 @@
             "filenamePattern": "*.csv"
           }
         ],
-        "priority": "exclusive"
+        "priority": "default"
       },
       {
         "viewType": "ritemark.excelViewer",
@@ -417,7 +424,7 @@
             "filenamePattern": "*.xls"
           }
         ],
-        "priority": "exclusive"
+        "priority": "default"
       },
       {
         "viewType": "ritemark.flowEditor",
@@ -437,7 +444,7 @@
             "filenamePattern": "*.pdf"
           }
         ],
-        "priority": "exclusive"
+        "priority": "default"
       },
       {
         "viewType": "ritemark.docxViewer",
@@ -447,7 +454,7 @@
             "filenamePattern": "*.docx"
           }
         ],
-        "priority": "exclusive"
+        "priority": "default"
       }
     ],
     "configurationDefaults": {

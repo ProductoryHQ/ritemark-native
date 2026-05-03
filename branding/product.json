@@ -52,6 +52,16 @@
     "window.autoDetectColorScheme": true,
     "workbench.layoutControl.enabled": true,
     "workbench.layoutControl.type": "toggles",
-    "security.workspace.trust.enabled": false
+    "security.workspace.trust.enabled": false,
+    "workbench.editorAssociations": {
+      "*.md": "ritemark.editor",
+      "*.markdown": "ritemark.editor",
+      "*.csv": "ritemark.editor",
+      "*.xlsx": "ritemark.excelViewer",
+      "*.xls": "ritemark.excelViewer",
+      "*.pdf": "ritemark.pdfViewer",
+      "*.docx": "ritemark.docxViewer",
+      "*.flow.json": "ritemark.flowEditor"
+    }
   }
 }

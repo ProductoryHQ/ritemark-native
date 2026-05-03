@@ -186,12 +186,25 @@ function App() {
           break
 
         case 'fileChanged':
-          // File changed externally - show notification banner
+          // External edit while user has unsaved local changes — surface the
+          // refresh button so they can decide whether to discard their work.
           setFileChangeData({
             filename: (message.filename as string) || '',
             isDirty: (message.isDirty as boolean) || false
           })
           setShowFileChangeNotification(true)
+          break
+
+        case 'externalChange':
+          // External edit, document was clean → silently swap in the new
+          // content (same payload shape as 'load'). Mirrors how collaborative
+          // editors apply remote changes without prompting.
+          setContent(message.content as string)
+          setProperties((message.properties as DocumentProperties) || {})
+          setHasProperties(message.hasProperties as boolean || false)
+          setImageMappings((message.imageMappings as Record<string, string>) || {})
+          // Clear any stale refresh banner from a previous dirty-state event.
+          setShowFileChangeNotification(false)
           break
       }
     })
