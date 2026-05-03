@@ -29,11 +29,29 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
   private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
 
-  // File metadata tracking for conflict detection
+  // File metadata tracking for CSV conflict detection
   private fileLoadTimes = new Map<string, number>();
-  private fileWatchers = new Map<string, vscode.FileSystemWatcher>();
-  private fileChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
-  private pendingSaves = new Set<string>(); // Track our own saves to ignore in file watcher
+
+  // Tracks documents currently being updated by the extension itself (applyEdit calls
+  // from webview-originated changes or our reloadFile path). Used to suppress the
+  // onDidChangeTextDocument echo so we don't loop edits back into the webview.
+  private applyingFromWebview = new Map<string, number>();
+
+  // Slim per-file watcher registered only for onDidDelete — onDidChange/onDidCreate
+  // detection has been replaced by the more reliable onDidChangeTextDocument path.
+  private deleteWatchers = new Map<string, vscode.FileSystemWatcher>();
+
+  // 3-second poll interval per open file. Compares disk mtime to fileLoadTimes;
+  // if newer, calls handleExternalDiskChange. Belt-and-suspenders fallback for
+  // single-file mode and any case where onDidChangeTextDocument / FileSystemWatcher
+  // miss an external write (notably Ritemark's own AI panel subprocess writes —
+  // VS Code 1.117 doesn't reliably auto-revert TextDocument for those).
+  private pollIntervals = new Map<string, NodeJS.Timeout>();
+
+  // 10-second auto-reload timer per open file. Started when a dirty-state external
+  // change surfaces the Refresh banner; cancelled if the user clicks Refresh first.
+  // On fire, force-reloads the editor with disk content (overrides unsaved local edits).
+  private autoReloadTimers = new Map<string, NodeJS.Timeout>();
 
   // Voice dictation controller
   private dictationController: DictationController | null = null;
@@ -234,9 +252,6 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri);
 
-    // Track if we're currently updating to prevent feedback loops
-    let isUpdating = false;
-
     // Track if webview is disposed to prevent accessing disposed webview
     let isDisposed = false;
 
@@ -252,16 +267,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       RitemarkEditorProvider._wordCountStatusBar?.show();
     }
 
-    // Create file watcher for all file types
-    this.createFileWatcher(document, webview);
+    // Slim watcher: only for file deletion (the onDidChangeTextDocument
+    // listener below covers content changes more reliably than onDidChange).
+    this.createDeleteWatcher(document, webview);
 
-    // Listen for saves to ignore our own saves in the file watcher
-    const saveListener = vscode.workspace.onWillSaveTextDocument(e => {
-      if (e.document.uri.fsPath === document.uri.fsPath) {
-        this.pendingSaves.add(document.uri.fsPath);
-      }
-    });
-    webviewPanel.onDidDispose(() => saveListener.dispose());
+    // 3-second polling fallback. Catches external writes that VS Code's
+    // TextDocument auto-revert misses (single-file mode, AI-panel subprocess
+    // writes, etc). Compared against fileLoadTimes mtime baseline.
+    this.startPolling(document, webview);
 
     // Handle messages from the webview
     webview.onDidReceiveMessage(
@@ -289,28 +302,26 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             webview.postMessage(this.buildLoadMessage(document, webview));
             return;
 
-          case 'contentChanged':
-            // Content changed in editor, update document
-            if (!isUpdating) {
-              const fileType = this.getFileType(document.uri.fsPath);
-
-              if (fileType === 'markdown') {
-                // Markdown: serialize with front-matter
-                const fullContent = this.serializeFrontMatter(
-                  message.properties as DocumentProperties | undefined,
-                  message.content as string
-                );
-                this.updateDocument(document, fullContent);
-              } else if (fileType === 'csv') {
-                // CSV: direct content update (no front-matter)
-                this.updateDocument(document, message.content as string);
-              }
+          case 'contentChanged': {
+            // Content changed in editor → push to TextDocument.
+            // The applyEditFromWebview wrapper inside updateDocument suppresses
+            // the resulting onDidChangeTextDocument echo so the webview is not
+            // sent back the same content it just submitted.
+            const fileType = this.getFileType(document.uri.fsPath);
+            if (fileType === 'markdown') {
+              const fullContent = this.serializeFrontMatter(
+                message.properties as DocumentProperties | undefined,
+                message.content as string
+              );
+              this.updateDocument(document, fullContent);
+            } else if (fileType === 'csv') {
+              this.updateDocument(document, message.content as string);
             }
             return;
+          }
 
           case 'propertiesChanged':
-            // Properties changed without content change, update document (markdown only)
-            if (!isUpdating && this.getFileType(document.uri.fsPath) === 'markdown') {
+            if (this.getFileType(document.uri.fsPath) === 'markdown') {
               const currentParsed = this.extractFrontMatter(document.getText());
               const newContent = this.serializeFrontMatter(
                 message.properties as DocumentProperties,
@@ -401,6 +412,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'refresh':
             // Refresh content from disk after external change
+            this.cancelAutoReload(document.uri.fsPath);
             this.handleRefresh(document, webview);
             return;
 
@@ -467,11 +479,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'confirmRefresh':
             // User confirmed refresh, discard local changes
+            this.cancelAutoReload(document.uri.fsPath);
             this.reloadFile(document, webview);
             return;
 
           case 'cancelRefresh':
-            // User cancelled refresh, do nothing
+            // User cancelled refresh — keep local edits, also cancel any pending
+            // auto-reload so we don't surprise them by reverting later.
+            this.cancelAutoReload(document.uri.fsPath);
             return;
 
           case 'openExternal':
@@ -489,24 +504,46 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       this.context.subscriptions
     );
 
-    // Update webview when document changes externally (only for markdown - CSV/Excel are read-only)
+    // External-change detection via VS Code's TextDocument model.
+    // Fires for: agent disk writes (after VS Code auto-revert), manual external edits,
+    // AND our own applyEdit calls — the applyingFromWebview guard distinguishes them.
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
-      if (e.document.uri.toString() === document.uri.toString() && !isUpdating) {
-        // Only reload for markdown files (CSV/Excel are read-only)
-        const fileType = this.getFileType(document.uri.fsPath);
-        if (fileType !== 'markdown') {
-          return;
-        }
+      if (e.document.uri.toString() !== document.uri.toString()) return;
+      if (isDisposed) return;
 
-        isUpdating = true;
-        // Skip if disposed
-        if (isDisposed) {
-          return;
-        }
+      const docKey = document.uri.toString();
+      if ((this.applyingFromWebview.get(docKey) ?? 0) > 0) {
+        // Our own applyEdit echo — skip to avoid sending content back to webview.
+        return;
+      }
 
-        webview.postMessage(this.buildLoadMessage(document, webview));
-        // Reset flag after a short delay
-        setTimeout(() => { isUpdating = false; }, 100);
+      // External change. Only Ritemark-rendered file types need webview sync;
+      // Excel/PDF/DOCX/Flow are read-only or have their own refresh paths.
+      const fileType = this.getFileType(document.uri.fsPath);
+      if (fileType !== 'markdown' && fileType !== 'csv') {
+        return;
+      }
+
+      // Refresh the disk-mtime baseline so the polling fallback and CSV conflict
+      // detection don't double-trigger on the same change we just processed.
+      this.updateFileLoadTime(document.uri.fsPath);
+
+      if (document.isDirty) {
+        // User has unsaved local edits AND disk content changed → surface a
+        // refresh prompt rather than silently overwriting their work. Start a
+        // 10s timer that auto-reloads if they don't react (matches the user's
+        // explicit UX request — agent-driven workflows shouldn't get blocked
+        // on a manual click).
+        webview.postMessage({
+          type: 'fileChanged',
+          filename: path.basename(document.uri.fsPath),
+          isDirty: true
+        });
+        this.scheduleAutoReload(document, webview);
+      } else {
+        // Clean state → push the new content straight into the webview.
+        const loadMessage = this.buildLoadMessage(document, webview);
+        webview.postMessage({ ...loadMessage, type: 'externalChange' });
       }
     });
 
@@ -518,8 +555,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       RitemarkEditorProvider.activeWebviews.delete(webview);
       changeDocumentSubscription.dispose();
 
-      // Dispose file watcher
-      this.disposeFileWatcher(document.uri.fsPath);
+      // Dispose the slim delete-only watcher
+      this.disposeDeleteWatcher(document.uri.fsPath);
+      this.stopPolling(document.uri.fsPath);
+      this.cancelAutoReload(document.uri.fsPath);
+      this.applyingFromWebview.delete(document.uri.toString());
 
       // Hide word count if no more Ritemark editors are open
       if (RitemarkEditorProvider.activeWebviews.size === 0) {
@@ -535,14 +575,41 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       new vscode.Range(0, 0, document.lineCount, 0),
       content
     );
-    vscode.workspace.applyEdit(edit);
+    void this.applyEditFromWebview(document, edit);
+  }
+
+  /**
+   * Apply a WorkspaceEdit while suppressing the onDidChangeTextDocument echo
+   * back to the webview. The flag is cleared on the next macrotask so the
+   * change event (which fires synchronously during applyEdit) sees it set.
+   */
+  private async applyEditFromWebview(
+    document: vscode.TextDocument,
+    edit: vscode.WorkspaceEdit
+  ): Promise<boolean> {
+    const docKey = document.uri.toString();
+    this.applyingFromWebview.set(docKey, (this.applyingFromWebview.get(docKey) ?? 0) + 1);
+    try {
+      return await vscode.workspace.applyEdit(edit);
+    } finally {
+      // Defer the decrement so any synchronously-queued change event still
+      // observes a non-zero counter and skips itself.
+      setImmediate(() => {
+        const current = this.applyingFromWebview.get(docKey) ?? 0;
+        if (current <= 1) {
+          this.applyingFromWebview.delete(docKey);
+        } else {
+          this.applyingFromWebview.set(docKey, current - 1);
+        }
+      });
+    }
   }
 
   private async initializeUntitledCsv(document: vscode.TextDocument): Promise<void> {
     const edit = new vscode.WorkspaceEdit();
     const lastLine = document.lineAt(Math.max(0, document.lineCount - 1));
     edit.replace(document.uri, new vscode.Range(new vscode.Position(0, 0), lastLine.range.end), buildCsvTemplate());
-    await vscode.workspace.applyEdit(edit);
+    await this.applyEditFromWebview(document, edit);
   }
 
   /**
@@ -863,14 +930,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       const filePath = document.uri.fsPath;
       const fileContent = fs.readFileSync(filePath, 'utf8');
 
-      // Update the document
+      // Update the document (suppress the change-event echo back to the webview)
       const edit = new vscode.WorkspaceEdit();
       edit.replace(
         document.uri,
         new vscode.Range(0, 0, document.lineCount, 0),
         fileContent
       );
-      await vscode.workspace.applyEdit(edit);
+      await this.applyEditFromWebview(document, edit);
 
       // Update load time
       this.updateFileLoadTime(filePath);
@@ -888,30 +955,36 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
-   * Create file watcher to detect external changes
+   * Slim watcher: only listens for file deletion. Content-change detection
+   * lives in the onDidChangeTextDocument listener (driven by VS Code's
+   * authoritative TextDocument auto-revert) — it's strictly more reliable
+   * than racing the FileSystemWatcher against VS Code's own disk sync.
    */
-  private createFileWatcher(
+  private createDeleteWatcher(
     document: vscode.TextDocument,
     webview: vscode.Webview
   ): void {
     const filePath = document.uri.fsPath;
 
-    // Don't create duplicate watchers
-    if (this.fileWatchers.has(filePath)) {
+    if (this.deleteWatchers.has(filePath)) {
       return;
     }
 
-    // Create watcher for this specific file
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(path.dirname(filePath), path.basename(filePath))
     );
 
-    // Listen for file changes
+    // Authoritative external-change source. VS Code's onDidChangeTextDocument
+    // does NOT fire reliably in single-file mode (no folder workspace) when
+    // an outside process — Claude CLI from the AI panel, an agent, a linter,
+    // anything that calls fs.writeFile — modifies the open file. The auto-revert
+    // path that fires onDidChangeTextDocument is gated by workspace folder watching.
+    // FileSystemWatcher fires either way, so we treat it as the source of truth
+    // and read the disk directly.
     watcher.onDidChange(() => {
-      this.handleFileChange(document, webview);
+      this.handleExternalDiskChange(document, webview);
     });
 
-    // Listen for file deletion
     watcher.onDidDelete(() => {
       webview.postMessage({
         type: 'fileDeleted',
@@ -919,68 +992,155 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       });
     });
 
-    this.fileWatchers.set(filePath, watcher);
+    this.deleteWatchers.set(filePath, watcher);
   }
 
   /**
-   * Handle file change event (debounced)
+   * Read the file from disk and push the new content to the webview as an
+   * externalChange (clean state) or surface the refresh banner (dirty state).
+   * Called from the FileSystemWatcher because that fires regardless of whether
+   * VS Code's TextDocument model is in sync with disk.
    */
-  private handleFileChange(
+  private handleExternalDiskChange(
     document: vscode.TextDocument,
     webview: vscode.Webview
   ): void {
     const filePath = document.uri.fsPath;
-
-    // Clear existing debounce timer
-    const existingTimer = this.fileChangeDebounceTimers.get(filePath);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
+    const fileType = this.getFileType(filePath);
+    if (fileType !== 'markdown' && fileType !== 'csv') {
+      return;
     }
 
-    // Debounce changes (500ms) to avoid spam
-    const timer = setTimeout(() => {
-      // Ignore our own saves - check and clear the flag
-      if (this.pendingSaves.has(filePath)) {
-        this.pendingSaves.delete(filePath);
-        this.fileChangeDebounceTimers.delete(filePath);
-        return;
-      }
+    // Suppress the echo from our own webview-originated saves. autoSave fires
+    // onWillSave + writes to disk after applyEdit; the watcher then fires for
+    // that write. If our flag is still raised, ignore it.
+    const docKey = document.uri.toString();
+    if ((this.applyingFromWebview.get(docKey) ?? 0) > 0) {
+      return;
+    }
 
-      // Update file load time
-      this.updateFileLoadTime(filePath);
+    let diskContent: string;
+    try {
+      diskContent = fs.readFileSync(filePath, 'utf8');
+    } catch (error) {
+      console.error('[Ritemark] handleExternalDiskChange: failed to read disk:', error);
+      return;
+    }
 
-      // Check if document has unsaved changes
-      const isDirty = document.isDirty;
-      const filename = path.basename(filePath);
+    // No-op if disk content matches what TextDocument already holds — the
+    // change was already applied (e.g., onDidChangeTextDocument processed it
+    // first in workspace mode) and the webview is in sync.
+    if (diskContent === document.getText()) {
+      return;
+    }
 
-      // Send notification to webview
+    this.updateFileLoadTime(filePath);
+
+    if (document.isDirty) {
       webview.postMessage({
         type: 'fileChanged',
-        filename,
-        isDirty
+        filename: path.basename(filePath),
+        isDirty: true
       });
-
-      this.fileChangeDebounceTimers.delete(filePath);
-    }, 500);
-
-    this.fileChangeDebounceTimers.set(filePath, timer);
-  }
-
-  /**
-   * Dispose file watcher for a specific file
-   */
-  private disposeFileWatcher(filePath: string): void {
-    const watcher = this.fileWatchers.get(filePath);
-    if (watcher) {
-      watcher.dispose();
-      this.fileWatchers.delete(filePath);
+      this.scheduleAutoReload(document, webview);
+      return;
     }
 
-    // Clear any pending debounce timer
-    const timer = this.fileChangeDebounceTimers.get(filePath);
+    // Build the load message ourselves from disk content because TextDocument
+    // may still be on the old version (it didn't auto-revert in single-file mode).
+    if (fileType === 'markdown') {
+      const parsed = this.extractFrontMatter(diskContent);
+      const imageMappings = this.transformImagePaths(
+        parsed.content,
+        document.uri,
+        webview
+      );
+      webview.postMessage({
+        type: 'externalChange',
+        fileType: 'markdown',
+        filename: path.basename(filePath),
+        content: parsed.content,
+        properties: parsed.properties,
+        hasProperties: parsed.hasProperties,
+        imageMappings,
+        features: {
+          voiceDictation: isEnabled('voice-dictation'),
+          markdownExport: isEnabled('markdown-export')
+        }
+      });
+    } else {
+      // CSV
+      webview.postMessage({
+        type: 'externalChange',
+        fileType: 'csv',
+        filename: path.basename(filePath),
+        content: diskContent,
+        sizeBytes: Buffer.byteLength(diskContent, 'utf8')
+      });
+    }
+  }
+
+  private disposeDeleteWatcher(filePath: string): void {
+    const watcher = this.deleteWatchers.get(filePath);
+    if (watcher) {
+      watcher.dispose();
+      this.deleteWatchers.delete(filePath);
+    }
+  }
+
+  private startPolling(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): void {
+    const filePath = document.uri.fsPath;
+    if (this.pollIntervals.has(filePath)) {
+      return;
+    }
+    const interval = setInterval(() => {
+      try {
+        const stats = fs.statSync(filePath);
+        const lastKnown = this.fileLoadTimes.get(filePath) ?? 0;
+        // 100ms slack avoids a triple-fire on the same write event when
+        // mtime resolution and our own save bookkeeping race.
+        if (stats.mtimeMs > lastKnown + 100) {
+          this.handleExternalDiskChange(document, webview);
+        }
+      } catch {
+        // File is missing — onDidDelete will surface that path.
+      }
+    }, 3000);
+    this.pollIntervals.set(filePath, interval);
+  }
+
+  private stopPolling(filePath: string): void {
+    const interval = this.pollIntervals.get(filePath);
+    if (interval) {
+      clearInterval(interval);
+      this.pollIntervals.delete(filePath);
+    }
+  }
+
+  private scheduleAutoReload(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): void {
+    const filePath = document.uri.fsPath;
+    const existing = this.autoReloadTimers.get(filePath);
+    if (existing) {
+      clearTimeout(existing);
+    }
+    const timer = setTimeout(() => {
+      this.autoReloadTimers.delete(filePath);
+      void this.reloadFile(document, webview);
+    }, 10000);
+    this.autoReloadTimers.set(filePath, timer);
+  }
+
+  private cancelAutoReload(filePath: string): void {
+    const timer = this.autoReloadTimers.get(filePath);
     if (timer) {
       clearTimeout(timer);
-      this.fileChangeDebounceTimers.delete(filePath);
+      this.autoReloadTimers.delete(filePath);
     }
   }
 
