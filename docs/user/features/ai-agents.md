@@ -83,8 +83,10 @@ After finding the binary, Ritemark runs `claude --version` to verify it works. I
 
 Claude supports two authentication methods:
 
-1. **Claude.ai sign-in** (recommended) - Click "Sign in with Claude.ai" to open a login terminal and browser. Uses your Claude.ai subscription.
+1. **Claude.ai sign-in** (recommended) - Click "Sign in with Claude.ai" to open your system browser. No terminal needed — sign-in runs as a background subprocess, with a Cancel button and a 5-minute timeout. Uses your Claude.ai subscription.
 2. **Anthropic API key** - Click "Use API key instead" to enter a key from [console.anthropic.com](https://console.anthropic.com). Stored securely on your machine.
+
+Settings reflects the truthful auth state by querying the Claude CLI directly. After `claude logout`, Settings will show Disconnected (it no longer falsely reports "Connected" based on a stale env var).
 
 ### Setup States
 

@@ -1,5 +1,7 @@
 # Ritemark v1.6.1 — Foundation + Polish
 
+> Archived copy of the release body as published on GitHub on 2026-05-02. Edit only if the live release body is also being edited.
+
 VS Code engine upgrade (1.109.5 → 1.117.0), nicer Mermaid diagrams, friendlier Claude/Codex onboarding, and a stack of bug fixes.
 
 ## Highlights
@@ -22,14 +24,14 @@ VS Code engine upgrade (1.109.5 → 1.117.0), nicer Mermaid diagrams, friendlier
 |----------|------|
 | macOS Apple Silicon (M1/M2/M3) | `Ritemark-arm64.dmg` |
 | macOS Intel | `Ritemark-x64.dmg` |
-| Windows | `Ritemark-1.6.1-win32-x64-setup.exe` |
+
+> Windows: coming soon — the installer will be added as a follow-up asset on this release.
 
 ## Checksums (SHA-256)
 
 ```
-TBD  Ritemark-arm64.dmg
-TBD  Ritemark-x64.dmg
-TBD  Ritemark-1.6.1-win32-x64-setup.exe
+8bba403437106da990ab49c9e994960d3079da3f1a2ee25dda8b6777cf6cf483  Ritemark-arm64.dmg
+7a86c1693e64d6c2880fe437c29bae657333f4c9d7d2a2bc77e62d12d7890a43  Ritemark-x64.dmg
 ```
 
 ## Notarization

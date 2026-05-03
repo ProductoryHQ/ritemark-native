@@ -54,16 +54,33 @@ If you see **AI Offline**, check your internet connection, verify the API key, a
 
 ---
 
-## Claude Code (Terminal AI)
+## Claude Code
 
-Claude Code is Anthropic's CLI tool for AI-powered editing directly in the terminal. Ritemark v1.5+ can also install Claude automatically from Settings.
+Claude Code is Anthropic's coding agent. As of v1.6.1, you sign in entirely from inside Ritemark — no terminal commands required.
 
-### Install
+For the authoritative agent overview, see [AI Agents](features/ai-agents.md).
 
-**Option A — From Ritemark Settings:**
-Open Settings (gear icon) and click **Install Claude**.
+### In-app sign-in (recommended)
 
-**Option B — Manual install:**
+1. Open Ritemark.
+2. Either:
+   - Open **Settings** (gear icon) and find the Claude row, **or**
+   - Open the **AI sidebar** and switch the agent to Claude.
+3. Click **Sign in**. Your system browser opens with the Anthropic OAuth flow.
+4. Approve, return to Ritemark — Settings and the AI sidebar both update to "Connected".
+
+If you'd rather paste a key instead of using OAuth, click **Use Anthropic API key** in the same flow and paste your key. Ritemark stores it in your system's secure credential store.
+
+You can cancel an in-progress sign-in from the same UI; sign-in times out after 5 minutes.
+
+### Learn more
+
+For Claude usage instructions (slash commands, planning, agent skills), see Anthropic's official documentation:
+**[Claude Code Documentation](https://docs.anthropic.com/en/docs/claude-code/overview)**
+
+### Advanced / fallback — manual install
+
+If you prefer to manage Claude yourself (or you want to use a globally installed Claude alongside Ritemark's bundled runtime):
 
 ```bash
 # npm
@@ -73,39 +90,51 @@ npm install -g @anthropic-ai/claude-code
 brew install claude-code
 ```
 
-Then authenticate:
+Then authenticate from a terminal:
 
 ```bash
 claude auth
 ```
 
-### Learn More
-
-For full usage instructions, see Anthropic's official documentation:
-**[Claude Code Documentation](https://docs.anthropic.com/en/docs/claude-code/overview)**
+Ritemark detects globally installed Claude binaries and uses them when present.
 
 ---
 
-## OpenAI Codex (Terminal AI)
+## OpenAI Codex
 
-Codex is OpenAI's CLI agent for terminal-based editing.
+Codex is OpenAI's coding agent. As of v1.6.1, sign-in is unified across Settings and the AI sidebar — both surfaces open your system browser instead of dropping you into a terminal, and they stay in sync.
 
-### Install
+For the authoritative agent overview, see [AI Agents](features/ai-agents.md).
+
+### In-app sign-in (recommended)
+
+1. Open Ritemark.
+2. Either:
+   - Open **Settings** (gear icon) and find the ChatGPT row, **or**
+   - Open the **AI sidebar** and switch the agent to Codex, then click **Sign in with ChatGPT**.
+3. Your system browser opens with the OpenAI OAuth flow.
+4. Approve, return to Ritemark — both Settings and the AI sidebar update.
+
+Signing out from one surface signs you out everywhere.
+
+### Learn more
+
+For Codex usage instructions, see OpenAI's official documentation:
+**[Codex CLI Documentation](https://github.com/openai/codex)**
+
+### Advanced / fallback — manual install
+
+If you prefer to manage Codex yourself:
 
 ```bash
 npm install -g @openai/codex
 ```
 
-Set your API key:
+Set your API key (only needed for the standalone CLI, not for in-app sign-in):
 
 ```bash
 export OPENAI_API_KEY='your-key-here'
 ```
-
-### Learn More
-
-For full usage instructions, see OpenAI's official documentation:
-**[Codex CLI Documentation](https://github.com/openai/codex)**
 
 ---
 

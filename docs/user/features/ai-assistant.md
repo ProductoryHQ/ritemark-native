@@ -19,7 +19,7 @@ This is one of three AI agents available in Ritemark. See [AI Agents](ai-agents.
 
 ## Setup Required
 
-The AI assistant requires an OpenAI API key. See [Set Up AI](../guides/setup-ai.md) for instructions.
+The AI assistant requires an OpenAI API key. See [Set Up AI](../setup-ai.md) for instructions.
 
 Without an API key, the AI sidebar shows "AI Offline" and tools are disabled. Everything else in Ritemark works normally.
 

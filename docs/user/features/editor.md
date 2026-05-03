@@ -41,6 +41,8 @@ No save button needed. No "unsaved changes" warnings. If Ritemark crashes, you l
 
 Type `/` anywhere to open the command menu:
 
+![Editor with slash command popup](../../releases/v1.6.1/screenshots/1-6-1-editor-slash-command.png)
+
 | Command | Inserts |
 |---------|---------|
 | `/heading1` | Large heading (H1) |

@@ -10,7 +10,7 @@ tags:
 ---
 # Ritemark v1.6.1 — Foundation + Polish
 
-**Status:** Draft (open — release pending)
+**Status:** Released (2026-05-02)
 **Type:** Patch release
 **Focus:** VS Code engine upgrade, Windows onboarding, Mermaid diagram polish, bug fixes
 
@@ -22,7 +22,8 @@ tags:
 | --- | --- |
 | macOS Apple Silicon (M1/M2/M3) | [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-arm64.dmg) |
 | macOS Intel | [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-x64.dmg) |
-| Windows | [Ritemark-Setup.exe](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-1.6.1-win32-x64-setup.exe) |
+
+> Windows: coming soon — the installer will be added as a follow-up asset on the v1.6.1 release.
 
 * * *
 
@@ -43,12 +44,34 @@ New diagram toolbar:
 - **Download** — Save As dialog to write the diagram to disk.
 - **Expand** — full-screen overlay with cursor-anchored Cmd/Ctrl+Scroll zoom (0.25×–4×). Press Esc to close.
 
+![Mermaid diagram with the new toolbar](screenshots/1-6-1-mermaid-diagram-action-buttons.png)
+
+![Mermaid expand view with toolbar](screenshots/1-6-1-mermaid-diagram-expanded-view-with-toolbar.png)
+
 ### Friendlier Claude / Codex Onboarding (Windows + macOS)
 
 - **Bundled agent runtime** — agent CLIs (Claude, Codex) can now be shipped inside the extension instead of relying on whatever's installed globally. Lays the groundwork for clean Windows onboarding.
 - **Truthful Claude auth state** — Settings now queries the Claude CLI directly to determine sign-in state. Previously the env-var fallback could falsely report "Connected" after `claude logout`.
 - **Terminal-free sign-in** — `claude /login` now runs as a background subprocess and opens your system browser. No terminal needed. There's also an "Use Anthropic API key" alternative path with input box + secret storage, and a Cancel button during in-progress sign-in (5-min timeout).
+- **Codex sign-in unified** — the AI sidebar's "Sign in with ChatGPT" now opens your system browser instead of dropping into a terminal, matching the Settings flow. Sign in/out from one surface propagates to the other.
 - **Workspace trust prompt removed** — first-launch friction gone; you can start editing immediately.
+
+![Settings showing both Claude and ChatGPT signed in via the unified browser flow](screenshots/1-6-1-codex-claude-login-settings.png)
+
+<!-- TODO: add AI sidebar Claude needs-auth wizard screenshot when shot -->
+<!-- TODO: add AI sidebar Claude in-progress / ready screenshot when shot -->
+<!-- TODO: add AI sidebar Codex needs-auth wizard screenshot when shot -->
+<!-- TODO: add AI sidebar Codex ready screenshot when shot -->
+
+### Visual Refresh — Phosphor Icon Weight
+
+Chrome icons (titlebar, sidebar, toolbars, activity bar) bumped from thin (100) to regular (400) for better legibility, especially in light theme. The icons now read clearly at small sizes without the hairline-thin strokes washing out.
+
+![Activity bar close-up showing Phosphor 400 weight](screenshots/1-6-1-activity-bar-closeup.png)
+
+### Copilot Removed
+
+VS Code 1.117 added a Microsoft Copilot first-run wizard which crashed Ritemark prod boot. We patched it out and removed the bundled GitHub Copilot Chat extension entirely. Ritemark uses Claude / Codex / Ritemark Agent — Copilot won't appear anywhere.
 
 ### Bug Fixes
 
@@ -57,6 +80,8 @@ New diagram toolbar:
 - **AI Flow file writes** — Flow-generated files now route through `vscode.workspace.fs` instead of raw Node `fs`, fixing reliability issues with workspace file creation.
 - **File explorer refresh after AI writes** — the explorer tree now auto-refreshes when Claude Code or other agents write files to the workspace, plus a manual refresh button in the explorer toolbar.
 - **Document header hook** — replaced stale `document-header` sentinel with `ai-sidebar` to fix hook misfires.
+- **GH #39 — spdlog x86_64 binary** — replaced an x86_64 native module that was leaking into arm64 builds, fixing a startup crash on Apple Silicon when the submodule was bumped.
+- **GH #41 — JSON LSP `startFailed`** — cleaned stale CJS-compiled `out/` from the html/css/json language-features extensions after the upstream ESM flip; the JSON language server starts cleanly again.
 
 * * *
 
