@@ -297,6 +297,13 @@ foreach ($d in $devClean) {
     if (Test-Path $p) { Remove-Item -Recurse -Force $p }
 }
 
+# Remove bundled copilot extension (adds ~254MB, shows "Chat Debug" in activity bar)
+$copilotExt = Join-Path $BuildOut "resources\app\extensions\copilot"
+if (Test-Path $copilotExt) {
+    Remove-Item -Recurse -Force $copilotExt
+    Write-Host "  Removed bundled copilot extension" -ForegroundColor Green
+}
+
 # Copy welcome assets to build output
 New-Item -ItemType Directory -Force -Path $WelcomeDest | Out-Null
 if (Test-Path $welcomeSrc) {
