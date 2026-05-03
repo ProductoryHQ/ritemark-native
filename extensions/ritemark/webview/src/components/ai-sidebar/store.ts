@@ -288,6 +288,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   selectAgent: (agentId) => {
     set({ selectedAgent: agentId });
     vscode.postMessage({ type: 'ai-select-agent', agentId });
+    // When switching to Codex, force a fresh auth status check.
+    // The AI sidebar and Settings each maintain their own CodexAppServer instance,
+    // so logging out from Settings can leave the AI sidebar with a stale "ready"
+    // state. A fresh status round-trip ensures CodexSetupView appears whenever
+    // the user actually needs to sign in.
+    if (agentId === 'codex') {
+      vscode.postMessage({ type: 'codex:refreshStatus' });
+    }
   },
 
   selectModel: (modelId) => {

@@ -26,9 +26,18 @@ export function CodexView() {
   const answerCodexQuestion = useAISidebarStore((s) => s.answerCodexQuestion);
   const approveCodexPlan = useAISidebarStore((s) => s.approveCodexPlan);
   const discardCodexPlan = useAISidebarStore((s) => s.discardCodexPlan);
+  const refreshCodexStatus = useAISidebarStore((s) => s.refreshCodexStatus);
   const scrollRef = useRef<HTMLDivElement>(null);
   const compatibilityNotice = getCompatibilityNotice(codexStatus);
   const showCompatibilityNotice = compatibilityNotice && dismissedCodexNoticeKey !== compatibilityNotice.key;
+
+  // Force a fresh server-side status check when this panel mounts.
+  // CodexView only renders when the cached state is "ready"; if the user
+  // actually signed out elsewhere, this round-trip surfaces the truthful
+  // state and AISidebar.tsx can swap to CodexSetupView on the next render.
+  useEffect(() => {
+    refreshCodexStatus();
+  }, [refreshCodexStatus]);
 
   // Auto-scroll to bottom
   useEffect(() => {

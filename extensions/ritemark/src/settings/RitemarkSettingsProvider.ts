@@ -9,7 +9,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { getAssistantModels, DEFAULT_MODELS } from '../ai/modelConfig';
 import { isEnabled } from '../features/featureGate';
-import { CodexAppServer, CodexAuth, emitCodexStatusInvalidated } from '../codex';
+import { CodexAppServer, CodexAuth, emitCodexStatusInvalidated, onCodexStatusInvalidated } from '../codex';
 import { UpdateService } from '../update';
 import { AVAILABLE_MODELS, getModelPath, isModelDownloaded } from '../voiceDictation/modelManager';
 import {
@@ -49,6 +49,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private codexAppServer: CodexAppServer | null = null;
   private codexAuth: CodexAuth | null = null;
   private disposeClaudeStatusListener: (() => void) | null = null;
+  private disposeCodexStatusListener: (() => void) | null = null;
   private claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
   private claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
 
@@ -82,6 +83,42 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       }
       const panel = RitemarkSettingsProvider.panel;
       if (panel) {
+        void this.sendCurrentSettings(panel.webview);
+      }
+    });
+
+    // Listen for Codex auth changes from other surfaces (AI sidebar) so the
+    // Settings page reflects the truthful state when a user signs in/out
+    // somewhere else. Settings has its own CodexAppServer instance whose
+    // cached account state survives across login/logout events, so we
+    // dispose+recreate the runtime on each invalidation. The next status
+    // round-trip then spawns a fresh app-server subprocess that re-reads
+    // ~/.codex/auth.json — the OS-level source of truth for both surfaces.
+    this.disposeCodexStatusListener = onCodexStatusInvalidated((event) => {
+      if (event.reason === 'login-finished' || event.reason === 'logout') {
+        this.codexAppServer?.dispose();
+        this.codexAuth?.removeAllListeners();
+        if (isEnabled('codex-integration')) {
+          this.codexAppServer = new CodexAppServer();
+          this.codexAuth = new CodexAuth(this.codexAppServer);
+          this.codexAuth.on('statusChanged', (_status) => {
+            if (RitemarkSettingsProvider.panel) {
+              void this.sendCodexAuthStatus(RitemarkSettingsProvider.panel.webview);
+            }
+          });
+          this.codexAuth.on('loginComplete', (e: { success: boolean }) => {
+            if (e.success) {
+              emitCodexStatusInvalidated('login-finished');
+            }
+          });
+        } else {
+          this.codexAppServer = null;
+          this.codexAuth = null;
+        }
+      }
+      const panel = RitemarkSettingsProvider.panel;
+      if (panel) {
+        void this.sendCodexAuthStatus(panel.webview);
         void this.sendCurrentSettings(panel.webview);
       }
     });
@@ -1095,6 +1132,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     this.codexAuth?.removeAllListeners();
     this.codexAuth = null;
     this.codexAppServer = null;
+    this.disposeClaudeStatusListener?.();
+    this.disposeClaudeStatusListener = null;
+    this.disposeCodexStatusListener?.();
+    this.disposeCodexStatusListener = null;
     RitemarkSettingsProvider.panel?.dispose();
   }
 
