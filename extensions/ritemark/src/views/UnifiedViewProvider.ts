@@ -31,8 +31,9 @@ import {
   clearSetupCache,
   setAnthropicKeyAvailable,
   installClaude,
-  openClaudeLoginTerminal,
   openAnthropicKeySettings,
+  startClaudeLoginSubprocess,
+  type ClaudeLoginSubprocessHandle,
   installGit,
   installNode,
   installCodexCli,
@@ -96,6 +97,41 @@ function shouldStartCodexInPlanMode(prompt: string): boolean {
     || /\benter plan mode\b/i.test(prompt);
 }
 
+/**
+ * Render a Codex turn error into a user-readable string.
+ *
+ * The Codex app-server delivers turn errors as opaque JSON objects shaped
+ * `{ type, message, ... }`. Calling `String(error)` on such an object yields
+ * the literal "[object Object]", which surfaced in the AI sidebar after a
+ * stale-auth turn (the user signed out elsewhere and the next turn returned
+ * an unauthenticated error). This formatter prefers `.message`, falls back to
+ * the JSON shape so we still see what came over the wire, and returns
+ * undefined when there is no error to propagate.
+ */
+function formatCodexTurnError(error: unknown): string | undefined {
+  if (error == null) {
+    return undefined;
+  }
+  if (typeof error === 'string') {
+    return error.trim() || undefined;
+  }
+  if (error instanceof Error) {
+    return error.message || error.name;
+  }
+  if (typeof error === 'object') {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+      return maybeMessage;
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return undefined;
+    }
+  }
+  return String(error);
+}
+
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
 
@@ -115,6 +151,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _codexLoginPoll: ReturnType<typeof setInterval> | null = null;
   private _disposeCodexStatusListener: (() => void) | null = null;
   private _claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
+  private _claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
   private _disposeClaudeStatusListener: (() => void) | null = null;
 
   constructor(
@@ -638,10 +675,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     } else if (reason === 'logout') {
       this._codexLoginInProgress = false;
       this._stopCodexLoginPolling();
-      this._resetCodexSessionState();
+      // Dispose the AI sidebar's Codex app-server so the next getStatus call
+      // spawns a fresh subprocess that re-reads ~/.codex/auth.json (now empty
+      // after logout in another surface). Without this, the cached app-server
+      // keeps reporting the previous authenticated account, leaving the AI
+      // sidebar showing chat instead of the SetupWizard.
+      this._disposeCodexRuntime();
     } else if (reason === 'login-finished') {
       this._codexLoginInProgress = false;
       this._stopCodexLoginPolling();
+      // Same reasoning as logout — the auth file changed under us. Dispose
+      // the local app-server so the next status read picks up the new token.
+      this._disposeCodexRuntime();
     }
 
     await this._sendCodexSidebarStatus();
@@ -1394,7 +1439,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       this._view?.webview.postMessage({
         type: 'codex-result',
         status: params.turn.status,
-        error: params.turn.error ? String(params.turn.error) : undefined,
+        error: formatCodexTurnError(params.turn.error),
       });
       // Bug #33: Codex apply_patch / shell tools write files outside VS Code's
       // filesystem provider, so the explorer is often stale. The protocol
@@ -1538,22 +1583,71 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (this._claudeLoginSubprocess) {
+      this._claudeLoginSubprocess.kill();
+      this._claudeLoginSubprocess = null;
+    }
+
     setClaudeLoginInProgress(true);
     this._startClaudeLoginPolling();
     emitClaudeStatusInvalidated('login-started');
-    openClaudeLoginTerminal(status.binaryPath);
+
+    this._claudeLoginSubprocess = startClaudeLoginSubprocess(status.binaryPath, {
+      onUrl: (url) => {
+        vscode.window.showInformationMessage(
+          'Sign-in opened in your browser. Authorize to finish.',
+          'Copy backup link'
+        ).then((action) => {
+          if (action === 'Copy backup link') {
+            void vscode.env.clipboard.writeText(url);
+          }
+        });
+      },
+      onComplete: () => {
+        this._claudeLoginSubprocess = null;
+        setClaudeLoginInProgress(false);
+        emitClaudeStatusInvalidated('login-finished');
+      },
+      onError: (msg) => {
+        this._claudeLoginSubprocess = null;
+        setClaudeLoginInProgress(false);
+        emitClaudeStatusInvalidated('settings-updated');
+        this._view?.webview.postMessage({
+          type: 'agent-setup:error',
+          error: `Claude sign-in failed: ${msg}`,
+        });
+      },
+      onTimeout: () => {
+        this._claudeLoginSubprocess = null;
+        setClaudeLoginInProgress(false);
+        emitClaudeStatusInvalidated('settings-updated');
+        this._view?.webview.postMessage({
+          type: 'agent-setup:error',
+          error: 'Claude sign-in timed out after 5 minutes. Please try again.',
+        });
+      },
+    });
 
     this._view?.webview.postMessage({
       type: 'agent-setup:progress',
       progress: {
         stage: 'login',
-        message: 'Finish Claude.ai sign-in in the terminal and browser. Ritemark will update automatically.',
+        message: 'Finish Claude.ai sign-in in your browser. Ritemark will update automatically.',
       },
     });
 
     const pendingStatus = await getSetupStatus({ refresh: true });
     const pendingEnvironmentStatus = await getAgentEnvironmentStatus({ setupStatus: pendingStatus });
     this._view?.webview.postMessage({ type: 'agent-setup:complete', status: pendingStatus, environmentStatus: pendingEnvironmentStatus });
+  }
+
+  private _cancelClaudeLogin(): void {
+    if (this._claudeLoginSubprocess) {
+      this._claudeLoginSubprocess.kill();
+      this._claudeLoginSubprocess = null;
+    }
+    setClaudeLoginInProgress(false);
+    emitClaudeStatusInvalidated('settings-updated');
   }
 
   private _sendChatFontSize() {
