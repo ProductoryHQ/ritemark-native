@@ -1,0 +1,49 @@
+# RiteMark Patch: windows-binary-strip
+#
+# Purpose: Strip cross-platform native binaries inside the bundled copilot
+#          SDK so the Windows packaging step (rcedit.exe) does not choke on
+#          .node files compiled for non-Windows platforms.
+#
+# Why:
+#   VS Code 1.117 bundles GitHub Copilot Chat (extensions/copilot/) as a
+#   first-party built-in. Its nested SDK ships native binaries for every
+#   supported platform. During gulp's vscode-win32-x64-min packaging step,
+#   rcedit.exe iterates the entire .app/resources/app/ tree to set Windows
+#   version metadata and fails with exit code 1 on any non-Windows .node
+#   file (e.g. linux-x64/computer.node, arm64-darwin/audio-capture.node).
+#
+#   The existing .moduleignore stripped @github/copilot/prebuilds/** but
+#   missed @github/copilot/sdk/prebuilds/** and the nested
+#   @anthropic-ai/claude-agent-sdk/vendor/* binary trees. This patch adds
+#   the missing strip rules.
+#
+#   The win32-x64 binaries that gulp's prepareBuiltInCopilotExtensionShims
+#   actually needs are recreated fresh by that function (see
+#   vscode/build/lib/copilot.ts: mkdirSync(nodePtyDest, { recursive: true })
+#   followed by cpSync). So stripping the entire prebuilds/** tree is safe.
+#
+# File(s): build/.moduleignore
+# Created: 2026-05-03
+#
+diff --git a/build/.moduleignore b/build/.moduleignore
+--- a/build/.moduleignore
++++ b/build/.moduleignore
+@@ -222,6 +222,18 @@
+ @github/copilot/ripgrep/**
+ @github/copilot/**/keytar.node
+
++# Ritemark: strip remaining cross-platform native binaries inside the
++# bundled copilot SDK. rcedit.exe (Windows resource editor) iterates every
++# file in the .app bundle and chokes on non-Windows .node files. The
++# win32-x64 prebuilds dir is recreated fresh by gulp's
++# prepareBuiltInCopilotExtensionShims after this strip, so removing the
++# entire prebuilds tree is safe.
++@github/copilot/sdk/prebuilds/**
++@github/copilot/sdk/ripgrep/**
++@anthropic-ai/claude-agent-sdk/vendor/audio-capture/**
++@anthropic-ai/claude-agent-sdk/vendor/ripgrep/**
++@anthropic-ai/claude-agent-sdk/vendor/tree-sitter/**
++
+ # @github/copilot platform binaries - not needed
+ @github/copilot-darwin-arm64/**
+ @github/copilot-darwin-x64/**
