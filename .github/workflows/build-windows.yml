@@ -100,19 +100,23 @@ jobs:
         run: |
           rm -f src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css 2>/dev/null || true
 
-      - name: Remove unwanted built-in extensions (VS Code 1.117+)
-        # VS Code 1.117 ships GitHub Copilot Chat (extensions/copilot) and
-        # Mermaid Chat Features (extensions/mermaid-chat-features) as first-party
-        # built-in extensions. Ritemark does not ship them. Removing them here
-        # also avoids a Windows-only build break: copilot's nested
-        # claude-agent-sdk pulls macOS-arm64 native binaries (audio-capture.node)
-        # that rcedit.exe cannot ingest during the win32-x64 packaging step.
-        # macOS build-prod.sh removes the same dirs post-gulp.
+      - name: Remove unwanted built-in extension (VS Code 1.117+)
+        # VS Code 1.117 ships GitHub Copilot Chat (extensions/copilot) as a
+        # first-party built-in extension. Ritemark does not ship it. Removing
+        # the source dir here also avoids a Windows-only build break:
+        # copilot's nested claude-agent-sdk pulls macOS-arm64 native binaries
+        # (vendor/audio-capture/arm64-darwin/audio-capture.node) that
+        # rcedit.exe cannot ingest during the win32-x64 packaging step.
+        #
+        # Note: mermaid-chat-features (also a 1.117 chat helper) is kept
+        # because gulp's hardcoded esbuild list calls its esbuild.webview.mts
+        # unconditionally. We instead drop it post-build with the same logic
+        # macOS build-prod.sh uses for both extensions.
         shell: bash
         working-directory: r/vscode
         run: |
-          rm -rf extensions/copilot extensions/mermaid-chat-features
-          echo "Removed: copilot, mermaid-chat-features"
+          rm -rf extensions/copilot
+          echo "Removed: copilot"
 
       - name: Apply patches
         shell: bash
