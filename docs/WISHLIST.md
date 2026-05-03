@@ -124,10 +124,6 @@ Consolidate UI components using shadcn/ui for consistency.
 
 - [ ] Sync to cloud (Google Drive, SharePoint)
 
-## VS Code Upstream
-
-- [ ] **Update base VS Code to 1.109+** - Investigate release notes, breaking changes, and patch compatibility. Current base: 1.94.0
-
 ## Developer Experience
 
 - [ ] **Claude Code auto-launch** - Detect and auto-launch Claude Code in terminal on new window - Setting: `ritemark.claudeCode.autoLaunch` (default: false) - Setting: `ritemark.claudeCode.flags` (e.g., `--dangerously-skip-permissions`) - One-time prompt before enabling
@@ -194,7 +190,8 @@ Consolidate UI components using shadcn/ui for consistency.
 - [x] DataTable columns have no max-width — text never wraps
 - [x] CSV row deletion with context menu
 - [x] Custom Welcome tab icon (Ritemark icon on Welcome tab)
+- [x] Update base VS Code (1.94 → 1.109.5 in v1.5.0 → 1.117.0 in v1.6.1 / Sprint 55)
 
 * * *
 
-*Last updated: 2026-04-21*
+*Last updated: 2026-05-02*

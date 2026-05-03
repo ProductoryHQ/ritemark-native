@@ -43,9 +43,9 @@ A native desktop app for writing, structured data, and AI automation—all in on
 
 ## Download
 
-**[Download for macOS (Apple Silicon)](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg)**
-
-**[Download for Windows](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-Setup.exe)**
+- **macOS (Apple Silicon / M1+):** [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-arm64.dmg)
+- **macOS (Intel):** [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-x64.dmg)
+- **Windows:** Coming soon — installer will be added as a follow-up asset on the v1.6.1 release.
 
 ## Screenshots
 
@@ -82,9 +82,9 @@ We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 ## Documentation
 
-- [Feature Guide](docs/features/README.md)
-- [Getting Started](docs/guides/getting-started.md)
-- [Keyboard Shortcuts](docs/features/keyboard-shortcuts.md)
+- [Feature Guide](docs/user/features/README.md)
+- [Getting Started](docs/user/getting-started.md)
+- [Keyboard Shortcuts](docs/user/features/keyboard-shortcuts.md)
 
 ## Community
 
