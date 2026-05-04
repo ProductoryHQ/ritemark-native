@@ -172,6 +172,36 @@ For changes confined to extension code:
 cp -R extensions/ritemark/out/* "VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extensions/ritemark/out/"
 ```
 
+## Past incidents (institutional memory)
+
+### v1.0.1 — broken DMG (2026-01-14)
+
+Three root causes compounded:
+
+1. **`node_modules` stripped from extension during DMG copy** → TipTap webview wouldn't load. When copying the extension to the app bundle, only remove `webview/node_modules` and `webview/src`. NEVER remove `extensions/ritemark/node_modules` — those are runtime dependencies. Hard check 7 (node_modules has 100+ packages) catches this regression.
+2. **`Info.plist` version not updated** → Finder showed VS Code base version, not Ritemark version. After gulp build, run `PlistBuddy -c "Set :CFBundleShortVersionString X.Y.Z" Ritemark.app/Contents/Info.plist` and the same for `CFBundleVersion`.
+3. **0-byte source file corruption** (random source files became 0 bytes — TS, SVG, configs, even node_modules type defs). Detection: `find extensions/ritemark/src -name "*.ts" -size 0`. Fix: `git checkout HEAD -- extensions/ritemark/`, reinstall node_modules, rebuild webview. Root cause unconfirmed (disk / sync tool / system process).
+
+### Quick comparison test
+
+When TipTap doesn't load, mount the working previous DMG and the broken new DMG side-by-side, then `diff` the extension folder listings:
+
+```bash
+hdiutil attach dist/Ritemark-1.0.0-darwin-arm64.dmg -mountpoint /tmp/v100
+hdiutil attach dist/Ritemark-1.0.1-darwin-arm64.dmg -mountpoint /tmp/v101
+diff <(ls /tmp/v100/Ritemark.app/Contents/Resources/app/extensions/ritemark/) \
+     <(ls /tmp/v101/Ritemark.app/Contents/Resources/app/extensions/ritemark/)
+hdiutil detach /tmp/v100; hdiutil detach /tmp/v101
+```
+
+### Key takeaways
+
+1. Never strip `node_modules` from the extension — runtime, not dev-only.
+2. Always update `Info.plist` version (Finder reads it, not product.json).
+3. Compare with the last working build when debugging — diff reveals missing pieces fast.
+4. Watch for 0-byte files (corruption signal); restore from git.
+5. Test the actual DMG, not just the source app bundle.
+
 ## References
 
 - Update feed contract: `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`
