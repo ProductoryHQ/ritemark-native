@@ -5,7 +5,7 @@ Surfaces VS Code renders directly (tabs, activity bar, status bar, titlebar, nat
 1. **Theme JSON** — color overrides per VS Code "color key." Lives in `extensions/ritemark/themes/*.json`.
 2. **Patches** — when theme JSON is not enough (e.g., hiding a feature, adding a layout rule), we patch VS Code core under `patches/vscode/`.
 
-This file covers theming; patches are covered in [CLAUDE.md](/Users/jarmotuisk/Projects/ritemark-native/CLAUDE.md) "VS Code Patch System."
+This file covers theming; patches are covered in [CLAUDE.md](../../../../CLAUDE.md) "VS Code Patch System."
 
 ## Current state
 
