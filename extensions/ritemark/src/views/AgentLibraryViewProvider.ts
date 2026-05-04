@@ -1054,7 +1054,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         const main = !!item.isMainAgent;
         const warn = !main && !item.hasFrontmatter;
         const rel = displayPath(item);
-        html += '<div class="item' + sel + '" data-filepath="' + escapeHtml(item.filePath) + '" data-item="' + escapeHtml(JSON.stringify(item)) + '">';
+        html += '<div class="item' + sel + '" data-filepath="' + escapeHtml(item.filePath) + '">';
         html += '<div class="item-content">';
         html += '<div class="item-name">' + escapeHtml(item.name) + '</div>';
         html += '<div class="item-path' + (warn ? ' has-warning' : '') + '">' + escapeHtml(rel) + '</div>';
@@ -1072,6 +1072,15 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       return html;
     }
 
+    function findItemByFilePath(fp) {
+      return (
+        agents.find((i) => i.filePath === fp) ||
+        skills.find((i) => i.filePath === fp) ||
+        commands.find((i) => i.filePath === fp) ||
+        null
+      );
+    }
+
     function wireRowHandlers() {
       contentEl.querySelectorAll('.item').forEach((el) => {
         el.addEventListener('click', () => {
@@ -1083,10 +1092,10 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         });
         el.addEventListener('contextmenu', (e) => {
           e.preventDefault();
-          const itemJson = el.dataset.item;
-          if (!itemJson) return;
-          let item;
-          try { item = JSON.parse(itemJson); } catch { return; }
+          const fp = el.dataset.filepath;
+          if (!fp) return;
+          const item = findItemByFilePath(fp);
+          if (!item) return;
           showContextMenu(e.clientX, e.clientY, item);
         });
       });
