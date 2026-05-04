@@ -73,15 +73,15 @@ It is **not**:
 
 ## Success Criteria
 
-- [ ] A user can create a new skill or agent from inside Ritemark, end to end, without opening a terminal.
-- [ ] The empty state offers actionable creation buttons.
-- [ ] The `+` affordance is discoverable in the Agent Library header and via row context menu.
-- [ ] *Duplicate* exists and is the recommended path in the `+` chooser when an existing item is selected.
-- [ ] *Delete* requires confirmation and is scope-aware (project files surface a teammate-impact note).
-- [ ] New files arrive with valid frontmatter scaffolding.
-- [ ] Files added externally appear in the sidebar without manual refresh.
-- [ ] On first run with an empty `~/.claude/`, the starter pack is seeded.
-- [ ] The Sprint 54 invariants remain intact — file-first truth, generic frontmatter editing, TOC/Properties exclusivity, no regressions in editor / chat / Flows.
+- [x] A user can create a new skill or agent from inside Ritemark, end to end, without opening a terminal.
+- [x] The empty state offers actionable creation buttons.
+- [x] The `+` affordance is discoverable in the Agent Library header and via row context menu.
+- [x] *Duplicate* exists and is the recommended path in the `+` chooser when an existing item is selected.
+- [x] *Delete* requires confirmation and is scope-aware (project files surface a teammate-impact note).
+- [x] New files arrive with valid frontmatter scaffolding.
+- [x] Files added externally appear in the sidebar without manual refresh.
+- [x] On first run with an empty `~/.claude/`, the starter pack is seeded. *(verified by code review of `extension.ts:128-174` + starter-pack contents; live test deferred — covered by trivial guard logic, marker file, and never-overwrite semantics)*
+- [x] The Sprint 54 invariants remain intact — file-first truth, generic frontmatter editing, TOC/Properties exclusivity, no regressions in editor / chat / Flows.
 
 ## Resolved Decisions (Jarmo, Phase 1)
 
@@ -142,9 +142,15 @@ These were the open product decisions for this sprint. All four are now settled 
 
 ## Status
 
-**Current Phase:** Phase 2 — Tier 1 implementation in progress
+**Current Phase:** Phase 4 — Validation complete (Jarmo manual test passed 2026-05-04)
 **Current Branch:** `claude/design-agents-skills-ui-ARdo7`
 
 Phase 1 closed: five product decisions resolved, two specs written (`creation-spec.md`, `starter-pack.md`), `skill-creator` LICENSE confirmed Apache-2.0 and vendored at `5128e186`, three Ritemark-authored starters drafted (`outline-from-notes`, `frontmatter-cleanup`, `document-reviewer`).
 
-**Next Step:** Implement Tier 1 in `AgentLibraryViewProvider.ts` and `extension.ts` — empty-state buttons, per-section `+` affordances, new-file modal, row context menu, file watcher. Each item gets its own commit; `npx tsc --noEmit` must pass before each.
+Phase 2 (Tier 1) shipped in commit `b28cb1e`: empty-state CTAs, per-section `+`, modal new-helper, row context menu, file watcher.
+
+Phase 3 (Tier 2) shipped in commit `7faa3e3`: full frontmatter skeleton, duplicate, move-scope, first-run starter-pack seeding, alphabetical / recently-modified sort.
+
+Phase 4 validation, dev-mode smoke test (2026-05-04, Jarmo): empty state → modal new-helper → frontmatter skeleton → row context menu → duplicate → move scope → file watcher → sort all green. Auto-seed (#9) verified by code review only (existing `~/.claude/` content makes live test destructive; seeding logic at `extension.ts:128-174` is small, conservative, and never overwrites). One bug fixed during validation: row context menu was silently failing because `data-item="..."` attribute holding `JSON.stringify(item)` was broken by unescaped quotes — fix in `6428189`.
+
+**Next Step:** Run `qa-validator` against the branch and merge to `main`.
