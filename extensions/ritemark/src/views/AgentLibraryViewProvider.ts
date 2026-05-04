@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import type { DiscoveredAgent, DiscoveredCommand, ItemScope } from '../agent/discovery';
+import { COLORS, ICONS } from '../agent/iconPack';
 
 type HelperType = 'skill' | 'agent';
 
@@ -510,8 +511,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
     /* === List items === */
     .item {
-      display: flex; align-items: flex-start;
-      padding: 8px 12px 8px 20px;
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 12px 8px 14px;
       cursor: pointer;
       border-left: 2px solid transparent;
       transition: background-color 0.1s;
@@ -522,23 +523,62 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       border-left-color: var(--r-accent);
     }
     .item.selected .item-name { font-weight: 600; }
-    .item-content { flex: 1; min-width: 0; }
+    .item-icon-chip {
+      flex-shrink: 0;
+      width: 32px; height: 32px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 8px;
+      margin-top: 1px;
+    }
+    .item-icon-chip svg {
+      width: 18px; height: 18px;
+      display: block;
+    }
+    .item-content { flex: 1; min-width: 0; padding-top: 1px; }
     .item-name {
-      font-size: 13px; font-weight: 500; line-height: 1.4;
+      font-size: 13px; font-weight: 500; line-height: 1.35;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .item-path {
+    .item-description {
       font-size: 11px; color: var(--r-ink-muted);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      margin-top: 3px;
+      line-height: 1.4;
+      margin-top: 2px;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      word-break: break-word;
     }
-    .item-path.has-warning { color: #F59E0B; }
+    .item-description.placeholder { font-style: italic; opacity: 0.65; }
     .item-icon {
-      flex-shrink: 0; margin-left: 6px; margin-top: 3px;
+      flex-shrink: 0; margin-left: 6px; margin-top: 6px;
       font-size: 11px; line-height: 1;
     }
     .item-icon.star { color: var(--r-accent); }
     .item-icon.warning { color: #F59E0B; cursor: help; }
+    .item-more-btn {
+      flex-shrink: 0;
+      width: 22px; height: 22px;
+      margin-left: 4px;
+      margin-top: 4px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 4px;
+      background: transparent;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      color: var(--r-ink-muted);
+      opacity: 0;
+      transition: opacity 0.1s, background-color 0.1s, color 0.1s;
+    }
+    .item:hover .item-more-btn,
+    .item.selected .item-more-btn,
+    .item-more-btn.menu-open { opacity: 1; }
+    .item-more-btn:hover {
+      background: var(--r-accent-soft);
+      color: var(--r-accent);
+    }
+    .item-more-btn svg { width: 14px; height: 14px; display: block; }
     .item-hint {
       font-size: 10px; line-height: 1.3;
       color: #F59E0B; padding: 2px 0 0; opacity: 0.85;
@@ -739,6 +779,21 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
 
+    const ICON_PATHS = ${JSON.stringify(ICONS)};
+    const ICON_COLORS = ${JSON.stringify(COLORS)};
+    const DEFAULT_ICON = 'sparkle';
+    const DEFAULT_COLOR = 'indigo';
+
+    function renderIconChip(iconName, colorName) {
+      const path = ICON_PATHS[iconName] || ICON_PATHS[DEFAULT_ICON];
+      const palette = ICON_COLORS[colorName] || ICON_COLORS[DEFAULT_COLOR];
+      const style = 'background:' + palette.bg + ';color:' + palette.fg + ';';
+      return '<span class="item-icon-chip" style="' + style + '" aria-hidden="true">' +
+        '<svg viewBox="0 0 256 256">' +
+        path +
+        '</svg></span>';
+    }
+
     let agents = [];
     let skills = [];
     let commands = [];
@@ -859,7 +914,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }
 
     // === Context menu ===
-    function showContextMenu(x, y, item) {
+    function showContextMenu(x, y, item, alignRightX) {
       const isMainAgent = !!item.isMainAgent;
       const itemScope = item.scope;
       const moveLabel = itemScope === 'project' ? 'Move to User scope' : 'Move to Project scope';
@@ -899,10 +954,12 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       contextMenuEl.style.top = y + 'px';
       contextMenuEl.classList.add('open');
 
-      // Adjust if it would overflow viewport
+      // Adjust if it would overflow viewport, or right-align to a given anchor
       requestAnimationFrame(() => {
         const rect = contextMenuEl.getBoundingClientRect();
-        if (rect.right > window.innerWidth - 4) {
+        if (typeof alignRightX === 'number') {
+          contextMenuEl.style.left = Math.max(4, alignRightX - rect.width) + 'px';
+        } else if (rect.right > window.innerWidth - 4) {
           contextMenuEl.style.left = Math.max(4, window.innerWidth - rect.width - 4) + 'px';
         }
         if (rect.bottom > window.innerHeight - 4) {
@@ -968,10 +1025,12 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     function matches(item) {
       if (!filter) return true;
       const rel = displayPath(item);
+      const desc = (item.description || '').toLowerCase();
       return (
         item.name.toLowerCase().includes(filter) ||
         item.id.toLowerCase().includes(filter) ||
-        rel.toLowerCase().includes(filter)
+        rel.toLowerCase().includes(filter) ||
+        desc.includes(filter)
       );
     }
 
@@ -1054,12 +1113,16 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         const main = !!item.isMainAgent;
         const warn = !main && !item.hasFrontmatter;
         const rel = displayPath(item);
-        html += '<div class="item' + sel + '" data-filepath="' + escapeHtml(item.filePath) + '">';
+        const desc = (item.description || '').trim();
+        const descText = desc || (main ? 'Main agent configuration' : 'No description in frontmatter');
+        const descClass = desc ? 'item-description' : 'item-description placeholder';
+        html += '<div class="item' + sel + '" data-filepath="' + escapeHtml(item.filePath) + '" title="' + escapeHtml(rel) + '">';
+        html += renderIconChip(item.icon, item.color);
         html += '<div class="item-content">';
         html += '<div class="item-name">' + escapeHtml(item.name) + '</div>';
-        html += '<div class="item-path' + (warn ? ' has-warning' : '') + '">' + escapeHtml(rel) + '</div>';
+        html += '<div class="' + descClass + '">' + escapeHtml(descText) + '</div>';
         if (warn) {
-          html += '<div class="item-hint">Add a description in frontmatter — open file and click ⓘ</div>';
+          html += '<div class="item-hint">Add a description in frontmatter — open file and click \\u24D8</div>';
         }
         html += '</div>';
         if (main) {
@@ -1067,6 +1130,10 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         } else if (warn) {
           html += '<span class="item-icon warning" title="Missing or empty description field in frontmatter.">\\u26A0</span>';
         }
+        html += '<button class="item-more-btn" data-more="1" title="More actions" aria-label="More actions">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />' +
+          '</svg></button>';
         html += '</div>';
       }
       return html;
@@ -1083,7 +1150,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
     function wireRowHandlers() {
       contentEl.querySelectorAll('.item').forEach((el) => {
-        el.addEventListener('click', () => {
+        el.addEventListener('click', (e) => {
+          if (e.target && e.target.closest && e.target.closest('.item-more-btn')) return;
           const fp = el.dataset.filepath;
           if (!fp) return;
           selectedPath = fp;
@@ -1098,6 +1166,19 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
           if (!item) return;
           showContextMenu(e.clientX, e.clientY, item);
         });
+        const moreBtn = el.querySelector('.item-more-btn');
+        if (moreBtn) {
+          moreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const fp = el.dataset.filepath;
+            if (!fp) return;
+            const item = findItemByFilePath(fp);
+            if (!item) return;
+            const rect = moreBtn.getBoundingClientRect();
+            showContextMenu(rect.right, rect.bottom + 2, item, rect.right);
+          });
+        }
       });
     }
 

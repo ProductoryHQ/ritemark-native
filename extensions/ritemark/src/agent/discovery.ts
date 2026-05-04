@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { ColorName, IconName, resolveIconAndColor } from './iconPack';
 
 export type ItemScope = 'project' | 'user';
 
@@ -20,6 +21,8 @@ export interface DiscoveredAgent {
   hasFrontmatter: boolean;
   isMainAgent: boolean;
   modifiedAt: number;
+  icon: IconName;
+  color: ColorName;
 }
 
 export interface DiscoveredCommand {
@@ -31,6 +34,8 @@ export interface DiscoveredCommand {
   scope: ItemScope;
   hasFrontmatter: boolean;
   modifiedAt: number;
+  icon: IconName;
+  color: ColorName;
 }
 
 function safeMtime(filePath: string): number {
@@ -119,15 +124,19 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
     try {
       const content = fs.readFileSync(claudeMdPath, 'utf-8');
       const frontmatter = parseFrontmatter(content);
+      const description = frontmatter.description || 'Main agent configuration';
+      const { icon, color } = resolveIconAndColor(frontmatter, 'CLAUDE.md', description, true);
       agents.push({
         id: 'CLAUDE',
         name: 'CLAUDE.md',
-        description: frontmatter.description || 'Main agent configuration',
+        description,
         filePath: claudeMdPath,
         scope,
         hasFrontmatter: hasFrontmatterBlock(content),
         isMainAgent: true,
         modifiedAt: safeMtime(claudeMdPath),
+        icon,
+        color,
       });
     } catch {
       // Skip
@@ -148,6 +157,8 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
         const id = frontmatter.name || path.basename(file, '.md');
         const name = toDisplayName(id);
         const description = frontmatter.description || '';
+        const isMain = isClaudeMd(filePath);
+        const { icon, color } = resolveIconAndColor(frontmatter, name, description, isMain);
 
         agents.push({
           id,
@@ -156,8 +167,10 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
           filePath,
           scope,
           hasFrontmatter: hasFm && !!description,
-          isMainAgent: isClaudeMd(filePath),
+          isMainAgent: isMain,
           modifiedAt: safeMtime(filePath),
+          icon,
+          color,
         });
       } catch {
         // Skip files that can't be read
@@ -207,16 +220,21 @@ function discoverCommandsInRoot(claudeRoot: string, scope: ItemScope): Discovere
           const hasFm = hasFrontmatterBlock(content);
           const frontmatter = parseFrontmatter(content);
           const id = frontmatter.name || path.basename(file, '.md');
+          const displayName = toDisplayName(id);
+          const description = frontmatter.description || extractFirstLine(content);
+          const { icon, color } = resolveIconAndColor(frontmatter, displayName, description);
 
           commands.push({
             id,
-            name: toDisplayName(id),
-            description: frontmatter.description || extractFirstLine(content),
+            name: displayName,
+            description,
             source: 'commands',
             filePath,
             scope,
             hasFrontmatter: hasFm && !!(frontmatter.description),
             modifiedAt: safeMtime(filePath),
+            icon,
+            color,
           });
         } catch {
           // Skip
@@ -250,15 +268,21 @@ function discoverCommandsInRoot(claudeRoot: string, scope: ItemScope): Discovere
 
           if (frontmatter['user-invocable'] === 'false') continue;
 
+          const displayName = toDisplayName(id);
+          const description = frontmatter.description || extractFirstLine(content);
+          const { icon, color } = resolveIconAndColor(frontmatter, displayName, description);
+
           commands.push({
             id,
-            name: toDisplayName(id),
-            description: frontmatter.description || extractFirstLine(content),
+            name: displayName,
+            description,
             source: 'skills',
             filePath: skillFile,
             scope,
             hasFrontmatter: hasFm && !!(frontmatter.description),
             modifiedAt: safeMtime(skillFile),
+            icon,
+            color,
           });
         } catch {
           // Skip
