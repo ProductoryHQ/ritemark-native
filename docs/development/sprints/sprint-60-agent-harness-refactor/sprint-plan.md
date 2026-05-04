@@ -22,38 +22,40 @@ Holistic refactor of the Claude Code harness (CLAUDE.md, agents, skills, memory,
 
 ## Success Criteria
 
-- [ ] CLAUDE.md ≤ 1700 words (target 1500)
-- [ ] MEMORY.md ≤ 60 lines
-- [ ] release-manager.md ≤ 1700 words; new `release` skill exists
-- [ ] All 5 skills have YAML frontmatter (`name`, `description`)
-- [ ] flow-testing skill is description-activatable (frontmatter present)
-- [ ] No agent file contains "Invoke X agent" subagent-delegation instruction
-- [ ] Hardcoded `/Users/jarmotuisk/Projects/ritemark-native` removed from CLAUDE.md and MEMORY.md build sections; `$CLAUDE_PROJECT_DIR` (with pwd fallback) used
-- [ ] Worktree context hook fires on session start, prints branch + worktree path
-- [ ] `pre-commit-validator.sh` is the single runtime invariant gate (no duplicated checks in agent prompts)
-- [ ] Sprint-manager prompt has Sprint Sizing section with lightweight criteria
-- [ ] Worktree dry-run: build paths resolve correctly when run from a `git worktree add` location
+- [x] CLAUDE.md ≤ 1700 words (target 1500) — currently 1192
+- [x] MEMORY.md ≤ 60 lines — currently 30
+- [x] release-manager.md ≤ 1700 words; new `release` skill exists
+- [x] All 6 skills have YAML frontmatter (`name`, `description`)
+- [x] flow-testing skill is description-activatable (frontmatter present)
+- [x] No agent file contains "Invoke X agent" subagent-delegation instruction
+- [x] Hardcoded `/Users/jarmotuisk/Projects/ritemark-native` removed from CLAUDE.md and MEMORY.md build sections; `$CLAUDE_PROJECT_DIR` (with pwd fallback) used
+- [x] Worktree context hook fires on session start, prints branch + worktree path
+- [x] `pre-commit-validator.sh` is the single runtime invariant gate (no duplicated checks in agent prompts)
+- [x] Sprint-manager prompt has Sprint Sizing section with lightweight criteria
+- [x] Worktree dry-run: build paths resolve correctly when run from a `git worktree add` location *(PROJECT_DIR derived from `${CLAUDE_PROJECT_DIR:-$(pwd)}` in build skills + hook script location fallback in pre-commit-validator)*
 
-## Implementation Tracks (10 commits, dependency-ordered)
+## Implementation Tracks
 
-| # | Track | Description | Commit subject |
+| # | Track | Description | Status |
 |---|---|---|---|
-| 1 | A | Replace hardcoded paths with `$CLAUDE_PROJECT_DIR` (CLAUDE.md, MEMORY.md) | `refactor(harness): replace hardcoded paths with $CLAUDE_PROJECT_DIR` |
-| 2 | J | New `worktree-context.sh` hook + settings.json wiring | `feat(harness): worktree context injection hook` |
-| 3 | C | Remove dead "invoke other agent" delegation from all agent files | `refactor(agents): remove dead "invoke other agent" delegation` |
-| 4 | H | Add `flow-testing` frontmatter, normalize skill spec compliance | `fix(skills): add flow-testing frontmatter, normalize spec` |
-| 5 | F-skill | New `.claude/skills/release/SKILL.md` (procedural commands + gotchas) | `feat(skills): split release-manager — new release skill` |
-| 6 | D | MEMORY.md cleanup: move procedural knowledge to skills | `refactor(memory): move procedural knowledge to skills` |
-| 7 | I | Add `## Gotchas` sections across skills | `feat(skills): add Gotchas sections` |
-| 8 | F-agent | Trim `release-manager.md` to workflow + gates (~1500 words) | `refactor(release-manager): trim to workflow + gates` |
-| 9 | B | Consolidate invariants — pre-commit hook is single source | `refactor(invariants): consolidate to pre-commit hook` |
-| 10 | E + G | Trim CLAUDE.md + sprint-manager lightweight mode | `refactor(harness): trim CLAUDE.md, add sprint lightweight mode` |
+| 1 | A | Replace hardcoded paths with `$CLAUDE_PROJECT_DIR` (CLAUDE.md, MEMORY.md) | Done — CLAUDE.md trim (track E+G) removed the only hardcoded path; MEMORY.md restructured to use `${CLAUDE_PROJECT_DIR:-$(pwd)}` |
+| 2 | J | New `worktree-context.sh` hook + settings.json wiring | Done — `chore(.claude): refresh agents, skills, and harness hooks` |
+| 3 | C | Remove dead "invoke other agent" delegation from all agent files | Done — same harness commit |
+| 4 | H | Add `flow-testing` frontmatter, normalize skill spec compliance | Done — same harness commit |
+| 5 | F-skill | New `.claude/skills/release/SKILL.md` (procedural commands + gotchas) | Done — same harness commit |
+| 6 | D | MEMORY.md cleanup: move procedural knowledge to skills | Done — MEMORY.md down to 30 lines (was 200+); build/release/Node-version content moved into `vscode-development` and `release` skills |
+| 7 | I | Add `## Gotchas` sections across skills | Done — same harness commit |
+| 8 | F-agent | Trim `release-manager.md` to workflow + gates (~1500 words) | Done — same harness commit |
+| 9 | B | Consolidate invariants — pre-commit hook is single source | Done — `refactor(sprint-60): consolidate invariants behind pre-commit hook (track B)`; added Patches Applied + Settings page integrity checks; CLAUDE.md table dropped |
+| 10 | E + G | Trim CLAUDE.md + sprint-manager lightweight mode | Done — `refactor(sprint-60): trim CLAUDE.md (track E+G)` |
 
 ## Status
 
-**Current Phase:** 3 (Develop)
+**Current Phase:** Phase 4 — Validation complete (all 10 tracks shipped)
 **Approval Required:** No (Phase 2→3 cleared via ExitPlanMode 2026-05-04)
 **Gate:** Clear
+
+All 10 audit recommendations landed. Ready for `qa-validator` and merge.
 
 ## Approval
 
