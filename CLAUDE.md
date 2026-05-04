@@ -22,15 +22,9 @@ Ritemark Native is a VS Code OSS fork with Ritemark built-in as the native markd
 
 ## Critical Invariants
 
-If broken, the project doesn't work. Enforced by `.claude/hooks/pre-commit-validator.sh`.
+Runtime invariants (extension symlink, webview bundle freshness + size + `ai-sidebar` sentinel, postcss config, no raw `@tailwind`, extension TS compiles, VS Code patches applied, Settings page integrity) are enforced by `.claude/hooks/pre-commit-validator.sh` — the single source of truth. To inspect or modify checks, read or edit the hook directly. A failing check blocks the commit.
 
-| Invariant | Quick check |
-| --- | --- |
-| Extension symlink | `ls -la vscode/extensions/ritemark` shows `→ ../../extensions/ritemark` |
-| Webview bundle | `extensions/ritemark/media/webview.js` ~900 KB, contains `ai-sidebar` sentinel |
-| Node architecture | `node -p "process.arch"` shows `arm64` (prod build) |
-| Patches applied | `./scripts/apply-patches.sh --dry-run` shows all "Already applied" |
-| Settings page | `RitemarkSettings.tsx` is the full implementation (400+ lines, NOT a stub) |
+Build-environment prerequisites that the hook can't enforce at commit time (Node v20.x arm64 for prod, Node v22.21.1 arm64 for dev mode, `arch -arm64` shell wrapper) live in `.claude/skills/vscode-development/SKILL.md`.
 
 Layout invariants (right sidebar AI panel + terminal placement, titlebar toolbar, etc.) are owned by patch 002. Detailed contract: `.claude/skills/vscode-development/references/layout-invariants.md`.
 
