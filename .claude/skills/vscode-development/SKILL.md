@@ -1,8 +1,9 @@
 ---
 name: vscode-development
 description: VS Code OSS development knowledge - building from source, extension development, debugging, testing. Use when working with VS Code forks, building VS Code, developing extensions, or troubleshooting VS Code build issues.
-version: 1.0.0
 allowed-tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
+metadata:
+  version: 1.0.0
 ---
 
 # VS Code Development
@@ -199,6 +200,55 @@ After gulp build completes, ALWAYS:
 - Min 4 cores, 6GB RAM (8GB recommended) for full build
 - Dev containers available in repo
 
+## Production Build (Ritemark Native)
+
+The user-facing app is built with `./scripts/build-prod.sh`. Hard rules — diverging from these has cost full 25-minute builds:
+
+```bash
+# 1. Switch to arm64 Node v20 (mandatory)
+arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && node -p "process.arch"'
+# Must show: arm64 + v20.x
+
+# 2. Verify patches
+./scripts/apply-patches.sh --dry-run
+# Must show: all "Already applied"
+
+# 3. Compile extension
+cd extensions/ritemark && npx tsc --noEmit && cd ../..
+
+# 4. Run production build (~25 min) — NEVER pipe through tail!
+arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" && ./scripts/build-prod.sh 2>&1'
+```
+
+**Hard rules:**
+- **NEVER** use `| tail` or `| head` with build commands — output buffering hangs background mode.
+- **NEVER** run `gulp vscode-darwin-arm64` directly — skips extension copy → broken app.
+- **ALWAYS** use the `arch -arm64 /bin/zsh` wrapper — default shell has x64 Node v23.
+- **ALWAYS** run as background task with `run_in_background: true` and `timeout: 600000` (10 min cap).
+- **Extension-only changes** (no VS Code core edits) skip full rebuild:
+
+  ```bash
+  cp -R extensions/ritemark/out/* "VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extensions/ritemark/out/"
+  ```
+
+For the release sequence (sign, DMG, notarize, GitHub Release), see the `release` skill.
+
+## Node Versions
+
+| Context | Required | Why |
+|---|---|---|
+| Production builds | Node v20.x arm64 (`nvm use 20`) | Build pipeline native arm64 dependencies (Rollup, esbuild, electron) require this exact arch + version |
+| Dev mode (`./vscode/scripts/code.sh`) | Node v22.21.1 arm64 (`nvm use 22.21.1`) | Matches `vscode/.nvmrc`. Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need. Node 20 fails with `ERR_UNKNOWN_FILE_EXTENSION` |
+| Webview Vite build | Node v20 (uses compiled rollup) | OK |
+
+Repo root `.nvmrc` pins 22.21.1. `nvm use` from repo root picks it up automatically. x64/Rosetta Node fails all builds (missing arm64 native binaries).
+
+Simple dev launch:
+
+```bash
+source "$HOME/.nvm/nvm.sh" && nvm use && ./vscode/scripts/code.sh
+```
+
 ## Extension Development
 
 ### Project Structure
@@ -363,9 +413,63 @@ extensions/             # Built-in extensions
 3. Use Reload Window, not restart
 4. Clean rebuild when stuck
 
+## Gotchas
+
+Hard-won lessons. Each one cost real time at least once.
+
+### `ELECTRON_RUN_AS_NODE` breaks dev launch
+
+Claude Code sets `ELECTRON_RUN_AS_NODE=1` in its shell. This makes Electron run as plain Node — `import { Menu } from 'electron'` then fails. Always unset before launching dev mode:
+
+```bash
+arch -arm64 /bin/zsh -c 'unset ELECTRON_RUN_AS_NODE && source "$HOME/.nvm/nvm.sh" && nvm use && VSCODE_SKIP_PRELAUNCH=1 ./vscode/scripts/code.sh'
+```
+
+### Dev mode serves from `out/`, not `src/`
+
+`./scripts/code.sh` reads from `out/`. TypeScript auto-compiles, **but CSS and static assets do NOT auto-copy.** After editing CSS or fonts, manually `cp` to `out/`. `CSSDevelopmentService` ripgreps `out/` at startup to build the import map. Cmd+R reloads CSS *content*; full restart needed for *new* CSS files.
+
+For production: register `.woff2` in esbuild loader + resource globs in gulpfile.
+
+### Theme `settingsId` ≠ label
+
+Theme `settingsId` comes from `theme.id` in package.json contribution — not the human label. Ritemark Light: `settingsId` = `"ritemark-light"`, label = `"Ritemark Light"`. Always reference the settingsId.
+
+`findThemeBySettingsId()` does exact match. VS Code theme default is set at three levels: bootstrap (`themeMainService.ts` + `workbench.js`), `workbenchThemeService.ts` placeholder, `themeConfiguration.ts` defaults. Desktop hardcodes `ColorScheme.DARK` and `'vs-dark'` as fallbacks — patched to `'vs'`/`ColorScheme.LIGHT` in patch 001.
+
+### React PDF — memoize file data
+
+Inline `<Document file={{ data: pdfData.slice(0) }}>` re-inits the doc every render → scroll jumps to top. Memoize:
+
+```ts
+const fileData = useMemo(() => ({ data: pdfData.slice(0) }), [pdfData])
+```
+
+Use `IntersectionObserver` + fixed-size containers for lazy page rendering (not scroll-position math). Once a page loads, keep it rendered (`hasLoaded` flag). The `URL.parse is not a function` warning from pdfjs-dist is harmless — Electron Chromium too old; ignore.
+
+### VS Code patches — unused imports = build fail (after 22 min)
+
+When commenting out code in patches, **always remove unused imports**. VS Code build is strict: "declared but never read" = build error. Also remove dead methods (cascading unused references fail too). DI constructor params no longer used: change `private readonly foo` → `_foo`.
+
+### VS Code patches — file path matters
+
+Files in `browser/media/` are NOT copied to production builds. Files in `common/media/` ARE. When referencing assets via `FileAccess.asBrowserUri()`, use `common/media/`.
+
+See: `.claude/skills/vscode-development/PATCH-RULES.md` for the full patching contract.
+
+### VS Code 1.117 upgrade pitfalls
+
+Three runtime crashes appeared only in prod bundle (dev mode unaffected): `onboardingVariationA` assertDefined, `ChatSetupContribution` activity-bar leak, `builtInExtensionsEnabledWithAutoUpdates` required field — plus newly-bundled `copilot`/`mermaid-chat-features` built-in extensions. Patched in v1.6.1 commit `275da52` + patch 007.
+
+### Native module arch check after submodule bump
+
+After `update-vscode.sh`, verify `vscode/node_modules` doesn't carry stale x86_64 native modules (GH #39) and `out/` of html/css/json language-features isn't stale CJS post-ESM-flip (GH #41). `update-vscode.sh` + `check-native-modules.sh` enforce this since 2026-05-02.
+
 ## References
 
 - [VS Code Contribution Guide](https://github.com/microsoft/vscode/wiki/How-to-Contribute)
 - [Extension API Docs](https://code.visualstudio.com/api)
 - [Testing Extensions](https://code.visualstudio.com/api/working-with-extensions/testing-extension)
 - [VS Code OSS Repo](https://github.com/microsoft/vscode)
+- Patch rules: `.claude/skills/vscode-development/PATCH-RULES.md`
+- Troubleshooting: `.claude/skills/vscode-development/TROUBLESHOOTING.md`

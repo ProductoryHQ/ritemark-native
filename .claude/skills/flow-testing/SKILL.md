@@ -1,3 +1,10 @@
+---
+name: flow-testing
+description: Use when testing Ritemark Flows — running unit/mock tests, validating flow node behavior in dev mode, debugging multi-step flow chains, or verifying outputs after flow JSON edits.
+metadata:
+  version: 1.0.0
+---
+
 # Flow Testing Skill
 
 Testing procedures for Ritemark Flows - visual AI workflows.
