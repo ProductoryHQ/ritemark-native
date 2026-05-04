@@ -75,6 +75,34 @@ if ! cd extensions/ritemark && npm run compile --silent 2>/dev/null; then
 fi
 cd "$PROJECT_DIR"
 
+# Check 8: VS Code patches applied cleanly
+# All patches in patches/vscode/ must be applied (or already applied) — never partially.
+# Reverse-applies and re-applies as a dry-run; "Already applied" means OK.
+if [[ -x "./scripts/apply-patches.sh" ]]; then
+  if ! ./scripts/apply-patches.sh --dry-run 2>&1 | grep -qE "Already applied|Would apply"; then
+    PATCH_OUTPUT=$(./scripts/apply-patches.sh --dry-run 2>&1 || true)
+    echo "ERROR: VS Code patches not cleanly applied"
+    echo "$PATCH_OUTPUT" | tail -5
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
+# Check 9: Settings page is the full implementation (NOT a stub)
+# v1.3.0 regression: Settings was replaced with a placeholder, breaking ALL AI features.
+# Real implementation is 400+ lines. Anything smaller is a stub or accidental gut.
+SETTINGS_FILE="extensions/ritemark/webview/src/components/settings/RitemarkSettings.tsx"
+if [[ -f "$SETTINGS_FILE" ]]; then
+  SETTINGS_LINES=$(wc -l < "$SETTINGS_FILE" | tr -d ' ')
+  if [[ $SETTINGS_LINES -lt 400 ]]; then
+    echo "ERROR: $SETTINGS_FILE shrunk to $SETTINGS_LINES lines (need ≥400 — full implementation)"
+    echo "  Likely regressed to a stub. Restore from git history."
+    ERRORS=$((ERRORS + 1))
+  fi
+else
+  echo "ERROR: $SETTINGS_FILE missing"
+  ERRORS=$((ERRORS + 1))
+fi
+
 # Summary
 if [[ $ERRORS -gt 0 ]]; then
   echo ""
