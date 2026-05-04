@@ -19,6 +19,7 @@ export interface DiscoveredAgent {
   scope: ItemScope;
   hasFrontmatter: boolean;
   isMainAgent: boolean;
+  modifiedAt: number;
 }
 
 export interface DiscoveredCommand {
@@ -29,6 +30,15 @@ export interface DiscoveredCommand {
   filePath: string;
   scope: ItemScope;
   hasFrontmatter: boolean;
+  modifiedAt: number;
+}
+
+function safeMtime(filePath: string): number {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -117,6 +127,7 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
         scope,
         hasFrontmatter: hasFrontmatterBlock(content),
         isMainAgent: true,
+        modifiedAt: safeMtime(claudeMdPath),
       });
     } catch {
       // Skip
@@ -146,6 +157,7 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
           scope,
           hasFrontmatter: hasFm && !!description,
           isMainAgent: isClaudeMd(filePath),
+          modifiedAt: safeMtime(filePath),
         });
       } catch {
         // Skip files that can't be read
@@ -204,6 +216,7 @@ function discoverCommandsInRoot(claudeRoot: string, scope: ItemScope): Discovere
             filePath,
             scope,
             hasFrontmatter: hasFm && !!(frontmatter.description),
+            modifiedAt: safeMtime(filePath),
           });
         } catch {
           // Skip
@@ -245,6 +258,7 @@ function discoverCommandsInRoot(claudeRoot: string, scope: ItemScope): Discovere
             filePath: skillFile,
             scope,
             hasFrontmatter: hasFm && !!(frontmatter.description),
+            modifiedAt: safeMtime(skillFile),
           });
         } catch {
           // Skip
