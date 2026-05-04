@@ -29,115 +29,23 @@ Invoke automatically when you detect:
 
 ## Validation Checks
 
-### 1. Symlink Integrity (CRITICAL)
-
-**Check:** `vscode/extensions/ritemark` must be a symlink to `../../extensions/ritemark`
+### Checks 1-5: invariants (delegate to pre-commit hook)
 
 ```bash
-# Validation command
-ls -la vscode/extensions/ritemark
-# Must show: ritemark -> ../../extensions/ritemark
+./.claude/hooks/pre-commit-validator.sh
 ```
 
-**If broken:**
-```
-FAILED: Symlink integrity check
+This hook is the **single runtime gate** for invariants. It validates:
 
-vscode/extensions/ritemark is not a symlink (or points wrong).
+1. **Symlink integrity** — `vscode/extensions/ritemark` → `../../extensions/ritemark`
+2. **Webview bundle size** — `extensions/ritemark/media/webview.js` > 500 KB
+3. **Webview config files** — `postcss.config.js`, `tailwind.config.ts` non-empty
+4. **CSS processing** — webview.js does NOT contain raw `@tailwind` directives
+5. **TypeScript compilation** — `extensions/ritemark` compiles cleanly
 
-FIX:
-rm -rf vscode/extensions/ritemark
-cd vscode/extensions && ln -s ../../extensions/ritemark ritemark
-```
+It also enforces bundle freshness (source change without bundle rebuild = block) and the `ai-sidebar` sentinel (the routing key for the AI sidebar / Agent Library).
 
-### 2. Webview Bundle Size (CRITICAL)
-
-**Check:** `extensions/ritemark/media/webview.js` must be > 500KB
-
-```bash
-# Validation command
-ls -la extensions/ritemark/media/webview.js
-# Size should be ~900KB, definitely > 500KB
-```
-
-**If too small:**
-```
-FAILED: Webview bundle size check
-
-webview.js is only XXK (expected ~900KB).
-This indicates a corrupted build or missing dependencies.
-
-FIX:
-cd extensions/ritemark/webview
-rm -rf node_modules package-lock.json
-npm install
-npm run build
-ls -la ../media/webview.js  # Verify ~900KB
-```
-
-### 3. Webview Config Files (CRITICAL)
-
-**Check:** PostCSS and Tailwind config files exist and are not empty
-
-```bash
-# Validation commands
-[ -s extensions/ritemark/webview/postcss.config.js ] && echo "OK" || echo "EMPTY"
-[ -s extensions/ritemark/webview/tailwind.config.ts ] && echo "OK" || echo "EMPTY"
-```
-
-**If empty or missing:**
-```
-FAILED: Webview config files check
-
-Config files are empty (0 bytes) - Tailwind CSS will NOT be processed!
-This causes styles to be missing in production builds.
-
-FIX:
-cd extensions/ritemark/webview
-git checkout HEAD -- postcss.config.js tailwind.config.ts
-npm run build
-```
-
-### 4. CSS Processing Verification (CRITICAL)
-
-**Check:** Webview bundle contains processed CSS, not raw @tailwind directives
-
-```bash
-# Validation command
-! grep -q "@tailwind base" extensions/ritemark/media/webview.js && echo "OK" || echo "FAIL"
-```
-
-**If fails:**
-```
-FAILED: CSS processing check
-
-webview.js contains raw "@tailwind" directives instead of processed CSS.
-This means Tailwind CSS was NOT processed during build.
-
-FIX:
-1. Check postcss.config.js and tailwind.config.ts are not empty
-2. Rebuild: cd extensions/ritemark/webview && npm run build
-3. Verify: grep "@tailwind base" ../media/webview.js (should return nothing)
-```
-
-### 5. TypeScript Compilation (CRITICAL)
-
-**Check:** Extension compiles without errors
-
-```bash
-# Validation command
-cd extensions/ritemark && npm run compile
-# Must exit 0 with no errors
-```
-
-**If fails:**
-```
-FAILED: TypeScript compilation
-
-Errors found in extension code. Fix before committing.
-
-[Show actual errors from compile output]
-```
+If the hook fails, surface its output verbatim and refuse to proceed. The hook prints actionable fixes for each failure.
 
 ### 6. VS Code Patches Applied (CRITICAL)
 
@@ -333,17 +241,17 @@ ls -la "VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extension
 # Must be ~900KB
 ```
 
-## Integration with Sprint Manager
+## Integration with Sprint Workflow
 
-When invoked by sprint-manager for phase transitions:
+When the user invokes you for a sprint phase transition (sprint-manager surfaces the recommendation; the user routes from the main session):
 
 **Phase 4→5 (Test & Validate → Cleanup):**
 - Run checks 1-7
-- Report to sprint-manager
+- Report findings; the user feeds them back to sprint-manager
 
 **Phase 6 (Deploy):**
 - Run all checks 1-11
-- Block release if any critical fails
+- Block release if any critical fails (report to user; user surfaces to release-manager)
 
 ## Quick Commands
 

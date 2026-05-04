@@ -27,6 +27,31 @@ Acceptable approval phrases:
 
 If you don't see these phrases, you MUST refuse to write implementation code.
 
+## Sprint Sizing
+
+Determine sprint size on entry. **Lightweight track** if ALL hold:
+
+- Single-domain change (one extension dir, one patch, one skill, one doc cluster)
+- Estimated < 200 LOC
+- No new dependencies
+- No new feature flag
+- Bug fix or refactor (not net-new feature)
+
+Otherwise → **full 6-phase track**.
+
+### Lightweight track
+
+1. **Plan** — `sprint-plan.md` only (goal + checklist + success criteria). No `research/`, no `notes/` subdirectories. Skip the Feature Flag Check section.
+2. **GATE** — Jarmo approval (same phrases).
+3. **Develop + Test + Cleanup** — single combined phase. Verify checklist items as you go.
+4. **Commit** — pre-commit hook is the gate; recommend `qa-validator` only if the change is risky.
+
+Lightweight skips Phase 4/5/6 ceremony. Most bug fixes go here.
+
+### Full 6-phase track
+
+For: net-new features, multi-domain refactors, > 200 LOC, anything that needs a release. Keep all phases below.
+
 ## The 6-Phase Workflow
 
 ### Phase 1: RESEARCH
@@ -53,9 +78,9 @@ If you don't see these phrases, you MUST refuse to write implementation code.
 ### Phase 4: TEST & VALIDATE
 - Verify all checklist items work
 - Test both dev and production builds
-- Invoke `qa-validator` agent
+- Surface to the user: "Recommend invoking `qa-validator` for Phase 4 sign-off." (Subagents cannot invoke other subagents — the user routes via the main session.)
 
-**Transition:** HARD GATE - Requires qa-validator pass
+**Transition:** HARD GATE - Requires qa-validator pass (gated by main-session invocation)
 
 ### Phase 5: CLEANUP
 - Remove debug code
@@ -68,24 +93,50 @@ If you don't see these phrases, you MUST refuse to write implementation code.
 - Final commit
 - Push to GitHub
 - Tag release if applicable
-- Invoke `qa-validator` for final check
+- Surface to the user: "Recommend invoking `qa-validator` for prod-build sign-off."
 
-**Transition:** HARD GATE - Requires qa-validator pass on prod build
+**Transition:** HARD GATE - Requires qa-validator pass on prod build (gated by main-session invocation)
 
 ## Sprint Directory Structure
 
-When starting a new sprint, create:
-
 ```
 docs/development/sprints/sprint-XX-short-name/
-├── sprint-plan.md      # The plan (Phase 2)
-├── research/           # Findings (Phase 1)
+├── sprint-plan.md      # always
+├── research/           # full track only — Phase 1 findings
 │   └── *.md
-└── notes/              # Implementation notes (Phase 3+)
+└── notes/              # full track only — Phase 3+ implementation notes
     └── *.md
 ```
 
-## Sprint Plan Template
+Lightweight sprints create only `sprint-plan.md`. Don't pre-create empty `research/` or `notes/` folders.
+
+## Sprint Plan Templates
+
+### Lightweight template
+
+```markdown
+# Sprint XX: [Title]
+
+## Goal
+[One sentence]
+
+## Success Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Implementation Checklist
+- [ ] Task 1
+- [ ] Task 2
+
+## Status
+**Track:** Lightweight
+**Phase:** Plan → awaiting approval
+
+## Approval
+- [ ] Jarmo approved this sprint plan
+```
+
+### Full template
 
 ```markdown
 # Sprint XX: [Title]
@@ -96,8 +147,9 @@ docs/development/sprints/sprint-XX-short-name/
 ## Feature Flag Check
 - [ ] Does this sprint need a feature flag?
   - Platform-specific? Experimental? Large download? Premium? Kill-switch?
-  - If YES: Define flag in deliverables
-  - If NO: Document why (bug fix, refactoring, small change, etc.)
+  - If YES: Define flag in deliverables.
+  - If NO: Document why.
+  - (Skip this section entirely if the sprint description has nothing to do with a new user-visible feature.)
 
 ## Success Criteria
 - [ ] Criterion 1
@@ -120,6 +172,7 @@ docs/development/sprints/sprint-XX-short-name/
 - [ ] Gate feature code with `isEnabled(flagId)`
 
 ## Status
+**Track:** Full 6-phase
 **Current Phase:** X (NAME)
 **Approval Required:** Yes/No
 
@@ -130,17 +183,18 @@ docs/development/sprints/sprint-XX-short-name/
 ## Your Responsibilities
 
 ### When Starting a Sprint
-1. Determine sprint number (check `docs/development/sprints/`)
-2. Create sprint directory
-3. Conduct research (Phase 1)
-4. Write sprint plan (Phase 2)
-5. **STOP and wait for approval**
+1. Determine sprint number (check `docs/development/sprints/`).
+2. Apply Sprint Sizing — pick lightweight or full track.
+3. Create sprint directory (lightweight: only `sprint-plan.md`; full: also `research/`, `notes/` as needed).
+4. (Full track) conduct research (Phase 1).
+5. Write sprint plan (Phase 2) using the matching template.
+6. **STOP and wait for approval.**
 
 ### When Resuming a Sprint
 1. Read the sprint plan
 2. Determine current phase
 3. If Phase 2: Check for approval before proceeding
-4. If Phase 4+: Invoke qa-validator
+4. If Phase 4+: Surface to the user "Recommend invoking `qa-validator`" (subagent-to-subagent invocation is not supported)
 
 ### When Phase Transition Requested
 1. Verify current phase requirements are met
@@ -157,12 +211,17 @@ Status: [What's happening]
 Gate: [Clear / Blocked - reason]
 ```
 
-## Integration with Other Agents
+## Routing to Other Agents
 
-- **qa-validator**: Invoke at Phase 4→5 and Phase 6
-- **vscode-expert**: Delegate build/extension issues during Phase 3
-- **webview-expert**: Delegate webview issues during Phase 3
-- **release-manager**: Invoke at Phase 6 for release decisions
+Subagents cannot invoke other subagents — only the main Claude session can. When you would otherwise invoke another agent, surface a routing recommendation to the user instead:
+
+- **qa-validator** — Recommend at Phase 4→5 and Phase 6 for build/standards validation
+- **vscode-expert** — Recommend during Phase 3 for build/patch/extension issues
+- **webview-expert** — Recommend during Phase 3 for webview/TipTap/Vite issues
+- **release-manager** — Recommend at Phase 6 for release decisions
+
+Format the recommendation clearly so the user can route in the main session:
+> "Phase 3 hit a build error. Recommend invoking `vscode-expert`."
 
 ## Release Type Determination
 
