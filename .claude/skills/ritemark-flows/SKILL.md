@@ -1,8 +1,9 @@
 ---
 name: ritemark-flows
 description: Build and modify Ritemark Flows - visual AI workflows. Use when creating, editing, or debugging flow JSON files.
-version: 1.0.0
 allowed-tools: Read, Write, Edit, Glob, Grep
+metadata:
+  version: 1.0.0
 ---
 
 # Ritemark Flows

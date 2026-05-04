@@ -1,8 +1,9 @@
 ---
 name: feature-flags
 description: Feature flag system for Ritemark - when to use flags, how to implement them, lifecycle management. Use when adding new features that need gating, platform restrictions, or experimental status.
-version: 1.0.0
 allowed-tools: Read, Grep, Glob, Edit, Write
+metadata:
+  version: 1.0.0
 ---
 
 # Feature Flags
@@ -154,3 +155,17 @@ Experimental features appear in VS Code settings under `ritemark.experimental.*`
   }
 }
 ```
+
+## Gotchas
+
+### Disable, don't delete
+
+When Jarmo asks to disable a feature, gate it with a flag — never remove the code. Removing components has caused outages (Settings v1.3.0 → all AI features unusable). Working code disabled by a flag stays restorable; deleted code does not.
+
+### Default ON, gate OFF for kill-switch
+
+For platform-restriction or kill-switch flags, default the flag to ON so existing users keep working features. Default OFF only for genuinely experimental code paths the user opts into.
+
+### Webview ↔ extension flag sync
+
+Flags evaluated in the extension and the webview can drift if the extension restarts but the webview keeps its old flag map. When toggling a flag at runtime, broadcast `flow:flagsUpdate` (or equivalent) to all webviews so UI gating stays correct.

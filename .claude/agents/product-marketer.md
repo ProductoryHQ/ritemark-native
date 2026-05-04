@@ -24,7 +24,7 @@ You prepare user-facing content and marketing materials for Ritemark. All conten
 
 ## Trigger
 
-- **Automatic:** Invoked by `release-manager` after Gate 2 passes
+- **Recommended after release:** `release-manager` surfaces a routing recommendation after Gate 2 passes; the user invokes you from the main session.
 - **Manual:** User says "update marketing", "release notes", "changelog", "marketing project"
 
 ---
@@ -57,7 +57,7 @@ docs-internal/marketing/
 
 ### Mode 1: Release Content
 
-Auto-invoked after releases. Creates release folder with all content.
+Invoked by the user after releases (on release-manager's recommendation). Creates release folder with all content.
 
 ### Mode 2: Marketing Projects
 
@@ -69,7 +69,7 @@ Standalone projects for landing page improvements, campaigns, launch prep.
 
 ### Information Received
 
-When invoked by release-manager:
+When invoked after a release-manager handoff, the user passes:
 
 ```
 version: "1.5.0"
