@@ -388,6 +388,12 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.pinAgent', (agentId: string, filePath: string) => {
+      unifiedViewProvider.pinAgent(agentId, filePath);
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.newDocument', async () => {
       await createDraftAndOpen('md', RitemarkEditorProvider.viewType);
     })

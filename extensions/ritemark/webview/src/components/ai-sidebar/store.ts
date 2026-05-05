@@ -192,6 +192,15 @@ interface AISidebarState {
   discoveredAgents: DiscoveredAgent[];
   discoveredCommands: DiscoveredCommand[];
 
+  // ── Pinned agent (set via Launch Chat from Agent Library) ──
+  pinnedAgent: string | null;
+  pinnedAgentContent: string | null;
+  pinnedAgentDismissal: string | null;
+  setPinnedAgent: (agentId: string | null) => void;
+  clearPinnedAgentContent: () => void;
+  clearPinnedAgentDismissal: () => void;
+  requestPinAgent: (agentId: string, filePath: string) => void;
+
   // ── Appearance ──
   chatFontSize: number;
 
@@ -205,7 +214,7 @@ interface AISidebarState {
   selectModel: (modelId: string) => void;
   setPendingRuntime: (partial: Partial<{ runtimeId: 'claude-code' | 'codex'; modelId: string; mode: 'plan' | 'edit' }>) => void;
   sendChatMessage: (prompt: string) => void;
-  sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean }) => void;
+  sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
   applyWidget: (widget: WidgetData) => void;
   discardWidget: (messageId: string) => void;
@@ -314,6 +323,22 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   isIndexing: false,
   discoveredAgents: [],
   discoveredCommands: [],
+  pinnedAgent: null,
+  pinnedAgentContent: null,
+  pinnedAgentDismissal: null,
+  setPinnedAgent: (agentId) => {
+    const current = get().pinnedAgent;
+    if (!agentId && current) {
+      set({ pinnedAgent: null, pinnedAgentContent: null, pinnedAgentDismissal: current });
+    } else {
+      set({ pinnedAgent: agentId, pinnedAgentContent: null, pinnedAgentDismissal: null });
+    }
+  },
+  clearPinnedAgentContent: () => set({ pinnedAgentContent: null }),
+  clearPinnedAgentDismissal: () => set({ pinnedAgentDismissal: null }),
+  requestPinAgent: (agentId, filePath) => {
+    vscode.postMessage({ type: 'pin-agent-request', agentId, filePath });
+  },
 
   estimatedTokens: 0,
   contextUsagePercent: 0,
@@ -388,7 +413,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       'Codex',
       lastAgentTimestamp,
     );
-    const fullPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+    const basePrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+    const fullPrompt = options?.hiddenContext
+      ? `${options.hiddenContext}\n\n---\n\n${basePrompt}`
+      : basePrompt;
 
     const turn: AgentConversationTurn = {
       id: nextId(),
@@ -416,7 +444,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       data: att.data,
       mediaType: att.mediaType,
     }));
-    vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile });
+    vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile, mentionedAgentPaths: options?.mentionedAgentPaths });
   },
 
   cancelRequest: () => {
@@ -978,6 +1006,26 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           discoveredCommands: message.discoveredCommands || [],
         });
         break;
+
+      case 'pin-agent': {
+        const newAgentId = message.agentId ?? null;
+        const currentAgent = get().pinnedAgent;
+        const currentDismissal = get().pinnedAgentDismissal;
+        // Carry over a dismissal: prefer the agent being replaced; otherwise keep
+        // any pending dismissal that hasn't been delivered yet (unless it's the same agent now)
+        let dismissal: string | null = null;
+        if (currentAgent && currentAgent !== newAgentId) {
+          dismissal = currentAgent;
+        } else if (currentDismissal && currentDismissal !== newAgentId) {
+          dismissal = currentDismissal;
+        }
+        set({
+          pinnedAgent: newAgentId,
+          pinnedAgentContent: message.content ?? null,
+          pinnedAgentDismissal: dismissal,
+        });
+        break;
+      }
 
       case 'codex:status': {
         const updates: Partial<AISidebarState> = {

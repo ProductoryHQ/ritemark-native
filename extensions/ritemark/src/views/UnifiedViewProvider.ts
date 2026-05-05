@@ -277,13 +277,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
           break;
 
+        case 'pin-agent-request':
+          this.pinAgent(message.agentId, message.filePath);
+          break;
+
         case 'ai-execute-agent':
           traceClaude('webview->extension', 'ai-execute-agent', {
             promptPreview: message.prompt?.slice(0, 200),
             imageCount: Array.isArray(message.images) ? message.images.length : 0,
             skipActiveFile: message.skipActiveFile === true,
           });
-          await this._handleAgentExecution(message.prompt, message.images, message.skipActiveFile);
+          await this._handleAgentExecution(message.prompt, message.images, message.skipActiveFile, message.mentionedAgentPaths);
           break;
 
         case 'ai-cancel-agent':
@@ -520,6 +524,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public clearChat() {
     this._resetProviderSessions();
     this._view?.webview.postMessage({ type: 'clear-chat' });
+  }
+
+  /**
+   * Pin a discovered agent in the chat composer — used by Launch Chat in the Agent Library.
+   * Reads the agent's .md file so the webview can include it as context on the first message.
+   */
+  public pinAgent(agentId: string, filePath: string) {
+    let content: string | undefined;
+    try {
+      content = require('fs').readFileSync(filePath, 'utf-8');
+    } catch {
+      // File unreadable — fall back to id-only reminder
+    }
+    this._view?.webview.postMessage({ type: 'pin-agent', agentId, content });
   }
 
   /**
@@ -1009,7 +1027,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Execute a prompt using the Claude Code agent (persistent session).
    * Reuses the same process across turns so the agent retains context.
    */
-  private async _handleAgentExecution(prompt: string, images?: Array<{ id: string; data: string; mediaType: string }>, skipActiveFile?: boolean) {
+  private async _handleAgentExecution(prompt: string, images?: Array<{ id: string; data: string; mediaType: string }>, skipActiveFile?: boolean, mentionedAgentPaths?: string[]) {
+    // Prepend @mentioned agent instructions as hidden context
+    if (mentionedAgentPaths && mentionedAgentPaths.length > 0) {
+      const fs = require('fs') as typeof import('fs');
+      const sections = mentionedAgentPaths.map((p) => {
+        try { return fs.readFileSync(p, 'utf-8'); } catch { return null; }
+      }).filter(Boolean);
+      if (sections.length > 0) {
+        prompt = `[Agent instructions — respond as this agent for this conversation]\n\n${sections.join('\n\n---\n\n')}\n\n---\n\n${prompt}`;
+      }
+    }
     if (!isEnabled('agentic-assistant')) {
       this._view?.webview.postMessage({
         type: 'agent-result',
