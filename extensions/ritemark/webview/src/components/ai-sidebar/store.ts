@@ -15,7 +15,7 @@ import {
   generateId,
   generateTitle,
   setWorkspaceContext,
-  type SavedConversation,
+  type SavedConversationV2,
 } from './chatHistoryStorage';
 import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult, shouldRequestPlanMode } from './lifecycle';
 import type {
@@ -55,6 +55,36 @@ function nextId(): string {
 
 function resetProviderSessions(): void {
   vscode.postMessage({ type: 'conversation:reset' });
+}
+
+/**
+ * Build a compact cross-runtime handoff block from the other runtime's turns
+ * that occurred after `sinceTimestamp`. Only includes completed turns (with a
+ * response). Injected as a preamble so the receiving runtime knows what the
+ * other runtime already said in this conversation.
+ */
+function buildHandoffContext(
+  turns: Array<{ userPrompt: string; responseText: string | undefined; timestamp: number }>,
+  runtimeLabel: string,
+  sinceTimestamp: number,
+  maxTurns = 6,
+  maxResponseChars = 1200,
+): string | null {
+  const relevant = turns
+    .filter((t) => t.timestamp > sinceTimestamp && t.responseText)
+    .slice(-maxTurns);
+  if (relevant.length === 0) return null;
+
+  const lines: string[] = [
+    `[The following turns were handled by ${runtimeLabel} earlier in this conversation. You are a different AI assistant continuing the same conversation — do not claim to be ${runtimeLabel}.]`,
+  ];
+  for (const t of relevant) {
+    lines.push(`User: ${t.userPrompt}`);
+    const text = t.responseText!;
+    lines.push(`${runtimeLabel}: ${text.length > maxResponseChars ? text.slice(0, maxResponseChars) + '…' : text}`);
+  }
+  lines.push('[End of prior context. Respond to the user request below as yourself.]');
+  return lines.join('\n');
 }
 
 const DEFAULT_CODEX_STATUS: CodexSidebarStatus = {
@@ -133,9 +163,12 @@ interface AISidebarState {
   dismissedCodexNoticeKey: string | null;
   dismissedCurrentPlanKey: string | null;
 
+  // ── Pending runtime (per-run draft selection) ──
+  pendingRuntime: { runtimeId: 'claude-code' | 'codex'; modelId: string; mode: 'plan' | 'edit' };
+
   // ── Chat history state ──
   currentConversationId: string | null;
-  savedConversations: SavedConversation[];
+  savedConversations: SavedConversationV2[];
   showHistoryPanel: boolean;
 
   // ── Setup state (Claude Code) ──
@@ -170,6 +203,7 @@ interface AISidebarState {
   // ── Actions ──
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
+  setPendingRuntime: (partial: Partial<{ runtimeId: 'claude-code' | 'codex'; modelId: string; mode: 'plan' | 'edit' }>) => void;
   sendChatMessage: (prompt: string) => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean }) => void;
   cancelRequest: () => void;
@@ -190,7 +224,7 @@ interface AISidebarState {
   rejectPlan: (turnId: string, feedback?: string) => void;
   answerAgentQuestion: (turnId: string, question: AgentQuestion, answers: Record<string, string>) => void;
   dismissWelcome: () => void;
-  sendCodexMessage: (prompt: string, attachments?: FileAttachment[]) => void;
+  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'plan' | 'edit') => void;
   selectCodexModel: (modelId: string) => void;
   handleCodexApproval: (requestId: string | number, approved: boolean) => void;
   answerCodexQuestion: (turnId: string, question: CodexQuestion, answers: Record<string, string>) => void;
@@ -229,7 +263,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   ready: false,
 
   agenticEnabled: false,
-  selectedAgent: 'ritemark-agent',
+  selectedAgent: 'claude-code',
   selectedModel: 'claude-sonnet-4-5',
   agents: [],
   models: [],
@@ -252,6 +286,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   codexConversation: [],
   dismissedCodexNoticeKey: null,
   dismissedCurrentPlanKey: null,
+
+  pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'edit' },
 
   currentConversationId: null,
   savedConversations: [],
@@ -303,6 +339,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'ai-select-model', modelId });
   },
 
+  setPendingRuntime: (partial) => {
+    set({ pendingRuntime: { ...get().pendingRuntime, ...partial } });
+  },
+
   sendChatMessage: (prompt) => {
     const state = get();
     if (state.isStreaming) return;
@@ -336,6 +376,20 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     if (lastTurn?.isRunning) return;
 
     const activeFile = (!options?.skipActiveFile && state.activeFilePath) ? state.activeFilePath : undefined;
+
+    // Prepend Codex turns that happened after Claude's last turn
+    const lastAgentTimestamp = lastTurn?.timestamp ?? 0;
+    const handoff = buildHandoffContext(
+      state.codexConversation.map((t) => ({
+        userPrompt: t.userPrompt,
+        responseText: t.streamingText || undefined,
+        timestamp: t.timestamp,
+      })),
+      'Codex',
+      lastAgentTimestamp,
+    );
+    const fullPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+
     const turn: AgentConversationTurn = {
       id: nextId(),
       userPrompt: prompt,
@@ -362,12 +416,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       data: att.data,
       mediaType: att.mediaType,
     }));
-    vscode.postMessage({ type: 'ai-execute-agent', prompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile });
+    vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile });
   },
 
   cancelRequest: () => {
     const state = get();
-    if (state.selectedAgent === 'codex') {
+    // Route by active turn, not selectedAgent — supports mixed-runtime conversations
+    const hasRunningCodex = state.codexConversation.some((t) => t.isRunning);
+    const hasRunningClaude = state.agentConversation.some((t) => t.isRunning);
+
+    if (hasRunningCodex) {
       vscode.postMessage({ type: 'codex-cancel' });
       const conv = [...state.codexConversation];
       const last = conv[conv.length - 1];
@@ -375,7 +433,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         conv[conv.length - 1] = { ...last, isRunning: false, result: { status: 'interrupted', error: 'Cancelled by user' } };
       }
       set({ codexConversation: conv });
-    } else if (state.selectedAgent === 'claude-code') {
+    } else if (hasRunningClaude) {
       vscode.postMessage({ type: 'ai-cancel-agent' });
       const conv = [...state.agentConversation];
       const last = conv[conv.length - 1];
@@ -533,15 +591,28 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
   },
 
-  sendCodexMessage: (prompt, attachments?) => {
+  sendCodexMessage: (prompt, attachments?, requestedMode?) => {
     const state = get();
     const lastTurn = state.codexConversation[state.codexConversation.length - 1];
     if (lastTurn?.isRunning) return;
 
+    // Prepend Claude turns that happened after Codex's last turn
+    const lastCodexTimestamp = lastTurn?.timestamp ?? 0;
+    const handoff = buildHandoffContext(
+      state.agentConversation.map((t) => ({
+        userPrompt: t.userPrompt,
+        responseText: t.result?.text || undefined,
+        timestamp: t.timestamp,
+      })),
+      'Claude',
+      lastCodexTimestamp,
+    );
+    const fullPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+
     const turn: CodexConversationTurn = {
       id: nextId(),
       userPrompt: prompt,
-      requestedPlanMode: shouldRequestPlanMode(prompt),
+      requestedPlanMode: requestedMode === 'plan' || shouldRequestPlanMode(prompt),
       activeFilePath: state.activeFilePath || undefined,
       attachments,
       streamingText: '',
@@ -561,7 +632,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     set({ codexConversation: [...state.codexConversation, turn] });
     vscode.postMessage({
       type: 'codex-execute',
-      prompt,
+      prompt: fullPrompt,
       model: state.codexSelectedModel,
       attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
     });
@@ -885,11 +956,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           ? currentClaude
           : (newClaudeModels[0]?.id || currentClaude);
         const incomingCodexStatus = message.codexStatus ?? get().codexStatus;
+        const incomingRuntimeId = message.selectedAgent === 'codex' ? 'codex' : 'claude-code';
         set({
           agenticEnabled: message.agenticEnabled,
           codexEnabled: message.codexEnabled ?? false,
-          selectedAgent: (message.selectedAgent as AgentId) || 'ritemark-agent',
+          selectedAgent: (message.selectedAgent as AgentId) || 'claude-code',
           selectedModel,
+          pendingRuntime: { ...get().pendingRuntime, runtimeId: incomingRuntimeId, modelId: selectedModel },
           agents: message.agents,
           models: newClaudeModels,
           codexModels: newCodexModels,

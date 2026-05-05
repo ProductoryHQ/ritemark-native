@@ -26,7 +26,7 @@ export function ActivePlanBanner({
   }
 
   return (
-    <div className="mx-3 mb-2 rounded border border-[var(--r-hairline)] bg-[var(--vscode-editorWidget-background)] px-3 py-2">
+    <div className="mx-3 mb-2 rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]/80 px-3 py-2 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
       <div className="flex items-start justify-between gap-3">
         <button
           type="button"
@@ -39,7 +39,7 @@ export function ActivePlanBanner({
             <Icon name="clipboard-text" size={14} className="shrink-0" />
             <span>Current plan</span>
           </div>
-          <div className="mt-1 text-[11px] font-medium text-[var(--r-ink-strong)]">
+          <div className="mt-1 text-[11px] font-semibold text-[var(--r-ink-strong)]">
             {model.summary}
           </div>
         </button>
@@ -48,7 +48,7 @@ export function ActivePlanBanner({
             <button
               type="button"
               onClick={onDismiss}
-              className="rounded p-1 text-[var(--r-ink-muted)] transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
+              className="rounded-md p-1 text-[var(--r-ink-muted)] transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
               title="Mark plan complete and hide"
               aria-label="Mark plan complete and hide"
             >
@@ -58,7 +58,7 @@ export function ActivePlanBanner({
           <button
             type="button"
             onClick={() => setExpanded((value) => !value)}
-            className="rounded p-1 text-[var(--r-ink-muted)] transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
+            className="rounded-md p-1 text-[var(--r-ink-muted)] transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
             title={expanded ? 'Collapse plan details' : 'Expand plan details'}
             aria-label={expanded ? 'Collapse plan details' : 'Expand plan details'}
           >
@@ -72,7 +72,7 @@ export function ActivePlanBanner({
       </div>
 
       {expanded && (
-        <div className="mt-2 space-y-1.5">
+        <div className="mt-2 space-y-1.5 rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/50 px-2.5 py-2">
           {model.steps.map((step, index) => (
             <div
               key={`${step.label}-${index}`}

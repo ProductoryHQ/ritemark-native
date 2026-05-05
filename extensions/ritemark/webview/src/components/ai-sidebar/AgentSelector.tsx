@@ -27,9 +27,11 @@ export function AgentSelector() {
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
   const agenticEnabled = useAISidebarStore((s) => s.agenticEnabled);
+  const pendingRuntime = useAISidebarStore((s) => s.pendingRuntime);
   const selectAgent = useAISidebarStore((s) => s.selectAgent);
   const selectModel = useAISidebarStore((s) => s.selectModel);
   const selectCodexModel = useAISidebarStore((s) => s.selectCodexModel);
+  const setPendingRuntime = useAISidebarStore((s) => s.setPendingRuntime);
 
   const visibleAgents = agents.filter((a) => !a.experimental || agenticEnabled);
 
@@ -51,7 +53,7 @@ export function AgentSelector() {
       ? `Claude · ${currentModelLabel}`
       : selectedAgent === 'codex' && currentCodexModelLabel
         ? `Codex · ${currentCodexModelLabel}`
-        : agents.find((a) => a.id === selectedAgent)?.label || 'Select agent...';
+        : agents.find((a) => a.id === selectedAgent)?.label || (selectedAgent === 'ritemark-agent' ? 'Legacy Agent' : 'Select agent...');
 
   function handleChange(value: string) {
     if (value.startsWith('claude-code:')) {
@@ -60,12 +62,14 @@ export function AgentSelector() {
         selectAgent('claude-code' as AgentId);
       }
       selectModel(modelId);
+      setPendingRuntime({ runtimeId: 'claude-code', modelId });
     } else if (value.startsWith('codex:')) {
       const modelId = value.slice('codex:'.length);
       if (selectedAgent !== 'codex') {
         selectAgent('codex' as AgentId);
       }
       selectCodexModel(modelId);
+      setPendingRuntime({ runtimeId: 'codex', modelId });
     } else {
       selectAgent(value as AgentId);
     }
@@ -77,6 +81,7 @@ export function AgentSelector() {
         <SelectTrigger className="h-7 text-xs">
           <span className="truncate">{triggerLabel}</span>
         </SelectTrigger>
+
         <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
           {/* Claude — grouped by model */}
           {visibleAgents.some((a) => a.id === 'claude-code') && models.length > 0 && (
@@ -131,6 +136,28 @@ export function AgentSelector() {
             ))}
         </SelectContent>
       </Select>
+
+      {/* Plan / Edit mode toggle — Codex only (Claude plan mode is lifecycle-driven) */}
+      {pendingRuntime.runtimeId === 'codex' && (
+        <div className="flex gap-1.5 mt-1.5">
+          {(['edit', 'plan'] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setPendingRuntime({ mode })}
+              className={[
+                'inline-flex items-center px-2.5 h-6 text-[11px] font-medium cursor-pointer',
+                'border transition-colors duration-100',
+                'rounded-[4px]',
+                pendingRuntime.mode === mode
+                  ? 'bg-[var(--r-accent-soft)] border-[var(--r-accent)] text-[var(--r-accent-deep)]'
+                  : 'bg-[var(--r-surface)] border-[var(--r-hairline)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]',
+              ].join(' ')}
+            >
+              {mode === 'edit' ? 'Edit' : 'Plan'}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

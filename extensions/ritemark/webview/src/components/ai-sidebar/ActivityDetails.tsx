@@ -22,11 +22,11 @@ export function ActivityDetails({ activities, metrics }: ActivityDetailsProps) {
   if (duration) summaryParts.push(duration);
 
   return (
-    <details className="mt-2 text-[11px]">
+    <details className="mt-2 rounded-md border border-transparent text-[11px]">
       <summary className="cursor-pointer select-none text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)]">
         Activity ({summaryParts.join(' \u00b7 ')})
       </summary>
-      <div className="mt-1.5 pl-1 space-y-0.5 border-l-2 border-[var(--r-hairline)] ml-1">
+      <div className="mt-1.5 ml-1 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
         {activities.map((a, i) => (
           <ActivityCard key={`${a.timestamp}-${i}`} activity={a} />
         ))}

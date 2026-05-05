@@ -20,6 +20,7 @@ export interface AgentInfo {
   description: string;
   experimental: boolean;
   requiresApiKey: 'anthropic' | 'openai' | null;
+  deprecated?: boolean;
 }
 
 /**
@@ -46,6 +47,7 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
     description: 'Chat & document search',
     experimental: false,
     requiresApiKey: null, // Uses whatever AI provider is configured
+    deprecated: true,
   },
 };
 

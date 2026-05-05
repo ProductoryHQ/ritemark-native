@@ -614,7 +614,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const agenticEnabled = isEnabled('agentic-assistant');
     const codexEnabled = isEnabled('codex-integration');
     const config = vscode.workspace.getConfiguration('ritemark.ai');
-    const selectedAgent = config.get<string>('selectedAgent', 'ritemark-agent');
+    const selectedAgent = config.get<string>('selectedAgent', 'claude-code');
     const selectedModel = config.get<string>('selectedModel', DEFAULT_MODEL);
 
     let setupStatus: SetupStatus | undefined;
@@ -637,8 +637,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const discoveredCommands = workspacePath ? discoverCommands(workspacePath) : [];
     const codexStatus = await this._getCodexSidebarStatus();
 
-    // Filter agents based on feature flags
+    // Filter agents based on feature flags; exclude deprecated agents from the selector
     const visibleAgents = Object.values(AGENTS).filter(a => {
+      if (a.deprecated) return false;
       if (a.id === 'codex') return codexEnabled;
       return true;
     });
