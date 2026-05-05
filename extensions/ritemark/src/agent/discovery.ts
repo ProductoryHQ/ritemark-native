@@ -188,15 +188,25 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
  */
 export function discoverAgents(workspacePath: string | undefined): DiscoveredAgent[] {
   const agents: DiscoveredAgent[] = [];
+  const seen = new Set<string>();
+
+  const addAgents = (discovered: DiscoveredAgent[]) => {
+    for (const agent of discovered) {
+      if (!seen.has(agent.id)) {
+        seen.add(agent.id);
+        agents.push(agent);
+      }
+    }
+  };
 
   if (workspacePath) {
-    const projectClaude = path.join(workspacePath, '.claude');
-    agents.push(...discoverAgentsInRoot(projectClaude, 'project'));
+    addAgents(discoverAgentsInRoot(path.join(workspacePath, '.claude'), 'project'));
+    addAgents(discoverAgentsInRoot(path.join(workspacePath, '.agents'), 'project'));
   }
 
   const userClaude = path.join(os.homedir(), '.claude');
   if (fs.existsSync(userClaude)) {
-    agents.push(...discoverAgentsInRoot(userClaude, 'user'));
+    addAgents(discoverAgentsInRoot(userClaude, 'user'));
   }
 
   return agents.sort((a, b) => a.name.localeCompare(b.name));
@@ -303,24 +313,23 @@ export function discoverCommands(workspacePath: string | undefined): DiscoveredC
   const commands: DiscoveredCommand[] = [];
   const seen = new Set<string>();
 
-  if (workspacePath) {
-    const projectClaude = path.join(workspacePath, '.claude');
-    for (const cmd of discoverCommandsInRoot(projectClaude, 'project')) {
+  const addCommands = (discovered: DiscoveredCommand[]) => {
+    for (const cmd of discovered) {
       if (!seen.has(cmd.id)) {
         seen.add(cmd.id);
         commands.push(cmd);
       }
     }
+  };
+
+  if (workspacePath) {
+    addCommands(discoverCommandsInRoot(path.join(workspacePath, '.claude'), 'project'));
+    addCommands(discoverCommandsInRoot(path.join(workspacePath, '.agents'), 'project'));
   }
 
   const userClaude = path.join(os.homedir(), '.claude');
   if (fs.existsSync(userClaude)) {
-    for (const cmd of discoverCommandsInRoot(userClaude, 'user')) {
-      if (!seen.has(cmd.id)) {
-        seen.add(cmd.id);
-        commands.push(cmd);
-      }
-    }
+    addCommands(discoverCommandsInRoot(userClaude, 'user'));
   }
 
   return commands.sort((a, b) => a.name.localeCompare(b.name));
