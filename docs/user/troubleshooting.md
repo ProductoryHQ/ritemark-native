@@ -87,6 +87,22 @@ The AI assistant can't connect. Check:
 
 ---
 
+## AI Agents and Agent Library
+
+### New helpers do not appear in the Agent Library
+
+1. Check that the helper exists under `.claude/` or `.agents/`
+2. Make sure the file uses the expected `.md` / `SKILL.md` structure
+3. Reload the window if the sidebar has not refreshed yet
+
+### Launch Chat is missing
+
+1. Confirm you are right-clicking an **agent** row, not a skill row
+2. Make sure the helper is recognized as an agent configuration file
+3. If the helper is new, wait for the sidebar to rescan or reload the window
+
+---
+
 ## Export
 
 ### PDF export fails

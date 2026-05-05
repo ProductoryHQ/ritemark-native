@@ -56,9 +56,10 @@ If you see **AI Offline**, check your internet connection, verify the API key, a
 
 ## Claude Code
 
-Claude Code is Anthropic's coding agent. As of v1.6.1, you sign in entirely from inside Ritemark — no terminal commands required.
+Claude Code is Anthropic's coding agent. As of v1.6.3, you sign in entirely from inside Ritemark — no terminal commands required.
 
 For the authoritative agent overview, see [AI Agents](features/ai-agents.md).
+For custom helpers and Launch Chat, see [Agent Library](features/agent-library.md).
 
 ### In-app sign-in (recommended)
 
@@ -102,9 +103,10 @@ Ritemark detects globally installed Claude binaries and uses them when present.
 
 ## OpenAI Codex
 
-Codex is OpenAI's coding agent. As of v1.6.1, sign-in is unified across Settings and the AI sidebar — both surfaces open your system browser instead of dropping you into a terminal, and they stay in sync.
+Codex is OpenAI's coding agent. As of v1.6.3, sign-in is unified across Settings and the AI sidebar — both surfaces open your system browser instead of dropping you into a terminal, and they stay in sync.
 
 For the authoritative agent overview, see [AI Agents](features/ai-agents.md).
+For custom helpers and Launch Chat, see [Agent Library](features/agent-library.md).
 
 ### In-app sign-in (recommended)
 

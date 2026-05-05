@@ -98,6 +98,8 @@ The status bar at the bottom shows the file state.
 
 Ritemark includes an AI assistant for text editing. [Set up your API key →](setup-ai.md)
 
+If you plan to use Claude or Codex, or want to create your own helpers, check out the [AI Agents](features/ai-agents.md) and [Agent Library](features/agent-library.md) guides.
+
 ### Learn the Features
 
 - [Core Editor](../features/editor.md) - How the editor works

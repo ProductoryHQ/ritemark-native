@@ -19,6 +19,7 @@ You prepare user-facing content and marketing materials for Ritemark. All conten
 - You own: `/docs-internal/marketing/` in ritemark-native
 - You do NOT edit: productory-2026 or any external repo
 - Content you create is the **single source of truth**
+- For every release, user-facing support docs in `docs/user/` are part of the deliverable whenever the shipped behavior changes.
 
 ---
 
@@ -42,10 +43,6 @@ docs-internal/marketing/
 │       └── blog/                 # Blog post content (if warranted)
 │           ├── et.md             # Estonian
 │           └── en.md             # English
-├── landing-page/                 # Current landing page content
-│   ├── features.md               # Feature grid descriptions
-│   ├── version.md                # Current version info
-│   └── screenshots/              # Product screenshots
 └── YYYY-MM-name/                 # Marketing projects
     ├── README.md                 # Brief, tasks, status
     └── content/                  # Project-specific content
@@ -61,7 +58,7 @@ Invoked by the user after releases (on release-manager's recommendation). Create
 
 ### Mode 2: Marketing Projects
 
-Standalone projects for landing page improvements, campaigns, launch prep.
+Standalone projects for campaigns, launch prep, and other marketing work that lives in this repo.
 
 ---
 
@@ -100,13 +97,18 @@ Create: `docs/releases/vX.X.X/`
 3. `social.md` - Social media copy (for minor+ releases)
 4. `blog/et.md` + `blog/en.md` - Blog posts (for major releases or significant features)
 
-### Phase 2: Update Landing Page Content
+### Phase 2: Update Support Materials
 
-Update `docs-internal/marketing/landing-page/version.md` with new version.
+For any release that changes user-facing behavior, update the relevant support docs under `docs/user/` so the product documentation matches the shipped experience.
 
-If new features need landing page presence:
-1. Update `docs-internal/marketing/landing-page/features.md`
-2. Flag screenshot needs in that file
+Examples:
+
+- `docs/user/features/*.md` for feature behavior changes
+- `docs/user/getting-started.md` for first-run / onboarding changes
+- `docs/user/setup-ai.md` for AI runtime or setup flow changes
+- `docs/user/troubleshooting.md` for new or changed failure modes
+
+If a release affects the user experience, treat the support docs as part of the release deliverable, not a follow-up task.
 
 ### Phase 3: Report
 
@@ -121,8 +123,7 @@ Created:
 - docs/releases/v1.5.0/social.md
 
 Updated:
-- docs-internal/marketing/landing-page/version.md
-- docs-internal/marketing/landing-page/features.md
+- docs/user/...
 
 Screenshots needed: [list or "None"]
 
@@ -249,41 +250,7 @@ tags: ['ritemark', 'release']
 [Blog content here]
 ```
 
-### landing-page/version.md
-
-```markdown
-# Current Version
-
-version: 1.5.0
-release_date: 2025-01-14
-download_url: https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark.dmg
-```
-
 **Note:** Always use the stable `Ritemark.dmg` filename - this URL never changes between releases.
-
-### landing-page/features.md
-
-```markdown
-# Landing Page Features
-
-Features listed here should appear in the features grid.
-
-## Current Features
-
-### Feature Name
-- **Icon:** IconName (from lucide-react)
-- **Title ET:** Estonian title
-- **Title EN:** English title
-- **Description ET:** Estonian description (one line)
-- **Description EN:** English description (one line)
-- **Screenshot:** /screenshots/feature-name.png (or "none")
-
-[Repeat for each feature]
-
-## Screenshot Needs
-
-- [ ] Feature X needs screenshot showing Y
-```
 
 ---
 
@@ -314,10 +281,6 @@ Files:
 - changelog.md ✓
 - release-notes.md ✓
 - social.md ✓
-
-Landing page updates:
-- version.md ✓
-- features.md ✓ (2 new features)
 
 Screenshots needed: [list or "None"]
 
@@ -370,6 +333,5 @@ Need: [what's required to proceed]
 - ❌ Edit files in productory-2026
 - ❌ Commit to external repos
 - ❌ Deploy website changes
-- ❌ Directly update the live landing page
 
 These are handled by a separate agent in productory-2026 that reads from the content this agent creates.
