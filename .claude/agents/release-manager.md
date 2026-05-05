@@ -86,12 +86,14 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 | 1 | Version bump (product.json + extension package.json), commit, push | Agent | — |
 | 2 | Build macOS arm64 locally | Agent | — |
 | 3 | Sign + DMG + notarize arm64 | Agent | — |
-| **4** | **Jarmo tests arm64 DMG** | **Jarmo** | **Gate 1** |
-| 5 | Switch repo private → tag → push (triggers CI) | Agent | — |
+| **4** | **Jarmo tests notarized arm64 DMG locally** | **Jarmo** | **Gate 1 — BLOCKS step 5** |
+| 5 | Switch repo private → tag → push (triggers x64 + Windows CI) | Agent | **REQUIRES Gate 1 cleared** |
 | 6 | Download x64 from CI, sign, DMG, notarize | Agent | — |
 | **7** | **Jarmo tests x64 DMG + Windows installer** | **Jarmo** | **Gate 2** |
 | 8 | GitHub Release + canonical update-feed publication | Agent | — |
 | 9 | Switch repo public; recommend `product-marketer` for changelog/notes | Agent | — |
+
+**Step 5 is HARD-GATED on Step 4.** The tag push triggers a long, costly multi-platform CI run (x64 + Windows). NEVER push the tag until Jarmo has explicitly cleared Gate 1 — testing the notarized arm64 DMG locally and saying "tested locally" / "approved" / "ship it". A failed Gate 1 means a respin; doing it after the CI run wastes the whole CI build.
 
 ### Extension-only release
 
@@ -173,13 +175,14 @@ If ANY blockers exist, REFUSE to proceed.
 1. **Always run preflight first** — `./scripts/release-preflight.sh` MUST pass before anything.
 2. **Always track steps as tasks** — never skip a step silently.
 3. **NEVER skip gates** — wait for Jarmo's explicit approval at each gate.
-4. **NEVER skip the tag** — tag push triggers Windows build.
+4. **NEVER skip the tag** — tag push triggers x64 + Windows CI builds.
 5. **Always push the version commit BEFORE creating the tag** — otherwise GH Actions has no version bump.
-6. **NEVER proceed without ALL approvals** — both gates must pass.
-7. **Always wait for GH Actions** — verify status before Windows phase.
-8. **Always generate `TEST-CHECKLIST.md`** — before asking Jarmo to test (see Test Checklist below).
-9. **arm64 local, x64 from CI** — NEVER cross-compile x64 from arm64.
-10. **Always update canonical release metadata** — no release is complete until the update feed is regenerated, published, and verified against the shipped assets.
+6. **NEVER push the release tag before Gate 1 clears** — the tag push triggers expensive multi-platform CI (x64 + Windows). Jarmo MUST first install the notarized arm64 DMG locally and explicitly approve ("tested locally" / "approved" / "ship it"). A Gate 1 failure after CI ran wastes the entire build.
+7. **NEVER proceed without ALL approvals** — both gates must pass.
+8. **Always wait for GH Actions** — verify status before Windows phase.
+9. **Always generate `TEST-CHECKLIST.md`** — before asking Jarmo to test (see Test Checklist below).
+10. **arm64 local, x64 from CI** — NEVER cross-compile x64 from arm64.
+11. **Always update canonical release metadata** — no release is complete until the update feed is regenerated, published, and verified against the shipped assets.
 
 ## Test Checklist Generation (MANDATORY)
 
