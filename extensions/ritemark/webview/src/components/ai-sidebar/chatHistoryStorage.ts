@@ -6,6 +6,7 @@
  */
 
 import type { AgentId, AgentConversationTurn, CodexConversationTurn, ChatMessage, ConversationEntry } from './types';
+import type { RuntimeId, ConversationRun } from './conversationModel';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -17,6 +18,17 @@ export interface SavedConversation {
   updatedAt: number;
 }
 
+/** v2 metadata shape — normalizes agentId to runtimeSummary on load */
+export interface SavedConversationV2 {
+  id: string;
+  title: string;
+  agentId?: AgentId;
+  primaryRuntimeId?: RuntimeId;
+  runtimeSummary: RuntimeId[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface SavedConversationData extends SavedConversation {
   agentConversation: AgentConversationTurn[];
   codexConversation?: CodexConversationTurn[];
@@ -24,10 +36,61 @@ export interface SavedConversationData extends SavedConversation {
   conversationHistory: ConversationEntry[];
 }
 
+/** v2 data record — preserves old fields for downgrade compatibility */
+export interface SavedConversationDataV2 extends SavedConversationV2 {
+  schemaVersion: 2;
+  runs: ConversationRun[];
+  agentConversation?: AgentConversationTurn[];
+  codexConversation?: CodexConversationTurn[];
+  chatMessages?: ChatMessage[];
+  conversationHistory?: ConversationEntry[];
+}
+
 // ── Constants ─────────────────────────────────────────────────────────
 
 const GLOBAL_PREFIX = 'ritemark-chat-';
 const MAX_CONVERSATIONS = 50;
+
+// ── v2 rollout guard ──────────────────────────────────────────────────
+
+let _v2StorageEnabled = false;
+
+/** Enable v2 conversation record writes. Off by default — flip after testing. */
+export function enableV2Storage(): void {
+  _v2StorageEnabled = true;
+}
+
+// ── Metadata normalization ────────────────────────────────────────────
+
+function agentIdToRuntimeId(agentId: AgentId): RuntimeId {
+  if (agentId === 'claude-code') return 'claude-code';
+  if (agentId === 'codex') return 'codex';
+  return 'legacy-ritemark';
+}
+
+/**
+ * Coerce a legacy or v2 metadata record to the v2 shape.
+ *
+ * Compatibility: conversations with agentId 'ritemark-agent' are mapped to
+ * runtimeId 'legacy-ritemark'. The ritemark-agent was deprecated in the primary
+ * UX (Phase 3, Sprint 62) but its saved conversations remain fully readable.
+ * Do not remove this mapping.
+ */
+export function normalizeMetadata(raw: SavedConversation | SavedConversationV2): SavedConversationV2 {
+  if ('runtimeSummary' in raw) {
+    return raw as SavedConversationV2;
+  }
+  const primaryRuntimeId = agentIdToRuntimeId(raw.agentId);
+  return {
+    id: raw.id,
+    title: raw.title,
+    agentId: raw.agentId,
+    primaryRuntimeId,
+    runtimeSummary: [primaryRuntimeId],
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
 
 // ── Workspace scoping ────────────────────────────────────────────────
 
@@ -99,20 +162,20 @@ function migrateGlobalConversations(): void {
   }
 
   try {
-    const globalMeta = JSON.parse(globalRaw) as SavedConversation[];
+    const globalMeta = JSON.parse(globalRaw) as (SavedConversation | SavedConversationV2)[];
     if (globalMeta.length === 0) {
       localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
       return;
     }
 
     // Copy each conversation to workspace-scoped keys
-    const migratedMeta: SavedConversation[] = [];
+    const migratedMeta: SavedConversationV2[] = [];
     for (const meta of globalMeta) {
       const oldKey = `${GLOBAL_PREFIX}${meta.id}`;
       const data = localStorage.getItem(oldKey);
       if (data) {
         localStorage.setItem(getConversationKey(meta.id), data);
-        migratedMeta.push(meta);
+        migratedMeta.push(normalizeMetadata(meta));
       }
     }
 
@@ -145,13 +208,14 @@ function getConversationKey(id: string): string {
 }
 
 /**
- * Load metadata list from localStorage
+ * Load metadata list from localStorage, normalizing all records to v2 shape.
  */
-export function loadMetadata(): SavedConversation[] {
+export function loadMetadata(): SavedConversationV2[] {
   try {
     const raw = localStorage.getItem(getMetadataKey());
     if (!raw) return [];
-    return JSON.parse(raw) as SavedConversation[];
+    const parsed = JSON.parse(raw) as (SavedConversation | SavedConversationV2)[];
+    return parsed.map(normalizeMetadata);
   } catch (err) {
     console.warn('[chatHistoryStorage] Failed to load metadata:', err);
     return [];
@@ -161,7 +225,7 @@ export function loadMetadata(): SavedConversation[] {
 /**
  * Save metadata list to localStorage
  */
-function saveMetadata(list: SavedConversation[]): void {
+function saveMetadata(list: SavedConversationV2[]): void {
   try {
     localStorage.setItem(getMetadataKey(), JSON.stringify(list));
   } catch (err) {
@@ -172,7 +236,7 @@ function saveMetadata(list: SavedConversation[]): void {
 /**
  * List all saved conversations (metadata only)
  */
-export function listConversations(): SavedConversation[] {
+export function listConversations(): SavedConversationV2[] {
   return loadMetadata().sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
@@ -201,10 +265,13 @@ export function saveConversation(data: SavedConversationData): void {
     // Update metadata
     const metadata = loadMetadata();
     const existingIndex = metadata.findIndex((m) => m.id === data.id);
-    const meta: SavedConversation = {
+    const primaryRuntimeId = agentIdToRuntimeId(data.agentId);
+    const meta: SavedConversationV2 = {
       id: data.id,
       title: data.title,
       agentId: data.agentId,
+      primaryRuntimeId,
+      runtimeSummary: [primaryRuntimeId],
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     };
@@ -312,4 +379,45 @@ export function generateTitle(
  */
 export function hasHistory(): boolean {
   return loadMetadata().length > 0;
+}
+
+/**
+ * Save a v2 conversation record. No-op unless enableV2Storage() has been called.
+ * Preserves old fields in the record so a downgrade can still read it.
+ */
+export function saveConversationV2(data: SavedConversationDataV2): void {
+  if (!_v2StorageEnabled) return;
+  try {
+    const key = getConversationKey(data.id);
+    localStorage.setItem(key, JSON.stringify(data));
+
+    const metadata = loadMetadata();
+    const existingIndex = metadata.findIndex((m) => m.id === data.id);
+    const meta: SavedConversationV2 = {
+      id: data.id,
+      title: data.title,
+      agentId: data.agentId,
+      primaryRuntimeId: data.primaryRuntimeId,
+      runtimeSummary: data.runtimeSummary,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    };
+
+    if (existingIndex >= 0) {
+      metadata[existingIndex] = meta;
+    } else {
+      metadata.unshift(meta);
+    }
+
+    if (metadata.length > MAX_CONVERSATIONS) {
+      const toRemove = metadata.splice(MAX_CONVERSATIONS);
+      for (const old of toRemove) {
+        try { localStorage.removeItem(getConversationKey(old.id)); } catch { /* ignore */ }
+      }
+    }
+
+    saveMetadata(metadata);
+  } catch (err) {
+    console.warn('[chatHistoryStorage] Failed to save v2 conversation:', err);
+  }
 }

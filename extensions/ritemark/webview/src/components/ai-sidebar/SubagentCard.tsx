@@ -21,21 +21,21 @@ export function SubagentCard({ subagent }: SubagentCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const statusIcon = {
-    running: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--vscode-progressBar-background)]" />,
-    done: <Icon name="check" size={12} className="text-green-500" />,
+    running: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-accent)]" />,
+    done: <Icon name="check" size={12} className="text-[var(--vscode-testing-iconPassed)]" />,
     error: <Icon name="warning-circle" size={12} className="text-[var(--r-error)]" />,
   }[subagent.status];
 
   const hasActivities = subagent.activities.length > 0;
 
   return (
-    <div className="ml-3 border-l-2 border-[var(--vscode-progressBar-background)] pl-3 py-1">
+    <div className="ml-2 rounded-md border border-[var(--r-hairline)] border-l-[3px] border-l-[var(--r-accent-fainter)] bg-[var(--vscode-input-background)]/60 px-2 py-1.5">
       {/* Header */}
       <button
         onClick={() => hasActivities && setIsExpanded(!isExpanded)}
         className={`flex items-center gap-2 w-full text-left ${
           hasActivities ? 'cursor-pointer hover:bg-[var(--r-surface-soft)]' : 'cursor-default'
-        } rounded px-1.5 py-1 -mx-1.5 transition-colors`}
+        } rounded-md px-1.5 py-1 transition-colors`}
         disabled={!hasActivities}
       >
         {/* Expand/collapse chevron */}
@@ -50,10 +50,10 @@ export function SubagentCard({ subagent }: SubagentCardProps) {
         )}
 
         {/* Bot icon */}
-        <Icon name="robot" size={14} className="shrink-0 text-[var(--vscode-progressBar-background)]" />
+        <Icon name="robot" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
 
         {/* Task description */}
-        <span className="flex-1 text-[11px] truncate text-[var(--r-ink-strong)]">
+        <span className="flex-1 truncate text-[11px] font-medium text-[var(--r-ink-strong)]">
           {subagent.task}
         </span>
 
@@ -63,7 +63,7 @@ export function SubagentCard({ subagent }: SubagentCardProps) {
 
       {/* Expanded content */}
       {isExpanded && hasActivities && (
-        <div className="mt-1.5 pl-5 space-y-0.5">
+        <div className="mt-1.5 space-y-0.5 border-l border-[var(--r-hairline)] pl-5">
           {subagent.activities.map((activity, i) => (
             <ActivityCard key={`${activity.timestamp}-${i}`} activity={activity} />
           ))}
@@ -72,7 +72,7 @@ export function SubagentCard({ subagent }: SubagentCardProps) {
 
       {/* Result when done */}
       {subagent.status === 'done' && subagent.result && (
-        <div className="mt-1 ml-5 text-[10px] text-[var(--r-ink-muted)] italic">
+        <div className="mt-1 ml-5 text-[10px] italic text-[var(--r-ink-muted)]">
           {subagent.result}
         </div>
       )}
