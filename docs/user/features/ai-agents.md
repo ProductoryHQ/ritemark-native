@@ -4,6 +4,8 @@
 
 Ritemark includes three AI agents in the sidebar, each with different capabilities and authentication methods. Switch between them using the dropdown at the top of the AI sidebar.
 
+If you want to manage custom helpers, see [Agent Library](agent-library.md) for creating, launching, and organizing your own agents and skills.
+
 ---
 
 ## Overview
@@ -13,6 +15,8 @@ Ritemark includes three AI agents in the sidebar, each with different capabiliti
 | **Ritemark Agent** | Quick edits, document search, rephrasing | OpenAI or Google API key | Stable |
 | **Claude** | Autonomous file work, multi-turn sessions | Claude.ai account or Anthropic API key | Stable |
 | **Codex** | Coding tasks, autonomous coding agent | ChatGPT account (OAuth) | Experimental |
+
+In v1.6.3, agent selection is per turn inside a conversation. You can keep one thread open and switch runtimes without starting over.
 
 ---
 
@@ -167,7 +171,7 @@ Use the dropdown at the top of the AI sidebar to switch agents:
 
 1. Click the agent name (e.g., "Claude - Opus")
 2. Select a different agent from the dropdown
-3. Each agent maintains its own conversation
+3. The selected runtime is used for the next turn, while the conversation stays continuous
 
 The dropdown shows all available agents and their models. Agents that require setup show a setup wizard instead of the chat interface.
 

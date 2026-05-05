@@ -1,0 +1,35 @@
+{
+  "_comment": "Draft v1.6.3 entry block for dist/update-feed.json. Fill exact size + sha256 from final notarized assets before publish.",
+  "_releaseNote": "Tag v1.6.3 currently points to commit afb5ecb in origin; ensure release artifacts and notes are generated from the same intended commit/tag before publishing.",
+  "version": "1.6.3",
+  "tagName": "v1.6.3",
+  "releaseDate": "2026-05-05T00:00:00.000Z",
+  "notesSummary": "Per-turn Claude/Codex runtime switching, agent-library authoring workflows, Launch Chat, and AGENTS/.agents discovery.",
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "assetName": "Ritemark-arm64.dmg",
+      "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.3/Ritemark-arm64.dmg",
+      "_sourceFile": "dist/Ritemark-1.6.3-darwin-arm64.dmg",
+      "_sizeNote": "release-manager script computes exact bytes",
+      "sha256": "TODO"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x64",
+      "assetName": "Ritemark-x64.dmg",
+      "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.3/Ritemark-x64.dmg",
+      "_sourceFile": "dist/Ritemark-1.6.3-darwin-x64.dmg",
+      "_sizeNote": "release-manager script computes exact bytes",
+      "sha256": "TODO"
+    },
+    {
+      "_pendingPlatform": true,
+      "platform": "win32",
+      "arch": "x64",
+      "assetName": "Ritemark-1.6.3-win32-x64-setup.exe",
+      "_note": "Fill size + sha256 after Windows host packaging/upload."
+    }
+  ]
+}
