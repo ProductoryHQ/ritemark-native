@@ -163,7 +163,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
           void this._moveScope(message.filePath);
           break;
         case 'launchChat':
-          void this._launchChat(message.agentId);
+          void this._launchChat(message.agentId, message.filePath);
           break;
       }
     });
@@ -202,13 +202,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     vscode.commands.executeCommand('vscode.open', uri);
   }
 
-  private async _launchChat(agentId: string) {
-    await vscode.workspace.getConfiguration('ritemark.ai').update(
-      'selectedAgent',
-      agentId,
-      vscode.ConfigurationTarget.Global
-    );
-    await vscode.commands.executeCommand('ritemark.newChat');
+  private async _launchChat(agentId: string, filePath: string) {
+    await vscode.commands.executeCommand('ritemark.pinAgent', agentId, filePath);
     await vscode.commands.executeCommand('ritemark.unifiedView.focus');
   }
 
@@ -934,7 +929,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
       const items = [];
       if (item.source === undefined) {
-        items.push({ label: 'Launch Chat', action: () => vscode.postMessage({ type: 'launchChat', agentId: item.id }) });
+        items.push({ label: 'Launch Chat', action: () => vscode.postMessage({ type: 'launchChat', agentId: item.id, filePath: item.filePath }) });
       }
       items.push({ label: 'Open', action: () => vscode.postMessage({ type: 'openFile', filePath: item.filePath }) });
       if (!isMainAgent) {

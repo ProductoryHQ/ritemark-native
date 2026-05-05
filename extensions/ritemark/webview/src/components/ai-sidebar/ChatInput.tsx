@@ -152,6 +152,13 @@ export function ChatInput() {
   const cancelRequest = useAISidebarStore((s) => s.cancelRequest);
   const discoveredAgents = useAISidebarStore((s) => s.discoveredAgents);
   const discoveredCommands = useAISidebarStore((s) => s.discoveredCommands);
+  const requestPinAgent = useAISidebarStore((s) => s.requestPinAgent);
+  const pinnedAgent = useAISidebarStore((s) => s.pinnedAgent);
+  const pinnedAgentContent = useAISidebarStore((s) => s.pinnedAgentContent);
+  const pinnedAgentDismissal = useAISidebarStore((s) => s.pinnedAgentDismissal);
+  const setPinnedAgent = useAISidebarStore((s) => s.setPinnedAgent);
+  const clearPinnedAgentContent = useAISidebarStore((s) => s.clearPinnedAgentContent);
+  const clearPinnedAgentDismissal = useAISidebarStore((s) => s.clearPinnedAgentDismissal);
   const activeFilePath = useAISidebarStore((s) => s.activeFilePath);
 
   // Merge built-in + discovered commands
@@ -176,7 +183,7 @@ export function ChatInput() {
       ? 'Ask Codex... (type / for commands)'
       : 'Ask anything... (type / for commands)';
 
-  // Build final message with path chips prepended
+  // Build final message with path chips and pinned agent prepended
   const buildFinalPrompt = useCallback((): string => {
     let prompt = value.trim();
 
@@ -195,10 +202,33 @@ export function ChatInput() {
     const prompt = buildFinalPrompt();
     if (!prompt || !isOnline || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
 
+    // Build hidden context (agent instructions — sent to AI but not shown in chat).
+    // Dismissal + new pin can both be active when switching agents A → B.
+    const hiddenParts: string[] = [];
+    if (pinnedAgentDismissal) {
+      hiddenParts.push(`[You are no longer acting as agent: '${pinnedAgentDismissal}'. Stop acting as that agent.]`);
+    }
+    if (pinnedAgent) {
+      if (pinnedAgentContent) {
+        hiddenParts.push(`[Agent instructions — respond as this agent for the rest of this conversation]\n\n${pinnedAgentContent}`);
+      } else {
+        hiddenParts.push(`[You are still acting as agent: '${pinnedAgent}']`);
+      }
+    } else if (pinnedAgentDismissal) {
+      hiddenParts.push('[From here on, respond in your default role.]');
+    }
+    const hiddenContext = hiddenParts.length > 0 ? hiddenParts.join('\n\n') : undefined;
+
+    // Collect file paths for @mentioned agents so the extension can load their instructions
+    // Parsed inline to avoid referencing `mentions` which is defined later in this component
+    const mentionedAgentPaths = parseMentions(discoveredAgents, value)
+      .map((m) => discoveredAgents.find((a) => a.id === m.agentId)?.filePath)
+      .filter((p): p is string => !!p);
+
     if (isCodex) {
       sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined, pendingRuntime.mode);
     } else if (isClaudeCode) {
-      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile });
+      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
     } else {
       sendChatMessage(prompt);
     }
@@ -208,11 +238,13 @@ export function ChatInput() {
     setHideActiveFile(false);
     setShowMentionPopup(false);
     setShowCommandPopup(false);
+    clearPinnedAgentContent();
+    clearPinnedAgentDismissal();
 
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendChatMessage]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendChatMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
   const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
@@ -387,7 +419,8 @@ export function ChatInput() {
     setShowMentionPopup(false);
   }, []);
 
-  // Handle agent selection from mention popup
+  // Handle agent selection from mention popup — uses Pin Agent flow (same as Launch Chat)
+  // Removes the partial '@' text from textarea and shows the indigo pinned-agent chip instead
   const handleAgentSelect = useCallback(
     (agent: AgentDefinition) => {
       if (mentionStartIndex === null) return;
@@ -396,22 +429,27 @@ export function ChatInput() {
       const cursorPos = textareaRef.current?.selectionStart ?? value.length;
       const after = value.slice(cursorPos);
 
-      // Insert @agent-id
-      const newValue = `${before}@${agent.id} ${after}`;
+      // Strip the partial '@…' text the user was typing — pinned chip replaces it
+      const newValue = before + after;
       setValue(newValue);
       setShowMentionPopup(false);
       setMentionStartIndex(null);
 
-      // Focus and set cursor after the inserted text
+      // Trigger Pin Agent (loads .md as hidden context, shows indigo chip)
+      const discovered = discoveredAgents.find((a) => a.id === agent.id);
+      if (discovered?.filePath) {
+        requestPinAgent(agent.id, discovered.filePath);
+      }
+
+      // Restore cursor at the '@' position
       setTimeout(() => {
         if (textareaRef.current) {
-          const newCursorPos = mentionStartIndex + agent.id.length + 2; // @ + id + space
           textareaRef.current.focus();
-          textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+          textareaRef.current.setSelectionRange(mentionStartIndex, mentionStartIndex);
         }
       }, 0);
     },
-    [value, mentionStartIndex]
+    [value, mentionStartIndex, discoveredAgents, requestPinAgent]
   );
 
   // Handle mention popup close
@@ -724,8 +762,8 @@ export function ChatInput() {
       )}
 
       <div className="overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)] shadow-[0_1px_2px_rgba(30,27,75,0.04)] focus-within:border-[var(--r-hairline-strong)] focus-within:shadow-[0_0_0_1px_rgba(100,116,139,0.08)]">
-        {/* Context chips: active file + manually added paths + @mentions */}
-        {(showActiveFileChip || pathChips.length > 0 || mentions.length > 0) && (
+        {/* Context chips: active file + manually added paths + @mentions + pinned agent */}
+        {(showActiveFileChip || pathChips.length > 0 || mentions.length > 0 || pinnedAgent) && (
           <div className="flex gap-1.5 px-2.5 pt-2 flex-wrap">
             {showActiveFileChip && (
               <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]">
@@ -760,6 +798,23 @@ export function ChatInput() {
                 </button>
               </div>
             ))}
+            {pinnedAgent && (() => {
+              const agent = findAgent(discoveredAgents, pinnedAgent);
+              const displayName = agent?.name ?? pinnedAgent;
+              return (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-indigo-50,#eef2ff)] text-[var(--r-indigo-700,#4338ca)]">
+                  <Icon name="robot" size={12} className="shrink-0" />
+                  <span>{displayName}</span>
+                  <button
+                    onClick={() => setPinnedAgent(null)}
+                    className="shrink-0 rounded hover:opacity-70"
+                    title="Remove agent"
+                  >
+                    <Icon name="x" size={12} />
+                  </button>
+                </div>
+              );
+            })()}
             {mentions.map((m) => {
               const agent = findAgent(discoveredAgents, m.agentId);
               if (!agent) return null;

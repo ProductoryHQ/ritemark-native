@@ -370,4 +370,6 @@ export type ExtensionMessage =
   | { type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> }
   // Onboarding messages
   | { type: 'onboarding:status'; status: OnboardingStatus }
-  | { type: 'onboarding:install-progress'; dependency: OnboardingDependency; state: OnboardingInstallState; error?: string };
+  | { type: 'onboarding:install-progress'; dependency: OnboardingDependency; state: OnboardingInstallState; error?: string }
+  // Agent pinning (Launch Chat + @mention)
+  | { type: 'pin-agent'; agentId: string | null; content?: string };
