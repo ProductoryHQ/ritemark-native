@@ -97,10 +97,11 @@ function toDisplayName(id: string): string {
 }
 
 /**
- * Check if a file is a CLAUDE.md (main agent config).
+ * Check if a file is a main agent config (CLAUDE.md or AGENTS.md).
  */
 function isClaudeMd(filePath: string): boolean {
-  return path.basename(filePath).toLowerCase() === 'claude.md';
+  const base = path.basename(filePath).toLowerCase();
+  return base === 'claude.md' || base === 'agents.md';
 }
 
 /**
@@ -117,24 +118,26 @@ function hasFrontmatterBlock(content: string): boolean {
 function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredAgent[] {
   const agents: DiscoveredAgent[] = [];
 
-  // Check for CLAUDE.md at the .claude/ parent (project root or home dir)
+  // Check for CLAUDE.md and AGENTS.md at the parent (project root or home dir)
   const parentDir = path.dirname(claudeRoot);
-  const claudeMdPath = path.join(parentDir, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
+  for (const fileName of ['CLAUDE.md', 'AGENTS.md']) {
+    const mdPath = path.join(parentDir, fileName);
+    if (!fs.existsSync(mdPath)) continue;
     try {
-      const content = fs.readFileSync(claudeMdPath, 'utf-8');
+      const content = fs.readFileSync(mdPath, 'utf-8');
       const frontmatter = parseFrontmatter(content);
+      const id = fileName.replace('.md', '');
       const description = frontmatter.description || 'Main agent configuration';
-      const { icon, color } = resolveIconAndColor(frontmatter, 'CLAUDE.md', description, true);
+      const { icon, color } = resolveIconAndColor(frontmatter, fileName, description, true);
       agents.push({
-        id: 'CLAUDE',
-        name: 'CLAUDE.md',
+        id,
+        name: fileName,
         description,
-        filePath: claudeMdPath,
+        filePath: mdPath,
         scope,
         hasFrontmatter: hasFrontmatterBlock(content),
         isMainAgent: true,
-        modifiedAt: safeMtime(claudeMdPath),
+        modifiedAt: safeMtime(mdPath),
         icon,
         color,
       });
