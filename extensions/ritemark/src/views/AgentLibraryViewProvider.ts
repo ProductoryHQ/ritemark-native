@@ -162,6 +162,9 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         case 'moveScope':
           void this._moveScope(message.filePath);
           break;
+        case 'launchChat':
+          void this._launchChat(message.agentId);
+          break;
       }
     });
   }
@@ -197,6 +200,16 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   private _openFile(filePath: string) {
     const uri = vscode.Uri.file(filePath);
     vscode.commands.executeCommand('vscode.open', uri);
+  }
+
+  private async _launchChat(agentId: string) {
+    await vscode.workspace.getConfiguration('ritemark.ai').update(
+      'selectedAgent',
+      agentId,
+      vscode.ConfigurationTarget.Global
+    );
+    await vscode.commands.executeCommand('ritemark.newChat');
+    await vscode.commands.executeCommand('ritemark.unifiedView.focus');
   }
 
   private async _createHelper(payload: CreateHelperPayload) {
@@ -920,6 +933,9 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       const moveLabel = itemScope === 'project' ? 'Move to User scope' : 'Move to Project scope';
 
       const items = [];
+      if (item.source === undefined) {
+        items.push({ label: 'Launch Chat', action: () => vscode.postMessage({ type: 'launchChat', agentId: item.id }) });
+      }
       items.push({ label: 'Open', action: () => vscode.postMessage({ type: 'openFile', filePath: item.filePath }) });
       if (!isMainAgent) {
         items.push({ label: 'Duplicate', action: () => vscode.postMessage({ type: 'duplicateHelper', filePath: item.filePath }) });
