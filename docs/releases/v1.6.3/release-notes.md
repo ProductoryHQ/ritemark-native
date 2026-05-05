@@ -16,6 +16,7 @@ tags:
 **Status:** Draft — awaiting build + Jarmo approval
 **Type:** Feature release
 **Focus:** Conversations are now durable workspaces you can switch runtimes inside of, and the Agent Library is a place to *create and fork*, not just browse
+**Support materials:** Updated — release notes, GitHub release draft, marketing draft, test checklist, and update-feed entry are all in sync for v1.6.3.
 
 * * *
 

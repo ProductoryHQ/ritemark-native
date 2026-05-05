@@ -1,8 +1,8 @@
 # v1.6.3 Test Checklist
 
-**Release:** Ritemark v1.6.3 — One Conversation, Many Runtimes; A Library You Can Author Into
+**Release:** Ritemark v1.6.3 — One Conversation, Many Runtimes; A Library You Can Talk To
 **Date:** 2026-05-05
-**Scope:** Sprint 59 (Agent Authoring Loop), Sprint 61 (Agent Library Icons & Colours), Sprint 62 (Conversation Runtime + Per-Turn Agent Switching)
+**Scope:** Sprint 59 (Agent Authoring Loop), Sprint 61 (Agent Library Icons & Colours), Sprint 62 (Conversation Runtime + Per-Turn Agent Switching), Sprint 63 (Minor Updates: Launch Chat + AGENTS/.agents + model refresh)
 
 > Before opening the new DMG: **quit any running Ritemark.app** (two instances share the user-data dir and will cause a blank webview / SW `InvalidStateError`).
 
