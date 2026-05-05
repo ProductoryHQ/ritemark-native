@@ -50,7 +50,7 @@ interface ActivityCardProps {
 
 export function ActivityCard({ activity }: ActivityCardProps) {
   return (
-    <div className="flex items-start gap-2 text-[11px] py-0.5">
+    <div className="flex items-start gap-2 rounded px-1 py-0.5 text-[11px]">
       <span className="shrink-0 mt-0.5 opacity-50">
         {getActivityIcon(activity)}
       </span>

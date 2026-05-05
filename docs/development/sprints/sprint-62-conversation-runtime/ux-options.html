@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sprint 62 — Runtime Switcher UX Refinement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ── Ritemark Design Tokens ─────────────────────────────────────────────── */
+:root {
+  --ritemark-surface:            #FFFFFF;
+  --ritemark-surface-muted:      #F8FAFC;
+  --ritemark-surface-soft:       #F1F5F9;
+  --ritemark-hairline:           #E2E8F0;
+  --ritemark-hairline-strong:    #CBD5E1;
+
+  --ritemark-ink-strong:         #1E1B4B;
+  --ritemark-ink-body:           #475569;
+  --ritemark-ink-muted:          #64748B;
+  --ritemark-ink-faint:          #94A3B8;
+  --ritemark-ink-disabled:       #CBD5E1;
+
+  --ritemark-indigo:             #4338CA;
+  --ritemark-indigo-deep:        #3730A3;
+  --ritemark-indigo-darker:      #312E81;
+  --ritemark-indigo-soft:        #E0E7FF;
+  --ritemark-indigo-fainter:     #C7D2FE;
+
+  --ritemark-success:            #22C55E;
+  --ritemark-success-soft:       #DCFCE7;
+  --ritemark-warning:            #F59E0B;
+  --ritemark-error:              #EF4444;
+
+  --ritemark-font-ui:   'Sofia Sans', ui-sans-serif, system-ui, sans-serif;
+  --ritemark-font-display: 'Space Grotesk', 'Sofia Sans', sans-serif;
+
+  --ritemark-size-xs:   11px;
+  --ritemark-size-sm:   12px;
+  --ritemark-size-base: 13px;
+  --ritemark-size-md:   14px;
+  --ritemark-size-lg:   16px;
+
+  --ritemark-radius-xs:  3px;
+  --ritemark-radius-sm:  4px;
+  --ritemark-radius-md:  6px;
+  --ritemark-radius-lg:  10px;
+  --ritemark-radius-pill: 999px;
+
+  --ritemark-shadow-xs:  0 1px 2px rgba(30,27,75,0.05);
+  --ritemark-shadow-sm:  0 1px 2px rgba(30,27,75,0.06), 0 1px 3px rgba(30,27,75,0.04);
+  --ritemark-shadow-md:  0 4px 6px -1px rgba(30,27,75,0.08), 0 2px 4px -2px rgba(30,27,75,0.06);
+  --ritemark-shadow-lg:  0 10px 15px -3px rgba(30,27,75,0.10), 0 4px 6px -4px rgba(30,27,75,0.08);
+  --ritemark-shadow-indigo-sm: 0 4px 6px -1px rgba(67,56,202,0.25);
+  --ritemark-shadow-indigo-md: 0 8px 20px -4px rgba(67,56,202,0.35);
+
+  --ritemark-ring-color: rgba(67,56,202,0.10);
+
+  --ritemark-ease-quick: cubic-bezier(0.4,0,0.2,1);
+  --ritemark-ease-spring: cubic-bezier(0.34,1.56,0.64,1);
+  --ritemark-dur-fast: 120ms;
+  --ritemark-dur-base: 200ms;
+
+  /* Role tokens (light) */
+  --r-surface:           var(--ritemark-surface);
+  --r-surface-muted:     var(--ritemark-surface-muted);
+  --r-surface-soft:      var(--ritemark-surface-soft);
+  --r-hairline:          var(--ritemark-hairline);
+  --r-hairline-strong:   var(--ritemark-hairline-strong);
+  --r-ink-strong:        var(--ritemark-ink-strong);
+  --r-ink-body:          var(--ritemark-ink-body);
+  --r-ink-muted:         var(--ritemark-ink-muted);
+  --r-ink-faint:         var(--ritemark-ink-faint);
+  --r-ink-disabled:      var(--ritemark-ink-disabled);
+  --r-accent:            var(--ritemark-indigo);
+  --r-accent-deep:       var(--ritemark-indigo-deep);
+  --r-accent-darker:     var(--ritemark-indigo-darker);
+  --r-accent-soft:       var(--ritemark-indigo-soft);
+  --r-accent-fainter:    var(--ritemark-indigo-fainter);
+  --r-shadow-accent:     var(--ritemark-shadow-indigo-sm);
+}
+
+[data-theme="dark"] {
+  --ritemark-dark-surface:       #1E1B4B;
+  --ritemark-dark-surface-muted: #191635;
+  --ritemark-dark-surface-soft:  #251F5C;
+  --ritemark-dark-hairline:      #3730A3;
+  --ritemark-dark-hairline-strong: #4338CA;
+  --ritemark-dark-ink-strong:    #F8FAFC;
+  --ritemark-dark-ink-body:      #C7D2FE;
+  --ritemark-dark-ink-muted:     #94A3B8;
+  --ritemark-dark-ink-faint:     #64748B;
+  --ritemark-dark-ink-disabled:  #475569;
+  --ritemark-dark-indigo:        #818CF8;
+  --ritemark-dark-indigo-deep:   #6366F1;
+  --ritemark-dark-indigo-darker: #4F46E5;
+  --ritemark-dark-indigo-soft:   rgba(129,140,248,0.16);
+  --ritemark-dark-indigo-fainter: rgba(129,140,248,0.28);
+
+  --r-surface:           var(--ritemark-dark-surface);
+  --r-surface-muted:     var(--ritemark-dark-surface-muted);
+  --r-surface-soft:      var(--ritemark-dark-surface-soft);
+  --r-hairline:          var(--ritemark-dark-hairline);
+  --r-hairline-strong:   var(--ritemark-dark-hairline-strong);
+  --r-ink-strong:        var(--ritemark-dark-ink-strong);
+  --r-ink-body:          var(--ritemark-dark-ink-body);
+  --r-ink-muted:         var(--ritemark-dark-ink-muted);
+  --r-ink-faint:         var(--ritemark-dark-ink-faint);
+  --r-ink-disabled:      var(--ritemark-dark-ink-disabled);
+  --r-accent:            var(--ritemark-dark-indigo);
+  --r-accent-deep:       var(--ritemark-dark-indigo-deep);
+  --r-accent-darker:     var(--ritemark-dark-indigo-darker);
+  --r-accent-soft:       var(--ritemark-dark-indigo-soft);
+  --r-accent-fainter:    var(--ritemark-dark-indigo-fainter);
+  --r-shadow-accent:     0 4px 6px -1px rgba(129,140,248,0.20);
+}
+
+/* ── Page Layout ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--ritemark-font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+  background: #0F0E1A;
+  color: #F8FAFC;
+  min-height: 100vh;
+  padding: 32px 24px 64px;
+}
+
+.page-header {
+  max-width: 1480px;
+  margin: 0 auto 48px;
+}
+.page-title {
+  font-family: var(--ritemark-font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: #F8FAFC;
+  letter-spacing: -0.5px;
+}
+.page-meta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #64748B;
+}
+.page-meta span {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(67,56,202,0.15);
+  color: #818CF8;
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+.decision-note {
+  max-width: 720px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(129,140,248,0.22);
+  border-radius: 8px;
+  background: rgba(67,56,202,0.08);
+  color: #CBD5E1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.decision-note strong { color: #A5B4FC; font-weight: 700; }
+
+/* theme toggle */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: #64748B;
+}
+.theme-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid #3730A3;
+  background: rgba(67,56,202,0.12);
+  color: #818CF8;
+  font-family: var(--ritemark-font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.theme-toggle button:hover { background: rgba(67,56,202,0.22); }
+
+/* options grid */
+.options-grid {
+  max-width: 1480px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 32px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .options-grid { grid-template-columns: 1fr; }
+}
+
+.option-col {}
+.option-label {
+  font-family: var(--ritemark-font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: #F8FAFC;
+  margin-bottom: 4px;
+}
+.option-tagline {
+  font-size: 12px;
+  color: #64748B;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* ── Sidebar shell ──────────────────────────────────────────────────────── */
+.sidebar {
+  width: 100%;
+  max-width: 340px;
+  height: 520px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--r-surface);
+  border: 1px solid var(--r-hairline);
+  box-shadow: var(--ritemark-shadow-lg), 0 0 0 1px rgba(255,255,255,0.03);
+  position: relative;
+}
+
+/* Sidebar titlebar */
+.sidebar-titlebar {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 36px;
+  background: var(--r-surface-muted);
+  border-bottom: 1px solid var(--r-hairline);
+  font-size: var(--ritemark-size-sm);
+  font-weight: 600;
+  color: var(--r-ink-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  user-select: none;
+}
+.titlebar-dots {
+  display: flex; gap: 5px; margin-right: 10px;
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot-r { background: #FF5F57; }
+.dot-y { background: #FEBC2E; }
+.dot-g { background: #28C840; }
+
+/* Conversation area */
+.convo {
+  flex: 1;
+  overflow: hidden;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* User bubble */
+.bubble-user {
+  align-self: flex-end;
+  background: var(--r-accent);
+  color: #fff;
+  font-size: var(--ritemark-size-base);
+  padding: 8px 12px;
+  border-radius: 10px 10px 2px 10px;
+  max-width: 80%;
+  line-height: 1.45;
+  box-shadow: var(--ritemark-shadow-indigo-sm);
+}
+
+/* Agent bubble */
+.bubble-agent {
+  align-self: flex-start;
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  color: var(--r-ink-body);
+  font-size: var(--ritemark-size-base);
+  padding: 8px 12px;
+  border-radius: 2px 10px 10px 10px;
+  max-width: 88%;
+  line-height: 1.5;
+}
+
+/* Provenance badge */
+.provenance {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--r-ink-faint);
+  margin-bottom: 4px;
+}
+.provenance svg { width: 12px; height: 12px; opacity: 0.7; }
+
+/* Typing indicator */
+.typing {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 12px;
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: 2px 10px 10px 10px;
+  width: fit-content;
+}
+.typing-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--r-ink-faint);
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+/* ── INPUT ZONE SHARED ──────────────────────────────────────────────────── */
+.input-zone {
+  border-top: 1px solid var(--r-hairline);
+}
+
+/* Common textarea */
+.textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: var(--ritemark-font-ui);
+  font-size: var(--ritemark-size-base);
+  color: var(--r-ink-strong);
+  line-height: 1.5;
+  display: block;
+}
+.textarea::placeholder { color: var(--r-ink-faint); }
+
+/* Send button */
+.btn-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--ritemark-radius-md);
+  background: var(--r-accent);
+  border: none;
+  cursor: pointer;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: var(--r-shadow-accent);
+  transition: background var(--ritemark-dur-fast) var(--ritemark-ease-quick),
+              transform var(--ritemark-dur-fast) var(--ritemark-ease-spring);
+}
+.btn-send:hover { background: var(--r-accent-deep); }
+.btn-send:active { transform: scale(0.95); }
+.btn-send svg { width: 14px; height: 14px; }
+
+/* Ghost icon button */
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--ritemark-radius-sm);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--r-ink-muted);
+  flex-shrink: 0;
+  transition: background var(--ritemark-dur-fast), color var(--ritemark-dur-fast);
+}
+.btn-ghost:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+.btn-ghost svg { width: 14px; height: 14px; }
+
+/* FilterChip — standard Ritemark pattern */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  height: 24px;
+  border-radius: var(--ritemark-radius-sm);   /* 4px */
+  border: 1px solid var(--r-hairline);
+  background: var(--r-surface);
+  color: var(--r-ink-body);
+  font-family: var(--ritemark-font-ui);
+  font-size: var(--ritemark-size-sm);         /* 12px */
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--ritemark-dur-fast) var(--ritemark-ease-quick),
+              border-color var(--ritemark-dur-fast),
+              color var(--ritemark-dur-fast);
+  user-select: none;
+  white-space: nowrap;
+}
+.chip:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+.chip.is-active {
+  background: var(--r-accent-soft);
+  border-color: var(--r-accent);
+  color: var(--r-accent-deep);
+}
+.chip.is-active:hover { background: var(--r-accent-fainter); }
+.chip svg { width: 12px; height: 12px; }
+.chip-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--r-accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--r-accent-soft);
+}
+.chip-dot.codex { background: #22C55E; box-shadow: 0 0 0 2px var(--ritemark-success-soft); }
+.chip-dot.chat { background: var(--r-ink-faint); box-shadow: none; }
+.chip-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--r-ink-muted);
+  font-size: 11px;
+}
+.chip.is-active .chip-count { color: var(--r-accent-deep); }
+
+/* ── OPTION C — Unified Input Card (Codex-inspired) ────────────────────── */
+.opt-c .input-zone {
+  padding: 8px 10px 10px;
+}
+.opt-c .input-card {
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--ritemark-radius-lg);
+  background: var(--r-surface);
+  overflow: hidden;
+  box-shadow: var(--ritemark-shadow-sm);
+  transition: border-color var(--ritemark-dur-base), box-shadow var(--ritemark-dur-base);
+}
+.opt-c .input-card.is-focused {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 3px var(--ritemark-ring-color);
+}
+[data-theme="dark"] .opt-c .input-card.is-focused {
+  box-shadow: 0 0 0 3px rgba(129,140,248,0.20);
+}
+.opt-c .textarea {
+  padding: 10px 12px 6px;
+  min-height: 64px;
+}
+.opt-c .card-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--r-hairline);
+  flex-wrap: nowrap;
+}
+.opt-c .footer-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+.opt-c .footer-left::-webkit-scrollbar { display: none; }
+.opt-c .runtime-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 22px;
+  border-radius: var(--ritemark-radius-sm);
+  border: 1px solid var(--r-accent);
+  background: var(--r-accent-soft);
+  color: var(--r-accent-deep);
+  font-family: var(--ritemark-font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.opt-c .runtime-toggle svg { width: 11px; height: 11px; }
+.opt-c .runtime-toggle .arrow { opacity: 0.55; margin-left: 1px; }
+.opt-c .mode-seg {
+  display: inline-flex;
+  border-radius: var(--ritemark-radius-xs);
+  border: 1px solid var(--r-hairline);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.opt-c .seg-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 22px;
+  font-family: var(--ritemark-font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--r-ink-body);
+  background: var(--r-surface);
+  border: none;
+  cursor: pointer;
+  transition: background var(--ritemark-dur-fast), color var(--ritemark-dur-fast);
+}
+.opt-c .seg-btn + .seg-btn {
+  border-left: 1px solid var(--r-hairline);
+}
+.opt-c .seg-btn.is-active {
+  background: var(--r-accent-soft);
+  color: var(--r-accent-deep);
+}
+.opt-c .footer-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.opt-c .context-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  color: var(--r-ink-muted);
+  font-size: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.opt-c .context-tag svg { width: 10px; height: 10px; }
+
+
+/* ── OPTION C VARIANTS — progressively less intrusive ───────────────────── */
+.opt-c-strong .input-card {
+  border-color: var(--r-hairline-strong);
+  box-shadow: var(--ritemark-shadow-sm);
+}
+.opt-c-strong .input-card.is-focused {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 3px var(--ritemark-ring-color), var(--ritemark-shadow-sm);
+}
+.opt-c-strong .runtime-toggle {
+  border-color: var(--r-accent);
+  background: var(--r-accent-soft);
+  color: var(--r-accent-deep);
+}
+.opt-c-strong .seg-btn.is-active {
+  background: var(--r-accent-soft);
+  color: var(--r-accent-deep);
+}
+.opt-c-strong .runtime-toggle[data-runtime="codex"] {
+  border-color: #22C55E;
+  background: rgba(34,197,94,0.10);
+  color: #16A34A;
+}
+
+.opt-c-soft .bubble-user {
+  background: var(--r-accent-soft);
+  color: var(--r-accent-deep);
+  box-shadow: none;
+}
+.opt-c-soft .bubble-agent {
+  background: var(--r-surface-muted);
+  border-color: var(--r-hairline);
+}
+.opt-c-soft .input-card {
+  border-color: var(--r-hairline);
+  box-shadow: none;
+}
+.opt-c-soft .input-card.is-focused {
+  border-color: var(--r-hairline-strong);
+  box-shadow: 0 0 0 2px rgba(67,56,202,0.06);
+}
+.opt-c-soft .runtime-toggle {
+  border-color: var(--r-hairline);
+  background: var(--r-surface-muted);
+  color: var(--r-ink-body);
+  font-weight: 500;
+}
+.opt-c-soft .runtime-toggle[data-runtime="codex"] {
+  color: #15803D;
+  background: rgba(34,197,94,0.07);
+  border-color: rgba(34,197,94,0.20);
+}
+.opt-c-soft .seg-btn.is-active {
+  background: var(--r-surface-soft);
+  color: var(--r-ink-strong);
+}
+.opt-c-soft .context-tag {
+  background: var(--r-surface-muted);
+  border-color: transparent;
+}
+.opt-c-soft .btn-send {
+  background: var(--r-accent-deep);
+  box-shadow: none;
+}
+
+.opt-c-quiet .bubble-user {
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  color: var(--r-ink-body);
+  box-shadow: none;
+}
+.opt-c-quiet .bubble-agent {
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+}
+.opt-c-quiet .input-zone {
+  padding: 8px 10px 10px;
+  background: linear-gradient(to bottom, transparent, rgba(148,163,184,0.04));
+}
+.opt-c-quiet .input-card {
+  border-color: rgba(148,163,184,0.18);
+  border-radius: var(--ritemark-radius-lg);
+  background: rgba(255,255,255,0.74);
+  box-shadow: 0 1px 2px rgba(30,27,75,0.03);
+}
+.opt-c-quiet .input-card.is-focused {
+  border-color: rgba(100,116,139,0.34);
+  box-shadow: 0 0 0 1px rgba(100,116,139,0.08), 0 1px 2px rgba(30,27,75,0.03);
+}
+.opt-c-quiet .textarea {
+  padding: 10px 10px 5px;
+  min-height: 70px;
+}
+.opt-c-quiet .card-footer {
+  border-top-color: transparent;
+  padding: 4px 8px 8px;
+}
+.opt-c-quiet .runtime-toggle {
+  height: 20px;
+  padding: 0 4px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--r-ink-muted);
+  font-weight: 500;
+}
+.opt-c-quiet .runtime-toggle[data-runtime="codex"] {
+  color: var(--r-ink-body);
+}
+.opt-c-quiet .mode-seg {
+  border-color: transparent;
+  background: var(--r-surface-muted);
+}
+.opt-c-quiet .seg-btn {
+  height: 20px;
+  padding: 0 7px;
+  background: transparent;
+  color: var(--r-ink-muted);
+}
+.opt-c-quiet .seg-btn + .seg-btn { border-left-color: transparent; }
+.opt-c-quiet .seg-btn.is-active {
+  background: var(--r-surface);
+  color: var(--r-ink-body);
+  box-shadow: var(--ritemark-shadow-xs);
+}
+.opt-c-quiet .context-tag {
+  background: transparent;
+  border-color: transparent;
+  color: var(--r-ink-faint);
+  padding: 0 2px;
+}
+.opt-c-quiet .btn-ghost {
+  width: 24px;
+  height: 24px;
+}
+.opt-c-quiet .btn-send {
+  width: 26px;
+  height: 26px;
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  color: var(--r-ink-body);
+  box-shadow: none;
+}
+.opt-c-quiet .btn-send:hover {
+  background: var(--r-surface-muted);
+}
+
+
+.opt-c-quiet .attachment-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 9px 7px;
+}
+.opt-c-quiet .attachment-thumb,
+.opt-c-quiet .attachment-file {
+  position: relative;
+  overflow: hidden;
+  border-radius: 7px;
+  border: 1px solid rgba(148,163,184,0.22);
+  background: rgba(248,250,252,0.86);
+}
+.opt-c-quiet .attachment-thumb {
+  width: 56px;
+  height: 56px;
+}
+.opt-c-quiet .attachment-thumb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(67,56,202,0.10), transparent 45%),
+    linear-gradient(25deg, rgba(34,197,94,0.16), transparent 50%),
+    linear-gradient(to bottom right, #F8FAFC, #DDE7F4);
+}
+.opt-c-quiet .attachment-thumb::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 9px;
+  height: 18px;
+  border-radius: 50% 50% 0 0;
+  background: rgba(71,85,105,0.18);
+  box-shadow: 18px -10px 0 -3px rgba(67,56,202,0.14);
+}
+.opt-c-quiet .attachment-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 150px;
+  padding: 0 8px;
+  color: var(--r-ink-muted);
+  font-size: 10px;
+  line-height: 1;
+}
+.opt-c-quiet .attachment-file svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.opt-c-quiet .attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.opt-c-quiet .attachment-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 0 0 5px;
+  background: rgba(15,23,42,0.48);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+.opt-c-quiet .attachment-thumb + .attachment-file {
+  align-self: flex-end;
+}
+
+.opt-c-current-elements {
+  height: 720px;
+}
+.opt-c-current-elements .convo {
+  overflow-y: auto;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+.opt-c-current-elements .convo::-webkit-scrollbar { width: 6px; }
+.opt-c-current-elements .convo::-webkit-scrollbar-thumb {
+  background: rgba(148,163,184,0.24);
+  border-radius: 999px;
+}
+.element-card {
+  border: 1px solid rgba(148,163,184,0.24);
+  border-radius: 9px;
+  background: rgba(248,250,252,0.78);
+  color: var(--r-ink-body);
+  padding: 9px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.element-card.compact { padding: 7px 9px; }
+.element-card.warning {
+  border-color: rgba(245,158,11,0.30);
+  background: rgba(255,251,235,0.78);
+}
+.element-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--r-ink-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.element-title svg { width: 13px; height: 13px; }
+.plan-summary {
+  color: var(--r-ink-strong);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.plan-steps {
+  display: grid;
+  gap: 5px;
+}
+.plan-step {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 6px;
+  align-items: start;
+  color: var(--r-ink-muted);
+}
+.plan-step.is-active {
+  color: var(--r-ink-strong);
+  font-weight: 600;
+}
+.plan-step.is-done {
+  opacity: 0.64;
+  text-decoration: line-through;
+}
+.subagent-stack {
+  display: grid;
+  gap: 6px;
+}
+.subagent-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center;
+  gap: 7px;
+  border-left: 2px solid rgba(67,56,202,0.28);
+  padding: 5px 0 5px 8px;
+}
+.subagent-row.is-done { border-left-color: rgba(34,197,94,0.42); }
+.subagent-task {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--r-ink-strong);
+}
+.subagent-status {
+  color: var(--r-ink-faint);
+  font-size: 10px;
+}
+.activity-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--r-ink-muted);
+  font-size: 10px;
+  min-width: 0;
+}
+.activity-line span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.question-options,
+.element-actions,
+.mention-strip,
+.context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.question-option,
+.quiet-chip,
+.element-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  border-radius: 6px;
+  border: 1px solid rgba(148,163,184,0.26);
+  background: rgba(255,255,255,0.62);
+  color: var(--r-ink-body);
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.element-btn.primary {
+  border-color: rgba(67,56,202,0.20);
+  background: rgba(67,56,202,0.08);
+  color: var(--r-accent-deep);
+}
+.element-btn.danger {
+  color: #991B1B;
+  background: rgba(239,68,68,0.06);
+  border-color: rgba(239,68,68,0.18);
+}
+.command-preview {
+  display: block;
+  margin: 6px 0;
+  padding: 6px 7px;
+  border-radius: 6px;
+  background: rgba(15,23,42,0.06);
+  color: var(--r-ink-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.input-context-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 9px 9px 0;
+}
+.input-context-row .quiet-chip {
+  background: rgba(248,250,252,0.72);
+  color: var(--r-ink-muted);
+  font-weight: 500;
+}
+.running-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--r-accent);
+  box-shadow: 0 0 0 3px rgba(67,56,202,0.10);
+}
+
+[data-theme="dark"] .opt-c-strong .input-card.is-focused {
+  box-shadow: 0 0 0 3px rgba(129,140,248,0.20), var(--ritemark-shadow-sm);
+}
+[data-theme="dark"] .opt-c-soft .bubble-user {
+  color: #C7D2FE;
+}
+[data-theme="dark"] .opt-c-soft .runtime-toggle[data-runtime="codex"] {
+  color: #4ADE80;
+  background: rgba(74,222,128,0.10);
+  border-color: rgba(74,222,128,0.20);
+}
+[data-theme="dark"] .opt-c-soft .input-card.is-focused {
+  box-shadow: 0 0 0 2px rgba(129,140,248,0.10);
+}
+[data-theme="dark"] .opt-c-quiet .btn-send {
+  color: var(--r-ink-body);
+}
+[data-theme="dark"] .opt-c-quiet .input-card {
+  background: rgba(30,27,75,0.62);
+  border-color: rgba(129,140,248,0.18);
+}
+[data-theme="dark"] .opt-c-quiet .input-card.is-focused {
+  border-color: rgba(148,163,184,0.26);
+  box-shadow: 0 0 0 1px rgba(129,140,248,0.06);
+}
+[data-theme="dark"] .opt-c-quiet .attachment-thumb,
+[data-theme="dark"] .opt-c-quiet .attachment-file {
+  background: rgba(25,22,53,0.84);
+  border-color: rgba(129,140,248,0.18);
+}
+[data-theme="dark"] .opt-c-quiet .attachment-thumb::before {
+  background:
+    linear-gradient(135deg, rgba(129,140,248,0.18), transparent 45%),
+    linear-gradient(25deg, rgba(74,222,128,0.13), transparent 50%),
+    linear-gradient(to bottom right, #251F5C, #191635);
+}
+
+[data-theme="dark"] .element-card {
+  background: rgba(25,22,53,0.72);
+  border-color: rgba(129,140,248,0.18);
+}
+[data-theme="dark"] .element-card.warning {
+  background: rgba(245,158,11,0.08);
+  border-color: rgba(245,158,11,0.24);
+}
+[data-theme="dark"] .question-option,
+[data-theme="dark"] .quiet-chip,
+[data-theme="dark"] .element-btn {
+  background: rgba(30,27,75,0.64);
+  border-color: rgba(129,140,248,0.18);
+}
+[data-theme="dark"] .element-btn.primary {
+  color: #C7D2FE;
+  background: rgba(129,140,248,0.10);
+}
+[data-theme="dark"] .command-preview {
+  background: rgba(15,14,26,0.40);
+}
+[data-theme="dark"] .input-context-row .quiet-chip {
+  background: rgba(25,22,53,0.72);
+}
+
+/* ── Option annotations ─────────────────────────────────────────────────── */
+.annotations {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ann {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #94A3B8;
+}
+.ann-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.ann-icon.pro { background: rgba(34,197,94,0.15); color: #4ADE80; }
+.ann-icon.con { background: rgba(239,68,68,0.12); color: #F87171; }
+.ann-icon.note { background: rgba(129,140,248,0.15); color: #818CF8; }
+
+/* ── Inspiration row ────────────────────────────────────────────────────── */
+.inspiration-section {
+  max-width: 1480px;
+  margin: 56px auto 0;
+}
+.section-title {
+  font-family: var(--ritemark-font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: #F8FAFC;
+  margin-bottom: 4px;
+}
+.section-sub {
+  font-size: 12px;
+  color: #64748B;
+  margin-bottom: 20px;
+}
+.inspiration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.inspiration-card {
+  border-radius: 8px;
+  border: 1px solid #3730A3;
+  background: rgba(67,56,202,0.06);
+  padding: 14px;
+}
+.inspiration-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #818CF8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.inspiration-desc { font-size: 12px; color: #64748B; line-height: 1.55; }
+.inspiration-desc code {
+  display: inline-block;
+  background: rgba(129,140,248,0.12);
+  color: #A5B4FC;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<!-- Page header -->
+<div class="page-header">
+  <div class="page-title">Runtime Switcher — Option C Refinement</div>
+  <div class="page-meta">
+    <span>Sprint 62</span>
+    Direction: keep the unified input card, then reduce color/border intensity step by step to lower cognitive load.
+  </div>
+  <div class="decision-note"><strong>Picked direction:</strong> Option C is the base. The variants below keep the same information architecture while progressively quieting accent fills, borders, focus rings, and message chrome; C3 is the preferred direction, with an attachment-thumbnail variant included.</div>
+  <div class="theme-toggle">
+    <button onclick="toggleTheme()">
+      <svg viewBox="0 0 16 16" fill="none" width="14" height="14" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="8" r="4"/><line x1="8" y1="1" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="15"/>
+        <line x1="1" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="15" y2="8"/>
+      </svg>
+      Toggle Light / Dark
+    </button>
+    <span>Both themes ship — toggling here previews the sidebar mock</span>
+  </div>
+</div>
+
+<!-- Options -->
+<div class="options-grid" id="optionsGrid">
+
+  <div class="option-col">
+    <div class="option-label">C1 — Focused card</div>
+    <div class="option-tagline">Keep the liked C structure, with the clearest active affordances: accent runtime pill, visible card border, and focus ring. Best for discoverability.</div>
+
+    <div class="sidebar opt-c opt-c-strong" data-option="C1" data-runtime-idx="0">
+      <div class="sidebar-titlebar">
+        <div class="titlebar-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        AI Chat
+      </div>
+
+      <div class="convo">
+        <div class="bubble-user">Let’s switch to Codex plan mode</div>
+        <div>
+          <div class="provenance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a3 3 0 016 0v2"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/><path d="M9 18h6"/></svg>
+            Codex · gpt-4.1
+          </div>
+          <div class="bubble-agent">Switched to Plan mode. I’ll draft a step-by-step plan for approval before writing any code.</div>
+        </div>
+        <div class="bubble-user">Now back to Claude for implementation</div>
+        <div class="typing">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+
+      <div class="input-zone">
+        <div class="input-card is-focused">
+          <textarea
+            class="textarea"
+            placeholder="Ask Claude… (@ mention agents, / commands)"
+            rows="3"
+            onfocus="toggleCardFocus(this, true)"
+            onblur="toggleCardFocus(this, false)"
+          ></textarea>
+
+          <div class="card-footer">
+            <div class="footer-left">
+              <div class="runtime-toggle" data-runtime="claude" onclick="cycleRuntimeVariant(this)">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M13 2L4.09 13H11l-2 9 9-10.91H11L13 2z"/></svg>
+                <span class="c-label">Claude · Sonnet</span>
+                <span class="arrow">▾</span>
+              </div>
+
+              <div class="mode-seg" style="display:none;">
+                <button class="seg-btn is-active" onclick="toggleSeg(this)">Edit</button>
+                <button class="seg-btn" onclick="toggleSeg(this)">Plan</button>
+              </div>
+
+              <div class="context-tag">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+                store.ts
+              </div>
+            </div>
+
+            <div class="footer-right">
+              <button class="btn-ghost" title="Attach">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <button class="btn-send" title="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="annotations">
+      <div class="ann"><div class="ann-icon pro">+</div><div>Strongest affordance: the runtime pill and focus ring make the active control obvious.</div></div>
+      <div class="ann"><div class="ann-icon pro">+</div><div>Keeps option C’s single-card grouping — no separated selector or rail.</div></div>
+      <div class="ann"><div class="ann-icon con">−</div><div>Most visually “alive”; accent fill, ring, and borders compete with conversation content.</div></div>
+      <div class="ann"><div class="ann-icon note">i</div><div>Use when first-run clarity matters more than absolute calm.</div></div>
+    </div>
+  </div>
+
+  <div class="option-col">
+    <div class="option-label">C2 — Soft card</div>
+    <div class="option-tagline">Same layout, quieter treatment: neutral runtime pill, thinner focus state, softer message color, and fewer heavy borders. Recommended middle path.</div>
+
+    <div class="sidebar opt-c opt-c-soft" data-option="C2" data-runtime-idx="0">
+      <div class="sidebar-titlebar">
+        <div class="titlebar-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        AI Chat
+      </div>
+
+      <div class="convo">
+        <div class="bubble-user">Can Codex make the plan first?</div>
+        <div>
+          <div class="provenance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a3 3 0 016 0v2"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/><path d="M9 18h6"/></svg>
+            Codex · gpt-4.1
+          </div>
+          <div class="bubble-agent">Yes — Codex can plan first, then Claude can continue from the merged conversation context.</div>
+        </div>
+        <div class="bubble-user">Good. Keep it lightweight.</div>
+        <div class="typing">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+
+      <div class="input-zone">
+        <div class="input-card is-focused">
+          <textarea
+            class="textarea"
+            placeholder="Ask Claude… (@ mention agents, / commands)"
+            rows="3"
+            onfocus="toggleCardFocus(this, true)"
+            onblur="toggleCardFocus(this, false)"
+          ></textarea>
+
+          <div class="card-footer">
+            <div class="footer-left">
+              <div class="runtime-toggle" data-runtime="claude" onclick="cycleRuntimeVariant(this)">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M13 2L4.09 13H11l-2 9 9-10.91H11L13 2z"/></svg>
+                <span class="c-label">Claude · Sonnet</span>
+                <span class="arrow">▾</span>
+              </div>
+
+              <div class="mode-seg" style="display:none;">
+                <button class="seg-btn is-active" onclick="toggleSeg(this)">Edit</button>
+                <button class="seg-btn" onclick="toggleSeg(this)">Plan</button>
+              </div>
+
+              <div class="context-tag">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+                store.ts
+              </div>
+            </div>
+
+            <div class="footer-right">
+              <button class="btn-ghost" title="Attach">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <button class="btn-send" title="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="annotations">
+      <div class="ann"><div class="ann-icon pro">+</div><div>Reduces cognitive load without hiding controls; the runtime switcher still reads as clickable.</div></div>
+      <div class="ann"><div class="ann-icon pro">+</div><div>Neutral chips let the message content stay visually primary.</div></div>
+      <div class="ann"><div class="ann-icon pro">+</div><div>Probably the safest production default for daily use.</div></div>
+      <div class="ann"><div class="ann-icon note">i</div><div>Accent appears only as a low-volume state cue, not as the whole component language.</div></div>
+    </div>
+  </div>
+
+  <div class="option-col">
+    <div class="option-label">C3 — Quiet card</div>
+    <div class="option-tagline">Preferred quiet direction: low accent, soft card boundary, neutral controls, and enough input structure to feel intentional rather than invisible.</div>
+
+    <div class="sidebar opt-c opt-c-quiet" data-option="C3" data-runtime-idx="0">
+      <div class="sidebar-titlebar">
+        <div class="titlebar-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        AI Chat
+      </div>
+
+      <div class="convo">
+        <div class="bubble-user">Use Claude for the next reply</div>
+        <div>
+          <div class="provenance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a3 3 0 016 0v2"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/><path d="M9 18h6"/></svg>
+            Codex · gpt-4.1
+          </div>
+          <div class="bubble-agent">Ready. The runtime choice stays available in the footer, but the input area stays visually quiet.</div>
+        </div>
+        <div class="bubble-user">This feels calmer.</div>
+        <div class="typing">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+
+      <div class="input-zone">
+        <div class="input-card is-focused">
+          <textarea
+            class="textarea"
+            placeholder="Ask Claude… (@ mention agents, / commands)"
+            rows="3"
+            onfocus="toggleCardFocus(this, true)"
+            onblur="toggleCardFocus(this, false)"
+          ></textarea>
+
+          <div class="card-footer">
+            <div class="footer-left">
+              <div class="runtime-toggle" data-runtime="claude" onclick="cycleRuntimeVariant(this)">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M13 2L4.09 13H11l-2 9 9-10.91H11L13 2z"/></svg>
+                <span class="c-label">Claude · Sonnet</span>
+                <span class="arrow">▾</span>
+              </div>
+
+              <div class="mode-seg" style="display:none;">
+                <button class="seg-btn is-active" onclick="toggleSeg(this)">Edit</button>
+                <button class="seg-btn" onclick="toggleSeg(this)">Plan</button>
+              </div>
+
+              <div class="context-tag">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+                store.ts
+              </div>
+            </div>
+
+            <div class="footer-right">
+              <button class="btn-ghost" title="Attach">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <button class="btn-send" title="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="annotations">
+      <div class="ann"><div class="ann-icon pro">+</div><div>Quietest default — saturated color recedes, but the input still has a soft, intentional container.</div></div>
+      <div class="ann"><div class="ann-icon pro">+</div><div>Best for long sessions where conversation readability beats feature discovery.</div></div>
+      <div class="ann"><div class="ann-icon con">−</div><div>Runtime and send controls stay low-key; hover/focus states should carry the discoverability.</div></div>
+      <div class="ann"><div class="ann-icon note">i</div><div>Preferred base direction; attachment thumbnails should layer in without turning it back into a busy control rail.</div></div>
+    </div>
+  </div>
+
+  <div class="option-col">
+    <div class="option-label">C3b — Quiet + attachments</div>
+    <div class="option-tagline">Same preferred quiet card, now loaded with currently implemented states: attachments, active plan, subagents, activity, approval, question, and @agent/context chips.</div>
+
+    <div class="sidebar opt-c opt-c-quiet opt-c-current-elements" data-option="C3b" data-runtime-idx="2">
+      <div class="sidebar-titlebar">
+        <div class="titlebar-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        AI Chat
+      </div>
+
+      <div class="convo">
+        <div class="element-card compact warning">
+          <div class="element-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Compatibility notice
+          </div>
+          Codex auth is available. Mixed-runtime turns keep provider-specific approvals and sessions.
+        </div>
+
+        <div class="element-card compact">
+          <div class="element-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            Current plan
+          </div>
+          <div class="plan-summary">Reduce runtime-switcher cognitive load while preserving all advanced states.</div>
+          <div class="plan-steps">
+            <div class="plan-step is-done"><span>✓</span><span>Pick C3 as visual base</span></div>
+            <div class="plan-step is-active"><span>•</span><span>Layer attachments + subagent/plan states</span></div>
+            <div class="plan-step"><span>○</span><span>Translate quiet states into production components</span></div>
+          </div>
+        </div>
+
+        <div class="bubble-user">Use this screenshot as context and ask @researcher to inspect related files.</div>
+        <div>
+          <div class="provenance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a3 3 0 016 0v2"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/><path d="M9 18h6"/></svg>
+            Claude · Sonnet 4.5
+          </div>
+          <div class="bubble-agent">I’ll keep the C3 shell quiet, but show the same working states the shipped sidebar can produce.</div>
+        </div>
+
+        <div class="element-card compact">
+          <div class="element-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/></svg>
+            Subagents
+          </div>
+          <div class="subagent-stack">
+            <div class="subagent-row">
+              <span>▸</span>
+              <span class="subagent-task">Explore current ChatInput attachment states</span>
+              <span class="subagent-status"><span class="running-dot"></span></span>
+            </div>
+            <div class="subagent-row is-done">
+              <span>✓</span>
+              <span class="subagent-task">Check Codex plan/approval cards</span>
+              <span class="subagent-status">done</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="element-card compact">
+          <div class="activity-line">
+            <span>▸</span><span>Running: grep attachment thumbnails and plan review components (4 actions)</span>
+          </div>
+        </div>
+
+        <div class="element-card">
+          <div class="element-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 00-4 12c.6.5 1 1.2 1 2h6c0-.8.4-1.5 1-2a7 7 0 00-4-12z"/></svg>
+            Claude is waiting for plan approval
+          </div>
+          <div class="plan-steps">
+            <div class="plan-step is-active"><span>1</span><span>Add quiet states for attachments, subagents, approvals, questions.</span></div>
+            <div class="plan-step"><span>2</span><span>Keep visual weight lower than the current shipped cards.</span></div>
+          </div>
+          <div class="element-actions" style="margin-top:8px;">
+            <span class="element-btn primary">✓ Approve plan</span>
+            <span class="element-btn">× Reject</span>
+          </div>
+        </div>
+
+        <div class="element-card warning">
+          <div class="element-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><path d="M12 3v18"/></svg>
+            Shell command approval
+          </div>
+          <code class="command-preview">npm run test -- ai-sidebar</code>
+          <div class="element-actions">
+            <span class="element-btn primary">✓ Approve</span>
+            <span class="element-btn danger">× Reject</span>
+          </div>
+        </div>
+
+        <div class="element-card">
+          <div class="element-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H7l-4 4V7a4 4 0 014-4h10a4 4 0 014 4z"/></svg>
+            Codex needs your input to continue
+          </div>
+          <div class="plan-summary">Which implementation path should the agent take?</div>
+          <div class="question-options">
+            <span class="question-option">C3 only</span>
+            <span class="question-option">C3 + attachments</span>
+            <span class="question-option">Other</span>
+          </div>
+          <div class="element-actions" style="margin-top:8px;">
+            <span class="element-btn primary">Submit answers</span>
+          </div>
+        </div>
+
+        <div class="bubble-user">Nice. Keep the thumbnail visible.</div>
+        <div class="typing">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+
+      <div class="input-zone">
+        <div class="input-card is-focused">
+          <div class="input-context-row">
+            <span class="quiet-chip">@researcher</span>
+            <span class="quiet-chip">@tests</span>
+            <span class="quiet-chip">Active: UnifiedConversationView.tsx</span>
+            <span class="quiet-chip">/plan</span>
+          </div>
+          <textarea
+            class="textarea"
+            placeholder="Ask Codex in Plan mode about the screenshot…"
+            rows="3"
+            onfocus="toggleCardFocus(this, true)"
+            onblur="toggleCardFocus(this, false)"
+          ></textarea>
+
+          <div class="attachment-strip" aria-label="Attached context">
+            <div class="attachment-thumb" title="sidebar-screenshot.png">
+              <span class="attachment-remove">×</span>
+            </div>
+            <div class="attachment-file" title="store.ts">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span class="attachment-name">store.ts</span>
+              <span class="attachment-remove">×</span>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <div class="footer-left">
+              <div class="runtime-toggle" data-runtime="codex" onclick="cycleRuntimeVariant(this)">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M13 2L4.09 13H11l-2 9 9-10.91H11L13 2z"/></svg>
+                <span class="c-label">Codex · gpt-4.1</span>
+                <span class="arrow">▾</span>
+              </div>
+
+              <div class="mode-seg" style="display:flex;">
+                <button class="seg-btn" onclick="toggleSeg(this)">Edit</button>
+                <button class="seg-btn is-active" onclick="toggleSeg(this)">Plan</button>
+              </div>
+
+              <div class="context-tag">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1.5"/><path d="M21 15l-4-4-6 6-3-3-5 5"/></svg>
+                2 attached
+              </div>
+            </div>
+
+            <div class="footer-right">
+              <button class="btn-ghost" title="Attach">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <button class="btn-send" title="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="annotations">
+      <div class="ann"><div class="ann-icon pro">+</div><div>Shows attachments plus existing advanced states without changing the preferred quiet C3 shell.</div></div>
+      <div class="ann"><div class="ann-icon pro">+</div><div>Includes subagents, activity, plan review, command approval, pending question, @agent chips, context chips, and current plan.</div></div>
+      <div class="ann"><div class="ann-icon con">−</div><div>This is a kitchen-sink stress test; production should reveal each card only when that state exists.</div></div>
+      <div class="ann"><div class="ann-icon note">i</div><div>Use this as the implementation reference for quiet-state density and hierarchy inside C3.</div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Inspiration section -->
+<div class="inspiration-section">
+  <div class="section-title">Reference notes that still apply</div>
+  <div class="section-sub">The direction is now Option C; these references explain why the card/footer architecture is the right base.</div>
+  <div class="inspiration-grid">
+    <div class="inspiration-card">
+      <div class="inspiration-name">Cursor</div>
+      <div class="inspiration-desc">
+        Tab strip <code>New Agent | Terminal</code> at the top. Inside the textarea: <code>∞ Agent ▾</code> mode pill bottom-left, <code>Auto 🔒</code> model pill bottom-right — embedded directly in the input box. Model label is always visible. Mode switching is one click, never hidden in a dropdown.
+      </div>
+    </div>
+    <div class="inspiration-card">
+      <div class="inspiration-name">Codex (OpenAI)</div>
+      <div class="inspiration-desc">
+        Rounded input card. All controls are in the card's bottom row: permissions (lock icon), model picker, environment selector, branch picker — then send. The textarea is top-anchored, controls are footer-anchored. Branch/env pickers appear only when Codex has workspaces, so the footer grows contextually.
+      </div>
+    </div>
+    <div class="inspiration-card">
+      <div class="inspiration-name">Claude Code (CLI)</div>
+      <div class="inspiration-desc">
+        Minimal — just a textarea. Below it: permission mode left, <code>Sonnet 4.6 · Medium</code> model indicator right, very small text. Nothing is clickable in that row — it's status only. Switching is done with <code>/model</code> slash commands instead of UI controls.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Theme toggle ───────────────────────────────────────────── */
+let dark = false;
+function toggleTheme() {
+  dark = !dark;
+  document.querySelectorAll('.sidebar').forEach(el => {
+    el.setAttribute('data-theme', dark ? 'dark' : 'light');
+  });
+  // apply to all sub-elements via closest data-theme
+  document.querySelectorAll('.sidebar *').forEach(el => {});
+  // Instead, set data-theme on sidebar elements directly
+  if (dark) {
+    document.querySelectorAll('.sidebar').forEach(el => el.setAttribute('data-theme', 'dark'));
+  } else {
+    document.querySelectorAll('.sidebar').forEach(el => el.removeAttribute('data-theme'));
+  }
+}
+
+/* ── Option C variants: runtime cycle + local focus state ───── */
+const runtimesC = [
+  { label: 'Claude · Sonnet', showMode: false, runtime: 'claude' },
+  { label: 'Claude · Opus',   showMode: false, runtime: 'claude' },
+  { label: 'Codex · gpt-4.1', showMode: true,  runtime: 'codex'  },
+  { label: 'Chat',            showMode: false, runtime: 'chat'   },
+];
+function toggleCardFocus(textarea, focused) {
+  const card = textarea.closest('.input-card');
+  if (card) card.classList.toggle('is-focused', focused);
+}
+function cycleRuntimeVariant(pill) {
+  const sidebar = pill.closest('.opt-c');
+  const idx = (Number(sidebar?.dataset.runtimeIdx || 0) + 1) % runtimesC.length;
+  const r = runtimesC[idx];
+  if (sidebar) sidebar.dataset.runtimeIdx = String(idx);
+  pill.querySelector('.c-label').textContent = r.label;
+  pill.dataset.runtime = r.runtime;
+  const seg = sidebar?.querySelector('.mode-seg');
+  if (seg) seg.style.display = r.showMode ? 'flex' : 'none';
+  const textarea = sidebar?.querySelector('textarea');
+  if (textarea) {
+    if (r.runtime === 'claude') textarea.placeholder = 'Ask Claude… (@ mention agents, / commands)';
+    else if (r.runtime === 'codex') textarea.placeholder = 'Ask Codex… (/ commands)';
+    else textarea.placeholder = 'Ask anything…';
+  }
+}
+function toggleSeg(btn) {
+  btn.parentElement.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('is-active'));
+  btn.classList.add('is-active');
+}
+</script>
+</body>
+</html>

@@ -128,13 +128,13 @@ function SingleQuestion({
               className="w-full text-left px-3 py-2 rounded border transition-colors"
               style={{
                 background: isSelected
-                  ? 'var(--r-accent)'
-                  : 'var(--vscode-button-secondaryBackground)',
+                  ? 'var(--r-accent-soft)'
+                  : 'var(--r-surface-muted)',
                 color: isSelected
-                  ? 'var(--vscode-button-foreground)'
-                  : 'var(--vscode-button-secondaryForeground)',
+                  ? 'var(--r-accent-deep)'
+                  : 'var(--r-ink-body)',
                 borderColor: isSelected
-                  ? 'var(--r-accent)'
+                  ? 'var(--r-accent-fainter)'
                   : 'var(--r-hairline)',
                 fontSize: 'var(--chat-font-size, 13px)',
               }}
@@ -170,13 +170,13 @@ function SingleQuestion({
             className="w-full text-left px-3 py-2 rounded border transition-colors"
             style={{
               background: otherSelected
-                ? 'var(--r-accent)'
-                : 'var(--vscode-button-secondaryBackground)',
+                ? 'var(--r-accent-soft)'
+                : 'var(--r-surface-muted)',
               color: otherSelected
-                ? 'var(--vscode-button-foreground)'
-                : 'var(--vscode-button-secondaryForeground)',
+                ? 'var(--r-accent-deep)'
+                : 'var(--r-ink-body)',
               borderColor: otherSelected
-                ? 'var(--r-accent)'
+                ? 'var(--r-accent-fainter)'
                 : 'var(--r-hairline)',
               fontSize: 'var(--chat-font-size, 13px)',
             }}
@@ -252,14 +252,11 @@ export function AgentQuestion({ turnId, question, onAnswer, providerLabel = 'Cla
 
   return (
     <div
-      className="rounded border px-3 py-3 space-y-4"
-      style={{
-        background: 'var(--vscode-input-background)',
-        borderColor: 'var(--r-hairline)',
-      }}
+      className="rounded-lg border px-3 py-3 space-y-3 bg-[var(--vscode-input-background)]/80 shadow-[0_1px_2px_rgba(30,27,75,0.04)]"
+      style={{ borderColor: 'var(--r-hairline)' }}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 text-[11px] text-[var(--r-ink-muted)]">
+      <div className="flex items-center gap-2 text-[11px] font-medium text-[var(--r-ink-muted)]">
         <Icon name="chat-circle" size={14} className="shrink-0" />
         <span>{providerLabel} needs your input to continue</span>
       </div>
@@ -279,10 +276,8 @@ export function AgentQuestion({ turnId, question, onAnswer, providerLabel = 'Cla
       <button
         onClick={handleSubmit}
         disabled={!canSubmit}
-        className="px-3 py-1.5 rounded text-xs font-medium transition-opacity"
+        className="rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--r-accent-deep)] transition-opacity hover:bg-[var(--r-accent-fainter)]"
         style={{
-          background: 'var(--r-accent)',
-          color: 'var(--vscode-button-foreground)',
           opacity: canSubmit ? 1 : 0.4,
           cursor: canSubmit ? 'pointer' : 'not-allowed',
           fontSize: 'var(--chat-font-size, 13px)',

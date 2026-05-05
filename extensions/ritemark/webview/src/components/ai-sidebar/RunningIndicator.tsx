@@ -38,11 +38,11 @@ export function RunningIndicator({ activities, subagents }: RunningIndicatorProp
   const runningSubagents = subagents?.filter((s) => s.status === 'running').length || 0;
 
   return (
-    <div className="flex items-center gap-2 py-1 text-[11px] text-[var(--r-ink-muted)]">
-      <Icon name="circle-notch" size={14} className="shrink-0 animate-spin" />
+    <div className="flex items-center gap-2 rounded-md border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]/60 px-2.5 py-1.5 text-[11px] text-[var(--r-ink-muted)]">
+      <Icon name="circle-notch" size={14} className="shrink-0 animate-spin text-[var(--r-accent)]" />
       <span className="truncate flex-1">{text}</span>
       {runningSubagents > 0 && (
-        <span className="flex items-center gap-1 shrink-0 text-[var(--vscode-progressBar-background)]">
+        <span className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--r-accent-soft)] px-1.5 py-0.5 text-[var(--r-accent-deep)]">
           <Icon name="robot" size={12} />
           <span>{runningSubagents}</span>
         </span>
