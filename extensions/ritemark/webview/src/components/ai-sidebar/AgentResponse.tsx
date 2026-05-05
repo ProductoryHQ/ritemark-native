@@ -61,7 +61,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           <div className="flex gap-2 ml-[22px]">
             <button
               onClick={() => startNewConversation()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className="flex items-center gap-1.5 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)]"
             >
               <Icon name="arrow-counter-clockwise" size={12} />
               Start new chat
@@ -106,7 +106,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
       {/* Plan preview card */}
       {needsApproval && displayPlanText && (
-        <div className="mt-2 px-3 py-2 rounded border border-[var(--r-hairline)] bg-[var(--vscode-editorWidget-background)] max-h-[300px] overflow-y-auto">
+        <div className="mt-2 max-h-[300px] overflow-y-auto rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/60 px-3 py-2">
           <div className="text-[10px] font-medium text-[var(--r-ink-muted)] uppercase tracking-wide mb-1.5">Plan</div>
           <div className="text-[12px]">
             <RenderedMarkdown content={displayPlanText} />
@@ -120,7 +120,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           <div className="flex gap-2">
             <button
               onClick={() => approvePlan(turn.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className="flex items-center gap-1.5 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)]"
             >
               <Icon name="check" size={12} />
               Approve plan
@@ -133,7 +133,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
                   setShowRejectInput(true);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:opacity-80"
+              className="flex items-center gap-1.5 rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-1.5 text-xs font-medium text-[var(--r-ink-body)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
             >
               <Icon name="x" size={12} />
               {showRejectInput ? 'Send feedback' : 'Reject'}
@@ -151,7 +151,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
               }}
               placeholder="What should be different?"
               autoFocus
-              className="w-full px-2.5 py-1.5 rounded text-xs bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] outline-none focus:border-[var(--vscode-focusBorder)]"
+              className="w-full rounded-md border border-[var(--r-hairline)] bg-[var(--vscode-input-background)] px-2.5 py-1.5 text-xs text-[var(--vscode-input-foreground)] outline-none focus:border-[var(--vscode-focusBorder)]"
             />
           )}
         </div>

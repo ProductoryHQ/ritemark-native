@@ -19,6 +19,8 @@ import type { CodexConversationTurn, AgentProgress, CodexSidebarStatus } from '.
 
 export function CodexView() {
   const codexConversation = useAISidebarStore((s) => s.codexConversation);
+  const agentConversation = useAISidebarStore((s) => s.agentConversation);
+  const isMixedRuntime = agentConversation.length > 0;
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const dismissedCodexNoticeKey = useAISidebarStore((s) => s.dismissedCodexNoticeKey);
   const dismissCodexNotice = useAISidebarStore((s) => s.dismissCodexNotice);
@@ -85,6 +87,7 @@ export function CodexView() {
         <CodexTurn
           key={turn.id}
           turn={turn}
+          isMixedRuntime={isMixedRuntime}
           onApprove={(requestId) => handleCodexApproval(requestId, true)}
           onReject={(requestId) => handleCodexApproval(requestId, false)}
           onAnswerQuestion={answerCodexQuestion}
@@ -96,7 +99,7 @@ export function CodexView() {
   );
 }
 
-function getCompatibilityNotice(status: CodexSidebarStatus): {
+export function getCompatibilityNotice(status: CodexSidebarStatus): {
   key: string;
   title: string;
   message: string;
@@ -131,8 +134,9 @@ function getCompatibilityNotice(status: CodexSidebarStatus): {
   };
 }
 
-function CodexTurn({
+export function CodexTurn({
   turn,
+  isMixedRuntime,
   onApprove,
   onReject,
   onAnswerQuestion,
@@ -140,6 +144,7 @@ function CodexTurn({
   onDiscardPlan,
 }: {
   turn: CodexConversationTurn;
+  isMixedRuntime: boolean;
   onApprove: (requestId: string | number) => void;
   onReject: (requestId: string | number) => void;
   onAnswerQuestion: (turnId: string, question: NonNullable<CodexConversationTurn['pendingQuestion']>, answers: Record<string, string>) => void;
@@ -163,6 +168,14 @@ function CodexTurn({
 
   return (
     <div className="space-y-2">
+      {/* Runtime provenance — only in mixed-runtime conversations */}
+      {isMixedRuntime && (
+        <div className="flex items-center gap-1 text-[10px] text-[var(--r-ink-faint)] select-none">
+          <Icon name="terminal" size={12} />
+          <span>Codex</span>
+        </div>
+      )}
+
       {/* User message */}
       <UserPromptBubble attachments={turn.attachments} activeFilePath={turn.activeFilePath}>
         {turn.userPrompt}
@@ -252,8 +265,8 @@ function PlanCard({
   planText?: string;
 }) {
   return (
-    <div className="mx-1 p-3 rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]">
-      <div className="text-[11px] opacity-70 mb-2 font-medium">Codex plan</div>
+    <div className="mx-1 rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]/80 p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
+      <div className="mb-2 text-[11px] font-medium text-[var(--r-ink-muted)]">Codex plan</div>
       {explanation && (
         <p className="text-[12px] opacity-85 mb-2 whitespace-pre-wrap">{explanation}</p>
       )}
@@ -302,11 +315,11 @@ function ActivitySection({
   const latestMessage = lastActivity?.message || '';
 
   return (
-    <div className="pl-1">
+    <div className="rounded-md border border-transparent bg-transparent px-1">
       {/* Summary row — always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 w-full text-left group hover:opacity-80 transition-opacity"
+        className="flex w-full items-center gap-1.5 rounded-md text-left transition-colors hover:bg-[var(--r-surface-soft)]"
       >
         <Icon
           name="caret-right"
@@ -348,7 +361,7 @@ function ActivityLine({ activity }: { activity: AgentProgress }) {
   );
 
   return (
-    <div className="flex items-center gap-1.5 text-[10px] opacity-45">
+    <div className="flex items-center gap-1.5 rounded px-1 text-[10px] text-[var(--r-ink-muted)] opacity-70">
       {icon}
       <span className="truncate">{activity.message}</span>
     </div>
@@ -367,8 +380,8 @@ function ApprovalCard({
   const isCommand = approval.approvalType === 'command';
 
   return (
-    <div className="mx-1 p-3 rounded-lg border-2 border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-editor-background)]">
-      <div className="flex items-center gap-2 mb-2">
+    <div className="mx-1 rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-input-background)]/80 p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
+      <div className="mb-2 flex items-center gap-2 text-[var(--r-ink-strong)]">
         <Icon name="warning" size={14} className="text-[var(--vscode-inputValidation-warningBorder)]" />
         <span className="text-xs font-semibold">
           {isCommand ? 'Shell Command Approval' : 'File Change Approval'}
@@ -378,7 +391,7 @@ function ApprovalCard({
       {/* Command preview */}
       {isCommand && approval.command && (
         <div className="mb-2">
-          <code className="block text-[11px] p-2 rounded bg-[var(--vscode-input-background)] font-mono whitespace-pre-wrap break-all">
+          <code className="block rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 p-2 font-mono text-[11px] whitespace-pre-wrap break-all">
             {approval.command}
           </code>
           {approval.workingDir && (
@@ -410,13 +423,13 @@ function ApprovalCard({
       <div className="flex gap-2">
         <button
           onClick={() => onApprove(approval.requestId)}
-          className="flex items-center gap-1 px-3 py-1 text-xs rounded bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+          className="flex items-center gap-1 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)]"
         >
           <Icon name="check" size={12} /> Approve
         </button>
         <button
           onClick={() => onReject(approval.requestId)}
-          className="flex items-center gap-1 px-3 py-1 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+          className="flex items-center gap-1 rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-1 text-xs font-medium text-[var(--r-ink-body)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
         >
           <Icon name="x" size={12} /> Reject
         </button>
@@ -425,7 +438,7 @@ function ApprovalCard({
   );
 }
 
-function CompatibilityNotice({
+export function CompatibilityNotice({
   title,
   message,
   bullets,
@@ -437,7 +450,7 @@ function CompatibilityNotice({
   onDismiss: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-editorWarning-background)]/20 p-3 text-left">
+    <div className="rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-input-background)]/80 p-3 text-left shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2 min-w-0">
           <Icon name="warning" size={14} className="mt-0.5 shrink-0 text-[var(--vscode-inputValidation-warningBorder)]" />
@@ -455,7 +468,7 @@ function CompatibilityNotice({
         </div>
         <button
           onClick={onDismiss}
-          className="rounded p-1 opacity-60 hover:opacity-100"
+          className="rounded-md p-1 text-[var(--r-ink-muted)] opacity-70 transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] hover:opacity-100"
           aria-label="Dismiss Codex compatibility notice"
           title="Dismiss"
         >

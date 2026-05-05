@@ -11,7 +11,8 @@
 import { useState } from 'react';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { useAISidebarStore } from './store';
-import type { SavedConversation } from './chatHistoryStorage';
+import type { SavedConversationV2 } from './chatHistoryStorage';
+import type { RuntimeId } from './conversationModel';
 import type { AgentId } from './types';
 
 // ── Date Grouping ──────────────────────────────────────────────────────
@@ -38,9 +39,9 @@ function getDateGroup(timestamp: number): DateGroup {
 }
 
 function groupConversations(
-  conversations: SavedConversation[]
-): Record<DateGroup, SavedConversation[]> {
-  const groups: Record<DateGroup, SavedConversation[]> = {
+  conversations: SavedConversationV2[]
+): Record<DateGroup, SavedConversationV2[]> {
+  const groups: Record<DateGroup, SavedConversationV2[]> = {
     today: [],
     yesterday: [],
     thisWeek: [],
@@ -54,6 +55,14 @@ function groupConversations(
 
   return groups;
 }
+
+// ── Runtime badge helpers ──────────────────────────────────────────────
+
+const runtimeBadgeConfig: Record<RuntimeId, { icon: PhosphorIconName; label: string }> = {
+  'claude-code': { icon: 'robot', label: 'Claude' },
+  'codex': { icon: 'terminal', label: 'Codex' },
+  'legacy-ritemark': { icon: 'star-four', label: 'Agent' },
+};
 
 const groupLabels: Record<DateGroup, string> = {
   today: 'Today',
@@ -70,12 +79,31 @@ const agentBadgeConfig: Record<AgentId, { icon: PhosphorIconName; label: string 
   'ritemark-agent': { icon: 'star-four', label: 'Agent' },
 };
 
-function AgentBadge({ agentId }: { agentId: AgentId }) {
-  const config = agentBadgeConfig[agentId] || agentBadgeConfig['ritemark-agent'];
+interface AgentBadgeProps {
+  agentId?: AgentId;
+  runtimeSummary?: RuntimeId[];
+}
+
+function AgentBadge({ agentId, runtimeSummary }: AgentBadgeProps) {
+  let icon: PhosphorIconName = 'star-four';
+  let label = 'Agent';
+
+  if (runtimeSummary && runtimeSummary.length > 1) {
+    icon = 'squares-four';
+    label = 'Mixed';
+  } else if (runtimeSummary && runtimeSummary.length === 1) {
+    const config = runtimeBadgeConfig[runtimeSummary[0]];
+    if (config) { icon = config.icon; label = config.label; }
+  } else if (agentId) {
+    const config = agentBadgeConfig[agentId] || agentBadgeConfig['ritemark-agent'];
+    icon = config.icon;
+    label = config.label;
+  }
+
   return (
     <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
-      <Icon name={config.icon} size={12} />
-      <span>{config.label}</span>
+      <Icon name={icon} size={12} />
+      <span>{label}</span>
     </span>
   );
 }
@@ -83,7 +111,7 @@ function AgentBadge({ agentId }: { agentId: AgentId }) {
 // ── Conversation Item ──────────────────────────────────────────────────
 
 interface ConversationItemProps {
-  conversation: SavedConversation;
+  conversation: SavedConversationV2;
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
@@ -126,7 +154,7 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: Conver
           <span className="text-[12px] font-medium truncate flex-1">
             {conversation.title}
           </span>
-          <AgentBadge agentId={conversation.agentId} />
+          <AgentBadge agentId={conversation.agentId} runtimeSummary={conversation.runtimeSummary} />
         </div>
         <span className="text-[10px] text-[var(--r-ink-muted)]">
           {formatTime(conversation.updatedAt)}

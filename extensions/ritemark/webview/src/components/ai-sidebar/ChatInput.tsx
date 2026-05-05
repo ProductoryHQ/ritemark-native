@@ -6,12 +6,21 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Icon } from '../ui/Icon';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+} from '../ui/select';
 import { useAISidebarStore } from './store';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
-import type { FileAttachment, AttachmentKind } from './types';
+import type { AgentId, FileAttachment, AttachmentKind } from './types';
 
 let attachmentIdCounter = 0;
 let pathChipIdCounter = 0;
@@ -123,10 +132,21 @@ export function ChatInput() {
   const mentionPopupRef = useRef<AgentMentionPopupHandle>(null);
   const commandPopupRef = useRef<SlashCommandPopupHandle>(null);
 
-  const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
+  const pendingRuntime = useAISidebarStore((s) => s.pendingRuntime);
   const isStreaming = useAISidebarStore((s) => s.isStreaming);
   const agentConversation = useAISidebarStore((s) => s.agentConversation);
   const isOnline = useAISidebarStore((s) => s.isOnline);
+  const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
+  const selectedModel = useAISidebarStore((s) => s.selectedModel);
+  const codexSelectedModel = useAISidebarStore((s) => s.codexSelectedModel);
+  const agents = useAISidebarStore((s) => s.agents);
+  const models = useAISidebarStore((s) => s.models);
+  const codexModels = useAISidebarStore((s) => s.codexModels);
+  const agenticEnabled = useAISidebarStore((s) => s.agenticEnabled);
+  const selectAgent = useAISidebarStore((s) => s.selectAgent);
+  const selectModel = useAISidebarStore((s) => s.selectModel);
+  const selectCodexModel = useAISidebarStore((s) => s.selectCodexModel);
+  const setPendingRuntime = useAISidebarStore((s) => s.setPendingRuntime);
   const sendChatMessage = useAISidebarStore((s) => s.sendChatMessage);
   const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
   const cancelRequest = useAISidebarStore((s) => s.cancelRequest);
@@ -141,12 +161,14 @@ export function ChatInput() {
   const codexConversation = useAISidebarStore((s) => s.codexConversation);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
 
-  const isClaudeCode = selectedAgent === 'claude-code';
-  const isCodex = selectedAgent === 'codex';
+  // Route by pendingRuntime so switching provider mid-session takes effect immediately
+  const isClaudeCode = pendingRuntime.runtimeId === 'claude-code';
+  const isCodex = pendingRuntime.runtimeId === 'codex';
   const isAgentMode = isClaudeCode || isCodex;
   const lastTurn = agentConversation[agentConversation.length - 1];
   const lastCodexTurn = codexConversation[codexConversation.length - 1];
-  const agentRunning = isCodex ? (lastCodexTurn?.isRunning ?? false) : (lastTurn?.isRunning ?? false);
+  // Check both arrays — cancel routes by active turn, not by selected agent
+  const agentRunning = (lastTurn?.isRunning ?? false) || (lastCodexTurn?.isRunning ?? false);
   const isLoading = isAgentMode ? agentRunning : isStreaming;
   const placeholder = isClaudeCode
     ? 'Ask Claude... (type @ to mention an agent, / for commands)'
@@ -174,7 +196,7 @@ export function ChatInput() {
     if (!prompt || !isOnline || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
 
     if (isCodex) {
-      sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined);
+      sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined, pendingRuntime.mode);
     } else if (isClaudeCode) {
       sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile });
     } else {
@@ -190,7 +212,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, sendAgentMessage, sendCodexMessage, sendChatMessage]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendChatMessage]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
   const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
@@ -623,6 +645,42 @@ export function ChatInput() {
   // Parse @mentions in value for visual highlighting
   const mentions = parseMentions(discoveredAgents, value);
 
+  const visibleAgents = agents.filter((a) => !a.experimental || agenticEnabled);
+  const canUseClaude = visibleAgents.some((a) => a.id === 'claude-code');
+  const canUseCodex = visibleAgents.some((a) => a.id === 'codex');
+  const currentClaudeModel = models.find((m) => m.id === selectedModel) || models[0];
+  const currentCodexModel = codexModels.find((m) => m.id === codexSelectedModel) || codexModels[0];
+  const runtimeSelectValue = pendingRuntime.runtimeId === 'codex'
+    ? `codex:${currentCodexModel?.id || codexSelectedModel}`
+    : `claude-code:${currentClaudeModel?.id || selectedModel}`;
+  const runtimeFooterLabel = pendingRuntime.runtimeId === 'codex'
+    ? `Codex · ${currentCodexModel?.label || codexSelectedModel || 'Model'}`
+    : `Claude · ${currentClaudeModel?.label || selectedModel || 'Model'}`;
+  const contextCount = (showActiveFileChip ? 1 : 0) + pathChips.length;
+  const contextSummary = [
+    attachmentCount > 0 ? `${attachmentCount} attached` : null,
+    contextCount > 0 ? `${contextCount} context` : null,
+    mentions.length > 0 ? `${mentions.length} agent${mentions.length === 1 ? '' : 's'}` : null,
+  ].filter(Boolean).join(' · ');
+
+  function handleRuntimeChange(value: string) {
+    if (value.startsWith('claude-code:')) {
+      const modelId = value.slice('claude-code:'.length);
+      if (selectedAgent !== 'claude-code') {
+        selectAgent('claude-code' as AgentId);
+      }
+      selectModel(modelId);
+      setPendingRuntime({ runtimeId: 'claude-code', modelId });
+    } else if (value.startsWith('codex:')) {
+      const modelId = value.slice('codex:'.length);
+      if (selectedAgent !== 'codex') {
+        selectAgent('codex' as AgentId);
+      }
+      selectCodexModel(modelId);
+      setPendingRuntime({ runtimeId: 'codex', modelId });
+    }
+  }
+
   return (
     <div
       ref={containerRef}
@@ -635,7 +693,7 @@ export function ChatInput() {
     >
       {/* Drag overlay indicator */}
       {isDragOver && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--vscode-editor-background)]/90 border-2 border-dashed border-[var(--vscode-focusBorder)] rounded pointer-events-none">
+        <div className="absolute inset-2 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--vscode-focusBorder)] bg-[var(--vscode-editor-background)]/90 pointer-events-none">
           <div className="flex items-center gap-2 text-sm text-[var(--r-ink-strong)]">
             <Icon name="file" size={20} />
             Drop files or folders here
@@ -665,127 +723,59 @@ export function ChatInput() {
         />
       )}
 
-      {/* Context chips: active file + manually added paths */}
-      {(showActiveFileChip || pathChips.length > 0) && (
-        <div className="flex gap-1.5 mb-2 flex-wrap">
-          {/* Active file context chip (auto, dimmer style) */}
-          {showActiveFileChip && (
-            <div
-              className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] bg-[var(--vscode-badge-background)]/50 text-[var(--r-ink-muted)]"
-            >
-              <Icon name="file-text" size={12} className="shrink-0" />
-              <span className="truncate max-w-[120px]" title={activeFilePath!}>
-                {getDisplayPath(activeFilePath!)}
-              </span>
-              <button
-                onClick={() => setHideActiveFile(true)}
-                className="shrink-0 hover:text-[var(--r-error)]"
-                title="Remove from context"
-              >
-                <Icon name="x" size={12} />
-              </button>
-            </div>
-          )}
-          {/* Manual path chips (brighter style) */}
-          {pathChips.map((chip) => (
-            <div
-              key={chip.id}
-              className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]"
-            >
-              <Icon name="file" size={12} className="shrink-0" />
-              <span className="truncate max-w-[120px]" title={chip.path}>
-                {getDisplayPath(chip.path)}
-              </span>
-              <button
-                onClick={() => removePathChip(chip.id)}
-                className="shrink-0 hover:text-[var(--r-error)]"
-                title="Remove"
-              >
-                <Icon name="x" size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Attachment thumbnail strip */}
-      {attachments.length > 0 && (
-        <div className="flex gap-1.5 mb-2 flex-wrap">
-          {attachments.map((att) => (
-            <div key={att.id} className="relative group rounded overflow-hidden border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]">
-              {att.kind === 'image' && att.thumbnail ? (
-                <div className="w-14 h-14">
-                  <img
-                    src={att.thumbnail}
-                    alt={att.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-2 py-1.5 max-w-[160px]">
-                  {att.kind === 'pdf' ? (
-                    <Icon name="file-text" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
-                  ) : (
-                    <Icon name="file-image" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
-                  )}
-                  <span className="text-[10px] text-[var(--r-ink-muted)] truncate">
-                    {att.name}
-                  </span>
-                </div>
-              )}
-              <button
-                onClick={() => removeAttachment(att.id)}
-                className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-black/60 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove"
-              >
-                <Icon name="x" size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Mentioned agents badge strip (visual indicator of @mentions in message) */}
-      {mentions.length > 0 && (
-        <div className="flex gap-1 mb-2 flex-wrap">
-          {mentions.map((m) => {
-            const agent = findAgent(discoveredAgents, m.agentId);
-            if (!agent) return null;
-            return (
-              <div
-                key={m.start}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[var(--vscode-symbolIcon-classForeground)]/10 text-[var(--vscode-symbolIcon-classForeground)]"
-              >
-                <Icon name="robot" size={12} />
-                {agent.name}
+      <div className="overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)] shadow-[0_1px_2px_rgba(30,27,75,0.04)] focus-within:border-[var(--r-hairline-strong)] focus-within:shadow-[0_0_0_1px_rgba(100,116,139,0.08)]">
+        {/* Context chips: active file + manually added paths + @mentions */}
+        {(showActiveFileChip || pathChips.length > 0 || mentions.length > 0) && (
+          <div className="flex gap-1.5 px-2.5 pt-2 flex-wrap">
+            {showActiveFileChip && (
+              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]">
+                <Icon name="file-text" size={12} className="shrink-0" />
+                <span className="truncate max-w-[140px]" title={activeFilePath!}>
+                  Active: {getDisplayPath(activeFilePath!)}
+                </span>
+                <button
+                  onClick={() => setHideActiveFile(true)}
+                  className="shrink-0 rounded hover:text-[var(--r-error)]"
+                  title="Remove from context"
+                >
+                  <Icon name="x" size={12} />
+                </button>
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="flex gap-2 items-end">
-        {/* Attach button — agent modes (Claude Code + Codex) */}
-        {isAgentMode && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ALL_ACCEPTED}
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
-              className="flex items-center justify-center w-8 h-8 rounded text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--vscode-input-background)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-              title="Attach files"
-            >
-              <Icon name="paperclip" size={14} />
-            </button>
-          </>
+            )}
+            {pathChips.map((chip) => (
+              <div
+                key={chip.id}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]"
+              >
+                <Icon name="file" size={12} className="shrink-0" />
+                <span className="truncate max-w-[140px]" title={chip.path}>
+                  {getDisplayPath(chip.path)}
+                </span>
+                <button
+                  onClick={() => removePathChip(chip.id)}
+                  className="shrink-0 rounded hover:text-[var(--r-error)]"
+                  title="Remove"
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </div>
+            ))}
+            {mentions.map((m) => {
+              const agent = findAgent(discoveredAgents, m.agentId);
+              if (!agent) return null;
+              return (
+                <div
+                  key={m.start}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]"
+                >
+                  <Icon name="robot" size={12} />
+                  @{agent.name}
+                </div>
+              );
+            })}
+          </div>
         )}
+
         <textarea
           ref={textareaRef}
           value={value}
@@ -794,28 +784,151 @@ export function ChatInput() {
           onPaste={handlePaste}
           placeholder={placeholder}
           disabled={isLoading}
-          rows={1}
-          className="flex-1 resize-none rounded px-2.5 py-1.5 leading-relaxed bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] outline-none focus:border-[var(--vscode-focusBorder)] disabled:opacity-50 disabled:cursor-not-allowed"
+          rows={2}
+          className="block w-full resize-none bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ fontSize: 'var(--chat-font-size, 13px)' }}
         />
-        {isLoading ? (
-          <button
-            onClick={cancelRequest}
-            className="flex items-center justify-center w-8 h-8 rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:opacity-80 shrink-0"
-            title="Stop"
-          >
-            <Icon name="square" size={14} />
-          </button>
-        ) : (
-          <button
-            onClick={handleSend}
-            disabled={!value.trim() || !isOnline}
-            className="flex items-center justify-center w-8 h-8 rounded bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-            title={sendTitle}
-          >
-            <Icon name="paper-plane-right" size={14} />
-          </button>
+
+        {/* Attachment thumbnail strip */}
+        {attachments.length > 0 && (
+          <div className="flex gap-1.5 px-2.5 pb-2 flex-wrap">
+            {attachments.map((att) => (
+              <div key={att.id} className="relative group overflow-hidden rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70">
+                {att.kind === 'image' && att.thumbnail ? (
+                  <div className="w-14 h-14">
+                    <img
+                      src={att.thumbnail}
+                      alt={att.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-7 items-center gap-1.5 px-2 max-w-[160px]">
+                    {att.kind === 'pdf' ? (
+                      <Icon name="file-text" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
+                    ) : (
+                      <Icon name="file-image" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
+                    )}
+                    <span className="text-[10px] text-[var(--r-ink-muted)] truncate">
+                      {att.name}
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={() => removeAttachment(att.id)}
+                  className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl border border-[var(--r-hairline)] bg-[var(--r-surface)] text-[var(--r-ink-body)] shadow-sm opacity-95 group-hover:text-[var(--r-error)] group-hover:opacity-100 transition-colors"
+                  title="Remove"
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
+
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent">
+          <Select value={runtimeSelectValue} onValueChange={handleRuntimeChange}>
+            <SelectTrigger
+              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0"
+              title={runtimeFooterLabel}
+            >
+              <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+                {runtimeFooterLabel}
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {canUseClaude && models.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel className="text-[10px]">Claude</SelectLabel>
+                  {models.map((model) => (
+                    <SelectItem key={model.id} value={`claude-code:${model.id}`} className="text-xs">
+                      {model.label}
+                      <span className="ml-1.5 text-[10px] opacity-50">{model.description}</span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+              {canUseClaude && models.length > 0 && canUseCodex && codexModels.length > 0 && <SelectSeparator />}
+              {canUseCodex && codexModels.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel className="text-[10px]">Codex</SelectLabel>
+                  {codexModels.map((model) => (
+                    <SelectItem key={model.id} value={`codex:${model.id}`} className="text-xs">
+                      {model.label}
+                      <span className="ml-1.5 text-[10px] opacity-50">{model.description}</span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+            </SelectContent>
+          </Select>
+
+          {pendingRuntime.runtimeId === 'codex' && (
+            <div className="inline-flex shrink-0 overflow-hidden rounded border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/60">
+              {(['edit', 'plan'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setPendingRuntime({ mode })}
+                  className={[
+                    'h-5 px-2 text-[10px] font-medium transition-colors',
+                    pendingRuntime.mode === mode
+                      ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)] shadow-[inset_0_0_0_1px_var(--r-accent-fainter)]'
+                      : 'text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]',
+                  ].join(' ')}
+                >
+                  {mode === 'edit' ? 'Edit' : 'Plan'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {contextSummary && (
+            <span className="min-w-0 truncate text-[10px] text-[var(--r-ink-faint)]">
+              {contextSummary}
+            </span>
+          )}
+
+          <div className="ml-auto flex items-center gap-1.5">
+            {isAgentMode && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ALL_ACCEPTED}
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  className="flex h-7 w-7 items-center justify-center rounded text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  title="Attach files"
+                >
+                  <Icon name="paperclip" size={14} />
+                </button>
+              </>
+            )}
+            {isLoading ? (
+              <button
+                onClick={cancelRequest}
+                className="flex h-7 w-7 items-center justify-center rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] shrink-0"
+                title="Stop"
+              >
+                <Icon name="square" size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={!value.trim() || !isOnline}
+                className="flex h-7 w-7 items-center justify-center rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-strong)] disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
+                title={sendTitle}
+              >
+                <Icon name="paper-plane-right" size={14} />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

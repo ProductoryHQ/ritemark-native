@@ -8,7 +8,6 @@
 import { useEffect } from 'react';
 import { useAISidebarStore } from './store';
 import { vscode } from '../../lib/vscode';
-import { AgentSelector } from './AgentSelector';
 import { OfflineBanner } from './OfflineBanner';
 import { NoApiKey } from './NoApiKey';
 import { OnboardingWizard } from './OnboardingWizard';
@@ -16,6 +15,7 @@ import { SetupWizard } from './SetupWizard';
 import { ChatView } from './ChatView';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
+import { UnifiedConversationView } from './UnifiedConversationView';
 import { CodexSetupView } from './CodexSetupView';
 import { ChatInput } from './ChatInput';
 import { IndexFooter } from './IndexFooter';
@@ -31,7 +31,6 @@ export function AISidebar() {
   const hasApiKey = useAISidebarStore((s) => s.hasApiKey);
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const ready = useAISidebarStore((s) => s.ready);
-  const agenticEnabled = useAISidebarStore((s) => s.agenticEnabled);
   const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
   const dismissCurrentPlan = useAISidebarStore((s) => s.dismissCurrentPlan);
   const dismissedCurrentPlanKey = useAISidebarStore((s) => s.dismissedCurrentPlanKey);
@@ -119,8 +118,9 @@ export function AISidebar() {
   const needsOpenAIKey = !isAgentMode && !hasApiKey;
   const needsSetup = isClaudeCode && setupStatus !== null
     && setupStatus.state !== 'ready';
+  const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
   const showWelcome = isClaudeCode && setupStatus !== null
-    && setupStatus.state === 'ready' && !hasSeenWelcome;
+    && setupStatus.state === 'ready' && !hasSeenWelcome && !hasAnyRuntimeConversation;
   const showCodexSetup = isCodex && codexStatus.state !== 'ready';
   const currentApprovedPlan = isClaudeCode
     ? getActiveApprovedPlanForClaude(agentConversation)
@@ -136,8 +136,6 @@ export function AISidebar() {
       {/* Inject markdown styles once at root level */}
       <style dangerouslySetInnerHTML={{ __html: markdownStyles }} />
 
-      {/* Agent selector — hidden during onboarding wizard */}
-      {agenticEnabled && !(onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed) && <AgentSelector />}
 
       {/* Chat History Panel (overlay) */}
       {showHistoryPanel && <ChatHistoryPanel />}
@@ -169,7 +167,11 @@ export function AISidebar() {
 
           {/* Main content area */}
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {isCodex ? <CodexView /> : isClaudeCode ? <AgentView /> : <ChatView />}
+            {agentConversation.length > 0 || codexConversation.length > 0
+              ? <UnifiedConversationView />
+              : isCodex ? <CodexView />
+              : isClaudeCode ? <AgentView />
+              : <ChatView />}
           </div>
 
           {/* Shared input */}
