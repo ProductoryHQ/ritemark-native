@@ -56,6 +56,7 @@ Build and run AI workflows.
 | Feature | Description |
 |---------|-------------|
 | [AI Agents](ai-agents.md) | Three built-in agents: Ritemark Agent, Claude, and Codex |
+| [Agent Library](agent-library.md) | Create, launch, and manage custom agents and skills |
 | [AI Assistant](ai-assistant.md) | Ritemark Agent tools: rephrase, replace, insert |
 | [Ritemark Flows](flows.md) | Visual AI workflow automation |
 
