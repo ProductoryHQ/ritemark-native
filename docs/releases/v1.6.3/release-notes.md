@@ -8,9 +8,10 @@ tags:
   - authoring
   - conversations
   - runtime
+  - launch-chat
   - feature
 ---
-# Ritemark v1.6.3 — One Conversation, Many Runtimes; A Library You Can Author Into
+# Ritemark v1.6.3 — One Conversation, Many Runtimes; A Library You Can Talk To
 
 **Status:** Draft — awaiting build + Jarmo approval
 **Type:** Feature release
@@ -109,11 +110,39 @@ External edits to anything under `.claude/agents/`, `.claude/skills/`, or `.clau
 
 A new sort dropdown gives you **Alphabetical** or **Recently modified**. Recently modified is the one that earns its keep once you have thirty or forty helpers and need to find the one you touched yesterday.
 
+### Launch Chat — Talk to Any Agent from the Library
+
+Right-click any agent in the Agent Library and you'll see a new **Launch Chat** action at the top of the menu. Click it and the AI panel focuses with that specific agent already pinned for the conversation. No manual agent picker, no copy-pasting `@mentions`.
+
+What this actually does under the hood: the agent's `.md` file is loaded into the conversation as **hidden context** — sent to the AI but never shown as visible message text in your chat. You see your own prompt and the agent's response; the AI sees its full instructions on top.
+
+-   **One indigo chip in the composer.** When an agent is pinned, an indigo chip appears next to the input showing the agent's name and an × to remove. The chip persists across multiple turns — once pinned, the agent stays active for the whole thread until you dismiss it.
+
+-   **Subsequent messages stay light.** The full instructions are loaded once on the first turn (so they live in the AI's context). Every turn after that gets a short reminder — no need to re-send the same `.md` file with every message.
+
+-   **Switching agents is explicit.** Pin agent A, chat for a few turns, then pin agent B. Ritemark sends both a "you are no longer agent A — stop acting as that role" note and the full agent B instructions in a single hidden block. The AI gets a clean handoff instead of having to guess.
+
+-   **Removing the agent tells the AI to revert.** When you click × on the chip, the next message you send carries a hidden "you are no longer acting as agent X — respond in your default role" note. The AI returns to its default persona without you having to remind it.
+
+The `@` mention popup in the composer now flows through the same Pin Agent path: typing `@product-marketer`, picking the agent, and the partial `@…` text is stripped from the textarea — replaced by the indigo pinned chip. Two ways in, one consistent experience: **one chip, one mechanism, one source of truth for who the AI is acting as.**
+
+### `AGENTS.md` and `.agents/` Are First-Class
+
+The Agent Library now scans both conventions side by side:
+
+-   **`AGENTS.md` at the workspace root** — the Codex/OpenAI convention for the main agent config — appears alongside `CLAUDE.md` in the library, with the same "main agent" treatment.
+
+-   **`.agents/` directory** — a sibling to `.claude/` — is now scanned for `agents/`, `skills/`, and `commands/` content. This unblocks repos that follow the Codex layout convention; their helpers were previously invisible in the library.
+
+Both directories are merged into the project scope; on name collision, `.claude/` wins to preserve existing behavior.
+
 * * *
 
 ## What's Fixed
 
 -   **Row context menu now opens reliably.** A regression caught during validation: the right-click menu was silently failing on some rows because we were stashing item data in a `data-item` HTML attribute via `JSON.stringify(item)`, and unescaped quotes inside the JSON were breaking the attribute. Switched to a `data-filepath` lookup against in-scope arrays, so the menu opens every time. (Commit `4299a77`.)
+
+-   **Claude model picker shows current versions.** The fallback model list (used when the SDK can't reach the API yet) was bumped from `claude-sonnet-4-5` / `claude-opus-4-6` / `claude-haiku-4-5` to `claude-sonnet-4-6` / `claude-opus-4-7` / `claude-haiku-4-5-20251001`. (Issue [#44](https://github.com/ProductoryHQ/ritemark-native/issues/44).)
 
 * * *
 
@@ -155,6 +184,7 @@ For developers and changelog readers.
 -   Sprint 60 — Agent Harness Refactor (PR #46, merged 2026-05-04). Internal-only refactor of `CLAUDE.md`, agents, skills, and hooks per the 2026-05-03 audit. No product code changes; included here for changelog completeness only.
 -   [Sprint 61 — Agent Library Icons & Colours](../../development/sprints/sprint-61-agent-library-icons/sprint-plan.md) (PR #47, merged 2026-05-04)
 -   [Sprint 62 — Conversation Runtime + Agent Switching](../../development/sprints/sprint-62-conversation-runtime/sprint-plan.md) (branch `codex/sprint-62-conversation-runtime`)
+-   [Sprint 63 — Minor Updates](../../development/sprints/sprint-63-minor-updates/sprint-plan.md) (closes [#38](https://github.com/ProductoryHQ/ritemark-native/issues/38), [#44](https://github.com/ProductoryHQ/ritemark-native/issues/44), [#49](https://github.com/ProductoryHQ/ritemark-native/issues/49))
 
 **Highlights — Conversation runtime (sprint 62):**
 
@@ -178,6 +208,15 @@ For developers and changelog readers.
 -   Sort dropdown reads modified-time from the FS at refresh time; no extra index file.
 -   Icon system (`extensions/ritemark/src/agent/iconPack.ts`): 33 Phosphor regular SVG paths (viewBox 256×256) embedded as inline strings in the webview HTML — no npm bundle needed since the Agent Library is a string-template webview, not a bundled React app. Eight brand colours as `rgba` alpha tints so chips read correctly on both light and dark VS Code themes. `resolveIconAndColor()` checks frontmatter first, then keyword heuristics, then defaults to `sparkle`+`indigo`. Phosphor is MIT-licensed; attribution added to `branding/ATTRIBUTION.md`.
 
+**Highlights — Pin Agent + Discovery (sprint 63):**
+
+-   New `pin-agent` message protocol between extension and webview. Extension reads the agent `.md` once, posts content to webview store, which holds it as `pinnedAgentContent` for the next turn only — subsequent turns drop to a short reminder string.
+-   `sendAgentMessage` gains a `hiddenContext` option: prepended to the prompt sent to the runtime, NOT to `turn.userPrompt` that the chat UI renders. Same separation pattern Sprint 62 introduced for cross-runtime handoff context.
+-   `@mention` popup selection now strips the partial `@…` text and routes through `requestPinAgent` instead of leaving the literal `@agent-id` in the textarea. One visual indicator (indigo chip), one context-loading mechanism.
+-   Switching agent A → B is handled in the `pin-agent` store handler with a switching-aware merge: new pin sets `pinnedAgent: B + content`, but also stamps `pinnedAgentDismissal: A` so the hidden context for the next turn includes both "stop being A" and "now you are B with these instructions". Direct switch and `× → pin` paths produce the same hidden block.
+-   `discoverAgents()` and `discoverCommands()` (`extensions/ritemark/src/agent/discovery.ts`) now scan `.claude/` and `.agents/` under the project scope with a shared dedup `Set` (`.claude/` wins on collision). `AGENTS.md` at the workspace root is recognized as a main-agent config alongside `CLAUDE.md`.
+-   Claude fallback model list refreshed in `extensions/ritemark/src/agent/claudeModels.ts`: `claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5-20251001`.
+
 **Upgrade notes:** No breaking changes. No new runtime dependencies in the extension or webview. localStorage migration is read-compatible with v1.6.2 records.
 
 * * *
@@ -188,5 +227,6 @@ For developers and changelog readers.
 -   **Sprint 60** — Agent Harness Refactor (internal only)
 -   **Sprint 61** — Agent Library Icons & Colours (user-facing)
 -   **Sprint 62** — Conversation Runtime + Agent Switching (user-facing)
+-   **Sprint 63** — Minor Updates: Launch Chat, AGENTS.md / .agents/ scan, Claude model IDs (user-facing)
 
-Browsing a library is fine. Adding to it is the part that matters. Owning a conversation that outlives any one runtime is the other part.
+Browsing a library is fine. Adding to it is the part that matters. Owning a conversation that outlives any one runtime is the other part. Talking *to* a specific agent without remembering its name is the third.
