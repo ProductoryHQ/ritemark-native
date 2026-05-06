@@ -2,26 +2,33 @@
 
 ## Goal
 
-Ship Codex and Claude runtimes inside the Ritemark app bundle so that a clean macOS install shows "Codex: Ready / Claude: Ready" with no terminal, npm, Node, PATH, or architecture knowledge required from the user.
+Ship Codex and Claude runtimes inside the Ritemark app bundle so that a clean install has working app-owned agent runtimes with no terminal, npm, Node, PATH, or architecture knowledge required from the user. Settings should show `Ready` only after auth/account checks pass; otherwise it should show `Runtime installed — sign in required`.
 
 ---
 
-## Feature Flag Check
+## Locked Decisions (Jarmo, 2026-05-06)
 
-The `codex-integration` flag already exists in `flags.ts` with status `experimental`. The bundled-runtime resolution path is orthogonal to that flag — it is an implementation detail of how the runtime is found, not whether the feature is enabled.
-
-**Open question for Jarmo (Q1):** Should the bundled-runtime resolver preference be independently flag-gated (`bundled-agent-runtime` flag, status `experimental`) so it can be disabled per-user during staged rollout, or is it on by default once artifacts land? See the Feature Flag section in Open Questions below.
+| Question | Decision |
+|---|---|
+| Q1 — Feature flag | **On by default. No new flag.** Bundled-runtime preference is installation architecture, not a user-visible experiment. |
+| Q2 — Artifact source | **Build-time fetch.** Codex from GitHub Releases tarballs; Claude from npm optional packages. Pinned by version + sha256 in `manifest.json`. Binaries `.gitignore`d. |
+| Q3 — Platform scope | **macOS arm64, macOS x64, Windows x64 — all three in Sprint 64.** Windows arm64 deferred. |
+| Q4 — Update story | **Manual.** Runtime versions ship with Ritemark releases. Settings exposes a "Check for updates" button that triggers the existing Ritemark app-update check. Background auto-update deferred to a future sprint. |
+| Q5 — Repair UI | **Check + Repair only.** Defer "Use system runtime" override (needs separate UX work). |
 
 ---
 
 ## Success Criteria
 
-- [ ] A clean macOS arm64 Ritemark install (no system Codex, no system Claude, fresh user-data dir) shows both agents as Ready in Settings without any manual step.
-- [ ] The production `.app` bundle contains `darwin-arm64/codex` (or `codex-app-server`) and `darwin-arm64/claude` under `Contents/Resources/app/extensions/ritemark/binaries/agents/darwin-arm64/`.
-- [ ] `build-prod.sh` fails (non-zero exit) if required runtime artifacts are absent or wrong architecture for the build target.
-- [ ] `validate-build-output.sh` includes architecture-specific binary checks that pass the above condition.
-- [ ] Settings shows human-readable status ("Ready", "Auth required", "Not installed") — not raw process errors.
+- [ ] A clean Ritemark install on each in-scope platform (macOS arm64, macOS x64, Windows x64) — no system Codex, no system Claude, fresh user-data dir — contains and selects bundled runtimes for the host architecture without any Node/npm/PATH/manual install step.
+- [ ] The production `.app` / installer for each platform contains the manifest-defined Codex and Claude artifacts under `…/extensions/ritemark/binaries/agents/<platform>-<arch>/`.
+- [ ] `build-prod.sh` and `build-prod-windows.sh` (and any other production build entrypoints) fail with a non-zero exit if required runtime artifacts are absent or wrong architecture for the build target.
+- [ ] `validate-build-output.sh` includes architecture-specific binary checks that pass the above condition for every in-scope platform.
+- [ ] Settings separates runtime health from auth state: `Runtime installed — sign in required` when bundled runtime is healthy but auth is missing; `Ready` only when runtime and auth/account checks pass.
+- [ ] Settings surfaces a "Check for updates" button that invokes the existing Ritemark app-update check (no separate runtime update channel in this sprint).
+- [ ] Settings exposes "Check agent installation" and "Repair bundled runtime" actions per Q5; the "use system runtime" override is intentionally not shipped.
 - [ ] `thread/start` timeout surfaces a progress message after ~10 s, not a bare `RPC call ... timed out after 30000ms` error after 30 s.
+- [ ] Runtime artifact payloads are not committed to the repo — only `manifest.json` and the README.
 - [ ] No regression on existing macOS auth/login flow.
 
 ---
@@ -30,87 +37,126 @@ The `codex-integration` flag already exists in `flags.ts` with status `experimen
 
 | Deliverable | Description |
 |---|---|
-| Artifact manifest (`manifest.json`) | Machine-readable source-of-truth: vendor, upstream version, sha256, platform/arch, expected executable name, license metadata. Lives at `extensions/ritemark/binaries/agents/`. |
-| macOS arm64 artifacts | `darwin-arm64/codex` (or `codex-app-server`) and `darwin-arm64/claude` — placed in the repo after Jarmo decides the artifact source strategy (Q2). |
-| `scripts/fetch-agent-runtimes.sh` | Script to download, verify sha256, and populate `binaries/agents/<platform>/` from the chosen artifact source. Idempotent; usable in CI and locally. |
-| Build gate in `build-prod.sh` | Step that verifies artifacts exist and match target arch before gulping. Exits non-zero if missing/wrong. |
-| Build gate in `validate-build-output.sh` | Post-build `file` checks for binary arch (e.g., `arm64` for `darwin-arm64` builds). |
-| Settings readiness UI repair | Replace raw error strings in the AI sidebar and Settings panel with human-readable "Ready / Auth required / Not installed / Architecture mismatch" states derived from bundled vs system runtime source. |
+| Artifact manifest (`manifest.json`) | Machine-readable source-of-truth: vendor, upstream version, sha256, platform/arch, source URL, archive entry, installed name, invocation mode, validation command, license metadata. Lives at `extensions/ritemark/binaries/agents/`. |
+| Per-platform runtime artifacts (built locally / in CI, not committed) | `darwin-arm64/`, `darwin-x64/`, `win32-x64/` populated by `fetch-agent-runtimes.sh` from manifest. Payloads `.gitignore`d. |
+| `scripts/fetch-agent-runtimes.sh` | Reads manifest, downloads from GitHub Releases (Codex) or npm optional packages (Claude), verifies sha256 before extraction, installs to `binaries/agents/<platform>-<arch>/<installName>`. Idempotent; usable in CI and locally. |
+| Build gates in production build scripts | Pre-gulp step in `build-prod.sh` and `build-prod-windows.sh` (and any other production build entrypoints) verifies artifacts exist and match target arch. Exits non-zero if missing/wrong. |
+| Build gate in `validate-build-output.sh` | Post-build `file` / PE-header checks for binary arch on each in-scope platform. |
+| Runtime/auth status model + Settings UI | Separate runtime and auth states: `Runtime missing`, `Architecture mismatch`, `Runtime installed — sign in required`, `Ready`, with `bundled` / `system` source labels. |
+| Settings actions (Q5 scope) | "Check agent installation" (health check) and "Repair bundled runtime" (re-run fetch) for both Codex and Claude. "Use system runtime" override deferred. |
+| Settings "Check for updates" button (Q4 scope) | Wires Settings to the existing Ritemark app-update check. No separate runtime update channel in this sprint. |
 | `thread/start` timeout UX improvement | Progress message at ~10 s, extended timeout to 60 s for thread creation, diagnostics snapshot on failure. |
-| `manifest.json` + `README.md` update | Updated `binaries/agents/README.md` to document the manifest schema and fetch workflow. |
+| `manifest.json` + `README.md` | `binaries/agents/README.md` documents the manifest schema, fetch workflow, and which payload paths are gitignored. |
+| Bonus track: selected-text docked context tab | Move selected-text context from the global Agent Chat Panel banner into the composer area using Sprint 62 option S5. Details: `notes/bonus-track-selected-text-docked-context-tab.md`. |
 
 ---
 
 ## Implementation Checklist
 
-### Phase A — Artifact source decision and manifest (blocks everything else)
+### Phase A — Artifact contract and manifest (blocks packaging)
 
-Jarmo must answer Q2–Q5 before this phase can begin. Sprint 64 cannot proceed to Phase 3 until those decisions are recorded.
+Phase A defines the exact runtime contract before any build script or UI work begins. The sprint no longer treats `codex` vs `codex-app-server` as an informal option: the manifest must say exactly how Ritemark invokes each artifact.
 
-- [ ] Jarmo decides artifact source strategy (Q2): vendor repo / npm extract / build-time fetch / CI artifact store.
-- [ ] Create `extensions/ritemark/binaries/agents/manifest.json` with schema covering vendor, version, sha256, platform, arch, executable name, license.
-- [ ] Populate manifest with macOS arm64 entries for Codex and Claude at the pinned versions.
-- [ ] Add manifest entries for additional platforms once scope decisions (Q3) are made.
+- [ ] Create `extensions/ritemark/binaries/agents/manifest.json`.
+- [ ] Manifest schema includes: `agent`, `vendor`, `version`, `platform`, `arch`, `sourceType` (`github-release` | `npm-optional-package`), `sourceUrl` / `npmPackage`, `sha256`, `archivePath`, `installName`, `invocationMode`, `validationCommand`, `expectedFileArch`, `license`.
+- [ ] Codex entry explicitly chooses one invocation mode:
+  - `cli-subcommand`: Ritemark runs `<path>/codex app-server`; or
+  - `direct-app-server`: Ritemark runs `<path>/codex-app-server`.
+- [ ] Claude entry explicitly identifies the runnable `claude` binary path inside the npm optional package after extraction.
+- [ ] Populate manifest with all three in-scope targets: `darwin-arm64`, `darwin-x64`, `win32-x64`.
+- [ ] Update `extensions/ritemark/binaries/agents/README.md` with the schema, invocation contract, and local fetch workflow.
+- [ ] Add `.gitignore` rules for `binaries/agents/<platform>-<arch>/` payloads, while keeping `manifest.json` and `README.md` tracked.
 
-**Files touched:** `extensions/ritemark/binaries/agents/manifest.json`, `extensions/ritemark/binaries/agents/README.md`.
-**Blocked by:** Q2, Q3.
-**Success:** Manifest exists, is machine-readable, and records the exact artifact source and hash for each platform/agent combination in scope.
-**Agent:** vscode-expert owns the shell script; sprint-manager owns manifest schema.
+**Files touched:** `extensions/ritemark/binaries/agents/manifest.json`, `extensions/ritemark/binaries/agents/README.md`, `.gitignore`.
+**Blocked by:** Nothing — Q2/Q3 are locked.
+**Success:** Manifest defines exact source, hash, extraction path, installed executable name, invocation mode, and validation command for every in-scope runtime on every in-scope platform.
+**Agent:** sprint-manager owns contract wording; vscode-expert owns schema practicality.
 
 ---
 
-### Phase B — macOS arm64 packaging gate
+### Phase B — Fetch/extract/verify script
 
-Wire the manifest into `build-prod.sh` and `validate-build-output.sh` so the build fails visibly if artifacts are absent rather than silently shipping an empty `binaries/agents/darwin-arm64/`.
+Create the deterministic materialization step. This may download artifacts, but production success depends on manifest-pinned sha256 verification, not on trusting latest vendor output.
 
-- [ ] Write `scripts/fetch-agent-runtimes.sh`: reads manifest, downloads to `binaries/agents/<platform>/`, verifies sha256, sets executable bit, errors on mismatch.
-- [ ] Add pre-gulp step to `build-prod.sh` that calls the fetch script (or verifies artifacts already present) for the target platform.
-- [ ] Add post-build check to `validate-build-output.sh`: run `file` on each expected binary, assert arch matches target (e.g., `aarch64` for `darwin-arm64`).
-- [ ] Verify executable bit is preserved through `cp -R` in Step 3 of `build-prod.sh`.
-- [ ] Run one full production build and confirm gate passes with artifacts present and fails without.
+- [ ] Write `scripts/fetch-agent-runtimes.sh`: reads manifest, downloads archive/package per `sourceType`, verifies sha256 before extraction, extracts `archivePath`, installs to `binaries/agents/<platform>-<arch>/<installName>`.
+- [ ] Script supports `--platform`, `--arch`, `--agent`, `--verify-only`, and default current host detection.
+- [ ] Script handles both `github-release` (tarball/zip) and `npm-optional-package` (Claude) source types.
+- [ ] Script handles POSIX (`darwin-*`) and Windows (`win32-x64`) extraction; Windows artifacts are `.exe` payloads inside `.tar.gz`.
+- [ ] **Single-file extraction case for Codex:** Codex tarballs extract a single platform-suffixed binary at archive root (e.g. `codex-app-server-aarch64-apple-darwin`) — `archivePath` contains no `/`. The fetch script must detect this case (no `/` in `archivePath`), extract to a temp dir, then `mv` the file to `binaries/agents/<platform>-<arch>/<installName>`. Claude entries use `package/<binary>` (npm tarball convention) and follow the standard nested-extraction path.
+- [ ] Script sets executable bit on POSIX runtimes and verifies it; on Windows verifies PE header.
+- [ ] Script runs each manifest `validationArgs` after install (e.g. `--version` or Codex app-server `--help` smoke test).
+- [ ] Script never fetches unpinned `latest`; version and sha256 must come from manifest.
 
-**Files touched:** `scripts/fetch-agent-runtimes.sh` (new), `scripts/build-prod.sh`, `scripts/validate-build-output.sh`.
-**Blocked by:** Phase A (manifest must exist).
-**Success:** `build-prod.sh` exits non-zero when `darwin-arm64/codex` or `darwin-arm64/claude` is absent; exits 0 with correct artifacts.
+**Files touched:** `scripts/fetch-agent-runtimes.sh` (new).
+**Blocked by:** Phase A.
+**Success:** Fresh checkout can materialize the in-scope runtimes from manifest on macOS arm64, macOS x64, and Windows x64 hosts (or via cross-platform fetch on a single host); corrupt download/hash mismatch fails before extraction.
+**Agent:** vscode-expert for shell script work.
+
+---
+
+### Phase C — macOS packaging gate (arm64 + x64)
+
+Wire the manifest/runtime artifacts into the macOS production app for both arm64 and x64. The build must fail visibly if artifacts are absent, wrong-architecture, non-executable, or fail their validation command.
+
+- [ ] Add pre-gulp step to `scripts/build-prod.sh` that calls `scripts/fetch-agent-runtimes.sh --platform darwin --arch <arch> --verify-only`, where `<arch>` is derived from the build target (arm64 or x64).
+- [ ] Add post-build check to `scripts/validate-build-output.sh`: assert each expected artifact exists in the built `.app`.
+- [ ] Post-build check verifies `file` output matches `expectedFileArch` from manifest (`arm64` for arm64 builds, `x86_64` for x64 builds).
+- [ ] Post-build check verifies POSIX executable bit.
+- [ ] Post-build check runs the manifest `validationCommand` from inside the built app payload where possible.
+- [ ] Verify bundled runtime wins over system `which codex` / `which claude` when healthy.
+- [ ] Run one full production build for arm64 and confirm the gate passes with artifacts present and fails without.
+- [ ] Run one full production build for x64 (if a build host is available) — at minimum, verify the gate logic is parameterized for x64 and fails if x64 artifacts are missing.
+
+**Files touched:** `scripts/build-prod.sh`, `scripts/validate-build-output.sh`.
+**Blocked by:** Phases A and B.
+**Success:** macOS production builds (arm64 and x64) cannot ship an empty or wrong-architecture `binaries/agents/darwin-<arch>/` tree.
 **Agent:** vscode-expert for build script work.
 
 ---
 
-### Phase C — Windows packaging gate
+### Phase D — Windows x64 packaging gate
 
-Equivalent wiring for `build-windows.sh` and `create-windows-installer.sh`. Depends on Jarmo's scope decision (Q3).
+Equivalent wiring for the actual Windows release path. This phase must audit both local and production Windows scripts because the repo contains multiple entrypoints.
 
-- [ ] Add `win32-x64` entries to manifest (after Q3 approval).
-- [ ] Extend `fetch-agent-runtimes.sh` to handle Windows executables (`.exe`, no executable-bit logic needed).
-- [ ] Add artifact presence check to `build-windows.sh`; run `file` check in CI (cross-arch detection for `.exe` requires `file` magic or PE header check).
-- [ ] Verify Windows installer (`ritemark.iss`) includes the `resources/app/extensions/ritemark/binaries/agents/win32-x64/` tree.
+- [ ] Audit and wire the real release path: `scripts/build-prod-windows.sh`, `scripts/build-windows.sh`, `scripts/create-windows-installer.sh`, and `installer/windows/ritemark.iss`.
+- [ ] Add a pre-build/pre-package step that calls `scripts/fetch-agent-runtimes.sh --platform win32 --arch x64 --verify-only` and exits non-zero on failure.
+- [ ] Verify installer includes `resources/app/extensions/ritemark/binaries/agents/win32-x64/`.
+- [ ] Add PE architecture validation via `file` magic or a small scripted PE header check (shared with `validate-build-output.sh`).
+- [ ] Confirm the bundled-runtime resolver picks `win32-x64/codex.exe` and `win32-x64/claude.exe` (or whatever names the manifest specifies) on Windows.
 
-**Files touched:** `scripts/build-windows.sh`, `scripts/create-windows-installer.sh`, `installer/windows/ritemark.iss`, `scripts/fetch-agent-runtimes.sh`.
-**Blocked by:** Phase A, Q3 scope decision.
-**Success:** Windows build fails if `win32-x64` artifacts are absent; installer includes them when present.
+**Files touched:** `scripts/build-prod-windows.sh`, `scripts/build-windows.sh`, `scripts/create-windows-installer.sh`, `installer/windows/ritemark.iss`, `scripts/validate-build-output.sh` if shared.
+**Blocked by:** Phases A/B.
+**Success:** Windows release build/installer cannot ship without `win32-x64` runtime artifacts.
 **Agent:** vscode-expert.
 
 ---
 
-### Phase D — Settings and sidebar readiness UI repair
+### Phase E — Runtime/auth status model and Settings/sidebar UI
 
-Once bundled artifacts exist, Settings and the AI sidebar should reflect the bundled-first resolver state with human-readable status strings, not raw process errors.
+Once bundled artifacts exist, Settings and the AI sidebar should reflect runtime health and auth state separately with human-readable status strings, not raw process errors.
 
 - [ ] Audit `agent/setup.ts` and `codexManager.ts` status return paths — identify where `runtimeSource: 'bundled' | 'system'` is already available and where it is not surfaced to the UI.
 - [ ] Add "Architecture mismatch" state to `ClaudeBinaryInspection` and `CodexBinaryStatus` when the resolved binary arch does not match the host arch.
-- [ ] Map `runtimeSource` + health-check result → one of: `Ready (bundled)`, `Ready (system)`, `Auth required`, `Architecture mismatch`, `Not installed`.
+- [ ] Map runtime + auth into separate fields:
+  - runtime: `missing`, `installed`, `architecture_mismatch`, `launch_failed`;
+  - source: `bundled`, `system`, `unknown`;
+  - auth: `ready`, `sign_in_required`, `unknown`, `error`.
+- [ ] User-facing labels include `Runtime installed — sign in required`, `Ready`, `Architecture mismatch`, `Runtime missing`, `Launch failed`.
 - [ ] Update Settings webview component to display the mapped state — no raw error strings visible to users.
-- [ ] Add Settings "Check agent installation" and "Repair bundled runtime" actions (Q5 scope decision needed for exact UX).
-- [ ] Validate on a fresh user-data directory with bundled artifacts present.
+- [ ] Add Settings actions per Q5: "Check agent installation" (health check on demand) and "Repair bundled runtime" (re-runs the fetch script for the affected agent). Do **not** ship the "use system runtime" override.
+- [ ] Add Settings "Check for updates" button (Q4) wired to the existing Ritemark app-update check. No separate runtime update channel.
+- [ ] Validate on a fresh user-data directory with bundled artifacts present and no auth: status should not claim full `Ready` until auth is valid.
+- [ ] Validate that "Repair bundled runtime" recovers from a corrupted/deleted artifact directory without re-installing Ritemark.
+- [ ] **Remove obsolete "audited Codex range" disclaimer.** Bundled Codex is pinned to a specific version (currently `0.128.0`), which is outside the existing `MIN_AUDITED_VERSION='0.111.0'` / `MAX_AUDITED_VERSION_EXCLUSIVE='0.125.0'` window in `codexManager.ts:71-73`. With bundled runtimes the version is no longer unknown, so the "Codex version not yet audited" notice (`getCompatibilityNotice` in `CodexView.tsx:102-135` returning the title from line 130) is logically obsolete and would fire on every bundled-runtime user. Action: delete `MIN_AUDITED_VERSION`, `MAX_AUDITED_VERSION_EXCLUSIVE`, `AUDITED_RANGE_LABEL`, `isInAuditedRange()` (line 764-765), the `'untested'` branch of `compatibility.state` (line 53 type, line 717), and the corresponding UI notice path. Keep the actual capability-detection logic (approvals/requestUserInput/planUpdates) — that is independently useful. Audit Settings/RitemarkSettings.tsx for any sibling references and remove them too.
 
-**Files touched:** `extensions/ritemark/src/agent/setup.ts`, `extensions/ritemark/src/codex/codexManager.ts`, Settings webview component(s).
-**Blocked by:** Phases A and B (needs artifacts present to test the happy path).
-**Success:** Fresh install shows "Ready" for both agents without user intervention. Settings repair actions work for corrupted installs.
+**Files touched:** `extensions/ritemark/src/agent/setup.ts`, `extensions/ritemark/src/codex/codexManager.ts`, `extensions/ritemark/webview/src/components/ai-sidebar/CodexView.tsx`, `extensions/ritemark/webview/src/components/ai-sidebar/types.ts`, `extensions/ritemark/webview/src/components/settings/RitemarkSettings.tsx`, Settings webview component(s).
+**Blocked by:** Phases A–C for reliable happy-path testing.
+**Success:** Fresh install selects bundled runtimes; UI accurately distinguishes runtime installed from auth readiness; Check / Repair / Check-for-updates actions all work.
 **Agent:** ux-expert for Settings UI component design; vscode-expert for TS logic; webview-expert if Settings webview changes are substantial.
 
 ---
 
-### Phase E — `thread/start` timeout UX improvement
+### Phase F — `thread/start` timeout UX improvement
 
 Secondary to artifact delivery but needed before the sprint is releasable. The current 30 s flat timeout produces a developer-facing error string.
 
@@ -126,7 +172,7 @@ Secondary to artifact delivery but needed before the sprint is releasable. The c
 
 ---
 
-### Phase F — App-server process lifecycle (deferred)
+### Phase G — App-server process lifecycle (deferred)
 
 Multiple `CodexAppServer` owners (AI sidebar, Settings, Flow execution) can contend on auth-sensitive startup. This is secondary and should be its own sprint after Phase A–E are shipped.
 
@@ -136,67 +182,33 @@ Multiple `CodexAppServer` owners (AI sidebar, Settings, Flow execution) can cont
 
 ---
 
-## Open Questions for Jarmo
+### Bonus Track — Selected-text docked context tab
 
-These must be answered before Phase 3 can begin. Phase 3 is blocked until Jarmo responds.
+This track is approved as the preferred UX direction but should not block the bundled-runtime work. It uses Sprint 62 option **S5 — Docked context tab**.
 
-**Q1 — Feature flag for bundled-runtime preference**
-Should the bundled-runtime resolver path be independently flag-gated (new `bundled-agent-runtime` flag, `experimental`) for staged rollout, or is it on unconditionally once artifacts land?
+Tracking doc: `docs/development/sprints/sprint-64-bundled-agent-runtimes/notes/bonus-track-selected-text-docked-context-tab.md`
 
-Recommended position: ship on by default (no new flag). The resolver already prefers bundled over system, and the flag already exists on `codex-integration`. Adding a second layer of flags for an implementation detail creates maintenance overhead without user-visible benefit. But if Jarmo wants a kill switch, the feature-flags skill has a pattern for it.
-
----
-
-**Q2 — Artifact source strategy (BLOCKS Phase A)**
-How should Ritemark acquire the agent runtime binaries? Three main options:
-
-| Option | Description | Tradeoff |
-|---|---|---|
-| A. Vendor into repo | Commit binaries to `binaries/agents/` under `.gitignore` or Git LFS | Simple local dev, no network on build; binaries in repo history; update requires commit |
-| B. Build-time fetch (download on `build-prod.sh`) | `fetch-agent-runtimes.sh` downloads from GitHub Releases or npm at build time | No binaries in repo; requires network on build; pinned version in manifest |
-| C. CI artifact store | Binaries stored in a private artifact store (S3, GitHub Packages); fetch on CI | Best for secrets/large files; more infra to own |
-
-Recommended position: Option B (build-time fetch from GitHub Releases). Codex publishes platform tarballs at `https://github.com/openai/codex/releases`; Claude publishes via npm optional deps. Manifest records the pinned version and sha256. Local dev: run `fetch-agent-runtimes.sh` once; CI: run it as a build step. Binaries go in `.gitignore`.
+- [ ] Move selected-text display from the global `Selected:` banner to a docked tab immediately above the chat input card.
+- [ ] Keep the input card internals stable: textarea, runtime/model controls, active-file chip, attach, and send remain in the same places.
+- [ ] Add a clear/detach selected-context affordance.
+- [ ] Preserve existing selected-text behavior when sending turns to Codex/Claude/Chat.
+- [ ] Validate light/dark and narrow sidebar layouts.
 
 ---
 
-**Q3 — Platform scope for Sprint 64**
-Which platforms should be in scope?
+## Open Questions for Jarmo — RESOLVED 2026-05-06
 
-| Platform | Recommended | Reason |
-|---|---|---|
-| macOS arm64 | YES (primary) | Current dev/test machine; production target |
-| macOS x64 | Optional | Intel Mac users exist; `build-prod.sh` already supports `darwin-x64`; low extra effort if fetch script is parameterized |
-| Windows x64 | YES (secondary) | Windows installer pipeline exists; Sprint 57 identified this as a requirement |
-| Windows arm64 | No (defer) | No current build target; emulation via x64 is acceptable for now |
+All five questions are answered. See **Locked Decisions** at the top of this document for the authoritative summary. The original question text is preserved below for traceability.
 
-Recommended position: macOS arm64 + Windows x64 in Sprint 64; macOS x64 as a stretch goal if the fetch script handles it for free; Windows arm64 deferred.
+**Q1 — Feature flag for bundled-runtime preference** → **No new flag. On by default.**
 
----
+**Q2 — Artifact source strategy** → **Build-time fetch.** Codex from GitHub Releases tarballs; Claude from npm optional packages. Pinned by version + sha256 in manifest. Binaries `.gitignore`d.
 
-**Q4 — Update story for bundled runtimes**
-When Codex or Claude release a new version, how should Ritemark update the bundled runtimes?
+**Q3 — Platform scope** → **macOS arm64, macOS x64, Windows x64.** Windows arm64 deferred.
 
-| Option | Description |
-|---|---|
-| Manual + new Ritemark release | Update manifest, re-run fetch, ship new Ritemark version |
-| Auto-update on launch | Ritemark checks for newer runtime on launch and downloads in background |
-| User-triggered repair | Settings "Check for runtime updates" button |
+**Q4 — Update story** → **Manual.** Runtime versions ship inside Ritemark releases. Settings "Check for updates" button invokes the existing Ritemark app-update check. Background auto-update deferred.
 
-Recommended position: Manual + new Ritemark release for now. Auto-update adds significant complexity and update-channel questions. Revisit in a follow-up sprint once bundled runtimes are proven.
-
----
-
-**Q5 — Settings repair UI scope**
-The audit recommends four repair actions in Settings:
-1. "Check agent installation" (health check on demand)
-2. "Repair bundled Codex runtime" (re-fetch from manifest)
-3. "Repair bundled Claude runtime" (re-fetch from manifest)
-4. "Use system Codex/Claude instead" (advanced override toggle)
-
-Which of these should be in Sprint 64 vs deferred?
-
-Recommended position: Ship (1) Check and a basic (2)/(3) that re-runs the fetch script. Defer (4) system override toggle — it requires UX design for the Settings page that ux-expert should own in a separate sprint. Existing system fallback in the resolver is sufficient until then.
+**Q5 — Settings repair UI scope** → **Check + Repair only.** "Use system runtime" override deferred to a future sprint.
 
 ---
 
@@ -209,7 +221,7 @@ Recommended position: Ship (1) Check and a basic (2)/(3) that re-runs the fetch 
 | Claude native binary not redistributable via this path | Low | High | Redistribution licensing already confirmed by Jarmo; noted in audit. If a specific artifact path requires different handling, surface it during Phase A. |
 | Build-time network fetch fails in CI | Medium | Medium | Pin exact version + sha256 in manifest; add retry logic; fallback to cached artifact. |
 | Settings repair UX scope expands | Medium | Medium | Hard-scope to Q5 answer; defer system override toggle. |
-| Phase E (timeout) conflicts with active AI sidebar changes | Low | Low | Keep the change surgical (codexAppServer.ts only unless webview-expert needed). |
+| Phase F (timeout) conflicts with active AI sidebar changes | Low | Low | Keep the change surgical (codexAppServer.ts only unless webview-expert needed). |
 | macOS x64 artifact differs from arm64 fetch path | Low | Low | Parameterize fetch script by platform/arch from the start. |
 
 ---
@@ -218,11 +230,12 @@ Recommended position: Ship (1) Check and a basic (2)/(3) that re-runs the fetch 
 
 | Phase | Agent |
 |---|---|
-| A — Manifest + fetch script | sprint-manager (schema); vscode-expert (shell script) |
-| B — macOS build gate | vscode-expert |
-| C — Windows build gate | vscode-expert |
-| D — Settings/sidebar UI | vscode-expert (TS logic); ux-expert (Settings component design); webview-expert (if substantial webview changes) |
-| E — Timeout UX | vscode-expert; webview-expert (if new sidebar progress message type needed) |
+| A — Artifact contract + manifest | sprint-manager (contract wording); vscode-expert (schema practicality) |
+| B — Fetch/extract/verify script | vscode-expert |
+| C — macOS build gate | vscode-expert |
+| D — Windows build gate | vscode-expert |
+| E — Runtime/auth status + Settings/sidebar UI | vscode-expert (TS logic); ux-expert (Settings component design); webview-expert (if substantial webview changes) |
+| F — Timeout UX | vscode-expert; webview-expert (if new sidebar progress message type needed) |
 | QA sign-off | qa-validator (Phase 4→5 gate) |
 | Release | release-manager (Phase 6 gate) |
 
@@ -231,14 +244,36 @@ Recommended position: Ship (1) Check and a basic (2)/(3) that re-runs the fetch 
 ## Status
 
 **Track:** Full 6-phase
-**Current Phase:** 2 (Plan)
-**Approval Required:** Yes — Phase 2 → 3 gate
+**Current Phase:** 3 (Implementation)
+**Approval Required:** Next gate is Phase 3 → 4 (qa-validator, invoked via main session)
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
-- [ ] Q2 (artifact source) answered
-- [ ] Q3 (platform scope) answered
-- [ ] Q1 (feature flag) answered
-- [ ] Q4 (update story) answered (can be deferred)
-- [ ] Q5 (Settings repair scope) answered (can be deferred, default above applies)
+- [x] Jarmo approved this sprint plan (Phase 2 → 3 gate) — 2026-05-06
+- [x] Q1 answered (2026-05-06): on by default, no new flag
+- [x] Q2 answered (2026-05-06): build-time fetch (GitHub Releases + npm optional pkg), pinned by version + sha256, gitignored
+- [x] Q3 answered (2026-05-06): macOS arm64, macOS x64, Windows x64
+- [x] Q4 answered (2026-05-06): manual via "Check for updates" button; auto-update deferred
+- [x] Q5 answered (2026-05-06): Check + Repair only; "use system runtime" override deferred
+
+---
+
+## Plan Revision Notes — 2026-05-06
+
+**Round 1 — Codex independent review incorporated:**
+
+- runtime installation and auth readiness are now separate acceptance states;
+- Phase A now requires an explicit artifact/invocation contract before packaging work;
+- fetch/extract/verify is its own phase;
+- macOS and Windows packaging gates are separate phases;
+- Windows scope now includes `build-prod-windows.sh` as well as local/installer scripts.
+
+**Round 2 — Jarmo decisions locked, all five questions resolved:**
+
+- Q1 = on by default, no flag;
+- Q2 = build-time fetch from GitHub Releases (Codex) + npm optional packages (Claude), pinned by version + sha256, payloads gitignored;
+- Q3 = macOS arm64 + macOS x64 + Windows x64 all in this sprint (was: macOS x64 stretch);
+- Q4 = manual updates via Settings "Check for updates" button wired to existing app-update check (was: just manual via Ritemark release);
+- Q5 = Check + Repair only; "use system runtime" override deferred.
+
+Phase A is no longer blocked. Implementation can begin once Jarmo gives Phase 2→3 approval.
