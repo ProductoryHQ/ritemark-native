@@ -139,7 +139,74 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# Check 5: App Launches (optional manual verification)
+# Check 5: Bundled Agent Runtimes (manifest-driven)
+# -----------------------------------------------------------------------------
+echo ""
+echo "Validating bundled agent runtimes..."
+
+ARCH="${TARGET#darwin-}"
+MANIFEST="$EXT_PATH/binaries/agents/manifest.json"
+AGENTS_IN_APP="$EXT_PATH/binaries/agents/darwin-$ARCH"
+
+if [[ ! -f "$MANIFEST" ]]; then
+  echo -e "  ${RED}FAIL${NC}: manifest.json missing at $MANIFEST"
+  ERRORS=$((ERRORS + 1))
+else
+  # Emit one line per matching entry: installName|expectedFileArchPattern
+  # NOTE: We do NOT execute the binary from inside the .app here. The .app is
+  # codesigned later in the release flow; modifying any byte under Resources
+  # invalidates the embedded signature, and Gatekeeper will SIGKILL any binary
+  # we try to launch from a tampered bundle. The fetch script already runs the
+  # manifest validationArgs smoke test on the source binary at fetch time —
+  # post-copy bytes are byte-identical, so re-running adds no value and
+  # introduces signing-stage fragility.
+  ENTRIES=$(python3 -c "
+import json
+with open('$MANIFEST') as f:
+    m = json.load(f)
+for r in m['runtimes']:
+    if r['platform'] == 'darwin' and r['arch'] == '$ARCH':
+        print(f\"{r['installName']}|{r['expectedFileArchPattern']}\")
+")
+
+  if [[ -z "$ENTRIES" ]]; then
+    echo -e "  ${RED}FAIL${NC}: no manifest entries for darwin-$ARCH"
+    ERRORS=$((ERRORS + 1))
+  else
+    while IFS='|' read -r install_name arch_pattern; do
+      bin_path="$AGENTS_IN_APP/$install_name"
+      echo -n "  Checking $install_name... "
+
+      if [[ ! -f "$bin_path" ]]; then
+        echo -e "${RED}FAIL${NC} (not in app bundle)"
+        echo "    Expected: $bin_path"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+
+      if [[ ! -x "$bin_path" ]]; then
+        echo -e "${RED}FAIL${NC} (exec bit missing)"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+
+      file_out=$(file -b "$bin_path")
+      if ! echo "$file_out" | grep -qF "$arch_pattern"; then
+        echo -e "${RED}FAIL${NC} (arch mismatch)"
+        echo "    Expected pattern: $arch_pattern"
+        echo "    Got:              $file_out"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+
+      echo -e "${GREEN}OK${NC} ($file_out)"
+    done <<< "$ENTRIES"
+  fi
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
+# Check 6: App Launches (optional manual verification)
 # -----------------------------------------------------------------------------
 echo ""
 echo "Manual verification recommended:"
