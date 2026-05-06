@@ -282,10 +282,8 @@ export interface CodexCapabilityFlags {
 }
 
 export interface CodexCompatibilityStatus {
-  state: 'compatible' | 'limited' | 'untested';
+  state: 'compatible' | 'limited';
   summary: string;
-  auditedRange: string;
-  versionInAuditedRange: boolean;
   capabilities: CodexCapabilityFlags;
   limitations: string[];
 }

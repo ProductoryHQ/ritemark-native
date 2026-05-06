@@ -50,10 +50,8 @@ export interface CodexCapabilityFlags {
 }
 
 export interface CodexCompatibilityStatus {
-  state: 'compatible' | 'limited' | 'untested';
+  state: 'compatible' | 'limited';
   summary: string;
-  auditedRange: string;
-  versionInAuditedRange: boolean;
   capabilities: CodexCapabilityFlags;
   limitations: string[];
 }
@@ -68,9 +66,6 @@ interface CodexResolvedBinary {
 }
 
 export class CodexManager {
-  private static readonly MIN_AUDITED_VERSION = '0.111.0';
-  private static readonly MAX_AUDITED_VERSION_EXCLUSIVE = '0.125.0';
-  private static readonly AUDITED_RANGE_LABEL = '0.111.x - 0.124.x';
   private static readonly compatibilityCache = new Map<string, CodexCompatibilityStatus>();
   private process: ChildProcess | null = null;
   private config: CodexManagerConfig;
@@ -643,9 +638,6 @@ export class CodexManager {
       requestUserInput: false,
       planUpdates: false,
     };
-    const versionInAuditedRange = version
-      ? this.isVersionInAuditedRange(version)
-      : false;
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-codex-protocol-'));
 
     try {
@@ -658,8 +650,6 @@ export class CodexManager {
       if (result.status !== 0) {
         const failure = this.summarizeFailure(String(result.stderr || result.stdout || 'Codex protocol probe failed.'));
         const status = this.buildCompatibilityStatus(
-          version,
-          versionInAuditedRange,
           defaultCapabilities,
           [`Protocol probe failed: ${failure}`]
         );
@@ -688,14 +678,12 @@ export class CodexManager {
         limitations.push('Structured plan update notifications were not detected in the current Codex app-server protocol.');
       }
 
-      const status = this.buildCompatibilityStatus(version, versionInAuditedRange, capabilities, limitations);
+      const status = this.buildCompatibilityStatus(capabilities, limitations);
       CodexManager.compatibilityCache.set(cacheKey, status);
       return status;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const status = this.buildCompatibilityStatus(
-        version,
-        versionInAuditedRange,
         defaultCapabilities,
         [`Protocol probe failed: ${message}`]
       );
@@ -707,30 +695,13 @@ export class CodexManager {
   }
 
   private buildCompatibilityStatus(
-    version: string | null,
-    versionInAuditedRange: boolean,
     capabilities: CodexCapabilityFlags,
     limitations: string[]
   ): CodexCompatibilityStatus {
-    if (!versionInAuditedRange) {
-      return {
-        state: 'untested',
-        summary: version
-          ? `Codex ${version} is outside Ritemark's audited range ${CodexManager.AUDITED_RANGE_LABEL}. Ritemark will only enable capabilities it can detect at runtime.`
-          : `Codex version could not be detected. Ritemark will only enable capabilities it can detect at runtime.`,
-        auditedRange: CodexManager.AUDITED_RANGE_LABEL,
-        versionInAuditedRange,
-        capabilities,
-        limitations,
-      };
-    }
-
     if (limitations.length > 0) {
       return {
         state: 'limited',
-        summary: `Codex is runnable, but this version is missing one or more lifecycle capabilities that Ritemark expects in the audited range ${CodexManager.AUDITED_RANGE_LABEL}.`,
-        auditedRange: CodexManager.AUDITED_RANGE_LABEL,
-        versionInAuditedRange,
+        summary: 'Codex is runnable, but one or more lifecycle capabilities Ritemark expects were not detected.',
         capabilities,
         limitations,
       };
@@ -738,9 +709,7 @@ export class CodexManager {
 
     return {
       state: 'compatible',
-      summary: `Codex matches the audited lifecycle capability set for ${CodexManager.AUDITED_RANGE_LABEL}.`,
-      auditedRange: CodexManager.AUDITED_RANGE_LABEL,
-      versionInAuditedRange,
+      summary: 'Codex lifecycle capabilities detected.',
       capabilities,
       limitations: [],
     };
@@ -758,27 +727,6 @@ export class CodexManager {
     }
 
     return '';
-  }
-
-  private isVersionInAuditedRange(version: string): boolean {
-    return this.compareVersions(version, CodexManager.MIN_AUDITED_VERSION) >= 0
-      && this.compareVersions(version, CodexManager.MAX_AUDITED_VERSION_EXCLUSIVE) < 0;
-  }
-
-  private compareVersions(left: string, right: string): number {
-    const leftParts = left.split('.').map((part) => Number.parseInt(part, 10) || 0);
-    const rightParts = right.split('.').map((part) => Number.parseInt(part, 10) || 0);
-    const length = Math.max(leftParts.length, rightParts.length);
-
-    for (let index = 0; index < length; index += 1) {
-      const leftValue = leftParts[index] ?? 0;
-      const rightValue = rightParts[index] ?? 0;
-      if (leftValue !== rightValue) {
-        return leftValue - rightValue;
-      }
-    }
-
-    return 0;
   }
 
   private buildAppServerArgs(launchMode: CodexLaunchMode | null): string[] {

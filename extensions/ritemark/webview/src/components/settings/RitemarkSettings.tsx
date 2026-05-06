@@ -90,10 +90,8 @@ interface SettingsData {
       diagnostics: string[];
       repairCommand: string | null;
       compatibility: {
-        state: 'compatible' | 'limited' | 'untested';
+        state: 'compatible' | 'limited';
         summary: string;
-        auditedRange: string;
-        versionInAuditedRange: boolean;
         capabilities: {
           approvals: boolean;
           requestUserInput: boolean;
@@ -1335,9 +1333,7 @@ export function RitemarkSettings() {
                   settings.componentStatus.codex.state === 'ready'
                     ? settings.componentStatus.codex.compatibility?.state === 'limited'
                       ? 'Ready with limits'
-                      : settings.componentStatus.codex.compatibility?.state === 'untested'
-                        ? 'Ready (untested)'
-                        : 'Ready'
+                      : 'Ready'
                     : settings.componentStatus.codex.state === 'broken'
                       ? 'Broken'
                       : 'Not installed'
