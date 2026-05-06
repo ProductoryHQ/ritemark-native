@@ -80,6 +80,16 @@ fi
 
 echo ""
 
+# Sprint 64 Phase D: fetch bundled agent runtimes before any extension copy
+# so binaries propagate into vscode/extensions/ritemark via the cp in Step 3.
+echo -e "${YELLOW}Step 1.5: Fetching bundled agent runtimes (win32-x64)...${NC}"
+cd "$ROOT_DIR"
+if ! ./scripts/fetch-agent-runtimes.sh --platform win32 --arch x64; then
+    echo -e "${RED}  ERROR: fetch-agent-runtimes failed${NC}"
+    exit 1
+fi
+echo ""
+
 # Step 2: Apply patches
 echo -e "${YELLOW}Step 2: Applying patches...${NC}"
 cd "$ROOT_DIR"

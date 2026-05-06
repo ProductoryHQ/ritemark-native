@@ -112,6 +112,17 @@ else
     echo "  ✓ No previous build to clean"
 fi
 
+# Sprint 64 Phase D: fetch bundled agent runtimes before gulp so binaries
+# land in extensions/ritemark/binaries/agents/win32-x64/ and are picked up by
+# the build. The fetch script is idempotent via .sha256 sidecars.
+echo
+echo "[4.5/6] Fetching bundled agent runtimes (win32-x64)..."
+cd "$PROJECT_ROOT"
+if ! ./scripts/fetch-agent-runtimes.sh --platform win32 --arch x64; then
+    echo -e "${RED}ERROR: fetch-agent-runtimes failed${NC}"
+    exit 1
+fi
+
 # Build
 echo
 echo "[5/6] Building Windows x64 application..."

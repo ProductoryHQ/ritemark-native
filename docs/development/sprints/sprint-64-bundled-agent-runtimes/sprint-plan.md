@@ -117,18 +117,40 @@ Wire the manifest/runtime artifacts into the macOS production app for both arm64
 
 ### Phase D — Windows x64 packaging gate
 
-Equivalent wiring for the actual Windows release path. This phase must audit both local and production Windows scripts because the repo contains multiple entrypoints.
+Equivalent wiring for the actual Windows release path.
 
-- [ ] Audit and wire the real release path: `scripts/build-prod-windows.sh`, `scripts/build-windows.sh`, `scripts/create-windows-installer.sh`, and `installer/windows/ritemark.iss`.
-- [ ] Add a pre-build/pre-package step that calls `scripts/fetch-agent-runtimes.sh --platform win32 --arch x64 --verify-only` and exits non-zero on failure.
-- [ ] Verify installer includes `resources/app/extensions/ritemark/binaries/agents/win32-x64/`.
-- [ ] Add PE architecture validation via `file` magic or a small scripted PE header check (shared with `validate-build-output.sh`).
-- [ ] Confirm the bundled-runtime resolver picks `win32-x64/codex.exe` and `win32-x64/claude.exe` (or whatever names the manifest specifies) on Windows.
+**Scope correction (Phase C audit):** The prior checklist listed only local Windows scripts. The canonical release path per `release-manager` is:
 
-**Files touched:** `scripts/build-prod-windows.sh`, `scripts/build-windows.sh`, `scripts/create-windows-installer.sh`, `installer/windows/ritemark.iss`, `scripts/validate-build-output.sh` if shared.
+```
+[GH Actions: build-windows.yml @ windows-8core] → artifact "ritemark-windows-x64"
+        ↓ (gh run download on Win host)
+[Local Win machine] → rcedit icon → ISCC.exe ritemark.iss → installer .exe
+```
+
+Therefore the binding gate is in **`.github/workflows/build-windows.yml`** + **`installer/windows/ritemark.iss`** (via `create-windows-installer.sh` pre-flight). The local cross-compile scripts (`build-windows.sh` / `build-prod-windows.sh`) get parity changes for dev-time consistency but are not on the release path.
+
+Manifest entries (Phase A): `codex-app-server.exe`, `claude.exe`, both arch `x64`, pattern `PE32+ executable (console) x86-64, for MS Windows`.
+
+#### Critical-path tasks (release blocker)
+
+- [ ] **`.github/workflows/build-windows.yml`** — add a "Fetch bundled agent runtimes" step calling `scripts/fetch-agent-runtimes.sh --platform win32 --arch x64` after extension copy and before `Apply patches`, so Windows binaries land in `extensions/ritemark/binaries/agents/win32-x64/` and propagate through the existing `cp -R vscode/extensions/ritemark "$EXT_DEST"` step. Extend the inline "Validate build" block to assert `binaries/agents/win32-x64/{codex-app-server.exe, claude.exe}` are present and PE-arch-correct via `file -b`. Job must fail-fast if either is missing or arch-mismatched.
+- [ ] **`scripts/validate-build-output.sh`** — add `win32-x64` target. Generalise Check 5 path resolution: `darwin-*` → `<App>.app/Contents/Resources/app/extensions/ritemark/binaries/agents/<plat>-<arch>/`, `win32-x64` → `VSCode-win32-x64/resources/app/extensions/ritemark/binaries/agents/win32-x64/`. Manifest's `expectedFileArchPattern` already supplies the correct PE pattern, so the existing `file -b | grep -F` logic works unchanged on macOS hosts. Same no-execute rule applies (don't run binaries from inside the bundle).
+- [ ] **`scripts/create-windows-installer.sh`** — add a pre-flight check after "Windows build found" that asserts `VSCode-win32-x64/resources/app/extensions/ritemark/binaries/agents/win32-x64/{codex-app-server.exe, claude.exe}` exist. If missing, exit non-zero with a clear "GH artifact lacks bundled runtimes; rerun build-windows.yml after Sprint 64 D-1" message. Optionally call `validate-build-output.sh win32-x64` for full Check 5.
+- [ ] **`installer/windows/ritemark.iss`** — verify the existing `Source: "{#SourcePath}\*"` with `recursesubdirs` already picks up `binaries/agents/win32-x64/`. Add an inline comment documenting the dependency so a future maintainer doesn't accidentally tighten the include pattern.
+
+#### Parity tasks (dev-time, non-release-path)
+
+- [ ] **`scripts/build-prod-windows.sh`** — add fetch step mirroring `build-prod.sh` Step 2.
+- [ ] **`scripts/build-windows.sh`** — same. Note: this script cross-compiles from macOS; not used for releases per `release-manager`'s "Windows comes from GitHub Actions" rule.
+
+#### Resolver verification (deferred to Phase E)
+
+- Bundled-runtime resolver behaviour on Windows is verified in Phase E along with the macOS resolver check, since it is runtime code (`agent/setup.ts` / `codexManager.ts`), not packaging.
+
+**Files touched:** `.github/workflows/build-windows.yml`, `scripts/validate-build-output.sh`, `scripts/create-windows-installer.sh`, `installer/windows/ritemark.iss`, `scripts/build-prod-windows.sh`, `scripts/build-windows.sh`.
 **Blocked by:** Phases A/B.
-**Success:** Windows release build/installer cannot ship without `win32-x64` runtime artifacts.
-**Agent:** vscode-expert.
+**Success:** Windows release artifact (GH Actions output) and the installer derived from it cannot ship without `win32-x64` runtime artifacts; failure is detected on the runner, not by an end user.
+**Agent:** vscode-expert (coordinated with main session for GH Actions edits).
 
 ---
 
