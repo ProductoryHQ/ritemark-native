@@ -98,14 +98,15 @@ Create the deterministic materialization step. This may download artifacts, but 
 
 Wire the manifest/runtime artifacts into the macOS production app for both arm64 and x64. The build must fail visibly if artifacts are absent, wrong-architecture, non-executable, or fail their validation command.
 
-- [ ] Add pre-gulp step to `scripts/build-prod.sh` that calls `scripts/fetch-agent-runtimes.sh --platform darwin --arch <arch> --verify-only`, where `<arch>` is derived from the build target (arm64 or x64).
-- [ ] Add post-build check to `scripts/validate-build-output.sh`: assert each expected artifact exists in the built `.app`.
-- [ ] Post-build check verifies `file` output matches `expectedFileArch` from manifest (`arm64` for arm64 builds, `x86_64` for x64 builds).
-- [ ] Post-build check verifies POSIX executable bit.
-- [ ] Post-build check runs the manifest `validationCommand` from inside the built app payload where possible.
-- [ ] Verify bundled runtime wins over system `which codex` / `which claude` when healthy.
-- [ ] Run one full production build for arm64 and confirm the gate passes with artifacts present and fails without.
-- [ ] Run one full production build for x64 (if a build host is available) — at minimum, verify the gate logic is parameterized for x64 and fails if x64 artifacts are missing.
+- [x] Add pre-gulp step to `scripts/build-prod.sh` that calls `scripts/fetch-agent-runtimes.sh --platform darwin --arch <arch>` (build steps renumbered to /8; new Step 2 sits between validate-env and gulp, before extension copy in Step 4 picks up the binaries).
+- [x] Add post-build check to `scripts/validate-build-output.sh` (Check 5): manifest-driven loop verifying each expected artifact exists in the built `.app`.
+- [x] Post-build check verifies `file` output matches `expectedFileArchPattern` from manifest.
+- [x] Post-build check verifies POSIX executable bit.
+- [x] **Post-build smoke-test of `validationArgs` from inside the built `.app` — INTENTIONALLY DROPPED.** The .app is codesigned later in the release flow (with hardened runtime); modifying any byte under `Contents/Resources/` would invalidate the embedded signature, and Gatekeeper SIGKILLs binaries launched from a tampered bundle. Discovered the hard way during Phase C verification — manually copying the runtimes into a previously-signed `.app` produced "Ritemark.app is damaged and can't be opened" via Gatekeeper. Recovered with `codesign --force --deep --sign -`. The fetch script already runs `validationArgs` against the source binary at fetch time (Phase B), and the post-copy bytes are byte-identical, so re-running adds no value while introducing signing-stage fragility. Rationale captured as a comment in `validate-build-output.sh`.
+- [ ] Run one full production build for arm64 and confirm the gate passes with artifacts present and fails without. (Gate logic verified with manual file copy + revert against existing `.app`; full prod build pending.)
+- [ ] Run one full production build for x64 (if a build host is available). Gate logic is parameterised by `${TARGET#darwin-}` so x64 should work without changes.
+
+**Note:** "Verify bundled runtime wins over system `which codex` / `which claude` when healthy" — moved to Phase E, since this is runtime-resolver behaviour in `setup.ts`/`codexManager.ts`, not a packaging-stage concern.
 
 **Files touched:** `scripts/build-prod.sh`, `scripts/validate-build-output.sh`.
 **Blocked by:** Phases A and B.
