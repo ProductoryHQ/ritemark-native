@@ -17,15 +17,16 @@ NC='\033[0m' # No Color
 TARGET="${1:-darwin-arm64}"
 
 case "$TARGET" in
-  darwin-arm64|darwin-x64)
+  darwin-arm64|darwin-x64|win32-x64)
     ;;
   *)
     echo -e "${RED}ERROR: Invalid target '$TARGET'${NC}"
-    echo "Supported targets: darwin-arm64 (default), darwin-x64"
+    echo "Supported targets: darwin-arm64 (default), darwin-x64, win32-x64"
     echo ""
     echo "Usage:"
     echo "  ./scripts/validate-build-output.sh              # Apple Silicon (default)"
     echo "  ./scripts/validate-build-output.sh darwin-x64   # Intel Mac"
+    echo "  ./scripts/validate-build-output.sh win32-x64    # Windows x64"
     exit 1
     ;;
 esac
@@ -36,8 +37,18 @@ echo "========================================"
 echo "Target: $TARGET"
 echo ""
 
-APP_PATH="VSCode-$TARGET/Ritemark.app"
-EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+# Layout differs per platform: macOS ships a .app bundle, Windows ships a flat
+# directory tree from VSCode-win32-x64/.
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    APP_PATH="VSCode-$TARGET/Ritemark.app"
+    EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+    ;;
+  win32-x64)
+    APP_PATH="VSCode-win32-x64"
+    EXT_PATH="$APP_PATH/resources/app/extensions/ritemark"
+    ;;
+esac
 
 ERRORS=0
 WARNINGS=0
@@ -144,33 +155,44 @@ fi
 echo ""
 echo "Validating bundled agent runtimes..."
 
-ARCH="${TARGET#darwin-}"
+# Map target → manifest platform/arch + on-disk agent dir.
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    MANIFEST_PLATFORM="darwin"
+    MANIFEST_ARCH="${TARGET#darwin-}"
+    ;;
+  win32-x64)
+    MANIFEST_PLATFORM="win32"
+    MANIFEST_ARCH="x64"
+    ;;
+esac
 MANIFEST="$EXT_PATH/binaries/agents/manifest.json"
-AGENTS_IN_APP="$EXT_PATH/binaries/agents/darwin-$ARCH"
+AGENTS_IN_APP="$EXT_PATH/binaries/agents/${MANIFEST_PLATFORM}-${MANIFEST_ARCH}"
 
 if [[ ! -f "$MANIFEST" ]]; then
   echo -e "  ${RED}FAIL${NC}: manifest.json missing at $MANIFEST"
   ERRORS=$((ERRORS + 1))
 else
   # Emit one line per matching entry: installName|expectedFileArchPattern
-  # NOTE: We do NOT execute the binary from inside the .app here. The .app is
-  # codesigned later in the release flow; modifying any byte under Resources
-  # invalidates the embedded signature, and Gatekeeper will SIGKILL any binary
-  # we try to launch from a tampered bundle. The fetch script already runs the
-  # manifest validationArgs smoke test on the source binary at fetch time —
-  # post-copy bytes are byte-identical, so re-running adds no value and
-  # introduces signing-stage fragility.
+  # NOTE: We do NOT execute the binary from inside the bundle here. macOS .app
+  # bundles are codesigned later in the release flow; modifying any byte under
+  # Resources invalidates the embedded signature, and Gatekeeper will SIGKILL
+  # any binary we try to launch from a tampered bundle. Windows installers are
+  # also signed downstream. The fetch script already runs the manifest
+  # validationArgs smoke test on the source binary at fetch time — post-copy
+  # bytes are byte-identical, so re-running adds no value and introduces
+  # signing-stage fragility.
   ENTRIES=$(python3 -c "
 import json
 with open('$MANIFEST') as f:
     m = json.load(f)
 for r in m['runtimes']:
-    if r['platform'] == 'darwin' and r['arch'] == '$ARCH':
+    if r['platform'] == '$MANIFEST_PLATFORM' and r['arch'] == '$MANIFEST_ARCH':
         print(f\"{r['installName']}|{r['expectedFileArchPattern']}\")
 ")
 
   if [[ -z "$ENTRIES" ]]; then
-    echo -e "  ${RED}FAIL${NC}: no manifest entries for darwin-$ARCH"
+    echo -e "  ${RED}FAIL${NC}: no manifest entries for ${MANIFEST_PLATFORM}-${MANIFEST_ARCH}"
     ERRORS=$((ERRORS + 1))
   else
     while IFS='|' read -r install_name arch_pattern; do
@@ -184,7 +206,9 @@ for r in m['runtimes']:
         continue
       fi
 
-      if [[ ! -x "$bin_path" ]]; then
+      # Exec bit only meaningful on POSIX targets. fetch-agent-runtimes.sh
+      # intentionally skips chmod +x for win32 .exe (Windows ignores exec bit).
+      if [[ "$MANIFEST_PLATFORM" != "win32" ]] && [[ ! -x "$bin_path" ]]; then
         echo -e "${RED}FAIL${NC} (exec bit missing)"
         ERRORS=$((ERRORS + 1))
         continue
