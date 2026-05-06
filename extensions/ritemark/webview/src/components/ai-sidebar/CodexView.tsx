@@ -126,9 +126,7 @@ export function getCompatibilityNotice(status: CodexSidebarStatus): {
       capabilities.requestUserInput ? 'question' : 'no-question',
       capabilities.planUpdates ? 'plan' : 'no-plan',
     ].join(':'),
-    title: compatibility.state === 'untested'
-      ? 'Codex version not yet audited'
-      : 'Codex session is running with limits',
+    title: 'Codex session is running with limits',
     message: compatibility.summary,
     bullets,
   };
