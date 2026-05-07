@@ -1136,13 +1136,24 @@ export function RitemarkSettings() {
               </div>
             </div>
 
-            <button
-              onClick={() => handleUpdateAction('updates:checkNow')}
-              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft flex items-center gap-2"
-            >
-              <Icon name="arrows-clockwise" size={14} />
-              Check Now
-            </button>
+            {(() => {
+              const isCheckingNow = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
+              return (
+                <button
+                  onClick={() => handleUpdateAction('updates:checkNow')}
+                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft active:bg-surface-soft active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-deep flex items-center gap-2 transition-all"
+                  aria-busy={isCheckingNow}
+                  aria-label={isCheckingNow ? 'Checking for updates' : 'Check now for updates'}
+                >
+                  {isCheckingNow ? (
+                    <Icon name="circle-notch" size={14} className="animate-spin" />
+                  ) : (
+                    <Icon name="arrows-clockwise" size={14} />
+                  )}
+                  {isCheckingNow ? 'Checking…' : 'Check Now'}
+                </button>
+              );
+            })()}
           </div>
 
           <div className="grid gap-2 text-xs text-ink-muted sm:grid-cols-2">
@@ -1248,30 +1259,12 @@ export function RitemarkSettings() {
           )}
 
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-medium text-ink-strong">
-                Component readiness
-              </div>
-              {(() => {
-                const isCheckingNow = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
-                return (
-                  <button
-                    onClick={() => handleUpdateAction('updates:checkNow')}
-                    className="inline-flex items-center gap-1 px-[10px] py-[6px] rounded-[4px] text-xs text-ink-body hover:bg-surface-soft hover:text-ink-strong active:bg-surface-soft active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-deep transition-all"
-                    aria-label="Check for updates"
-                    aria-busy={isCheckingNow}
-                    title="Check for app and runtime updates"
-                  >
-                    {isCheckingNow ? (
-                      <Icon name="circle-notch" size={14} className="animate-spin" />
-                    ) : (
-                      <Icon name="arrow-up-right" size={14} />
-                    )}
-                    {isCheckingNow ? 'Checking…' : 'Check for updates'}
-                  </button>
-                );
-              })()}
+            <div className="text-sm font-medium text-ink-strong mb-3">
+              Component readiness
             </div>
+            {/* The single update trigger lives on the Update Center card
+                above ("Check Now"). Don't duplicate it here — two buttons
+                firing the same action is confusing. */}
 
             <div className="grid gap-3 md:grid-cols-3">
               <ComponentCard
