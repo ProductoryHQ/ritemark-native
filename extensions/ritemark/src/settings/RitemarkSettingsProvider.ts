@@ -67,7 +67,13 @@ function deriveClaudeRuntimeStatus(status: SetupStatus): RuntimeStatusModel {
 }
 
 function deriveCodexRuntimeStatus(
-  status: { available: boolean; runnable: boolean; runtimeSource: 'bundled' | 'system' | null },
+  status: {
+    available: boolean;
+    runnable: boolean;
+    runtimeSource: 'bundled' | 'system' | null;
+    installNodeArch: string | null;
+    machineArch: string;
+  },
   authState: AuthState,
 ): RuntimeStatusModel {
   if (!status.available) {
@@ -77,7 +83,27 @@ function deriveCodexRuntimeStatus(
   if (!status.runnable) {
     return { runtime: 'launch_failed', source, auth: 'unknown' };
   }
+  if (isArchMismatch(status.installNodeArch, status.machineArch)) {
+    return { runtime: 'architecture_mismatch', source, auth: 'unknown' };
+  }
   return { runtime: 'installed', source, auth: authState };
+}
+
+/**
+ * Compare a binary's reported arch (from `file` magic) against the host arch.
+ * Returns false when either side is unknown — we never flag a mismatch on
+ * incomplete data.
+ */
+function isArchMismatch(binaryArch: string | null, machineArch: string): boolean {
+  if (!binaryArch || !machineArch) return false;
+  // Normalise: `file` may report 'x86_64', `process.arch` reports 'x64'.
+  const normalise = (v: string): string => {
+    const lower = v.toLowerCase();
+    if (lower === 'x86_64' || lower === 'x86-64') return 'x64';
+    if (lower === 'aarch64') return 'arm64';
+    return lower;
+  };
+  return normalise(binaryArch) !== normalise(machineArch);
 }
 
 const RITEMARK_THEMES = [
@@ -598,7 +624,16 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
 
     const claudeRuntimeStatus = deriveClaudeRuntimeStatus(claudeStatus);
-    const codexRuntimeStatus = deriveCodexRuntimeStatus(codexStatus, codexAuthState);
+    const codexRuntimeStatus = deriveCodexRuntimeStatus(
+      {
+        available: codexStatus.available,
+        runnable: codexStatus.runnable,
+        runtimeSource: codexStatus.runtimeSource,
+        installNodeArch: codexStatus.installNodeArch,
+        machineArch: codexStatus.machineArch,
+      },
+      codexAuthState,
+    );
 
     return {
       voiceModel: {
