@@ -94,6 +94,40 @@ const CODEX_TURN_REMINDER = [
   '- After calling request_user_input, wait for the answer instead of finishing the turn with the question in prose.',
 ].join('\n');
 
+/**
+ * Convert a selection into 1-indexed line numbers in the markdown source.
+ *
+ * The from/to we receive are TipTap (ProseMirror) document positions —
+ * they count node boundaries, not just characters, so they do NOT map
+ * directly to offsets in the markdown text. To get reliable line numbers
+ * we instead search for the selected text inside documentContent.
+ *
+ * Why we need this at all: GPT-5.3-codex's apply_patch matches the
+ * selected string by content. When the same word appears in multiple
+ * places (e.g. "Runtimes" in a heading and "runtime" in frontmatter
+ * tags), the agent can patch the wrong one — Jarmo, 2026-05-07.
+ * Telling the agent "selection is on line 47" lets it disambiguate.
+ *
+ * Returns undefined fields when the text can't be located (e.g. document
+ * content not yet synced) — the prompt still works without line info,
+ * just less precisely.
+ */
+function computeSelectionLineRange(
+  documentContent: string,
+  selection: { text: string; from: number; to: number },
+): { startLine?: number; endLine?: number } {
+  if (!documentContent || !selection.text) return {};
+  const idx = documentContent.indexOf(selection.text);
+  if (idx === -1) return {};
+  let startLine = 1;
+  for (let i = 0; i < idx; i += 1) {
+    if (documentContent[i] === '\n') startLine += 1;
+  }
+  const newlinesInSelection = (selection.text.match(/\n/g) ?? []).length;
+  const endLine = startLine + newlinesInSelection;
+  return { startLine, endLine };
+}
+
 function shouldStartCodexInPlanMode(prompt: string): boolean {
   return /\bplan mode\b/i.test(prompt)
     || /\bwork in plan\b/i.test(prompt)
@@ -471,15 +505,25 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Send current selection and document content from active editor
+   * Send current selection and document content from active editor.
+   *
+   * Enriches the payload with 1-indexed startLine / endLine so the AI
+   * sidebar can put exact line numbers in the LLM prompt. Without this,
+   * Codex's apply_patch had to find the selected text by string search and
+   * could match the wrong occurrence (Jarmo, 2026-05-07: a "Runtimes"
+   * selection in the body got patched in the frontmatter tags section
+   * because both contained the substring "runtime").
    */
   public sendSelection(selection: EditorSelection, documentContent: string) {
     this._currentSelection = selection;
     this._documentContent = documentContent;
     const activeFile = this._getActiveFileContext();
+    const enriched: EditorSelection = selection.isEmpty
+      ? selection
+      : { ...selection, ...computeSelectionLineRange(documentContent, selection) };
     this._view?.webview.postMessage({
       type: 'selection-update',
-      selection,
+      selection: enriched,
       activeFilePath: activeFile?.path,
     });
   }
