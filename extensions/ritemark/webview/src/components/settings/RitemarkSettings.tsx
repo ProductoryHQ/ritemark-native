@@ -356,12 +356,12 @@ export function RitemarkSettings() {
               <p className="text-xs text-ink-muted mb-3">
                 Install Claude to use Claude agent mode in Ritemark.
               </p>
-              <button
-                onClick={() => handleClaudeAction('claude:install')}
-                className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-              >
+              <Button
+ onClick={() => handleClaudeAction('claude:install')}
+ 
+ >
                 Install Claude
-              </button>
+              </Button>
             </>
           ) : settings.componentStatus.claudeCode.state === 'broken' ? (
             <>
@@ -370,19 +370,19 @@ export function RitemarkSettings() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
-                  <button
-                    onClick={() => handleClaudeAction('claude:reload')}
-                    className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-                  >
+                  <Button
+ onClick={() => handleClaudeAction('claude:reload')}
+ 
+ >
                     Reload Window
-                  </button>
+                  </Button>
                 ) : (
-                  <button
-                    onClick={() => handleClaudeAction('claude:repair')}
-                    className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-                  >
+                  <Button
+ onClick={() => handleClaudeAction('claude:repair')}
+ 
+ >
                     Repair Claude
-                  </button>
+                  </Button>
                 )}
               </div>
             </>
@@ -392,18 +392,18 @@ export function RitemarkSettings() {
                 Sign in to start using Claude. Choose Claude.ai for the simplest setup, or paste an Anthropic API key if you prefer.
               </p>
               <div className="flex flex-wrap gap-2">
-                <button
+                <Button
                   onClick={() => handleClaudeAction('claude:login')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  size="lg"
                 >
                   Sign in with Claude.ai
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleClaudeAction('claude:enterApiKey')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Use Anthropic API key
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-ink-faint mt-3">
                 Don&apos;t have an API key? Get one at{' '}
@@ -418,12 +418,12 @@ export function RitemarkSettings() {
               <p className="text-xs text-ink-muted mb-3">
                 Sign-in opened in your browser. Authorize to finish — Ritemark will refresh automatically.
               </p>
-              <button
+              <Button
                 onClick={() => handleClaudeAction('claude:cancelLogin')}
-                className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                variant="secondary" size="lg"
               >
                 Cancel sign-in
-              </button>
+              </Button>
             </>
           ) : (
             <>
@@ -451,27 +451,27 @@ export function RitemarkSettings() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {settings.componentStatus.claudeCode.authMethod === 'claude-oauth' && (
-                  <button
+                  <Button
                     onClick={() => handleClaudeAction('claude:logout')}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Sign Out
-                  </button>
+                  </Button>
                 )}
                 {settings.componentStatus.claudeCode.authMethod === 'api-key' && (
-                  <button
+                  <Button
                     onClick={() => handleClaudeAction('claude:login')}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Switch to Claude.ai sign-in
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={() => handleClaudeAction('claude:refreshStatus')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Refresh Status
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -567,24 +567,24 @@ export function RitemarkSettings() {
                   </div>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button
+                  <Button
                     onClick={() => vscode.postMessage({ type: 'codex:repair' })}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    size="lg"
                   >
                     Repair Codex
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => vscode.postMessage({ type: 'updates:reload' })}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Reload Window
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => vscode.postMessage({ type: 'codex:refreshStatus' })}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Refresh Status
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-xs text-ink-muted mt-2">
                   After reinstalling, use Reload Window here and then reopen Settings.
@@ -606,26 +606,26 @@ export function RitemarkSettings() {
                         <Icon name="circle-notch" size={16} className="animate-spin" />
                         Opening browser...
                       </button>
-                      <button
+                      <Button
                         onClick={() => {
                           setCodexLoading(false);
                           vscode.postMessage({ type: 'codex:cancelLogin' });
                         }}
-                        className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                        variant="secondary" size="lg"
                       >
                         Cancel sign-in
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button
+                    <Button
                       onClick={() => {
                         setCodexLoading(true);
                         vscode.postMessage({ type: 'codex:startLogin' });
                       }}
-                      className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                      size="lg"
                     >
                       Sign in with ChatGPT
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {codexAuth.error && (
@@ -660,12 +660,12 @@ export function RitemarkSettings() {
                     </div>
                   )}
                 </div>
-                <button
+                <Button
                   onClick={() => vscode.postMessage({ type: 'codex:logout' })}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Sign Out
-                </button>
+                </Button>
               </>
             )}
 
@@ -752,19 +752,20 @@ export function RitemarkSettings() {
                 {showOpenaiKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
-            <button
+            <Button
               onClick={() => handleSaveApiKey('openai-api-key', openaiKey)}
-              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+              size="lg"
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleTestApiKey('openai-api-key')}
               disabled={!settings.openaiKeyConfigured || testingOpenai}
-              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
+              variant="secondary"
+              size="lg"
             >
               {testingOpenai ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </button>
+            </Button>
           </div>
 
           {testResults.openai && (
@@ -829,19 +830,20 @@ export function RitemarkSettings() {
                 {showGoogleKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
-            <button
+            <Button
               onClick={() => handleSaveApiKey('google-ai-key', googleKey)}
-              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+              size="lg"
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleTestApiKey('google-ai-key')}
               disabled={!settings.googleKeyConfigured || testingGoogle}
-              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
+              variant="secondary"
+              size="lg"
             >
               {testingGoogle ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </button>
+            </Button>
           </div>
 
           {testResults.google && (
@@ -905,19 +907,20 @@ export function RitemarkSettings() {
                 {showAnthropicKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
-            <button
+            <Button
               onClick={() => handleSaveApiKey('anthropic-api-key', anthropicKey)}
-              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+              size="lg"
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleTestApiKey('anthropic-api-key')}
               disabled={!settings.anthropicKeyConfigured || testingAnthropic}
-              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
+              variant="secondary"
+              size="lg"
             >
               {testingAnthropic ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </button>
+            </Button>
           </div>
 
           {testResults.anthropic && (
@@ -1140,9 +1143,10 @@ export function RitemarkSettings() {
             {(() => {
               const isCheckingNow = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
               return (
-                <button
+                <Button
                   onClick={() => handleUpdateAction('updates:checkNow')}
-                  className="inline-flex items-center gap-2 px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary"
+                  size="lg"
                   aria-busy={isCheckingNow}
                   aria-label={isCheckingNow ? 'Checking for updates' : 'Check now for updates'}
                 >
@@ -1152,7 +1156,7 @@ export function RitemarkSettings() {
                     <Icon name="arrows-clockwise" size={14} />
                   )}
                   {isCheckingNow ? 'Checking…' : 'Check Now'}
-                </button>
+                </Button>
               );
             })()}
           </div>
@@ -1182,13 +1186,13 @@ export function RitemarkSettings() {
               <div className="text-xs text-ink-muted mt-1">
                 Extension {settings.updateCenter.pendingRestartVersion} is installed and will activate after reload.
               </div>
-              <button
-                onClick={() => handleUpdateAction('updates:reload')}
-                className="mt-3 px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md flex items-center gap-2"
-              >
+              <Button
+ onClick={() => handleUpdateAction('updates:reload')}
+ className="mt-3"
+ >
                 <Icon name="arrow-counter-clockwise" size={14} />
                 Reload Window
-              </button>
+              </Button>
             </div>
           )}
 
@@ -1209,32 +1213,32 @@ export function RitemarkSettings() {
               </div>
 
               <div className="flex flex-wrap gap-2 mt-4">
-                <button
-                  onClick={() => handleUpdateAction('updates:install')}
-                  className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md flex items-center gap-2"
-                >
+                <Button
+ onClick={() => handleUpdateAction('updates:install')}
+ 
+ >
                   <Icon name="download" size={14} />
                   {settings.updateCenter.availableUpdate.action === 'full' ? 'Download Installer' : 'Install Update'}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleUpdateAction('updates:skipVersion')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Skip This Version
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleUpdateAction('updates:pause')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Pause 7 Days
-                </button>
+                </Button>
                 {(settings.updateCenter.skippedVersion || settings.updateCenter.snoozeUntil) && (
-                  <button
+                  <Button
                     onClick={() => handleUpdateAction('updates:resume')}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Re-enable Notifications
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
