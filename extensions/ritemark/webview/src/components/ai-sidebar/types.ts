@@ -85,9 +85,9 @@ export interface EditorSelection {
   isEmpty: boolean;
   from: number;
   to: number;
-  /** 1-indexed line numbers (set by the extension's sendSelection). */
-  startLine?: number;
-  endLine?: number;
+  /** Surrounding text — used as an unambiguous fingerprint by buildSelectionContextBlock. */
+  contextBefore?: string;
+  contextAfter?: string;
 }
 
 export interface RAGCitation {

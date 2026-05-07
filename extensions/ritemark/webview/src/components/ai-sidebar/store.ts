@@ -498,58 +498,67 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     if (selection.isEmpty || !selection.text) return undefined;
 
     const fileLine = activeFilePath ? `File: ${activeFilePath}\n` : '';
-    const quotedText = selection.text
-      .split('\n')
-      .map((line) => `> ${line}`)
-      .join('\n');
 
-    // Line range — provided by the extension (sendSelection enriches the
-    // payload). Crucial for disambiguation: "Runtimes" in the body and
-    // "runtime" in frontmatter tags can match the same string search, so
-    // we tell the agent which lines to target instead of letting it grep.
-    const hasLines = typeof selection.startLine === 'number' && typeof selection.endLine === 'number';
-    const lineRange = hasLines
-      ? selection.startLine === selection.endLine
-        ? `Selection is on line ${selection.startLine}`
-        : `Selection spans lines ${selection.startLine}–${selection.endLine}`
-      : '';
+    // Build an unambiguous fingerprint by wrapping the selection in
+    // sentinels and showing it inside its surrounding context. The agent
+    // can then locate the selection by matching the FULL window
+    // (contextBefore + selection + contextAfter), which is unique within
+    // the file even when the selected word itself isn't (e.g. "runtime"
+    // in body vs frontmatter — same word, different sentences around it).
+    const hasContext = Boolean(selection.contextBefore || selection.contextAfter);
+    const contextWindow = hasContext
+      ? `${selection.contextBefore ?? ''}<<<SELECTION>>>${selection.text}<<</SELECTION>>>${selection.contextAfter ?? ''}`
+      : null;
 
     // Mode-aware framing. Without explicit "use your file editing tools"
     // language, models default to chat replies even when the user clearly
-    // asks for a modification. Tested 2026-05-07: "tee see lause
-    // lihtsamaks" with selection produced a chat suggestion instead of an
-    // apply_patch call. Strong directive language fixes this.
+    // asks for a modification. Tested 2026-05-07: weaker wording produced
+    // chat suggestions instead of apply_patch calls; strong directive
+    // language fixes the mode but earlier line-number disambiguation
+    // pointed at the wrong occurrence — replaced with a context window.
     const isEditMode = pendingRuntime.mode === 'edit';
     const header = isEditMode
       ? '[Selection context — Edit mode]'
       : '[Selection context — Plan mode]';
     const instruction = isEditMode
       ? [
-          'The user has selected the following text in the active file.',
-          'They are in EDIT MODE and expect you to MODIFY this exact',
-          'selection in the file using your file editing tools (apply_patch).',
-          hasLines
-            ? 'Edit ONLY the text at the line range below — do NOT modify other occurrences elsewhere in the file (e.g. frontmatter, headings, other paragraphs).'
-            : 'Edit ONLY the exact selected text shown below — do NOT modify other occurrences of similar words elsewhere in the file.',
-          'Do NOT just suggest changes in chat — make the actual file edit.',
-          'Reply text should briefly confirm what you changed.',
+          'The user has selected text in the active file (shown below',
+          'wrapped in <<<SELECTION>>>...<<</SELECTION>>> sentinels with',
+          'surrounding context).',
+          'You are in EDIT MODE — MODIFY this exact selection in the file',
+          'using your file editing tools (apply_patch). To find the right',
+          'spot, match the SURROUNDING CONTEXT below — do NOT search for',
+          'just the selected word, because the same word may appear in',
+          'frontmatter, headings, or other paragraphs.',
+          'Do NOT just suggest changes in chat — make the actual file',
+          'edit. Reply text should briefly confirm what you changed.',
         ].join('\n')
       : [
-          'The user has selected the following text in the active file.',
-          'They are in PLAN MODE — propose changes to THIS selection using',
+          'The user has selected text in the active file (shown below',
+          'wrapped in <<<SELECTION>>>...<<</SELECTION>>> sentinels with',
+          'surrounding context).',
+          'You are in PLAN MODE — propose changes to this selection using',
           'your plan tools. Do NOT make file edits yet; wait for plan',
           'approval before applying anything.',
         ].join('\n');
 
-    const linesEntry = lineRange ? `${lineRange}\n` : '';
+    const contextSection = contextWindow
+      ? [
+          fileLine + 'Surrounding context (selection wrapped in sentinels):',
+          '',
+          contextWindow,
+        ].join('\n')
+      : [
+          fileLine + 'Selected text:',
+          '',
+          selection.text.split('\n').map((line) => `> ${line}`).join('\n'),
+        ].join('\n');
 
     return [
       header,
       instruction,
       '',
-      fileLine + linesEntry + 'Selected text:',
-      '',
-      quotedText,
+      contextSection,
       '',
       '---',
       '',
