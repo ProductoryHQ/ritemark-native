@@ -126,7 +126,7 @@ export function getCompatibilityNotice(status: CodexSidebarStatus): {
       capabilities.requestUserInput ? 'question' : 'no-question',
       capabilities.planUpdates ? 'plan' : 'no-plan',
     ].join(':'),
-    title: 'Codex session is running with limits',
+    title: 'Some agent features are unavailable',
     message: compatibility.summary,
     bullets,
   };
