@@ -153,6 +153,11 @@ export function RitemarkSettings() {
   const [testingOpenai, setTestingOpenai] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
+  // Track last manual update-check click. Used to show the spinner during the
+  // brief gap between click and the backend's first 'checking' state push,
+  // and to time-out the spinner if the backend never reports back (defensive
+  // — prevents a "stuck updating" UI like Jarmo hit on 2026-05-07).
+  const [updateCheckClickedAt, setUpdateCheckClickedAt] = useState<number | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [localAgentTimeout, setLocalAgentTimeout] = useState(15);
   const [localChatFontSize, setLocalChatFontSize] = useState(13);
@@ -204,6 +209,20 @@ export function RitemarkSettings() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Reset the manual update-check click marker as soon as the backend reports
+  // a non-checking state, OR after 15s as a safety net (prevents a stuck
+  // spinner if the backend never pushes a state transition back).
+  useEffect(() => {
+    if (updateCheckClickedAt === null) return;
+    const backendState = settings?.updateCenter.state;
+    if (backendState && backendState !== 'checking') {
+      setUpdateCheckClickedAt(null);
+      return;
+    }
+    const timer = setTimeout(() => setUpdateCheckClickedAt(null), 15_000);
+    return () => clearTimeout(timer);
+  }, [updateCheckClickedAt, settings?.updateCenter.state]);
+
   const handleToggle = (key: string, value: boolean) => {
     vscode.postMessage({ type: 'setSetting', key, value });
   };
@@ -220,6 +239,9 @@ export function RitemarkSettings() {
   const handleUpdateAction = (
     type: 'updates:checkNow' | 'updates:install' | 'updates:skipVersion' | 'updates:pause' | 'updates:resume' | 'updates:reload'
   ) => {
+    if (type === 'updates:checkNow') {
+      setUpdateCheckClickedAt(Date.now());
+    }
     vscode.postMessage({ type });
   };
 
@@ -1230,20 +1252,25 @@ export function RitemarkSettings() {
               <div className="text-sm font-medium text-ink-strong">
                 Component readiness
               </div>
-              <button
-                onClick={() => handleUpdateAction('updates:checkNow')}
-                disabled={settings.updateCenter.state === 'checking'}
-                className="inline-flex items-center gap-1 px-[10px] py-[6px] rounded-[4px] text-xs text-ink-body hover:bg-surface-soft hover:text-ink-strong disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                aria-label="Check for updates"
-                title="Check for app and runtime updates"
-              >
-                {settings.updateCenter.state === 'checking' ? (
-                  <Icon name="circle-notch" size={14} className="animate-spin" />
-                ) : (
-                  <Icon name="arrow-up-right" size={14} />
-                )}
-                Check for updates
-              </button>
+              {(() => {
+                const isCheckingNow = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
+                return (
+                  <button
+                    onClick={() => handleUpdateAction('updates:checkNow')}
+                    className="inline-flex items-center gap-1 px-[10px] py-[6px] rounded-[4px] text-xs text-ink-body hover:bg-surface-soft hover:text-ink-strong active:bg-surface-soft active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-deep transition-all"
+                    aria-label="Check for updates"
+                    aria-busy={isCheckingNow}
+                    title="Check for app and runtime updates"
+                  >
+                    {isCheckingNow ? (
+                      <Icon name="circle-notch" size={14} className="animate-spin" />
+                    ) : (
+                      <Icon name="arrow-up-right" size={14} />
+                    )}
+                    {isCheckingNow ? 'Checking…' : 'Check for updates'}
+                  </button>
+                );
+              })()}
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">
