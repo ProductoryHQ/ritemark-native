@@ -17,6 +17,7 @@ import type {
   AgentEnvironmentStatus,
   ClaudeAuthMethod,
   ClaudeRepairAction,
+  ClaudeRuntimeSource,
   ClaudeSetupState,
   OnboardingStatus,
   SetupStatus,
@@ -42,6 +43,7 @@ interface ClaudeBinaryInspection {
   version?: string;
   error?: string;
   diagnostics: string[];
+  runtimeSource?: ClaudeRuntimeSource;
 }
 
 interface ClaudeStatusInput {
@@ -241,14 +243,16 @@ function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): 
       // For the SDK's pathToClaudeCodeExecutable, we need the JS entry point,
       // not the .cmd wrapper (the SDK runs `node <path>`, not `shell .cmd`).
       const sdkPath = resolveJsEntryFromCmd(candidate) || candidate;
+      const runtimeSource: ClaudeRuntimeSource = isBundledAgentRuntimePath(candidate) ? 'bundled' : 'system';
       return {
         installed: true,
         runnable: true,
         path: sdkPath,
         authCheckPath: candidate,
         version,
-        diagnostics: candidatePaths[0] !== candidate || sdkPath !== candidate || isBundledAgentRuntimePath(candidate)
-          ? [...diagnostics, `${isBundledAgentRuntimePath(candidate) ? 'Using bundled Claude runtime' : 'Using detected Claude path'}: ${sdkPath}`]
+        runtimeSource,
+        diagnostics: candidatePaths[0] !== candidate || sdkPath !== candidate || runtimeSource === 'bundled'
+          ? [...diagnostics, `${runtimeSource === 'bundled' ? 'Using bundled Claude runtime' : 'Using detected Claude path'}: ${sdkPath}`]
           : diagnostics,
       };
     }
@@ -440,6 +444,7 @@ export function deriveClaudeSetupStatus(input: ClaudeStatusInput): SetupStatus {
     diagnostics,
     repairAction,
     error,
+    runtimeSource: input.binary.runtimeSource,
   };
 }
 
