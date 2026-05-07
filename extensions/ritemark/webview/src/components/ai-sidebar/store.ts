@@ -216,6 +216,12 @@ interface AISidebarState {
   sendChatMessage: (prompt: string) => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
+  /**
+   * Detach the editor selection from the chat input context. Does NOT clear
+   * the editor's actual selection — only the chat-side reference. Sprint 62
+   * S5 default behaviour (per bonus-track tracking doc, Open Question).
+   */
+  dismissSelectedContext: () => void;
   applyWidget: (widget: WidgetData) => void;
   discardWidget: (messageId: string) => void;
   configureApiKey: () => void;
@@ -445,6 +451,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       mediaType: att.mediaType,
     }));
     vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile, mentionedAgentPaths: options?.mentionedAgentPaths });
+  },
+
+  dismissSelectedContext: () => {
+    set({ selection: { text: '', isEmpty: true, from: 0, to: 0 } });
   },
 
   cancelRequest: () => {
