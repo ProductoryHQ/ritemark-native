@@ -19,4 +19,8 @@ export interface EditorSelection {
 
   /** Number of words in the selection (for UI display) */
   wordCount: number
+
+  /** 1-indexed line numbers — set by the extension when forwarding to the AI sidebar */
+  startLine?: number
+  endLine?: number
 }

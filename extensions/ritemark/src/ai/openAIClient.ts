@@ -35,6 +35,14 @@ export interface EditorSelection {
   isEmpty: boolean;
   from: number;
   to: number;
+  /**
+   * 1-indexed line numbers covering the selection. Optional because they
+   * are computed by the extension from `documentContent` at the moment
+   * the selection is sent over to the webview — older payloads on the
+   * wire may not carry them.
+   */
+  startLine?: number;
+  endLine?: number;
 }
 
 /**

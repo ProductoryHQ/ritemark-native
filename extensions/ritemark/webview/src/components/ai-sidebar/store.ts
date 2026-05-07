@@ -503,6 +503,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       .map((line) => `> ${line}`)
       .join('\n');
 
+    // Line range — provided by the extension (sendSelection enriches the
+    // payload). Crucial for disambiguation: "Runtimes" in the body and
+    // "runtime" in frontmatter tags can match the same string search, so
+    // we tell the agent which lines to target instead of letting it grep.
+    const hasLines = typeof selection.startLine === 'number' && typeof selection.endLine === 'number';
+    const lineRange = hasLines
+      ? selection.startLine === selection.endLine
+        ? `Selection is on line ${selection.startLine}`
+        : `Selection spans lines ${selection.startLine}–${selection.endLine}`
+      : '';
+
     // Mode-aware framing. Without explicit "use your file editing tools"
     // language, models default to chat replies even when the user clearly
     // asks for a modification. Tested 2026-05-07: "tee see lause
@@ -515,10 +526,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const instruction = isEditMode
       ? [
           'The user has selected the following text in the active file.',
-          'They are in EDIT MODE and expect you to MODIFY this text in the',
-          'file using your file editing tools (apply_patch). Do NOT just',
-          'suggest changes in chat — make the actual file edit. Reply text',
-          'should briefly confirm what you changed.',
+          'They are in EDIT MODE and expect you to MODIFY this exact',
+          'selection in the file using your file editing tools (apply_patch).',
+          hasLines
+            ? 'Edit ONLY the text at the line range below — do NOT modify other occurrences elsewhere in the file (e.g. frontmatter, headings, other paragraphs).'
+            : 'Edit ONLY the exact selected text shown below — do NOT modify other occurrences of similar words elsewhere in the file.',
+          'Do NOT just suggest changes in chat — make the actual file edit.',
+          'Reply text should briefly confirm what you changed.',
         ].join('\n')
       : [
           'The user has selected the following text in the active file.',
@@ -527,11 +541,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           'approval before applying anything.',
         ].join('\n');
 
+    const linesEntry = lineRange ? `${lineRange}\n` : '';
+
     return [
       header,
       instruction,
       '',
-      fileLine + 'Selected text:',
+      fileLine + linesEntry + 'Selected text:',
       '',
       quotedText,
       '',

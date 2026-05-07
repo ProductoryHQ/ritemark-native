@@ -85,6 +85,9 @@ export interface EditorSelection {
   isEmpty: boolean;
   from: number;
   to: number;
+  /** 1-indexed line numbers (set by the extension's sendSelection). */
+  startLine?: number;
+  endLine?: number;
 }
 
 export interface RAGCitation {
