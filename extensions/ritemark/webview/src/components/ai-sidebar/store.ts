@@ -222,6 +222,13 @@ interface AISidebarState {
    * S5 default behaviour (per bonus-track tracking doc, Open Question).
    */
   dismissSelectedContext: () => void;
+  /**
+   * Build the LLM-facing prompt block describing the current editor
+   * selection. Returns undefined if no selection. Used internally by
+   * sendAgentMessage and sendCodexMessage to inject selection context
+   * into the hidden prompt prefix without showing it in the chat bubble.
+   */
+  buildSelectionContextBlock: () => string | undefined;
   applyWidget: (widget: WidgetData) => void;
   discardWidget: (messageId: string) => void;
   configureApiKey: () => void;
@@ -420,8 +427,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       lastAgentTimestamp,
     );
     const basePrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
-    const fullPrompt = options?.hiddenContext
-      ? `${options.hiddenContext}\n\n---\n\n${basePrompt}`
+    // Selection context comes BEFORE the pinned-agent hidden context so the
+    // agent's role instructions (if any) can frame their response around the
+    // selected text. The order is:
+    //   [Selection context] → [Pinned agent instructions] → handoff → prompt
+    const selectionBlock = get().buildSelectionContextBlock();
+    const hiddenPieces = [
+      selectionBlock,
+      options?.hiddenContext,
+    ].filter((p): p is string => Boolean(p));
+    const fullPrompt = hiddenPieces.length > 0
+      ? `${hiddenPieces.join('\n\n---\n\n')}\n\n---\n\n${basePrompt}`
       : basePrompt;
 
     const turn: AgentConversationTurn = {
@@ -455,6 +471,51 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   dismissSelectedContext: () => {
     set({ selection: { text: '', isEmpty: true, from: 0, to: 0 } });
+  },
+
+  /**
+   * Build the hidden prompt block that tells the LLM about the currently-
+   * selected text. Used by sendAgentMessage and sendCodexMessage so the
+   * agent actually receives the selection — without this, the docked tab
+   * is purely cosmetic and the LLM has no idea what text the user means
+   * by "this".
+   *
+   * Format chosen for clarity to the LLM:
+   *   - Plain-text [Selection context] header (no XML — works equally well
+   *     across Claude and Codex models)
+   *   - Explicit instruction that the request applies to this selection
+   *     "unless explicitly indicated otherwise" — gives the LLM permission
+   *     to override when the user's prompt clearly references something
+   *     else
+   *   - Selected text rendered as a blockquote so multi-line content
+   *     stays readable and won't be confused with the user's request
+   *   - User request: prefix is the conventional separator the agent
+   *     instructions can latch onto
+   */
+  buildSelectionContextBlock: () => {
+    const state = get();
+    const { selection, activeFilePath } = state;
+    if (selection.isEmpty || !selection.text) return undefined;
+
+    const fileLine = activeFilePath ? `File: ${activeFilePath}\n` : '';
+    const quotedText = selection.text
+      .split('\n')
+      .map((line) => `> ${line}`)
+      .join('\n');
+
+    return [
+      '[Selection context]',
+      'The user has selected text in the active editor. Their request',
+      'below applies to THIS selection unless they explicitly indicate otherwise.',
+      '',
+      fileLine + 'Selected text:',
+      '',
+      quotedText,
+      '',
+      '---',
+      '',
+      'User request:',
+    ].join('\n');
   },
 
   cancelRequest: () => {
@@ -645,7 +706,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       'Claude',
       lastCodexTimestamp,
     );
-    const fullPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+    // Prepend selection context so the agent actually receives the docked
+    // selection. The Codex turn shows only the user-typed prompt in the chat
+    // bubble; the selection wrapper is invisible to the user but visible to
+    // the model — same pattern Claude already uses for hiddenContext.
+    const selectionBlock = get().buildSelectionContextBlock();
+    const handoffPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+    const fullPrompt = selectionBlock
+      ? `${selectionBlock}\n\n---\n\n${handoffPrompt}`
+      : handoffPrompt;
 
     const turn: CodexConversationTurn = {
       id: nextId(),
