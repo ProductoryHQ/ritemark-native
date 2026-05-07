@@ -24,8 +24,61 @@ import {
   setClaudeLoginInProgress,
   startClaudeLoginSubprocess,
   type ClaudeLoginSubprocessHandle,
+  type SetupStatus,
 } from '../agent';
 import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
+
+/**
+ * Phase E status model: split runtime health, source provenance, and auth
+ * readiness into three independent fields so the UI can communicate them
+ * separately instead of conflating them into a single ad-hoc string.
+ */
+type RuntimeState = 'missing' | 'installed' | 'architecture_mismatch' | 'launch_failed';
+type RuntimeSource = 'bundled' | 'system' | 'unknown';
+type AuthState = 'ready' | 'sign_in_required' | 'unknown' | 'error';
+
+interface RuntimeStatusModel {
+  runtime: RuntimeState;
+  source: RuntimeSource;
+  auth: AuthState;
+}
+
+function deriveClaudeRuntimeStatus(status: SetupStatus): RuntimeStatusModel {
+  const source: RuntimeSource = status.runtimeSource ?? 'unknown';
+
+  if (!status.cliInstalled) {
+    return { runtime: 'missing', source: 'unknown', auth: 'unknown' };
+  }
+  if (!status.runnable) {
+    return { runtime: 'launch_failed', source, auth: 'unknown' };
+  }
+
+  // Runnable from here on.
+  switch (status.state) {
+    case 'ready':
+      return { runtime: 'installed', source, auth: 'ready' };
+    case 'needs-auth':
+      return { runtime: 'installed', source, auth: 'sign_in_required' };
+    case 'auth-in-progress':
+      return { runtime: 'installed', source, auth: 'unknown' };
+    default:
+      return { runtime: 'installed', source, auth: 'unknown' };
+  }
+}
+
+function deriveCodexRuntimeStatus(
+  status: { available: boolean; runnable: boolean; runtimeSource: 'bundled' | 'system' | null },
+  authState: AuthState,
+): RuntimeStatusModel {
+  if (!status.available) {
+    return { runtime: 'missing', source: 'unknown', auth: 'unknown' };
+  }
+  const source: RuntimeSource = status.runtimeSource ?? 'unknown';
+  if (!status.runnable) {
+    return { runtime: 'launch_failed', source, auth: 'unknown' };
+  }
+  return { runtime: 'installed', source, auth: authState };
+}
 
 const RITEMARK_THEMES = [
   {
@@ -504,6 +557,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       error: string | null;
       diagnostics: string[];
       repairAction: 'install' | 'repair' | 'reload' | null;
+      runtimeStatus: RuntimeStatusModel;
     };
     codex: {
       installed: boolean;
@@ -514,6 +568,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       diagnostics: string[];
       repairCommand: string | null;
       compatibility: CodexCompatibilityStatus | null;
+      runtimeStatus: RuntimeStatusModel;
     };
   }> {
     const defaultModelFile = 'ggml-large-v3-turbo.bin';
@@ -528,6 +583,22 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
     const codexManager = new CodexManager();
     const codexStatus = await codexManager.getBinaryStatus();
+
+    // Resolve Codex auth state independently of the binary inspection. This
+    // can fail if the app-server is not reachable; treat any failure as
+    // 'unknown' so the UI shows attention required without hiding the runtime.
+    let codexAuthState: AuthState = 'unknown';
+    if (codexStatus.runnable && this.codexAuth) {
+      try {
+        const authStatus = await this.codexAuth.getStatus();
+        codexAuthState = authStatus.authenticated ? 'ready' : 'sign_in_required';
+      } catch {
+        codexAuthState = 'error';
+      }
+    }
+
+    const claudeRuntimeStatus = deriveClaudeRuntimeStatus(claudeStatus);
+    const codexRuntimeStatus = deriveCodexRuntimeStatus(codexStatus, codexAuthState);
 
     return {
       voiceModel: {
@@ -554,6 +625,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         error: claudeStatus.error,
         diagnostics: claudeStatus.diagnostics,
         repairAction: claudeStatus.repairAction,
+        runtimeStatus: claudeRuntimeStatus,
       },
       codex: {
         installed: codexStatus.available,
@@ -568,6 +640,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         diagnostics: codexStatus.diagnostics,
         repairCommand: codexStatus.repairCommand,
         compatibility: codexStatus.compatibility,
+        runtimeStatus: codexRuntimeStatus,
       }
     };
   }
