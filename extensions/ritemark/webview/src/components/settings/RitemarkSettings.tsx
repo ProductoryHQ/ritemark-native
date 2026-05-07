@@ -1140,9 +1140,9 @@ export function RitemarkSettings() {
             {(() => {
               const isCheckingNow = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
               return (
-                <Button
+                <button
                   onClick={() => handleUpdateAction('updates:checkNow')}
-                  variant="secondary"
+                  className="inline-flex items-center gap-2 px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
                   aria-busy={isCheckingNow}
                   aria-label={isCheckingNow ? 'Checking for updates' : 'Check now for updates'}
                 >
@@ -1152,7 +1152,7 @@ export function RitemarkSettings() {
                     <Icon name="arrows-clockwise" size={14} />
                   )}
                   {isCheckingNow ? 'Checking…' : 'Check Now'}
-                </Button>
+                </button>
               );
             })()}
           </div>
