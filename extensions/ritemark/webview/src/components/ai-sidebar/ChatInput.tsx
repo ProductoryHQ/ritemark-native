@@ -16,6 +16,7 @@ import {
   SelectTrigger,
 } from '../ui/select';
 import { useAISidebarStore } from './store';
+import { SelectedContextTab } from './SelectedContextTab';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
@@ -729,6 +730,13 @@ export function ChatInput() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Sprint 64 bonus track (S5): docked selected-text context tab.
+          Renders only when the editor has a non-empty selection. The tab's
+          rounded-t-lg + border-b-0 makes it visually connect to the input
+          card below; the negative -mb-px on the tab overlaps the card's
+          top border by 1px so there's no seam. */}
+      <SelectedContextTab />
+
       {/* Drag overlay indicator */}
       {isDragOver && (
         <div className="absolute inset-2 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--vscode-focusBorder)] bg-[var(--vscode-editor-background)]/90 pointer-events-none">
