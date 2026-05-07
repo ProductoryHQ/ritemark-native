@@ -636,14 +636,28 @@ export function Editor({
         return null
       }
       const { from, to, empty } = ctx.editor.state.selection
-      const text = ctx.editor.state.doc.textBetween(from, to, ' ')
+      const doc = ctx.editor.state.doc
+      const text = doc.textBetween(from, to, ' ')
+
+      // Capture surrounding context so the AI sidebar can give the agent
+      // an unambiguous fingerprint of WHERE in the file the selection is.
+      // Line numbers were unreliable (TipTap from/to are ProseMirror
+      // positions, not source-character offsets, and a fallback indexOf
+      // search hit the first occurrence — wrong when the same word appears
+      // in frontmatter and body). 80 chars on each side is enough to
+      // disambiguate from any other occurrence in a typical markdown file.
+      const CONTEXT_CHARS = 80
+      const contextBefore = empty ? '' : doc.textBetween(Math.max(0, from - CONTEXT_CHARS), from, ' ')
+      const contextAfter = empty ? '' : doc.textBetween(to, Math.min(doc.content.size, to + CONTEXT_CHARS), ' ')
 
       const result = {
         text,
         from,
         to,
         isEmpty: empty,
-        wordCount: text.trim() ? text.split(/\s+/).filter(Boolean).length : 0
+        wordCount: text.trim() ? text.split(/\s+/).filter(Boolean).length : 0,
+        contextBefore,
+        contextAfter,
       }
 
       return result

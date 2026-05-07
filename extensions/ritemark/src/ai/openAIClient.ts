@@ -36,13 +36,15 @@ export interface EditorSelection {
   from: number;
   to: number;
   /**
-   * 1-indexed line numbers covering the selection. Optional because they
-   * are computed by the extension from `documentContent` at the moment
-   * the selection is sent over to the webview — older payloads on the
-   * wire may not carry them.
+   * Up to ~80 chars on either side of the selection, supplied by the
+   * editor webview. Used to produce an unambiguous fingerprint of the
+   * selection's location for the LLM (line numbers proved unreliable —
+   * TipTap from/to are ProseMirror positions that don't map cleanly to
+   * source offsets, and fallback string searches hit the wrong
+   * occurrence when the same word appears in frontmatter and body).
    */
-  startLine?: number;
-  endLine?: number;
+  contextBefore?: string;
+  contextAfter?: string;
 }
 
 /**
