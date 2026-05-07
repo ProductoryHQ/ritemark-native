@@ -790,6 +790,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       void this._sendCodexSidebarStatus();
     });
 
+    // Phase F: forward in-flight progress notifications (e.g. slow
+    // thread/start) to the AI sidebar so the user sees that the runtime is
+    // still working rather than a frozen UI. Distinct from 'codex-progress'
+    // which carries AgentProgress events for turn execution.
+    this._codexAppServer.on('progress', (event: { method: string; message: string }) => {
+      this._view?.webview.postMessage({
+        type: 'codex-rpc-progress',
+        method: event.method,
+        message: event.message,
+      });
+    });
+
     this._setupCodexEventListeners();
     return this._codexAppServer;
   }
