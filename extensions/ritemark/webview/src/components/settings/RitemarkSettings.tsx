@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../ui/Icon';
+import { Button } from '../ui/button';
 import { vscode } from '../../lib/vscode';
 import { getDefaultAssistantModel } from '../../config/modelConfig';
 import { Slider } from '../ui/slider';
@@ -1139,9 +1140,9 @@ export function RitemarkSettings() {
             {(() => {
               const isCheckingNow = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
               return (
-                <button
+                <Button
                   onClick={() => handleUpdateAction('updates:checkNow')}
-                  className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft active:bg-surface-soft active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-deep flex items-center gap-2 transition-all"
+                  variant="secondary"
                   aria-busy={isCheckingNow}
                   aria-label={isCheckingNow ? 'Checking for updates' : 'Check now for updates'}
                 >
@@ -1151,7 +1152,7 @@ export function RitemarkSettings() {
                     <Icon name="arrows-clockwise" size={14} />
                   )}
                   {isCheckingNow ? 'Checking…' : 'Check Now'}
-                </button>
+                </Button>
               );
             })()}
           </div>
