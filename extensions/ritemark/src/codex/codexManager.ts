@@ -16,6 +16,7 @@ import { isEnabled } from '../features/featureGate';
 import {
   findBundledAgentRuntime,
   inferCodexRuntimeLaunchMode,
+  readBundledRuntimeVersion,
   isBundledAgentRuntimePath,
 } from '../utils/bundledAgentRuntime';
 
@@ -251,6 +252,33 @@ export class CodexManager {
     const binaryPath = binary.binaryPath;
     const installNodeVersion = this.extractNvmNodeVersion(binaryPath);
     const installNodeArch = this.getBinaryArchitecture(binaryPath);
+
+    // The bundled `codex-app-server` binary does NOT accept `--version` (it
+    // exits with `error: unexpected argument '--version' found` and code 2).
+    // For app-server launch mode the canonical version comes from the
+    // manifest the build script ships alongside the binary. Skip the spawn
+    // probe in that case — otherwise we'd flag a perfectly working bundled
+    // runtime as "needs repair" with the spawn error as the description.
+    if (binary.launchMode === 'codex-app-server') {
+      const manifestVersion = readBundledRuntimeVersion(binaryPath);
+      return {
+        available: true,
+        runnable: true,
+        version: manifestVersion,
+        error: null,
+        binaryPath,
+        installNodeVersion,
+        runtimeNodeVersion,
+        diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
+        repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
+        installNodeArch,
+        runtimeNodeArch,
+        machineArch,
+        compatibility: this.inspectCompatibility(binaryPath, manifestVersion, binary.launchMode),
+        runtimeSource: binary.runtimeSource,
+        launchMode: binary.launchMode,
+      };
+    }
 
     return new Promise((resolve) => {
       const versionProcess = this.spawnResolvedBinary(binaryPath, ['--version']);
