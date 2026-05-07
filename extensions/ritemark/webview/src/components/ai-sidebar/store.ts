@@ -494,7 +494,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
    */
   buildSelectionContextBlock: () => {
     const state = get();
-    const { selection, activeFilePath } = state;
+    const { selection, activeFilePath, pendingRuntime } = state;
     if (selection.isEmpty || !selection.text) return undefined;
 
     const fileLine = activeFilePath ? `File: ${activeFilePath}\n` : '';
@@ -503,10 +503,33 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       .map((line) => `> ${line}`)
       .join('\n');
 
+    // Mode-aware framing. Without explicit "use your file editing tools"
+    // language, models default to chat replies even when the user clearly
+    // asks for a modification. Tested 2026-05-07: "tee see lause
+    // lihtsamaks" with selection produced a chat suggestion instead of an
+    // apply_patch call. Strong directive language fixes this.
+    const isEditMode = pendingRuntime.mode === 'edit';
+    const header = isEditMode
+      ? '[Selection context — Edit mode]'
+      : '[Selection context — Plan mode]';
+    const instruction = isEditMode
+      ? [
+          'The user has selected the following text in the active file.',
+          'They are in EDIT MODE and expect you to MODIFY this text in the',
+          'file using your file editing tools (apply_patch). Do NOT just',
+          'suggest changes in chat — make the actual file edit. Reply text',
+          'should briefly confirm what you changed.',
+        ].join('\n')
+      : [
+          'The user has selected the following text in the active file.',
+          'They are in PLAN MODE — propose changes to THIS selection using',
+          'your plan tools. Do NOT make file edits yet; wait for plan',
+          'approval before applying anything.',
+        ].join('\n');
+
     return [
-      '[Selection context]',
-      'The user has selected text in the active editor. Their request',
-      'below applies to THIS selection unless they explicitly indicate otherwise.',
+      header,
+      instruction,
       '',
       fileLine + 'Selected text:',
       '',
@@ -741,6 +764,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       type: 'codex-execute',
       prompt: fullPrompt,
       model: state.codexSelectedModel,
+      // The Edit/Plan toggle in ChatInput sets pendingRuntime.mode; until
+      // 51095ad this never reached the extension because mode wasn't on
+      // the wire. Now it is — Codex collaboration mode actually responds
+      // to the toggle.
+      mode: requestedMode,
       attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
     });
   },
