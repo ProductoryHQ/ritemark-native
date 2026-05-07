@@ -234,6 +234,15 @@ export function CodexTurn({
         <RunningIndicator activities={turn.activities} />
       )}
 
+      {/* Phase F: slow-RPC progress notice (e.g. cold thread/start). Shown
+          while still running and no other progress signal has arrived. */}
+      {turn.isRunning && turn.rpcProgressMessage && !turn.streamingText && !hasActivities && (
+        <div className="flex items-center gap-2 text-xs text-ink-muted pl-2">
+          <Icon name="circle-notch" size={12} className="animate-spin shrink-0" />
+          <span>{turn.rpcProgressMessage}</span>
+        </div>
+      )}
+
       {/* Error */}
       {turn.result?.error && (
         <div className="flex items-start gap-2 text-xs text-[var(--vscode-testing-iconFailed)] pl-2">

@@ -1434,6 +1434,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
       }
 
+      case 'codex-rpc-progress': {
+        // A slow RPC (typically thread/start at cold start) is still in
+        // flight. Surface the message on the running turn so the user
+        // sees progress instead of a frozen UI.
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = { ...lastTurn, rpcProgressMessage: message.message };
+          set({ codexConversation: conv });
+        }
+        break;
+      }
+
       case 'codex-approval': {
         const conv = [...state.codexConversation];
         const lastTurn = conv[conv.length - 1];
