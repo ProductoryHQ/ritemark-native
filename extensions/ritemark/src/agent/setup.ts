@@ -211,10 +211,21 @@ function checkWindowsPrereqs(): string[] {
 
 function getClaudeVersion(binaryPath: string): string | undefined {
   try {
-    const result = runBinary(binaryPath, ['--version'], 5000);
-    if (result.status === 0 && result.stdout?.trim()) {
-      return result.stdout.trim();
-    }
+    // 15s allows for cold-start of the 217MB bundled Mach-O on first launch
+    // (macOS Gatekeeper signature verification can spike on the very first
+    // execution; subsequent runs cache and return in < 1s).
+    const result = runBinary(binaryPath, ['--version'], 15000);
+    const stdout = result.stdout?.trim();
+    if (!stdout) return undefined;
+    // Happy path: clean exit + non-empty stdout.
+    if (result.status === 0) return stdout;
+    // Permissive recovery: some bundled binaries print a valid version then
+    // exit non-zero on first run (env-related, harmless). If stdout matches
+    // semver-prefix, trust it. Without this we'd label a working binary as
+    // "broken" and surface the version string itself as a "repair needed"
+    // error message — exactly the UX trap that broke the bundled Claude
+    // Settings screen on cold start.
+    if (/^\d+\.\d+\.\d+/.test(stdout)) return stdout;
   } catch {
     // optional
   }
