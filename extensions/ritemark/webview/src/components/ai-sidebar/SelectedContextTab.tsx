@@ -41,7 +41,7 @@ export function SelectedContextTab() {
       <div className="flex items-center gap-1.5">
         <Icon name="selection" size={11} className="shrink-0 opacity-60" />
         <span className="text-[11px] font-medium text-[var(--r-ink-muted)] flex-1 truncate">
-          Selected in active file
+          Working on selected text
         </span>
         <button
           onClick={dismissSelectedContext}
