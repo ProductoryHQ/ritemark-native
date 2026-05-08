@@ -85,6 +85,9 @@ export interface EditorSelection {
   isEmpty: boolean;
   from: number;
   to: number;
+  /** Surrounding text — used as an unambiguous fingerprint by buildSelectionContextBlock. */
+  contextBefore?: string;
+  contextAfter?: string;
 }
 
 export interface RAGCitation {
@@ -282,10 +285,8 @@ export interface CodexCapabilityFlags {
 }
 
 export interface CodexCompatibilityStatus {
-  state: 'compatible' | 'limited' | 'untested';
+  state: 'compatible' | 'limited';
   summary: string;
-  auditedRange: string;
-  versionInAuditedRange: boolean;
   capabilities: CodexCapabilityFlags;
   limitations: string[];
 }
@@ -327,6 +328,11 @@ export interface CodexConversationTurn {
     error?: string;
   };
   isRunning: boolean;
+  /**
+   * Transient status string from a slow RPC call (e.g. thread/start at
+   * cold start). Cleared once streamingText / activities arrive.
+   */
+  rpcProgressMessage?: string;
   timestamp: number;
 }
 
@@ -362,6 +368,7 @@ export type ExtensionMessage =
   // Codex messages
   | { type: 'codex:status'; status: CodexSidebarStatus }
   | { type: 'codex-progress'; progress: AgentProgress }
+  | { type: 'codex-rpc-progress'; method: string; message: string }
   | { type: 'codex-streaming'; delta: string }
   | { type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> }
   | { type: 'codex-plan-text-delta'; delta: string }

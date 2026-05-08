@@ -194,6 +194,8 @@ export interface OnboardingStatus {
   anyAgentReady: boolean;
 }
 
+export type ClaudeRuntimeSource = 'bundled' | 'system';
+
 export interface SetupStatus {
   cliInstalled: boolean;
   runnable: boolean;
@@ -205,6 +207,7 @@ export interface SetupStatus {
   diagnostics: string[];
   repairAction: ClaudeRepairAction;
   error: string | null;
+  runtimeSource?: ClaudeRuntimeSource;
 }
 
 /**

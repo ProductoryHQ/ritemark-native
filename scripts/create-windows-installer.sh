@@ -48,6 +48,38 @@ if [ ! -d "$WIN_BUILD" ]; then
 fi
 echo "  ✓ Windows build found"
 
+# Sprint 64 Phase D: pre-flight bundled agent runtime check.
+# The GH Actions Windows build is responsible for fetching and embedding the
+# win32-x64 Codex + Claude binaries via fetch-agent-runtimes.sh. If the
+# downloaded artifact is missing them, the resulting installer would ship
+# without app-owned agent runtimes — block here rather than discover at
+# runtime on a user's machine.
+WIN_AGENTS="$WIN_BUILD/resources/app/extensions/ritemark/binaries/agents/win32-x64"
+if [ ! -f "$WIN_AGENTS/codex-app-server.exe" ] || [ ! -f "$WIN_AGENTS/claude.exe" ]; then
+    echo -e "${RED}ERROR: bundled agent runtimes missing from build artifact${NC}"
+    echo "  Expected: $WIN_AGENTS/{codex-app-server.exe, claude.exe}"
+    echo ""
+    echo "This means the GH Actions build that produced this artifact did not"
+    echo "run the Sprint 64 fetch step. Re-run build-windows.yml on a commit"
+    echo "that includes the win32-x64 fetch wiring."
+    exit 1
+fi
+echo "  ✓ Bundled agent runtimes present"
+
+# Defer to validate-build-output.sh for full Check 5 (manifest-driven arch
+# verification). Skip if the host doesn't have python3/file (older macOS).
+if command -v python3 >/dev/null 2>&1 && command -v file >/dev/null 2>&1; then
+    if ! "$SCRIPT_DIR/validate-build-output.sh" win32-x64 >/dev/null 2>&1; then
+        echo -e "${YELLOW}WARNING: validate-build-output.sh win32-x64 reported issues${NC}"
+        echo "  Re-running with full output for diagnosis:"
+        "$SCRIPT_DIR/validate-build-output.sh" win32-x64 || true
+        echo ""
+        echo -e "${RED}ERROR: bundled runtime validation failed${NC}"
+        exit 1
+    fi
+    echo "  ✓ Bundled runtime arch validation passed (validate-build-output.sh)"
+fi
+
 # Check .iss file exists
 if [ ! -f "$ISS_FILE" ]; then
     echo -e "${RED}ERROR: Inno Setup script not found at $ISS_FILE${NC}"

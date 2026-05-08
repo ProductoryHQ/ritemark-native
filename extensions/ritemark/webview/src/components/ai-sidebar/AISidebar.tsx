@@ -162,8 +162,10 @@ export function AISidebar() {
         </>
       ) : (
         <>
-          {/* Selection indicator */}
-          <SelectionIndicator />
+          {/* Sprint 64 bonus track (S5): selection is now shown as a docked
+              tab inside ChatInput, not as a global banner here. The
+              SelectionIndicator above is still used for Welcome and Setup
+              flows where there's no chat input to anchor to. */}
 
           {/* Main content area */}
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">

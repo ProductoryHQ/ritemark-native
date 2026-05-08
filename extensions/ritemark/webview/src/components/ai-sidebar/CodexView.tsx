@@ -126,9 +126,7 @@ export function getCompatibilityNotice(status: CodexSidebarStatus): {
       capabilities.requestUserInput ? 'question' : 'no-question',
       capabilities.planUpdates ? 'plan' : 'no-plan',
     ].join(':'),
-    title: compatibility.state === 'untested'
-      ? 'Codex version not yet audited'
-      : 'Codex session is running with limits',
+    title: 'Some agent features are unavailable',
     message: compatibility.summary,
     bullets,
   };
@@ -234,6 +232,15 @@ export function CodexTurn({
       {/* Running indicator (only if no activities or approval to show) */}
       {turn.isRunning && !hasActivities && !turn.approval && !turn.streamingText && (
         <RunningIndicator activities={turn.activities} />
+      )}
+
+      {/* Phase F: slow-RPC progress notice (e.g. cold thread/start). Shown
+          while still running and no other progress signal has arrived. */}
+      {turn.isRunning && turn.rpcProgressMessage && !turn.streamingText && !hasActivities && (
+        <div className="flex items-center gap-2 text-xs text-ink-muted pl-2">
+          <Icon name="circle-notch" size={12} className="animate-spin shrink-0" />
+          <span>{turn.rpcProgressMessage}</span>
+        </div>
       )}
 
       {/* Error */}

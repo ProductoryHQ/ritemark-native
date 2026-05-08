@@ -17,18 +17,43 @@ NC='\033[0m' # No Color
 TARGET="${1:-darwin-arm64}"
 
 case "$TARGET" in
-  darwin-arm64|darwin-x64)
+  darwin-arm64|darwin-x64|win32-x64)
     ;;
   *)
     echo -e "${RED}ERROR: Invalid target '$TARGET'${NC}"
-    echo "Supported targets: darwin-arm64 (default), darwin-x64"
+    echo "Supported targets: darwin-arm64 (default), darwin-x64, win32-x64"
     echo ""
     echo "Usage:"
     echo "  ./scripts/validate-build-output.sh              # Apple Silicon (default)"
     echo "  ./scripts/validate-build-output.sh darwin-x64   # Intel Mac"
+    echo "  ./scripts/validate-build-output.sh win32-x64    # Windows x64"
     exit 1
     ;;
 esac
+
+# ---------------------------------------------------------------------------
+# Portable file-size + python interpreter resolution
+# ---------------------------------------------------------------------------
+# `validate-build-output.sh win32-x64` runs on macOS for cross-host pre-flight
+# (e.g. before invoking ISCC.exe locally) AND on Windows runners reusing this
+# script. macOS `stat` uses BSD flags (`-f%z`); GNU stat on Git Bash uses
+# `-c%s`. Codex review on PR #57: hard-coded `stat -f%z` returned 0 on
+# Windows and the size gates failed on perfectly valid build outputs. Same
+# for `python3` — Windows often only has `python` on PATH.
+file_size() {
+  local f="$1"
+  local s
+  s=$(stat -f%z "$f" 2>/dev/null) || s=$(stat -c%s "$f" 2>/dev/null) || s=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
+  echo "${s:-0}"
+}
+
+PYTHON=""
+for py in python3 python; do
+  if command -v "$py" >/dev/null 2>&1; then
+    PYTHON="$py"
+    break
+  fi
+done
 
 echo "========================================"
 echo "Post-Build Output Validation"
@@ -36,8 +61,18 @@ echo "========================================"
 echo "Target: $TARGET"
 echo ""
 
-APP_PATH="VSCode-$TARGET/Ritemark.app"
-EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+# Layout differs per platform: macOS ships a .app bundle, Windows ships a flat
+# directory tree from VSCode-win32-x64/.
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    APP_PATH="VSCode-$TARGET/Ritemark.app"
+    EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+    ;;
+  win32-x64)
+    APP_PATH="VSCode-win32-x64"
+    EXT_PATH="$APP_PATH/resources/app/extensions/ritemark"
+    ;;
+esac
 
 ERRORS=0
 WARNINGS=0
@@ -89,7 +124,8 @@ check_file_size() {
     return
   fi
 
-  local size=$(stat -f%z "$file" 2>/dev/null || echo 0)
+  local size
+  size=$(file_size "$file")
 
   if [[ $size -lt $min_size ]]; then
     echo -e "${RED}FAIL${NC}"
@@ -139,7 +175,96 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# Check 5: App Launches (optional manual verification)
+# Check 5: Bundled Agent Runtimes (manifest-driven)
+# -----------------------------------------------------------------------------
+echo ""
+echo "Validating bundled agent runtimes..."
+
+# Map target → manifest platform/arch + on-disk agent dir.
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    MANIFEST_PLATFORM="darwin"
+    MANIFEST_ARCH="${TARGET#darwin-}"
+    ;;
+  win32-x64)
+    MANIFEST_PLATFORM="win32"
+    MANIFEST_ARCH="x64"
+    ;;
+esac
+MANIFEST="$EXT_PATH/binaries/agents/manifest.json"
+AGENTS_IN_APP="$EXT_PATH/binaries/agents/${MANIFEST_PLATFORM}-${MANIFEST_ARCH}"
+
+if [[ ! -f "$MANIFEST" ]]; then
+  echo -e "  ${RED}FAIL${NC}: manifest.json missing at $MANIFEST"
+  ERRORS=$((ERRORS + 1))
+else
+  # Emit one line per matching entry: installName|expectedFileArchPattern
+  # NOTE: We do NOT execute the binary from inside the bundle here. macOS .app
+  # bundles are codesigned later in the release flow; modifying any byte under
+  # Resources invalidates the embedded signature, and Gatekeeper will SIGKILL
+  # any binary we try to launch from a tampered bundle. Windows installers are
+  # also signed downstream. The fetch script already runs the manifest
+  # validationArgs smoke test on the source binary at fetch time — post-copy
+  # bytes are byte-identical, so re-running adds no value and introduces
+  # signing-stage fragility.
+  if [[ -z "$PYTHON" ]]; then
+    echo -e "  ${RED}FAIL${NC}: neither python3 nor python found in PATH (needed to parse manifest.json)"
+    ERRORS=$((ERRORS + 1))
+    PYTHON_FOR_PARSE=""
+  else
+    PYTHON_FOR_PARSE="$PYTHON"
+  fi
+  if [[ -n "$PYTHON_FOR_PARSE" ]]; then
+  ENTRIES=$("$PYTHON_FOR_PARSE" -c "
+import json
+with open('$MANIFEST') as f:
+    m = json.load(f)
+for r in m['runtimes']:
+    if r['platform'] == '$MANIFEST_PLATFORM' and r['arch'] == '$MANIFEST_ARCH':
+        print(f\"{r['installName']}|{r['expectedFileArchPattern']}\")
+")
+
+  if [[ -z "$ENTRIES" ]]; then
+    echo -e "  ${RED}FAIL${NC}: no manifest entries for ${MANIFEST_PLATFORM}-${MANIFEST_ARCH}"
+    ERRORS=$((ERRORS + 1))
+  else
+    while IFS='|' read -r install_name arch_pattern; do
+      bin_path="$AGENTS_IN_APP/$install_name"
+      echo -n "  Checking $install_name... "
+
+      if [[ ! -f "$bin_path" ]]; then
+        echo -e "${RED}FAIL${NC} (not in app bundle)"
+        echo "    Expected: $bin_path"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+
+      # Exec bit only meaningful on POSIX targets. fetch-agent-runtimes.sh
+      # intentionally skips chmod +x for win32 .exe (Windows ignores exec bit).
+      if [[ "$MANIFEST_PLATFORM" != "win32" ]] && [[ ! -x "$bin_path" ]]; then
+        echo -e "${RED}FAIL${NC} (exec bit missing)"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+
+      file_out=$(file -b "$bin_path")
+      if ! echo "$file_out" | grep -qF "$arch_pattern"; then
+        echo -e "${RED}FAIL${NC} (arch mismatch)"
+        echo "    Expected pattern: $arch_pattern"
+        echo "    Got:              $file_out"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+
+      echo -e "${GREEN}OK${NC} ($file_out)"
+    done <<< "$ENTRIES"
+  fi
+  fi
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
+# Check 6: App Launches (optional manual verification)
 # -----------------------------------------------------------------------------
 echo ""
 echo "Manual verification recommended:"

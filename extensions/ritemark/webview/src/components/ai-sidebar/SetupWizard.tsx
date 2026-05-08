@@ -38,7 +38,7 @@ export function SetupWizard() {
     : isBroken
       ? setupStatus.repairAction === 'reload'
         ? 'Reload to finish Claude setup'
-        : 'Claude needs repair'
+        : 'Could not verify Claude'
       : loginInProgress
         ? 'Finish sign-in in your browser'
         : isReady
@@ -47,10 +47,22 @@ export function SetupWizard() {
             ? 'Connect to the internet'
             : 'Sign in with Claude.ai';
 
+  // Filter out version-looking error strings: when getClaudeVersion fails on
+  // a non-zero exit but stdout contains "1.2.3 (Claude Code)" the upstream
+  // setupStatus.error gets that version verbatim. Showing a version number as
+  // a failure description is the worst kind of misleading UX, so we fall
+  // back to a generic explanation when the error looks like a version.
+  const errorLooksLikeVersion = Boolean(
+    setupStatus.error && /^\s*\d+\.\d+\.\d+/.test(setupStatus.error),
+  );
+  const brokenDescription = errorLooksLikeVersion || !setupStatus.error
+    ? "Claude was found, but Ritemark couldn't confirm it's working. Reinstalling restores the bundled runtime."
+    : setupStatus.error;
+
   const description = needsInstall
     ? 'Install Claude to use file-aware agent mode in Ritemark.'
     : isBroken
-      ? setupStatus.error ?? 'Claude was found, but it could not start correctly.'
+      ? brokenDescription
       : loginInProgress
         ? 'Your terminal and browser were opened for Claude.ai sign-in. Ritemark will update automatically when sign-in completes.'
         : isReady
@@ -176,7 +188,7 @@ export function SetupWizard() {
                   {setupStatus.binaryPath && <div className="break-all">Binary: {setupStatus.binaryPath}</div>}
                   {setupStatus.authMethod === 'api-key' && <div>Auth: Anthropic API key</div>}
                   {setupStatus.authMethod === 'claude-oauth' && <div>Auth: Claude.ai</div>}
-                  {setupStatus.diagnostics.map((line) => (
+                  {dedupeDiagnostics(setupStatus.diagnostics, setupStatus.binaryPath, setupStatus.cliVersion).map((line) => (
                     <div key={line} className="break-words">
                       {line}
                     </div>
@@ -189,6 +201,31 @@ export function SetupWizard() {
       </div>
     </div>
   );
+}
+
+/**
+ * deriveClaudeSetupStatus prepends `Binary: <path>` and `Version: <v>` to
+ * the diagnostics array, but the technical-details panel renders those two
+ * fields explicitly above. Strip duplicates here so the user doesn't see the
+ * same path three times. We also drop the legacy "Claude binary detected at
+ * <path>" string from inspectClaudeBinary's fallback — it's the same
+ * information, expressed as a fallback diagnostic, and adds no value when
+ * Binary is already shown above.
+ */
+function dedupeDiagnostics(
+  diagnostics: string[],
+  binaryPath?: string,
+  version?: string,
+): string[] {
+  const seen = new Set<string>();
+  return diagnostics.filter((line) => {
+    if (seen.has(line)) return false;
+    seen.add(line);
+    if (binaryPath && line === `Binary: ${binaryPath}`) return false;
+    if (version && line === `Version: ${version}`) return false;
+    if (binaryPath && line === `Claude binary detected at ${binaryPath}`) return false;
+    return true;
+  });
 }
 
 function PrimaryButton({

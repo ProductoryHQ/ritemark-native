@@ -1,5 +1,5 @@
-import { existsSync } from 'fs';
-import { basename, join, resolve } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { basename, join, resolve, dirname } from 'path';
 
 export type AgentRuntimeKind = 'claude' | 'codex-cli' | 'codex-app-server';
 
@@ -95,4 +95,39 @@ export function isBundledAgentRuntimePath(binaryPath: string): boolean {
 export function inferCodexRuntimeLaunchMode(binaryPath: string): 'codex-cli' | 'codex-app-server' {
   const name = basename(binaryPath).toLowerCase();
   return name.startsWith('codex-app-server') ? 'codex-app-server' : 'codex-cli';
+}
+
+interface BundledManifestEntry {
+  installName: string;
+  platform: string;
+  arch: string;
+  version: string;
+}
+
+interface BundledManifest {
+  runtimes: BundledManifestEntry[];
+}
+
+/**
+ * Read the version of a bundled binary from manifest.json.
+ *
+ * Some bundled binaries (codex-app-server) don't accept `--version`, so the
+ * canonical source for their version is the manifest the build script wrote.
+ * Returns null if the binary isn't bundled, the manifest is missing, or the
+ * manifest doesn't list the requested entry.
+ */
+export function readBundledRuntimeVersion(binaryPath: string): string | null {
+  if (!isBundledAgentRuntimePath(binaryPath)) return null;
+  // <ext>/binaries/agents/<plat>-<arch>/<name> → <ext>/binaries/agents/manifest.json
+  const agentDir = dirname(binaryPath);
+  const manifestPath = join(dirname(agentDir), 'manifest.json');
+  if (!existsSync(manifestPath)) return null;
+  try {
+    const manifest: BundledManifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    const installName = basename(binaryPath);
+    const entry = manifest.runtimes.find((r) => r.installName === installName);
+    return entry?.version ?? null;
+  } catch {
+    return null;
+  }
 }

@@ -35,6 +35,16 @@ export interface EditorSelection {
   isEmpty: boolean;
   from: number;
   to: number;
+  /**
+   * Up to ~80 chars on either side of the selection, supplied by the
+   * editor webview. Used to produce an unambiguous fingerprint of the
+   * selection's location for the LLM (line numbers proved unreliable —
+   * TipTap from/to are ProseMirror positions that don't map cleanly to
+   * source offsets, and fallback string searches hit the wrong
+   * occurrence when the same word appears in frontmatter and body).
+   */
+  contextBefore?: string;
+  contextAfter?: string;
 }
 
 /**

@@ -16,6 +16,7 @@ import { isEnabled } from '../features/featureGate';
 import {
   findBundledAgentRuntime,
   inferCodexRuntimeLaunchMode,
+  readBundledRuntimeVersion,
   isBundledAgentRuntimePath,
 } from '../utils/bundledAgentRuntime';
 
@@ -50,10 +51,8 @@ export interface CodexCapabilityFlags {
 }
 
 export interface CodexCompatibilityStatus {
-  state: 'compatible' | 'limited' | 'untested';
+  state: 'compatible' | 'limited';
   summary: string;
-  auditedRange: string;
-  versionInAuditedRange: boolean;
   capabilities: CodexCapabilityFlags;
   limitations: string[];
 }
@@ -68,9 +67,6 @@ interface CodexResolvedBinary {
 }
 
 export class CodexManager {
-  private static readonly MIN_AUDITED_VERSION = '0.111.0';
-  private static readonly MAX_AUDITED_VERSION_EXCLUSIVE = '0.125.0';
-  private static readonly AUDITED_RANGE_LABEL = '0.111.x - 0.124.x';
   private static readonly compatibilityCache = new Map<string, CodexCompatibilityStatus>();
   private process: ChildProcess | null = null;
   private config: CodexManagerConfig;
@@ -256,6 +252,46 @@ export class CodexManager {
     const binaryPath = binary.binaryPath;
     const installNodeVersion = this.extractNvmNodeVersion(binaryPath);
     const installNodeArch = this.getBinaryArchitecture(binaryPath);
+
+    // The bundled `codex-app-server` binary does NOT accept `--version` (it
+    // exits with `error: unexpected argument '--version' found` and code 2).
+    // For app-server launch mode the canonical version comes from the
+    // manifest the build script ships alongside the binary. We still need
+    // to confirm the binary is actually launchable so a corrupt or non-
+    // executable file doesn't show as "Ready" until the first turn fails
+    // (Codex review on PR #57). `--help` works on codex-app-server, exits 0
+    // quickly, and gives us a real spawn check.
+    if (binary.launchMode === 'codex-app-server') {
+      const manifestVersion = readBundledRuntimeVersion(binaryPath);
+      const probe = this.spawnResolvedBinarySync(binaryPath, ['--help'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 3000,
+      });
+      const probeOk = probe.status === 0;
+      const probeError = probeOk
+        ? null
+        : this.summarizeFailure(
+            String(probe.stderr || probe.stdout || `app-server --help exited ${probe.status ?? 'null'}`),
+          );
+      return {
+        available: true,
+        runnable: probeOk,
+        version: manifestVersion,
+        error: probeError,
+        binaryPath,
+        installNodeVersion,
+        runtimeNodeVersion,
+        diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
+        repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
+        installNodeArch,
+        runtimeNodeArch,
+        machineArch,
+        compatibility: probeOk ? this.inspectCompatibility(binaryPath, manifestVersion, binary.launchMode) : null,
+        runtimeSource: binary.runtimeSource,
+        launchMode: binary.launchMode,
+      };
+    }
 
     return new Promise((resolve) => {
       const versionProcess = this.spawnResolvedBinary(binaryPath, ['--version']);
@@ -643,9 +679,6 @@ export class CodexManager {
       requestUserInput: false,
       planUpdates: false,
     };
-    const versionInAuditedRange = version
-      ? this.isVersionInAuditedRange(version)
-      : false;
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-codex-protocol-'));
 
     try {
@@ -658,8 +691,6 @@ export class CodexManager {
       if (result.status !== 0) {
         const failure = this.summarizeFailure(String(result.stderr || result.stdout || 'Codex protocol probe failed.'));
         const status = this.buildCompatibilityStatus(
-          version,
-          versionInAuditedRange,
           defaultCapabilities,
           [`Protocol probe failed: ${failure}`]
         );
@@ -688,14 +719,12 @@ export class CodexManager {
         limitations.push('Structured plan update notifications were not detected in the current Codex app-server protocol.');
       }
 
-      const status = this.buildCompatibilityStatus(version, versionInAuditedRange, capabilities, limitations);
+      const status = this.buildCompatibilityStatus(capabilities, limitations);
       CodexManager.compatibilityCache.set(cacheKey, status);
       return status;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const status = this.buildCompatibilityStatus(
-        version,
-        versionInAuditedRange,
         defaultCapabilities,
         [`Protocol probe failed: ${message}`]
       );
@@ -707,30 +736,13 @@ export class CodexManager {
   }
 
   private buildCompatibilityStatus(
-    version: string | null,
-    versionInAuditedRange: boolean,
     capabilities: CodexCapabilityFlags,
     limitations: string[]
   ): CodexCompatibilityStatus {
-    if (!versionInAuditedRange) {
-      return {
-        state: 'untested',
-        summary: version
-          ? `Codex ${version} is outside Ritemark's audited range ${CodexManager.AUDITED_RANGE_LABEL}. Ritemark will only enable capabilities it can detect at runtime.`
-          : `Codex version could not be detected. Ritemark will only enable capabilities it can detect at runtime.`,
-        auditedRange: CodexManager.AUDITED_RANGE_LABEL,
-        versionInAuditedRange,
-        capabilities,
-        limitations,
-      };
-    }
-
     if (limitations.length > 0) {
       return {
         state: 'limited',
-        summary: `Codex is runnable, but this version is missing one or more lifecycle capabilities that Ritemark expects in the audited range ${CodexManager.AUDITED_RANGE_LABEL}.`,
-        auditedRange: CodexManager.AUDITED_RANGE_LABEL,
-        versionInAuditedRange,
+        summary: 'Codex is runnable, but one or more lifecycle capabilities Ritemark expects were not detected.',
         capabilities,
         limitations,
       };
@@ -738,9 +750,7 @@ export class CodexManager {
 
     return {
       state: 'compatible',
-      summary: `Codex matches the audited lifecycle capability set for ${CodexManager.AUDITED_RANGE_LABEL}.`,
-      auditedRange: CodexManager.AUDITED_RANGE_LABEL,
-      versionInAuditedRange,
+      summary: 'Codex lifecycle capabilities detected.',
       capabilities,
       limitations: [],
     };
@@ -758,27 +768,6 @@ export class CodexManager {
     }
 
     return '';
-  }
-
-  private isVersionInAuditedRange(version: string): boolean {
-    return this.compareVersions(version, CodexManager.MIN_AUDITED_VERSION) >= 0
-      && this.compareVersions(version, CodexManager.MAX_AUDITED_VERSION_EXCLUSIVE) < 0;
-  }
-
-  private compareVersions(left: string, right: string): number {
-    const leftParts = left.split('.').map((part) => Number.parseInt(part, 10) || 0);
-    const rightParts = right.split('.').map((part) => Number.parseInt(part, 10) || 0);
-    const length = Math.max(leftParts.length, rightParts.length);
-
-    for (let index = 0; index < length; index += 1) {
-      const leftValue = leftParts[index] ?? 0;
-      const rightValue = rightParts[index] ?? 0;
-      if (leftValue !== rightValue) {
-        return leftValue - rightValue;
-      }
-    }
-
-    return 0;
   }
 
   private buildAppServerArgs(launchMode: CodexLaunchMode | null): string[] {
