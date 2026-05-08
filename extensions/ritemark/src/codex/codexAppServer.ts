@@ -128,6 +128,13 @@ export class CodexAppServer extends EventEmitter {
 
   /**
    * Start a new thread (conversation)
+   *
+   * thread/start can be slow on first invocation (binary warm-up, network
+   * handshake, model download). We give it a 60s timeout and emit a
+   * 'progress' event after 10s so the AI sidebar can show "Starting Codex
+   * session, this may take a moment…" instead of looking frozen. On
+   * timeout we attach a diagnostics snapshot to the error so the user
+   * sees actionable info (binary path, source, arch, last stderr).
    */
   async threadStart(params: Partial<ThreadStartParams> & { cwd?: string | null }): Promise<ThreadStartResponse> {
     await this.ensureInitialized();
@@ -135,7 +142,35 @@ export class CodexAppServer extends EventEmitter {
       experimentalRawEvents: false,
       persistExtendedHistory: false,
       ...params,
+    }, 60_000, {
+      progressAfterMs: 10_000,
+      progressMessage: 'Starting Codex session, this may take a moment…',
+      diagnosticsOnTimeout: () => this.buildThreadStartDiagnostics(),
     });
+  }
+
+  /**
+   * Build a diagnostics snapshot for thread/start timeouts. Includes the
+   * resolved binary path, runtime source (bundled/system), arch, and the
+   * last stderr line — enough to triage without opening the developer
+   * console.
+   */
+  private async buildThreadStartDiagnostics(): Promise<string[]> {
+    const lines: string[] = [];
+    try {
+      const status = await this.manager.getBinaryStatus();
+      if (status.binaryPath) lines.push(`Binary: ${status.binaryPath}`);
+      if (status.runtimeSource) lines.push(`Source: ${status.runtimeSource}`);
+      if (status.machineArch) lines.push(`Machine arch: ${status.machineArch}`);
+      if (status.installNodeArch) lines.push(`Binary arch: ${status.installNodeArch}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      lines.push(`Diagnostics probe failed: ${message}`);
+    }
+    if (this.lastStderrMessage) {
+      lines.push(`Last stderr: ${this.lastStderrMessage}`);
+    }
+    return lines;
   }
 
   /**
@@ -210,9 +245,26 @@ export class CodexAppServer extends EventEmitter {
   }
 
   /**
-   * Generic JSON-RPC call with timeout
+   * Generic JSON-RPC call with timeout.
+   *
+   * Optional `options.progressAfterMs` + `options.progressMessage` schedule a
+   * 'progress' event emission while the call is still in flight — useful
+   * for slow operations like thread/start where the user otherwise sees a
+   * frozen UI for tens of seconds. Optional `options.diagnosticsOnTimeout`
+   * is invoked when the timeout fires; the returned lines are appended to
+   * the error message so callers don't have to dig through extension host
+   * logs to triage.
    */
-  private rpc<TParams, TResult>(method: string, params: TParams, timeoutMs = 30_000): Promise<TResult> {
+  private rpc<TParams, TResult>(
+    method: string,
+    params: TParams,
+    timeoutMs = 30_000,
+    options?: {
+      progressAfterMs?: number;
+      progressMessage?: string;
+      diagnosticsOnTimeout?: () => Promise<string[]>;
+    },
+  ): Promise<TResult> {
     return new Promise((resolve, reject) => {
       const id = this.nextId++;
       const request: JsonRpcRequest = {
@@ -222,21 +274,50 @@ export class CodexAppServer extends EventEmitter {
         params,
       };
 
-      const timer = setTimeout(() => {
+      let progressTimer: ReturnType<typeof setTimeout> | null = null;
+      if (options?.progressAfterMs && options.progressMessage) {
+        const progressMessage = options.progressMessage;
+        progressTimer = setTimeout(() => {
+          if (this.pendingRequests.has(id)) {
+            this.trace?.('rpc:progress', method, { id, message: progressMessage });
+            this.emit('progress', { method, message: progressMessage });
+          }
+        }, options.progressAfterMs);
+      }
+
+      const finalize = () => {
+        if (progressTimer) clearTimeout(progressTimer);
+      };
+
+      const timer = setTimeout(async () => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
-          reject(new Error(`RPC call '${method}' timed out after ${timeoutMs}ms`));
+          finalize();
+          let message = `RPC call '${method}' timed out after ${timeoutMs}ms`;
+          if (options?.diagnosticsOnTimeout) {
+            try {
+              const lines = await options.diagnosticsOnTimeout();
+              if (lines.length > 0) {
+                message += `\n${lines.join('\n')}`;
+              }
+            } catch {
+              // Diagnostics probe must never throw further errors at the user.
+            }
+          }
+          reject(new Error(message));
         }
       }, timeoutMs);
 
       this.pendingRequests.set(id, {
         resolve: (result: unknown) => {
           clearTimeout(timer);
+          finalize();
           this.trace?.('rpc:result', method, { id, result });
           resolve(result as TResult);
         },
         reject: (error: Error) => {
           clearTimeout(timer);
+          finalize();
           this.trace?.('rpc:error', method, { id, error: error.message });
           reject(error);
         },
@@ -247,6 +328,7 @@ export class CodexAppServer extends EventEmitter {
         this.manager.send(JSON.stringify(request));
       } catch (error) {
         clearTimeout(timer);
+        finalize();
         this.pendingRequests.delete(id);
         reject(error);
       }

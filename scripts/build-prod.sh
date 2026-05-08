@@ -81,7 +81,7 @@ echo ""
 # =============================================================================
 # Step 1: Pre-Build Validation
 # =============================================================================
-echo -e "${BLUE}Step 1/7: Pre-Build Validation${NC}"
+echo -e "${BLUE}Step 1/8: Pre-Build Validation${NC}"
 echo "----------------------------------------"
 
 if ! ./scripts/validate-build-env.sh; then
@@ -93,11 +93,32 @@ fi
 
 echo ""
 
+# =============================================================================
+# Step 2: Bundled Agent Runtimes (manifest-driven)
+# =============================================================================
+echo -e "${BLUE}Step 2/8: Bundled Agent Runtimes${NC}"
+echo "----------------------------------------"
+
+# Materialise Codex + Claude runtimes for the build target before any gulp
+# work runs. The extension copy in Step 4 picks these up from
+# extensions/ritemark/binaries/agents/<platform>-<arch>/. Without this step,
+# the .app would ship without app-owned agent runtimes and clean installs
+# would fall back to system PATH lookups.
+ARCH="${TARGET#darwin-}"
+if ! ./scripts/fetch-agent-runtimes.sh --platform darwin --arch "$ARCH"; then
+  echo ""
+  echo -e "${RED}Bundled agent runtime fetch/verify failed!${NC}"
+  echo "See manifest: extensions/ritemark/binaries/agents/manifest.json"
+  exit 1
+fi
+
+echo ""
+
 
 # =============================================================================
-# Step 2: Backup & Build VS Code
+# Step 3: Backup & Build VS Code
 # =============================================================================
-echo -e "${BLUE}Step 2/7: Backing Up & Building VS Code${NC}"
+echo -e "${BLUE}Step 3/8: Backing Up & Building VS Code${NC}"
 echo "----------------------------------------"
 echo ""
 
@@ -145,9 +166,9 @@ echo "Build completed at: $(date '+%H:%M:%S')"
 echo ""
 
 # =============================================================================
-# Step 3: Copy RiteMark Extension
+# Step 4: Copy RiteMark Extension
 # =============================================================================
-echo -e "${BLUE}Step 3/7: Copying RiteMark Extension${NC}"
+echo -e "${BLUE}Step 4/8: Copying RiteMark Extension${NC}"
 echo "----------------------------------------"
 
 APP_PATH="$PROJECT_DIR/VSCode-$TARGET/Ritemark.app"
@@ -216,7 +237,7 @@ fi
 echo ""
 
 # =============================================================================
-# Step 3.5: Remove unwanted built-in extensions (VS Code 1.117+)
+# Step 4.5: Remove unwanted built-in extensions (VS Code 1.117+)
 # Microsoft started bundling GitHub Copilot Chat + Mermaid Chat Features as
 # first-party built-in extensions. Ritemark does not ship these — they pollute
 # the activity bar with a "Chat Debug" item and inject chat tools we don't use.
@@ -239,9 +260,9 @@ fi
 echo ""
 
 # =============================================================================
-# Step 4: Verify Extension Copy (GUARDRAIL)
+# Step 5: Verify Extension Copy (GUARDRAIL)
 # =============================================================================
-echo -e "${BLUE}Step 4/7: Verifying Extension Copy${NC}"
+echo -e "${BLUE}Step 5/8: Verifying Extension Copy${NC}"
 echo "----------------------------------------"
 
 VALIDATION_FAILED=0
@@ -305,9 +326,9 @@ echo -e "${GREEN}All extension files validated successfully${NC}"
 echo ""
 
 # =============================================================================
-# Step 5: Post-Build Validation
+# Step 6: Post-Build Validation
 # =============================================================================
-echo -e "${BLUE}Step 5/7: Post-Build Validation${NC}"
+echo -e "${BLUE}Step 6/8: Post-Build Validation${NC}"
 echo "----------------------------------------"
 
 if ! ./scripts/validate-build-output.sh "$TARGET"; then
@@ -320,9 +341,9 @@ fi
 echo ""
 
 # =============================================================================
-# Step 6: Fix Timestamps
+# Step 7: Fix Timestamps
 # =============================================================================
-echo -e "${BLUE}Step 6/7: Fixing Timestamps${NC}"
+echo -e "${BLUE}Step 7/8: Fixing Timestamps${NC}"
 echo "----------------------------------------"
 
 # VS Code build sets creation dates to 1980 (ZIP epoch) - fix to current time
@@ -340,9 +361,9 @@ fi
 echo ""
 
 # =============================================================================
-# Step 7: Success
+# Step 8: Success
 # =============================================================================
-echo -e "${BLUE}Step 7/7: Build Complete${NC}"
+echo -e "${BLUE}Step 8/8: Build Complete${NC}"
 echo "----------------------------------------"
 echo ""
 echo -e "${GREEN}========================================${NC}"

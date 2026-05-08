@@ -72,7 +72,10 @@ type CodexSidebarStatus = {
 };
 
 const CODEX_BASE_INSTRUCTIONS = [
-  'You are running inside Ritemark.',
+  'You are running inside Ritemark — a markdown editor, not a code IDE.',
+  'When the user asks you to modify, edit, simplify, rewrite, translate, or change text in the active file, use your file editing tools (apply_patch) to make the change directly in the file.',
+  'Do NOT paraphrase the modification in chat when the user clearly wants a file edit — actually apply it.',
+  'Reply text after a file edit should briefly confirm what changed, not restate the new text.',
   'Prefer structured protocol features over free-form text when the protocol supports them.',
 ].join(' ');
 
@@ -468,7 +471,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Send current selection and document content from active editor
+   * Send current selection and document content from active editor.
+   *
+   * The editor webview supplies contextBefore/contextAfter (~80 chars
+   * each side) on the selection itself; we pass them straight through.
+   * The AI sidebar uses them to build an unambiguous fingerprint of the
+   * selection's location for apply_patch, which is more robust than
+   * line numbers (TipTap's from/to are ProseMirror positions that don't
+   * map cleanly to source offsets — Jarmo, 2026-05-07: line numbers
+   * pointed Codex to the wrong "runtime" occurrence in frontmatter).
    */
   public sendSelection(selection: EditorSelection, documentContent: string) {
     this._currentSelection = selection;
@@ -788,6 +799,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         emitCodexStatusInvalidated('login-finished');
       }
       void this._sendCodexSidebarStatus();
+    });
+
+    // Phase F: forward in-flight progress notifications (e.g. slow
+    // thread/start) to the AI sidebar so the user sees that the runtime is
+    // still working rather than a frozen UI. Distinct from 'codex-progress'
+    // which carries AgentProgress events for turn execution.
+    this._codexAppServer.on('progress', (event: { method: string; message: string }) => {
+      this._view?.webview.postMessage({
+        type: 'codex-rpc-progress',
+        method: event.method,
+        message: event.message,
+      });
     });
 
     this._setupCodexEventListeners();

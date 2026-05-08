@@ -15,7 +15,7 @@ const buttonVariants = cva(
         outline:
           "border border-hairline-strong bg-background shadow-xs hover:bg-surface-soft hover:text-ink-strong",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-surface-soft",
+          "bg-secondary text-secondary-foreground hover:bg-hairline",
         ghost:
           "hover:bg-surface-soft hover:text-ink-strong",
         toolbar:
@@ -27,7 +27,10 @@ const buttonVariants = cva(
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
         sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
+        // `lg` matches the canonical Ritemark Settings/CTA pattern: rounded-lg
+        // (8px) corners, larger 18px / 10px padding for touch comfort. Use this
+        // size for prominent actions like Save / Sign Out / Refresh Status.
+        lg: "h-auto rounded-lg px-[18px] py-[10px] has-[>svg]:px-[14px]",
         icon: "size-9",
         "icon-sm": "size-8",
         "icon-lg": "size-10",

@@ -216,6 +216,19 @@ interface AISidebarState {
   sendChatMessage: (prompt: string) => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
+  /**
+   * Detach the editor selection from the chat input context. Does NOT clear
+   * the editor's actual selection — only the chat-side reference. Sprint 62
+   * S5 default behaviour (per bonus-track tracking doc, Open Question).
+   */
+  dismissSelectedContext: () => void;
+  /**
+   * Build the LLM-facing prompt block describing the current editor
+   * selection. Returns undefined if no selection. Used internally by
+   * sendAgentMessage and sendCodexMessage to inject selection context
+   * into the hidden prompt prefix without showing it in the chat bubble.
+   */
+  buildSelectionContextBlock: () => string | undefined;
   applyWidget: (widget: WidgetData) => void;
   discardWidget: (messageId: string) => void;
   configureApiKey: () => void;
@@ -414,8 +427,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       lastAgentTimestamp,
     );
     const basePrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
-    const fullPrompt = options?.hiddenContext
-      ? `${options.hiddenContext}\n\n---\n\n${basePrompt}`
+    // Selection context comes BEFORE the pinned-agent hidden context so the
+    // agent's role instructions (if any) can frame their response around the
+    // selected text. The order is:
+    //   [Selection context] → [Pinned agent instructions] → handoff → prompt
+    const selectionBlock = get().buildSelectionContextBlock();
+    const hiddenPieces = [
+      selectionBlock,
+      options?.hiddenContext,
+    ].filter((p): p is string => Boolean(p));
+    const fullPrompt = hiddenPieces.length > 0
+      ? `${hiddenPieces.join('\n\n---\n\n')}\n\n---\n\n${basePrompt}`
       : basePrompt;
 
     const turn: AgentConversationTurn = {
@@ -445,6 +467,103 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       mediaType: att.mediaType,
     }));
     vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile, mentionedAgentPaths: options?.mentionedAgentPaths });
+  },
+
+  dismissSelectedContext: () => {
+    set({ selection: { text: '', isEmpty: true, from: 0, to: 0 } });
+  },
+
+  /**
+   * Build the hidden prompt block that tells the LLM about the currently-
+   * selected text. Used by sendAgentMessage and sendCodexMessage so the
+   * agent actually receives the selection — without this, the docked tab
+   * is purely cosmetic and the LLM has no idea what text the user means
+   * by "this".
+   *
+   * Format chosen for clarity to the LLM:
+   *   - Plain-text [Selection context] header (no XML — works equally well
+   *     across Claude and Codex models)
+   *   - Explicit instruction that the request applies to this selection
+   *     "unless explicitly indicated otherwise" — gives the LLM permission
+   *     to override when the user's prompt clearly references something
+   *     else
+   *   - Selected text rendered as a blockquote so multi-line content
+   *     stays readable and won't be confused with the user's request
+   *   - User request: prefix is the conventional separator the agent
+   *     instructions can latch onto
+   */
+  buildSelectionContextBlock: () => {
+    const state = get();
+    const { selection, activeFilePath, pendingRuntime } = state;
+    if (selection.isEmpty || !selection.text) return undefined;
+
+    const fileLine = activeFilePath ? `File: ${activeFilePath}\n` : '';
+
+    // Build an unambiguous fingerprint by wrapping the selection in
+    // sentinels and showing it inside its surrounding context. The agent
+    // can then locate the selection by matching the FULL window
+    // (contextBefore + selection + contextAfter), which is unique within
+    // the file even when the selected word itself isn't (e.g. "runtime"
+    // in body vs frontmatter — same word, different sentences around it).
+    const hasContext = Boolean(selection.contextBefore || selection.contextAfter);
+    const contextWindow = hasContext
+      ? `${selection.contextBefore ?? ''}<<<SELECTION>>>${selection.text}<<</SELECTION>>>${selection.contextAfter ?? ''}`
+      : null;
+
+    // Mode-aware framing. Without explicit "use your file editing tools"
+    // language, models default to chat replies even when the user clearly
+    // asks for a modification. Tested 2026-05-07: weaker wording produced
+    // chat suggestions instead of apply_patch calls; strong directive
+    // language fixes the mode but earlier line-number disambiguation
+    // pointed at the wrong occurrence — replaced with a context window.
+    const isEditMode = pendingRuntime.mode === 'edit';
+    const header = isEditMode
+      ? '[Selection context — Edit mode]'
+      : '[Selection context — Plan mode]';
+    const instruction = isEditMode
+      ? [
+          'The user has selected text in the active file (shown below',
+          'wrapped in <<<SELECTION>>>...<<</SELECTION>>> sentinels with',
+          'surrounding context).',
+          'You are in EDIT MODE — MODIFY this exact selection in the file',
+          'using your file editing tools (apply_patch). To find the right',
+          'spot, match the SURROUNDING CONTEXT below — do NOT search for',
+          'just the selected word, because the same word may appear in',
+          'frontmatter, headings, or other paragraphs.',
+          'Do NOT just suggest changes in chat — make the actual file',
+          'edit. Reply text should briefly confirm what you changed.',
+        ].join('\n')
+      : [
+          'The user has selected text in the active file (shown below',
+          'wrapped in <<<SELECTION>>>...<<</SELECTION>>> sentinels with',
+          'surrounding context).',
+          'You are in PLAN MODE — propose changes to this selection using',
+          'your plan tools. Do NOT make file edits yet; wait for plan',
+          'approval before applying anything.',
+        ].join('\n');
+
+    const contextSection = contextWindow
+      ? [
+          fileLine + 'Surrounding context (selection wrapped in sentinels):',
+          '',
+          contextWindow,
+        ].join('\n')
+      : [
+          fileLine + 'Selected text:',
+          '',
+          selection.text.split('\n').map((line) => `> ${line}`).join('\n'),
+        ].join('\n');
+
+    return [
+      header,
+      instruction,
+      '',
+      contextSection,
+      '',
+      '---',
+      '',
+      'User request:',
+    ].join('\n');
   },
 
   cancelRequest: () => {
@@ -635,7 +754,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       'Claude',
       lastCodexTimestamp,
     );
-    const fullPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+    // Prepend selection context so the agent actually receives the docked
+    // selection. The Codex turn shows only the user-typed prompt in the chat
+    // bubble; the selection wrapper is invisible to the user but visible to
+    // the model — same pattern Claude already uses for hiddenContext.
+    const selectionBlock = get().buildSelectionContextBlock();
+    const handoffPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+    const fullPrompt = selectionBlock
+      ? `${selectionBlock}\n\n---\n\n${handoffPrompt}`
+      : handoffPrompt;
 
     const turn: CodexConversationTurn = {
       id: nextId(),
@@ -662,6 +789,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       type: 'codex-execute',
       prompt: fullPrompt,
       model: state.codexSelectedModel,
+      // The Edit/Plan toggle in ChatInput sets pendingRuntime.mode; until
+      // 51095ad this never reached the extension because mode wasn't on
+      // the wire. Now it is — Codex collaboration mode actually responds
+      // to the toggle.
+      mode: requestedMode,
       attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
     });
   },
@@ -1430,6 +1562,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           });
           set({ codexConversation: conv });
           setTimeout(() => get().saveCurrentConversation(), 100);
+        }
+        break;
+      }
+
+      case 'codex-rpc-progress': {
+        // A slow RPC (typically thread/start at cold start) is still in
+        // flight. Surface the message on the running turn so the user
+        // sees progress instead of a frozen UI.
+        const conv = [...state.codexConversation];
+        const lastTurn = conv[conv.length - 1];
+        if (lastTurn?.isRunning) {
+          conv[conv.length - 1] = { ...lastTurn, rpcProgressMessage: message.message };
+          set({ codexConversation: conv });
         }
         break;
       }

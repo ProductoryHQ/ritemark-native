@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../ui/Icon';
+import { Button } from '../ui/button';
 import { vscode } from '../../lib/vscode';
 import { getDefaultAssistantModel } from '../../config/modelConfig';
 import { Slider } from '../ui/slider';
@@ -80,6 +81,7 @@ interface SettingsData {
       error: string | null;
       diagnostics: string[];
       repairAction: 'install' | 'repair' | 'reload' | null;
+      runtimeStatus: RuntimeStatusModel;
     };
     codex: {
       installed: boolean;
@@ -90,10 +92,8 @@ interface SettingsData {
       diagnostics: string[];
       repairCommand: string | null;
       compatibility: {
-        state: 'compatible' | 'limited' | 'untested';
+        state: 'compatible' | 'limited';
         summary: string;
-        auditedRange: string;
-        versionInAuditedRange: boolean;
         capabilities: {
           approvals: boolean;
           requestUserInput: boolean;
@@ -101,8 +101,15 @@ interface SettingsData {
         };
         limitations: string[];
       } | null;
+      runtimeStatus: RuntimeStatusModel;
     };
   };
+}
+
+interface RuntimeStatusModel {
+  runtime: 'missing' | 'installed' | 'architecture_mismatch' | 'launch_failed';
+  source: 'bundled' | 'system' | 'unknown';
+  auth: 'ready' | 'sign_in_required' | 'unknown' | 'error';
 }
 
 interface ThemeInfo {
@@ -147,6 +154,11 @@ export function RitemarkSettings() {
   const [testingOpenai, setTestingOpenai] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
+  // Track last manual update-check click. Used to show the spinner during the
+  // brief gap between click and the backend's first 'checking' state push,
+  // and to time-out the spinner if the backend never reports back (defensive
+  // — prevents a "stuck updating" UI like Jarmo hit on 2026-05-07).
+  const [updateCheckClickedAt, setUpdateCheckClickedAt] = useState<number | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [localAgentTimeout, setLocalAgentTimeout] = useState(15);
   const [localChatFontSize, setLocalChatFontSize] = useState(13);
@@ -198,6 +210,20 @@ export function RitemarkSettings() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Reset the manual update-check click marker as soon as the backend reports
+  // a non-checking state, OR after 15s as a safety net (prevents a stuck
+  // spinner if the backend never pushes a state transition back).
+  useEffect(() => {
+    if (updateCheckClickedAt === null) return;
+    const backendState = settings?.updateCenter.state;
+    if (backendState && backendState !== 'checking') {
+      setUpdateCheckClickedAt(null);
+      return;
+    }
+    const timer = setTimeout(() => setUpdateCheckClickedAt(null), 15_000);
+    return () => clearTimeout(timer);
+  }, [updateCheckClickedAt, settings?.updateCenter.state]);
+
   const handleToggle = (key: string, value: boolean) => {
     vscode.postMessage({ type: 'setSetting', key, value });
   };
@@ -214,11 +240,20 @@ export function RitemarkSettings() {
   const handleUpdateAction = (
     type: 'updates:checkNow' | 'updates:install' | 'updates:skipVersion' | 'updates:pause' | 'updates:resume' | 'updates:reload'
   ) => {
+    if (type === 'updates:checkNow') {
+      setUpdateCheckClickedAt(Date.now());
+    }
     vscode.postMessage({ type });
   };
 
   const handleClaudeAction = (
     type: 'claude:install' | 'claude:repair' | 'claude:login' | 'claude:logout' | 'claude:reload' | 'claude:refreshStatus' | 'claude:cancelLogin' | 'claude:enterApiKey'
+  ) => {
+    vscode.postMessage({ type });
+  };
+
+  const handleCodexAction = (
+    type: 'codex:startLogin' | 'codex:logout' | 'codex:refreshStatus' | 'codex:cancelLogin' | 'codex:repair'
   ) => {
     vscode.postMessage({ type });
   };
@@ -321,12 +356,12 @@ export function RitemarkSettings() {
               <p className="text-xs text-ink-muted mb-3">
                 Install Claude to use Claude agent mode in Ritemark.
               </p>
-              <button
-                onClick={() => handleClaudeAction('claude:install')}
-                className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-              >
+              <Button
+ onClick={() => handleClaudeAction('claude:install')}
+ 
+ >
                 Install Claude
-              </button>
+              </Button>
             </>
           ) : settings.componentStatus.claudeCode.state === 'broken' ? (
             <>
@@ -335,19 +370,19 @@ export function RitemarkSettings() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
-                  <button
-                    onClick={() => handleClaudeAction('claude:reload')}
-                    className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-                  >
+                  <Button
+ onClick={() => handleClaudeAction('claude:reload')}
+ 
+ >
                     Reload Window
-                  </button>
+                  </Button>
                 ) : (
-                  <button
-                    onClick={() => handleClaudeAction('claude:repair')}
-                    className="px-4 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-                  >
+                  <Button
+ onClick={() => handleClaudeAction('claude:repair')}
+ 
+ >
                     Repair Claude
-                  </button>
+                  </Button>
                 )}
               </div>
             </>
@@ -357,18 +392,18 @@ export function RitemarkSettings() {
                 Sign in to start using Claude. Choose Claude.ai for the simplest setup, or paste an Anthropic API key if you prefer.
               </p>
               <div className="flex flex-wrap gap-2">
-                <button
+                <Button
                   onClick={() => handleClaudeAction('claude:login')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  size="lg"
                 >
                   Sign in with Claude.ai
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleClaudeAction('claude:enterApiKey')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Use Anthropic API key
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-ink-faint mt-3">
                 Don&apos;t have an API key? Get one at{' '}
@@ -383,12 +418,12 @@ export function RitemarkSettings() {
               <p className="text-xs text-ink-muted mb-3">
                 Sign-in opened in your browser. Authorize to finish — Ritemark will refresh automatically.
               </p>
-              <button
+              <Button
                 onClick={() => handleClaudeAction('claude:cancelLogin')}
-                className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                variant="secondary" size="lg"
               >
                 Cancel sign-in
-              </button>
+              </Button>
             </>
           ) : (
             <>
@@ -416,27 +451,27 @@ export function RitemarkSettings() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {settings.componentStatus.claudeCode.authMethod === 'claude-oauth' && (
-                  <button
+                  <Button
                     onClick={() => handleClaudeAction('claude:logout')}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Sign Out
-                  </button>
+                  </Button>
                 )}
                 {settings.componentStatus.claudeCode.authMethod === 'api-key' && (
-                  <button
+                  <Button
                     onClick={() => handleClaudeAction('claude:login')}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Switch to Claude.ai sign-in
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={() => handleClaudeAction('claude:refreshStatus')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Refresh Status
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -532,24 +567,24 @@ export function RitemarkSettings() {
                   </div>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button
+                  <Button
                     onClick={() => vscode.postMessage({ type: 'codex:repair' })}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    size="lg"
                   >
                     Repair Codex
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => vscode.postMessage({ type: 'updates:reload' })}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Reload Window
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => vscode.postMessage({ type: 'codex:refreshStatus' })}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Refresh Status
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-xs text-ink-muted mt-2">
                   After reinstalling, use Reload Window here and then reopen Settings.
@@ -571,26 +606,26 @@ export function RitemarkSettings() {
                         <Icon name="circle-notch" size={16} className="animate-spin" />
                         Opening browser...
                       </button>
-                      <button
+                      <Button
                         onClick={() => {
                           setCodexLoading(false);
                           vscode.postMessage({ type: 'codex:cancelLogin' });
                         }}
-                        className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                        variant="secondary" size="lg"
                       >
                         Cancel sign-in
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button
+                    <Button
                       onClick={() => {
                         setCodexLoading(true);
                         vscode.postMessage({ type: 'codex:startLogin' });
                       }}
-                      className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent transition-all duration-150 hover:bg-accent-deep hover:shadow-ritemark-accent-md active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                      size="lg"
                     >
                       Sign in with ChatGPT
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {codexAuth.error && (
@@ -625,12 +660,12 @@ export function RitemarkSettings() {
                     </div>
                   )}
                 </div>
-                <button
+                <Button
                   onClick={() => vscode.postMessage({ type: 'codex:logout' })}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Sign Out
-                </button>
+                </Button>
               </>
             )}
 
@@ -717,19 +752,20 @@ export function RitemarkSettings() {
                 {showOpenaiKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
-            <button
+            <Button
               onClick={() => handleSaveApiKey('openai-api-key', openaiKey)}
-              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+              size="lg"
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleTestApiKey('openai-api-key')}
               disabled={!settings.openaiKeyConfigured || testingOpenai}
-              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
+              variant="secondary"
+              size="lg"
             >
               {testingOpenai ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </button>
+            </Button>
           </div>
 
           {testResults.openai && (
@@ -794,19 +830,20 @@ export function RitemarkSettings() {
                 {showGoogleKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
-            <button
+            <Button
               onClick={() => handleSaveApiKey('google-ai-key', googleKey)}
-              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+              size="lg"
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleTestApiKey('google-ai-key')}
               disabled={!settings.googleKeyConfigured || testingGoogle}
-              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
+              variant="secondary"
+              size="lg"
             >
               {testingGoogle ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </button>
+            </Button>
           </div>
 
           {testResults.google && (
@@ -870,19 +907,20 @@ export function RitemarkSettings() {
                 {showAnthropicKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
               </button>
             </div>
-            <button
+            <Button
               onClick={() => handleSaveApiKey('anthropic-api-key', anthropicKey)}
-              className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+              size="lg"
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleTestApiKey('anthropic-api-key')}
               disabled={!settings.anthropicKeyConfigured || testingAnthropic}
-              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft disabled:opacity-50"
+              variant="secondary"
+              size="lg"
             >
               {testingAnthropic ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </button>
+            </Button>
           </div>
 
           {testResults.anthropic && (
@@ -1102,13 +1140,25 @@ export function RitemarkSettings() {
               </div>
             </div>
 
-            <button
-              onClick={() => handleUpdateAction('updates:checkNow')}
-              className="px-3 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft flex items-center gap-2"
-            >
-              <Icon name="arrows-clockwise" size={14} />
-              Check Now
-            </button>
+            {(() => {
+              const isCheckingNow = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
+              return (
+                <Button
+                  onClick={() => handleUpdateAction('updates:checkNow')}
+                  variant="secondary"
+                  size="lg"
+                  aria-busy={isCheckingNow}
+                  aria-label={isCheckingNow ? 'Checking for updates' : 'Check now for updates'}
+                >
+                  {isCheckingNow ? (
+                    <Icon name="circle-notch" size={14} className="animate-spin" />
+                  ) : (
+                    <Icon name="arrows-clockwise" size={14} />
+                  )}
+                  {isCheckingNow ? 'Checking…' : 'Check Now'}
+                </Button>
+              );
+            })()}
           </div>
 
           <div className="grid gap-2 text-xs text-ink-muted sm:grid-cols-2">
@@ -1136,13 +1186,13 @@ export function RitemarkSettings() {
               <div className="text-xs text-ink-muted mt-1">
                 Extension {settings.updateCenter.pendingRestartVersion} is installed and will activate after reload.
               </div>
-              <button
-                onClick={() => handleUpdateAction('updates:reload')}
-                className="mt-3 px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md flex items-center gap-2"
-              >
+              <Button
+ onClick={() => handleUpdateAction('updates:reload')}
+ className="mt-3"
+ >
                 <Icon name="arrow-counter-clockwise" size={14} />
                 Reload Window
-              </button>
+              </Button>
             </div>
           )}
 
@@ -1163,32 +1213,32 @@ export function RitemarkSettings() {
               </div>
 
               <div className="flex flex-wrap gap-2 mt-4">
-                <button
-                  onClick={() => handleUpdateAction('updates:install')}
-                  className="px-3 py-2 text-sm rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md flex items-center gap-2"
-                >
+                <Button
+ onClick={() => handleUpdateAction('updates:install')}
+ 
+ >
                   <Icon name="download" size={14} />
                   {settings.updateCenter.availableUpdate.action === 'full' ? 'Download Installer' : 'Install Update'}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleUpdateAction('updates:skipVersion')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Skip This Version
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleUpdateAction('updates:pause')}
-                  className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                  variant="secondary" size="lg"
                 >
                   Pause 7 Days
-                </button>
+                </Button>
                 {(settings.updateCenter.skippedVersion || settings.updateCenter.snoozeUntil) && (
-                  <button
+                  <Button
                     onClick={() => handleUpdateAction('updates:resume')}
-                    className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-secondary text-secondary-foreground transition-all duration-150 hover:bg-hairline active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_var(--r-ring-color)]"
+                    variant="secondary" size="lg"
                   >
                     Re-enable Notifications
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -1217,6 +1267,9 @@ export function RitemarkSettings() {
             <div className="text-sm font-medium text-ink-strong mb-3">
               Component readiness
             </div>
+            {/* The single update trigger lives on the Update Center card
+                above ("Check Now"). Don't duplicate it here — two buttons
+                firing the same action is confusing. */}
 
             <div className="grid gap-3 md:grid-cols-3">
               <ComponentCard
@@ -1232,143 +1285,88 @@ export function RitemarkSettings() {
                 ]}
               />
 
-              <ComponentCard
+              <RuntimeStatusCard
                 icon={<Icon name="shield-check" size={16} />}
                 title="Claude"
-                status={
-                  settings.componentStatus.claudeCode.state === 'ready'
-                    ? 'Ready'
-                    : settings.componentStatus.claudeCode.state === 'broken'
-                      ? 'Broken'
-                      : settings.componentStatus.claudeCode.state === 'auth-in-progress'
-                        ? 'Signing in'
-                    : settings.componentStatus.claudeCode.state === 'needs-auth'
-                      ? 'Needs login'
-                      : 'Not installed'
-                }
-                details={[
-                  settings.componentStatus.claudeCode.version
-                    ? `Version: ${settings.componentStatus.claudeCode.version}`
-                    : settings.componentStatus.claudeCode.state === 'broken'
-                      ? 'CLI detected but not runnable'
-                      : 'CLI not detected',
-                  settings.componentStatus.claudeCode.state === 'ready'
-                    ? settings.componentStatus.claudeCode.authMethod === 'api-key'
-                      ? 'Connected with Anthropic API key'
-                      : 'Connected with Claude.ai'
-                    : settings.componentStatus.claudeCode.state === 'broken'
-                      ? (settings.componentStatus.claudeCode.error ?? 'Repair Claude to continue.')
-                      : settings.componentStatus.claudeCode.state === 'auth-in-progress'
-                        ? 'Finish Claude.ai sign-in in your terminal and browser.'
-                      : settings.componentStatus.claudeCode.state === 'needs-auth'
-                        ? 'Sign in with Claude.ai or use an Anthropic API key.'
-                        : 'Install Claude to use agent mode.',
-                  ...(settings.componentStatus.claudeCode.binaryPath
-                    ? [`Binary: ${settings.componentStatus.claudeCode.binaryPath}`]
-                    : []),
-                  'Managed by user'
-                ]}
+                runtimeStatus={settings.componentStatus.claudeCode.runtimeStatus}
+                version={settings.componentStatus.claudeCode.version}
+                errorMessage={settings.componentStatus.claudeCode.error}
+                diagnostics={settings.componentStatus.claudeCode.diagnostics}
               >
-                <div className="flex flex-wrap gap-2">
-                  {(settings.componentStatus.claudeCode.repairAction === 'install'
-                    || settings.componentStatus.claudeCode.state === 'not-installed') && (
-                    <button
-                      onClick={() => handleClaudeAction('claude:install')}
-                      className="px-3 py-1.5 text-xs rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-                    >
-                      Install Claude
-                    </button>
-                  )}
-                  {(settings.componentStatus.claudeCode.repairAction === 'repair'
-                    || settings.componentStatus.claudeCode.state === 'broken') && (
-                    <button
-                      onClick={() => handleClaudeAction('claude:repair')}
-                      className="px-3 py-1.5 text-xs rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-                    >
-                      Repair Claude
-                    </button>
-                  )}
-                  {settings.componentStatus.claudeCode.repairAction === 'reload' && (
-                    <button
-                      onClick={() => handleClaudeAction('claude:reload')}
-                      className="px-3 py-1.5 text-xs rounded-md bg-primary shadow-ritemark-accent transition-all active:scale-[0.98] text-primary-foreground hover:bg-accent-deep hover:shadow-ritemark-accent-md"
-                    >
-                      Reload Window
-                    </button>
-                  )}
-                  {(settings.componentStatus.claudeCode.state === 'needs-auth'
-                    || settings.componentStatus.claudeCode.state === 'auth-in-progress') && (
-                    <button
-                      onClick={() => handleClaudeAction(
-                        settings.componentStatus.claudeCode.state === 'auth-in-progress'
-                          ? 'claude:refreshStatus'
-                          : 'claude:login'
-                      )}
-                      className="px-3 py-1.5 text-xs rounded-md bg-secondary text-secondary-foreground hover:bg-surface-soft"
-                    >
-                      {settings.componentStatus.claudeCode.state === 'auth-in-progress'
-                        ? 'Refresh Status'
-                        : 'Sign in with Claude.ai'}
-                    </button>
-                  )}
-                </div>
-                {settings.componentStatus.claudeCode.diagnostics.length > 0 && (
-                  <details className="mt-3">
-                    <summary className="cursor-pointer text-xs text-accent-deep hover:underline">
-                      Technical details
-                    </summary>
-                    <div className="mt-2 space-y-1 text-xs text-ink-muted">
-                      {settings.componentStatus.claudeCode.diagnostics.map((detail) => (
-                        <div key={detail} className="break-words [overflow-wrap:anywhere]">
-                          {detail}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
+                {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
+                  <button
+                    onClick={() => handleClaudeAction('claude:reload')}
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                  >
+                    Reload window
+                  </button>
+                ) : settings.componentStatus.claudeCode.runtimeStatus.runtime === 'missing' ? (
+                  <button
+                    onClick={() => handleClaudeAction('claude:install')}
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                  >
+                    Install Claude
+                  </button>
+                ) : settings.componentStatus.claudeCode.runtimeStatus.auth === 'sign_in_required' ? (
+                  <button
+                    onClick={() => handleClaudeAction('claude:login')}
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                  >
+                    Sign in with Claude.ai
+                  </button>
+                ) : settings.componentStatus.claudeCode.state === 'auth-in-progress' ? (
+                  <button
+                    onClick={() => handleClaudeAction('claude:refreshStatus')}
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
+                  >
+                    Refresh status
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleClaudeAction('claude:refreshStatus')}
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
+                  >
+                    Check installation
+                  </button>
                 )}
-              </ComponentCard>
+                <button
+                  onClick={() => handleClaudeAction('claude:repair')}
+                  className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
+                >
+                  Repair runtime
+                </button>
+              </RuntimeStatusCard>
 
-              <ComponentCard
+              <RuntimeStatusCard
                 icon={<Icon name="robot" size={16} />}
-                title="Codex CLI"
-                status={
-                  settings.componentStatus.codex.state === 'ready'
-                    ? settings.componentStatus.codex.compatibility?.state === 'limited'
-                      ? 'Ready with limits'
-                      : settings.componentStatus.codex.compatibility?.state === 'untested'
-                        ? 'Ready (untested)'
-                        : 'Ready'
-                    : settings.componentStatus.codex.state === 'broken'
-                      ? 'Broken'
-                      : 'Not installed'
-                }
-                details={[
-                  settings.componentStatus.codex.version
-                    ? `Version: ${settings.componentStatus.codex.version}`
-                    : settings.componentStatus.codex.state === 'broken'
-                      ? 'CLI failed to start'
-                      : settings.componentStatus.codex.installed
-                        ? 'Version unavailable'
-                        : 'CLI not detected',
-                  settings.componentStatus.codex.error
-                    ? settings.componentStatus.codex.error
-                    : settings.componentStatus.codex.installed
-                      ? 'Managed by user'
-                      : 'CLI not detected',
-                  settings.componentStatus.codex.compatibility?.summary ?? 'Compatibility not checked',
-                  settings.componentStatus.codex.compatibility
-                    ? `Approvals: ${settings.componentStatus.codex.compatibility.capabilities.approvals ? 'available' : 'not detected'}`
-                    : 'Approvals: unknown',
-                  settings.componentStatus.codex.compatibility
-                    ? `Ask questions: ${settings.componentStatus.codex.compatibility.capabilities.requestUserInput ? 'available' : 'not detected'}`
-                    : 'Ask questions: unknown',
-                  settings.componentStatus.codex.compatibility
-                    ? `Plan updates: ${settings.componentStatus.codex.compatibility.capabilities.planUpdates ? 'available' : 'not detected'}`
-                    : 'Plan updates: unknown',
-                  ...(settings.componentStatus.codex.compatibility?.limitations ?? []),
-                  ...settings.componentStatus.codex.diagnostics,
-                ]}
-              />
+                title="Codex"
+                runtimeStatus={settings.componentStatus.codex.runtimeStatus}
+                version={settings.componentStatus.codex.version}
+                errorMessage={settings.componentStatus.codex.error}
+                diagnostics={settings.componentStatus.codex.diagnostics}
+              >
+                {settings.componentStatus.codex.runtimeStatus.auth === 'sign_in_required' ? (
+                  <button
+                    onClick={() => handleCodexAction('codex:startLogin')}
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                  >
+                    Sign in with OpenAI
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleCodexAction('codex:refreshStatus')}
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
+                  >
+                    Check installation
+                  </button>
+                )}
+                <button
+                  onClick={() => handleCodexAction('codex:repair')}
+                  className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
+                >
+                  Repair runtime
+                </button>
+              </RuntimeStatusCard>
             </div>
           </div>
         </div>
@@ -1461,6 +1459,142 @@ function ComponentCard({
         ))}
       </div>
       {children ? <div className="mt-3">{children}</div> : null}
+    </div>
+  );
+}
+
+function getRuntimeStatusCopy(model: RuntimeStatusModel): { label: string; sub: string | null } {
+  if (model.runtime === 'missing') {
+    return { label: 'Runtime missing', sub: 'The agent runtime was not found' };
+  }
+  if (model.runtime === 'architecture_mismatch') {
+    return { label: 'Architecture mismatch', sub: 'The installed runtime does not match this Mac' };
+  }
+  if (model.runtime === 'launch_failed') {
+    return { label: 'Launch failed', sub: 'The runtime could not start — see diagnostics' };
+  }
+  // runtime === 'installed'
+  switch (model.auth) {
+    case 'ready':
+      return { label: 'Ready', sub: null };
+    case 'sign_in_required':
+      return { label: 'Sign in required', sub: 'Runtime is installed — connect your account to continue' };
+    case 'unknown':
+      return { label: 'Status unknown', sub: 'Could not verify account connection' };
+    case 'error':
+      return { label: 'Account error', sub: 'There was a problem verifying your account' };
+  }
+}
+
+function getRuntimeDotClass(model: RuntimeStatusModel): { bg: string; pulse: boolean; ariaLabel: string } {
+  if (model.runtime === 'installed' && model.auth === 'ready') {
+    return { bg: 'bg-emerald-500', pulse: false, ariaLabel: 'Status: ready' };
+  }
+  if (model.runtime === 'installed' && model.auth === 'sign_in_required') {
+    return { bg: 'bg-amber-500', pulse: true, ariaLabel: 'Status: attention required' };
+  }
+  if (model.runtime === 'installed') {
+    return { bg: 'bg-amber-500', pulse: false, ariaLabel: 'Status: attention required' };
+  }
+  return { bg: 'bg-rose-500', pulse: false, ariaLabel: 'Status: error' };
+}
+
+function getSourceChipLabel(source: RuntimeStatusModel['source']): string | null {
+  if (source === 'bundled') return 'Bundled with app';
+  if (source === 'system') return 'System installation';
+  return null;
+}
+
+function RuntimeStatusCard({
+  icon,
+  title,
+  runtimeStatus,
+  version,
+  errorMessage,
+  diagnostics,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  runtimeStatus: RuntimeStatusModel;
+  version: string | null;
+  errorMessage: string | null;
+  diagnostics: string[];
+  children?: React.ReactNode;
+}) {
+  const copy = getRuntimeStatusCopy(runtimeStatus);
+  const dot = getRuntimeDotClass(runtimeStatus);
+  const sourceLabel = getSourceChipLabel(runtimeStatus.source);
+  const versionLabel = version ? `v${version.replace(/^v/, '')}` : null;
+  // Auto-expand diagnostics when launch failed — user needs the detail immediately.
+  const autoOpenDiagnostics = runtimeStatus.runtime === 'launch_failed';
+  const showError = errorMessage && runtimeStatus.runtime !== 'installed';
+
+  return (
+    <div className="min-w-0 p-4 rounded-lg bg-surface border border-hairline shadow-sm">
+      <div className="flex items-center justify-between gap-2 pb-3 border-b border-hairline">
+        <div className="flex items-center gap-2 text-sm font-medium text-ink-strong">
+          {icon}
+          {title}
+        </div>
+        <span
+          className={`inline-block w-2 h-2 rounded-full ${dot.bg} ${dot.pulse ? 'animate-pulse' : ''}`}
+          aria-label={dot.ariaLabel}
+          role="status"
+        />
+      </div>
+
+      <div className="mt-3">
+        <div className="text-[13px] font-medium text-ink-strong leading-snug">
+          {copy.label}
+        </div>
+        {copy.sub && (
+          <div className="mt-0.5 text-xs text-ink-muted leading-normal">
+            {copy.sub}
+          </div>
+        )}
+        {showError && (
+          <div className="mt-1 text-xs text-rose-700 break-words [overflow-wrap:anywhere]">
+            {errorMessage}
+          </div>
+        )}
+      </div>
+
+      {(sourceLabel || versionLabel) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {sourceLabel && (
+            <span className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-surface-soft text-ink-body">
+              {sourceLabel}
+            </span>
+          )}
+          {versionLabel && (
+            <span className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-surface-soft text-ink-body">
+              {versionLabel}
+            </span>
+          )}
+        </div>
+      )}
+
+      {children && (
+        <div className="mt-3 pt-3 border-t border-hairline flex flex-wrap gap-2">
+          {children}
+        </div>
+      )}
+
+      {diagnostics.length > 0 && (
+        <details className="mt-3" open={autoOpenDiagnostics}>
+          <summary className="cursor-pointer text-xs text-accent-deep hover:underline">
+            Diagnostics
+          </summary>
+          <div className="mt-2 space-y-1 text-xs text-ink-muted">
+            {diagnostics.map((detail) => (
+              <div key={detail} className="break-words [overflow-wrap:anywhere]">
+                {detail}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

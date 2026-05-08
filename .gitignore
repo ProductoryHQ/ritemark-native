@@ -112,3 +112,9 @@ docs/releases/**/*.xlsx
 # Apple certificate requests
 *.certSigningRequest
 .claude/scheduled_tasks.lock
+
+# Sprint 64: bundled agent runtime payloads (fetched at build time per manifest.json).
+# Keep manifest.json + README.md tracked; ignore all binary payloads.
+extensions/ritemark/binaries/agents/darwin-arm64/
+extensions/ritemark/binaries/agents/darwin-x64/
+extensions/ritemark/binaries/agents/win32-x64/

@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "1",
+  "generated": "2026-05-06",
+  "description": "Source-of-truth manifest for bundled agent runtimes. The fetch script reads this to download, verify (sha256), extract, and install runtime binaries into binaries/agents/<platform>-<arch>/<installName>. Binary payloads are gitignored; only this manifest and the README are tracked.",
+  "runtimes": [
+    {
+      "agent": "codex",
+      "vendor": "openai",
+      "version": "0.128.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "sourceType": "github-release",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.128.0/codex-app-server-aarch64-apple-darwin.tar.gz",
+      "archiveFilename": "codex-app-server-aarch64-apple-darwin.tar.gz",
+      "archiveFormat": "tar.gz",
+      "sha256": "5d622f679a5207374040f531f15865d735bdf9d736f083865cabbdacdc6805a8",
+      "archivePath": "codex-app-server-aarch64-apple-darwin",
+      "installName": "codex-app-server",
+      "invocationMode": "direct-app-server",
+      "validationArgs": ["--help"],
+      "expectedFileArchPattern": "Mach-O 64-bit executable arm64",
+      "license": {
+        "spdx": "Apache-2.0",
+        "redistribution": "permitted",
+        "noticeUrl": "https://github.com/openai/codex/blob/main/LICENSE"
+      }
+    },
+    {
+      "agent": "codex",
+      "vendor": "openai",
+      "version": "0.128.0",
+      "platform": "darwin",
+      "arch": "x64",
+      "sourceType": "github-release",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.128.0/codex-app-server-x86_64-apple-darwin.tar.gz",
+      "archiveFilename": "codex-app-server-x86_64-apple-darwin.tar.gz",
+      "archiveFormat": "tar.gz",
+      "sha256": "671110293d9871b61ad25f685080c9ffb03c4bd0a98214fa3d33b703f252a187",
+      "archivePath": "codex-app-server-x86_64-apple-darwin",
+      "installName": "codex-app-server",
+      "invocationMode": "direct-app-server",
+      "validationArgs": ["--help"],
+      "expectedFileArchPattern": "Mach-O 64-bit executable x86_64",
+      "license": {
+        "spdx": "Apache-2.0",
+        "redistribution": "permitted",
+        "noticeUrl": "https://github.com/openai/codex/blob/main/LICENSE"
+      }
+    },
+    {
+      "agent": "codex",
+      "vendor": "openai",
+      "version": "0.128.0",
+      "platform": "win32",
+      "arch": "x64",
+      "sourceType": "github-release",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.128.0/codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz",
+      "archiveFilename": "codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz",
+      "archiveFormat": "tar.gz",
+      "sha256": "cb65e1ed46c42159a030ca62a0b9568c9631bd7dec9fd5ce5013b1b3eaeb978a",
+      "archivePath": "codex-app-server-x86_64-pc-windows-msvc.exe",
+      "installName": "codex-app-server.exe",
+      "invocationMode": "direct-app-server",
+      "validationArgs": ["--help"],
+      "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows",
+      "license": {
+        "spdx": "Apache-2.0",
+        "redistribution": "permitted",
+        "noticeUrl": "https://github.com/openai/codex/blob/main/LICENSE"
+      }
+    },
+    {
+      "agent": "claude",
+      "vendor": "anthropic",
+      "version": "2.1.131",
+      "platform": "darwin",
+      "arch": "arm64",
+      "sourceType": "npm-optional-package",
+      "npmPackage": "@anthropic-ai/claude-code-darwin-arm64",
+      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.131.tgz",
+      "archiveFilename": "claude-code-darwin-arm64-2.1.131.tgz",
+      "archiveFormat": "tar.gz",
+      "sha256": "3ed1b2740a49e4b8d53735a7f6e2c2d55e7e889c78fd0fe754d7667062ba1ff8",
+      "archivePath": "package/claude",
+      "installName": "claude",
+      "validationArgs": ["--version"],
+      "expectedFileArchPattern": "Mach-O 64-bit executable arm64",
+      "license": {
+        "spdx": "LicenseRef-Anthropic-Proprietary",
+        "redistribution": "permitted-by-vendor-confirmation",
+        "noticeUrl": "https://code.claude.com/docs/en/legal-and-compliance"
+      }
+    },
+    {
+      "agent": "claude",
+      "vendor": "anthropic",
+      "version": "2.1.131",
+      "platform": "darwin",
+      "arch": "x64",
+      "sourceType": "npm-optional-package",
+      "npmPackage": "@anthropic-ai/claude-code-darwin-x64",
+      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/-/claude-code-darwin-x64-2.1.131.tgz",
+      "archiveFilename": "claude-code-darwin-x64-2.1.131.tgz",
+      "archiveFormat": "tar.gz",
+      "sha256": "7a85b4da4386f5456981a7e73d9de635bfd0b1ff494e6edcad23caa37363e451",
+      "archivePath": "package/claude",
+      "installName": "claude",
+      "validationArgs": ["--version"],
+      "expectedFileArchPattern": "Mach-O 64-bit executable x86_64",
+      "license": {
+        "spdx": "LicenseRef-Anthropic-Proprietary",
+        "redistribution": "permitted-by-vendor-confirmation",
+        "noticeUrl": "https://code.claude.com/docs/en/legal-and-compliance"
+      }
+    },
+    {
+      "agent": "claude",
+      "vendor": "anthropic",
+      "version": "2.1.131",
+      "platform": "win32",
+      "arch": "x64",
+      "sourceType": "npm-optional-package",
+      "npmPackage": "@anthropic-ai/claude-code-win32-x64",
+      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.131.tgz",
+      "archiveFilename": "claude-code-win32-x64-2.1.131.tgz",
+      "archiveFormat": "tar.gz",
+      "sha256": "2f41d033e39e1534314a57cb41c79e5bc62ed147c89d7396ff19e8f338bba0e2",
+      "archivePath": "package/claude.exe",
+      "installName": "claude.exe",
+      "validationArgs": ["--version"],
+      "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows",
+      "license": {
+        "spdx": "LicenseRef-Anthropic-Proprietary",
+        "redistribution": "permitted-by-vendor-confirmation",
+        "noticeUrl": "https://code.claude.com/docs/en/legal-and-compliance"
+      }
+    }
+  ]
+}

@@ -43,6 +43,17 @@ jobs:
           git clone --depth 1 --branch ${{ env.VSCODE_VERSION }} https://github.com/microsoft/vscode.git r/vscode
           echo "VS Code ${{ env.VSCODE_VERSION }} cloned"
 
+      - name: Fetch bundled agent runtimes (win32-x64)
+        # Sprint 64 Phase D: materialise app-owned Codex + Claude binaries into
+        # extensions/ritemark/binaries/agents/win32-x64/ BEFORE the extension is
+        # copied into vscode/extensions/ritemark. The fetch script is
+        # idempotent via per-binary .sha256 sidecars — re-runs are cheap and
+        # verify integrity. Job fails fast if checksums don't match the
+        # manifest.
+        shell: bash
+        working-directory: r
+        run: ./scripts/fetch-agent-runtimes.sh --platform win32 --arch x64
+
       - name: Copy extension (replace symlink)
         shell: bash
         working-directory: r
@@ -255,6 +266,50 @@ jobs:
           else
             echo "FAIL: Welcome assets missing"
             ERRORS=$((ERRORS + 1))
+          fi
+
+          # Sprint 64 Phase D: bundled agent runtime check.
+          # Verify Codex + Claude .exe binaries from the manifest landed in the
+          # build output and have the expected PE32+ x86-64 architecture. Same
+          # rule as macOS Check 5: do NOT execute the binary here — installer
+          # signing happens downstream and any mutation to the binary tree
+          # would invalidate the signature.
+          AGENTS_DIR="$EXT_PATH/binaries/agents/win32-x64"
+          MANIFEST="$EXT_PATH/binaries/agents/manifest.json"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "FAIL: manifest.json missing at $MANIFEST"
+            ERRORS=$((ERRORS + 1))
+          else
+            ENTRIES=$(python -c "
+          import json
+          with open(r'$MANIFEST') as f:
+              m = json.load(f)
+          for r in m['runtimes']:
+              if r['platform'] == 'win32' and r['arch'] == 'x64':
+                  print(f\"{r['installName']}|{r['expectedFileArchPattern']}\")
+          ")
+            if [ -z "$ENTRIES" ]; then
+              echo "FAIL: no manifest entries for win32-x64"
+              ERRORS=$((ERRORS + 1))
+            else
+              while IFS='|' read -r install_name arch_pattern; do
+                bin_path="$AGENTS_DIR/$install_name"
+                if [ ! -f "$bin_path" ]; then
+                  echo "FAIL: $install_name not in build output ($bin_path)"
+                  ERRORS=$((ERRORS + 1))
+                  continue
+                fi
+                file_out=$(file -b "$bin_path" 2>/dev/null || echo "")
+                if echo "$file_out" | grep -qF "$arch_pattern"; then
+                  echo "OK: $install_name ($file_out)"
+                else
+                  echo "FAIL: $install_name arch mismatch"
+                  echo "  Expected pattern: $arch_pattern"
+                  echo "  Got:              $file_out"
+                  ERRORS=$((ERRORS + 1))
+                fi
+              done <<< "$ENTRIES"
+            fi
           fi
 
           if [ $ERRORS -gt 0 ]; then

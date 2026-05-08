@@ -19,4 +19,14 @@ export interface EditorSelection {
 
   /** Number of words in the selection (for UI display) */
   wordCount: number
+
+  /**
+   * Up to 80 characters of text immediately before the selection. Used by
+   * the AI sidebar to give the agent an unambiguous fingerprint of WHERE
+   * the selection sits in the document — line numbers proved unreliable
+   * because TipTap positions don't map cleanly to markdown source offsets.
+   */
+  contextBefore?: string
+  /** Up to 80 characters of text immediately after the selection. */
+  contextAfter?: string
 }
