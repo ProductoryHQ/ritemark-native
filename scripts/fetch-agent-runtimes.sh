@@ -169,9 +169,16 @@ trap 'rm -rf "${TMPDIR_RUN}"' EXIT
 # Fields: agent|platform|arch|sourceUrl|archiveFilename|sha256|archivePath|
 #         installName|validationArgs|expectedFileArchPattern|archiveFormat
 # validationArgs is space-joined (e.g. "--help" or "--version")
+#
+# CRLF defense (layer 1): the python heredoc below calls
+# sys.stdout.reconfigure(newline=) so Windows hosts emit LF, not CRLF.
+# Without it, a trailing CR leaks into the last pipe field (archiveFormat)
+# and breaks the case statement match further down. Layer 2 (a per-field
+# %$''\r'' strip after `read`) is defense-in-depth — see below.
 # ---------------------------------------------------------------------------
 ENTRIES_TSV="$("${PYTHON}" - "${MANIFEST}" <<'PYEOF'
 import json, sys
+sys.stdout.reconfigure(newline="\n")
 
 manifest_path = sys.argv[1]
 with open(manifest_path) as f:
@@ -212,6 +219,21 @@ while IFS="|" read -r \
     entry_archive_path entry_install_name \
     entry_validation_args entry_expected_arch_pattern entry_archive_format
 do
+  # CRLF defense (layer 2): strip trailing CR from every field. Belt-and-braces
+  # for the layer-1 stdout reconfigure above. Covers any future caller that
+  # pipes CRLF text into this loop (Windows-authored fixtures, etc.).
+  entry_agent="${entry_agent%$'\r'}"
+  entry_platform="${entry_platform%$'\r'}"
+  entry_arch="${entry_arch%$'\r'}"
+  entry_source_url="${entry_source_url%$'\r'}"
+  entry_archive_filename="${entry_archive_filename%$'\r'}"
+  entry_sha256="${entry_sha256%$'\r'}"
+  entry_archive_path="${entry_archive_path%$'\r'}"
+  entry_install_name="${entry_install_name%$'\r'}"
+  entry_validation_args="${entry_validation_args%$'\r'}"
+  entry_expected_arch_pattern="${entry_expected_arch_pattern%$'\r'}"
+  entry_archive_format="${entry_archive_format%$'\r'}"
+
   # --- Platform/arch filters ---
   if [[ "${OPT_ALL_PLATFORMS}" == false ]]; then
     [[ "${entry_platform}" == "${TARGET_PLATFORM}" ]] || continue
