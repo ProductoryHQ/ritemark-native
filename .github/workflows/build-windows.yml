@@ -282,48 +282,16 @@ jobs:
             ERRORS=$((ERRORS + 1))
           fi
 
-          # Sprint 64 Phase D: bundled agent runtime check.
-          # Verify Codex + Claude .exe binaries from the manifest landed in the
-          # build output and have the expected PE32+ x86-64 architecture. Same
-          # rule as macOS Check 5: do NOT execute the binary here — installer
-          # signing happens downstream and any mutation to the binary tree
-          # would invalidate the signature.
-          AGENTS_DIR="$EXT_PATH/binaries/agents/win32-x64"
-          MANIFEST="$EXT_PATH/binaries/agents/manifest.json"
-          if [ ! -f "$MANIFEST" ]; then
-            echo "FAIL: manifest.json missing at $MANIFEST"
+          # Sprint 64 Phase D: delegate bundled-agent arch check to
+          # validate-build-output.sh which has Layer 2 fallback for file(1)
+          # output drift on Windows runners (PE32+ + x86-64 tokens + MZ magic
+          # bytes verification). The previous duplicate inline grep -qF
+          # approach was fragile to runner-specific file(1) format reordering
+          # like "PE32+ executable for MS Windows 6.00 (console), x86-64".
+          # See Commit D (7dc66e5) for the fallback logic; this delegation
+          # ensures Windows CI uses it (the inline check did not).
+          if ! ./scripts/validate-build-output.sh win32-x64; then
             ERRORS=$((ERRORS + 1))
-          else
-            ENTRIES=$(python -c "
-          import json
-          with open(r'$MANIFEST') as f:
-              m = json.load(f)
-          for r in m['runtimes']:
-              if r['platform'] == 'win32' and r['arch'] == 'x64':
-                  print(f\"{r['installName']}|{r['expectedFileArchPattern']}\")
-          ")
-            if [ -z "$ENTRIES" ]; then
-              echo "FAIL: no manifest entries for win32-x64"
-              ERRORS=$((ERRORS + 1))
-            else
-              while IFS='|' read -r install_name arch_pattern; do
-                bin_path="$AGENTS_DIR/$install_name"
-                if [ ! -f "$bin_path" ]; then
-                  echo "FAIL: $install_name not in build output ($bin_path)"
-                  ERRORS=$((ERRORS + 1))
-                  continue
-                fi
-                file_out=$(file -b "$bin_path" 2>/dev/null || echo "")
-                if echo "$file_out" | grep -qF "$arch_pattern"; then
-                  echo "OK: $install_name ($file_out)"
-                else
-                  echo "FAIL: $install_name arch mismatch"
-                  echo "  Expected pattern: $arch_pattern"
-                  echo "  Got:              $file_out"
-                  ERRORS=$((ERRORS + 1))
-                fi
-              done <<< "$ENTRIES"
-            fi
           fi
 
           if [ $ERRORS -gt 0 ]; then
