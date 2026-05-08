@@ -248,7 +248,31 @@ for r in m['runtimes']:
       fi
 
       file_out=$(file -b "$bin_path")
-      if ! echo "$file_out" | grep -qF "$arch_pattern"; then
+      arch_ok=false
+
+      # Layer 1: exact substring match (fast path; preserves macOS behavior).
+      if echo "$file_out" | grep -qF "$arch_pattern"; then
+        arch_ok=true
+      fi
+
+      # Layer 2 (win32 only): file(1) output format varies across Windows
+      # toolchains (MSYS/Git Bash, libmagic versions). Manifest pattern was
+      # captured on one host; runners may emit reordered tokens like
+      # "PE32+ executable for MS Windows 6.00 (console), x86-64, 7 sections".
+      # Mirror fetch-agent-runtimes.sh: require both "PE32+" and "x86-64",
+      # then confirm via the MZ magic bytes at offset 0.
+      win32_fallback_used=false
+      if [[ "$arch_ok" == false ]] && [[ "$MANIFEST_PLATFORM" == "win32" ]]; then
+        if echo "$file_out" | grep -qF "PE32+" && echo "$file_out" | grep -qF "x86-64"; then
+          magic=$(od -An -N2 -tx1 "$bin_path" 2>/dev/null | tr -d ' \n')
+          if [[ "$magic" == "4d5a" ]]; then
+            arch_ok=true
+            win32_fallback_used=true
+          fi
+        fi
+      fi
+
+      if [[ "$arch_ok" == false ]]; then
         echo -e "${RED}FAIL${NC} (arch mismatch)"
         echo "    Expected pattern: $arch_pattern"
         echo "    Got:              $file_out"
@@ -256,7 +280,11 @@ for r in m['runtimes']:
         continue
       fi
 
-      echo -e "${GREEN}OK${NC} ($file_out)"
+      if [[ "$win32_fallback_used" == true ]]; then
+        echo -e "${GREEN}OK${NC} (PE32+/x86-64 tokens + MZ magic; file output: $file_out)"
+      else
+        echo -e "${GREEN}OK${NC} ($file_out)"
+      fi
     done <<< "$ENTRIES"
   fi
   fi
