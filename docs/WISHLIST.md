@@ -1,5 +1,7 @@
 # Feature Wishlist
 
+> **⚠️ DEPRECATED — 2026-05-08.** This file is kept as **historical reference only**. New feature ideas/requests must be filed as **GitHub Issues** on `ProductoryHQ/ritemark-native` with the `enhancement` label. Sprint planning now pulls from open `enhancement` issues, not from this file.
+
 A collection of ideas for future development. No commitment, no order - just a place to capture inspiration.
 
 * * *
