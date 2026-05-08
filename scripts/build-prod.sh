@@ -191,6 +191,15 @@ echo "Removing webview dev dependencies..."
 rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
 rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
 
+# Strip foreign-platform agent runtimes from the .app extension copy.
+# Sprint 64 fetches Codex + Claude binaries for ALL supported targets into
+# extensions/ritemark/binaries/agents/<platform>-<arch>/. Without this strip,
+# a darwin-arm64 build would ship win32-x64 (and other) agent trees, bloating
+# the .app by hundreds of MB. The script is allowlist-based and idempotent.
+KEEP_ARCH="${TARGET#darwin-}"
+echo "Stripping foreign-platform agent runtimes (keeping darwin-${KEEP_ARCH})..."
+"$PROJECT_DIR/scripts/strip-foreign-agent-runtimes.sh" "$EXT_DEST" darwin "$KEEP_ARCH"
+
 echo -e "${GREEN}Extension copied successfully${NC}"
 echo ""
 
