@@ -229,5 +229,35 @@ For developers and changelog readers.
 -   **Sprint 61** — Agent Library Icons & Colours (user-facing)
 -   **Sprint 62** — Conversation Runtime + Agent Switching (user-facing)
 -   **Sprint 63** — Minor Updates: Launch Chat, AGENTS.md / .agents/ scan, Claude model IDs (user-facing)
+-   **Sprint 64** — Bundled Agent Runtimes + Selected-Text Docked Context Tab (user-facing)
+
+* * *
+
+## Also in This Release — Bundled Runtimes & Selected-Text Docked Tab
+
+Two further changes ship with v1.6.3, captured here for completeness.
+
+### Codex and Claude Are Now Bundled
+
+A clean Ritemark install now contains the Codex and Claude runtimes inside the app bundle. No terminal, no `npm install -g`, no Node version mismatch, no PATH lookup.
+
+-   **Bundled by default.** On macOS arm64, macOS x64, and Windows x64, the runtime binaries ship under `…/extensions/ritemark/binaries/agents/<platform>-<arch>/` and are picked up automatically when a system runtime is absent.
+-   **Architecture-mismatch detection.** If a Rosetta-translated user accidentally launches an arm64 Codex on x64 (or vice versa), the runtime status surfaces an explicit "Architecture mismatch" state instead of a confusing crash.
+-   **Status separates runtime from auth.** Settings now distinguishes "Runtime installed — sign in required" from "Ready". You'll only see `Ready` after both the bundled runtime and provider auth check out.
+-   **Check + Repair.** The Settings page exposes "Check agent installation" and "Repair bundled runtime" actions for both Codex and Claude. The "Use system runtime" override is intentionally not shipped in this release.
+-   **Updates ride the app.** Runtime versions are pinned per-release. The "Check for updates" button runs the existing Ritemark app-update check; there is no separate runtime update channel.
+-   **`thread/start` timeout UX.** Long Codex starts now surface a progress message at ~10 s instead of a bare `RPC call ... timed out after 30000ms` after 30 s, and the timeout itself is bumped to 60 s with a diagnostics snapshot on failure.
+
+Build-time gates ensure the production `.app` and Windows installer cannot ship without the right-architecture runtime artifacts: `build-prod.sh`, `build-prod-windows.sh`, and `validate-build-output.sh` all fail closed if a binary is missing or wrong-arch.
+
+### Selected Text Now Docks to the Composer
+
+Until this release, when you selected text in the editor and switched to the AI panel, the selection landed in a global banner at the top of the chat. v1.6.3 moves it down to where it belongs: a docked context tab anchored to the chat input card.
+
+-   **Tab connects to the composer.** A rounded tab sits flush on top of the input box, visually attached, so the selection reads as next-turn context instead of global panel state.
+-   **Dismiss without clearing the editor.** The × on the tab detaches the chat-side reference only. Your editor's actual selection stays put — it's still the source of truth.
+-   **Codex now actually edits files when in Edit mode.** A pair of Sprint 64 fixes makes selected text reach the LLM with correct line numbers (via a surrounding-context fingerprint, not raw line counts that drifted on edits) and routes Edit-mode Codex through the file-edit code path.
+
+* * *
 
 Browsing a library is fine. Adding to it is the part that matters. Owning a conversation that outlives any one runtime is the other part. Talking *to* a specific agent without remembering its name is the third.
