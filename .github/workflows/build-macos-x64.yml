@@ -40,12 +40,20 @@ jobs:
       # =========================================================================
       # Step 3: Handle extension symlink
       # =========================================================================
+      - name: Fetch bundled agent runtimes (darwin-x64)
+        # Sprint 64: materialise app-owned Codex + Claude binaries into
+        # extensions/ritemark/binaries/agents/darwin-x64/ BEFORE the extension
+        # is copied into vscode/extensions/ritemark. The fetch script is
+        # idempotent via per-binary .sha256 sidecars and verifies integrity
+        # against the manifest. Without this, fresh CI checkouts ship the
+        # x64 .app with NO bundled agents.
+        working-directory: r
+        run: ./scripts/fetch-agent-runtimes.sh --platform darwin --arch x64
+
       - name: Copy extension (replace symlink)
         working-directory: r
         run: |
           rm -rf vscode/extensions/ritemark 2>/dev/null || true
-          # Remove non-x64 binaries that won't be needed
-          rm -rf extensions/ritemark/binaries/darwin-arm64 2>/dev/null || true
           cp -R extensions/ritemark vscode/extensions/ritemark
           echo "Extension copied to vscode/extensions/ritemark"
 
@@ -139,6 +147,10 @@ jobs:
           # Remove dev dependencies only - keep runtime node_modules!
           rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
           rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
+          # Strip foreign-platform agent runtimes (Sprint 64). Keeps only
+          # darwin-x64/ inside binaries/agents/, removes darwin-arm64/ and
+          # win32-x64/ if present. Allowlist-based and idempotent.
+          ./scripts/strip-foreign-agent-runtimes.sh "$EXT_DEST" darwin x64
           ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
 

@@ -59,7 +59,6 @@ jobs:
         working-directory: r
         run: |
           rm -rf vscode/extensions/ritemark 2>/dev/null || true
-          rm -rf extensions/ritemark/binaries/darwin-arm64 2>/dev/null || true
           cp -R extensions/ritemark vscode/extensions/ritemark
           echo "Extension copied to vscode/extensions/ritemark"
 
@@ -195,6 +194,10 @@ jobs:
           cp -R vscode/extensions/ritemark "$EXT_DEST"
           rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
           rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
+          # Strip foreign-platform agent runtimes (Sprint 64). Keeps only
+          # win32-x64/ inside binaries/agents/, removes darwin-arm64/ and
+          # darwin-x64/ if present. Allowlist-based and idempotent.
+          ./scripts/strip-foreign-agent-runtimes.sh "$EXT_DEST" win32 x64
           ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
 
