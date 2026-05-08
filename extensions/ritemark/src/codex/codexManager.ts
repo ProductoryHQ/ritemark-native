@@ -256,16 +256,29 @@ export class CodexManager {
     // The bundled `codex-app-server` binary does NOT accept `--version` (it
     // exits with `error: unexpected argument '--version' found` and code 2).
     // For app-server launch mode the canonical version comes from the
-    // manifest the build script ships alongside the binary. Skip the spawn
-    // probe in that case — otherwise we'd flag a perfectly working bundled
-    // runtime as "needs repair" with the spawn error as the description.
+    // manifest the build script ships alongside the binary. We still need
+    // to confirm the binary is actually launchable so a corrupt or non-
+    // executable file doesn't show as "Ready" until the first turn fails
+    // (Codex review on PR #57). `--help` works on codex-app-server, exits 0
+    // quickly, and gives us a real spawn check.
     if (binary.launchMode === 'codex-app-server') {
       const manifestVersion = readBundledRuntimeVersion(binaryPath);
+      const probe = this.spawnResolvedBinarySync(binaryPath, ['--help'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 3000,
+      });
+      const probeOk = probe.status === 0;
+      const probeError = probeOk
+        ? null
+        : this.summarizeFailure(
+            String(probe.stderr || probe.stdout || `app-server --help exited ${probe.status ?? 'null'}`),
+          );
       return {
         available: true,
-        runnable: true,
+        runnable: probeOk,
         version: manifestVersion,
-        error: null,
+        error: probeError,
         binaryPath,
         installNodeVersion,
         runtimeNodeVersion,
@@ -274,7 +287,7 @@ export class CodexManager {
         installNodeArch,
         runtimeNodeArch,
         machineArch,
-        compatibility: this.inspectCompatibility(binaryPath, manifestVersion, binary.launchMode),
+        compatibility: probeOk ? this.inspectCompatibility(binaryPath, manifestVersion, binary.launchMode) : null,
         runtimeSource: binary.runtimeSource,
         launchMode: binary.launchMode,
       };
