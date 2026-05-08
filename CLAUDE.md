@@ -136,14 +136,16 @@ ritemark-native/
 ├── scripts/                     # Development and release scripts
 ├── VSCode-darwin-arm64/         # Production build output
 ├── docs/
-│   ├── WISHLIST.md              # Feature wishlist (linked to sprint planning)
+│   ├── WISHLIST.md              # DEPRECATED — historical reference only (see below)
 │   ├── user/                    # User-facing docs
 │   ├── releases/                # Release notes per version
 │   └── development/             # Developer docs (analysis, sprints, release-process)
 └── docs-internal/               # Gitignored: marketing, product strategy
 ```
 
-`docs/WISHLIST.md` is where all feature ideas land. `.claude/agents/` and `.claude/skills/` are git-tracked — discoverable with `ls`.
+Feature ideas/requests → **GitHub Issues** on `ProductoryHQ/ritemark-native` with the `enhancement` label. Sprint planning pulls from open `enhancement` issues.
+
+`docs/WISHLIST.md` is **deprecated** — kept as historical reference only. Do not add new items there. `.claude/agents/` and `.claude/skills/` are git-tracked — discoverable with `ls`.
 
 * * *
 
