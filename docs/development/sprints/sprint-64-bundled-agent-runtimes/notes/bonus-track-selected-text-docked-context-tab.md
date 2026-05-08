@@ -1,5 +1,42 @@
 # Bonus Track: Selected Text Docked Context Tab
 
+**Status: CLOSED — shipped 2026-05-08**
+
+Implemented in commits `f94dbde` (S5 docked tab UI), `51095ad` (selection
+actually reaches the LLM), `fd7d383` (Edit/Plan toggle wiring + mode-aware
+prompt + Codex base-instructions for file edits), `554ff90` (line numbers —
+later reverted), `f999c42` (replaced misleading line numbers with
+surrounding-context fingerprint, sentinel-wrapped).
+
+What ended up shipping went well beyond the original UI scope:
+
+- **UI**: docked tab anchored to ChatInput card (S5), `dismissSelectedContext`
+  store action that detaches chat-side selection without clearing the
+  editor's actual selection (open-question default behaviour).
+- **Backend wiring**: selection now actually reaches both Codex and Claude
+  via a hidden prompt prefix produced by `buildSelectionContextBlock`. Edit
+  vs Plan mode reaches the extension on the wire (was a dead toggle before
+  this sprint).
+- **Disambiguation**: surrounding-context fingerprint (~80 chars on each
+  side, `<<<SELECTION>>>`/`<<</SELECTION>>>` sentinels) replaces the original
+  "selected text only" prompt so apply_patch hits the right occurrence even
+  when the selected word appears multiple times (e.g. "runtime" in body
+  vs frontmatter tags).
+- **System prompt**: `CODEX_BASE_INSTRUCTIONS` now explicitly directs Codex
+  to use file editing tools for edit/simplify/rewrite/translate requests
+  rather than replying with the suggestion in chat.
+
+Validated 2026-05-08 by Jarmo: Codex now patches the correct occurrence
+when given a body selection like "runtime" surrounded by "Until this
+release, the … — Claude or Codex —".
+
+The Acceptance Criteria below reflect the original UI scope; everything
+checked.
+
+---
+
+## Decision (original)
+
 ## Decision
 
 Use Sprint 62 UX option **S5 — Docked context tab** as the preferred direction for moving selected-text context from the global Agent Chat Panel banner into the chat input area.
@@ -43,17 +80,19 @@ Likely implementation shape:
 
 ## Acceptance Criteria
 
-- [ ] When editor text is selected, the Agent Chat Panel shows a docked selected-text context tab immediately above the chat input card.
-- [ ] The old global top `Selected:` banner is no longer shown in normal chat view.
-- [ ] The docked tab truncates long selected text without resizing the composer unpredictably.
-- [ ] The user can remove selected text from the next message context.
-- [ ] Sending a message still passes the selected text to the active agent runtime exactly as before.
-- [ ] Empty selection hides the docked context tab.
-- [ ] Light and dark themes both remain legible.
-- [ ] Mobile/narrow sidebar width does not overlap runtime controls, active-file chip, attach, or send.
+- [x] When editor text is selected, the Agent Chat Panel shows a docked selected-text context tab immediately above the chat input card.
+- [x] The old global top `Selected:` banner is no longer shown in normal chat view.
+- [x] The docked tab truncates long selected text without resizing the composer unpredictably.
+- [x] The user can remove selected text from the next message context.
+- [x] Sending a message still passes the selected text to the active agent runtime exactly as before — and the agent now actually receives it (not just visually).
+- [x] Empty selection hides the docked context tab.
+- [x] Light and dark themes both remain legible.
+- [x] Mobile/narrow sidebar width does not overlap runtime controls, active-file chip, attach, or send.
 
 ## Open Question
 
 Should the close action clear the actual editor selection, or only detach selected text from the chat input context for the next turn?
 
 Default recommendation: detach only from chat context. Clearing editor selection would be surprising because the editor is the source of truth and may still be visibly selected.
+
+**Resolved: detach only.** Implemented in `dismissSelectedContext()` (commit `f94dbde`).
