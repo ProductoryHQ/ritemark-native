@@ -31,6 +31,30 @@ case "$TARGET" in
     ;;
 esac
 
+# ---------------------------------------------------------------------------
+# Portable file-size + python interpreter resolution
+# ---------------------------------------------------------------------------
+# `validate-build-output.sh win32-x64` runs on macOS for cross-host pre-flight
+# (e.g. before invoking ISCC.exe locally) AND on Windows runners reusing this
+# script. macOS `stat` uses BSD flags (`-f%z`); GNU stat on Git Bash uses
+# `-c%s`. Codex review on PR #57: hard-coded `stat -f%z` returned 0 on
+# Windows and the size gates failed on perfectly valid build outputs. Same
+# for `python3` — Windows often only has `python` on PATH.
+file_size() {
+  local f="$1"
+  local s
+  s=$(stat -f%z "$f" 2>/dev/null) || s=$(stat -c%s "$f" 2>/dev/null) || s=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
+  echo "${s:-0}"
+}
+
+PYTHON=""
+for py in python3 python; do
+  if command -v "$py" >/dev/null 2>&1; then
+    PYTHON="$py"
+    break
+  fi
+done
+
 echo "========================================"
 echo "Post-Build Output Validation"
 echo "========================================"
@@ -100,7 +124,8 @@ check_file_size() {
     return
   fi
 
-  local size=$(stat -f%z "$file" 2>/dev/null || echo 0)
+  local size
+  size=$(file_size "$file")
 
   if [[ $size -lt $min_size ]]; then
     echo -e "${RED}FAIL${NC}"
@@ -182,7 +207,15 @@ else
   # validationArgs smoke test on the source binary at fetch time — post-copy
   # bytes are byte-identical, so re-running adds no value and introduces
   # signing-stage fragility.
-  ENTRIES=$(python3 -c "
+  if [[ -z "$PYTHON" ]]; then
+    echo -e "  ${RED}FAIL${NC}: neither python3 nor python found in PATH (needed to parse manifest.json)"
+    ERRORS=$((ERRORS + 1))
+    PYTHON_FOR_PARSE=""
+  else
+    PYTHON_FOR_PARSE="$PYTHON"
+  fi
+  if [[ -n "$PYTHON_FOR_PARSE" ]]; then
+  ENTRIES=$("$PYTHON_FOR_PARSE" -c "
 import json
 with open('$MANIFEST') as f:
     m = json.load(f)
@@ -225,6 +258,7 @@ for r in m['runtimes']:
 
       echo -e "${GREEN}OK${NC} ($file_out)"
     done <<< "$ENTRIES"
+  fi
   fi
 fi
 echo ""
