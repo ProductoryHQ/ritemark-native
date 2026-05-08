@@ -2,7 +2,7 @@
 
 **Release:** Ritemark v1.6.3 — One Conversation, Many Runtimes; A Library You Can Talk To
 **Date:** 2026-05-05
-**Scope:** Sprint 59 (Agent Authoring Loop), Sprint 61 (Agent Library Icons & Colours), Sprint 62 (Conversation Runtime + Per-Turn Agent Switching), Sprint 63 (Minor Updates: Launch Chat + AGENTS/.agents + model refresh)
+**Scope:** Sprint 59 (Agent Authoring Loop), Sprint 61 (Agent Library Icons & Colours), Sprint 62 (Conversation Runtime + Per-Turn Agent Switching), Sprint 63 (Minor Updates: Launch Chat + AGENTS/.agents + model refresh), Sprint 64 (Bundled Agent Runtimes + Selected-Text Docked Context Tab)
 
 > Before opening the new DMG: **quit any running Ritemark.app** (two instances share the user-data dir and will cause a blank webview / SW `InvalidStateError`).
 
@@ -89,6 +89,62 @@
 #### Agent Selector
 - [ ] `AgentSelector.tsx` still handles setup, discovery, and availability of runtimes
 - [ ] Selector reflects current runtime correctly when navigating between conversations
+
+---
+
+### Sprint 64 — Bundled Agent Runtimes
+
+#### Bundled runtime presence (clean install)
+- [ ] In a fresh `/Applications/Ritemark.app`, verify `Contents/Resources/app/extensions/ritemark/binaries/agents/darwin-arm64/` contains the Codex and Claude artifacts named per `manifest.json`
+- [ ] No system Codex / Claude required: with `which codex` and `which claude` returning nothing on PATH, Ritemark still detects healthy runtimes
+- [ ] Settings → Claude section: status reads `Ready` after sign-in, or `Runtime installed — sign in required` before sign-in (NOT "Runtime missing")
+- [ ] Settings → Codex section: same — runtime healthy state separates cleanly from auth state
+
+#### Architecture-mismatch detection
+- [ ] On Apple Silicon, runtime status is `Ready` / `sign in required` (NOT `Architecture mismatch`)
+- [ ] If you swap in an x64 binary by hand under `darwin-arm64/`, status flips to `Architecture mismatch` (negative test — optional)
+
+#### Check + Repair actions
+- [ ] Settings shows **Check agent installation** button for both Codex and Claude — clicking re-runs the health check and updates status
+- [ ] Settings shows **Repair bundled runtime** button — clicking re-runs fetch and restores the binary if removed/damaged
+- [ ] "Use system runtime" override is intentionally NOT shown (deferred per Q5)
+
+#### Check for updates button (Q4)
+- [ ] Settings shows a **Check for updates** button that triggers the existing Ritemark app-update check (no separate runtime channel)
+- [ ] Pressed state is visible during the check; spinner doesn't get stuck
+
+#### `thread/start` timeout UX
+- [ ] Start a Codex thread; if startup is slow (>~10 s), a progress message appears (NOT a bare `RPC call ... timed out after 30000ms`)
+- [ ] Timeout extended to 60 s; on actual failure, a diagnostics snapshot is surfaced
+
+#### Build gates (technical regression — verify in DMG)
+- [ ] Mounted DMG: `Ritemark.app/Contents/Resources/app/extensions/ritemark/binaries/agents/darwin-arm64/codex*` exists and is arm64 (`file` shows `arm64`)
+- [ ] Same path: `claude` (or the manifest-defined Claude entry) exists and is arm64
+- [ ] No `darwin-x64` or `win32-x64` runtime payloads accidentally bundled in the arm64 DMG
+
+---
+
+### Sprint 64 bonus — Selected-Text Docked Context Tab (S5)
+
+#### Tab appears anchored to the composer
+- [ ] Open a .md file, select a line of text in the editor, switch to the AI sidebar
+- [ ] Selected text appears as a **docked tab on top of the chat input card** (NOT in a global banner above the conversation)
+- [ ] Tab visually connects to the input card (rounded top, no visible seam at the bottom edge)
+- [ ] Long selections truncate with an ellipsis around 140 characters
+
+#### Tab styling — light + dark
+- [ ] In the light VS Code theme, the tab uses the slate gradient (matches prototype)
+- [ ] In the dark VS Code theme, the tab uses the indigo tint (rgba(129,140,248,0.16))
+
+#### Dismiss does not clear the editor selection
+- [ ] Click the × on the docked tab → the chat-side reference detaches (tab disappears)
+- [ ] The editor's actual selection remains visible in the editor (the editor is the source of truth)
+- [ ] Re-selecting different text re-attaches a fresh tab
+
+#### Selected text actually reaches the LLM (Sprint 64 fix)
+- [ ] With selection attached, send a message asking the agent to reference or describe the selected text — the response demonstrates the agent received the actual selected lines
+- [ ] In Edit mode, ask Codex to modify the selected text — Codex makes the edit at the right location (line numbers correct)
+- [ ] Test with a file where selection has been edited above (line numbers shift) — surrounding-context fingerprint still resolves the correct lines
 
 ---
 
