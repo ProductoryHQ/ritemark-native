@@ -263,7 +263,7 @@ done
 # container registration leaks through a partially-applied patch 003.
 CSS_FILE="$APP_PATH/Contents/Resources/app/out/vs/workbench/workbench.desktop.main.css"
 if [[ -f "$CSS_FILE" ]]; then
-  printf '\n/* Ritemark: hide VS Code chat view container from activity bar */\n.activitybar .action-item a[class*="workbench-panel-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="workbench-panel-chat"]) { display: none !important; }\n' >> "$CSS_FILE"
+  printf '\n/* Ritemark: hide VS Code chat view container from activity bar */\n.activitybar .action-item a[class*="workbench-panel-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="workbench-panel-chat"]) { display: none !important; }\n.activitybar .action-item a[class*="copilot-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="copilot-chat"]) { display: none !important; }\n' >> "$CSS_FILE"
   echo -e "${GREEN}Chat activity bar CSS hide rule appended${NC}"
 fi
 echo ""
