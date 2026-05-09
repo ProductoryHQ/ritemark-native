@@ -202,6 +202,59 @@ hdiutil detach /tmp/v100; hdiutil detach /tmp/v101
 4. Watch for 0-byte files (corruption signal); restore from git.
 5. Test the actual DMG, not just the source app bundle.
 
+## CI workflow editing — pre-push audit (HARD RULE)
+
+Before editing ANY GitHub Actions workflow file (`.github/workflows/*.yml`), follow this checklist. Skipping it costs 20–30 min per CI iteration; v1.6.3 burned ~5 hours across 5 commits because the checklist wasn't followed.
+
+### Mandatory pre-edit audit
+
+1. **Read the ENTIRE workflow file end-to-end first.** Not just the failing step. Map every step:
+   - Does the step run **inline shell** in YAML, or call **a script** in `scripts/`?
+   - Is similar logic **duplicated** between inline YAML and a script? (Hidden drift hazard.)
+2. **Compare cross-platform workflow pairs.** When changing one workflow, also read the sibling. Differences between `build-macos-x64.yml` and `build-windows.yml` are often where bugs hide:
+   - macOS step succeeds where Windows fails because Mac runner is more lenient (symlinks, line endings, `file(1)` format).
+   - x64 macOS workflow may be missing a step the arm64 build does locally.
+3. **For every fix:** before pushing, answer aloud "What code path runs in the failing step?" then verify your edit lands in that exact file. If the failing step is `inline:`, editing a `scripts/` file fixes nothing.
+4. **Bash + YAML syntax checks before commit:**
+   ```bash
+   bash -n scripts/foo.sh
+   python3 -c "import yaml; yaml.safe_load(open('.github/workflows/build-windows.yml'))"
+   ```
+5. **Where possible, run the same command path locally.** E.g. `./scripts/validate-build-output.sh win32-x64` works on Mac (it's cross-host pre-flight aware) — surfaces script bugs before the 25-min CI run does.
+
+### Cross-platform CI pitfalls catalogue (Windows vs macOS runners)
+
+| Pitfall | Symptom | Fix |
+|---|---|---|
+| **Python `print()` emits CRLF on Windows pipes** | `bash read -r IFS="|"` reads `tar.gz\r` (length 7) → `case` doesn't match | `sys.stdout.reconfigure(newline="\n")` after `import sys`, AND strip `${var%$'\r'}` on bash side (belt-and-braces) |
+| **Git Bash `cp -R` cannot replicate macOS symlinks** | `cp: cannot create symbolic link '...libggml-base.0.dylib'` | Strip `binaries/darwin-*/` BEFORE `cp -R` on Windows runners. NEVER remove that line without solving symlinks first. |
+| **`file(1)` output format drift across MSYS / Git Bash / libmagic versions** | `grep -qF "PE32+ executable (console) x86-64, for MS Windows"` misses runner output `"PE32+ executable for MS Windows 6.00 (console), x86-64, 7 sections"` | Two-token check (`PE32+` AND `x86-64`) + MZ magic-byte fallback (`od -An -N2 -tx1` → `4d5a`). Pattern is a hint, magic bytes are truth. |
+| **`stat -f%z` (BSD) returns 0 on Git Bash; GNU expects `-c%s`** | size gates fail on valid build outputs | `file_size()` helper trying `-f%z` then `-c%s` then `wc -c`. |
+| **`python3` not always on Windows PATH; only `python`** | `command not found` mid-script | Probe `for py in python3 python; do ...; done` and use the first hit. |
+| **Inline YAML duplicates a script's logic** | Fix to script doesn't reach CI because workflow inlines its own copy | Single source of truth: delete inline, call the script. Two places = drift. |
+| **Tag `--force` retriggers ALL `tag: 'v*'` workflows** | Earlier in-progress runs become wasted artifacts | Plan tag moves: only re-tag once per commit you actually want shipped. |
+| **gh auth account drift** | `HTTP 404 Not Found` on a repo that exists | `gh auth status` to check active account. Switch with `gh auth switch --user <handle>`. ProductoryHQ repos need `jarmo-productory`. |
+
+### Architecture rule: validation lives in scripts, not YAML
+
+Validation logic for a build artifact (size checks, manifest cross-refs, arch verification, signing checks) MUST live in `scripts/validate-build-output.sh` (or a sibling). Workflows call the script. Workflows do not duplicate the logic inline.
+
+Why: when the validation rule changes (e.g. `file(1)` format drift), the fix is one commit in one file. If the logic is duplicated inline in YAML, the fix may land in the script while CI still runs the stale inline copy — exact failure mode that cost 4 commits in v1.6.3.
+
+When you find inline validation in a workflow, the right move is **replace inline with `./scripts/validate-build-output.sh <target>`** — preserves Layer 2 fallbacks, single source of truth, smaller workflow file.
+
+### v1.6.3 post-mortem (for future reference)
+
+| Commit | Intent | What broke after | Lesson |
+|---|---|---|---|
+| A `956665b` | Strip foreign agent platforms from .app | Removed `rm -rf binaries/darwin-arm64` thinking it was a buggy dictation strip; it was actually a Windows symlink workaround | Don't remove "looks wrong" lines without testing on the platform that step actually runs on |
+| B `f7cbe10` | Fix CRLF in Python→bash pipe | Hit the symlink regression from Commit A | Always read end-to-end before pushing — would have caught both at once |
+| C `82174be` | Restore Windows symlink-strip with comment | Hit `file(1)` format drift in arch check | Reading full workflow earlier would have flagged inline arch check |
+| D `7dc66e5` | Add Layer 2 fallback in `validate-build-output.sh` | Windows CI didn't call the script — has its own inline check | Always verify the fix lands in the failing code path |
+| E `ef99417` | Replace inline arch check with script call | ✅ Both runs green | Single source of truth |
+
+If v1.6.3 had run the pre-edit audit, Commits A→D would have collapsed into a single first-pass commit that read both workflows fully, identified all the platform-specific quirks, and shipped one consolidated fix.
+
 ## References
 
 - Update feed contract: `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`
@@ -209,3 +262,4 @@ hdiutil detach /tmp/v100; hdiutil detach /tmp/v101
 - Pre-flight script: `scripts/release-preflight.sh`
 - Build script: `scripts/build-prod.sh`
 - Sign + DMG + notarize: `scripts/codesign-app.sh`, `scripts/create-dmg.sh`, `scripts/notarize-dmg.sh`
+- Validation script: `scripts/validate-build-output.sh` (cross-platform aware: `darwin-arm64` / `darwin-x64` / `win32-x64`)
