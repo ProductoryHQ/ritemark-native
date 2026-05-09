@@ -175,6 +175,10 @@ Use the dropdown at the top of the AI sidebar to switch agents:
 
 The dropdown shows all available agents and their models. Agents that require setup show a setup wizard instead of the chat interface.
 
+You can also pin a custom agent from the [Agent Library](agent-library.md) for the next turn — the previous role is automatically retired so the AI gets a clean handoff.
+
+![Handover between two pinned agents inside one chat](../releases/v1.6.3/screenshots/1-6-3-agents-handover-in-chat.png)
+
 ---
 
 ## Environment Checks

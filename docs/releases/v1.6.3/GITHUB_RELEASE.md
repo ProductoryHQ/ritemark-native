@@ -4,6 +4,8 @@
 
 Conversations are now durable workspaces where each turn can use a different runtime (Claude or Codex), and the Agent Library is now something you can *author from* and *launch from* — not just browse.
 
+![Launch Chat — pin an agent from the library and the composer shows an indigo chip for the active role](screenshots/1-6-3-launch-chat-with-agent.png)
+
 ## Highlights
 
 - **Conversation runtime switching (per turn)** — switch Claude ↔ Codex inside one thread without starting over
@@ -13,6 +15,8 @@ Conversations are now durable workspaces where each turn can use a different run
 - **Launch Chat from Agent Library** — right-click an agent and start chat with it pinned as hidden context
 - **`AGENTS.md` + `.agents/` discovery** — project conventions from both Claude and Codex ecosystems are now first-class
 - **Model fallback refresh** — Claude fallback IDs updated to current Sonnet/Opus/Haiku values
+
+![Agent handover inside one chat — the previous role is retired in the same hidden block as the new one is pinned](screenshots/1-6-3-agents-handover-in-chat.png)
 
 ## Sprints rolled up
 
