@@ -1,5 +1,6 @@
 ---
 name: ux-expert
+displayName: UX Expert
 description: >
   UX/UI design specialist for Ritemark Native. Invoke when designing user
   interfaces, interactions, or features that need to be friendly for

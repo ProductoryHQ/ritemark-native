@@ -1,5 +1,6 @@
 ---
 name: pr-reviewer
+displayName: PR Reviewer
 description: >
   PR review and merge agent. Invoke when user mentions: review PR, merge PR,
   check PR, approve PR. Reviews code changes, checks for issues, and manages the

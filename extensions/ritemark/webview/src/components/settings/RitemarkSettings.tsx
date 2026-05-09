@@ -8,25 +8,13 @@ import { useState, useEffect } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { vscode } from '../../lib/vscode';
-import { getDefaultAssistantModel } from '../../config/modelConfig';
 import { Slider } from '../ui/slider';
 
-interface ModelInfo {
-  id: string;
-  name: string;
-  description: string;
-  api: 'responses' | 'chat';
-}
-
 interface SettingsData {
-  voiceDictation: boolean;
-  ritemarkFlows: boolean;
   codexIntegration: boolean;
   codexApprovalPolicy: 'untrusted' | 'on-request' | 'on-failure' | 'never';
   codexSandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
   updatesEnabled: boolean;
-  aiModel: string;
-  availableModels: ModelInfo[];
   agentTimeout: number;
   debugTrace: boolean;
   openaiKey: string;
@@ -533,16 +521,7 @@ export function RitemarkSettings() {
               )}
             </div>
 
-            {!settings.codexIntegration ? (
-              <>
-                <p className="text-xs text-ink-muted mb-3">
-                  Turn on Codex Integration in Features to connect your ChatGPT account and use Codex agents in Ritemark.
-                </p>
-                <div className="text-xs p-2 rounded bg-accent-soft text-ink-muted">
-                  The feature toggle is currently off.
-                </div>
-              </>
-            ) : codexAuth.binaryMissing || codexAuth.binaryBroken ? (
+            {codexAuth.binaryMissing || codexAuth.binaryBroken ? (
               <>
                 <p className="text-xs text-ink-muted mb-3">
                   {codexAuth.binaryMissing
@@ -956,39 +935,6 @@ export function RitemarkSettings() {
 
       </section>
 
-      {/* AI Model Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="robot" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            AI Model
-          </h2>
-        </div>
-
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
-          <label className="text-sm font-medium text-ink-strong block mb-2">
-            Model for Ritemark AI Assistant
-          </label>
-
-          <select
-            value={settings.aiModel || getDefaultAssistantModel()}
-            onChange={(e) => handleSettingChange('ai.model', e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
-          >
-            {(settings.availableModels || []).map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name} - {model.description}
-              </option>
-            ))}
-          </select>
-
-          <p className="text-xs text-ink-muted mt-2">
-            GPT-5 models use the newer Responses API with enhanced reasoning.
-            GPT-4 models use Chat Completions API with tool support.
-          </p>
-        </div>
-      </section>
-
       {/* Agent Timeout Section */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
@@ -1075,40 +1021,6 @@ export function RitemarkSettings() {
           <p className="text-xs text-ink-muted mt-2">
             Adjust the font size for the AI chat messages (10-20px).
           </p>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="lightning" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            Features
-          </h2>
-        </div>
-
-        <div className="space-y-3">
-          <ToggleRow
-            label="Voice Dictation"
-            description="Speech-to-text using Whisper (experimental, macOS only)"
-            checked={settings.voiceDictation}
-            onChange={(value) => handleToggle('features.voice-dictation', value)}
-          />
-
-          <ToggleRow
-            label="Ritemark Flows"
-            description="Visual automation workflows with AI and file operations"
-            checked={settings.ritemarkFlows}
-            onChange={(value) => handleToggle('features.ritemark-flows', value)}
-          />
-
-          <ToggleRow
-            label="Codex Integration"
-            description="ChatGPT-authenticated coding agents (experimental, requires codex binary)"
-            checked={settings.codexIntegration}
-            onChange={(value) => handleToggle('features.codex-integration', value)}
-            badge="Experimental"
-          />
         </div>
       </section>
 
