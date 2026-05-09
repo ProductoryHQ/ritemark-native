@@ -1,5 +1,6 @@
 ---
 name: qa-validator
+displayName: QA Validator
 description: >
   MANDATORY before any commit or release. Invoke IMMEDIATELY when user mentions:
   commit, push, done, ship, merge, PR, ready, complete, finished.

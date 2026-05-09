@@ -97,6 +97,29 @@ function toDisplayName(id: string): string {
 }
 
 /**
+ * Resolve the display name for an item using (in priority order):
+ *   1. Explicit `displayName` frontmatter field — used as-is
+ *   2. `name` frontmatter, when it looks like a real display name
+ *      (contains a space or any uppercase letter — e.g. "UX Expert")
+ *   3. Fallback: title-case the kebab `name` or filename slug
+ *      ("sprint-manager" -> "Sprint Manager")
+ *
+ * This preserves acronyms and branded casing without forcing every existing
+ * agent file (which all use kebab-case `name`) to be rewritten.
+ */
+function resolveDisplayName(frontmatter: Record<string, string>, slug: string): string {
+  const explicit = frontmatter.displayName?.trim();
+  if (explicit) return explicit;
+
+  const fmName = frontmatter.name?.trim();
+  if (fmName && (/\s/.test(fmName) || /[A-Z]/.test(fmName))) {
+    return fmName;
+  }
+
+  return toDisplayName(fmName || slug);
+}
+
+/**
  * Check if a file is a main agent config (CLAUDE.md or AGENTS.md).
  */
 function isClaudeMd(filePath: string): boolean {
@@ -157,8 +180,9 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
         const content = fs.readFileSync(filePath, 'utf-8');
         const hasFm = hasFrontmatterBlock(content);
         const frontmatter = parseFrontmatter(content);
-        const id = frontmatter.name || path.basename(file, '.md');
-        const name = toDisplayName(id);
+        const slug = path.basename(file, '.md');
+        const id = frontmatter.name || slug;
+        const name = resolveDisplayName(frontmatter, slug);
         const description = frontmatter.description || '';
         const isMain = isClaudeMd(filePath);
         const { icon, color } = resolveIconAndColor(frontmatter, name, description, isMain);
@@ -232,8 +256,9 @@ function discoverCommandsInRoot(claudeRoot: string, scope: ItemScope): Discovere
           const content = fs.readFileSync(filePath, 'utf-8');
           const hasFm = hasFrontmatterBlock(content);
           const frontmatter = parseFrontmatter(content);
-          const id = frontmatter.name || path.basename(file, '.md');
-          const displayName = toDisplayName(id);
+          const slug = path.basename(file, '.md');
+          const id = frontmatter.name || slug;
+          const displayName = resolveDisplayName(frontmatter, slug);
           const description = frontmatter.description || extractFirstLine(content);
           const { icon, color } = resolveIconAndColor(frontmatter, displayName, description);
 
@@ -281,7 +306,7 @@ function discoverCommandsInRoot(claudeRoot: string, scope: ItemScope): Discovere
 
           if (frontmatter['user-invocable'] === 'false') continue;
 
-          const displayName = toDisplayName(id);
+          const displayName = resolveDisplayName(frontmatter, dir);
           const description = frontmatter.description || extractFirstLine(content);
           const { icon, color } = resolveIconAndColor(frontmatter, displayName, description);
 

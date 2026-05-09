@@ -1,5 +1,6 @@
 ---
 name: vscode-expert
+displayName: VS Code Expert
 description: >
   MANDATORY for VS Code builds, extension issues, and patch management. Invoke IMMEDIATELY when user mentions:
   build, compile, error, fail, not working, extension not loading, yarn, npm install,
