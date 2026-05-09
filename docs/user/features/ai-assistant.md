@@ -129,10 +129,14 @@ Add new content at a specific position.
 
 ### Selection Indicator
 
-When you select text, the sidebar shows:
-- A pulsing dot indicator
-- Preview of selected text
-- This tells AI what to work with
+When you select text, the sidebar shows a docked context tab anchored on top of the chat input — the selection reads as next-turn context for the agent, not global panel state.
+
+![Selected editor text docked as a context tab on top of the AI composer](../releases/v1.6.3/screenshots/1-6-3-selected-text-editing-with-agent.png)
+
+The indicator includes:
+- A pulsing dot
+- A preview of the selected text
+- An × to detach the chat-side reference without clearing the editor selection
 
 ---
 

@@ -2,7 +2,7 @@
   "name": "ritemark",
   "displayName": "Ritemark Editor",
   "description": "WYSIWYG Markdown Editor",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "publisher": "ritemark",
   "license": "MIT",
   "engines": {

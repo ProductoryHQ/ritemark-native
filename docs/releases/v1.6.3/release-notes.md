@@ -1,6 +1,6 @@
 ---
 date: '2026-05-05'
-title: ''
+title: 'Ritemark v1.6.3 — One Conversation, Many Runtimes; A Library You Can Talk To'
 author: Jarmo Tuisk
 tags:
   - agents
@@ -73,6 +73,12 @@ v1.6.3 closes that loop. The library now creates files for you, in the right pla
 
 -   **Empty state with intent.** When the library has nothing to show, you no longer get a "open a terminal and add files to `.claude/`" instruction. You get two buttons: **New skill** and **New agent**. Click one, name the helper, pick a scope, and you're editing a real file with valid frontmatter a second later.
 
+    ![Agent Library empty state — two buttons offer New skill and New agent instead of terminal instructions](screenshots/1-6-3-agent-library-empty.png)
+    *Empty state offers a one-click path to the first helper — no terminal, no boilerplate.*
+
+    ![New-agent modal — name and scope fields ready for input](screenshots/1-6-3-agent-library-new-agent.png)
+    *Name the helper, pick project or user scope, and Ritemark opens the scaffolded file for you to edit.*
+
 -   **`+` on every section header.** The Agents and Skills sections both have a `+` affordance in the header. Same modal, same flow — no need to scroll back to the empty state once you have helpers in the library.
 
 -   **Right-click to manage.** Each row has a context menu: **Open**, **Duplicate** (the fastest way to fork an existing skill into your own), **Reveal in Finder**, **Move scope** (one click to promote a project-scope helper to your user library, or vice versa), and **Delete…** (uses the OS trash via VS Code's API, so it's recoverable; project-scope deletes also surface a teammate-impact note before you confirm).
@@ -115,6 +121,9 @@ A new sort dropdown gives you **Alphabetical** or **Recently modified**. Recentl
 
 Right-click any agent in the Agent Library and you'll see a new **Launch Chat** action at the top of the menu. Click it and the AI panel focuses with that specific agent already pinned for the conversation. No manual agent picker, no copy-pasting `@mentions`.
 
+![Launch Chat with a pinned agent — the indigo chip in the composer shows which agent is active for the next turn](screenshots/1-6-3-launch-chat-with-agent.png)
+*One click from the library row to a chat with that agent already pinned as hidden context.*
+
 What this actually does under the hood: the agent's `.md` file is loaded into the conversation as **hidden context** — sent to the AI but never shown as visible message text in your chat. You see your own prompt and the agent's response; the AI sees its full instructions on top.
 
 -   **One indigo chip in the composer.** When an agent is pinned, an indigo chip appears next to the input showing the agent's name and an × to remove. The chip persists across multiple turns — once pinned, the agent stays active for the whole thread until you dismiss it.
@@ -122,6 +131,9 @@ What this actually does under the hood: the agent's `.md` file is loaded into th
 -   **Subsequent messages stay light.** The full instructions are loaded once on the first turn (so they live in the AI's context). Every turn after that gets a short reminder — no need to re-send the same `.md` file with every message.
 
 -   **Switching agents is explicit.** Pin agent A, chat for a few turns, then pin agent B. Ritemark sends both a "you are no longer agent A — stop acting as that role" note and the full agent B instructions in a single hidden block. The AI gets a clean handoff instead of having to guess.
+
+    ![Agent handover inside one chat — the indigo pinned chip swaps from one agent to the next, with the previous role explicitly retired in hidden context](screenshots/1-6-3-agents-handover-in-chat.png)
+    *Pinning a new agent retires the previous one in the same hidden block — one chip, one active role.*
 
 -   **Removing the agent tells the AI to revert.** When you click × on the chip, the next message you send carries a hidden "you are no longer acting as agent X — respond in your default role" note. The AI returns to its default persona without you having to remind it.
 
@@ -136,6 +148,9 @@ The Agent Library now scans both conventions side by side:
 -   **`.agents/` directory** — a sibling to `.claude/` — is now scanned for `agents/`, `skills/`, and `commands/` content. This unblocks repos that follow the Codex layout convention; their helpers were previously invisible in the library.
 
 Both directories are merged into the project scope; on name collision, `.claude/` wins to preserve existing behavior.
+
+![Agent Library showing a main-agent config (CLAUDE.md / AGENTS.md) opened from the sidebar](screenshots/1-6-3-agent-library-claudemd-open.png)
+*Workspace-root main-agent configs are first-class — open them straight from the library like any other helper.*
 
 * * *
 
@@ -254,10 +269,13 @@ Build-time gates ensure the production `.app` and Windows installer cannot ship 
 
 Until this release, when you selected text in the editor and switched to the AI panel, the selection landed in a global banner at the top of the chat. v1.6.3 moves it down to where it belongs: a docked context tab anchored to the chat input card.
 
+![Selected editor text docked as a context tab on top of the AI composer, ready to be edited by the agent](screenshots/1-6-3-selected-text-editing-with-agent.png)
+*The selection sits flush on top of the input — it reads as next-turn context, not global panel state.*
+
 -   **Tab connects to the composer.** A rounded tab sits flush on top of the input box, visually attached, so the selection reads as next-turn context instead of global panel state.
 -   **Dismiss without clearing the editor.** The × on the tab detaches the chat-side reference only. Your editor's actual selection stays put — it's still the source of truth.
 -   **Codex now actually edits files when in Edit mode.** A pair of Sprint 64 fixes makes selected text reach the LLM with correct line numbers (via a surrounding-context fingerprint, not raw line counts that drifted on edits) and routes Edit-mode Codex through the file-edit code path.
 
 * * *
 
-Browsing a library is fine. Adding to it is the part that matters. Owning a conversation that outlives any one runtime is the other part. Talking *to* a specific agent without remembering its name is the third.
+Browsing a library is fine. Adding to it is the part that matters. Owning a conversation that outlives any one runtime is the second part. Talking *to* a specific agent without remembering its name is the third. v1.6.3 puts all three in one app.

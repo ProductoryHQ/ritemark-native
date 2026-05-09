@@ -29,9 +29,15 @@ When the library is empty, you can start with:
 - **New skill**
 - **New agent**
 
+![Agent Library empty state with New skill and New agent buttons](../releases/v1.6.3/screenshots/1-6-3-agent-library-empty.png)
+
 You can also click the **+** button in the Agents or Skills section header once helpers already exist.
 
+![New-agent modal — name and scope fields](../releases/v1.6.3/screenshots/1-6-3-agent-library-new-agent.png)
+
 Ritemark creates a valid starter file for you, opens it in the editor, and leaves you ready to edit the frontmatter and instructions.
+
+![A scaffolded agent file (CLAUDE.md / AGENTS.md) opened from the library](../releases/v1.6.3/screenshots/1-6-3-agent-library-claudemd-open.png)
 
 ---
 
@@ -53,12 +59,16 @@ Project-scope helpers may show an impact note before deletion so you know whethe
 
 Right-click an agent row and choose **Launch Chat** to start a conversation with that agent already pinned.
 
+![Launch Chat with a pinned agent — indigo chip in the composer marks the active role](../releases/v1.6.3/screenshots/1-6-3-launch-chat-with-agent.png)
+
 What that means:
 
 - the AI sidebar opens focused on chat
 - the selected agent is loaded as hidden context
 - your prompt stays clean; the agent instructions are sent behind the scenes
 - switching to a different agent later updates the hidden context for the next turn
+
+![Handover between agents inside one chat — pinning a new agent retires the previous role in the same hidden block](../releases/v1.6.3/screenshots/1-6-3-agents-handover-in-chat.png)
 
 This is useful when you want to talk to a specific helper without manually copying its instructions.
 
