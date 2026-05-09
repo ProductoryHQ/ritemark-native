@@ -17,14 +17,23 @@ echo "Running pre-commit validation..."
 
 ERRORS=0
 
+# Cross-platform file size: BSD `stat -f%z` (macOS) vs GNU `stat -c%s` (linux)
+file_size() {
+  stat -f%z "$1" 2>/dev/null || stat -c%s "$1" 2>/dev/null || echo 0
+}
+
 # Check 1: Symlink integrity
-if [[ ! -L "vscode/extensions/ritemark" ]]; then
-  echo "ERROR: vscode/extensions/ritemark symlink is broken"
-  ERRORS=$((ERRORS + 1))
+# Skip when the VS Code submodule isn't present (e.g. Claude Code on the web,
+# fresh clone before `git submodule update`) — there's nothing to symlink into.
+if [[ -d "vscode" ]] && find vscode -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+  if [[ ! -L "vscode/extensions/ritemark" ]]; then
+    echo "ERROR: vscode/extensions/ritemark symlink is broken"
+    ERRORS=$((ERRORS + 1))
+  fi
 fi
 
 # Check 2: Webview bundle size
-WEBVIEW_SIZE=$(stat -f%z "extensions/ritemark/media/webview.js" 2>/dev/null || echo 0)
+WEBVIEW_SIZE=$(file_size "extensions/ritemark/media/webview.js")
 if [[ $WEBVIEW_SIZE -lt 500000 ]]; then
   echo "ERROR: webview.js too small (${WEBVIEW_SIZE} bytes, need >500KB)"
   ERRORS=$((ERRORS + 1))
