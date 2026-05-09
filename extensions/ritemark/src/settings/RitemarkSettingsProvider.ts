@@ -7,7 +7,6 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { getAssistantModels, DEFAULT_MODELS } from '../ai/modelConfig';
 import { isEnabled } from '../features/featureGate';
 import { CodexAppServer, CodexAuth, emitCodexStatusInvalidated, onCodexStatusInvalidated } from '../codex';
 import { UpdateService } from '../update';
@@ -450,14 +449,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     const googleKey = await this.context.secrets.get('google-ai-key');
     const anthropicKey = await this.context.secrets.get('anthropic-api-key');
 
-    // Get available AI models from config
-    const availableModels = getAssistantModels().map(m => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      api: m.api,
-    }));
-
     const initialUpdateSnapshot = await this.updateService.getStatusSnapshot();
     const updateCenterPromise = initialUpdateSnapshot.lastCheckedAt === 0
       ? this.updateService.checkForUpdates({ manual: false, notify: false })
@@ -519,10 +510,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     webview.postMessage({
       type: 'settings',
       data: {
-        // Features
-        voiceDictation: config.get('features.voice-dictation', false),
-        ritemarkFlows: config.get('features.ritemark-flows', false),
-        codexIntegration: config.get('features.codex-integration', true),
+        // Codex availability is gated by the feature flag system, not the
+        // (now-removed) Settings toggle. Stable status → always true on
+        // supported platforms.
+        codexIntegration: isEnabled('codex-integration'),
         codexApprovalPolicy: config.get('codex.approvalPolicy', 'on-request'),
         codexSandboxMode: config.get('codex.sandboxMode', 'workspace-write'),
 
@@ -533,10 +524,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Appearance
         currentTheme: activeTheme,
         availableThemes: RITEMARK_THEMES,
-
-        // AI Model
-        aiModel: config.get('ai.model', DEFAULT_MODELS.assistant),
-        availableModels,
 
         // Agent
         agentTimeout: config.get('ai.agentTimeout', 15),
