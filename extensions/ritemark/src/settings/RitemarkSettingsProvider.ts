@@ -517,6 +517,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         codexApprovalPolicy: config.get('codex.approvalPolicy', 'on-request'),
         codexSandboxMode: config.get('codex.sandboxMode', 'workspace-write'),
 
+        // Browser
+        htmlDefaultOpener: config.get('browser.htmlDefaultOpener', 'editor'),
+
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
         updateCenter,
