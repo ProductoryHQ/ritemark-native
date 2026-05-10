@@ -31,7 +31,9 @@
     "onView:ritemark.agentLibraryView",
     "onView:ritemark.flowsView",
     "onCustomEditor:ritemark.pdfViewer",
-    "onCustomEditor:ritemark.docxViewer"
+    "onCustomEditor:ritemark.docxViewer",
+    "onCommand:ritemark.browser.openUrl",
+    "onView:ritemark.browserView"
   ],
   "contributes": {
     "commands": [
@@ -106,9 +108,88 @@
         "command": "ritemark.reactions",
         "title": "Send Feedback",
         "icon": "$(thumbsup)"
+      },
+      {
+        "command": "ritemark.browser.openUrl",
+        "title": "Open URL in Ritemark Browser",
+        "category": "Ritemark Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "ritemark.browser.back",
+        "title": "Back",
+        "category": "Ritemark Browser",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "ritemark.browser.forward",
+        "title": "Forward",
+        "category": "Ritemark Browser",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "ritemark.browser.refresh",
+        "title": "Refresh",
+        "category": "Ritemark Browser",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ritemark.browser.openInSystemBrowser",
+        "title": "Open in System Browser",
+        "category": "Ritemark Browser",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "ritemark.browser.openAsText",
+        "title": "Open as Text",
+        "category": "Ritemark Browser"
+      },
+      {
+        "command": "ritemark.browser.openInBrowser",
+        "title": "Open in Ritemark Browser",
+        "category": "Ritemark Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "ritemark.browser.newTab",
+        "title": "New Browser Tab",
+        "category": "Ritemark Browser",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ritemark.browser.history.open",
+        "title": "Open in Ritemark Browser",
+        "category": "Ritemark Browser"
+      },
+      {
+        "command": "ritemark.browser.history.clearAll",
+        "title": "Clear History",
+        "category": "Ritemark Browser",
+        "icon": "$(clear-all)"
       }
     ],
     "configuration": [
+      {
+        "title": "Ritemark Browser",
+        "properties": {
+          "ritemark.browser.htmlDefaultOpener": {
+            "type": "string",
+            "enum": [
+              "browser",
+              "editor",
+              "prompt"
+            ],
+            "default": "browser",
+            "description": "Controls whether workspace .html files open in the native Ritemark Browser by default or as text.",
+            "enumDescriptions": [
+              "Open .html files in the native Ritemark Browser by default.",
+              "Open .html files in the text editor.",
+              "Ask each time which editor to use."
+            ],
+            "scope": "application"
+          }
+        }
+      },
       {
         "title": "Ritemark Updates",
         "properties": {
@@ -186,7 +267,7 @@
               "Ask before every command and file change (safest)",
               "Ask only for operations outside workspace boundaries",
               "Auto-approve everything, ask only when a command fails",
-              "Never ask — run everything automatically (use with caution)"
+              "Never ask \u2014 run everything automatically (use with caution)"
             ],
             "description": "When Codex should ask for your approval before running shell commands or modifying files.",
             "scope": "application"
@@ -202,7 +283,7 @@
             "enumDescriptions": [
               "Codex can only read files (no writing or command execution)",
               "Codex can read and write files within the workspace (recommended)",
-              "Full system access including network — use with extreme caution"
+              "Full system access including network \u2014 use with extreme caution"
             ],
             "description": "What Codex is allowed to do on your filesystem.",
             "scope": "application"
@@ -214,7 +295,7 @@
         "properties": {
           "ritemark.ai.selectedAgent": {
             "type": "string",
-            "default": "ritemark-agent",
+            "default": "claude-code",
             "enum": [
               "ritemark-agent",
               "claude-code",
@@ -296,6 +377,11 @@
           "id": "ritemark-flows",
           "title": "Flows",
           "icon": "media/flows-icon.svg"
+        },
+        {
+          "id": "ritemark-browser",
+          "title": "Browser",
+          "icon": "media/browser-icon.svg"
         }
       ],
       "auxiliarybar": [
@@ -331,6 +417,15 @@
           "id": "ritemark.flowsView",
           "name": "Flows",
           "contextualTitle": "Ritemark Flows",
+          "visibility": "visible"
+        }
+      ],
+      "ritemark-browser": [
+        {
+          "type": "webview",
+          "id": "ritemark.browserView",
+          "name": "Recent",
+          "contextualTitle": "Browser",
           "visibility": "visible"
         }
       ]
@@ -387,12 +482,39 @@
           "command": "ritemark.flows.settings",
           "when": "view == ritemark.flowsView",
           "group": "navigation@3"
+        },
+        {
+          "command": "ritemark.browser.newTab",
+          "when": "view == ritemark.browserView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ritemark.browser.history.clearAll",
+          "when": "view == ritemark.browserView",
+          "group": "navigation@2"
         }
       ],
       "explorer/context": [
         {
           "command": "ritemark.sendToChat",
           "group": "navigation"
+        },
+        {
+          "command": "ritemark.browser.openAsText",
+          "when": "resourceLangId == html",
+          "group": "navigation"
+        },
+        {
+          "command": "ritemark.browser.openInBrowser",
+          "when": "resourceLangId == html",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "ritemark.browser.openInBrowser",
+          "group": "navigation",
+          "when": "resourceLangId == html"
         }
       ]
     },
