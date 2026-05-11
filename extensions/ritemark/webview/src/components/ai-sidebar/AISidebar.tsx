@@ -147,7 +147,10 @@ export function AISidebar() {
       {ready && onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed ? (
         <OnboardingWizard />
       ) : ready && needsOpenAIKey ? (
-        <NoApiKey />
+        <>
+          <NoApiKey />
+          <ChatInput />
+        </>
       ) : ready && (needsSetup || showWelcome) ? (
         <>
           <SelectionIndicator />
