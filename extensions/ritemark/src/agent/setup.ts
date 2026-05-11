@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
-import { findBundledAgentRuntime, isBundledAgentRuntimePath } from '../utils/bundledAgentRuntime';
+import { findBundledAgentRuntime, isBundledAgentRuntimePath, readAgentRuntimePreference } from '../utils/bundledAgentRuntime';
 import { onClaudeStatusInvalidated } from './claudeStatusEvents';
 import type {
   AgentEnvironmentStatus,
@@ -150,8 +150,9 @@ function getCandidateClaudePaths(platform: SupportedPlatform): string[] {
   const home = homedir();
   const candidates: string[] = [];
   const bundledRuntime = findBundledAgentRuntime('claude', { platform });
+  const preference = readAgentRuntimePreference();
 
-  if (bundledRuntime) {
+  if (preference === 'bundled' && bundledRuntime) {
     candidates.push(bundledRuntime.path);
   }
 
@@ -188,6 +189,13 @@ function getCandidateClaudePaths(platform: SupportedPlatform): string[] {
       '/opt/homebrew/bin/claude',
       '/usr/local/bin/claude',
     );
+  }
+
+  // When the user prefers system installs but none were found, append the bundled
+  // runtime as a graceful last resort so Claude remains usable. The Settings page
+  // exposes runtimeSource so users can see which path is actually in use.
+  if (preference === 'system' && bundledRuntime) {
+    candidates.push(bundledRuntime.path);
   }
 
   return uniquePaths(candidates);

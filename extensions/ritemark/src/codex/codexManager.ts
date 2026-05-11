@@ -18,6 +18,7 @@ import {
   inferCodexRuntimeLaunchMode,
   readBundledRuntimeVersion,
   isBundledAgentRuntimePath,
+  readAgentRuntimePreference,
 } from '../utils/bundledAgentRuntime';
 
 export interface CodexManagerConfig {
@@ -97,6 +98,38 @@ export class CodexManager {
   }
 
   private async findBinary(): Promise<CodexResolvedBinary | null> {
+    const preference = readAgentRuntimePreference();
+    const bundled = this.resolveBundledBinary();
+
+    if (preference === 'bundled' && bundled) {
+      return bundled;
+    }
+
+    const fromPath = await this.findBinaryInPath();
+    if (fromPath) {
+      return {
+        binaryPath: fromPath,
+        runtimeSource: 'system',
+        launchMode: inferCodexRuntimeLaunchMode(fromPath),
+      };
+    }
+
+    const fallbackPath = this.findSystemFallbackBinaryPath();
+    if (fallbackPath) {
+      return {
+        binaryPath: fallbackPath,
+        runtimeSource: 'system',
+        launchMode: inferCodexRuntimeLaunchMode(fallbackPath),
+      };
+    }
+
+    // No system binary found. If the user prefers system but no install exists,
+    // gracefully fall back to bundled so Codex remains usable. The Settings page
+    // surfaces runtimeSource so the user can see which path is actually in use.
+    return bundled;
+  }
+
+  private resolveBundledBinary(): CodexResolvedBinary | null {
     const bundledAppServer = findBundledAgentRuntime('codex-app-server');
     if (bundledAppServer) {
       return {
@@ -115,23 +148,7 @@ export class CodexManager {
       };
     }
 
-    const fromPath = await this.findBinaryInPath();
-    if (fromPath) {
-      return {
-        binaryPath: fromPath,
-        runtimeSource: 'system',
-        launchMode: inferCodexRuntimeLaunchMode(fromPath),
-      };
-    }
-
-    const fallbackPath = this.findSystemFallbackBinaryPath();
-    return fallbackPath
-      ? {
-        binaryPath: fallbackPath,
-        runtimeSource: 'system',
-        launchMode: inferCodexRuntimeLaunchMode(fallbackPath),
-      }
-      : null;
+    return null;
   }
 
   private findSystemFallbackBinaryPath(): string | null {
@@ -674,26 +691,29 @@ export class CodexManager {
       return cached;
     }
 
-    const defaultCapabilities: CodexCapabilityFlags = {
-      approvals: false,
-      requestUserInput: false,
-      planUpdates: false,
+    // Optimistic fail-safe: when the protocol probe cannot run with either argv shape
+    // (legacy `codex app-server generate-ts` vs new `codex-app-server generate-ts`),
+    // we assume the binary is a modern Codex and keep capability flags ON. The
+    // alternative — all flags off — surfaces a "limited features" banner for healthy
+    // binaries whose launch-mode was guessed wrong from basename heuristics (issue #60).
+    // Banner now fires only on positive evidence of incompatibility (generate-ts
+    // succeeded but a specific method was missing), never on probe failure.
+    const optimisticCapabilities: CodexCapabilityFlags = {
+      approvals: true,
+      requestUserInput: true,
+      planUpdates: true,
     };
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-codex-protocol-'));
 
     try {
-      const result = this.spawnResolvedBinarySync(binaryPath, this.buildGenerateTypesArgs(launchMode, tempDir), {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 8000,
-      });
+      // Try the argv form matching the detected launchMode first, then fall back to
+      // the other form. inferCodexRuntimeLaunchMode() classifies on basename, which
+      // is wrong for a system-installed Rust `codex` that is actually the new
+      // app-server shape. Trying both shapes detects the real binary at runtime.
+      const probeOutcome = this.runGenerateTypesProbe(binaryPath, launchMode, tempDir);
 
-      if (result.status !== 0) {
-        const failure = this.summarizeFailure(String(result.stderr || result.stdout || 'Codex protocol probe failed.'));
-        const status = this.buildCompatibilityStatus(
-          defaultCapabilities,
-          [`Protocol probe failed: ${failure}`]
-        );
+      if (!probeOutcome.success) {
+        const status = this.buildCompatibilityStatus(optimisticCapabilities, []);
         CodexManager.compatibilityCache.set(cacheKey, status);
         return status;
       }
@@ -722,17 +742,41 @@ export class CodexManager {
       const status = this.buildCompatibilityStatus(capabilities, limitations);
       CodexManager.compatibilityCache.set(cacheKey, status);
       return status;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const status = this.buildCompatibilityStatus(
-        defaultCapabilities,
-        [`Protocol probe failed: ${message}`]
-      );
+    } catch {
+      const status = this.buildCompatibilityStatus(optimisticCapabilities, []);
       CodexManager.compatibilityCache.set(cacheKey, status);
       return status;
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  }
+
+  private runGenerateTypesProbe(
+    binaryPath: string,
+    launchMode: CodexLaunchMode,
+    tempDir: string,
+  ): { success: boolean } {
+    const tried = new Set<string>();
+    const orderedModes: CodexLaunchMode[] = [launchMode, launchMode === 'codex-app-server' ? 'codex-cli' : 'codex-app-server'];
+
+    for (const mode of orderedModes) {
+      const args = this.buildGenerateTypesArgs(mode, tempDir);
+      const key = args.join(' ');
+      if (tried.has(key)) continue;
+      tried.add(key);
+
+      const result = this.spawnResolvedBinarySync(binaryPath, args, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 8000,
+      });
+
+      if (result.status === 0) {
+        return { success: true };
+      }
+    }
+
+    return { success: false };
   }
 
   private buildCompatibilityStatus(
