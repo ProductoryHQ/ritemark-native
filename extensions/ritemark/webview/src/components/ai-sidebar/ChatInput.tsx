@@ -120,6 +120,7 @@ export function ChatInput() {
   const [pathChips, setPathChips] = useState<PathChip[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [hideActiveFile, setHideActiveFile] = useState(false);
+  const [hideBrowserContext, setHideBrowserContext] = useState(false);
   const [showMentionPopup, setShowMentionPopup] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
@@ -161,6 +162,7 @@ export function ChatInput() {
   const clearPinnedAgentContent = useAISidebarStore((s) => s.clearPinnedAgentContent);
   const clearPinnedAgentDismissal = useAISidebarStore((s) => s.clearPinnedAgentDismissal);
   const activeFilePath = useAISidebarStore((s) => s.activeFilePath);
+  const currentBrowserContext = useAISidebarStore((s) => s.currentBrowserContext);
 
   // Merge built-in + discovered commands
   const allCommands = useMemo(() => mergeCommands(discoveredCommands), [discoveredCommands]);
@@ -227,9 +229,9 @@ export function ChatInput() {
       .filter((p): p is string => !!p);
 
     if (isCodex) {
-      sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined, pendingRuntime.mode);
+      sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined, pendingRuntime.mode, hideBrowserContext);
     } else if (isClaudeCode) {
-      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
+      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext: hideBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
     } else {
       sendChatMessage(prompt);
     }
@@ -237,6 +239,7 @@ export function ChatInput() {
     setAttachments([]);
     setPathChips([]);
     setHideActiveFile(false);
+    setHideBrowserContext(false);
     setShowMentionPopup(false);
     setShowCommandPopup(false);
     clearPinnedAgentContent();
@@ -245,7 +248,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendChatMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendChatMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
   const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
@@ -653,12 +656,14 @@ export function ChatInput() {
   // Reset "hide active file" when the active file changes
   useEffect(() => {
     setHideActiveFile(false);
+    setHideBrowserContext(false);
   }, [activeFilePath]);
 
   // Determine if active file context chip should show
   // Don't show if: no active file, user dismissed it, or it's already in manual path chips
   const showActiveFileChip = activeFilePath && !hideActiveFile &&
     !pathChips.some((p) => p.path === activeFilePath || p.path.endsWith('/' + activeFilePath));
+  const showBrowserContextChip = currentBrowserContext?.url && !hideBrowserContext;
 
   // Auto-resize textarea
   useEffect(() => {
@@ -695,7 +700,7 @@ export function ChatInput() {
   const runtimeFooterLabel = pendingRuntime.runtimeId === 'codex'
     ? `Codex · ${currentCodexModel?.label || codexSelectedModel || 'Model'}`
     : `Claude · ${currentClaudeModel?.label || selectedModel || 'Model'}`;
-  const contextCount = (showActiveFileChip ? 1 : 0) + pathChips.length;
+  const contextCount = (showActiveFileChip ? 1 : 0) + (showBrowserContextChip ? 1 : 0) + pathChips.length;
   const contextSummary = [
     attachmentCount > 0 ? `${attachmentCount} attached` : null,
     contextCount > 0 ? `${contextCount} context` : null,
@@ -770,8 +775,8 @@ export function ChatInput() {
       )}
 
       <div className="overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)] shadow-[0_1px_2px_rgba(30,27,75,0.04)] focus-within:border-[var(--r-hairline-strong)] focus-within:shadow-[0_0_0_1px_rgba(100,116,139,0.08)]">
-        {/* Context chips: active file + manually added paths + @mentions + pinned agent */}
-        {(showActiveFileChip || pathChips.length > 0 || mentions.length > 0 || pinnedAgent) && (
+        {/* Context chips: active file + browser + manually added paths + @mentions + pinned agent */}
+        {(showActiveFileChip || showBrowserContextChip || pathChips.length > 0 || mentions.length > 0 || pinnedAgent) && (
           <div className="flex gap-1.5 px-2.5 pt-2 flex-wrap">
             {showActiveFileChip && (
               <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]">
@@ -783,6 +788,22 @@ export function ChatInput() {
                   onClick={() => setHideActiveFile(true)}
                   className="shrink-0 rounded hover:text-[var(--r-error)]"
                   title="Remove from context"
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </div>
+            )}
+            {showBrowserContextChip && (
+              <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border ${currentBrowserContext?.annotationMode ? 'border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-indigo-50,#eef2ff)] text-[var(--r-indigo-700,#4338ca)]' : 'border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]'}`}>
+                <Icon name="globe" size={12} className="shrink-0" />
+                <span className="truncate max-w-[180px]" title={currentBrowserContext?.url}>
+                  Browser: {currentBrowserContext?.title || currentBrowserContext?.url}
+                  {currentBrowserContext?.annotationMode ? ' · Annotation' : ''}
+                </span>
+                <button
+                  onClick={() => setHideBrowserContext(true)}
+                  className="shrink-0 rounded hover:text-[var(--r-error)]"
+                  title="Remove browser context from this turn"
                 >
                   <Icon name="x" size={12} />
                 </button>
