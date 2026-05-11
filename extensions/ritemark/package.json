@@ -252,6 +252,25 @@
         }
       },
       {
+        "title": "Ritemark Agent Runtime",
+        "properties": {
+          "ritemark.agentRuntime.preference": {
+            "type": "string",
+            "enum": [
+              "bundled",
+              "system"
+            ],
+            "enumDescriptions": [
+              "Use the Codex and Claude runtimes that ship inside Ritemark (recommended)",
+              "Prefer system-installed Codex and Claude; bundled runtimes are used only if no system install is found"
+            ],
+            "default": "bundled",
+            "description": "Which agent runtime Ritemark prefers when both bundled and system installs are available. Applies to both Codex and Claude.",
+            "scope": "application"
+          }
+        }
+      },
+      {
         "title": "Codex",
         "properties": {
           "ritemark.codex.approvalPolicy": {

@@ -14,6 +14,7 @@ interface SettingsData {
   codexIntegration: boolean;
   codexApprovalPolicy: 'untrusted' | 'on-request' | 'on-failure' | 'never';
   codexSandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
+  agentRuntimePreference: 'bundled' | 'system';
   htmlDefaultOpener: 'browser' | 'editor' | 'prompt'; // browser/prompt are legacy values
   updatesEnabled: boolean;
   agentTimeout: number;
@@ -308,6 +309,57 @@ export function RitemarkSettings() {
                 onSelect={() => handleThemeChange(theme.id)}
               />
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Agent Runtime Section */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Icon name="gear" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
+            Agent Runtime
+          </h2>
+        </div>
+        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <label className="text-sm font-medium text-ink-strong block mb-1">
+            Runtime preference
+          </label>
+          <select
+            value={settings.agentRuntimePreference ?? 'bundled'}
+            onChange={(e) => handleSettingChange('agentRuntime.preference', e.target.value)}
+            className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
+          >
+            <option value="bundled">Bundled (recommended) — use the runtimes that ship with Ritemark</option>
+            <option value="system">Use system install — prefer Codex/Claude installed on PATH; bundled is fallback</option>
+          </select>
+          <p className="text-xs text-ink-muted mt-1">
+            Applies to both Codex and Claude. Bundled runtimes are pinned per Ritemark release; choose "system install" if you want to use your own up-to-date or custom builds.
+          </p>
+
+          <div className="mt-4 pt-4 border-t border-hairline space-y-2">
+            <div className="text-xs font-medium text-ink-strong">Currently active</div>
+            <div className="grid gap-2 sm:grid-cols-2 text-xs">
+              <div className="flex items-center justify-between p-2 rounded bg-surface-soft">
+                <span className="text-ink-muted">Claude</span>
+                <span className="text-ink-strong">
+                  {getSourceChipLabel(settings.componentStatus.claudeCode.runtimeStatus.source) ?? 'Not detected'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded bg-surface-soft">
+                <span className="text-ink-muted">Codex</span>
+                <span className="text-ink-strong">
+                  {getSourceChipLabel(settings.componentStatus.codex.runtimeStatus.source) ?? 'Not detected'}
+                </span>
+              </div>
+            </div>
+            {settings.agentRuntimePreference === 'system'
+              && (settings.componentStatus.claudeCode.runtimeStatus.source === 'bundled'
+                || settings.componentStatus.codex.runtimeStatus.source === 'bundled') && (
+              <p className="text-xs text-ink-muted mt-2">
+                One or more agents fell back to the bundled runtime because no system install was found on PATH.
+              </p>
+            )}
           </div>
         </div>
       </section>

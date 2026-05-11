@@ -97,6 +97,25 @@ export function inferCodexRuntimeLaunchMode(binaryPath: string): 'codex-cli' | '
   return name.startsWith('codex-app-server') ? 'codex-app-server' : 'codex-cli';
 }
 
+export type AgentRuntimePreference = 'bundled' | 'system';
+
+/**
+ * Read the user's preferred agent-runtime source from VS Code settings.
+ * Lazy-loads `vscode` so this stays callable from tsx tests that don't run
+ * inside the extension host (returns `'bundled'` when vscode is unavailable).
+ */
+export function readAgentRuntimePreference(): AgentRuntimePreference {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const vscode = require('vscode');
+    const config = vscode.workspace.getConfiguration('ritemark');
+    const value = config.get('agentRuntime.preference', 'bundled');
+    return value === 'system' ? 'system' : 'bundled';
+  } catch {
+    return 'bundled';
+  }
+}
+
 interface BundledManifestEntry {
   installName: string;
   platform: string;

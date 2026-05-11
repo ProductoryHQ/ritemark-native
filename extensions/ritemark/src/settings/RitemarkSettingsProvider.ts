@@ -248,6 +248,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Update VS Code setting
         if (message.key && message.value !== undefined) {
           await config.update(message.key, message.value, vscode.ConfigurationTarget.Global);
+          // Changing the runtime preference invalidates Claude/Codex resolver state
+          // (which binary is selected, source chip readout, capabilities). Force a
+          // refresh so the Settings page reflects the active choice immediately.
+          if (message.key === 'agentRuntime.preference') {
+            emitClaudeStatusInvalidated('settings-updated');
+            emitCodexStatusInvalidated('status-refresh');
+          }
           // Send updated settings back
           await this.sendCurrentSettings(webview);
         }
@@ -516,6 +523,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         codexIntegration: isEnabled('codex-integration'),
         codexApprovalPolicy: config.get('codex.approvalPolicy', 'on-request'),
         codexSandboxMode: config.get('codex.sandboxMode', 'workspace-write'),
+
+        // Agent runtime preference (bundled vs system)
+        agentRuntimePreference: config.get('agentRuntime.preference', 'bundled'),
 
         // Browser
         htmlDefaultOpener: config.get('browser.htmlDefaultOpener', 'editor'),
