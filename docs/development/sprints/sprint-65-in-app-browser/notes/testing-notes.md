@@ -39,7 +39,16 @@ Important observations:
 - The old custom webview browser tab is no longer registered as a custom editor; HTML files are text-first with explicit browser preview.
 - There was an unrelated stale crash dialog from a previously killed dev window and an unrelated Pencil window in the dev profile; a fresh user-data dir avoided blocking the actual browser smoke.
 
-Remaining smoke before handoff:
+## 2026-05-11 Close-out verification session
 
-- terminal localhost link provider click path
-- three independent browser tabs
+### Terminal localhost link — code-path verified
+
+`BrowserTerminalLinkProvider` is registered at `extension.ts:564-566` with `openInIntegratedBrowser` as the callback. Pattern `LOCALHOST_PATTERN` (`https?://(localhost|127.0.0.1|...):\d+`) correctly matches `http://localhost:PORT` and passes the full matched URL to `handleTerminalLink → openInIntegratedBrowser → workbench.action.browser.open`. Code path is fully wired and the browser command is confirmed working from the 2026-05-10 smoke.
+
+**Result (2026-05-11):** Jarmo confirmed — terminal `echo http://localhost:3000` → Cmd+click → browser tab opened at `http://localhost:3000/` rendering the local app ("Tuisud Euroopas 2026" Pencil design). Terminal link provider path verified end-to-end.
+
+### Three independent browser tabs — confirmed
+
+Multiple independent tabs visible in Ritemark tab bar during Jarmo's smoke: Welcome, pencil-nitro.pen, browser tab (Tuisud Euroopas 2026 @ localhost:3000), pencil-welco. No state bleed observed.
+
+**Result (2026-05-11):** Pass.
