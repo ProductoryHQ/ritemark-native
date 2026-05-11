@@ -120,6 +120,12 @@ export class BrowserContextStore {
     const metadata = await this.refreshMetadata();
     if (!metadata?.url) return null;
 
+    // Consent boundary (Sprint 67 D5): no browser context — not even URL/title
+    // — flows to the AI runtimes unless the user has accepted the workbench
+    // share-with-agent prompt. Auto-share fires the prompt on first activation;
+    // if the user declined, this guard keeps URL identity off the wire.
+    if (!metadata.sharedWithAgent) return null;
+
     let snapshot: BrowserContextSnapshot = metadata;
 
     if (metadata.sharedWithAgent) {

@@ -476,9 +476,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // Browser annotation mode is toggled by a workbench BrowserView action, not
     // by the extension webview. Poll lightweight metadata while the AI sidebar
     // is visible so the composer chip reflects browser/menu changes without
-    // requiring a tab switch. Polling stops when the sidebar hides.
+    // requiring a tab switch. Polling stops when the sidebar hides or disposes.
     webviewView.onDidChangeVisibility(() => {
       this._refreshBrowserContextPolling();
+    });
+    webviewView.onDidDispose(() => {
+      if (this._browserContextPoll) {
+        clearInterval(this._browserContextPoll);
+        this._browserContextPoll = null;
+      }
     });
     this._refreshBrowserContextPolling();
   }
@@ -583,6 +589,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._stopClaudeLoginPolling();
     this._disposeCodexStatusListener?.();
     this._disposeClaudeStatusListener?.();
+    if (this._browserContextPoll) {
+      clearInterval(this._browserContextPoll);
+      this._browserContextPoll = null;
+    }
   }
 
   private async _sendApiKeyStatus() {
