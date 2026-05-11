@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ritemark Browser Fixture</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        margin: 0;
+        padding: 24px;
+        line-height: 1.5;
+      }
+      .card {
+        border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+        border-radius: 12px;
+        padding: 16px;
+        margin: 0 0 16px;
+      }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .spacer {
+        min-height: 720px;
+        margin: 16px 0;
+        border: 1px dashed #8885;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        color: #667;
+        background: linear-gradient(180deg, transparent, #8881, transparent);
+      }
+      button, input, select {
+        font: inherit;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #8885;
+      }
+      code { background: #8882; padding: 2px 6px; border-radius: 6px; }
+      #status { font-weight: 600; }
+    </style>
+  </head>
+  <body id="top">
+    <h1>Ritemark In-App Browser Test Fixture</h1>
+    <p>
+      Use this file to validate Sprint 65 behavior for <code>file://</code> and
+      workspace <code>.html</code> opening.
+    </p>
+
+    <section class="card">
+      <h2>Navigation checks</h2>
+      <div class="row">
+        <a href="#section-a">Go to #section-a</a>
+        <a href="#section-b">Go to #section-b</a>
+        <a href="#section-c">Go to #section-c</a>
+        <a href="./browser-fixture-page-2.html">Open local page 2</a>
+        <a href="https://example.com" target="_blank" rel="noreferrer">Open example.com</a>
+      </div>
+      <p id="status">Status: waiting for interaction</p>
+    </section>
+
+    <div class="spacer">Spacer before Section A — anchor scroll should visibly move here.</div>
+
+    <section class="card" id="section-a">
+      <h2>Section A</h2>
+      <p>Use Back/Forward in the browser chrome after anchor and page navigation.</p>
+    </section>
+
+    <div class="spacer">Spacer between Section A and Section B.</div>
+
+    <section class="card" id="section-b">
+      <h2>Section B</h2>
+      <form id="test-form">
+        <label>
+          Name:
+          <input id="name" name="name" placeholder="Type here" />
+        </label>
+        <label>
+          Mode:
+          <select id="mode" name="mode">
+            <option>Browser</option>
+            <option>Editor</option>
+            <option>Prompt</option>
+          </select>
+        </label>
+        <button type="submit">Submit</button>
+      </form>
+      <p id="form-output"></p>
+    </section>
+
+    <div class="spacer">Spacer between Section B and Section C.</div>
+
+    <section class="card" id="section-c">
+      <h2>Section C — Deep Anchor Target</h2>
+      <p>If this card is near the top after clicking #section-c, long-distance anchor scrolling works.</p>
+      <p><a href="#top">Back to top hash</a></p>
+    </section>
+
+    <script>
+      const status = document.getElementById('status');
+      const out = document.getElementById('form-output');
+      const form = document.getElementById('test-form');
+
+      function setStatus(msg) {
+        status.textContent = 'Status: ' + msg;
+      }
+
+      setStatus('loaded at ' + new Date().toLocaleTimeString());
+
+      window.addEventListener('hashchange', () => {
+        setStatus('hash changed to ' + location.hash);
+      });
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('name').value || 'anonymous';
+        const mode = document.getElementById('mode').value;
+        out.textContent = `Form OK: ${name} (${mode})`;
+        setStatus('form submitted');
+      });
+    </script>
+  </body>
+</html>

@@ -23,6 +23,19 @@ import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './co
 import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
 import { initAnalytics, shutdownAnalytics } from './analytics/posthog';
 import { registerReactionCommand } from './analytics/reactions';
+import { BrowserTerminalLinkProvider } from './browser/BrowserTerminalLinkProvider';
+import { BrowserHtmlOpenRedirector } from './browser/BrowserHtmlOpenRedirector';
+import {
+  goBackInIntegratedBrowser,
+  goForwardInIntegratedBrowser,
+  openEmptyBrowserTab,
+  openInIntegratedBrowser,
+  openIntegratedBrowserUrlExternally,
+  reloadIntegratedBrowser,
+  setBrowserHistoryStore,
+} from './browser/IntegratedBrowser';
+import { BrowserHistoryStore } from './browser/BrowserHistoryStore';
+import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
@@ -517,6 +530,154 @@ export function activate(context: vscode.ExtensionContext) {
   // Register DOCX viewer (read-only)
   context.subscriptions.push(
     DocxEditorProvider.register(context)
+  );
+
+  // ---------------------------------------------------------------------------
+  // Browser tab (Sprint 65)
+  // ---------------------------------------------------------------------------
+
+  // Sprint 65 pivot: use the shell-level Electron BrowserView implementation
+  // (`workbench.action.browser.*`) rather than the extension webview/iframe
+  // prototype. Real webContents can render external sites and workspace file://
+  // URLs without iframe embedding restrictions.
+
+  // Register .html default opener. Text opens are redirected to the native
+  // integrated browser; explicit 'Open as Text' bypasses this redirect.
+  const browserHtmlOpenRedirector = BrowserHtmlOpenRedirector.register(context);
+
+  // Browser history store + Activity Bar panel (Indigo-Editorial webview).
+  const browserHistoryStore = new BrowserHistoryStore(context.globalState);
+  setBrowserHistoryStore(browserHistoryStore);
+  const browserPanelProvider = new BrowserPanelProvider(browserHistoryStore, context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      BrowserPanelProvider.viewId,
+      browserPanelProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    ),
+    browserPanelProvider,
+    browserHistoryStore,
+    { dispose: () => setBrowserHistoryStore(undefined) }
+  );
+
+  context.subscriptions.push(
+    vscode.window.registerTerminalLinkProvider(
+      new BrowserTerminalLinkProvider(openInIntegratedBrowser)
+    )
+  );
+
+  // Command: open URL via input box
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.browser.openUrl', async () => {
+      const raw = await vscode.window.showInputBox({
+        prompt: 'Enter a URL to open in Ritemark Browser',
+        placeHolder: 'https://…, localhost:PORT, or file:///…',
+        validateInput: (value) => {
+          if (!value.trim()) return 'URL must not be empty.';
+          return null;
+        },
+      });
+      if (!raw) return;
+      try {
+        await openInIntegratedBrowser(raw);
+      } catch (err) {
+        void vscode.window.showErrorMessage(
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+    })
+  );
+
+  // Command: go back in active browser tab
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.browser.back', async () => {
+      await goBackInIntegratedBrowser();
+    })
+  );
+
+  // Command: go forward in active browser tab
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.browser.forward', async () => {
+      await goForwardInIntegratedBrowser();
+    })
+  );
+
+  // Command: refresh active browser tab
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.browser.refresh', async () => {
+      await reloadIntegratedBrowser();
+    })
+  );
+
+  // Command: open current browser URL externally, or a manually entered URL if
+  // invoked outside an active browser editor.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.browser.openInSystemBrowser', async () => {
+      try {
+        await openIntegratedBrowserUrlExternally();
+      } catch {
+        const raw = await vscode.window.showInputBox({
+          prompt: 'URL to open in system browser',
+          placeHolder: 'https://…',
+        });
+        if (raw) await openIntegratedBrowserUrlExternally(raw);
+      }
+    })
+  );
+
+  // Command: open .html file as plain text (right-click "Open as Text")
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'ritemark.browser.openAsText',
+      (uri?: vscode.Uri) => {
+        const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+        if (!target) return;
+        browserHtmlOpenRedirector.allowTextOpen(target);
+        void vscode.commands.executeCommand('vscode.openWith', target, 'default');
+      }
+    )
+  );
+
+  // Command: open .html file in the native Electron BrowserView.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'ritemark.browser.openInBrowser',
+      async (uri?: vscode.Uri) => {
+        const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+        if (!target) return;
+        try {
+          await openInIntegratedBrowser(target);
+        } catch (err) {
+          void vscode.window.showErrorMessage(
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+      }
+    )
+  );
+
+  // Command: open empty browser tab (Activity Bar "New Tab" button).
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.browser.newTab', async () => {
+      await openEmptyBrowserTab();
+    })
+  );
+
+  // Commands: open / remove / clear Recent URLs from the Activity Bar panel.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.browser.history.open', async (url: string) => {
+      if (!url) return;
+      try {
+        await openInIntegratedBrowser(url);
+      } catch (err) {
+        void vscode.window.showErrorMessage(
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+    }),
+    vscode.commands.registerCommand('ritemark.browser.history.clearAll', async () => {
+      await browserHistoryStore.clear();
+    })
   );
 
   // Register reindex command (initializes indexer on-demand if needed)
