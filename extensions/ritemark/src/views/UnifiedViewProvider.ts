@@ -53,6 +53,7 @@ import {
   type OnboardingStatus,
   traceClaude,
 } from '../agent';
+import { BrowserContextStore } from '../browser/BrowserContextStore';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
@@ -156,6 +157,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
   private _claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
   private _disposeClaudeStatusListener: (() => void) | null = null;
+  private _browserContextPoll: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -212,6 +214,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           await this._sendAgentConfig();
           this._sendChatFontSize();
           this._sendActiveFile();
+          void this._sendActiveBrowserContext();
           this._sendOnboardingStatus();
           break;
 
@@ -290,7 +293,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             imageCount: Array.isArray(message.images) ? message.images.length : 0,
             skipActiveFile: message.skipActiveFile === true,
           });
-          await this._handleAgentExecution(message.prompt, message.images, message.skipActiveFile, message.mentionedAgentPaths);
+          await this._handleAgentExecution(message.prompt, message.images, message.skipActiveFile, message.mentionedAgentPaths, message.skipBrowserContext === true);
           break;
 
         case 'ai-cancel-agent':
@@ -383,7 +386,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             mode: message.mode,
             attachmentCount: Array.isArray(message.attachments) ? message.attachments.length : 0,
           });
-          await this._handleCodexExecution(message.prompt, message.model, message.attachments, message.mode);
+          await this._handleCodexExecution(message.prompt, message.model, message.attachments, message.mode, message.skipBrowserContext === true);
           break;
 
         case 'codex:login':
@@ -467,7 +470,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // Track active tab changes to update context chip in webview
     vscode.window.tabGroups.onDidChangeTabs(() => {
       this._sendActiveFile();
+      void this._sendActiveBrowserContext();
     });
+
+    // Browser annotation mode is toggled by a workbench BrowserView action, not
+    // by the extension webview. Poll lightweight metadata while the AI sidebar
+    // is visible so the composer chip reflects browser/menu changes without
+    // requiring a tab switch. Polling stops when the sidebar hides.
+    webviewView.onDidChangeVisibility(() => {
+      this._refreshBrowserContextPolling();
+    });
+    this._refreshBrowserContextPolling();
   }
 
   /**
@@ -1050,7 +1063,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Execute a prompt using the Claude Code agent (persistent session).
    * Reuses the same process across turns so the agent retains context.
    */
-  private async _handleAgentExecution(prompt: string, images?: Array<{ id: string; data: string; mediaType: string }>, skipActiveFile?: boolean, mentionedAgentPaths?: string[]) {
+  private async _handleAgentExecution(prompt: string, images?: FileAttachment[], skipActiveFile?: boolean, mentionedAgentPaths?: string[], skipBrowserContext?: boolean) {
     // Prepend @mentioned agent instructions as hidden context
     if (mentionedAgentPaths && mentionedAgentPaths.length > 0) {
       const fs = require('fs') as typeof import('fs');
@@ -1124,6 +1137,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           models,
         });
       };
+    }
+
+    const browserContext = skipBrowserContext ? null : await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
+    if (browserContext) {
+      prompt = `${browserContext.promptBlock}
+
+---
+
+${prompt}`;
+      if (browserContext.claudeAttachments.length > 0) {
+        images = [...(images ?? []), ...browserContext.claudeAttachments];
+      }
     }
 
     // Get active file context — works for both TextEditor and custom editors (Ritemark)
@@ -1271,7 +1296,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     prompt: string,
     model?: string,
     attachments?: Array<{ kind: string; data: string; mediaType: string }>,
-    mode?: 'plan' | 'execute'
+    mode?: 'plan' | 'execute',
+    skipBrowserContext?: boolean
   ) {
     if (!isEnabled('codex-integration')) {
       this._view?.webview.postMessage({
@@ -1330,7 +1356,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       // Convert image attachments to data URLs for Codex
       const imageDataUrls = attachments
         ?.filter(a => a.kind === 'image')
-        .map(a => `data:${a.mediaType};base64,${a.data}`);
+        .map(a => `data:${a.mediaType};base64,${a.data}`) ?? [];
+
+      const browserContext = skipBrowserContext ? null : await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
+      if (browserContext?.codexImageDataUrls.length) {
+        imageDataUrls.push(...browserContext.codexImageDataUrls);
+      }
 
       const resolvedModel = model || getCodexModels()[0]?.id || 'gpt-5.3-codex';
       const shouldUsePlanMode = mode === 'plan' || (mode !== 'execute' && shouldStartCodexInPlanMode(prompt));
@@ -1352,11 +1383,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         hasImages: Boolean(imageDataUrls && imageDataUrls.length > 0),
       });
 
-      // Prepend active file context to prompt (same pattern as Claude Code agent)
+      // Prepend active file and browser context to prompt (same pattern as Claude Code agent)
       const activeFile = this._getActiveFileContext();
-      const promptBody = activeFile
-        ? `[Currently editing: ${activeFile.path}]\n\n${prompt}`
+      const promptWithBrowserContext = browserContext
+        ? `${browserContext.promptBlock}\n\n---\n\n${prompt}`
         : prompt;
+      const promptBody = activeFile
+        ? `[Currently editing: ${activeFile.path}]\n\n${promptWithBrowserContext}`
+        : promptWithBrowserContext;
       const enrichedPrompt = `${CODEX_TURN_REMINDER}\n\n${promptBody}`;
 
       // Start turn (send user message)
@@ -1364,7 +1398,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         this._codexThreadId,
         enrichedPrompt,
         resolvedModel,
-        imageDataUrls && imageDataUrls.length > 0 ? imageDataUrls : undefined,
+        imageDataUrls.length > 0 ? imageDataUrls : undefined,
         collaborationMode,
       );
       this._codexTurnId = turnResult.turn.id;
@@ -1713,6 +1747,39 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       type: 'active-file-changed',
       path: activeFile?.path ?? null,
     });
+  }
+
+  private async _sendActiveBrowserContext() {
+    const snapshot = await BrowserContextStore.instance.refreshMetadata();
+    if (snapshot?.url && snapshot.pageId && !snapshot.sharedWithAgent) {
+      // Fire-and-forget: triggers consent dialog the first time per pageId per session.
+      // Subsequent polls see sharedWithAgent === true and skip.
+      void BrowserContextStore.instance.ensureSharedForActiveTab();
+    }
+    const post = BrowserContextStore.instance.getLastSnapshot() ?? snapshot;
+    this._view?.webview.postMessage({
+      type: 'active-browser-changed',
+      context: post?.url ? {
+        url: post.url,
+        title: post.title,
+        sharedWithAgent: post.sharedWithAgent === true,
+        annotationMode: post.annotationMode === true,
+        error: post.error,
+      } : null,
+    });
+  }
+
+  private _refreshBrowserContextPolling() {
+    const shouldPoll = this._view?.visible === true;
+    if (shouldPoll && !this._browserContextPoll) {
+      void this._sendActiveBrowserContext();
+      this._browserContextPoll = setInterval(() => {
+        void this._sendActiveBrowserContext();
+      }, 1500);
+    } else if (!shouldPoll && this._browserContextPoll) {
+      clearInterval(this._browserContextPoll);
+      this._browserContextPoll = null;
+    }
   }
 
   private async _sendIndexStatus() {

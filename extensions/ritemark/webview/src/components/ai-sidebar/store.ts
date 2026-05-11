@@ -143,6 +143,7 @@ interface AISidebarState {
   // ── Selection ──
   selection: EditorSelection;
   activeFilePath: string | null;
+  currentBrowserContext: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null;
 
   // ── Chat state (Ritemark Agent) ──
   chatMessages: ChatMessage[];
@@ -214,7 +215,7 @@ interface AISidebarState {
   selectModel: (modelId: string) => void;
   setPendingRuntime: (partial: Partial<{ runtimeId: 'claude-code' | 'codex'; modelId: string; mode: 'plan' | 'edit' }>) => void;
   sendChatMessage: (prompt: string) => void;
-  sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
+  sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
   /**
    * Detach the editor selection from the chat input context. Does NOT clear
@@ -246,7 +247,7 @@ interface AISidebarState {
   rejectPlan: (turnId: string, feedback?: string) => void;
   answerAgentQuestion: (turnId: string, question: AgentQuestion, answers: Record<string, string>) => void;
   dismissWelcome: () => void;
-  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'plan' | 'edit') => void;
+  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'plan' | 'edit', skipBrowserContext?: boolean) => void;
   selectCodexModel: (modelId: string) => void;
   handleCodexApproval: (requestId: string | number, approved: boolean) => void;
   answerCodexQuestion: (turnId: string, question: CodexQuestion, answers: Record<string, string>) => void;
@@ -292,6 +293,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   selection: { text: '', isEmpty: true, from: 0, to: 0 },
   activeFilePath: null,
+  currentBrowserContext: null,
 
   chatMessages: [],
   conversationHistory: [],
@@ -466,7 +468,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       data: att.data,
       mediaType: att.mediaType,
     }));
-    vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile, mentionedAgentPaths: options?.mentionedAgentPaths });
+    vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile, skipBrowserContext: options?.skipBrowserContext, mentionedAgentPaths: options?.mentionedAgentPaths });
   },
 
   dismissSelectedContext: () => {
@@ -738,7 +740,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
   },
 
-  sendCodexMessage: (prompt, attachments?, requestedMode?) => {
+  sendCodexMessage: (prompt, attachments?, requestedMode?, skipBrowserContext?) => {
     const state = get();
     const lastTurn = state.codexConversation[state.codexConversation.length - 1];
     if (lastTurn?.isRunning) return;
@@ -794,6 +796,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       // the wire. Now it is — Codex collaboration mode actually responds
       // to the toggle.
       mode: requestedMode,
+      skipBrowserContext,
       attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
     });
   },
@@ -1210,6 +1213,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
       case 'active-file-changed':
         set({ activeFilePath: message.path });
+        break;
+
+      case 'active-browser-changed':
+        set({ currentBrowserContext: message.context ?? null });
         break;
 
       case 'ai-streaming':
