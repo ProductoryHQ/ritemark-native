@@ -179,7 +179,7 @@ cp -R extensions/ritemark/out/* "VSCode-darwin-arm64/Ritemark Native.app/Content
 Three root causes compounded:
 
 1. **`node_modules` stripped from extension during DMG copy** → TipTap webview wouldn't load. When copying the extension to the app bundle, only remove `webview/node_modules` and `webview/src`. NEVER remove `extensions/ritemark/node_modules` — those are runtime dependencies. Hard check 7 (node_modules has 100+ packages) catches this regression.
-2. **`Info.plist` version not updated** → Finder showed VS Code base version, not Ritemark version. After gulp build, run `PlistBuddy -c "Set :CFBundleShortVersionString X.Y.Z" Ritemark.app/Contents/Info.plist` and the same for `CFBundleVersion`.
+2. ~~**`Info.plist` version not updated**~~ — **RETRACTED (2026-05-12).** `Info.plist CFBundleShortVersionString` always shows the VS Code base version (e.g. `1.117.0`) for ALL Ritemark releases — this is expected and correct. Ritemark's version is authoritative only in `product.json` (`ritemarkVersion`). The About dialog and update system (`versionService.ts`) both read from `product.json`, not `Info.plist`. Do NOT run PlistBuddy to patch the bundle version; do NOT flag this in release audits.
 3. **0-byte source file corruption** (random source files became 0 bytes — TS, SVG, configs, even node_modules type defs). Detection: `find extensions/ritemark/src -name "*.ts" -size 0`. Fix: `git checkout HEAD -- extensions/ritemark/`, reinstall node_modules, rebuild webview. Root cause unconfirmed (disk / sync tool / system process).
 
 ### Quick comparison test

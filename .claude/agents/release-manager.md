@@ -123,7 +123,7 @@ Report the latest version and determine the NEXT valid version. NEVER suggest a 
 Verify the local build:
 
 - Build date (Info.plist mtime is recent, NOT 1980)
-- Version (`product.json` shows target version; `Info.plist CFBundleShortVersionString` matches)
+- Version (`product.json ritemarkVersion` shows target version) — **do NOT check `Info.plist CFBundleShortVersionString`**: it always shows the VS Code base version (e.g. 1.117.0) and that is expected; Ritemark's version is authoritative only in `product.json` and is read by the About dialog and update system from there
 - Code signature (TeamIdentifier set, NOT adhoc)
 - DMG exists, signed, and dated after the app build
 
@@ -139,7 +139,7 @@ Verify the local build:
 | DMG adhoc-signed | `codesign -dv` must show `TeamIdentifier=` |
 | ritemarkVersion missing | `grep ritemarkVersion product.json` |
 | Timestamps show 1980 | `stat -f "%Sm" Ritemark.app` |
-| Info.plist version wrong | `CFBundleShortVersionString` must match target |
+| ~~Info.plist version wrong~~ | NOT a blocker — `CFBundleShortVersionString` always shows VS Code base version; Ritemark version lives in `product.json` (`ritemarkVersion`) |
 
 **SOFT WARNINGS** (proceed but flag to Jarmo): DMG older than app build, uncommitted changes, open sprint WIP, notarization pending, release notes missing or out-of-date.
 
