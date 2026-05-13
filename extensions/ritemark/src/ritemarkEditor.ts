@@ -5,9 +5,11 @@ import matter from 'gray-matter';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
 import { exportToWordV2 } from './export/v2/wordHtmlExporter';
+import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from './export/saveAsMarkdown';
 import { DictationController } from './voiceDictation/controller';
 import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
+import { writeImageRelativeTo } from './utils/imageWriter';
 import { trackEvent } from './analytics/posthog';
 
 // Properties type for front-matter
@@ -164,7 +166,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       imageMappings,
       features: {
         voiceDictation: isEnabled('voice-dictation'),
-        markdownExport: isEnabled('markdown-export')
+        markdownExport: isEnabled('markdown-export'),
+        saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview')
       }
     };
   }
@@ -444,6 +447,15 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             );
             return;
 
+          case 'saveAsMarkdown':
+            // Save converted markdown payload (from DOCX/PDF preview) to disk.
+            void saveAsMarkdownHandler(
+              message.payload as SaveAsMarkdownPayload,
+              document.uri,
+              webview
+            );
+            return;
+
           case 'mermaid:downloadImage':
             // Save mermaid diagram PNG via OS Save As dialog (same pattern as exportWord).
             void trackEvent('feature_used', { feature: 'mermaid_download' });
@@ -697,15 +709,6 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     webview: vscode.Webview
   ): Promise<void> {
     try {
-      // Get directory of the markdown file
-      const docDir = path.dirname(document.uri.fsPath);
-      const imagesDir = path.join(docDir, 'images');
-
-      // Create images folder if it doesn't exist
-      if (!fs.existsSync(imagesDir)) {
-        fs.mkdirSync(imagesDir, { recursive: true });
-      }
-
       // Extract base64 data from data URL (format: data:image/png;base64,...)
       const matches = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
       if (!matches) {
@@ -715,26 +718,20 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       const extension = matches[1];
       const base64Data = matches[2];
 
-      // Sanitize filename - remove special characters that cause issues
+      const docDir = path.dirname(document.uri.fsPath);
+      const imagesDir = path.join(docDir, 'images');
       const rawBaseName = path.basename(filename, path.extname(filename));
-      // Replace special chars with dash, remove consecutive dashes, trim dashes from ends
-      const sanitizedBaseName = rawBaseName
-        .normalize('NFD')                          // Decompose accented chars
-        .replace(/[\u0300-\u036f]/g, '')           // Remove diacritics
-        .replace(/[^a-zA-Z0-9_-]/g, '-')           // Replace special chars with dash
-        .replace(/-+/g, '-')                       // Remove consecutive dashes
-        .replace(/^-|-$/g, '');                    // Trim dashes from ends
 
-      const finalFilename = `${sanitizedBaseName || 'image'}.${extension}`;
-      const imagePath = path.join(imagesDir, finalFilename);
-
-      // Write image file
-      fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
+      const finalFilename = writeImageRelativeTo(
+        imagesDir,
+        `${rawBaseName}.${extension}`,
+        base64Data
+      );
 
       // Return relative path for markdown and webview URI for display
       const relativePath = `./images/${finalFilename}`;
       const webviewUri = webview.asWebviewUri(
-        vscode.Uri.file(imagePath)
+        vscode.Uri.file(path.join(imagesDir, finalFilename))
       ).toString();
 
       // Send success response to webview with both paths

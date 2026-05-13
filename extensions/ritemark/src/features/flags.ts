@@ -24,6 +24,7 @@ export interface FeatureFlag {
 export type FlagId =
   | 'voice-dictation'
   | 'markdown-export'
+  | 'save-as-markdown-from-preview'
   | 'document-search'
   | 'ritemark-flows'
   | 'agentic-assistant'
@@ -46,6 +47,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'markdown-export',
     label: 'Markdown Export',
     description: 'Export documents as PDF and Word files',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  'save-as-markdown-from-preview': {
+    id: 'save-as-markdown-from-preview',
+    label: 'Save as Markdown from Preview',
+    description: 'Convert .docx / .pdf previews to editable markdown',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
