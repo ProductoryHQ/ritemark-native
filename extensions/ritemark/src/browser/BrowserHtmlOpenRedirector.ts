@@ -37,10 +37,19 @@ export class BrowserHtmlOpenRedirector implements vscode.Disposable {
       }),
       vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (editor) void redirector.redirectIfNeeded(editor.document);
+      }),
+      // Cold-start: VS Code may surface visible editors before onDidOpenTextDocument
+      // fires (e.g. CLI open, restore-session). Subscribe to the event so we catch
+      // editors that become visible after activation but before the setTimeout fires.
+      // The existing redirectedUntil map prevents double-redirect.
+      vscode.window.onDidChangeVisibleTextEditors((editors) => {
+        for (const editor of editors) {
+          void redirector.redirectIfNeeded(editor.document);
+        }
       })
     );
 
-    // Catch files that were opened by the CLI before this extension activated.
+    // Belt-and-suspenders: catch files already visible at activation time.
     setTimeout(() => {
       for (const editor of vscode.window.visibleTextEditors) {
         void redirector.redirectIfNeeded(editor.document);
