@@ -3,6 +3,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PdfDocument } from './pdfDocument';
 import { trackEvent } from './analytics/posthog';
+import { isEnabled } from './features';
+import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from './export/saveAsMarkdown';
 
 /**
  * Custom editor provider for PDF files
@@ -77,6 +79,13 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
         case 'refresh':
           await this.handleRefresh(document, webviewPanel.webview, workerUri);
           break;
+        case 'saveAsMarkdown':
+          await saveAsMarkdownHandler(
+            message.payload as SaveAsMarkdownPayload,
+            document.uri,
+            webviewPanel.webview
+          );
+          break;
       }
     });
 
@@ -111,7 +120,12 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
       encoding: 'base64',
       filename: filename,
       sizeBytes: document.buffer.length,
-      workerSrc: workerUri.toString()
+      workerSrc: workerUri.toString(),
+      features: {
+        voiceDictation: isEnabled('voice-dictation'),
+        markdownExport: isEnabled('markdown-export'),
+        saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview')
+      }
     });
   }
 

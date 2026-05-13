@@ -4,6 +4,8 @@ import * as path from 'path';
 import { DocxDocument } from './docxDocument';
 import { isAppInstalled, openInExternalApp, getWordProcessorAppName } from './utils/openExternal';
 import { trackEvent } from './analytics/posthog';
+import { isEnabled } from './features';
+import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from './export/saveAsMarkdown';
 
 /**
  * Custom editor provider for DOCX files
@@ -79,6 +81,13 @@ export class DocxEditorProvider implements vscode.CustomReadonlyEditorProvider<D
         case 'openInExternalApp':
           await this.openInExternalApp(document.uri.fsPath, message.app || 'word');
           break;
+        case 'saveAsMarkdown':
+          await saveAsMarkdownHandler(
+            message.payload as SaveAsMarkdownPayload,
+            document.uri,
+            webviewPanel.webview
+          );
+          break;
       }
     });
 
@@ -108,7 +117,12 @@ export class DocxEditorProvider implements vscode.CustomReadonlyEditorProvider<D
       content: base64,
       encoding: 'base64',
       filename: filename,
-      sizeBytes: document.buffer.length
+      sizeBytes: document.buffer.length,
+      features: {
+        voiceDictation: isEnabled('voice-dictation'),
+        markdownExport: isEnabled('markdown-export'),
+        saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview')
+      }
     });
   }
 
