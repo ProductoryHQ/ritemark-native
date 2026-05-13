@@ -1103,9 +1103,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
 
       case 'agent:config':
-        // Set workspace context for per-project history scoping
+        // Set workspace context for per-project history scoping, then immediately
+        // reload the conversation list so the history panel shows all saved entries.
         if (message.workspacePath) {
           setWorkspaceContext(message.workspacePath);
+          get().loadConversationList();
         }
         const newCodexModels = message.codexModels || [];
         const newClaudeModels = message.models || [];
