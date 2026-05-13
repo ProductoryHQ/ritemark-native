@@ -5,9 +5,10 @@ import { sendToExtension } from '../../bridge'
 interface DOCXViewerProps {
   content: string  // base64-encoded DOCX
   filename: string
+  canSaveAsMarkdown?: boolean
 }
 
-export function DOCXViewer({ content, filename }: DOCXViewerProps) {
+export function DOCXViewer({ content, filename, canSaveAsMarkdown: _canSaveAsMarkdown }: DOCXViewerProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [hasWord, setHasWord] = useState(false)

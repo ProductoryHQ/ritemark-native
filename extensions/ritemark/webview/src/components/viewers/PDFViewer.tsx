@@ -7,6 +7,7 @@ interface PDFViewerProps {
   content: string  // base64-encoded PDF
   filename: string
   workerSrc?: string
+  canSaveAsMarkdown?: boolean
 }
 
 /**
@@ -96,7 +97,7 @@ function LazyPage({
   )
 }
 
-export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
+export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown: _canSaveAsMarkdown }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)

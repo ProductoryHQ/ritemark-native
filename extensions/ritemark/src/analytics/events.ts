@@ -19,6 +19,7 @@ export interface EventPayloads {
   };
   feature_used: {
     feature: string;
+    source?: string;
   };
   agent_used: {
     agent: string;
