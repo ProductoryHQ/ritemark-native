@@ -1,11 +1,6 @@
-/**
- * Filename helpers for Save-as-Markdown image extraction.
- *
- * Mirrors the sanitization rules used by the extension-host `writeImageRelativeTo`
- * helper (extensions/ritemark/src/utils/imageWriter.ts). Running the sanitizer
- * on both sides is idempotent — the webview produces the canonical filename so
- * the markdown reference matches the on-disk filename exactly.
- */
+// Webview-side mirror of utils/imageWriter.ts in the extension. Sanitizing
+// here keeps the markdown reference in lock-step with the on-disk filename.
+// The sanitizer is idempotent, so the extension running it again is a no-op.
 
 export function sanitizeImageBaseName(rawBaseName: string): string {
   return rawBaseName
@@ -16,13 +11,8 @@ export function sanitizeImageBaseName(rawBaseName: string): string {
     .replace(/^-|-$/g, '')
 }
 
-/**
- * Build the canonical filename for an extracted image:
- * `<sanitized-source>--image-<index>.<ext>`
- *
- * Two different source files never collide; re-importing the same source
- * overwrites previous images (correct).
- */
+// `<sanitized-source>--image-<index>.<ext>` — two different sources never
+// collide; re-importing the same source overwrites previous images.
 export function buildExtractedImageFilename(
   sourceBasename: string,
   index1Based: number,
@@ -33,25 +23,39 @@ export function buildExtractedImageFilename(
   return `${cleanBase}--image-${index1Based}.${cleanExt}`
 }
 
+export function stripExt(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.slice(0, dot) : name
+}
+
+export interface MimeMapping {
+  ext: string
+  recognized: boolean
+}
+
 /**
- * Map an image MIME type to a filename extension.
+ * Map an image MIME type to a filename extension. `recognized: false` means
+ * the bytes might not actually be PNG even though we'll save them with that
+ * extension — callers should surface a warning so the user knows the .md
+ * may reference a file the markdown viewer can't render (e.g. WMF/EMF in
+ * legacy Word docs).
  */
-export function mimeToExt(contentType: string): string {
+export function mimeToExt(contentType: string): MimeMapping {
   const subtype = contentType.toLowerCase().replace(/^image\//, '').split(/[;+]/)[0].trim()
   switch (subtype) {
     case 'jpeg':
     case 'jpg':
-      return 'jpg'
+      return { ext: 'jpg', recognized: true }
     case 'svg+xml':
     case 'svg':
-      return 'svg'
+      return { ext: 'svg', recognized: true }
     case 'png':
     case 'gif':
     case 'webp':
     case 'bmp':
     case 'tiff':
-      return subtype
+      return { ext: subtype, recognized: true }
     default:
-      return 'png'
+      return { ext: 'png', recognized: false }
   }
 }

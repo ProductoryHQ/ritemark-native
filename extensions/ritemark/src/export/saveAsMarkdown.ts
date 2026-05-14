@@ -27,16 +27,10 @@ export interface SaveAsMarkdownResult {
 
 /**
  * Save a converted markdown payload to disk via VS Code Save As dialog.
- *
- * - Defaults the save target to <source-basename>.md next to the source file.
- * - Writes any extracted images to a sibling ./images/ folder using the same
- *   sanitization the paste flow uses.
- * - Opens the resulting .md in Ritemark's markdown editor.
- * - Posts a `saveAsMarkdownResult` message back to the webview for the toast.
- *
- * STUB: full implementation lands in work-block 2 (DOCX) / 3 (PDF). For now
- * this handler exists so the message route can be wired up end-to-end during
- * work-block 1 plumbing.
+ * Writes extracted images to a sibling ./images/ folder using the same
+ * sanitization as the paste-flow saveImage handler, opens the resulting .md
+ * in Ritemark's editor, and posts a `saveAsMarkdownResult` message back to
+ * the webview for the toast.
  */
 export async function saveAsMarkdownHandler(
   payload: SaveAsMarkdownPayload,

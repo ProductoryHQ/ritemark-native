@@ -185,22 +185,6 @@ turndownService.addRule('tiptapTaskList', {
 // Keep Turndown's default escaping behavior to prevent content corruption
 // The unescape logic below handles loading escaped files correctly
 
-// Custom rule to handle images with webview URIs
-// When an image has a title starting with ./, it means the relative path is stored there
-// and the src is a webview URI for display purposes only
-turndownService.addRule('imageWithRelativePath', {
-  filter: 'img',
-  replacement: function (_content, node) {
-    const element = node as HTMLImageElement
-    const alt = element.alt || ''
-    const title = element.title || ''
-    // If title contains a relative path, use it as the src
-    const src = title.startsWith('./') ? title : element.src
-    // Don't include title in markdown output
-    return `![${alt}](${src})`
-  }
-})
-
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common)
 

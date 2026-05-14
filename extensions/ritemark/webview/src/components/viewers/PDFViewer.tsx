@@ -4,7 +4,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { sendToExtension } from '../../bridge'
 import { convertPdfToMarkdown } from '../../conversion/pdfToMarkdown'
-import { sanitizeImageBaseName } from '../../utils/imageNaming'
+import { stripExt } from '../../utils/imageNaming'
 
 interface PDFViewerProps {
   content: string  // base64-encoded PDF
@@ -98,11 +98,6 @@ function LazyPage({
       )}
     </div>
   )
-}
-
-function stripExt(name: string): string {
-  const dot = name.lastIndexOf('.')
-  return dot > 0 ? name.slice(0, dot) : name
 }
 
 export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: PDFViewerProps) {
@@ -209,7 +204,14 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
         workerSrc ? { workerSrc } : undefined
       )
 
-      const sourceBasename = sanitizeImageBaseName(stripExt(filename)) || 'document'
+      // Empty markdown + warnings means we already know the save will produce
+      // nothing useful (e.g. scanned PDF). Surface it without bothering the
+      // user with a Save As dialog.
+      if (markdown.trim().length === 0 && warnings.length > 0) {
+        setIsSavingMd(false)
+        setSaveToast({ kind: 'error', message: 'Nothing to save', warnings })
+        return
+      }
 
       sendToExtension('saveAsMarkdown', {
         payload: {
@@ -218,7 +220,6 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
           source: 'pdf',
           images: [],          // PDF image extraction is a v2 feature (see WB-discovery risk #5)
           warnings,
-          sourceBasename,
         },
       })
     } catch (e) {

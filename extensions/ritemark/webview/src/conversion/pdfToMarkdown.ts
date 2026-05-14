@@ -96,7 +96,8 @@ export async function convertPdfToMarkdown(
   if (skipPatterns.size > 0) {
     for (const pageLines of pages) {
       for (let i = pageLines.length - 1; i >= 0; i--) {
-        if (skipPatterns.has(normalizePageNumber(pageLines[i].text))) {
+        const key = normalizePageNumber(pageLines[i].text)
+        if (key && skipPatterns.has(key)) {
           pageLines.splice(i, 1)
         }
       }
@@ -315,6 +316,7 @@ function detectRepeatingMargins(pages: Line[][]): Set<string> {
     for (const line of candidates) {
       if (!line || !line.text) continue
       const key = normalizePageNumber(line.text)
+      if (!key) continue  // line isn't page-number-like
       if (seenThisPage.has(key)) continue
       seenThisPage.add(key)
       counts.set(key, (counts.get(key) ?? 0) + 1)
@@ -329,9 +331,32 @@ function detectRepeatingMargins(pages: Line[][]): Set<string> {
   return repeating
 }
 
-/** Replace standalone digits with a `\d` token so "Page 7" and "Page 8" collide. */
+/**
+ * Normalize a line for cross-page repetition matching.
+ *
+ * Only fires on lines that are *mostly* digits / common page-number tokens —
+ * pure body-text headings like "Section 4 conclusions" must not collide with
+ * each other just because of a shared bare digit. Returns the empty string for
+ * lines that don't look like a page-number candidate.
+ */
 function normalizePageNumber(text: string): string {
-  return text.replace(/\b\d+\b/g, '\\d').toLowerCase().trim()
+  const trimmed = text.trim()
+  if (!trimmed) return ''
+
+  // Strip everything except letters, digits and one-letter separators so we
+  // can decide whether the line is dominated by digits.
+  const compact = trimmed.replace(/\s+/g, ' ')
+  const digitCount = (compact.match(/\d/g) ?? []).length
+  const letterCount = (compact.match(/\p{L}/gu) ?? []).length
+
+  // A footer like "Page 7", "7 / 42", "— 7 —", "7" all qualify (≥1 digit and
+  // either no letters or very few — capped at 8 to allow "Page", "Chapter").
+  const looksLikePageNumber =
+    digitCount > 0 && letterCount <= 8
+
+  if (!looksLikePageNumber) return ''
+
+  return compact.replace(/\b\d+\b/g, '\\d').toLowerCase()
 }
 
 /**

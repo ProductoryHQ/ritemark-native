@@ -3,7 +3,7 @@ import { renderAsync } from 'docx-preview'
 import mammoth from 'mammoth'
 import { sendToExtension } from '../../bridge'
 import { createTurndownService } from '../../utils/turndownService'
-import { buildExtractedImageFilename, mimeToExt } from '../../utils/imageNaming'
+import { buildExtractedImageFilename, mimeToExt, stripExt } from '../../utils/imageNaming'
 
 interface DOCXViewerProps {
   content: string  // base64-encoded DOCX
@@ -24,11 +24,6 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
     bytes[i] = binaryString.charCodeAt(i)
   }
   return bytes
-}
-
-function stripExt(name: string): string {
-  const dot = name.lastIndexOf('.')
-  return dot > 0 ? name.slice(0, dot) : name
 }
 
 export function DOCXViewer({ content, filename, canSaveAsMarkdown }: DOCXViewerProps) {
@@ -130,13 +125,15 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown }: DOCXViewerP
       const bytes = decodeBase64ToBytes(content)
       const sourceBasename = stripExt(filename) || 'document'
       const images: ExtractedImage[] = []
+      const unrecognizedMimes = new Set<string>()
 
       const result = await mammoth.convertToHtml(
         { arrayBuffer: bytes.buffer as ArrayBuffer },
         {
           convertImage: mammoth.images.imgElement(async (image) => {
             const base64 = await image.readAsBase64String()
-            const ext = mimeToExt(image.contentType)
+            const { ext, recognized } = mimeToExt(image.contentType)
+            if (!recognized) unrecognizedMimes.add(image.contentType)
             const imgFilename = buildExtractedImageFilename(
               sourceBasename,
               images.length + 1,
@@ -157,21 +154,13 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown }: DOCXViewerP
         .filter((m) => m.type === 'warning')
         .map((m) => m.message)
 
-      const turndownService = createTurndownService()
-      // Match Editor's image-href semantics: an <img title="./..."> turns into
-      // ![alt](./...) so the markdown points at the on-disk file instead of
-      // whatever the DOM resolved src to.
-      turndownService.addRule('saveAsMarkdownImage', {
-        filter: 'img',
-        replacement: (_content, node) => {
-          const el = node as HTMLImageElement
-          const alt = el.alt || ''
-          const title = el.getAttribute('title') || ''
-          const src = title.startsWith('./') ? title : el.getAttribute('src') || el.src
-          return `![${alt}](${src})`
-        },
-      })
+      if (unrecognizedMimes.size > 0) {
+        warnings.push(
+          `Saved ${unrecognizedMimes.size} image${unrecognizedMimes.size === 1 ? '' : 's'} with unrecognized content type${unrecognizedMimes.size === 1 ? '' : 's'} (${[...unrecognizedMimes].join(', ')}); files were written with .png extension and may not render correctly.`
+        )
+      }
 
+      const turndownService = createTurndownService()
       const markdown = turndownService.turndown(html)
 
       sendToExtension('saveAsMarkdown', {
