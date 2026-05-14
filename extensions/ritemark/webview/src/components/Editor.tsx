@@ -13,8 +13,7 @@ import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExten
 import { CustomLink } from '../extensions/CustomLink'
 import { createLowlight, common } from 'lowlight'
 import { marked } from 'marked'
-import TurndownService from 'turndown'
-import { tables, taskListItems } from 'turndown-plugin-gfm'
+import { createTurndownService } from '../utils/turndownService'
 import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
@@ -26,18 +25,11 @@ import { TableOverlayControls } from './TableOverlayControls'
 import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
 
-// Initialize Turndown for HTML to Markdown conversion
-export const turndownService = new TurndownService({
-  headingStyle: 'atx',
-  codeBlockStyle: 'fenced',
-  bulletListMarker: '-',
-  emDelimiter: '*',  // Use * for italic (matches TipTap BubbleMenu input)
-  strongDelimiter: '**'  // Use ** for bold (matches TipTap BubbleMenu input)
-})
-
-// Enable GFM plugins for turndown
-turndownService.use(tables)
-turndownService.use(taskListItems)
+// Initialize Turndown for HTML to Markdown conversion.
+// Base config + GFM plugins + pipe-escape rule live in utils/turndownService;
+// TipTap-specific rules (taskItem, taskList, imageWithRelativePath) are layered
+// on top below.
+export const turndownService = createTurndownService()
 
 /**
  * Preprocess HTML to convert GFM task lists to TipTap format
@@ -187,23 +179,6 @@ turndownService.addRule('tiptapTaskList', {
     const parent = (node as HTMLElement).parentElement
     const isNested = parent && parent.getAttribute('data-type') === 'taskItem'
     return isNested ? content : '\n' + content + '\n'
-  }
-})
-
-// Override the tableCell rule to escape pipe characters in cell content
-// The turndown-plugin-gfm doesn't escape pipes by default, which breaks table structure
-// when cell content contains | characters (e.g., code examples, commands)
-turndownService.addRule('tableCellWithPipeEscape', {
-  filter: ['th', 'td'],
-  replacement: function (content, node) {
-    // Escape pipe characters to prevent breaking table structure
-    const escapedContent = content.replace(/\|/g, '\\|')
-
-    // Replicate the original cell formatting logic from turndown-plugin-gfm
-    // Table cells always have a parent (tr), so this is safe
-    const index = node.parentNode ? Array.prototype.indexOf.call(node.parentNode.childNodes, node) : 0
-    const prefix = index === 0 ? '| ' : ' '
-    return prefix + escapedContent + ' |'
   }
 })
 
