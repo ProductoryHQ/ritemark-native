@@ -5,6 +5,7 @@ const GET_ACTIVE_CONTEXT_COMMAND = 'workbench.action.browser.getActiveContext';
 const GET_ACTIVE_SUMMARY_COMMAND = 'workbench.action.browser.getActiveSummary';
 const CAPTURE_ACTIVE_VIEWPORT_COMMAND = 'workbench.action.browser.captureActiveViewport';
 const ENSURE_ACTIVE_BROWSER_SHARED_COMMAND = 'workbench.action.browser.ensureActiveBrowserShared';
+const ENSURE_ACTIVE_BROWSER_CONTROL_SHARED_COMMAND = 'workbench.action.browser.ensureActiveBrowserControlShared';
 
 const NORMAL_SUMMARY_CHAR_LIMIT = 12_000;
 const ANNOTATION_SUMMARY_CHAR_LIMIT = 24_000;
@@ -17,6 +18,7 @@ export interface BrowserContextSnapshot {
   visible?: boolean;
   loading?: boolean;
   sharedWithAgent?: boolean;
+  sharedWithAgentForControl?: boolean;
   annotationMode?: boolean;
   summary?: string;
   summaryTruncated?: boolean;
@@ -72,9 +74,19 @@ export class BrowserContextStore {
 
   private lastSnapshot: BrowserContextSnapshot | null = null;
   private autoSharedPageIds = new Set<string>();
+  private autoControlSharedPageIds = new Set<string>();
 
   public getLastSnapshot(): BrowserContextSnapshot | null {
     return this.lastSnapshot;
+  }
+
+  /**
+   * Whether the active browser tab has been granted AI control consent.
+   * Distinct from `sharedWithAgent` (read consent) — control allows the AI
+   * to click, fill, navigate, scroll, and type. Stronger consent.
+   */
+  public isControlConsented(): boolean {
+    return Boolean(this.lastSnapshot?.sharedWithAgentForControl);
   }
 
   public async refreshMetadata(): Promise<BrowserContextSnapshot | null> {
@@ -114,6 +126,39 @@ export class BrowserContextStore {
       // Workbench may have rejected (consent declined). Keep the pageId
       // marked so we don't re-prompt for this tab in this session.
     }
+  }
+
+  /**
+   * Trigger the workbench browser-control consent prompt for the active tab
+   * the first time control is requested in this session. The prompt is
+   * stronger than the read-only "Share with Agent?" prompt because the AI
+   * gains write-level access (navigate, click, fill, scroll, type).
+   *
+   * Returns true if control consent is granted, false otherwise. Once a
+   * tab has been prompted and either accepted or declined in this session,
+   * the result is cached — we don't re-prompt for the same tab.
+   */
+  public async ensureControlConsentForActiveTab(): Promise<boolean> {
+    const refreshed = await this.refreshMetadata();
+    if (refreshed?.sharedWithAgentForControl) {
+      return true;
+    }
+    if (!refreshed?.pageId || !refreshed.url) {
+      return false;
+    }
+    if (this.autoControlSharedPageIds.has(refreshed.pageId)) {
+      return Boolean(refreshed.sharedWithAgentForControl);
+    }
+    this.autoControlSharedPageIds.add(refreshed.pageId);
+    try {
+      const result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_CONTROL_SHARED_COMMAND);
+      if (isUsableSnapshot(result)) {
+        this.lastSnapshot = { ...refreshed, ...result };
+      }
+    } catch {
+      // Consent declined or workbench error — surface as false.
+    }
+    return this.isControlConsented();
   }
 
   public async buildTurnContext(options: { includeScreenshot?: boolean } = {}): Promise<BrowserTurnContext | null> {

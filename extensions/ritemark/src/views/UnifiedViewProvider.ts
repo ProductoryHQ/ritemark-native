@@ -26,6 +26,7 @@ import {
   AGENTS,
   CLAUDE_FALLBACK_MODELS,
   DEFAULT_MODEL,
+  DEFAULT_TOOLS,
   getSetupStatus,
   getAgentEnvironmentStatus,
   clearSetupCache,
@@ -54,6 +55,8 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore } from '../browser/BrowserContextStore';
+import { createBrowserMcpServer, BROWSER_MCP_SERVER_NAME, BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
+import { buildCodexBrowserDynamicTools, isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
@@ -93,6 +96,22 @@ const CODEX_TURN_REMINDER = [
   '- Do not ask the question in normal assistant text when request_user_input can represent it.',
   '- If the user explicitly asked for multiple-choice questions, use request_user_input for them.',
   '- After calling request_user_input, wait for the answer instead of finishing the turn with the question in prose.',
+].join('\n');
+
+const CODEX_BROWSER_REMINDER = [
+  'Browser instructions:',
+  '- When the user asks to open a URL, navigate, browse, or interact with a web page, you MUST use the `ritemark_browser_navigate` tool (and other `ritemark_browser_*` tools).',
+  '- NEVER open URLs through shell commands like `open`, `xdg-open`, or any system-browser path — those launch the user\'s default external browser (Chrome / Edge / Safari), which is the wrong surface.',
+  '- The user\'s expectation is that the page opens inside the integrated Ritemark browser tab so they can see what you see and you can act on it.',
+  '- If the URL is ambiguous (e.g. user says "go to my company website" without an exact URL), use web search to resolve the exact URL first, then call `ritemark_browser_navigate` with that URL.',
+].join('\n');
+
+const CLAUDE_BROWSER_APPEND = [
+  'Browser routing (Ritemark-specific):',
+  '- For any request to open, navigate, browse, click, fill, type, or scroll a web page, use the `mcp__ritemark_browser__*` tools (browser_navigate, browser_click, browser_fill, browser_type, browser_scroll).',
+  '- NEVER use Bash to run `open <url>`, `xdg-open <url>`, or otherwise launch the system default browser — that opens Chrome/Edge/Safari, which is the wrong surface. The user expects the page to load inside the integrated Ritemark browser.',
+  '- If the URL is ambiguous (e.g. "my company website"), use WebFetch or WebSearch to resolve the exact URL first, THEN call `browser_navigate` with the resolved URL.',
+  '- `browser_navigate` will create a new tab if none exists and reuse the first existing tab otherwise — call it directly when the user says "open browser and go to X".',
 ].join('\n');
 
 function shouldStartCodexInPlanMode(prompt: string): boolean {
@@ -185,6 +204,28 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     } catch (err) {
       console.warn('[UnifiedViewProvider] Vector store init failed:', err);
       this._vectorStore = null;
+    }
+  }
+
+  /**
+   * Sprint 69: build the browser-action MCP server config for a new
+   * AgentSession. Returns null if the SDK cannot create the MCP server
+   * (e.g. import failure) — callers should fall back to no browser tools.
+   *
+   * Workbench-side `EnsureActiveBrowserControlShared` is the consent gate;
+   * we wire the tools unconditionally when the feature flag is on, and the
+   * first browser-tool call from the model triggers the consent prompt.
+   */
+  private async _buildBrowserMcpConfig(): Promise<{ servers: Record<string, unknown>; allowedTools: string[] } | null> {
+    try {
+      const mcpServer = await createBrowserMcpServer();
+      return {
+        servers: { [BROWSER_MCP_SERVER_NAME]: mcpServer },
+        allowedTools: [...DEFAULT_TOOLS, ...BROWSER_TOOL_ALLOW_NAMES],
+      };
+    } catch (err) {
+      console.warn('[UnifiedViewProvider] Failed to build browser MCP config:', err);
+      return null;
     }
   }
 
@@ -1128,16 +1169,29 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         anthropicApiKey = await this._secrets.get('anthropic-api-key');
       }
 
+      // Sprint 69: when browser-control feature flag is on, expose the
+      // browser-action MCP server to the agent. Tool execution still
+      // requires per-tab control consent enforced by the workbench Action2.
+      const browserMcp = isEnabled('browser-agent-control')
+        ? await this._buildBrowserMcpConfig()
+        : null;
+
       this._agentSession = new AgentSession({
         workspacePath: this._workspacePath,
         model,
         pathToClaudeCodeExecutable: status.binaryPath,
         ...(excludedFolders ? { excludedFolders } : {}),
         ...(anthropicApiKey ? { anthropicApiKey } : {}),
+        ...(browserMcp ? {
+          mcpServers: browserMcp.servers,
+          allowedTools: browserMcp.allowedTools,
+          extraSystemPromptAppend: CLAUDE_BROWSER_APPEND,
+        } : {}),
       });
       traceClaude('execution', 'created AgentSession', {
         model,
         workspacePath: this._workspacePath,
+        browserMcpEnabled: Boolean(browserMcp),
       });
 
       // When SDK reports available models, update the webview dropdown
@@ -1346,6 +1400,7 @@ ${prompt}`;
         const codexConfig = vscode.workspace.getConfiguration('ritemark.codex');
         const approvalPolicy = codexConfig.get<string>('approvalPolicy', 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
         const sandbox = codexConfig.get<string>('sandboxMode', 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
+        const dynamicTools = isEnabled('browser-agent-control') ? buildCodexBrowserDynamicTools() : undefined;
         const result = await appServer.threadStart({
           cwd: this._workspacePath || null,
           model: model || null,
@@ -1353,6 +1408,7 @@ ${prompt}`;
           sandbox,
           baseInstructions: CODEX_BASE_INSTRUCTIONS,
           developerInstructions: CODEX_DEVELOPER_INSTRUCTIONS,
+          ...(dynamicTools ? { dynamicTools } : {}),
         });
         this._codexThreadId = result.thread.id;
         traceCodex('execution', 'thread started', {
@@ -1360,6 +1416,7 @@ ${prompt}`;
           model: result.model,
           approvalPolicy,
           sandbox,
+          browserToolCount: dynamicTools?.length ?? 0,
         });
       }
 
@@ -1401,7 +1458,8 @@ ${prompt}`;
       const promptBody = activeFile
         ? `[Currently editing: ${activeFile.path}]\n\n${promptWithBrowserContext}`
         : promptWithBrowserContext;
-      const enrichedPrompt = `${CODEX_TURN_REMINDER}\n\n${promptBody}`;
+      const browserReminder = isEnabled('browser-agent-control') ? `\n\n${CODEX_BROWSER_REMINDER}` : '';
+      const enrichedPrompt = `${CODEX_TURN_REMINDER}${browserReminder}\n\n${promptBody}`;
 
       // Start turn (send user message)
       const turnResult = await appServer.turnStart(
@@ -1551,6 +1609,26 @@ ${prompt}`;
         method: request.method,
         params: request.params,
       });
+      // Sprint 69: handle dynamic browser tool calls before the legacy
+      // approval/userInput routing — these are server-initiated calls into
+      // our `dynamicTools` registered at thread/start.
+      if (request.method === 'item/tool/call') {
+        const params = request.params as Record<string, unknown>;
+        const toolName = typeof params.tool === 'string' ? params.tool : '';
+        const toolArgs = (params.arguments && typeof params.arguments === 'object')
+          ? params.arguments as Record<string, unknown>
+          : {};
+        if (isCodexBrowserToolCall(toolName)) {
+          void (async () => {
+            const reply = await dispatchCodexBrowserToolCall(toolName, toolArgs);
+            this._codexAppServer?.sendToolCallResponse(request.id, reply.text, reply.success);
+          })();
+          return;
+        }
+        // Unknown dynamic tool — reply with an error so the model can recover.
+        this._codexAppServer?.sendToolCallResponse(request.id, `Unknown dynamic tool: ${toolName}`, false);
+        return;
+      }
       const routed = routeApprovalRequest(request);
       if (request.method === 'item/tool/requestUserInput') {
         console.log('[codex] request_user_input received');

@@ -120,7 +120,7 @@ function isContextOverflowError(str: string): boolean {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'AskUserQuestion', 'ExitPlanMode'];
+export const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'AskUserQuestion', 'ExitPlanMode'];
 export const DEFAULT_SETTING_SOURCES: AgentSettingSource[] = ['user', 'project', 'local'];
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const CLAUDE_LIFECYCLE_APPEND = [
@@ -439,11 +439,13 @@ export class AgentSession {
   // Config
   private readonly _workspacePath: string;
   private readonly _excludedFolders: string[];
-  private readonly _allowedTools: string[];
+  private _allowedTools: string[];
   private readonly _settingSources: AgentSettingSource[];
   private readonly _modelId: string | undefined;
   private readonly _anthropicApiKey: string | undefined;
   private readonly _pathToClaudeCodeExecutable: string | undefined;
+  private _mcpServers: Record<string, unknown> | undefined;
+  private _extraSystemPromptAppend: string | undefined;
 
   /** Called when SDK reports its available models (after session init) */
   onModelsDiscovered: ((models: Array<{ id: string; label: string; description: string }>) => void) | null = null;
@@ -456,6 +458,26 @@ export class AgentSession {
     this._modelId = config.model;
     this._anthropicApiKey = config.anthropicApiKey;
     this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
+    this._mcpServers = config.mcpServers;
+    this._extraSystemPromptAppend = config.extraSystemPromptAppend;
+  }
+
+  /**
+   * Replace the MCP servers exposed to the agent. Takes effect on the NEXT
+   * session start — does not affect an already-running session. The
+   * `mcpServers` option is passed to the SDK query at session init.
+   */
+  setMcpServers(servers: Record<string, unknown> | undefined): void {
+    this._mcpServers = servers;
+  }
+
+  /**
+   * Replace the allowed tools list. Like `setMcpServers`, takes effect on
+   * the next session start. Used by Sprint 69 to opt browser-action tool
+   * names into the allow-list when browser control is active.
+   */
+  setAllowedTools(tools: string[]): void {
+    this._allowedTools = tools;
   }
 
   get isActive(): boolean {
@@ -737,6 +759,9 @@ export class AgentSession {
   private async _startSession(firstMsg: Record<string, unknown>) {
     const query = await getQuery();
     const safetyAppend = buildClaudeSystemAppend(this._workspacePath, this._excludedFolders);
+    const fullAppend = this._extraSystemPromptAppend
+      ? `${safetyAppend}\n\n${this._extraSystemPromptAppend}`
+      : safetyAppend;
 
     const queryOptions: Record<string, unknown> = {
       cwd: this._workspacePath,
@@ -744,13 +769,14 @@ export class AgentSession {
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
-        append: safetyAppend,
+        append: fullAppend,
       },
       settingSources: this._settingSources,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       allowedTools: this._allowedTools,
       canUseTool: this._handleCanUseTool.bind(this),
+      ...(this._mcpServers ? { mcpServers: this._mcpServers } : {}),
     };
 
     if (this._modelId) {

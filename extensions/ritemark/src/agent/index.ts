@@ -6,7 +6,7 @@
  * ```
  */
 
-export { runAgent, AgentSession } from './AgentRunner';
+export { runAgent, AgentSession, DEFAULT_TOOLS } from './AgentRunner';
 export { traceClaude, showClaudeTrace, getClaudeTraceLogPath } from './agentTrace';
 export {
   getSetupStatus,

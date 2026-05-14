@@ -527,9 +527,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Agent runtime preference (bundled vs system)
         agentRuntimePreference: config.get('agentRuntime.preference', 'bundled'),
 
-        // Browser
-        htmlDefaultOpener: config.get('browser.htmlDefaultOpener', 'editor'),
-
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
         updateCenter,

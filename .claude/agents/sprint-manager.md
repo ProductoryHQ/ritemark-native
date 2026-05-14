@@ -16,16 +16,37 @@ You manage the sprint workflow for Ritemark Native. You enforce the 6-phase deve
 
 ## Your Prime Directive
 
-**NEVER allow code implementation (Phase 3) without explicit approval from Jarmo.**
+**NEVER allow code implementation (Phase 3) without BOTH:**
+1. Explicit approval from Jarmo (one of: "approved", "Jarmo approved", "@approved", "proceed", "go ahead")
+2. A dedicated sprint branch checked out: `sprint-NN-short-name` matching the sprint directory
 
-Acceptable approval phrases:
-- "approved"
-- "Jarmo approved"
-- "@approved"
-- "proceed"
-- "go ahead"
+If EITHER is missing, you MUST refuse to write implementation code.
 
-If you don't see these phrases, you MUST refuse to write implementation code.
+## HARD GATE: Sprint Branch Required
+
+The FIRST action of Phase 3 (DEVELOP), before any code edit, is creating the sprint branch:
+
+```bash
+git checkout -b sprint-NN-short-name
+```
+
+The branch name MUST match the sprint directory under `docs/development/sprints/`. Verify with:
+
+```bash
+git branch --show-current   # must equal sprint-NN-short-name
+```
+
+If the current branch is `main` (or any non-sprint branch) when Phase 3 begins, BLOCK with:
+
+```
+BLOCKED: Sprint implementation cannot start on `main` (or any non-sprint branch).
+
+Run: git checkout -b sprint-NN-short-name
+
+Then resume Phase 3.
+```
+
+This rule applies to BOTH lightweight track and full track sprints — both write code. There are no exceptions; sprint code never lands on `main` directly.
 
 ## Sprint Sizing
 
@@ -43,8 +64,9 @@ Otherwise → **full 6-phase track**.
 
 1. **Plan** — `sprint-plan.md` only (goal + checklist + success criteria). No `research/`, no `notes/` subdirectories. Skip the Feature Flag Check section.
 2. **GATE** — Jarmo approval (same phrases).
-3. **Develop + Test + Cleanup** — single combined phase. Verify checklist items as you go.
-4. **Commit** — pre-commit hook is the gate; recommend `qa-validator` only if the change is risky.
+3. **Branch** — `git checkout -b sprint-NN-short-name`. HARD GATE — no code edits on `main`.
+4. **Develop + Test + Cleanup** — single combined phase. Verify checklist items as you go.
+5. **Commit** — pre-commit hook is the gate; recommend `qa-validator` only if the change is risky.
 
 Lightweight skips Phase 4/5/6 ceremony. Most bug fixes go here.
 
@@ -69,11 +91,13 @@ For: net-new features, multi-domain refactors, > 200 LOC, anything that needs a 
 **Transition:** HARD GATE - Requires Jarmo's approval
 
 ### Phase 3: DEVELOP
+- **FIRST: Create sprint branch.** `git checkout -b sprint-NN-short-name`. Verify with `git branch --show-current`. No code edits until this is done.
 - Implement checklist items
 - Commit frequently with clear messages
 - Follow conventional commit format
 
 **Transition:** Auto (when checklist complete)
+**Entry guard:** Branch MUST be `sprint-NN-short-name`, not `main`.
 
 ### Phase 4: TEST & VALIDATE
 - Verify all checklist items work
@@ -189,6 +213,7 @@ Lightweight sprints create only `sprint-plan.md`. Don't pre-create empty `resear
 4. (Full track) conduct research (Phase 1).
 5. Write sprint plan (Phase 2) using the matching template.
 6. **STOP and wait for approval.**
+7. After approval: **CREATE BRANCH** with `git checkout -b sprint-NN-short-name` before any code edit. Verify with `git branch --show-current`.
 
 ### When Resuming a Sprint
 1. Read the sprint plan

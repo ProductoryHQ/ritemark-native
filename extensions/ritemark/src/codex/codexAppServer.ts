@@ -130,11 +130,14 @@ export class CodexAppServer extends EventEmitter {
    * Start a new thread (conversation)
    *
    * thread/start can be slow on first invocation (binary warm-up, network
-   * handshake, model download). We give it a 60s timeout and emit a
-   * 'progress' event after 10s so the AI sidebar can show "Starting Codex
-   * session, this may take a moment…" instead of looking frozen. On
-   * timeout we attach a diagnostics snapshot to the error so the user
-   * sees actionable info (binary path, source, arch, last stderr).
+   * handshake, model download). Sprint 69 also adds `dynamicTools` schema
+   * validation to the first thread/start, which can extend cold-start
+   * latency. We give it a 120s timeout (bumped from 60s in Sprint 69) and
+   * emit a 'progress' event after 10s so the AI sidebar can show
+   * "Starting Codex session, this may take a moment…" instead of looking
+   * frozen. On timeout we attach a diagnostics snapshot to the error so
+   * the user sees actionable info (binary path, source, arch, last
+   * stderr).
    */
   async threadStart(params: Partial<ThreadStartParams> & { cwd?: string | null }): Promise<ThreadStartResponse> {
     await this.ensureInitialized();
@@ -142,7 +145,7 @@ export class CodexAppServer extends EventEmitter {
       experimentalRawEvents: false,
       persistExtendedHistory: false,
       ...params,
-    }, 60_000, {
+    }, 120_000, {
       progressAfterMs: 10_000,
       progressMessage: 'Starting Codex session, this may take a moment…',
       diagnosticsOnTimeout: () => this.buildThreadStartDiagnostics(),
@@ -228,6 +231,23 @@ export class CodexAppServer extends EventEmitter {
       requestId,
       { answers } as ToolRequestUserInputResponse,
       'request_user_input response'
+    );
+  }
+
+  /**
+   * Respond to a server-initiated `item/tool/call` request for a dynamic
+   * tool (Sprint 69 / experimental Codex App Server feature). The client
+   * MUST respond using the same request id with `{ contentItems, success }`
+   * — see DynamicToolDefinition for the protocol contract.
+   */
+  sendToolCallResponse(requestId: string | number, text: string, success: boolean): void {
+    this.sendServerRequestResponse(
+      requestId,
+      {
+        contentItems: [{ type: 'inputText', text }],
+        success,
+      },
+      'tool_call response'
     );
   }
 
