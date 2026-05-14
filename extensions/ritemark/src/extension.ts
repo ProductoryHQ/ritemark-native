@@ -24,7 +24,6 @@ import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
 import { initAnalytics, shutdownAnalytics } from './analytics/posthog';
 import { registerReactionCommand } from './analytics/reactions';
 import { BrowserTerminalLinkProvider } from './browser/BrowserTerminalLinkProvider';
-import { BrowserHtmlOpenRedirector } from './browser/BrowserHtmlOpenRedirector';
 import {
   goBackInIntegratedBrowser,
   goForwardInIntegratedBrowser,
@@ -541,9 +540,11 @@ export function activate(context: vscode.ExtensionContext) {
   // prototype. Real webContents can render external sites and workspace file://
   // URLs without iframe embedding restrictions.
 
-  // Register .html default opener. Text opens are redirected to the native
-  // integrated browser; explicit 'Open as Text' bypasses this redirect.
-  const browserHtmlOpenRedirector = BrowserHtmlOpenRedirector.register(context);
+  // HTML opener: handled at the workbench-level editor resolver (patch 010,
+  // BrowserEditorResolverContribution). The previous extension-side reactive
+  // listener (BrowserHtmlOpenRedirector) caused visible text-tab flicker
+  // before redirecting; the resolver intercepts the open at the resolver
+  // layer so the text editor never opens in the first place.
 
   // Browser history store + Activity Bar panel (Indigo-Editorial webview).
   const browserHistoryStore = new BrowserHistoryStore(context.globalState);
@@ -632,7 +633,9 @@ export function activate(context: vscode.ExtensionContext) {
       (uri?: vscode.Uri) => {
         const target = uri ?? vscode.window.activeTextEditor?.document.uri;
         if (!target) return;
-        browserHtmlOpenRedirector.allowTextOpen(target);
+        // Explicit text-editor open via `vscode.openWith` with the built-in
+        // 'default' editor ID. The workbench-level HTML resolver matches by
+        // priority, not editor ID, so passing 'default' here bypasses it.
         void vscode.commands.executeCommand('vscode.openWith', target, 'default');
       }
     )

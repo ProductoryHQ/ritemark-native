@@ -273,6 +273,17 @@ export interface AgentSessionConfig {
   model?: string;
   anthropicApiKey?: string;
   pathToClaudeCodeExecutable?: string;
+  /**
+   * Optional MCP servers (typically in-process SDK MCP servers) to expose to
+   * the agent. Used by Sprint 69 to inject browser-action tools. Loose typing
+   * keeps the SDK out of this generic shape.
+   */
+  mcpServers?: Record<string, unknown>;
+  /**
+   * Optional extra text to append to the system prompt. Used by Sprint 69 to
+   * push browser-tool routing instructions when browser control is on.
+   */
+  extraSystemPromptAppend?: string;
 }
 
 /**

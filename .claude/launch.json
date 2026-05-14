@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "webview-vite-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "extensions/ritemark/webview"],
+      "port": 5173
+    },
+    {
+      "name": "extension-ts-watch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "watch", "--prefix", "extensions/ritemark"],
+      "port": 0
+    }
+  ]
+}

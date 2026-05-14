@@ -1,18 +1,23 @@
 ---
-date: ''
-title: 'Ritemark v1.7.1'
+date: '2026-05-13'
+title: 'Ritemark v1.7.1 — The AI Can Now Drive the Browser'
 author: Jarmo Tuisk
 tags:
-  - bugfix
+  - browser
+  - ai-browser-control
+  - agent-tools
+  - claude
+  - codex
   - patch
+  - feature
 draft: true
 ---
 
-# Ritemark v1.7.1
+# Ritemark v1.7.1 — The AI Can Now Drive the Browser
 
 **Status:** In progress
-**Type:** Patch release
-**Focus:** Bug fixes
+**Type:** Feature + patch release
+**Focus:** v1.7.0 taught the AI sidebar to *read* the integrated browser. v1.7.1 lets it *act* — navigate, click, fill forms, type, scroll — with an explicit per-tab consent gate that's distinct from the read prompt. Plus the v1.7.0 follow-up fixes that didn't ship as their own release: clipboard inside the webview, chat history showing every conversation, and HTML files opening cleanly into the browser without a text-tab flicker.
 
 * * *
 
@@ -21,33 +26,189 @@ draft: true
 | Platform | Download |
 | --- | --- |
 | macOS Apple Silicon (M1/M2/M3) | [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-arm64.dmg) |
+| macOS Intel | [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-x64.dmg) |
+
+> Windows: coming as a follow-up asset on the v1.7.1 release.
 
 * * *
 
-## Bug Fixes
+## Why This Release
 
-### Copy button and clipboard operations now work correctly
+v1.7.0 closed the seam between markdown and HTML and gave the AI sidebar a third context source: the page in the active browser tab. The AI could finally read both halves of the work. But it was still a passive reader — you opened the page, the AI commented on it, you clicked the next link.
 
-The Copy button on code blocks, "Copy as Markdown" in the export menu, and Cmd+C/Cmd+V in table cells were silently failing — nothing was copied to the clipboard. Fixed by routing all clipboard operations through the VS Code extension host instead of the sandboxed webview browser API.
+The natural next question is what happens when the AI does the clicking. That question opens a different set of risks than "read the page." A model that types in your input fields and submits forms is operating with materially more authority than one that just summarizes the DOM. It needs a different consent gate, a different default (off), and a stronger expectation that you can see every action happen in real time.
 
-**Affected in previous versions:**
-- Code block Copy button
-- Export menu → Copy as Markdown
-- Table cell Cmd+C (copy cell value)
-- Table cell Cmd+V (paste into cell)
+v1.7.1 is that gate. Five focused browser tools — navigate, click, fill, type, scroll — wired into both Claude Code SDK and Codex App Server, gated behind an opt-in feature flag, and protected by a dedicated **"Allow AI to control this browser tab?"** prompt that fires the first time the AI tries to act on a tab. Decline and subsequent calls fail safely. Accept and the agent can drive the tab while you watch, with each action returning an updated page snapshot so the AI sees the result of its own work without needing to ask again.
 
-Fixes [#66](https://github.com/ProductoryHQ/ritemark-native/issues/66)
+This release also bundles three v1.7.0 follow-ups that were planned as a Sprint 68 patch but folded into v1.7.1 once Sprint 69 landed on schedule: clipboard operations now work inside the sandboxed webview, the Chat History panel shows every saved conversation (not just the most recent), and clicking an `.html` file no longer flickers through a text editor on its way to the browser. The flicker fix in particular changes how Ritemark opens `.html` files at the workbench level — the text editor never opens in the first place, instead of being opened and then redirected.
 
-### Chat History now shows all past conversations
+Closes [#67](https://github.com/ProductoryHQ/ritemark-native/issues/67) (AI Browser Control).
 
-Chat History was always showing only one entry — the most recent conversation. All older conversations were saved correctly but never loaded into the panel. Fixed. History is workspace-scoped: conversations from one project never appear when working in another.
+* * *
 
-The "New Chat" button was also removed from the history panel (the + button in the toolbar does the same thing).
+## What's New
 
-Fixes [#65](https://github.com/ProductoryHQ/ritemark-native/issues/65)
+### AI Agent Browser Control
 
-### HTML files now open correctly in the integrated browser on cold start
+The AI sidebar can now drive the integrated browser. Five tools, both runtimes, one consent dialog.
 
-Opening an `.html` file directly from Finder or CLI (when Ritemark wasn't already running) could leave the file stuck as a blank text editor tab instead of routing to the integrated browser. Fixed.
+The tools are deliberately narrow:
 
-Fixes [#63](https://github.com/ProductoryHQ/ritemark-native/issues/63)
+-   **`browser_navigate`** — go to a URL, or `back` / `forward` / `reload` the current page. If no browser tab is open, the agent auto-creates one; if a tab already exists, the agent reuses the first one rather than spawning a new tab for every navigation.
+-   **`browser_click`** — click an element by ARIA reference or CSS selector. The ARIA reference comes from the same page outline the AI receives as Sprint 67 read context, so the AI is clicking on something it has already seen.
+-   **`browser_fill`** — set the value of a form input. Used for typed text that the AI wants to submit as part of a form.
+-   **`browser_type`** — send raw keystrokes or key combinations to the focused element. Used when the page expects keyboard events rather than a programmatic value set (rich text editors, search-as-you-type widgets, hotkey flows).
+-   **`browser_scroll`** — scroll the page into the area the AI wants to inspect or interact with next.
+
+Every tool call ends by returning the updated ARIA page summary, so the AI sees the result of its own action without spending another round-trip asking. The browser tab stays visible and interactive while the agent works — you can watch the cursor move, the input fill, and the page change. There is no headless mode, no off-screen browser, no shadow tab.
+
+#### A dedicated control consent
+
+The first time the AI tries to call any of these tools, Ritemark shows a workbench dialog distinct from the Sprint 67 read-share prompt:
+
+> **Allow AI to control this browser tab?**
+>
+> The AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.
+>
+> Grant control only for tabs where you trust the AI's actions.
+>
+> **[Allow Control]    [Cancel]**
+
+`[screenshot: 03-control-consent-dialog.png — TODO manual capture]`
+
+Allow once per tab per session. Decline and any subsequent control call from the AI returns a typed error — the next call doesn't re-prompt, and Sprint 67 read context (URL, title, summary, screenshot) keeps working. Revoking read consent for a tab also revokes control consent: you can't accidentally end up in a state where the AI can act on a page it can't see.
+
+This consent is intentionally separate from the read-share prompt. Reading the page is a different question from typing into it. The two prompts use different wording and different default buttons.
+
+#### Experimental, opt-in, macOS only
+
+The feature ships behind the `browser-agent-control` flag, status **experimental**, platform **darwin** only. It is **off by default**. To turn it on for v1.7.1, edit `settings.json` directly:
+
+```json
+{
+  "ritemark.features.browser-agent-control": true
+}
+```
+
+(The Settings UI's Features section was removed in this same release — see *What's Fixed* below — so the flag toggle lives in `settings.json` for now. A leaner Features panel returns in a later release.)
+
+With the flag off, the browser-tool definitions are not registered with either runtime, the AI does not know they exist, and Sprint 67 read context behaves exactly as in v1.7.0.
+
+#### How each runtime sees the tools
+
+Same five capabilities, two protocols:
+
+-   **Claude Code SDK** — Ritemark exposes the tools as an in-process MCP server. The model sees them as `mcp__ritemark_browser__browser_navigate`, `mcp__ritemark_browser__browser_click`, and so on.
+-   **Codex App Server** — Ritemark uses Codex's experimental `dynamicTools` parameter on `thread/start`, with `item/tool/call` round-trips back to the workbench. The model sees the tools as the bare names `ritemark_browser_navigate`, `ritemark_browser_click`, and so on (no `mcp__` prefix on the Codex side).
+
+Either way, the consent dialog, the page-summary readback, and the underlying Playwright-driven action layer are the same. Codex `thread/start` now waits up to 120 seconds for cold-start (was 60s) because the dynamic-tools attach occasionally exceeded the old limit.
+
+#### What this is not (yet)
+
+This sprint shipped the smallest control loop that proves the product value. Several adjacent capabilities were considered and deliberately deferred:
+
+-   **Cross-origin iframe interaction** — embedded YouTube, Stripe Checkout, OAuth popups inside an iframe. Out of scope.
+-   **Drag-and-drop** — gesture-based file uploads, sortable lists. Out of scope.
+-   **Raw `run_playwright_code` / evaluate** — a general-purpose script-eval escape hatch. Deliberately not exposed; the five named tools are the surface.
+-   **File upload picker handling** — `<input type="file">` interactions.
+-   **Multi-tab orchestration** — the AI drives a single active tab; it does not open a tab, work in it, switch to another tab, and continue.
+-   **Persistent recording / replay** — actions are not recorded for re-execution.
+-   **Coordinate-based or vision-only clicking** — control is ARIA-first.
+
+These are recorded in Sprint 69's *Deferred* section and are candidates for follow-up sprints.
+
+### HTML files open in the browser without flicker
+
+In v1.7.0, clicking an `.html` file in the Explorer briefly showed a text editor before the `BrowserHtmlOpenRedirector` listener noticed and closed it in favour of the browser. The flicker was harmless but visible, and on cold start the redirector occasionally lost the race entirely (tracked as [#63](https://github.com/ProductoryHQ/ritemark-native/issues/63)).
+
+v1.7.1 replaces the reactive listener with a workbench-level editor resolver: `**/*.{html,htm}` routes to the BrowserEditor at `default` priority. The text editor is never opened in the first place, on cold start or otherwise. Right-click → **Open as Text** still works — it goes through an explicit `vscode.openWith(uri, 'default')` that bypasses the resolver and opens the source.
+
+The same-URL reuse logic applies here too: opening the same `.html` file twice reuses the existing browser tab rather than stacking duplicates.
+
+`[screenshot: 05-html-direct-render.png]`
+
+* * *
+
+## What's Fixed
+
+-   **Chat History shows every saved conversation.** The panel was loading the conversation list exactly once — on first open — and then never refreshing. Saved conversations from earlier sessions sat correctly in workspace-scoped storage but never made it into the panel; users saw a single entry where they should have seen a full list. Fixed: the list now reloads as soon as the workspace context is established, so every conversation in the current project appears, grouped by recency. Workspace scoping is unchanged — conversations from one project never appear when working in another. The redundant "New Chat" button in the history panel header was also removed; the `+` button in the AI sidebar toolbar starts a new chat. Fixes [#65](https://github.com/ProductoryHQ/ritemark-native/issues/65). `[screenshot: 07-chat-history.png]`
+
+-   **Clipboard works inside the sandboxed webview.** Copy buttons on code blocks, "Copy as Markdown" in the export menu, and Cmd+C/Cmd+V inside table cells were silently failing under the hardened webview sandbox — the browser clipboard API was not available, and nothing landed on the system clipboard. Fixed by routing every clipboard operation through the VS Code extension host instead of the webview's `navigator.clipboard`. Fixes [#66](https://github.com/ProductoryHQ/ritemark-native/issues/66).
+
+-   **HTML cold-start race is gone.** The Sprint 65 `BrowserHtmlOpenRedirector` had a window where it could lose the race on app cold-start and leave an `.html` file stuck as a blank text tab. Sprint 68 patched the redirector with an extra `onDidChangeVisibleTextEditors` listener; Sprint 69 then superseded the redirector entirely with the workbench editor resolver described above. Either way, the original symptom is gone. Fixes [#63](https://github.com/ProductoryHQ/ritemark-native/issues/63).
+
+-   **Misleading Settings dropdown removed.** Settings had an "Open HTML files in…" dropdown with options *Open as Text (default)* and *Legacy: Browser default (disabled)*. The wording never matched actual behaviour since Sprint 65 — the integrated browser was already the real default — so the control was quietly removed in this release. The Features section in Settings (which housed the flag toggles) was removed in the same pass; flags are temporarily set via `settings.json` until a leaner Features panel returns. `[screenshot: 08-settings-no-browser-section.png]`
+
+* * *
+
+## What Didn't Change
+
+Markdown editing, the file explorer, file watcher, Mermaid rendering, the agent library, dictation, the Codex auth flow, the integrated browser's address bar / DevTools / back-forward / annotation toggle, Sprint 67's read-side AI context (URL, title, ARIA summary, optional screenshot) — everything outside the new browser-control surface and the four fixes above behaves as in v1.7.0.
+
+A handful of adjacent capabilities were considered and deferred (see *What this is not (yet)* under AI Agent Browser Control). The deferred list is the Sprint 69 plan's *Deferred from Sprint 69* section.
+
+* * *
+
+## Upgrade
+
+Auto-update will offer v1.7.1 to existing v1.7.0 users on next launch. You can also download the DMG directly. No settings migration is required.
+
+The `browser-agent-control` flag is **off by default**. To try the new AI browser control, open `settings.json` (Cmd+, → "Open Settings (JSON)") and add:
+
+```json
+{
+  "ritemark.features.browser-agent-control": true
+}
+```
+
+Then restart Ritemark — the AgentSession reads feature flags only at session creation time.
+
+The first AI action against a browser tab triggers the **"Allow AI to control this browser tab?"** dialog. This is a separate consent from the Sprint 67 read-share prompt; both can be required for a tab where you also want the AI to read it.
+
+* * *
+
+## Technical Notes
+
+For developers and changelog readers.
+
+**Sprints rolled up:**
+
+-   [Sprint 68 — v1.7.1 Patch Fixes](../../development/sprints/sprint-68-v1.7.1-patch-fixes/sprint-plan.md)
+-   [Sprint 69 — AI Agent Browser Control](../../development/sprints/sprint-69-ai-browser-control/sprint-plan.md)
+
+**Highlights — AI Agent Browser Control (Sprint 69):**
+
+-   New VS Code patch `patches/vscode/010-ritemark-browser-action-bridge.patch`. Adds five `BrowserViewCommandId` entries (`ClickElement`, `FillElement`, `Navigate`, `Scroll`, `TypeInPage`) plus `EnsureActiveBrowserControlShared` (the new consent command). Each tool action runs through `IPlaywrightService` and returns `{ summary, error? }` so the AI sees the post-action page state without an extra read call.
+-   `IBrowserViewModel` gains `sharedWithAgentForControl: boolean` plus `setSharedWithAgentForControl()` / `onDidChangeSharedWithAgentForControl`. Cascade rule: revoking `sharedWithAgent` also flips `sharedWithAgentForControl` to false.
+-   Claude Code SDK side: `extensions/ritemark/src/browser/BrowserActionTools.ts` registers an in-process MCP server. Tool names surface to the model as `mcp__ritemark_browser__*`. The `canUseTool` callback is the dispatch point; the action runs synchronously, the result is injected via `updatedInput._result`.
+-   Codex side: `dynamicTools` is attached to `thread/start`; `item/tool/call` JSON-RPC requests are dispatched the same way through `BrowserActionTools`. Tool names surface as bare `ritemark_browser_*`. `thread/start` timeout bumped from 60s to 120s to accommodate the dynamic-tools attach.
+-   New feature flag `browser-agent-control` — `experimental`, `darwin`-only — in `extensions/ritemark/src/features/flags.ts`. With the flag off, neither runtime sees the tools (no MCP server registered for Claude, no `dynamicTools` array for Codex).
+-   `BrowserContextStore` extended with control-consent tracking; `ensureControlConsentForActiveTab()` is the helper the dispatch path calls before executing any tool.
+-   E2E validation matrix in `docs/development/sprints/sprint-69-ai-browser-control/notes/e2e-validation.md`: Claude + Codex happy path, flag-off negative test, no-tab error path, consent revoke cascade.
+
+**Highlights — HTML opens cleanly (Sprint 69 polish):**
+
+-   Workbench editor resolver registers `**/*.{html,htm}` → BrowserEditor at `default` priority. The text editor is never opened for `.html` files; the old `BrowserHtmlOpenRedirector` reactive listener is deleted.
+-   Right-click → **Open as Text** routes through `vscode.openWith(uri, 'default')`, which bypasses the resolver and opens the source.
+-   Same-URL reuse: opening the same `.html` twice reuses the existing browser tab.
+
+**Highlights — Sprint 68 carry-over:**
+
+-   `webview/src/lib/clipboard.ts` routes every clipboard read/write through a new extension-host message (`webview:clipboard:write` / `webview:clipboard:read`). All call sites — code block copy, export → Copy as Markdown, table cell Cmd+C/Cmd+V — migrated to the helper.
+-   `store.ts` `agent:config` handler calls `loadConversationList()` immediately after `setWorkspaceContext()` so the panel state is populated before first render.
+-   `BrowserHtmlOpenRedirector` cold-start race fix from Sprint 68 (`onDidChangeVisibleTextEditors` subscription) is now redundant — superseded by the Sprint 69 editor resolver — but kept for one release as a belt-and-suspenders guard.
+
+**Upgrade notes:** No breaking changes. Patch 010 applies cleanly on top of patches 001–009. The workbench `out/` directory needs a re-transpile on the first dev build after pulling v1.7.1 source. No new runtime dependencies — the MCP server runs in-process inside the extension host.
+
+* * *
+
+## Sprints Rolled Up
+
+-   **Sprint 68** — v1.7.1 Patch Fixes (clipboard, chat history, HTML cold-start race)
+-   **Sprint 69** — AI Agent Browser Control (user-facing marquee)
+
+Plus the Sprint 69 cleanup items: removal of the misleading `htmlDefaultOpener` Settings dropdown and the Features section in Settings (the feature-flag toggle UI). The flag system itself is unchanged; only the in-Settings UI was removed.
+
+* * *
+
+v1.7.0 made the AI fluent in two languages at once: prose and rendered HTML. v1.7.1 takes the next step that question naturally asks — *if the AI can read the page, why can't it act on the page?* — and answers it carefully, with a consent gate that's distinct from reading, an opt-in flag, and a tool set that is small on purpose.

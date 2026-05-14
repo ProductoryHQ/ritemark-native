@@ -1,0 +1,630 @@
+# RiteMark Patch: browser-action-bridge
+#
+# Purpose: Expose Playwright-driven browser action commands (navigate, click,
+#          fill, type, scroll) and a dedicated AI-control consent flag on
+#          BrowserViewModel, so the Ritemark extension host can drive the
+#          integrated browser through AI agents (Sprint 69). Also registers
+#          a workbench-level editor resolver for .html files so they open
+#          directly in BrowserEditor with zero text-tab flicker.
+#
+# File(s): src/vs/platform/browserView/common/browserView.ts,
+#          src/vs/workbench/contrib/browserView/common/browserView.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
+# Created: 2026-05-13
+#
+diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
+--- a/src/vs/platform/browserView/common/browserView.ts
++++ b/src/vs/platform/browserView/common/browserView.ts
+@@ -42,6 +42,14 @@
+ 	ToggleAnnotationMode = `${commandPrefix}.toggleAnnotationMode`,
+ 	GetAnnotationMode = `${commandPrefix}.getAnnotationMode`,
+ 	EnsureActiveBrowserShared = `${commandPrefix}.ensureActiveBrowserShared`,
++
++	// Ritemark AI browser control bridge (Sprint 69)
++	EnsureActiveBrowserControlShared = `${commandPrefix}.ensureActiveBrowserControlShared`,
++	BrowserNavigate = `${commandPrefix}.agentNavigate`,
++	BrowserClick = `${commandPrefix}.agentClick`,
++	BrowserFill = `${commandPrefix}.agentFill`,
++	BrowserType = `${commandPrefix}.agentType`,
++	BrowserScroll = `${commandPrefix}.agentScroll`,
+ 
+ 	// Storage
+ 	ClearGlobalStorage = `${commandPrefix}.clearGlobalStorage`,
+diff --git a/src/vs/workbench/contrib/browserView/common/browserView.ts b/src/vs/workbench/contrib/browserView/common/browserView.ts
+--- a/src/vs/workbench/contrib/browserView/common/browserView.ts
++++ b/src/vs/workbench/contrib/browserView/common/browserView.ts
+@@ -173,12 +173,14 @@
+ 	readonly certificateError: IBrowserViewCertificateError | undefined;
+ 	readonly storageScope: BrowserViewStorageScope;
+ 	readonly sharedWithAgent: boolean;
++	readonly sharedWithAgentForControl: boolean;
+ 	readonly annotationMode: boolean;
+ 	readonly zoomFactor: number;
+ 	readonly canZoomIn: boolean;
+ 	readonly canZoomOut: boolean;
+ 
+ 	readonly onDidChangeSharedWithAgent: Event<boolean>;
++	readonly onDidChangeSharedWithAgentForControl: Event<boolean>;
+ 	readonly onDidChangeAnnotationMode: Event<boolean>;
+ 	readonly onDidChangeZoom: Event<void>;
+ 	readonly onDidNavigate: Event<IBrowserViewNavigationEvent>;
+@@ -211,6 +213,7 @@
+ 	getSelectedText(): Promise<string>;
+ 	clearStorage(): Promise<void>;
+ 	setSharedWithAgent(shared: boolean): Promise<void>;
++	setSharedWithAgentForControl(shared: boolean): Promise<void>;
+ 	setAnnotationMode(annotate: boolean): Promise<void>;
+ 	trustCertificate(host: string, fingerprint: string): Promise<void>;
+ 	untrustCertificate(host: string, fingerprint: string): Promise<void>;
+@@ -239,12 +242,16 @@
+ 	private _isEphemeral: boolean = false;
+ 	private _zoomHost: string | undefined = undefined;
+ 	private _sharedWithAgent: boolean = false;
++	private _sharedWithAgentForControl: boolean = false;
+ 	private _annotationMode: boolean = false;
+ 	private _browserZoomIndex: number = browserZoomDefaultIndex;
+ 
+ 	private readonly _onDidChangeSharedWithAgent = this._register(new Emitter<boolean>());
+ 	readonly onDidChangeSharedWithAgent: Event<boolean> = this._onDidChangeSharedWithAgent.event;
+ 
++	private readonly _onDidChangeSharedWithAgentForControl = this._register(new Emitter<boolean>());
++	readonly onDidChangeSharedWithAgentForControl: Event<boolean> = this._onDidChangeSharedWithAgentForControl.event;
++
+ 	private readonly _onDidChangeAnnotationMode = this._register(new Emitter<boolean>());
+ 	readonly onDidChangeAnnotationMode: Event<boolean> = this._onDidChangeAnnotationMode.event;
+ 
+@@ -284,6 +291,7 @@
+ 	get certificateError(): IBrowserViewCertificateError | undefined { return this._certificateError; }
+ 	get storageScope(): BrowserViewStorageScope { return this._storageScope; }
+ 	get sharedWithAgent(): boolean { return this._sharedWithAgent; }
++	get sharedWithAgentForControl(): boolean { return this._sharedWithAgentForControl; }
+ 	get annotationMode(): boolean { return this._annotationMode; }
+ 	get zoomFactor(): number { return browserZoomFactors[this._browserZoomIndex]; }
+ 	get canZoomIn(): boolean { return this._browserZoomIndex < browserZoomFactors.length - 1; }
+@@ -661,9 +669,28 @@
+ 		if (!isShared && this._annotationMode) {
+ 			this._annotationMode = false;
+ 			this._onDidChangeAnnotationMode.fire(false);
++		}
++		// Control consent requires read consent; revoking read consent also revokes control.
++		if (!isShared && this._sharedWithAgentForControl) {
++			this._sharedWithAgentForControl = false;
++			this._onDidChangeSharedWithAgentForControl.fire(false);
+ 		}
+ 	}
+ 
++	async setSharedWithAgentForControl(shared: boolean): Promise<void> {
++		// Control consent requires read consent (page must be tracked by Playwright).
++		if (shared && !this._sharedWithAgent) {
++			await this.setSharedWithAgent(true);
++			if (!this._sharedWithAgent) {
++				return;
++			}
++		}
++		if (shared !== this._sharedWithAgentForControl) {
++			this._sharedWithAgentForControl = shared;
++			this._onDidChangeSharedWithAgentForControl.fire(shared);
++		}
++	}
++
+ 	async setAnnotationMode(annotate: boolean): Promise<void> {
+ 		// Annotation requires share to be enabled (we need page tracking to capture screenshots).
+ 		if (annotate && !this._sharedWithAgent) {
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
+--- a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
++++ b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
+@@ -4,6 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { localize } from '../../../../nls.js';
++import { generateUuid } from '../../../../base/common/uuid.js';
+ import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
+ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { EditorPaneDescriptor, IEditorPaneRegistry } from '../../../browser/editor.js';
+@@ -19,6 +20,7 @@
+ import { IBrowserViewCDPService, IBrowserViewWorkbenchService } from '../common/browserView.js';
+ import { BrowserViewWorkbenchService } from './browserViewWorkbenchService.js';
+ import { BrowserViewCDPService } from './browserViewCDPService.js';
++import { IEditorService } from '../../../services/editor/common/editorService.js';
+ 
+ // Register actions and browser features
+ import './browserViewActions.js';
+@@ -29,6 +31,7 @@
+ import './features/browserEditorFindFeature.js';
+ import './features/browserTabManagementFeatures.js';
+ import './features/ritemarkBrowserContextFeature.js';
++import './features/ritemarkBrowserActionFeature.js';
+ 
+ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
+ 	EditorPaneDescriptor.create(
+@@ -51,7 +54,8 @@
+ 
+ 	constructor(
+ 		@IEditorResolverService editorResolverService: IEditorResolverService,
+-		@IInstantiationService instantiationService: IInstantiationService
++		@IInstantiationService instantiationService: IInstantiationService,
++		@IEditorService editorService: IEditorService,
+ 	) {
+ 		editorResolverService.registerEditor(
+ 			`${Schemas.vscodeBrowser}:/**`,
+@@ -90,6 +94,53 @@
+ 				}
+ 			}
+ 		);
++
++		// Sprint 69: route file:// HTML opens directly to BrowserEditor. Replaces
++		// the extension-side BrowserHtmlOpenRedirector reactive-listener approach
++		// which produced visible text-tab → close → browser-tab flicker. By
++		// registering at the editor resolver level (workbench, not extension)
++		// the text editor never opens in the first place — zero flicker.
++		//
++		// Reuse rule: if a BrowserEditorInput already exists with the same file
++		// URL, focus that one instead of creating a new tab. Avoids tab pile-up
++		// when the user clicks the same .html file repeatedly.
++		editorResolverService.registerEditor(
++			'**/*.{html,htm}',
++			{
++				id: BrowserEditorInput.EDITOR_ID,
++				label: localize('browser.htmlEditorLabel', "Ritemark Browser"),
++				priority: RegisteredEditorPriority.default,
++			},
++			{
++				canSupportResource: resource => resource.scheme === Schemas.file && /\.html?$/i.test(resource.path),
++				singlePerResource: false,
++			},
++			{
++				createEditorInput: ({ resource, options }) => {
++					const fileUrl = resource.toString();
++
++					const existing = editorService.editors.find((input): input is BrowserEditorInput =>
++						input instanceof BrowserEditorInput && input.url === fileUrl,
++					);
++					if (existing) {
++						return {
++							editor: existing,
++							options: { ...options, pinned: true },
++						};
++					}
++
++					const browserInput = instantiationService.createInstance(BrowserEditorInput, {
++						id: generateUuid(),
++						url: fileUrl,
++					});
++					void browserInput.resolve();
++					return {
++						editor: browserInput,
++						options: { ...options, pinned: true },
++					};
++				},
++			},
++		);
+ 	}
+ }
+ 
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
+new file mode 100644
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
+@@ -0,0 +1,421 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import { localize, localize2 } from '../../../../../nls.js';
++import { Action2, registerAction2 } from '../../../../../platform/actions/common/actions.js';
++import { BrowserViewCommandId } from '../../../../../platform/browserView/common/browserView.js';
++import { IPlaywrightService } from '../../../../../platform/browserView/common/playwrightService.js';
++import { BrowserViewUri } from '../../../../../platform/browserView/common/browserViewUri.js';
++import { ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
++import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.js';
++import { ACTIVE_GROUP, IEditorService } from '../../../../services/editor/common/editorService.js';
++import { BrowserEditor } from '../browserEditor.js';
++import { BrowserActionCategory } from '../browserViewActions.js';
++import { IBrowserViewModel } from '../../common/browserView.js';
++import { Schemas } from '../../../../../base/common/network.js';
++import { generateUuid } from '../../../../../base/common/uuid.js';
++
++export interface IRitemarkBrowserActionResult {
++	readonly pageId?: string;
++	readonly summary?: string;
++	readonly error?: string;
++	readonly url?: string;
++	readonly title?: string;
++}
++
++async function ensureControlConsent(model: IBrowserViewModel, dialogService: IDialogService): Promise<boolean> {
++	if (model.sharedWithAgentForControl) {
++		return true;
++	}
++	const result = await dialogService.confirm({
++		type: 'warning',
++		message: localize('ritemark.browser.controlConsent.message', "Allow AI to control this browser tab?"),
++		detail: localize('ritemark.browser.controlConsent.detail', "The AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.\n\nGrant control only for tabs where you trust the AI's actions."),
++		primaryButton: localize('ritemark.browser.controlConsent.allow', "Allow Control"),
++		cancelButton: localize('ritemark.browser.controlConsent.deny', "Deny"),
++	});
++	if (result.confirmed) {
++		await model.setSharedWithAgentForControl(true);
++	}
++	return model.sharedWithAgentForControl;
++}
++
++function modelMeta(model: IBrowserViewModel): Pick<IRitemarkBrowserActionResult, 'pageId' | 'url' | 'title'> {
++	return { pageId: model.id, url: model.url, title: model.title };
++}
++
++class EnsureActiveBrowserControlSharedAction extends Action2 {
++	constructor() {
++		super({
++			id: BrowserViewCommandId.EnsureActiveBrowserControlShared,
++			title: localize2('ritemark.browser.ensureActiveBrowserControlShared', 'Ensure Active Browser Has AI Control Consent'),
++			category: BrowserActionCategory,
++			f1: false,
++		});
++	}
++
++	async run(accessor: ServicesAccessor): Promise<IRitemarkBrowserActionResult> {
++		const editorService = accessor.get(IEditorService);
++		const dialogService = accessor.get(IDialogService);
++		const model = activeBrowserModelFromEditorService(editorService);
++		if (!model) {
++			return { error: 'No active integrated browser tab.' };
++		}
++		try {
++			const granted = await ensureControlConsent(model, dialogService);
++			if (!granted) {
++				return { ...modelMeta(model), error: 'Browser control consent was not granted.' };
++			}
++			return { ...modelMeta(model) };
++		} catch (err) {
++			return { ...modelMeta(model), error: err instanceof Error ? err.message : String(err) };
++		}
++	}
++}
++
++interface IBrowserNavigateArgs {
++	readonly url?: string;
++	readonly type?: 'url' | 'back' | 'forward' | 'reload';
++}
++
++class BrowserNavigateAction extends Action2 {
++	constructor() {
++		super({
++			id: BrowserViewCommandId.BrowserNavigate,
++			title: localize2('ritemark.browser.agentNavigate', 'Navigate Active Browser (AI)'),
++			category: BrowserActionCategory,
++			f1: false,
++		});
++	}
++
++	async run(accessor: ServicesAccessor, args: IBrowserNavigateArgs): Promise<IRitemarkBrowserActionResult> {
++		// ServicesAccessor is only valid during the synchronous portion of run().
++		// Capture all services up front before any await — otherwise later
++		// accessor.get() calls throw "Illegal state: service accessor is only
++		// valid during the invocation of its target method".
++		const dialogService = accessor.get(IDialogService);
++		const editorService = accessor.get(IEditorService);
++		const playwrightService = accessor.get(IPlaywrightService);
++		const type = args.type ?? 'url';
++		return runNavigateInternal({ args, type, dialogService, editorService, playwrightService });
++	}
++}
++
++async function runNavigateInternal(ctx: {
++	args: IBrowserNavigateArgs;
++	type: 'url' | 'back' | 'forward' | 'reload';
++	dialogService: IDialogService;
++	editorService: IEditorService;
++	playwrightService: IPlaywrightService;
++}): Promise<IRitemarkBrowserActionResult> {
++	const { args, type, dialogService, editorService, playwrightService } = ctx;
++	try {
++		const model = type === 'url'
++			? await getOrCreateBrowserModelFromEditorService(editorService, args.url)
++			: activeBrowserModelFromEditorService(editorService);
++		if (!model) {
++			return { error: 'No active integrated browser tab.' };
++		}
++		const granted = await ensureControlConsent(model, dialogService);
++		if (!granted) {
++			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
++		}
++		try {
++			if (type === 'url') {
++				if (!args.url) {
++					return { ...modelMeta(model), error: 'navigate: url is required when type is "url".' };
++				}
++				if (model.url !== args.url) {
++					await model.loadURL(args.url);
++				}
++			} else if (type === 'back') {
++				await model.goBack();
++			} else if (type === 'forward') {
++				await model.goForward();
++			} else if (type === 'reload') {
++				await model.reload(false);
++			} else {
++				return { ...modelMeta(model), error: `navigate: unknown type "${type}".` };
++			}
++		} catch (err) {
++			return { ...modelMeta(model), error: err instanceof Error ? err.message : 'navigate failed.' };
++		}
++		try {
++			const summary = await playwrightService.getSummary(model.id);
++			return { ...modelMeta(model), summary };
++		} catch (err) {
++			return {
++				...modelMeta(model),
++				error: `Navigated to ${args.url ?? '(URL)'}, but reading the page summary failed: ${err instanceof Error ? err.message : String(err)}. The page may still be loading — try again.`,
++			};
++		}
++	} catch (err) {
++		return { error: err instanceof Error ? err.message : String(err) };
++	}
++}
++
++function activeBrowserModelFromEditorService(editorService: IEditorService): IBrowserViewModel | undefined {
++	const editor = editorService.activeEditorPane;
++	return editor instanceof BrowserEditor ? editor.model : undefined;
++}
++
++async function getOrCreateBrowserModelFromEditorService(
++	editorService: IEditorService,
++	urlForNewTab?: string,
++): Promise<IBrowserViewModel | undefined> {
++	const activePane = editorService.activeEditorPane;
++	if (activePane instanceof BrowserEditor) {
++		return activePane.model;
++	}
++	for (const pane of editorService.visibleEditorPanes) {
++		if (pane instanceof BrowserEditor) {
++			return pane.model;
++		}
++	}
++	const existingBrowserInput = editorService.editors.find((input) =>
++		input.resource?.scheme === Schemas.vscodeBrowser,
++	);
++	if (existingBrowserInput) {
++		const opened = await editorService.openEditor(existingBrowserInput);
++		if (opened instanceof BrowserEditor) {
++			return opened.model;
++		}
++	}
++	if (!urlForNewTab) {
++		return undefined;
++	}
++	const resource = BrowserViewUri.forId(generateUuid());
++	const opened = await editorService.openEditor(
++		{ resource, options: { viewState: { url: urlForNewTab } } },
++		ACTIVE_GROUP,
++	);
++	return opened instanceof BrowserEditor ? opened.model : undefined;
++}
++
++/**
++ * Shared runner for the four "invoke Playwright function" actions: click,
++ * fill, type, scroll. Each captures its services up front (to avoid the
++ * "Illegal state: service accessor only valid during invocation" error when
++ * accessor.get is called after an await), then defers to this helper.
++ */
++async function runPlaywrightInvoke(ctx: {
++	editorService: IEditorService;
++	dialogService: IDialogService;
++	playwrightService: IPlaywrightService;
++	validate: () => string | null;
++	functionBody: string;
++	invokeArgs: unknown[];
++}): Promise<IRitemarkBrowserActionResult> {
++	const { editorService, dialogService, playwrightService, validate, functionBody, invokeArgs } = ctx;
++	try {
++		const model = activeBrowserModelFromEditorService(editorService);
++		if (!model) {
++			return { error: 'No active integrated browser tab.' };
++		}
++		const granted = await ensureControlConsent(model, dialogService);
++		if (!granted) {
++			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
++		}
++		const validationError = validate();
++		if (validationError) {
++			return { ...modelMeta(model), error: validationError };
++		}
++		const result = await playwrightService.invokeFunction(model.id, functionBody, invokeArgs);
++		if (result.error) {
++			return { ...modelMeta(model), summary: result.summary, error: result.error };
++		}
++		return { ...modelMeta(model), summary: result.summary };
++	} catch (err) {
++		return { error: err instanceof Error ? err.message : String(err) };
++	}
++}
++
++interface IBrowserClickArgs {
++	readonly ref?: string;
++	readonly selector?: string;
++	readonly button?: 'left' | 'right' | 'middle';
++	readonly dblClick?: boolean;
++}
++
++function clickFunctionBody(): string {
++	return `async (page, refOrSelector, options) => {
++		const locator = options.ref ? page.locator('aria-ref=' + options.ref) : page.locator(options.selector);
++		if (options.dblClick) {
++			await locator.dblclick({ button: options.button || 'left' });
++		} else {
++			await locator.click({ button: options.button || 'left' });
++		}
++	}`;
++}
++
++class BrowserClickAction extends Action2 {
++	constructor() {
++		super({
++			id: BrowserViewCommandId.BrowserClick,
++			title: localize2('ritemark.browser.agentClick', 'Click in Active Browser (AI)'),
++			category: BrowserActionCategory,
++			f1: false,
++		});
++	}
++
++	async run(accessor: ServicesAccessor, args: IBrowserClickArgs): Promise<IRitemarkBrowserActionResult> {
++		const editorService = accessor.get(IEditorService);
++		const dialogService = accessor.get(IDialogService);
++		const playwrightService = accessor.get(IPlaywrightService);
++		return runPlaywrightInvoke({
++			editorService,
++			dialogService,
++			playwrightService,
++			validate: () => (!args.ref && !args.selector) ? 'click: either "ref" or "selector" is required.' : null,
++			functionBody: clickFunctionBody(),
++			invokeArgs: [args],
++		});
++	}
++}
++
++interface IBrowserFillArgs {
++	readonly ref?: string;
++	readonly selector?: string;
++	readonly value: string;
++}
++
++function fillFunctionBody(): string {
++	return `async (page, args) => {
++		const locator = args.ref ? page.locator('aria-ref=' + args.ref) : page.locator(args.selector);
++		await locator.fill(args.value);
++	}`;
++}
++
++class BrowserFillAction extends Action2 {
++	constructor() {
++		super({
++			id: BrowserViewCommandId.BrowserFill,
++			title: localize2('ritemark.browser.agentFill', 'Fill Input in Active Browser (AI)'),
++			category: BrowserActionCategory,
++			f1: false,
++		});
++	}
++
++	async run(accessor: ServicesAccessor, args: IBrowserFillArgs): Promise<IRitemarkBrowserActionResult> {
++		const editorService = accessor.get(IEditorService);
++		const dialogService = accessor.get(IDialogService);
++		const playwrightService = accessor.get(IPlaywrightService);
++		return runPlaywrightInvoke({
++			editorService,
++			dialogService,
++			playwrightService,
++			validate: () => {
++				if (!args.ref && !args.selector) return 'fill: either "ref" or "selector" is required.';
++				if (typeof args.value !== 'string') return 'fill: "value" must be a string.';
++				return null;
++			},
++			functionBody: fillFunctionBody(),
++			invokeArgs: [args],
++		});
++	}
++}
++
++interface IBrowserTypeArgs {
++	readonly text?: string;
++	readonly key?: string;
++}
++
++function typeFunctionBody(): string {
++	return `async (page, args) => {
++		if (args.key) {
++			await page.keyboard.press(args.key);
++		} else if (typeof args.text === 'string') {
++			await page.keyboard.type(args.text);
++		}
++	}`;
++}
++
++class BrowserTypeAction extends Action2 {
++	constructor() {
++		super({
++			id: BrowserViewCommandId.BrowserType,
++			title: localize2('ritemark.browser.agentType', 'Type Keystrokes in Active Browser (AI)'),
++			category: BrowserActionCategory,
++			f1: false,
++		});
++	}
++
++	async run(accessor: ServicesAccessor, args: IBrowserTypeArgs): Promise<IRitemarkBrowserActionResult> {
++		const editorService = accessor.get(IEditorService);
++		const dialogService = accessor.get(IDialogService);
++		const playwrightService = accessor.get(IPlaywrightService);
++		return runPlaywrightInvoke({
++			editorService,
++			dialogService,
++			playwrightService,
++			validate: () => (typeof args.text !== 'string' && !args.key) ? 'type: either "text" or "key" is required.' : null,
++			functionBody: typeFunctionBody(),
++			invokeArgs: [args],
++		});
++	}
++}
++
++interface IBrowserScrollArgs {
++	readonly direction?: 'up' | 'down' | 'top' | 'bottom' | 'into-view';
++	readonly amount?: number;
++	readonly ref?: string;
++	readonly selector?: string;
++}
++
++function scrollFunctionBody(): string {
++	return `async (page, args) => {
++		const direction = args.direction || 'down';
++		const amount = typeof args.amount === 'number' ? args.amount : 600;
++		if (direction === 'into-view') {
++			const locator = args.ref ? page.locator('aria-ref=' + args.ref) : page.locator(args.selector);
++			await locator.scrollIntoViewIfNeeded();
++			return;
++		}
++		if (direction === 'top') {
++			await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
++			return;
++		}
++		if (direction === 'bottom') {
++			await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
++			return;
++		}
++		const delta = direction === 'up' ? -amount : amount;
++		await page.mouse.wheel(0, delta);
++	}`;
++}
++
++class BrowserScrollAction extends Action2 {
++	constructor() {
++		super({
++			id: BrowserViewCommandId.BrowserScroll,
++			title: localize2('ritemark.browser.agentScroll', 'Scroll Active Browser (AI)'),
++			category: BrowserActionCategory,
++			f1: false,
++		});
++	}
++
++	async run(accessor: ServicesAccessor, args: IBrowserScrollArgs): Promise<IRitemarkBrowserActionResult> {
++		const editorService = accessor.get(IEditorService);
++		const dialogService = accessor.get(IDialogService);
++		const playwrightService = accessor.get(IPlaywrightService);
++		return runPlaywrightInvoke({
++			editorService,
++			dialogService,
++			playwrightService,
++			validate: () => (args.direction === 'into-view' && !args.ref && !args.selector)
++				? 'scroll: "ref" or "selector" required when direction is "into-view".'
++				: null,
++			functionBody: scrollFunctionBody(),
++			invokeArgs: [args],
++		});
++	}
++}
++
++registerAction2(EnsureActiveBrowserControlSharedAction);
++registerAction2(BrowserNavigateAction);
++registerAction2(BrowserClickAction);
++registerAction2(BrowserFillAction);
++registerAction2(BrowserTypeAction);
++registerAction2(BrowserScrollAction);

@@ -29,7 +29,8 @@ export type FlagId =
   | 'agentic-assistant'
   | 'codex-integration'
   | 'scheduled-flow-runs'
-  | 'analytics';
+  | 'analytics'
+  | 'browser-agent-control';
 
 /**
  * Feature flag registry
@@ -90,6 +91,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     description: 'Anonymous usage analytics and reaction feedback via PostHog',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
+  },
+  'browser-agent-control': {
+    id: 'browser-agent-control',
+    label: 'AI Browser Control',
+    description: 'Let the AI agent navigate, click, and fill forms in the integrated browser (experimental)',
+    status: 'experimental',
+    platforms: ['darwin'],
   },
 };
 

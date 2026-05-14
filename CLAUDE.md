@@ -48,10 +48,21 @@ Layout invariants (right sidebar AI panel + terminal placement, titlebar toolbar
 | Gate | Condition | Release Phrase |
 | --- | --- | --- |
 | Sprint Phase 2→3 | Cannot write implementation code | "approved", "Jarmo approved", "proceed" |
+| Sprint Phase 3 entry | Cannot edit code on `main` — must be on `sprint-NN-short-name` branch | `git checkout -b sprint-NN-short-name` |
 | Any commit | pre-commit hook must pass; for sprint-end, also `qa-validator` review | All checks green |
 | Production release | release-manager Gate 1 (technical) + Gate 2 (Jarmo tested) | "tested locally", "approved for release" |
 
 These gates cannot be bypassed. If blocked, wait for approval or fix the underlying issue.
+
+### Sprint branch rule (HARD)
+
+After Jarmo approves a sprint plan, the IMMEDIATE next action — before any code edit — is creating the sprint branch:
+
+```bash
+git checkout -b sprint-NN-short-name
+```
+
+Branch name matches the sprint directory under `docs/development/sprints/`. Verify with `git branch --show-current` before touching code. Applies to both lightweight and full-track sprints. **Sprint code never lands on `main` directly.**
 
 * * *
 
