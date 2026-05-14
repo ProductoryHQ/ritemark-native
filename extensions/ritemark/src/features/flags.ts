@@ -95,8 +95,8 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   'browser-agent-control': {
     id: 'browser-agent-control',
     label: 'AI Browser Control',
-    description: 'Let the AI agent navigate, click, and fill forms in the integrated browser (experimental)',
-    status: 'experimental',
+    description: 'Let the AI agent navigate, click, and fill forms in the integrated browser',
+    status: 'stable',
     platforms: ['darwin'],
   },
 };

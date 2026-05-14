@@ -60,7 +60,7 @@ export function buildCodexBrowserDynamicTools(): DynamicToolDefinition[] {
     {
       name: 'ritemark_browser_click',
       description:
-        'Click an element in the active integrated Ritemark browser tab. Prefer ARIA refs (e.g. "@e12") from the page summary; CSS selectors are a fallback. Use dblClick=true for double-click, button="right" for context menu.',
+        'Click an element in the active integrated Ritemark browser tab. Prefer ARIA refs (e.g. "@e12") from the page summary; CSS selectors are a fallback. Use dblClick=true for double-click, button="right" for context menu. Do not call this without either ref or selector.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -75,7 +75,7 @@ export function buildCodexBrowserDynamicTools(): DynamicToolDefinition[] {
     {
       name: 'ritemark_browser_fill',
       description:
-        'Replace the value of an input/textarea/select in the active integrated Ritemark browser tab. Calls Playwright fill() — clears the field before typing.',
+        'Replace the value of an input/textarea/select in the active integrated Ritemark browser tab. Calls Playwright fill() — clears the field before typing. Prefer this over browser_type when you know the target ref or selector.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -90,7 +90,7 @@ export function buildCodexBrowserDynamicTools(): DynamicToolDefinition[] {
     {
       name: 'ritemark_browser_type',
       description:
-        'Send keystrokes to the active integrated Ritemark browser tab. Use "text" to type plain text, or "key" to press a single named key (e.g. "Enter", "Tab", "Control+A").',
+        'Send keystrokes to the active integrated Ritemark browser tab. Use "key" for shortcuts or single keys (e.g. "Enter", "Tab", "Control+A"). Use "text" only after an editable element is already focused; otherwise use browser_fill with a ref or selector.',
       inputSchema: {
         type: 'object',
         properties: {
