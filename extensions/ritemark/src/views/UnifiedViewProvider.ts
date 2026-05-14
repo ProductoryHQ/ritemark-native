@@ -57,6 +57,7 @@ import {
 import { BrowserContextStore } from '../browser/BrowserContextStore';
 import { createBrowserMcpServer, BROWSER_MCP_SERVER_NAME, BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
 import { buildCodexBrowserDynamicTools, isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
+import { browserNavigate, formatActionResultForAgent } from '../browser/BrowserActionTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
@@ -83,14 +84,14 @@ const CODEX_BASE_INSTRUCTIONS = [
   'Prefer structured protocol features over free-form text when the protocol supports them.',
 ].join(' ');
 
-const CODEX_DEVELOPER_INSTRUCTIONS = [
+const CODEX_PLAN_DEVELOPER_INSTRUCTIONS = [
   'When you need the user to choose between options or provide required clarifications before continuing, you must use the request_user_input tool instead of asking in plain assistant text.',
   'Do not present a question as normal chat text if request_user_input can express it.',
   'When you produce a plan, prefer structured plan updates over embedding the whole plan only in prose.',
   'If you already asked for user input via request_user_input, wait for the answer instead of ending the turn with the question rendered as plain text.',
 ].join(' ');
 
-const CODEX_TURN_REMINDER = [
+const CODEX_PLAN_TURN_REMINDER = [
   'Ritemark runtime reminder:',
   '- If you need the user to answer a question or choose from options, you must call request_user_input.',
   '- Do not ask the question in normal assistant text when request_user_input can represent it.',
@@ -104,6 +105,7 @@ const CODEX_BROWSER_REMINDER = [
   '- NEVER open URLs through shell commands like `open`, `xdg-open`, or any system-browser path — those launch the user\'s default external browser (Chrome / Edge / Safari), which is the wrong surface.',
   '- The user\'s expectation is that the page opens inside the integrated Ritemark browser tab so they can see what you see and you can act on it.',
   '- If the URL is ambiguous (e.g. user says "go to my company website" without an exact URL), use web search to resolve the exact URL first, then call `ritemark_browser_navigate` with that URL.',
+  '- Use `ritemark_browser_fill` for form fields when a ref/selector is available. Use `ritemark_browser_type` only for keyboard shortcuts or after an editable field is focused.',
 ].join('\n');
 
 const CLAUDE_BROWSER_APPEND = [
@@ -118,6 +120,24 @@ function shouldStartCodexInPlanMode(prompt: string): boolean {
   return /\bplan mode\b/i.test(prompt)
     || /\bwork in plan\b/i.test(prompt)
     || /\benter plan mode\b/i.test(prompt);
+}
+
+function extractRequestedBrowserUrl(prompt: string): string | null {
+  const hasNavigationIntent = /\b(open|go to|navigate|browse|load|visit|ava|mine|liigu|navigeeri)\b/i.test(prompt);
+  if (!hasNavigationIntent) {
+    return null;
+  }
+
+  const explicitUrl = prompt.match(/\bhttps?:\/\/[^\s<>"')]+/i)?.[0];
+  if (explicitUrl) {
+    return explicitUrl.replace(/[.,;:!?]+$/, '');
+  }
+
+  const domain = prompt.match(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<>"')]+)?/i)?.[0];
+  if (!domain) {
+    return null;
+  }
+  return `https://${domain.replace(/[.,;:!?]+$/, '')}`;
 }
 
 /**
@@ -170,6 +190,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _codexAuth: CodexAuth | null = null;
   private _codexThreadId: string | null = null;
   private _codexTurnId: string | null = null;
+  private _codexBrowserToolsEnabledForThread = false;
+  private _codexBrowserToolQueue: Promise<void> = Promise.resolve();
   private _codexLoginInProgress = false;
   private _codexLoginPoll: ReturnType<typeof setInterval> | null = null;
   private _disposeCodexStatusListener: (() => void) | null = null;
@@ -905,9 +927,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     traceCodex('runtime', 'reset session state', {
       threadId: this._codexThreadId,
       turnId: this._codexTurnId,
+      browserToolsEnabledForThread: this._codexBrowserToolsEnabledForThread,
     });
     this._codexThreadId = null;
     this._codexTurnId = null;
+    this._codexBrowserToolsEnabledForThread = false;
+    this._codexBrowserToolQueue = Promise.resolve();
   }
 
   private _stopCodexLoginPolling(): void {
@@ -1395,22 +1420,32 @@ ${prompt}`;
       const appServer = this._ensureCodexRuntime();
       await appServer.ensureInitialized();
 
+      const browserControlEnabled = isEnabled('browser-agent-control');
+      const resolvedModel = model || getCodexModels()[0]?.id || 'gpt-5.3-codex';
+      const shouldUsePlanMode = mode === 'plan' || (mode !== 'execute' && shouldStartCodexInPlanMode(prompt));
+
+      if (browserControlEnabled && this._codexThreadId && !this._codexBrowserToolsEnabledForThread) {
+        this._codexThreadId = null;
+        this._codexTurnId = null;
+      }
+
       // Create thread if needed
       if (!this._codexThreadId) {
         const codexConfig = vscode.workspace.getConfiguration('ritemark.codex');
         const approvalPolicy = codexConfig.get<string>('approvalPolicy', 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
         const sandbox = codexConfig.get<string>('sandboxMode', 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
-        const dynamicTools = isEnabled('browser-agent-control') ? buildCodexBrowserDynamicTools() : undefined;
+        const dynamicTools = browserControlEnabled ? buildCodexBrowserDynamicTools() : undefined;
         const result = await appServer.threadStart({
           cwd: this._workspacePath || null,
           model: model || null,
           approvalPolicy,
           sandbox,
           baseInstructions: CODEX_BASE_INSTRUCTIONS,
-          developerInstructions: CODEX_DEVELOPER_INSTRUCTIONS,
+          developerInstructions: shouldUsePlanMode ? CODEX_PLAN_DEVELOPER_INSTRUCTIONS : null,
           ...(dynamicTools ? { dynamicTools } : {}),
         });
         this._codexThreadId = result.thread.id;
+        this._codexBrowserToolsEnabledForThread = Boolean(dynamicTools?.length);
         traceCodex('execution', 'thread started', {
           threadId: result.thread.id,
           model: result.model,
@@ -1425,20 +1460,33 @@ ${prompt}`;
         ?.filter(a => a.kind === 'image')
         .map(a => `data:${a.mediaType};base64,${a.data}`) ?? [];
 
+      let browserPreActionBlock = '';
+      const requestedBrowserUrl = browserControlEnabled && !skipBrowserContext && !this._codexBrowserToolsEnabledForThread
+        ? extractRequestedBrowserUrl(prompt)
+        : null;
+      if (requestedBrowserUrl) {
+        const navigationResult = await browserNavigate({ type: 'url', url: requestedBrowserUrl });
+        browserPreActionBlock = [
+          '[Ritemark browser action already executed before this Codex turn]',
+          formatActionResultForAgent(navigationResult),
+          navigationResult.error
+            ? 'Instruction: tell the user the browser navigation failed and do not claim it succeeded.'
+            : 'Instruction: use this resulting page state; do not claim you opened a different page.',
+        ].join('\n');
+      }
+
       const browserContext = skipBrowserContext ? null : await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
       if (browserContext?.codexImageDataUrls.length) {
         imageDataUrls.push(...browserContext.codexImageDataUrls);
       }
 
-      const resolvedModel = model || getCodexModels()[0]?.id || 'gpt-5.3-codex';
-      const shouldUsePlanMode = mode === 'plan' || (mode !== 'execute' && shouldStartCodexInPlanMode(prompt));
       const collaborationMode = shouldUsePlanMode
         ? {
             mode: 'plan' as const,
             settings: {
               model: resolvedModel,
               reasoning_effort: null,
-              developer_instructions: CODEX_DEVELOPER_INSTRUCTIONS,
+              developer_instructions: CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
             },
           }
         : null;
@@ -1453,13 +1501,18 @@ ${prompt}`;
       // Prepend active file and browser context to prompt (same pattern as Claude Code agent)
       const activeFile = this._getActiveFileContext();
       const promptWithBrowserContext = browserContext
-        ? `${browserContext.promptBlock}\n\n---\n\n${prompt}`
+        ? `${browserContext.promptBlock}\n\n---\n\n${browserPreActionBlock ? `${browserPreActionBlock}\n\n---\n\n` : ''}${prompt}`
+        : browserPreActionBlock
+          ? `${browserPreActionBlock}\n\n---\n\n${prompt}`
         : prompt;
       const promptBody = activeFile
         ? `[Currently editing: ${activeFile.path}]\n\n${promptWithBrowserContext}`
         : promptWithBrowserContext;
       const browserReminder = isEnabled('browser-agent-control') ? `\n\n${CODEX_BROWSER_REMINDER}` : '';
-      const enrichedPrompt = `${CODEX_TURN_REMINDER}${browserReminder}\n\n${promptBody}`;
+      const planReminder = shouldUsePlanMode ? CODEX_PLAN_TURN_REMINDER : '';
+      const enrichedPrompt = planReminder
+        ? `${planReminder}${browserReminder}\n\n${promptBody}`
+        : `${browserReminder ? `${browserReminder.trim()}\n\n` : ''}${promptBody}`;
 
       // Start turn (send user message)
       const turnResult = await appServer.turnStart(
@@ -1523,9 +1576,6 @@ ${prompt}`;
     // V2 notifications
     this._codexAppServer.on('turn/started', (params: { threadId: string; turn: { id: string }; collaborationModeKind?: 'plan' | 'default' }) => {
       traceCodex('event', 'turn/started', params);
-      if (params.collaborationModeKind) {
-        console.log(`[codex] turn started in ${params.collaborationModeKind} mode`);
-      }
     });
 
     this._codexAppServer.on('item/started', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
@@ -1615,14 +1665,31 @@ ${prompt}`;
       if (request.method === 'item/tool/call') {
         const params = request.params as Record<string, unknown>;
         const toolName = typeof params.tool === 'string' ? params.tool : '';
-        const toolArgs = (params.arguments && typeof params.arguments === 'object')
-          ? params.arguments as Record<string, unknown>
-          : {};
+        let toolArgs: Record<string, unknown> = {};
+        if (params.arguments && typeof params.arguments === 'object') {
+          toolArgs = params.arguments as Record<string, unknown>;
+        } else if (typeof params.arguments === 'string') {
+          try {
+            const parsed = JSON.parse(params.arguments);
+            if (parsed && typeof parsed === 'object') {
+              toolArgs = parsed as Record<string, unknown>;
+            }
+          } catch {
+            toolArgs = {};
+          }
+        }
         if (isCodexBrowserToolCall(toolName)) {
-          void (async () => {
+          const runBrowserTool = async () => {
             const reply = await dispatchCodexBrowserToolCall(toolName, toolArgs);
             this._codexAppServer?.sendToolCallResponse(request.id, reply.text, reply.success);
-          })();
+          };
+          const queuedBrowserTool = this._codexBrowserToolQueue
+            .catch(() => undefined)
+            .then(runBrowserTool);
+          this._codexBrowserToolQueue = queuedBrowserTool.then(
+            () => undefined,
+            () => undefined,
+          );
           return;
         }
         // Unknown dynamic tool — reply with an error so the model can recover.
@@ -1631,7 +1698,6 @@ ${prompt}`;
       }
       const routed = routeApprovalRequest(request);
       if (request.method === 'item/tool/requestUserInput') {
-        console.log('[codex] request_user_input received');
         const params = request.params;
         const questions = Array.isArray(params.questions)
           ? params.questions

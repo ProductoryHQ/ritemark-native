@@ -206,7 +206,7 @@ diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/rite
 new file mode 100644
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
-@@ -0,0 +1,421 @@
+@@ -0,0 +1,445 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -253,6 +253,11 @@ new file mode 100644
 +
 +function modelMeta(model: IBrowserViewModel): Pick<IRitemarkBrowserActionResult, 'pageId' | 'url' | 'title'> {
 +	return { pageId: model.id, url: model.url, title: model.title };
++}
++
++function isNavigationAbortError(err: unknown): boolean {
++	const message = err instanceof Error ? err.message : String(err);
++	return message.includes('(-3)') || message.includes('ERR_ABORTED');
 +}
 +
 +class EnsureActiveBrowserControlSharedAction extends Action2 {
@@ -349,7 +354,9 @@ new file mode 100644
 +				return { ...modelMeta(model), error: `navigate: unknown type "${type}".` };
 +			}
 +		} catch (err) {
-+			return { ...modelMeta(model), error: err instanceof Error ? err.message : 'navigate failed.' };
++			if (!isNavigationAbortError(err)) {
++				return { ...modelMeta(model), error: err instanceof Error ? err.message : 'navigate failed.' };
++			}
 +		}
 +		try {
 +			const summary = await playwrightService.getSummary(model.id);
@@ -449,7 +456,7 @@ new file mode 100644
 +}
 +
 +function clickFunctionBody(): string {
-+	return `async (page, refOrSelector, options) => {
++	return `async (page, options) => {
 +		const locator = options.ref ? page.locator('aria-ref=' + options.ref) : page.locator(options.selector);
 +		if (options.dblClick) {
 +			await locator.dblclick({ button: options.button || 'left' });
@@ -536,6 +543,23 @@ new file mode 100644
 +		if (args.key) {
 +			await page.keyboard.press(args.key);
 +		} else if (typeof args.text === 'string') {
++			const focused = await page.evaluate(() => {
++				const el = document.activeElement;
++				if (!el) {
++					return { editable: false, description: 'no focused element' };
++				}
++				const tagName = el.tagName.toLowerCase();
++				const inputType = tagName === 'input' ? (el.getAttribute('type') || '').toLowerCase() : null;
++				const nonTextInputTypes = ['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'];
++				const editable = tagName === 'textarea'
++					|| (tagName === 'input' && !nonTextInputTypes.includes(inputType || ''))
++					|| (el instanceof HTMLElement && el.isContentEditable);
++				const label = el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.textContent?.slice(0, 80) || null;
++				return { editable, tagName, inputType, label };
++			});
++			if (!focused.editable) {
++				throw new Error('type: no editable element is focused. Use browser_fill with a ref/selector, or browser_click an input first.');
++			}
 +			await page.keyboard.type(args.text);
 +		}
 +	}`;
