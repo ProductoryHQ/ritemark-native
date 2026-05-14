@@ -1,11 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * Sanitize a filename base for safe use on disk.
- * Mirrors the rules used by the paste-flow saveImage handler:
- * NFD normalize → strip diacritics → non-[a-zA-Z0-9_-] → '-' → collapse → trim.
- */
+// Sanitization matches paste-flow saveImage: NFD → strip diacritics →
+// non-[a-zA-Z0-9_-] → '-' → collapse → trim. Idempotent.
 export function sanitizeImageBaseName(rawBaseName: string): string {
   return rawBaseName
     .normalize('NFD')
@@ -15,13 +12,7 @@ export function sanitizeImageBaseName(rawBaseName: string): string {
     .replace(/^-|-$/g, '');
 }
 
-/**
- * Write a base64-encoded image into `targetDir` with a sanitized filename.
- * The directory is created (recursively) if missing.
- *
- * @returns the final on-disk filename actually written (after sanitization
- *          and fallback to `image` when the base name sanitizes to empty)
- */
+/** Returns the final on-disk filename actually written. */
 export function writeImageRelativeTo(
   targetDir: string,
   rawFilename: string,

@@ -12,10 +12,11 @@ import { tables, taskListItems } from 'turndown-plugin-gfm'
  *  - GFM tables + task list items
  *  - Pipe-escape rule for table cells (the GFM plugin doesn't escape `|`
  *    inside cell content by default and that breaks tables containing code)
+ *  - Image rule preferring `title="./..."` over DOM-resolved `src` (used for
+ *    both paste-flow and Save-as-Markdown image references)
  *
- * TipTap-specific rules (`tiptapTaskItem`, `tiptapTaskList`,
- * `imageWithRelativePath`) live in `components/Editor.tsx` and are layered
- * on top of this base when the editor module is loaded.
+ * TipTap-specific rules (`tiptapTaskItem`, `tiptapTaskList`) live in
+ * `components/Editor.tsx` and are layered on top when the editor loads.
  */
 export function createTurndownService(): TurndownService {
   const service = new TurndownService({
@@ -29,8 +30,6 @@ export function createTurndownService(): TurndownService {
   service.use(tables)
   service.use(taskListItems)
 
-  // Escape pipes inside table cells so cell content containing `|` does not
-  // break the surrounding GFM table structure.
   service.addRule('tableCellWithPipeEscape', {
     filter: ['th', 'td'],
     replacement(content, node) {
@@ -40,6 +39,22 @@ export function createTurndownService(): TurndownService {
         : 0
       const prefix = index === 0 ? '| ' : ' '
       return prefix + escapedContent + ' |'
+    },
+  })
+
+  // Image rule: when title starts with "./", that's the canonical relative
+  // path (set by paste-flow's saveImage response or mammoth's convertImage
+  // hook); the DOM-resolved src is just for display.
+  service.addRule('imageWithRelativePath', {
+    filter: 'img',
+    replacement(_content, node) {
+      const el = node as HTMLImageElement
+      const alt = el.alt || ''
+      const title = el.getAttribute('title') || ''
+      const src = title.startsWith('./')
+        ? title
+        : el.getAttribute('src') || el.src
+      return `![${alt}](${src})`
     },
   })
 
