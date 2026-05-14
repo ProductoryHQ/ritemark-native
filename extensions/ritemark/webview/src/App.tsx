@@ -9,6 +9,7 @@ import { PropertiesSidePanel } from './components/properties'
 import { FindBar } from './components/FindBar'
 import { InlineTableOfContents } from './components/InlineTableOfContents'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
+import { writeClipboard } from './lib/clipboard'
 import { getHeadings } from './lib/headingUtils'
 import type { Heading } from './lib/headingUtils'
 import { marked } from 'marked'
@@ -430,24 +431,12 @@ function App() {
     })
   }, [content, properties])
 
-  const handleCopyAsMarkdown = useCallback(async () => {
+  const handleCopyAsMarkdown = useCallback(() => {
     if (!editorRef.current) return
-
-    try {
-      // Get HTML from selection or full document
-      const html = getSelectionHTML(editorRef.current)
-
-      // Clean HTML for proper markdown conversion (removes colgroup, unwraps <p> in cells)
-      const cleanedHTML = preprocessTableHTML(html)
-
-      // Convert to markdown
-      const markdown = turndownService.turndown(cleanedHTML)
-
-      // Copy to clipboard
-      await navigator.clipboard.writeText(markdown)
-    } catch (error) {
-      console.error('Failed to copy markdown:', error)
-    }
+    const html = getSelectionHTML(editorRef.current)
+    const cleanedHTML = preprocessTableHTML(html)
+    const markdown = turndownService.turndown(cleanedHTML)
+    writeClipboard(markdown)
   }, [])
 
   // Scroll-spy: track which heading is currently topmost in the editor view.

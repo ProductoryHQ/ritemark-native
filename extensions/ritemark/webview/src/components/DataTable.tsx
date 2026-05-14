@@ -9,6 +9,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { Icon } from './ui/Icon'
+import { writeClipboard, readClipboard } from '../lib/clipboard'
 import { useVirtualizer } from '@tanstack/react-virtual'
 
 export interface DataTableProps {
@@ -608,7 +609,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                         // Copy works even in read-only mode
                         if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
                           e.preventDefault()
-                          navigator.clipboard.writeText(rawValue)
+                          writeClipboard(rawValue)
                           return
                         }
 
@@ -619,7 +620,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                         // Paste into selected cell
                         if (e.key === 'v' && (e.metaKey || e.ctrlKey)) {
                           e.preventDefault()
-                          navigator.clipboard.readText().then((text) => {
+                          readClipboard().then((text) => {
                             if (onCellChange) {
                               const row = rows[cellCoord.rowPosition]
                               const columnId = columns[cellCoord.columnIndex]
