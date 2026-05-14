@@ -498,6 +498,18 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
               vscode.env.openExternal(vscode.Uri.parse(fullUrl));
             }
             return;
+
+          case 'copyToClipboard':
+            if (typeof message.text === 'string') {
+              void vscode.env.clipboard.writeText(message.text);
+            }
+            return;
+
+          case 'readClipboard':
+            void vscode.env.clipboard.readText().then((text) => {
+              void webview.postMessage({ type: 'clipboardText', text });
+            });
+            return;
         }
       },
       undefined,

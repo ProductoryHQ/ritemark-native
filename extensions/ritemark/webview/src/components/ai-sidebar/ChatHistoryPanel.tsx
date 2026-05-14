@@ -5,15 +5,12 @@
  * - Date grouping (Today, Yesterday, This Week, Older)
  * - Click to resume conversation
  * - Delete button with confirmation
- * - New Chat button at top
  */
 
 import { useState } from 'react';
-import { Icon, type PhosphorIconName } from '../ui/Icon';
+import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import type { SavedConversationV2 } from './chatHistoryStorage';
-import type { RuntimeId } from './conversationModel';
-import type { AgentId } from './types';
 
 // ── Date Grouping ──────────────────────────────────────────────────────
 
@@ -56,57 +53,12 @@ function groupConversations(
   return groups;
 }
 
-// ── Runtime badge helpers ──────────────────────────────────────────────
-
-const runtimeBadgeConfig: Record<RuntimeId, { icon: PhosphorIconName; label: string }> = {
-  'claude-code': { icon: 'robot', label: 'Claude' },
-  'codex': { icon: 'terminal', label: 'Codex' },
-  'legacy-ritemark': { icon: 'star-four', label: 'Agent' },
-};
-
 const groupLabels: Record<DateGroup, string> = {
   today: 'Today',
   yesterday: 'Yesterday',
   thisWeek: 'This Week',
   older: 'Older',
 };
-
-// ── Agent Badge ────────────────────────────────────────────────────────
-
-const agentBadgeConfig: Record<AgentId, { icon: PhosphorIconName; label: string }> = {
-  'claude-code': { icon: 'robot', label: 'Claude' },
-  'codex': { icon: 'terminal', label: 'Codex' },
-  'ritemark-agent': { icon: 'star-four', label: 'Agent' },
-};
-
-interface AgentBadgeProps {
-  agentId?: AgentId;
-  runtimeSummary?: RuntimeId[];
-}
-
-function AgentBadge({ agentId, runtimeSummary }: AgentBadgeProps) {
-  let icon: PhosphorIconName = 'star-four';
-  let label = 'Agent';
-
-  if (runtimeSummary && runtimeSummary.length > 1) {
-    icon = 'squares-four';
-    label = 'Mixed';
-  } else if (runtimeSummary && runtimeSummary.length === 1) {
-    const config = runtimeBadgeConfig[runtimeSummary[0]];
-    if (config) { icon = config.icon; label = config.label; }
-  } else if (agentId) {
-    const config = agentBadgeConfig[agentId] || agentBadgeConfig['ritemark-agent'];
-    icon = config.icon;
-    label = config.label;
-  }
-
-  return (
-    <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]">
-      <Icon name={icon} size={12} />
-      <span>{label}</span>
-    </span>
-  );
-}
 
 // ── Conversation Item ──────────────────────────────────────────────────
 
@@ -140,25 +92,25 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: Conver
   return (
     <div
       onClick={onSelect}
-      className={`
-        group flex items-start gap-2 p-2 rounded cursor-pointer
-        transition-colors duration-100
-        ${isActive
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+      className={`group w-full px-3 py-2 flex items-start gap-2 text-left cursor-pointer hover:bg-[var(--r-surface-soft)] ${
+        isActive
           ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)]'
-          : 'hover:bg-[var(--r-surface-soft)]'
-        }
-      `}
+          : ''
+      }`}
     >
+      <Icon
+        name="clock-counter-clockwise"
+        size={16}
+        className="mt-0.5 shrink-0"
+      />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] font-medium truncate flex-1">
-            {conversation.title}
-          </span>
-          <AgentBadge agentId={conversation.agentId} runtimeSummary={conversation.runtimeSummary} />
-        </div>
-        <span className="text-[10px] text-[var(--r-ink-muted)]">
+        <div className="text-sm font-medium truncate">{conversation.title}</div>
+        <div className="text-xs text-[var(--r-ink-muted)] truncate">
           {formatTime(conversation.updatedAt)}
-        </span>
+        </div>
       </div>
       <button
         onClick={handleDelete}
@@ -200,7 +152,6 @@ export function ChatHistoryPanel() {
   const currentConversationId = useAISidebarStore((s) => s.currentConversationId);
   const loadSavedConversation = useAISidebarStore((s) => s.loadSavedConversation);
   const deleteSavedConversation = useAISidebarStore((s) => s.deleteSavedConversation);
-  const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
   const toggleHistoryPanel = useAISidebarStore((s) => s.toggleHistoryPanel);
 
   const grouped = groupConversations(savedConversations);
@@ -220,17 +171,6 @@ export function ChatHistoryPanel() {
           title="Close"
         >
           <Icon name="x" size={16} />
-        </button>
-      </div>
-
-      {/* New Chat Button */}
-      <div className="px-2 py-2 border-b border-[var(--r-hairline)]">
-        <button
-          onClick={startNewConversation}
-          className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded text-[12px] font-medium bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] transition-colors"
-        >
-          <Icon name="note-pencil" size={14} />
-          New Chat
         </button>
       </div>
 

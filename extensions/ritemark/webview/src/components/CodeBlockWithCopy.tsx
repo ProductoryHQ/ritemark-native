@@ -110,17 +110,12 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
     return () => { cancelled = true }
   }, [node.textContent, isMermaid, uniqueId])
 
-  const handleCopy = useCallback(async () => {
+  const handleCopy = useCallback(() => {
     const text = node.textContent
     if (!text) return
-
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy code:', err)
-    }
+    sendToExtension('copyToClipboard', { text })
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }, [node.textContent])
 
   const toggleView = useCallback(() => {
