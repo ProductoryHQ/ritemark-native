@@ -140,11 +140,32 @@ export OPENAI_API_KEY='your-key-here'
 
 ---
 
+## Agent Runtime (v1.7.0+)
+
+By default, Ritemark ships its own bundled Claude and Codex binaries. If you prefer to use your own system-installed versions:
+
+1. Open **Settings** (gear icon).
+2. Find the **Agent Runtime** section.
+3. Switch from **Bundled** to **System**.
+
+The "Currently active:" path shown below the dropdown tells you which binary Ritemark is actually running — useful for verifying your system install is being picked up.
+
+**When to use System runtime:**
+- You want to use a specific version of Claude or Codex you've installed yourself.
+- You're testing a newer Codex or Claude CLI release before it ships bundled with Ritemark.
+
+**When to use Bundled (default):**
+- You haven't installed Claude or Codex manually.
+- You want the exact version Ritemark has tested against.
+
+---
+
 ## Privacy Notes
 
 - API keys are stored in your system's secure credential store
 - Text is sent to the respective AI provider's servers for processing
 - Ritemark doesn't store or transmit your data elsewhere
+- Browser page content is only shared with the AI after you explicitly allow it via the "Share with Agent?" prompt
 - See each provider's usage policies for details
 
 ---

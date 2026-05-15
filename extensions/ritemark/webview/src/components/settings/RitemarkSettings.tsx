@@ -15,7 +15,6 @@ interface SettingsData {
   codexApprovalPolicy: 'untrusted' | 'on-request' | 'on-failure' | 'never';
   codexSandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
   agentRuntimePreference: 'bundled' | 'system';
-  htmlDefaultOpener: 'browser' | 'editor' | 'prompt'; // browser/prompt are legacy values
   updatesEnabled: boolean;
   agentTimeout: number;
   debugTrace: boolean;
@@ -986,33 +985,6 @@ export function RitemarkSettings() {
           </p>
         </div>
 
-      </section>
-
-      {/* Browser Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="link-simple" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            Browser
-          </h2>
-        </div>
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
-          <label className="text-sm font-medium text-ink-strong block mb-1">
-            HTML File Default
-          </label>
-          <select
-            value={settings.htmlDefaultOpener ?? 'editor'}
-            onChange={(e) => handleSettingChange('browser.htmlDefaultOpener', e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
-          >
-            <option value="editor">Open as Text (default)</option>
-            <option value="browser">Legacy: Browser default (disabled)</option>
-            <option value="prompt">Legacy: Ask each time (disabled)</option>
-          </select>
-          <p className="text-xs text-ink-muted mt-1">
-            HTML files open as text by default. Right-click a workspace .html file and choose Open in Ritemark Browser to preview it in the native Electron browser.
-          </p>
-        </div>
       </section>
 
       {/* Agent Timeout Section */}

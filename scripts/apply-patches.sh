@@ -71,7 +71,56 @@ APPLIED=0
 FAILED=0
 SKIPPED=0
 
-for patch in "${PATCHES[@]}"; do
+patch_paths() {
+    awk '
+        /^(---|\+\+\+) [ab]\// {
+            path = $2
+            sub(/^[ab]\//, "", path)
+            if (path != "/dev/null") {
+                print path
+            }
+        }
+    ' "$@" | sort -u
+}
+
+copy_patch_paths_to_temp() {
+    local tmp_dir="$1"
+    shift
+
+    while IFS= read -r path; do
+        if [ -f "$path" ]; then
+            mkdir -p "$tmp_dir/$(dirname "$path")"
+            cp "$path" "$tmp_dir/$path"
+        fi
+    done < <(patch_paths "$@")
+}
+
+reverse_later_patches_then_check_current() {
+    local current_index="$1"
+    local current_patch="$2"
+    local tmp_dir
+    tmp_dir="$(mktemp -d)"
+
+    copy_patch_paths_to_temp "$tmp_dir" "${PATCHES[@]:$current_index}"
+
+    (
+        cd "$tmp_dir"
+        local later_patch
+        for later_patch in "${PATCHES[@]:$((current_index + 1))}"; do
+            if git apply --check --reverse "$later_patch" 2>/dev/null; then
+                git apply --reverse "$later_patch" 2>/dev/null
+            fi
+        done
+
+        git apply --check --reverse "$current_patch" 2>/dev/null
+    )
+    local result=$?
+    rm -rf "$tmp_dir"
+    return "$result"
+}
+
+for patch_index in "${!PATCHES[@]}"; do
+    patch="${PATCHES[$patch_index]}"
     PATCH_NAME=$(basename "$patch")
 
     if [ "$DRY_RUN" = true ]; then
@@ -81,6 +130,9 @@ for patch in "${PATCHES[@]}"; do
             APPLIED=$((APPLIED + 1))
         elif git apply --check --reverse "$patch" 2>/dev/null; then
             echo -e "${YELLOW}Already applied${NC}"
+            SKIPPED=$((SKIPPED + 1))
+        elif reverse_later_patches_then_check_current "$patch_index" "$patch"; then
+            echo -e "${YELLOW}Already applied (overlapped by later patch)${NC}"
             SKIPPED=$((SKIPPED + 1))
         else
             echo -e "${RED}CONFLICT${NC}"
