@@ -6,8 +6,6 @@
 
 Ritemark v1.7.0: the AI can finally read both halves of your work. Markdown is your prose. HTML is your executable PowerPoint. v1.7.0 makes the AI fluent in both.
 
-![](./images/image-1778675212584.png)
-
 ## Positioning
 
 **The AI used to be blind to half your work.**

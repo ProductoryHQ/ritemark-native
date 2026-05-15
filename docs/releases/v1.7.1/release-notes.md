@@ -10,7 +10,6 @@ tags:
   - codex
   - patch
   - feature
-draft: true
 ---
 
 # Ritemark v1.7.1 — The AI Can Now Drive the Browser
@@ -74,7 +73,7 @@ The first time the AI tries to call any of these tools, Ritemark shows a workben
 >
 > **[Allow Control]    [Cancel]**
 
-`[screenshot: 03-control-consent-dialog.png — TODO manual capture]`
+![Allow AI to control this browser tab? consent dialog](./screenshots/1-7-1-browser-use-consent-dialog.png)
 
 Allow once per tab per session. Decline and any subsequent control call from the AI returns a typed error — the next call doesn't re-prompt, and Sprint 67 read context (URL, title, summary, screenshot) keeps working. Revoking read consent for a tab also revokes control consent: you can't accidentally end up in a state where the AI can act on a page it can't see.
 
@@ -125,19 +124,19 @@ v1.7.1 replaces the reactive listener with a workbench-level editor resolver: `*
 
 The same-URL reuse logic applies here too: opening the same `.html` file twice reuses the existing browser tab rather than stacking duplicates.
 
-`[screenshot: 05-html-direct-render.png]`
+![.html file rendered directly in the integrated browser, no text-tab flicker](./screenshots/1-7-1-html-fixture-direct-render.png)
 
 * * *
 
 ## What's Fixed
 
--   **Chat History shows every saved conversation.** The panel was loading the conversation list exactly once — on first open — and then never refreshing. Saved conversations from earlier sessions sat correctly in workspace-scoped storage but never made it into the panel; users saw a single entry where they should have seen a full list. Fixed: the list now reloads as soon as the workspace context is established, so every conversation in the current project appears, grouped by recency. Workspace scoping is unchanged — conversations from one project never appear when working in another. The redundant "New Chat" button in the history panel header was also removed; the `+` button in the AI sidebar toolbar starts a new chat. Fixes [#65](https://github.com/ProductoryHQ/ritemark-native/issues/65). `[screenshot: 07-chat-history.png]`
+-   **Chat History shows every saved conversation.** The panel was loading the conversation list exactly once — on first open — and then never refreshing. Saved conversations from earlier sessions sat correctly in workspace-scoped storage but never made it into the panel; users saw a single entry where they should have seen a full list. Fixed: the list now reloads as soon as the workspace context is established, so every conversation in the current project appears, grouped by recency. Workspace scoping is unchanged — conversations from one project never appear when working in another. The redundant "New Chat" button in the history panel header was also removed; the `+` button in the AI sidebar toolbar starts a new chat. Fixes [#65](https://github.com/ProductoryHQ/ritemark-native/issues/65).
 
 -   **Clipboard works inside the sandboxed webview.** Copy buttons on code blocks, "Copy as Markdown" in the export menu, and Cmd+C/Cmd+V inside table cells were silently failing under the hardened webview sandbox — the browser clipboard API was not available, and nothing landed on the system clipboard. Fixed by routing every clipboard operation through the VS Code extension host instead of the webview's `navigator.clipboard`. Fixes [#66](https://github.com/ProductoryHQ/ritemark-native/issues/66).
 
 -   **HTML cold-start race is gone.** The Sprint 65 `BrowserHtmlOpenRedirector` had a window where it could lose the race on app cold-start and leave an `.html` file stuck as a blank text tab. Sprint 68 patched the redirector with an extra `onDidChangeVisibleTextEditors` listener; Sprint 69 then superseded the redirector entirely with the workbench editor resolver described above. Either way, the original symptom is gone. Fixes [#63](https://github.com/ProductoryHQ/ritemark-native/issues/63).
 
--   **Misleading Settings dropdown removed.** Settings had an "Open HTML files in…" dropdown with options *Open as Text (default)* and *Legacy: Browser default (disabled)*. The wording never matched actual behaviour since Sprint 65 — the integrated browser was already the real default — so the control was quietly removed in this release. The Features section in Settings (which housed the flag toggles) was removed in the same pass; flags are temporarily set via `settings.json` until a leaner Features panel returns. `[screenshot: 08-settings-no-browser-section.png]`
+-   **Misleading Settings dropdown removed.** Settings had an "Open HTML files in…" dropdown with options *Open as Text (default)* and *Legacy: Browser default (disabled)*. The wording never matched actual behaviour since Sprint 65 — the integrated browser was already the real default — so the control was quietly removed in this release. The Features section in Settings (which housed the flag toggles) was removed in the same pass; flags are temporarily set via `settings.json` until a leaner Features panel returns.
 
 * * *
 
