@@ -170,27 +170,6 @@
     ],
     "configuration": [
       {
-        "title": "Ritemark Browser",
-        "properties": {
-          "ritemark.browser.htmlDefaultOpener": {
-            "type": "string",
-            "enum": [
-              "browser",
-              "editor",
-              "prompt"
-            ],
-            "default": "browser",
-            "description": "Controls whether workspace .html files open in the native Ritemark Browser by default or as text.",
-            "enumDescriptions": [
-              "Open .html files in the native Ritemark Browser by default.",
-              "Open .html files in the text editor.",
-              "Ask each time which editor to use."
-            ],
-            "scope": "application"
-          }
-        }
-      },
-      {
         "title": "Ritemark Updates",
         "properties": {
           "ritemark.updates.enabled": {
@@ -286,7 +265,7 @@
               "Ask before every command and file change (safest)",
               "Ask only for operations outside workspace boundaries",
               "Auto-approve everything, ask only when a command fails",
-              "Never ask \u2014 run everything automatically (use with caution)"
+              "Never ask — run everything automatically (use with caution)"
             ],
             "description": "When Codex should ask for your approval before running shell commands or modifying files.",
             "scope": "application"
@@ -302,7 +281,7 @@
             "enumDescriptions": [
               "Codex can only read files (no writing or command execution)",
               "Codex can read and write files within the workspace (recommended)",
-              "Full system access including network \u2014 use with extreme caution"
+              "Full system access including network — use with extreme caution"
             ],
             "description": "What Codex is allowed to do on your filesystem.",
             "scope": "application"
@@ -674,7 +653,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts",
+    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts",
     "test:integration": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/LLMNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration:free": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts",
     "test:all": "npm run test && npm run test:integration",

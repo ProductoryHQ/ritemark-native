@@ -17,7 +17,7 @@ draft: true
 
 # Ritemark v1.7.0 — Markdown for Text. HTML for Where It Clicks. AI for Both.
 
-**Status:** Draft — awaiting build + Jarmo approval
+**Status:** Published — 2026-05-12
 **Type:** Feature release
 **Focus:** Markdown is great for prose. But complex ideas — schematics, parameter spaces, "expand this part," visual comparisons — eventually want to live in HTML. v1.7.0 brings the browser inside the editor, so a folder of markdown and a folder of HTML artifacts become one workspace, and the AI can read both.
 

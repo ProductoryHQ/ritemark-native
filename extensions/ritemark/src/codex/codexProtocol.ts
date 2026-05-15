@@ -128,6 +128,26 @@ export interface LogoutAccountResponse {
 // Thread Management (Client → Server)
 // ============================================================================
 
+/**
+ * Codex App Server custom tool definition (experimental).
+ *
+ * Passed in `ThreadStartParams.dynamicTools`. When the model invokes one,
+ * the App Server sends an `item/tool/call` JSON-RPC REQUEST back to the
+ * client; the client must respond with `ToolCallResponse` using the same
+ * request id.
+ *
+ * Tool `name` must match `^[a-zA-Z0-9_-]+$` and must not collide with the
+ * built-in tool namespaces (`functions`, `browser`, `computer`, `terminal`,
+ * `python`, `web`, etc.). Ritemark uses the `ritemark_browser_*` prefix.
+ *
+ * Requires `initialize.params.capabilities.experimentalApi = true`.
+ */
+export interface DynamicToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
 export interface ThreadStartParams {
   model?: string | null;
   modelProvider?: string | null;
@@ -138,6 +158,30 @@ export interface ThreadStartParams {
   developerInstructions?: string | null;
   experimentalRawEvents: boolean;
   persistExtendedHistory: boolean;
+  /** Experimental Codex App Server feature — see DynamicToolDefinition. */
+  dynamicTools?: DynamicToolDefinition[];
+}
+
+/**
+ * Server → client `item/tool/call` request params for a dynamic tool.
+ * The client responds with a `ToolCallResponse` keyed by the request id.
+ */
+export interface ToolCallRequestParams {
+  threadId: string;
+  turnId: string;
+  callId: string;
+  tool: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ToolCallResponseContentItem {
+  type: 'inputText';
+  text: string;
+}
+
+export interface ToolCallResponse {
+  contentItems: ToolCallResponseContentItem[];
+  success: boolean;
 }
 
 export interface ThreadStartResponse {

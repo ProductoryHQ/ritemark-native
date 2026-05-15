@@ -417,6 +417,24 @@ extensions/             # Built-in extensions
 
 Hard-won lessons. Each one cost real time at least once.
 
+### `navigator.clipboard` is blocked in VS Code webview sandbox
+
+`navigator.clipboard.writeText/readText` fails silently in VS Code's sandboxed webview iframe — no error shown, nothing happens. **Never use `navigator.clipboard` directly in webview code.**
+
+Use the shared utility instead:
+
+```typescript
+import { writeClipboard, readClipboard } from '../lib/clipboard'
+
+// Write
+writeClipboard(text)
+
+// Read (Promise)
+const text = await readClipboard()
+```
+
+`writeClipboard` sends a `copyToClipboard` message to the extension host, which calls `vscode.env.clipboard.writeText`. `readClipboard` sends `readClipboard` and waits for a `clipboardText` response message. Both handlers live in `ritemarkEditor.ts`.
+
 ### `ELECTRON_RUN_AS_NODE` breaks dev launch
 
 Claude Code sets `ELECTRON_RUN_AS_NODE=1` in its shell. This makes Electron run as plain Node — `import { Menu } from 'electron'` then fails. Always unset before launching dev mode:
