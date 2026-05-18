@@ -71,6 +71,37 @@ try {
     `default path must sanitize user-supplied filenames (got "${sanitized}")`
   );
 
+  // skipSanitize must refuse any input that could escape targetDir on disk.
+  // Defense-in-depth against a crafted webview message — Codex PR #75 P1.
+  const trapDir = join(tempRoot, 'trap');
+  const trapInputs = [
+    '../escape.png',
+    '..\\escape.png',
+    '/etc/passwd',
+    'C:\\Windows\\evil.png',
+    'sub/dir/file.png',
+    '.hidden.png',
+    '..',
+    '.',
+    '',
+  ];
+  for (const evil of trapInputs) {
+    assert.throws(
+      () => writeImageRelativeTo(trapDir, evil, ONE_PIXEL_PNG_BASE64, { skipSanitize: true }),
+      /Refusing unsafe image filename/,
+      `skipSanitize must reject "${evil}"`
+    );
+  }
+  // And the trap directory must not contain any files written by those rejections.
+  if (existsSync(trapDir)) {
+    const trapDirFiles = readdirSync(trapDir);
+    assert.strictEqual(
+      trapDirFiles.length,
+      0,
+      `no files should have landed in trap dir; got [${trapDirFiles.join(', ')}]`
+    );
+  }
+
   console.log('imageWriter.test.ts: PASS');
 } finally {
   if (existsSync(tempRoot)) {

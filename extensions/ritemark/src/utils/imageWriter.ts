@@ -33,6 +33,18 @@ export function writeImageRelativeTo(
 
   let finalFilename: string;
   if (options.skipSanitize) {
+    // Defense in depth: even when the caller asserts the filename is already
+    // canonical, refuse anything that could escape targetDir on disk. The
+    // sanitizer's char-replace step was incidentally providing this guard
+    // before skipSanitize existed; without an explicit check a crafted
+    // webview message could traverse via `../foo` or absolute paths.
+    if (
+      rawFilename.length === 0 ||
+      /[/\\]/.test(rawFilename) ||
+      rawFilename.startsWith('.')
+    ) {
+      throw new Error(`Refusing unsafe image filename: ${rawFilename}`);
+    }
     finalFilename = rawFilename;
   } else {
     const ext = path.extname(rawFilename);
