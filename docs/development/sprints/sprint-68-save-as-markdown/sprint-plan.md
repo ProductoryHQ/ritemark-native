@@ -13,21 +13,21 @@ Add a "Save as Markdown" button to the DOCX and PDF viewer toolbars so users can
 
 ## Success Criteria
 
-- [ ] A "Save as Markdown" button appears in the DOCXViewer toolbar (gated by `saveAsMarkdownFromPreview` flag).
-- [ ] A "Save as Markdown" button appears in the PDFViewer toolbar (gated by flag).
-- [ ] Clicking either button opens a VS Code Save As dialog defaulted to `<source-basename>.md` in the same directory as the source file.
-- [ ] The saved `.md` file opens immediately in the Ritemark editor after save.
-- [ ] Images extracted from DOCX are written to `./images/<basename>--image-N.<ext>` next to the `.md`.
-- [ ] Images extracted from PDF are written to the same `./images/` folder with the same naming convention.
-- [ ] No inline base64 appears in the output markdown.
-- [ ] PDF conversion runs in a Web Worker for documents > 20 pages; the UI does not freeze.
-- [ ] Scanned PDFs (no text layer) surface a warning toast; they do not crash.
-- [ ] Multi-column PDFs surface a warning toast.
-- [ ] Toast summarises result: "Saved `brief.md` · N tables, N images, N warnings."
-- [ ] Telemetry fires `feature_used: save_as_markdown` with `source: 'docx' | 'pdf'`.
-- [ ] `saveAsMarkdownFromPreview` flag is registered in `flags.ts` and gating is confirmed by disabling the flag and verifying buttons disappear.
-- [ ] `writeImageRelativeTo()` helper is shared between the paste flow and the new save handler (no duplicated sanitization logic).
-- [ ] Extension TypeScript compiles clean. Pre-commit hook passes.
+- [x] A "Save as Markdown" button appears in the DOCXViewer toolbar (gated by `saveAsMarkdownFromPreview` flag).
+- [x] A "Save as Markdown" button appears in the PDFViewer toolbar (gated by flag).
+- [x] Clicking either button opens a VS Code Save As dialog defaulted to `<source-basename>.md` in the same directory as the source file.
+- [x] The saved `.md` file opens immediately in the Ritemark editor after save.
+- [x] Images extracted from DOCX are written to `./images/<basename>--image-N.<ext>` next to the `.md`. *(Required a follow-up fix — see commit `51c1f67` — because the extension's `writeImageRelativeTo` re-sanitizer collapsed the `--` separator. Resolved with `skipSanitize` option on the trusted save-as-markdown path.)*
+- [ ] ~~Images extracted from PDF are written to the same `./images/` folder with the same naming convention.~~ **Waived (2026-05-18).** PDF image extraction not shipped (Risk 5 acknowledged in plan; getOperatorList + objs cache too fragile for first cut). Heuristic converter is text-only.
+- [x] No inline base64 appears in the output markdown.
+- [ ] ~~PDF conversion runs in a Web Worker for documents > 20 pages; the UI does not freeze.~~ **Waived (2026-05-18).** Shipped Risk 2 Option A (inline conversion). pdfjs's own internal worker handles rendering. No user reports of UI freeze yet; revisit only if real-world large PDFs surface a problem.
+- [ ] ~~Scanned PDFs (no text layer) surface a warning toast; they do not crash.~~ **Intentionally untested (2026-05-18).** No scanned-PDF test fixture on hand; per the [intentionally-untested triage rule](../../../../.claude/memory.md), wait for a real user bug report rather than fabricate a fixture. Code path exists (`pdfToMarkdown.ts` returns empty markdown + warning; DOCXViewer short-circuits to "Nothing to save" toast).
+- [ ] ~~Multi-column PDFs surface a warning toast.~~ **Intentionally untested (2026-05-18).** Same triage rule as above. Code path exists (`pdfToMarkdown.ts` bumps a column-detection warning counter when X-band clustering fires).
+- [ ] ~~Toast summarises result: "Saved `brief.md` · N tables, N images, N warnings."~~ **Shipped narrower (2026-05-18).** Toast shows `"Saved <filename>"` plus the warnings list (if any). The `N tables / N images / N warnings` counts were dropped; warnings list alone is sufficient signal for the failure modes users actually care about. Plan amended; no follow-up.
+- [x] Telemetry fires `feature_used: save_as_markdown` with `source: 'docx' | 'pdf'`. *(Confirmed in PostHog 2026-05-18 — 5 events visible over 90-day window from QA runs.)*
+- [ ] ~~`saveAsMarkdownFromPreview` flag is registered in `flags.ts` and gating is confirmed by disabling the flag and verifying buttons disappear.~~ **Half-shipped (2026-05-18).** Flag is registered and `isEnabled()` call sites work. UI gating cannot be verified the planned way because the Settings flag-toggle UI was removed project-wide — see `project_feature_flags_no_ui.md`. Code-review of `canSaveAsMarkdown` prop threading is the substitute QA.
+- [x] `writeImageRelativeTo()` helper is shared between the paste flow and the new save handler (no duplicated sanitization logic). *(Now also gains `skipSanitize` option for trusted callers — see commit `51c1f67`.)*
+- [x] Extension TypeScript compiles clean. Pre-commit hook passes.
 
 ## Deliverables
 
@@ -214,9 +214,20 @@ The proposed phase split (plumbing → DOCX → PDF → polish) is correct and i
 ## Status
 
 **Track:** Full 6-phase
-**Current Phase:** 2 (PLAN)
+**Current Phase:** 5 (QA complete, ready for sprint-end)
 **Approval Required:** Yes
+
+### Manual QA outcome (2026-05-18)
+
+| Criterion | Result |
+|-----------|--------|
+| DOCX → Save as Markdown | ✓ verified (after `--image-N` fix in `51c1f67`) |
+| PDF → Save as Markdown (text path) | ✓ verified |
+| Telemetry `save_as_markdown` event | ✓ verified in PostHog |
+| Scanned + multi-column PDF toasts | Intentionally untested — wait for user bug report |
+| Feature flag gate via UI | Not testable (flag UI removed project-wide) |
+| Toast wording, PDF image extraction, PDF Worker | Shipped narrower than plan; waived above |
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan
