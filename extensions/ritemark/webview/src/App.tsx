@@ -82,6 +82,7 @@ function insertDictationPlaceholder(editor: TipTapEditor, placeholder: string) {
 interface Features {
   voiceDictation: boolean
   markdownExport: boolean
+  saveAsMarkdownFromPreview: boolean
 }
 
 function App() {
@@ -97,7 +98,8 @@ function App() {
   const [imageMappings, setImageMappings] = useState<Record<string, string>>({})
   const [features, setFeatures] = useState<Features>({
     voiceDictation: false,
-    markdownExport: false
+    markdownExport: false,
+    saveAsMarkdownFromPreview: false
   })
 
   // Track selection for AI tool execution
@@ -158,7 +160,8 @@ function App() {
           setImageMappings((message.imageMappings as Record<string, string>) || {})
           setFeatures((message.features as Features) || {
             voiceDictation: false,
-            markdownExport: false
+            markdownExport: false,
+            saveAsMarkdownFromPreview: false
           })
           setIsReady(true)
           break
@@ -518,6 +521,7 @@ function App() {
         content={content}
         filename={filename}
         workerSrc={workerSrc}
+        canSaveAsMarkdown={features.saveAsMarkdownFromPreview}
       />
     )
   }
@@ -528,6 +532,7 @@ function App() {
       <DOCXViewer
         content={content}
         filename={filename}
+        canSaveAsMarkdown={features.saveAsMarkdownFromPreview}
       />
     )
   }

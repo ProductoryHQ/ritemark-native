@@ -2,11 +2,15 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
+import { sendToExtension } from '../../bridge'
+import { convertPdfToMarkdown } from '../../conversion/pdfToMarkdown'
+import { stripExt } from '../../utils/imageNaming'
 
 interface PDFViewerProps {
   content: string  // base64-encoded PDF
   filename: string
   workerSrc?: string
+  canSaveAsMarkdown?: boolean
 }
 
 /**
@@ -96,7 +100,7 @@ function LazyPage({
   )
 }
 
-export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
+export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
@@ -105,6 +109,12 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
   const [pageWidth, setPageWidth] = useState<number>(595)  // A4 default
   const [pageHeight, setPageHeight] = useState<number>(842)
+  const [isSavingMd, setIsSavingMd] = useState(false)
+  const [saveToast, setSaveToast] = useState<{
+    kind: 'success' | 'error'
+    message: string
+    warnings: string[]
+  } | null>(null)
 
   // Configure PDF.js worker
   useEffect(() => {
@@ -112,6 +122,38 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
       pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
     }
   }, [workerSrc])
+
+  // Listen for Save-as-Markdown result from extension host.
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const message = event.data
+      if (message.type === 'saveAsMarkdownResult') {
+        setIsSavingMd(false)
+        if (message.success) {
+          setSaveToast({
+            kind: 'success',
+            message: `Saved ${message.filename}`,
+            warnings: (message.warnings as string[]) ?? [],
+          })
+        } else if (message.error && message.error !== 'cancelled') {
+          setSaveToast({
+            kind: 'error',
+            message: `Save failed: ${message.error}`,
+            warnings: [],
+          })
+        }
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  // Auto-dismiss toast after 6s.
+  useEffect(() => {
+    if (!saveToast) return
+    const timer = setTimeout(() => setSaveToast(null), 6000)
+    return () => clearTimeout(timer)
+  }, [saveToast])
 
   // Decode base64 content to Uint8Array
   useEffect(() => {
@@ -150,6 +192,43 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
     setPageHeight(page.height)
   }, [])
 
+  const handleSaveAsMarkdown = useCallback(async () => {
+    if (isSavingMd || !pdfData) return
+    setIsSavingMd(true)
+    setSaveToast(null)
+
+    try {
+      const { markdown, warnings } = await convertPdfToMarkdown(
+        pdfjs as unknown as Parameters<typeof convertPdfToMarkdown>[0],
+        pdfData,
+        workerSrc ? { workerSrc } : undefined
+      )
+
+      // Empty markdown + warnings means we already know the save will produce
+      // nothing useful (e.g. scanned PDF). Surface it without bothering the
+      // user with a Save As dialog.
+      if (markdown.trim().length === 0 && warnings.length > 0) {
+        setIsSavingMd(false)
+        setSaveToast({ kind: 'error', message: 'Nothing to save', warnings })
+        return
+      }
+
+      sendToExtension('saveAsMarkdown', {
+        payload: {
+          markdown,
+          defaultFilename: `${stripExt(filename) || 'document'}.md`,
+          source: 'pdf',
+          images: [],          // PDF image extraction is a v2 feature (see WB-discovery risk #5)
+          warnings,
+        },
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error'
+      setIsSavingMd(false)
+      setSaveToast({ kind: 'error', message: `Conversion failed: ${msg}`, warnings: [] })
+    }
+  }, [content, filename, isSavingMd, pdfData, workerSrc])
+
   // Track current page from scroll position
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return
@@ -178,7 +257,7 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       {/* Toolbar */}
       <div style={{
         height: '40px',
@@ -213,6 +292,27 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
         >
           +
         </button>
+
+        {canSaveAsMarkdown && (
+          <button
+            onClick={handleSaveAsMarkdown}
+            disabled={isSavingMd || !pdfData}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: isSavingMd || !pdfData ? 'default' : 'pointer',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              color: 'var(--r-ink-strong)',
+              fontSize: '12px',
+              opacity: isSavingMd || !pdfData ? 0.5 : 1,
+              marginLeft: 4,
+            }}
+            title="Save the PDF as a Markdown file (best-effort heuristic conversion)"
+          >
+            {isSavingMd ? 'Converting…' : 'Save as Markdown'}
+          </button>
+        )}
       </div>
 
       {/* PDF Content */}
@@ -243,6 +343,38 @@ export function PDFViewer({ content, filename, workerSrc }: PDFViewerProps) {
           ))}
         </Document>
       </div>
+
+      {/* Save-as-Markdown toast */}
+      {saveToast && (
+        <div
+          role="status"
+          style={{
+            position: 'absolute',
+            bottom: 16,
+            right: 16,
+            maxWidth: 420,
+            padding: '10px 14px',
+            borderRadius: 6,
+            background: saveToast.kind === 'success'
+              ? 'var(--vscode-editorInfo-background, #1f2937)'
+              : 'var(--vscode-editorError-background, #5b1f1f)',
+            color: 'var(--vscode-editor-foreground, #f5f5f5)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+            fontSize: 12,
+            lineHeight: 1.4,
+            zIndex: 10,
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>{saveToast.message}</div>
+          {saveToast.warnings.length > 0 && (
+            <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+              {saveToast.warnings.map((w, i) => (
+                <li key={i} style={{ color: 'var(--r-ink-muted, #c9c9c9)' }}>{w}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   )
 }
