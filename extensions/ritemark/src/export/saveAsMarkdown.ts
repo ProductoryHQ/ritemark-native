@@ -61,7 +61,10 @@ export async function saveAsMarkdownHandler(
     if (payload.images && payload.images.length > 0) {
       const imagesDir = path.join(targetDir, 'images');
       for (const img of payload.images) {
-        writeImageRelativeTo(imagesDir, img.filename, img.base64);
+        // Webview's buildExtractedImageFilename already produced a canonical
+        // `<sanitized>--image-N.ext`. Re-sanitizing here would collapse the
+        // `--` separator and break the relative-path link in the saved .md.
+        writeImageRelativeTo(imagesDir, img.filename, img.base64, { skipSanitize: true });
       }
     }
 
