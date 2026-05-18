@@ -15,17 +15,28 @@
 #      ChatSetupContribution + ChatTeardownContribution which add a
 #      "Chat Debug" item with a setup badge to the activity bar — even
 #      though Ritemark already gates the chat view via patch 003. Disable
-#      both contribution registrations, void the imports.
+#      both full contribution registrations, but keep a narrow action-only
+#      contribution so Marketplace Copilot can launch GitHub sign-in.
 #
 # File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
-#          src/vs/workbench/contrib/chat/browser/chat.contribution.ts
+#          src/vs/workbench/contrib/chat/browser/chat.contribution.ts,
+#          src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
 # Created: 2026-05-02
 #
 diff --git a/src/vs/workbench/contrib/chat/browser/chat.contribution.ts b/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
-index e76d44b8645..41c3ba7a9b6 100644
+index e76d44b8645..91b73daa38a 100644
 --- a/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
-@@ -2107,8 +2107,13 @@ registerWorkbenchContribution2(ChatCopyActionRendering.ID, ChatCopyActionRenderi
+@@ -141,7 +141,7 @@ import { ChatPasteProvidersFeature } from './widget/input/editor/chatPasteProvid
+ import { QuickChatService } from './widgetHosts/chatQuick.js';
+ import { ChatResponseAccessibleView } from './accessibility/chatResponseAccessibleView.js';
+ import { ChatTerminalOutputAccessibleView } from './accessibility/chatTerminalOutputAccessibleView.js';
+-import { ChatSetupContribution, ChatTeardownContribution } from './chatSetup/chatSetupContributions.js';
++import { ChatSetupActionsContribution, ChatSetupContribution, ChatTeardownContribution } from './chatSetup/chatSetupContributions.js';
+ import { ChatStatusBarEntry } from './chatStatus/chatStatusEntry.js';
+ import { ChatVariablesService } from './attachments/chatVariables.js';
+ import { ChatWidget } from './widget/chatWidget.js';
+@@ -2107,8 +2107,15 @@ registerWorkbenchContribution2(ChatCopyActionRendering.ID, ChatCopyActionRenderi
  registerWorkbenchContribution2(ChatImplicitContextContribution.ID, ChatImplicitContextContribution, WorkbenchPhase.Eventually);
  registerWorkbenchContribution2(ChatViewsWelcomeHandler.ID, ChatViewsWelcomeHandler, WorkbenchPhase.BlockStartup);
  registerWorkbenchContribution2(ChatGettingStartedContribution.ID, ChatGettingStartedContribution, WorkbenchPhase.Eventually);
@@ -33,7 +44,9 @@ index e76d44b8645..41c3ba7a9b6 100644
 -registerWorkbenchContribution2(ChatTeardownContribution.ID, ChatTeardownContribution, WorkbenchPhase.AfterRestored);
 +// Ritemark: ChatSetupContribution adds a chat icon to the activity bar (with setup badge)
 +// even when chat views are disabled. ChatTeardownContribution is its sibling. Both removed
-+// to keep the activity bar clean.
++// to keep the activity bar clean. Keep only the setup/sign-in commands that Copilot
++// calls from its contained chat view.
++registerWorkbenchContribution2(ChatSetupActionsContribution.ID, ChatSetupActionsContribution, WorkbenchPhase.BlockRestore);
 +// registerWorkbenchContribution2(ChatSetupContribution.ID, ChatSetupContribution, WorkbenchPhase.BlockRestore);
 +// registerWorkbenchContribution2(ChatTeardownContribution.ID, ChatTeardownContribution, WorkbenchPhase.AfterRestored);
 +void ChatSetupContribution;
@@ -41,6 +54,137 @@ index e76d44b8645..41c3ba7a9b6 100644
  registerWorkbenchContribution2(ChatStatusBarEntry.ID, ChatStatusBarEntry, WorkbenchPhase.BlockRestore);
  registerWorkbenchContribution2(BuiltinToolsContribution.ID, BuiltinToolsContribution, WorkbenchPhase.Eventually);
  registerWorkbenchContribution2(UsagesToolContribution.ID, UsagesToolContribution, WorkbenchPhase.BlockRestore);
+diff --git a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
+index 2ea65ba8917..dcd1e54127a 100644
+--- a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
++++ b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
+@@ -67,6 +67,126 @@ const defaultChat = {
+ 
+ const SIGN_IN_TITLE_BAR_ACTION_ID = 'workbench.action.chat.signInIndicator';
+ 
++export class ChatSetupActionsContribution extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.chatSetupActions';
++
++	constructor(
++		@IInstantiationService private readonly instantiationService: IInstantiationService,
++		@IChatEntitlementService chatEntitlementService: ChatEntitlementService,
++	) {
++		super();
++
++		const context = chatEntitlementService.context?.value;
++		const requests = chatEntitlementService.requests?.value;
++		if (!context || !requests) {
++			return; // disabled
++		}
++
++		const controller = new Lazy(() => this._register(this.instantiationService.createInstance(ChatSetupController, context, requests)));
++		this.registerActions(context, controller);
++	}
++
++	private registerActions(context: ChatEntitlementContext, controller: Lazy<ChatSetupController>): void {
++		class ChatSetupTriggerAction extends Action2 {
++
++			constructor() {
++				super({
++					id: CHAT_SETUP_ACTION_ID,
++					title: localize2('triggerChatSetup', "Use AI Features with Copilot for free..."),
++					category: CHAT_CATEGORY,
++					f1: false,
++				});
++			}
++
++			override async run(accessor: ServicesAccessor, mode?: ChatModeKind | string, options?: { forceSignInDialog?: boolean; additionalScopes?: readonly string[]; forceAnonymous?: ChatSetupAnonymous; inputValue?: string; dialogIcon?: ThemeIcon; dialogTitle?: string; setupStrategy?: ChatSetupStrategy }): Promise<boolean> {
++				const widgetService = accessor.get(IChatWidgetService);
++				const instantiationService = accessor.get(IInstantiationService);
++				const dialogService = accessor.get(IDialogService);
++				const commandService = accessor.get(ICommandService);
++				const lifecycleService = accessor.get(ILifecycleService);
++				const configurationService = accessor.get(IConfigurationService);
++
++				await context.update({ hidden: false });
++				configurationService.updateValue(ChatConfiguration.AIDisabled, false);
++
++				if (mode) {
++					const chatWidget = await widgetService.revealWidget();
++					chatWidget?.input.setChatMode(mode);
++				}
++
++				if (options?.inputValue) {
++					const chatWidget = await widgetService.revealWidget();
++					chatWidget?.input.showScrollbarUntilAccept();
++					chatWidget?.setInput(options.inputValue);
++				}
++
++				const setup = ChatSetup.getInstance(instantiationService, context, controller);
++				const { success } = await setup.run(options);
++				if (success === false && !lifecycleService.willShutdown) {
++					const { confirmed } = await dialogService.confirm({
++						type: Severity.Error,
++						message: localize('setupErrorDialog', "Chat setup failed. Would you like to try again?"),
++						primaryButton: localize('retry', "Retry"),
++					});
++
++					if (confirmed) {
++						return Boolean(await commandService.executeCommand(CHAT_SETUP_ACTION_ID, mode, options));
++					}
++				}
++
++				return Boolean(success);
++			}
++		}
++
++		class ChatSetupTriggerSupportAnonymousAction extends Action2 {
++
++			constructor() {
++				super({
++					id: CHAT_SETUP_SUPPORT_ANONYMOUS_ACTION_ID,
++					title: localize2('triggerChatSetup', "Use AI Features with Copilot for free...")
++				});
++			}
++
++			override async run(accessor: ServicesAccessor, options?: { dialogIcon?: ThemeIcon; dialogTitle?: string; setupStrategy?: ChatSetupStrategy }): Promise<unknown> {
++				const commandService = accessor.get(ICommandService);
++				const telemetryService = accessor.get(ITelemetryService);
++				const chatEntitlementService = accessor.get(IChatEntitlementService);
++
++				telemetryService.publicLog2<WorkbenchActionExecutedEvent, WorkbenchActionExecutedClassification>('workbenchActionExecuted', { id: CHAT_SETUP_ACTION_ID, from: 'api' });
++
++				return commandService.executeCommand(CHAT_SETUP_ACTION_ID, undefined, {
++					forceAnonymous: chatEntitlementService.anonymous ? ChatSetupAnonymous.EnabledWithDialog : undefined,
++					...options
++				});
++			}
++		}
++
++		class ChatSetupTriggerForceSignInDialogAction extends Action2 {
++
++			constructor() {
++				super({
++					id: 'workbench.action.chat.triggerSetupForceSignIn',
++					title: localize2('forceSignIn', "Sign in to use AI features")
++				});
++			}
++
++			override async run(accessor: ServicesAccessor): Promise<unknown> {
++				const commandService = accessor.get(ICommandService);
++				const telemetryService = accessor.get(ITelemetryService);
++
++				telemetryService.publicLog2<WorkbenchActionExecutedEvent, WorkbenchActionExecutedClassification>('workbenchActionExecuted', { id: CHAT_SETUP_ACTION_ID, from: 'api' });
++
++				return commandService.executeCommand(CHAT_SETUP_ACTION_ID, undefined, { forceSignInDialog: true });
++			}
++		}
++
++		registerAction2(ChatSetupTriggerAction);
++		registerAction2(ChatSetupTriggerForceSignInDialogAction);
++		registerAction2(ChatSetupTriggerSupportAnonymousAction);
++	}
++}
++
+ export class ChatSetupContribution extends Disposable implements IWorkbenchContribution {
+ 
+ 	static readonly ID = 'workbench.contrib.chatSetup';
 diff --git a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
 index e1486cb5c58..6cf78728d39 100644
 --- a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts

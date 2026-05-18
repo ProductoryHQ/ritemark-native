@@ -229,7 +229,7 @@ with open("'"$PRODUCT_JSON"'", "r") as f:
 data["ritemarkVersion"] = "'"$RITEMARK_VERSION"'"
 import os, pathlib
 branding = json.load(open(pathlib.Path("'"$(pwd)"'") / "branding" / "product.json"))
-for key in ("posthogProjectApiKey", "posthogHost", "builtInExtensionsEnabledWithAutoUpdates"):
+for key in ("posthogProjectApiKey", "posthogHost", "builtInExtensionsEnabledWithAutoUpdates", "defaultChatAgent", "trustedExtensionAuthAccess", "extensionEnabledApiProposals"):
     if key in branding:
         data[key] = branding[key]
 with open("'"$PRODUCT_JSON"'", "w") as f:
@@ -248,8 +248,8 @@ echo ""
 # =============================================================================
 # Step 4.5: Remove unwanted built-in extensions (VS Code 1.117+)
 # Microsoft started bundling GitHub Copilot Chat + Mermaid Chat Features as
-# first-party built-in extensions. Ritemark does not ship these — they pollute
-# the activity bar with a "Chat Debug" item and inject chat tools we don't use.
+# first-party built-in extensions. Sprint 71 supports Marketplace-installed
+# Copilot instead, so production builds still strip the bundled copies.
 # =============================================================================
 EXTENSIONS_DIR="$APP_PATH/Contents/Resources/app/extensions"
 for unwanted_ext in copilot mermaid-chat-features; do
@@ -259,12 +259,12 @@ for unwanted_ext in copilot mermaid-chat-features; do
   fi
 done
 
-# Belt-and-suspenders: hide chat activity bar icon via CSS in case the view
-# container registration leaks through a partially-applied patch 003.
+# Belt-and-suspenders: keep Copilot debug containers hidden without blocking
+# the intended Marketplace-installed Copilot Chat workbench-panel-chat surface.
 CSS_FILE="$APP_PATH/Contents/Resources/app/out/vs/workbench/workbench.desktop.main.css"
 if [[ -f "$CSS_FILE" ]]; then
-  printf '\n/* Ritemark: hide VS Code chat view container from activity bar */\n.activitybar .action-item a[class*="workbench-panel-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="workbench-panel-chat"]) { display: none !important; }\n.activitybar .action-item a[class*="copilot-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="copilot-chat"]) { display: none !important; }\n' >> "$CSS_FILE"
-  echo -e "${GREEN}Chat activity bar CSS hide rule appended${NC}"
+  printf '\n/* Ritemark: hide Copilot debug activity bar containers */\n.activitybar .action-item a[class*="copilot-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="copilot-chat"]) { display: none !important; }\n' >> "$CSS_FILE"
+  echo -e "${GREEN}Copilot debug activity bar CSS hide rule appended${NC}"
 fi
 echo ""
 

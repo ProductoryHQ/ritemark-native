@@ -597,12 +597,12 @@
       "workbench.preferredLightColorTheme": "ritemark-light",
       "workbench.preferredDarkColorTheme": "ritemark-dark",
       "chat.commandCenter.enabled": false,
-      "chat.agent.enabled": false,
+      "chat.agent.enabled": true,
       "github.copilot.enable": {
-        "*": false
+        "*": true
       },
-      "github.copilot.editor.enableAutoCompletions": false,
-      "github.copilot.editor.enableCodeActions": false,
+      "github.copilot.editor.enableAutoCompletions": true,
+      "github.copilot.editor.enableCodeActions": true,
       "workbench.panel.defaultLocation": "right",
       "terminal.integrated.defaultLocation": "view",
       "problems.decorations.enabled": false,
