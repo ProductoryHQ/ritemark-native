@@ -91,15 +91,24 @@ export async function convertPdfToMarkdown(
   }
 
   // Phase 2: strip running headers / footers (text that repeats verbatim in
-  // the top or bottom of >= 3 pages).
+  // the top or bottom of >= 3 pages). Removal is scoped to the same top/
+  // bottom-most lines the detector inspected — a body-text heading like
+  // "Chapter 3" that happens to normalize to a header pattern is never
+  // touched mid-page.
   const skipPatterns = detectRepeatingMargins(pages)
   if (skipPatterns.size > 0) {
     for (const pageLines of pages) {
-      for (let i = pageLines.length - 1; i >= 0; i--) {
-        const key = normalizePageNumber(pageLines[i].text)
-        if (key && skipPatterns.has(key)) {
-          pageLines.splice(i, 1)
-        }
+      if (pageLines.length === 0) continue
+      const sortedByY = [...pageLines].sort((a, b) => b.y - a.y)
+      const marginCandidates = [
+        sortedByY[0],
+        sortedByY[sortedByY.length - 1],
+      ].filter((line, idx, arr) => line && (idx === 0 || line !== arr[0]))
+      for (const candidate of marginCandidates) {
+        const key = normalizePageNumber(candidate.text)
+        if (!key || !skipPatterns.has(key)) continue
+        const idx = pageLines.indexOf(candidate)
+        if (idx >= 0) pageLines.splice(idx, 1)
       }
     }
   }
