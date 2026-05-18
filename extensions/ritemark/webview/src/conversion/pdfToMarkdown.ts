@@ -210,9 +210,23 @@ export async function convertPdfToMarkdown(
       // or this is the first line after a heading).
       const prevLine = lineIdx > 0 ? pageLines[lineIdx - 1] : null
       const verticalGap = prevLine ? Math.abs(prevLine.y - line.y) : 0
+      const tightGap = verticalGap <= line.height * 1.6
+
+      // List-item soft-wrap: a non-bullet line that sits close to the previous
+      // line while a list is active is almost always a wrap of that last item
+      // (long bullets routinely break onto a second line). Append to the
+      // pending list entry rather than ending the list and re-emitting as a
+      // separate paragraph.
+      if (listMode !== 'none' && tightGap && !lastWasHeading) {
+        const lastEmitted = md.pop() ?? ''
+        md.push(`${lastEmitted} ${escapeMarkdownInline(text)}`)
+        lastWasHeading = false
+        continue
+      }
+
       const newParagraph =
         lastWasHeading ||
-        verticalGap > line.height * 1.6 ||
+        !tightGap ||
         listMode !== 'none'
 
       if (newParagraph) {
