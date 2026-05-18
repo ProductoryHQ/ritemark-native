@@ -216,8 +216,11 @@ export async function convertPdfToMarkdown(
       // line while a list is active is almost always a wrap of that last item
       // (long bullets routinely break onto a second line). Append to the
       // pending list entry rather than ending the list and re-emitting as a
-      // separate paragraph.
-      if (listMode !== 'none' && tightGap && !lastWasHeading) {
+      // separate paragraph. Requires a real previous line on THIS page —
+      // without it (page-boundary case) `verticalGap` defaults to 0 and the
+      // tight-gap check would wrongly graft new-page content onto the prior
+      // list item.
+      if (listMode !== 'none' && prevLine && tightGap && !lastWasHeading) {
         const lastEmitted = md.pop() ?? ''
         md.push(`${lastEmitted} ${escapeMarkdownInline(text)}`)
         lastWasHeading = false
