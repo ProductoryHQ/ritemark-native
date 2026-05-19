@@ -361,7 +361,7 @@ Option 1 is now the selected and implemented path for the first validation pass.
 Implemented:
 
 - Added Copilot compatibility metadata to `branding/product.json` using the local installed VS Code product defaults as the source for `defaultChatAgent`.
-- Added provider-scoped trusted auth access for `github.copilot` and `github.copilot-chat`.
+- Added GitHub/GHE-scoped trusted auth access for `github.copilot` and `github.copilot-chat`.
 - Added `extensionEnabledApiProposals["github.copilot-chat"]` with the 60 proposals declared by the local VS Code 1.117 Copilot Chat package.
 - Verified all 60 proposal names exist in the local VS Code proposal registry.
 - Changed Ritemark defaults so Marketplace-installed Copilot is not disabled by default:

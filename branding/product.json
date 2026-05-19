@@ -77,9 +77,6 @@
     "github-enterprise": [
       "github.copilot",
       "github.copilot-chat"
-    ],
-    "microsoft": [
-      "github.copilot-chat"
     ]
   },
   "extensionEnabledApiProposals": {
