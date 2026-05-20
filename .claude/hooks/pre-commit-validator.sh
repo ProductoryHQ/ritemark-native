@@ -112,6 +112,27 @@ else
   ERRORS=$((ERRORS + 1))
 fi
 
+# Check 10: No docs-internal/ files staged
+# docs-internal/ holds internal-only material (QA strategy, product/marketing
+# planning) and is listed in .gitignore. But .gitignore ONLY protects UNTRACKED
+# files — a `git add -f`, or adding a file before the ignore rule existed, silently
+# puts it under version control where .gitignore can no longer hide it. On a PUBLIC
+# repo that leaks internal docs to the world.
+# This actually happened: 14 docs-internal/quality-assurance/ files were committed
+# and reached the public origin/main; the history had to be rewritten to scrub them
+# (2026-05-20). This check is the backstop .gitignore cannot be — it refuses the
+# commit outright the moment anything under docs-internal/ is staged.
+STAGED_INTERNAL=$(git diff --cached --name-only -- "docs-internal/" 2>/dev/null || true)
+if [[ -n "$STAGED_INTERNAL" ]]; then
+  echo "ERROR: docs-internal/ files are staged — this directory must NEVER be committed"
+  echo "  (it is internal-only and this repository is PUBLIC)"
+  echo "  Staged:"
+  echo "$STAGED_INTERNAL" | sed 's/^/    /'
+  echo "  Fix: git reset HEAD -- docs-internal/   (files stay on disk, just unstaged)"
+  echo "  If a file genuinely belongs in the repo, move it OUT of docs-internal/ first."
+  ERRORS=$((ERRORS + 1))
+fi
+
 # Summary
 if [[ $ERRORS -gt 0 ]]; then
   echo ""
