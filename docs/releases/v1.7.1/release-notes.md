@@ -8,6 +8,7 @@ tags:
   - agent-tools
   - claude
   - codex
+  - copilot
   - patch
   - feature
 ---
@@ -16,7 +17,7 @@ tags:
 
 **Status:** In progress
 **Type:** Feature + patch release
-**Focus:** v1.7.0 taught the AI sidebar to *read* the integrated browser. v1.7.1 lets it *act* — navigate, click, fill forms, type, scroll — with an explicit per-tab consent gate that's distinct from the read prompt. Plus the v1.7.0 follow-up fixes that didn't ship as their own release: clipboard inside the webview, chat history showing every conversation, and HTML files opening cleanly into the browser without a text-tab flicker.
+**Focus:** v1.7.0 taught the AI sidebar to *read* the integrated browser. v1.7.1 lets it *act* — navigate, click, fill forms, type, scroll — with an explicit per-tab consent gate that's distinct from the read prompt. Plus the v1.7.0 follow-up fixes that didn't ship as their own release: clipboard inside the webview, chat history showing every conversation, HTML files opening cleanly into the browser without a text-tab flicker, and Marketplace-installed GitHub Copilot support for teams that need the Microsoft/GitHub-approved path.
 
 * * *
 
@@ -41,7 +42,7 @@ v1.7.1 is that gate. Five focused browser tools — navigate, click, fill, type,
 
 This release also bundles three v1.7.0 follow-ups that were planned as a Sprint 68 patch but folded into v1.7.1 once Sprint 69 landed on schedule: clipboard operations now work inside the sandboxed webview, the Chat History panel shows every saved conversation (not just the most recent), and clicking an `.html` file no longer flickers through a text editor on its way to the browser. The flicker fix in particular changes how Ritemark opens `.html` files at the workbench level — the text editor never opens in the first place, instead of being opened and then redirected.
 
-Closes [#67](https://github.com/ProductoryHQ/ritemark-native/issues/67) (AI Browser Control).
+Closes [#67](https://github.com/ProductoryHQ/ritemark-native/issues/67) (AI Browser Control) and [#68](https://github.com/ProductoryHQ/ritemark-native/issues/68) (GitHub Copilot support).
 
 * * *
 
@@ -126,6 +127,22 @@ The same-URL reuse logic applies here too: opening the same `.html` file twice r
 
 ![.html file rendered directly in the integrated browser, no text-tab flicker](./screenshots/1-7-1-html-fixture-direct-render.png)
 
+### Marketplace-installed GitHub Copilot support
+
+Ritemark now allows users to install GitHub Copilot and Copilot Chat from the Marketplace and use them inside Ritemark without letting upstream VS Code Chat take over the Ritemark-owned AI surface.
+
+This is deliberately a Marketplace path, not a bundled Copilot path. Ritemark still strips the bundled `extensions/copilot` package from production builds, and there is no separate Ritemark Copilot toggle. Installing or uninstalling the Marketplace extension is the user-facing control.
+
+The support work restores the minimum VS Code compatibility Copilot needs:
+
+-   GitHub auth metadata and trusted access for `github.copilot-chat`
+-   Copilot Chat proposed API allow-listing for the compatible VS Code 1.117 extension package
+-   Copilot inline completions and code actions no longer disabled by Ritemark defaults
+-   Core Copilot Chat view registration restored while setup badges, command-center takeover, status-bar takeover, and debug-only Copilot containers remain suppressed
+-   A narrow sign-in command path so Copilot's contained Sign In button works without restoring the full upstream Chat setup contribution
+
+Ritemark AI remains the primary agentic UI. If Copilot Chat is installed, it can appear beside Ritemark AI in the Activity Bar / Auxiliary Bar, but Ritemark keeps its own AI panel first and visible.
+
 * * *
 
 ## What's Fixed
@@ -142,7 +159,9 @@ The same-URL reuse logic applies here too: opening the same `.html` file twice r
 
 ## What Didn't Change
 
-Markdown editing, the file explorer, file watcher, Mermaid rendering, the agent library, dictation, the Codex auth flow, the integrated browser's address bar / DevTools / back-forward / annotation toggle, Sprint 67's read-side AI context (URL, title, ARIA summary, optional screenshot) — everything outside the new browser-control surface and the four fixes above behaves as in v1.7.0.
+Markdown editing, the file explorer, file watcher, Mermaid rendering, the agent library, dictation, the Codex auth flow, the integrated browser's address bar / DevTools / back-forward / annotation toggle, Sprint 67's read-side AI context (URL, title, ARIA summary, optional screenshot) — everything outside the new browser-control surface, Copilot compatibility path, and the four fixes above behaves as in v1.7.0.
+
+GitHub Copilot does not replace Ritemark AI, does not become the default Ritemark runtime, and is not bundled with the app. It is available only when the user installs it from the Marketplace.
 
 A handful of adjacent capabilities were considered and deferred (see *What this is not (yet)* under AI Agent Browser Control). The deferred list is the Sprint 69 plan's *Deferred from Sprint 69* section.
 
@@ -174,6 +193,7 @@ For developers and changelog readers.
 
 -   [Sprint 68 — v1.7.1 Patch Fixes](../../development/sprints/sprint-68-v1.7.1-patch-fixes/sprint-plan.md)
 -   [Sprint 69 — AI Agent Browser Control](../../development/sprints/sprint-69-ai-browser-control/sprint-plan.md)
+-   [Sprint 71 — GitHub Copilot Support](../../development/sprints/sprint-71-github-copilot-support/sprint-plan.md)
 
 **Highlights — AI Agent Browser Control (Sprint 69):**
 
@@ -197,6 +217,15 @@ For developers and changelog readers.
 -   `store.ts` `agent:config` handler calls `loadConversationList()` immediately after `setWorkspaceContext()` so the panel state is populated before first render.
 -   `BrowserHtmlOpenRedirector` cold-start race fix from Sprint 68 (`onDidChangeVisibleTextEditors` subscription) is now redundant — superseded by the Sprint 69 editor resolver — but kept for one release as a belt-and-suspenders guard.
 
+**Highlights — GitHub Copilot support (Sprint 71):**
+
+-   `branding/product.json` now includes the Copilot-compatible `defaultChatAgent`, GitHub trusted auth access, and the `github.copilot-chat` proposed API allow-list required by the Marketplace Copilot Chat extension.
+-   `extensions/ritemark/package.json` no longer disables Marketplace-installed Copilot inline completions, auto-completions, code actions, or chat-agent enablement by default.
+-   Patch 003 restores the core Chat view registration and skips VS Code's builtin chat enablement migration, which otherwise disabled Marketplace-installed Copilot Chat when Ritemark suppresses the full upstream Chat setup UI.
+-   Patch 007 registers only the Copilot sign-in/setup commands needed by the contained Copilot Chat flow, while leaving setup agents, titlebar sign-in, account menus, and setup badges disabled.
+-   Patch 002 keeps `ritemark-ai` first in the Auxiliary Bar for new and existing profiles, so Copilot Chat can coexist without replacing the Ritemark AI panel.
+-   Production builds still remove bundled `extensions/copilot`; Sprint 71 supports Marketplace-installed Copilot only.
+
 **Upgrade notes:** No breaking changes. Patch 010 applies cleanly on top of patches 001–009. The workbench `out/` directory needs a re-transpile on the first dev build after pulling v1.7.1 source. No new runtime dependencies — the MCP server runs in-process inside the extension host.
 
 * * *
@@ -205,6 +234,7 @@ For developers and changelog readers.
 
 -   **Sprint 68** — v1.7.1 Patch Fixes (clipboard, chat history, HTML cold-start race)
 -   **Sprint 69** — AI Agent Browser Control (user-facing marquee)
+-   **Sprint 71** — GitHub Copilot Support (Marketplace install path, inline completions, contained Copilot Chat)
 
 Plus the Sprint 69 cleanup items: removal of the misleading `htmlDefaultOpener` Settings dropdown and the Features section in Settings (the feature-flag toggle UI). The flag system itself is unchanged; only the in-Settings UI was removed.
 
