@@ -4,7 +4,7 @@ Sprint 53: Chrome activity bar refactor (28px action labels, 40px container).
 Sprint 54: Agent Library activity bar entry, auxiliary bar chrome polish.
 Sprint 55: Rebased onto VS Code 1.117.0 (CSS var migration, compact-mode constants).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-index 833787070f3..7cb8cf44871 100644
+index 833787070f3..0e7f8b9689d 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 +++ b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 @@ -323,6 +323,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
@@ -17,7 +17,18 @@ index 833787070f3..7cb8cf44871 100644
  				}
  			});
  		}
-@@ -413,7 +416,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -382,7 +385,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+ 			const icon = themeIcon || resources.joinPath(extension.extensionLocation, descriptor.icon);
+ 			const id = `workbench.view.extension.${descriptor.id}`;
+ 			const title = descriptor.title || id;
+-			const viewContainer = this.registerCustomViewContainer(id, title, icon, order++, extension.identifier, location);
++			const effectiveOrder = location === ViewContainerLocation.AuxiliaryBar && descriptor.id === 'ritemark-ai' ? 0 : order;
++			const viewContainer = this.registerCustomViewContainer(id, title, icon, effectiveOrder, extension.identifier, location);
++			order++;
+ 
+ 			// Move those views that belongs to this container
+ 			if (existingViewContainers.length) {
+@@ -413,7 +418,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  					ViewPaneContainer,
  					[id, { mergeViewWithContainerWhenSingleView: true }]
  				),
@@ -26,6 +37,69 @@ index 833787070f3..7cb8cf44871 100644
  				order,
  				icon,
  			}, location);
+diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+index c89c0e4eee8..4aaccf3c849 100644
+--- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
++++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+@@ -10,7 +10,7 @@ import { IContextMenuService } from '../../../../platform/contextview/browser/co
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+ import { INotificationService } from '../../../../platform/notification/common/notification.js';
+-import { IStorageService } from '../../../../platform/storage/common/storage.js';
++import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+ import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
+ import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+ import { ActiveAuxiliaryContext, AuxiliaryBarFocusContext } from '../../../common/contextkeys.js';
+@@ -42,6 +42,40 @@ interface IAuxiliaryBarPartConfiguration {
+ 	showLabels: boolean;
+ }
+ 
++function migrateRitemarkAuxiliaryBarOrder(storageService: IStorageService): void {
++	const ritemarkContainerId = 'workbench.view.extension.ritemark-ai';
++	const value = storageService.get(AuxiliaryBarPart.pinnedViewsKey, StorageScope.PROFILE);
++	if (!value) {
++		return;
++	}
++
++	try {
++		const items = JSON.parse(value) as Array<{ id: string; pinned: boolean; visible: boolean; order?: number }>;
++		if (!Array.isArray(items)) {
++			return;
++		}
++
++		const ritemarkItem = items.find(item => item.id === ritemarkContainerId);
++		if (!ritemarkItem) {
++			return;
++		}
++
++		const remainingItems = items
++			.filter(item => item.id !== ritemarkContainerId)
++			.sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
++		const migratedItems = [
++			{ ...ritemarkItem, order: 0 },
++			...remainingItems.map((item, index) => ({ ...item, order: index + 1 }))
++		];
++
++		if (JSON.stringify(items) !== JSON.stringify(migratedItems)) {
++			storageService.store(AuxiliaryBarPart.pinnedViewsKey, JSON.stringify(migratedItems), StorageScope.PROFILE, StorageTarget.USER);
++		}
++	} catch {
++		// Ignore malformed storage and let the regular composite bar recovery path handle it.
++	}
++}
++
+ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+ 
+ 	static readonly activeViewSettingsKey = 'workbench.auxiliarybar.activepanelid';
+@@ -97,6 +131,8 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+ 		@IMenuService menuService: IMenuService,
+ 		@IConfigurationService private readonly configurationService: IConfigurationService
+ 	) {
++		migrateRitemarkAuxiliaryBarOrder(storageService);
++
+ 		super(
+ 			Parts.AUXILIARYBAR_PART,
+ 			{
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
 index 86f783cefa4..b3e57918cea 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts

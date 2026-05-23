@@ -1,4 +1,4 @@
-Ritemark Menu Cleanup: hide VS Code dev features (chat, debug, go menu, emmet, extensions marketplace)
+Ritemark Menu Cleanup: hide VS Code dev features (chat, debug, go menu, emmet)
 Sprint 1+: Original menu cleanup.
 Sprint 55: Rebased onto VS Code 1.117.0
   - Optional-guard fixes around defaultChatAgent (upstream now allows null)
@@ -228,26 +228,6 @@ index 8ac8f531427..e4067aea77d 100644
  
  const chatViewDescriptor: IViewDescriptor = {
  	id: ChatViewId,
-@@ -68,16 +68,10 @@ const chatViewDescriptor: IViewDescriptor = {
- 		order: 1
- 	},
- 	ctorDescriptor: new SyncDescriptor(ChatViewPane),
--	when: ContextKeyExpr.or(
--		ContextKeyExpr.and(
--			ChatContextKeys.Setup.hidden.negate(),
--			ChatContextKeys.Setup.disabledInWorkspace.negate(),
--		),
--		ChatContextKeys.panelParticipantRegistered,
--		ChatContextKeys.extensionInvalid
--	)
-+	when: ContextKeyExpr.equals('ritemark.chatDisabled', 'true')
- };
--Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([chatViewDescriptor], chatViewContainer);
-+void chatViewContainer;
-+void chatViewDescriptor;
- 
- const chatParticipantExtensionPoint = extensionsRegistry.ExtensionsRegistry.registerExtensionPoint<IRawChatParticipantContribution[]>({
- 	extensionPoint: 'chatParticipants',
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 index bbce59557f4..4bacd71205f 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
@@ -379,31 +359,6 @@ index ba98845660f..b465da5a1d6 100644
  			}
  		});
  
-diff --git a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-index 69bec710f50..85428bd9858 100644
---- a/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-+++ b/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts
-@@ -8,7 +8,6 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
- import { IStringDictionary } from '../../../../base/common/collections.js';
- import { onUnexpectedError } from '../../../../base/common/errors.js';
- import { Event } from '../../../../base/common/event.js';
--import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
- import { mnemonicButtonLabel } from '../../../../base/common/labels.js';
- import { Disposable, DisposableStore, IDisposable, isDisposable } from '../../../../base/common/lifecycle.js';
- import { Schemas } from '../../../../base/common/network.js';
-@@ -116,12 +115,6 @@ export const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainer
- 	{
- 		id: VIEWLET_ID,
- 		title: localize2('extensions', "Extensions"),
--		openCommandActionDescriptor: {
--			id: VIEWLET_ID,
--			mnemonicTitle: localize({ key: 'miViewExtensions', comment: ['&& denotes a mnemonic'] }, "E&&xtensions"),
--			keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyX },
--			order: 4,
--		},
- 		ctorDescriptor: new SyncDescriptor(ExtensionsViewPaneContainer),
- 		icon: extensionsViewIcon,
- 		order: 4,
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
 index 49b3ec6a6eb..021fdb0a86d 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
@@ -418,9 +373,18 @@ index 49b3ec6a6eb..021fdb0a86d 100644
  				if (packExtension.local && !extensionsToUninstall.some(e => areSameExtensions(e.extension.identifier, packExtension.identifier))) {
  					extensionsToUninstall.push({ extension: packExtension.local });
 diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
-index be4e0b92675..74411f69174 100644
+index be4e0b92675..ff8736fa3f4 100644
 --- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
 +++ b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+@@ -33,7 +33,7 @@ import { isString } from '../../../../base/common/types.js';
+ import { Delayer } from '../../../../base/common/async.js';
+ import { IProductService } from '../../../../platform/product/common/productService.js';
+ import { isWeb } from '../../../../base/common/platform.js';
+-import { ChatEntitlementService, IChatEntitlementService } from '../../chat/common/chatEntitlementService.js';
++import { IChatEntitlementService } from '../../chat/common/chatEntitlementService.js';
+ 
+ const SOURCE = 'IWorkbenchExtensionEnablementService';
+ 
 @@ -101,8 +101,8 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
  		this._register(allowedExtensionsService.onDidChangeAllowedExtensionsConfigValue(() => this._onDidChangeExtensions([], [], false)));
  
@@ -432,6 +396,48 @@ index be4e0b92675..74411f69174 100644
  		const unificationExtensions = [this._completionsExtensionId, this._chatExtensionId].filter(id => !!id);
  
  		// Disabling extension unification should immediately disable the unified extension flow
+@@ -136,37 +136,10 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
+ 			});
+ 		}
+ 
+-		if (!this.environmentService.isSessionsWindow && !this.environmentService.skipBuiltinExtensions?.some(id => id.toLowerCase() === this._chatExtensionId)) {
+-			const builtinChatExtensionEnablementMigrationKey = 'builtinChatExtensionEnablementMigration';
+-			const builtinChatExtensionEnablementMigration = this.storageService.getBoolean(builtinChatExtensionEnablementMigrationKey, StorageScope.PROFILE) === true;
+-			if (!builtinChatExtensionEnablementMigration) {
+-				this.logService.debug('Running builtin chat extension enablement migration');
+-				this.storageService.store(builtinChatExtensionEnablementMigrationKey, true, StorageScope.PROFILE, StorageTarget.MACHINE);
+-				const context = (chatEntitlementService as ChatEntitlementService).context;
+-				if (context) {
+-					if (context.value.state.completed) {
+-						// User has used chat features before
+-						if (this._isDisabledGlobally({ id: this._chatExtensionId })) {
+-							// User had specifically disabled the chat extension to disable AI features
+-							if (this.configurationService.getValue('chat.disableAIFeatures') !== true) {
+-								// Honor that choice by disabling AI features
+-								this.logService.debug('Disabling AI features because builtin chat extension is disabled');
+-								this.configurationService.updateValue('chat.disableAIFeatures', true)
+-									.catch(err => this.logService.error('Failed to update chat.disableAIFeatures setting during builtin chat extension enablement migration', err));
+-							}
+-						}
+-					} else {
+-						try {
+-							// User has not used chat features before so avoid activating the chat extension by disabling it
+-							this.logService.debug('Disabling builtin chat extension as chat set up is not completed');
+-							this._disableExtension({ id: this._chatExtensionId });
+-						} catch (error) {
+-							this.logService.error('Failed to disable builtin chat extension during enablement migration', error);
+-						}
+-					}
+-				}
+-			}
+-		}
++		// Ritemark: ChatSetupContribution is intentionally disabled, so VS Code's
++		// builtin chat migration would strand Marketplace-installed Copilot Chat in
++		// a globally disabled state before the user can use it.
++		void chatEntitlementService;
+ 	}
+ 
+ 	private get hasWorkspace(): boolean {
 diff --git a/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts b/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
 index 16802452df2..be2ca64f668 100644
 --- a/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
