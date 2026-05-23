@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **GitHub Copilot support:** Marketplace-installed GitHub Copilot and Copilot Chat can now authenticate and run in Ritemark for users with Copilot entitlement
+- **Contained Copilot Chat:** Copilot Chat can appear beside Ritemark AI in the Activity Bar / Auxiliary Bar without replacing the Ritemark AI panel
+
+### Changed
+- **Copilot compatibility metadata:** product metadata now includes the GitHub auth trust, default chat agent, and proposed API allow-list required by the Marketplace Copilot Chat extension
+- **Marketplace extension defaults:** Ritemark no longer disables Copilot inline completions, auto-completions, code actions, or chat-agent enablement by default
+
+### Fixed
+- **Copilot sign-in path:** Copilot's contained Sign In button now has the narrow setup commands it needs without restoring the full upstream VS Code Chat setup UI
+- **Copilot Chat disabled state:** VS Code's builtin chat enablement migration no longer disables Marketplace-installed Copilot Chat when Ritemark suppresses the upstream setup contribution
+
 ---
 
 ## [1.6.0] - 2026-04-28

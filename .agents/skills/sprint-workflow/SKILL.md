@@ -27,6 +27,7 @@ docs/development/sprints/sprint-XX-name/
 2. Capture research in `research/`.
 3. Keep `sprint-plan.md` current with goals, success criteria, and checklist state.
 4. Record meaningful implementation notes in `notes/` when the work spans multiple sessions or has architectural decisions worth preserving.
+5. Before sprint closeout or readiness handoff, check whether user-facing behavior changed. Update `docs/CHANGELOG.md` and the relevant `docs/releases/<version>/release-notes.md`, or record why no release note is needed in the sprint plan.
 
 ## When To Escalate
 

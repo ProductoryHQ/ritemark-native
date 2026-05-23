@@ -13,6 +13,7 @@ This file configures Codex behavior for `ritemark-native`. It is additive to the
 - Before commit, push, merge, release, or "ready" handoff, use the `qa-validation` skill and run `./scripts/validate-qa.sh`.
 - For release work, also use the `release-process` skill and run `./scripts/release-preflight.sh` before version bumps, tags, or build/distribution steps.
 - Keep sprint documentation under `docs/development/sprints/` aligned with implementation when the task is part of an explicit sprint.
+- Before closing a sprint or handing work off as ready, check whether user-facing behavior changed. If it did, update `docs/CHANGELOG.md` and the relevant `docs/releases/<version>/release-notes.md`; if no release note is appropriate, record why in the sprint plan.
 
 ### Hard Gates
 
