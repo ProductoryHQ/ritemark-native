@@ -49,8 +49,8 @@ Some users can use GitHub Copilot Business or Enterprise through Microsoft/GitHu
 - [x] Copilot auth requirements are documented (`defaultChatAgent`, trusted auth access, product metadata, extension API proposals).
 - [x] UI containment rules are documented: which Copilot surfaces may appear, which must remain hidden, and why.
 - [x] A validation checklist exists for sign-in, inline completions, chat/agent behavior, and Ritemark UI regression checks.
-- [ ] Marketplace-installed Copilot has been smoke-tested in the dev app.
-- [ ] Existing non-Copilot users see no Ritemark AI UI regression.
+- [x] Marketplace-installed Copilot has been smoke-tested in the dev app. User acceptance completed on 2026-05-23.
+- [x] Existing non-Copilot users see no Ritemark AI UI regression. Closeout QA passed on 2026-05-23.
 
 ## Product Decisions
 
@@ -111,25 +111,25 @@ Short version:
 
 - [x] Verify Ritemark AI auxiliary bar remains default and visible.
 - [x] Verify Copilot does not overwrite `ritemark-ai` or `ritemark.unifiedView`.
-- [ ] Allow Copilot Activity Bar access only when the Copilot extension is installed.
+- [x] Allow Copilot Activity Bar access only when the Copilot extension is installed.
 - [x] Allow Copilot Chat to live beside Ritemark AI in Auxiliary Bar/Activity Bar if it does not hide or replace Ritemark AI.
 - [x] Gate or remove production CSS that hides the intended `workbench-panel-chat` surface when Copilot support is enabled.
 - [x] Keep Copilot debug containers hidden unless their debug settings are explicitly enabled.
 - [x] Prevent VS Code's builtin chat enablement migration from disabling Marketplace-installed Copilot Chat when Ritemark suppresses ChatSetupContribution.
 - [x] Register the narrow Copilot sign-in setup commands without restoring the full ChatSetupContribution UI/badge surface.
 - [x] Force `ritemark-ai` to order first in the Auxiliary Bar for new profiles and migrate existing profile order storage so Ritemark stays before Copilot Chat.
-- [ ] If Copilot Agent Window depends on taking over the primary chat surface, disable that specific surface gracefully while keeping Copilot Chat and inline completions working.
+- [x] If Copilot Agent Window depends on taking over the primary chat surface, disable that specific surface gracefully while keeping Copilot Chat and inline completions working. No blocking Agent Window takeover issue was reported during acceptance testing.
 
 ### Phase 3: Validation
 
-- [ ] Launch dev app with Copilot support flag off: confirm current UI remains clean.
-- [ ] Launch dev app with Copilot support flag on.
-- [ ] Sign in with a GitHub account that has Copilot entitlement.
-- [ ] Validate inline completions.
-- [ ] Validate Copilot Chat / Agent behavior according to the Phase 0 decision.
-- [ ] Validate Ritemark AI sidebar still works.
-- [ ] Validate Agent Library, Browser, Flows, and Explorer activity bar entries remain stable.
-- [ ] Run `./scripts/validate-qa.sh` before merge/readiness.
+- [x] Launch dev app with Copilot support flag off: confirm current UI remains clean.
+- [x] Launch dev app with Copilot support flag on.
+- [x] Sign in with a GitHub account that has Copilot entitlement.
+- [x] Validate inline completions.
+- [x] Validate Copilot Chat / Agent behavior according to the Phase 0 decision.
+- [x] Validate Ritemark AI sidebar still works.
+- [x] Validate Agent Library, Browser, Flows, and Explorer activity bar entries remain stable.
+- [x] Run `./scripts/validate-qa.sh` before merge/readiness.
 
 ## Risks
 
@@ -173,6 +173,12 @@ Dev smoke follow-up from the Marketplace screenshot:
 - Patch 003 now skips that migration for Ritemark while keeping setup/status/titlebar/command-center takeover surfaces suppressed.
 - Follow-up: Copilot's contained `Sign In` button calls `workbench.action.chat.triggerSetupForceSignIn`. Patch 007 now registers a narrow action-only setup contribution for `workbench.action.chat.triggerSetupForceSignIn`, `workbench.action.chat.triggerSetup`, and anonymous setup support, without registering setup agents, titlebar sign-in, account menus, or setup badges.
 
+Closeout validation completed on 2026-05-23:
+
+- User acceptance testing completed and sprint closure approved.
+- `./scripts/validate-qa.sh` passed in the main checkout.
+- Git working tree was clean before closeout documentation was updated.
+
 References:
 
 - [VS Code: Set up GitHub Copilot](https://code.visualstudio.com/docs/copilot/setup?ref_product=copilot&ref_style=text)
@@ -182,7 +188,7 @@ References:
 
 ## Status
 
-**Track:** Audit-first implementation planning  
-**Current phase:** Phase 2/3 validation  
+**Track:** Closed
+**Current phase:** Closed on 2026-05-23
 **Branch:** `codex/sprint-71-github-copilot-support`  
 **Worktree:** `/Users/jarmotuisk/Projects/ritemark-native`
