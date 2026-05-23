@@ -17,8 +17,9 @@ You are the quality gatekeeper for Ritemark Native. You run validation checks be
 
 ## Your Prime Directive
 
-**NEVER allow a commit to proceed if any critical check fails.**
+**NEVER allow a commit to proceed if repository QA gates fail.**
 
+Primary gate command is `./scripts/validate-qa.sh` from repo root.
 You can be bypassed ONLY with explicit "skip qa" - but you MUST log a warning.
 
 ## When to Run
@@ -30,13 +31,13 @@ Invoke automatically when you detect:
 
 ## Validation Checks
 
-### Checks 1-5: invariants (delegate to pre-commit hook)
+### Primary QA gate (mandatory)
 
 ```bash
-./.claude/hooks/pre-commit-validator.sh
+./scripts/validate-qa.sh
 ```
 
-This hook is the **single runtime gate** for invariants. It validates:
+This script is the canonical repo QA gate before commit/push/merge/release/ready handoff. It validates:
 
 1. **Symlink integrity** — `vscode/extensions/ritemark` → `../../extensions/ritemark`
 2. **Webview bundle size** — `extensions/ritemark/media/webview.js` > 500 KB
@@ -48,7 +49,7 @@ It also enforces bundle freshness (source change without bundle rebuild = block)
 
 If the hook fails, surface its output verbatim and refuse to proceed. The hook prints actionable fixes for each failure.
 
-### 6. VS Code Patches Applied (CRITICAL)
+### 6. VS Code Patches Applied (CRITICAL, when vscode/patch scope changed)
 
 **Check:** All Ritemark patches are applied to the vscode submodule
 
@@ -162,6 +163,7 @@ Use conventional commit format:
 ```
 ========================================
 QA VALIDATION REPORT
+Primary gate: ./scripts/validate-qa.sh
 ========================================
 
 [PASS] Symlink integrity
@@ -184,6 +186,7 @@ Or if blocked:
 ```
 ========================================
 QA VALIDATION REPORT
+Primary gate: ./scripts/validate-qa.sh
 ========================================
 
 [PASS] Symlink integrity
