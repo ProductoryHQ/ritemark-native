@@ -9,18 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_No changes since v1.7.1._
+
+---
+
+## [1.7.1] - 2026-05-25
+
+> **macOS note:** the macOS DMGs in this release are signed with Developer ID + hardened runtime but **not notarized by Apple** (team-eligibility hold, Apple case 102892219755). On first launch macOS Gatekeeper will refuse the app — one-time Open Anyway via System Settings → Privacy & Security clears it. Full disclaimer and exact steps are on the [GitHub Release page](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.7.1). Windows is unaffected.
+
 ### Added
-- **GitHub Copilot support:** Marketplace-installed GitHub Copilot and Copilot Chat can now authenticate and run in Ritemark for users with Copilot entitlement
-- **Contained Copilot Chat:** Copilot Chat now lives beside Ritemark AI in the Auxiliary Bar, with a primary Activity Bar launcher that opens that right-side Chat panel
+- **GitHub Copilot Chat is first-class.** Marketplace-installed `GitHub.copilot-chat` can authenticate, the real Chat panel lives in the Secondary Sidebar (Auxiliary Bar) next to Ritemark AI, and a dedicated Activity Bar launcher icon opens it
+- **Install/uninstall symmetry for Copilot Chat.** Install the Marketplace extension → launcher icon and Chat panel appear; uninstall → both disappear cleanly; reinstall → they come back. Stale hidden layout state from earlier Ritemark builds is repaired on first launch
+- **AI Agent Browser Control (macOS, on by default).** Five tools — `navigate`, `click`, `fill`, `type`, `scroll` — wired into both Claude Code SDK and Codex App Server. The `browser-agent-control` flag ships as `stable`, `darwin`-only; non-darwin platforms receive no browser tools
+- **"Allow AI to control this browser tab?" consent dialog.** Per-tab consent gate distinct from the v1.7.0 read-share prompt; revoking read consent cascades to control consent
 
 ### Changed
-- **Copilot compatibility metadata:** product metadata now includes the GitHub auth trust, default chat agent, and proposed API allow-list required by the Marketplace Copilot Chat extension
-- **Marketplace extension defaults:** Ritemark no longer disables Copilot inline completions, auto-completions, code actions, or chat-agent enablement by default
+- **Copilot compatibility metadata** in `branding/product.json` now includes the GitHub trusted auth access, default chat agent, and proposed API allow-list required by the Marketplace Copilot Chat extension
+- **Marketplace extension defaults** no longer disable Copilot inline completions, auto-completions, code actions, or chat-agent enablement
+- **Auxiliary Bar order** is **Ritemark AI → GitHub Chat → Terminal** for new and existing profiles, so Copilot Chat coexists beside Ritemark AI rather than replacing it
+- **`.html` files open in the integrated browser at the workbench level** — `.html`/`.htm` resolver registered at `default` priority; right-click "Open as Text" is preserved
+- **Codex `thread/start` timeout** bumped from 60s to 120s to accommodate the dynamic-tools attach for browser control
+- **Settings cleanup:** the misleading "Open HTML files in…" dropdown and the Features section (flag toggles) were removed. Stable feature flags are now baked into platform defaults; a leaner Features panel returns in a later release for experimental flags only
 
 ### Fixed
-- **Copilot sign-in path:** Copilot's contained Sign In button now has the narrow setup commands it needs without restoring the full upstream VS Code Chat setup UI
+- **Chat History shows every saved conversation** instead of just the most recent — the list now reloads as soon as the workspace context is established
+- **Clipboard works inside the sandboxed webview** — Copy on code blocks, Export → Copy as Markdown, and Cmd+C/Cmd+V in table cells now route through the extension host
+- **HTML cold-start race is gone** — the `.html` flicker / blank-text-tab on app cold start is resolved by the workbench editor resolver
+- **Copilot sign-in path:** Copilot's contained Sign In button has the narrow setup commands it needs without restoring the full upstream VS Code Chat setup UI
 - **Copilot Chat disabled state:** VS Code's builtin chat enablement migration no longer disables Marketplace-installed Copilot Chat when Ritemark suppresses the upstream setup contribution
-- **Copilot Chat production visibility:** Marketplace-installed Copilot Chat now repairs stale hidden view state, keeps the real Chat panel in the Auxiliary Bar, and pins the Activity Bar launcher in macOS production builds
+
+### Technical
+- VS Code base: 1.117 (compat patches required for Marketplace Copilot Chat)
+- New patch: `patches/vscode/010-ritemark-browser-action-bridge.patch`
+- Sprints rolled up: 68 (v1.7.1 patch fixes), 69 (AI Agent Browser Control), 71 (GitHub Copilot Support)
+- Closes issues #63, #65, #66, #67, #68
 
 ---
 
@@ -202,6 +224,7 @@ Initial release of Ritemark Native.
 
 | Version | Date | Type | Notes |
 |---------|------|------|-------|
+| 1.7.1 | 2026-05-25 | Minor | GitHub Copilot Chat first-class, AI Agent Browser Control (experimental), HTML resolver, clipboard + chat history fixes — macOS DMGs unnotarized this one time |
 | 1.6.0 | 2026-04-28 | Minor | Agent Library, design refresh (Phosphor), inline ToC, dark mode, CSV→xlsx |
 | 1.3.0 | 2026-02-06 | Major | PDF/DOCX preview, CSV enhancements, Claude Code node |
 | 1.2.0 | 2026-02-02 | Major | Ritemark Flows - visual AI workflows |

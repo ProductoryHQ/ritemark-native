@@ -1,72 +1,77 @@
 ---
-date: '2026-05-13'
-title: 'Ritemark v1.7.1 — The AI Can Now Drive the Browser'
+date: '2026-05-25'
+title: 'Ritemark v1.7.1 — GitHub Copilot Chat, first-class'
 author: Jarmo Tuisk
 tags:
+  - copilot
+  - github
+  - marketplace
   - browser
   - ai-browser-control
   - agent-tools
   - claude
   - codex
-  - copilot
   - patch
   - feature
 ---
 
-# Ritemark v1.7.1 — The AI Can Now Drive the Browser
+# Ritemark v1.7.1 — GitHub Copilot Chat, first-class
 
 **Status:** Released
 **Type:** Feature + patch release
-**Focus:** v1.7.0 taught the AI sidebar to *read* the integrated browser. v1.7.1 lets it *act* — navigate, click, fill forms, type, scroll — with an explicit per-tab consent gate that's distinct from the read prompt. Plus the v1.7.0 follow-up fixes that didn't ship as their own release: clipboard inside the webview, chat history showing every conversation, HTML files opening cleanly into the browser without a text-tab flicker, and Marketplace-installed GitHub Copilot support for teams that need the Microsoft/GitHub-approved path.
+**Focus:** Marketplace-installed **GitHub Copilot Chat is now first-class in Ritemark.** Sign-in works, the real Chat surface lives in the Secondary Sidebar (Auxiliary Bar) right next to Ritemark AI, and there is a dedicated Activity Bar launcher icon. Install and uninstall are symmetric — no stale UI either way. Plus the AI sidebar can now *drive* the integrated browser (navigate, click, fill, type, scroll) behind an explicit per-tab consent, three v1.7.0 follow-up fixes (clipboard inside the webview, chat history showing every conversation, `.html` files opening cleanly without a text-tab flicker), and a Windows desktop build.
 
 * * *
 
 ## Downloads
 
-| Platform | Download |
-| --- | --- |
-| macOS Apple Silicon (M1/M2/M3) | [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-arm64.dmg) |
-| macOS Intel | [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-x64.dmg) |
+The release page lists every shipped asset, including the macOS DMGs and the Windows installer:
 
-> Windows: coming as a follow-up asset on the v1.7.1 release.
+> **[Download Ritemark v1.7.1 on GitHub](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.7.1)**
 
 * * *
 
-## First-Launch on macOS: Open Anyway
+## First-launch on macOS
 
-This release is **signed but not notarized by Apple**. The DMG is signed with our Developer ID certificate (Team JKBSC3ZDT5) and uses the hardened runtime — the same signing posture as every previous release. Apple's notarization service is currently holding our submissions in a team-eligibility review (case 102892219755, open since 2026-05-15), so we are shipping the v1.7.1 binaries without the notarization staple this one time.
+The macOS DMGs in this release are **signed with Developer ID + hardened runtime, but not notarized by Apple**. Our team account is held in a notarization eligibility review (Apple case 102892219755, open since 2026-05-15) and the v1.7.1 binaries shipped without the notarization staple as a one-time exception. Windows builds are unaffected.
 
-What you will see on first launch:
+On first launch macOS Gatekeeper will refuse the app with *"Ritemark.app can't be opened because Apple cannot check it for malicious software."* The one-time fix is:
 
-- **macOS will refuse to open the app** with the message *"Ritemark.app can't be opened because Apple cannot check it for malicious software."* This is Gatekeeper's standard response to an unnotarized Developer ID app — it is **not** a "this app is unsafe" warning.
-- Click **Done** to dismiss the dialog.
-- Open **System Settings → Privacy & Security**.
-- Scroll to the *Security* section. You will see a line: *"Ritemark.app was blocked to protect your Mac."*
-- Click **Open Anyway** (you may need to authenticate with Touch ID or your password).
-- macOS will show the original dialog again with an **Open** button. Click it.
-- From this point onward, Ritemark opens normally — macOS remembers the approval for this exact build.
+- **System Settings → Privacy & Security → Open Anyway** (Touch ID or password), then click **Open** in the dialog that reappears, or
+- in Terminal: `xattr -dr com.apple.quarantine /Applications/Ritemark.app`
 
-If you upgraded from v1.7.0 via the in-app update prompt, you will still see this dialog: the v1.7.1 DMG is downloaded to a fresh location, mounted, and the new Ritemark.app inherits a fresh quarantine attribute that triggers Gatekeeper one more time. After approving once, future launches work without any prompts.
-
-We expect to ship a notarized re-upload to this same release page (no version bump, no new tag) as soon as Apple clears the case. If you prefer to wait, v1.7.0 remains available on the [previous release](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.7.0).
+After approving once, future launches work without any prompts. The full disclaimer, the exact dialog text, and the upgrade-path notes live in the banner at the top of the [GitHub Release body](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.7.1). We will re-upload a notarized DMG to the same release page (no version bump, no new tag) as soon as Apple clears the case. If you prefer to wait, v1.7.0 remains available on the [previous release](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.7.0).
 
 * * *
 
 ## Why This Release
 
-v1.7.0 closed the seam between markdown and HTML and gave the AI sidebar a third context source: the page in the active browser tab. The AI could finally read both halves of the work. But it was still a passive reader — you opened the page, the AI commented on it, you clicked the next link.
+v1.7.1 closes two loops at once.
 
-The natural next question is what happens when the AI does the clicking. That question opens a different set of risks than "read the page." A model that types in your input fields and submits forms is operating with materially more authority than one that just summarizes the DOM. It needs a different consent gate, a different default (off), and a stronger expectation that you can see every action happen in real time.
+The first loop is **GitHub Copilot**. Some users — Copilot Business and Copilot Enterprise customers in particular — can use Copilot through their company's Microsoft/GitHub-approved policy while direct OpenAI or Anthropic calls are blocked. Previous Ritemark builds suppressed enough VS Code Chat surface to keep Ritemark AI primary but also unintentionally broke Marketplace-installed Copilot Chat: the sign-in flow was incomplete, the Chat panel could be installed but stay invisible behind stale layout state, and an Activity Bar entry sometimes appeared, sometimes did not. v1.7.1 makes Copilot install/uninstall a clean, symmetric user-facing contract: install the Marketplace extension and Copilot Chat appears in the right place; uninstall it and everything goes away.
 
-v1.7.1 is that gate. Five focused browser tools — navigate, click, fill, type, scroll — wired into both Claude Code SDK and Codex App Server, gated behind an opt-in feature flag, and protected by a dedicated **"Allow AI to control this browser tab?"** prompt that fires the first time the AI tries to act on a tab. Decline and subsequent calls fail safely. Accept and the agent can drive the tab while you watch, with each action returning an updated page snapshot so the AI sees the result of its own work without needing to ask again.
+The second loop is the **AI sidebar driving the integrated browser**. v1.7.0 gave the AI eyes inside the browser — read the page, summarize it, screenshot it for visual questions. v1.7.1 gives it hands: five focused tools (navigate, click, fill, type, scroll) wired into both Claude Code SDK and Codex App Server (macOS only), protected by a dedicated per-tab consent dialog distinct from the read prompt.
 
-This release also bundles three v1.7.0 follow-ups that were planned as a Sprint 68 patch but folded into v1.7.1 once Sprint 69 landed on schedule: clipboard operations now work inside the sandboxed webview, the Chat History panel shows every saved conversation (not just the most recent), and clicking an `.html` file no longer flickers through a text editor on its way to the browser. The flicker fix in particular changes how Ritemark opens `.html` files at the workbench level — the text editor never opens in the first place, instead of being opened and then redirected.
+This release also bundles three v1.7.0 follow-ups that were originally planned as a Sprint 68 patch: clipboard operations now work inside the sandboxed webview, the Chat History panel shows every saved conversation (not just the most recent), and clicking an `.html` file no longer flickers through a text editor on its way to the browser.
 
-Closes [#67](https://github.com/ProductoryHQ/ritemark-native/issues/67) (AI Browser Control) and [#68](https://github.com/ProductoryHQ/ritemark-native/issues/68) (GitHub Copilot support).
+Closes [#68](https://github.com/ProductoryHQ/ritemark-native/issues/68) (GitHub Copilot support) and [#67](https://github.com/ProductoryHQ/ritemark-native/issues/67) (AI Browser Control).
 
 * * *
 
 ## What's New
+
+### GitHub Copilot Chat, first-class in Ritemark
+
+Marketplace-installed `GitHub.copilot-chat` is now fully supported. There is no separate Ritemark Copilot setting and no bundled Copilot toggle — installing or uninstalling the Marketplace extension is the entire user-facing control. After install:
+
+- **Sign-in works.** The contained Copilot **Sign In** button completes the GitHub auth flow without restoring the full upstream VS Code Chat setup UI.
+- **The real Chat surface lives in the Secondary Sidebar (Auxiliary Bar)**, ordered next to Ritemark AI. The pinned order is **Ritemark AI → GitHub Chat → Terminal**, so Copilot Chat coexists beside Ritemark AI rather than replacing it.
+- **A dedicated Activity Bar launcher icon** opens GitHub Chat in the Secondary Sidebar with one click — users don't need to remember which sidebar Chat lives in.
+- **Inline completions and code actions are no longer disabled** by Ritemark defaults; Marketplace Copilot inline completions run as they would in upstream VS Code.
+
+Install and uninstall are **symmetric**: install Copilot Chat → the Activity Bar launcher icon and the Chat panel appear; uninstall it → both disappear cleanly; reinstall → they come back. Stale hidden layout state from earlier Ritemark builds is repaired on first launch so users who tried Marketplace Copilot before v1.7.1 also get the clean experience.
+
+What stays the same: **Ritemark AI remains the primary agentic UI.** GitHub Copilot does not become the default Ritemark runtime, is not wired into the Ritemark AI sidebar's runtime picker, and is not bundled with the app — production builds still strip `extensions/copilot`. The titlebar Copilot sign-in button, the command-center takeover, the status-bar takeover, setup badges, and the debug-only Copilot Activity Bar container remain suppressed. Only the surfaces a user needs to actually use Marketplace Copilot are exposed.
 
 ### AI Agent Browser Control
 
@@ -100,19 +105,11 @@ Allow once per tab per session. Decline and any subsequent control call from the
 
 This consent is intentionally separate from the read-share prompt. Reading the page is a different question from typing into it. The two prompts use different wording and different default buttons.
 
-#### Experimental, opt-in, macOS only
+#### macOS only, on by default
 
-The feature ships behind the `browser-agent-control` flag, status **experimental**, platform **darwin** only. It is **off by default**. To turn it on for v1.7.1, edit `settings.json` directly:
+The feature is enabled for macOS users out of the box (flag `browser-agent-control`, status **stable**, platform **darwin** only). Windows and Linux are not supported in this release — the underlying CDP integration is darwin-only for now.
 
-```json
-{
-  "ritemark.features.browser-agent-control": true
-}
-```
-
-(The Settings UI's Features section was removed in this same release — see *What's Fixed* below — so the flag toggle lives in `settings.json` for now. A leaner Features panel returns in a later release.)
-
-With the flag off, the browser-tool definitions are not registered with either runtime, the AI does not know they exist, and Sprint 67 read context behaves exactly as in v1.7.0.
+The first AI action against a browser tab still triggers the **"Allow AI to control this browser tab?"** per-tab consent dialog, so nothing happens silently. With consent declined, the AI continues to work exactly as in v1.7.0 (read-only browser context per Sprint 67).
 
 #### How each runtime sees the tools
 
@@ -147,23 +144,6 @@ The same-URL reuse logic applies here too: opening the same `.html` file twice r
 
 ![.html file rendered directly in the integrated browser, no text-tab flicker](./screenshots/1-7-1-html-fixture-direct-render.png)
 
-### Marketplace-installed GitHub Copilot support
-
-Ritemark now allows users to install GitHub Copilot and Copilot Chat from the Marketplace and use them inside Ritemark without letting upstream VS Code Chat take over the Ritemark-owned AI surface.
-
-This is deliberately a Marketplace path, not a bundled Copilot path. Ritemark still strips the bundled `extensions/copilot` package from production builds, and there is no separate Ritemark Copilot toggle. Installing or uninstalling the Marketplace extension is the user-facing control.
-
-The support work restores the minimum VS Code compatibility Copilot needs:
-
--   GitHub auth metadata and trusted access for `github.copilot-chat`
--   Copilot Chat proposed API allow-listing for the compatible VS Code 1.117 extension package
--   Copilot inline completions and code actions no longer disabled by Ritemark defaults
--   Core Copilot Chat view registration restored while setup badges, command-center takeover, status-bar takeover, and debug-only Copilot containers remain suppressed
--   A narrow sign-in command path so Copilot's contained Sign In button works without restoring the full upstream Chat setup contribution
--   Production profiles with stale hidden Chat layout state are repaired, the real Chat panel stays in the Auxiliary Bar, and a primary Activity Bar launcher opens it when Marketplace Copilot Chat is installed
-
-Ritemark AI remains the primary agentic UI. If Copilot Chat is installed, it appears beside Ritemark AI in the Auxiliary Bar, ordered after Ritemark AI and before Terminal; the Activity Bar only provides the launcher.
-
 * * *
 
 ## What's Fixed
@@ -192,17 +172,7 @@ A handful of adjacent capabilities were considered and deferred (see *What this 
 
 Auto-update will offer v1.7.1 to existing v1.7.0 users on next launch. You can also download the DMG directly. No settings migration is required.
 
-The `browser-agent-control` flag is **off by default**. To try the new AI browser control, open `settings.json` (Cmd+, → "Open Settings (JSON)") and add:
-
-```json
-{
-  "ritemark.features.browser-agent-control": true
-}
-```
-
-Then restart Ritemark — the AgentSession reads feature flags only at session creation time.
-
-The first AI action against a browser tab triggers the **"Allow AI to control this browser tab?"** dialog. This is a separate consent from the Sprint 67 read-share prompt; both can be required for a tab where you also want the AI to read it.
+AI browser control (macOS) is on by default — no settings.json edit needed. The first AI action against a browser tab triggers the **"Allow AI to control this browser tab?"** dialog. This is a separate consent from the Sprint 67 read-share prompt; both can be required for a tab where you also want the AI to read it.
 
 * * *
 
@@ -222,7 +192,7 @@ For developers and changelog readers.
 -   `IBrowserViewModel` gains `sharedWithAgentForControl: boolean` plus `setSharedWithAgentForControl()` / `onDidChangeSharedWithAgentForControl`. Cascade rule: revoking `sharedWithAgent` also flips `sharedWithAgentForControl` to false.
 -   Claude Code SDK side: `extensions/ritemark/src/browser/BrowserActionTools.ts` registers an in-process MCP server. Tool names surface to the model as `mcp__ritemark_browser__*`. The `canUseTool` callback is the dispatch point; the action runs synchronously, the result is injected via `updatedInput._result`.
 -   Codex side: `dynamicTools` is attached to `thread/start`; `item/tool/call` JSON-RPC requests are dispatched the same way through `BrowserActionTools`. Tool names surface as bare `ritemark_browser_*`. `thread/start` timeout bumped from 60s to 120s to accommodate the dynamic-tools attach.
--   New feature flag `browser-agent-control` — `experimental`, `darwin`-only — in `extensions/ritemark/src/features/flags.ts`. With the flag off, neither runtime sees the tools (no MCP server registered for Claude, no `dynamicTools` array for Codex).
+-   New feature flag `browser-agent-control` — `stable`, `darwin`-only — in `extensions/ritemark/src/features/flags.ts`. On supported platforms `isEnabled()` returns true automatically; non-darwin platforms receive no MCP server registration for Claude and no `dynamicTools` array for Codex.
 -   `BrowserContextStore` extended with control-consent tracking; `ensureControlConsentForActiveTab()` is the helper the dispatch path calls before executing any tool.
 -   E2E validation matrix in `docs/development/sprints/sprint-69-ai-browser-control/notes/e2e-validation.md`: Claude + Codex happy path, flag-off negative test, no-tab error path, consent revoke cascade.
 
@@ -253,12 +223,12 @@ For developers and changelog readers.
 
 ## Sprints Rolled Up
 
+-   **Sprint 71** — GitHub Copilot Support (Marketplace install path, inline completions, contained Copilot Chat) — *user-facing headline*
+-   **Sprint 69** — AI Agent Browser Control (macOS, on by default)
 -   **Sprint 68** — v1.7.1 Patch Fixes (clipboard, chat history, HTML cold-start race)
--   **Sprint 69** — AI Agent Browser Control (user-facing marquee)
--   **Sprint 71** — GitHub Copilot Support (Marketplace install path, inline completions, contained Copilot Chat)
 
 Plus the Sprint 69 cleanup items: removal of the misleading `htmlDefaultOpener` Settings dropdown and the Features section in Settings (the feature-flag toggle UI). The flag system itself is unchanged; only the in-Settings UI was removed.
 
 * * *
 
-v1.7.0 made the AI fluent in two languages at once: prose and rendered HTML. v1.7.1 takes the next step that question naturally asks — *if the AI can read the page, why can't it act on the page?* — and answers it carefully, with a consent gate that's distinct from reading, an opt-in flag, and a tool set that is small on purpose.
+v1.7.0 made the AI fluent in prose and rendered HTML. v1.7.1 finishes two things v1.7.0 left open: it lets the AI **act** on the page it was reading (carefully, behind a separate consent), and it makes **Marketplace-installed GitHub Copilot Chat** a clean, symmetric, install/uninstall-driven part of the Ritemark UI — without replacing Ritemark AI as the primary agentic surface.
