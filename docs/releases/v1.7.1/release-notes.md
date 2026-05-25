@@ -15,7 +15,7 @@ tags:
 
 # Ritemark v1.7.1 — The AI Can Now Drive the Browser
 
-**Status:** In progress
+**Status:** Released
 **Type:** Feature + patch release
 **Focus:** v1.7.0 taught the AI sidebar to *read* the integrated browser. v1.7.1 lets it *act* — navigate, click, fill forms, type, scroll — with an explicit per-tab consent gate that's distinct from the read prompt. Plus the v1.7.0 follow-up fixes that didn't ship as their own release: clipboard inside the webview, chat history showing every conversation, HTML files opening cleanly into the browser without a text-tab flicker, and Marketplace-installed GitHub Copilot support for teams that need the Microsoft/GitHub-approved path.
 
@@ -29,6 +29,26 @@ tags:
 | macOS Intel | [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-x64.dmg) |
 
 > Windows: coming as a follow-up asset on the v1.7.1 release.
+
+* * *
+
+## First-Launch on macOS: Open Anyway
+
+This release is **signed but not notarized by Apple**. The DMG is signed with our Developer ID certificate (Team JKBSC3ZDT5) and uses the hardened runtime — the same signing posture as every previous release. Apple's notarization service is currently holding our submissions in a team-eligibility review (case 102892219755, open since 2026-05-15), so we are shipping the v1.7.1 binaries without the notarization staple this one time.
+
+What you will see on first launch:
+
+- **macOS will refuse to open the app** with the message *"Ritemark.app can't be opened because Apple cannot check it for malicious software."* This is Gatekeeper's standard response to an unnotarized Developer ID app — it is **not** a "this app is unsafe" warning.
+- Click **Done** to dismiss the dialog.
+- Open **System Settings → Privacy & Security**.
+- Scroll to the *Security* section. You will see a line: *"Ritemark.app was blocked to protect your Mac."*
+- Click **Open Anyway** (you may need to authenticate with Touch ID or your password).
+- macOS will show the original dialog again with an **Open** button. Click it.
+- From this point onward, Ritemark opens normally — macOS remembers the approval for this exact build.
+
+If you upgraded from v1.7.0 via the in-app update prompt, you will still see this dialog: the v1.7.1 DMG is downloaded to a fresh location, mounted, and the new Ritemark.app inherits a fresh quarantine attribute that triggers Gatekeeper one more time. After approving once, future launches work without any prompts.
+
+We expect to ship a notarized re-upload to this same release page (no version bump, no new tag) as soon as Apple clears the case. If you prefer to wait, v1.7.0 remains available on the [previous release](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.7.0).
 
 * * *
 
@@ -140,6 +160,7 @@ The support work restores the minimum VS Code compatibility Copilot needs:
 -   Copilot inline completions and code actions no longer disabled by Ritemark defaults
 -   Core Copilot Chat view registration restored while setup badges, command-center takeover, status-bar takeover, and debug-only Copilot containers remain suppressed
 -   A narrow sign-in command path so Copilot's contained Sign In button works without restoring the full upstream Chat setup contribution
+-   Production profiles with stale hidden Chat layout state are repaired, and the real Chat entry is pinned to the Activity Bar when Marketplace Copilot Chat is installed
 
 Ritemark AI remains the primary agentic UI. If Copilot Chat is installed, it can appear beside Ritemark AI in the Activity Bar / Auxiliary Bar, but Ritemark keeps its own AI panel first and visible.
 
