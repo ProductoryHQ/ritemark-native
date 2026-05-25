@@ -160,9 +160,9 @@ The support work restores the minimum VS Code compatibility Copilot needs:
 -   Copilot inline completions and code actions no longer disabled by Ritemark defaults
 -   Core Copilot Chat view registration restored while setup badges, command-center takeover, status-bar takeover, and debug-only Copilot containers remain suppressed
 -   A narrow sign-in command path so Copilot's contained Sign In button works without restoring the full upstream Chat setup contribution
--   Production profiles with stale hidden Chat layout state are repaired, and the real Chat entry is pinned to the Activity Bar when Marketplace Copilot Chat is installed
+-   Production profiles with stale hidden Chat layout state are repaired, the real Chat panel stays in the Auxiliary Bar, and a primary Activity Bar launcher opens it when Marketplace Copilot Chat is installed
 
-Ritemark AI remains the primary agentic UI. If Copilot Chat is installed, it can appear beside Ritemark AI in the Activity Bar / Auxiliary Bar, but Ritemark keeps its own AI panel first and visible.
+Ritemark AI remains the primary agentic UI. If Copilot Chat is installed, it appears beside Ritemark AI in the Auxiliary Bar, ordered after Ritemark AI and before Terminal; the Activity Bar only provides the launcher.
 
 * * *
 
@@ -243,7 +243,7 @@ For developers and changelog readers.
 -   `branding/product.json` now includes the Copilot-compatible `defaultChatAgent`, GitHub trusted auth access, and the `github.copilot-chat` proposed API allow-list required by the Marketplace Copilot Chat extension.
 -   `extensions/ritemark/package.json` no longer disables Marketplace-installed Copilot inline completions, auto-completions, code actions, or chat-agent enablement by default.
 -   Patch 003 restores the core Chat view registration and skips VS Code's builtin chat enablement migration, which otherwise disabled Marketplace-installed Copilot Chat when Ritemark suppresses the full upstream Chat setup UI.
--   Patch 007 registers only the Copilot sign-in/setup commands needed by the contained Copilot Chat flow, while leaving setup agents, titlebar sign-in, account menus, and setup badges disabled.
+-   Patch 007 registers only the Copilot sign-in/setup commands needed by the contained Copilot Chat flow, keeps the real Chat panel in the Auxiliary Bar, and routes the Activity Bar launcher to that panel while leaving setup agents, titlebar sign-in, account menus, and setup badges disabled.
 -   Patch 002 keeps `ritemark-ai` first in the Auxiliary Bar for new and existing profiles, so Copilot Chat can coexist without replacing the Ritemark AI panel.
 -   Production builds still remove bundled `extensions/copilot`; Sprint 71 supports Marketplace-installed Copilot only.
 

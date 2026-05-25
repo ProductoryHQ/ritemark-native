@@ -17,13 +17,14 @@
 #      though Ritemark already gates the chat view via patch 003. Disable
 #      both full contribution registrations, but keep a narrow action-only
 #      contribution so Marketplace Copilot can launch GitHub sign-in. The narrow
-#      contribution also mirrors the install-state check, reveals the real Chat
-#      view in the primary Activity Bar for Marketplace-installed Copilot Chat,
-#      and clears stale hidden Chat view layout state.
+#      contribution also mirrors the install-state check, keeps the real Chat
+#      view in the Auxiliary Bar beside Ritemark AI, exposes a primary Activity
+#      Bar launcher for it, and clears stale hidden Chat view layout state.
 #
 # File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
 #          src/vs/workbench/contrib/chat/browser/chat.contribution.ts,
-#          src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
+#          src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts,
+#          src/vs/workbench/browser/parts/paneCompositeBar.ts
 # Created: 2026-05-02
 #
 diff --git a/src/vs/workbench/contrib/chat/browser/chat.contribution.ts b/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
@@ -58,7 +59,7 @@ index e76d44b8645..91b73daa38a 100644
  registerWorkbenchContribution2(BuiltinToolsContribution.ID, BuiltinToolsContribution, WorkbenchPhase.Eventually);
  registerWorkbenchContribution2(UsagesToolContribution.ID, UsagesToolContribution, WorkbenchPhase.BlockRestore);
 diff --git a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
-index 2ea65ba8917..e9e2f37e6d5 100644
+index 2ea65ba8917..25954ea783f 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
 @@ -32,6 +32,7 @@ import { IMarkerService } from '../../../../../platform/markers/common/markers.j
@@ -78,10 +79,14 @@ index 2ea65ba8917..e9e2f37e6d5 100644
  import { chatViewsWelcomeRegistry } from '../viewsWelcome/chatViewsWelcome.js';
  import { ChatSetupAnonymous, ChatSetupStrategy } from './chatSetup.js';
  import { ChatSetupController } from './chatSetupController.js';
-@@ -67,6 +68,260 @@ const defaultChat = {
+@@ -66,6 +67,344 @@ const defaultChat = {
+ };
  
  const SIGN_IN_TITLE_BAR_ACTION_ID = 'workbench.action.chat.signInIndicator';
- 
++const RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID = 'workbench.view.ritemark.copilotChatLauncher';
++const RITEMARK_AI_VIEW_CONTAINER_ID = 'workbench.view.extension.ritemark-ai';
++const TERMINAL_VIEW_CONTAINER_ID = 'terminal';
++
 +export class ChatSetupActionsContribution extends Disposable implements IWorkbenchContribution {
 +
 +	static readonly ID = 'workbench.contrib.chatSetupActions';
@@ -113,8 +118,8 @@ index 2ea65ba8917..e9e2f37e6d5 100644
 +	private revealCopilotChatViewState(): void {
 +		try {
 +			const chatViewContainer = this.viewDescriptorService.getViewContainerById(ChatViewContainerId);
-+			if (chatViewContainer && this.viewDescriptorService.getViewContainerLocation(chatViewContainer) !== ViewContainerLocation.Sidebar) {
-+				this.viewDescriptorService.moveViewContainerToLocation(chatViewContainer, ViewContainerLocation.Sidebar, undefined, 'ritemark-copilot-chat');
++			if (chatViewContainer && this.viewDescriptorService.getViewContainerLocation(chatViewContainer) !== ViewContainerLocation.AuxiliaryBar) {
++				this.viewDescriptorService.moveViewContainerToLocation(chatViewContainer, ViewContainerLocation.AuxiliaryBar, undefined, 'ritemark-copilot-chat');
 +			}
 +
 +			const workspaceStateRaw = this.storageService.get(ChatViewContainerId, StorageScope.WORKSPACE);
@@ -148,15 +153,30 @@ index 2ea65ba8917..e9e2f37e6d5 100644
 +			if (pinnedViewletsRaw) {
 +				const pinnedViewlets = JSON.parse(pinnedViewletsRaw) as Array<{ id: string; pinned?: boolean; visible?: boolean; order?: number }>;
 +				if (Array.isArray(pinnedViewlets)) {
-+					const chatViewlet = pinnedViewlets.find(item => item.id === ChatViewContainerId);
-+					if (chatViewlet) {
-+						if (chatViewlet.pinned !== true) {
-+							chatViewlet.pinned = true;
-+							this.storageService.store(pinnedViewletsKey, JSON.stringify(pinnedViewlets), StorageScope.PROFILE, StorageTarget.USER);
++					let changed = false;
++					const oldChatViewlet = pinnedViewlets.find(item => item.id === ChatViewContainerId);
++					if (oldChatViewlet?.pinned !== false || oldChatViewlet?.visible !== false) {
++						if (oldChatViewlet) {
++							oldChatViewlet.pinned = false;
++							oldChatViewlet.visible = false;
++							changed = true;
++						}
++					}
++
++					const launcherViewlet = pinnedViewlets.find(item => item.id === RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID);
++					if (launcherViewlet) {
++						if (launcherViewlet.pinned !== true || launcherViewlet.visible !== true || launcherViewlet.order !== 0.5) {
++							launcherViewlet.pinned = true;
++							launcherViewlet.visible = true;
++							launcherViewlet.order = 0.5;
++							changed = true;
 +						}
 +					} else {
-+						const sourceControlViewlet = pinnedViewlets.find(item => item.id === 'workbench.view.scm');
-+						pinnedViewlets.push({ id: ChatViewContainerId, pinned: true, visible: false, order: (sourceControlViewlet?.order ?? 2) + 1 });
++						pinnedViewlets.push({ id: RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID, pinned: true, visible: true, order: 0.5 });
++						changed = true;
++					}
++
++					if (changed) {
 +						this.storageService.store(pinnedViewletsKey, JSON.stringify(pinnedViewlets), StorageScope.PROFILE, StorageTarget.USER);
 +					}
 +				}
@@ -167,22 +187,86 @@ index 2ea65ba8917..e9e2f37e6d5 100644
 +			if (pinnedPanelsRaw) {
 +				const pinnedPanels = JSON.parse(pinnedPanelsRaw) as Array<{ id: string; pinned?: boolean; visible?: boolean; order?: number }>;
 +				if (Array.isArray(pinnedPanels)) {
-+					const chatPanel = pinnedPanels.find(item => item.id === ChatViewContainerId);
-+					if (chatPanel) {
-+						if (chatPanel.pinned !== true || chatPanel.visible !== true) {
-+							chatPanel.pinned = true;
-+							chatPanel.visible = true;
-+							this.storageService.store(pinnedPanelsKey, JSON.stringify(pinnedPanels), StorageScope.PROFILE, StorageTarget.USER);
++					let changed = false;
++					const ensurePanel = (id: string, order: number): void => {
++						const panel = pinnedPanels.find(item => item.id === id);
++						if (panel) {
++							if (panel.pinned !== true || panel.visible !== true || panel.order !== order) {
++								panel.pinned = true;
++								panel.visible = true;
++								panel.order = order;
++								changed = true;
++							}
++						} else {
++							pinnedPanels.push({ id, pinned: true, visible: true, order });
++							changed = true;
 +						}
-+					} else {
-+						const ritemarkPanel = pinnedPanels.find(item => item.id === 'workbench.view.extension.ritemark-ai');
-+						pinnedPanels.push({ id: ChatViewContainerId, pinned: true, visible: true, order: (ritemarkPanel?.order ?? 0) + 1 });
++					};
++
++					ensurePanel(RITEMARK_AI_VIEW_CONTAINER_ID, 0);
++					ensurePanel(ChatViewContainerId, 1);
++					ensurePanel(TERMINAL_VIEW_CONTAINER_ID, 2);
++
++					let nextOrder = 3;
++					for (const panel of pinnedPanels
++						.filter(item => item.id !== RITEMARK_AI_VIEW_CONTAINER_ID && item.id !== ChatViewContainerId && item.id !== TERMINAL_VIEW_CONTAINER_ID)
++						.sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))) {
++						if (panel.order !== nextOrder) {
++							panel.order = nextOrder;
++							changed = true;
++						}
++						nextOrder++;
++					}
++
++					if (changed) {
 +						this.storageService.store(pinnedPanelsKey, JSON.stringify(pinnedPanels), StorageScope.PROFILE, StorageTarget.USER);
 +					}
 +				}
 +			}
 +		} catch (error) {
 +			this.logService.warn('[chat setup] Failed to reveal Copilot Chat view state', error);
++		}
++	}
++
++	private hideCopilotChatViewState(): void {
++		try {
++			const pinnedViewletsKey = 'workbench.activity.pinnedViewlets2';
++			const pinnedViewletsRaw = this.storageService.get(pinnedViewletsKey, StorageScope.PROFILE);
++			if (pinnedViewletsRaw) {
++				const pinnedViewlets = JSON.parse(pinnedViewletsRaw) as Array<{ id: string; pinned?: boolean; visible?: boolean; order?: number }>;
++				if (Array.isArray(pinnedViewlets)) {
++					let changed = false;
++					const launcherViewlet = pinnedViewlets.find(item => item.id === RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID);
++					if (launcherViewlet && (launcherViewlet.pinned !== false || launcherViewlet.visible !== false)) {
++						launcherViewlet.pinned = false;
++						launcherViewlet.visible = false;
++						changed = true;
++					}
++					if (changed) {
++						this.storageService.store(pinnedViewletsKey, JSON.stringify(pinnedViewlets), StorageScope.PROFILE, StorageTarget.USER);
++					}
++				}
++			}
++
++			const pinnedPanelsKey = 'workbench.auxiliarybar.pinnedPanels';
++			const pinnedPanelsRaw = this.storageService.get(pinnedPanelsKey, StorageScope.PROFILE);
++			if (pinnedPanelsRaw) {
++				const pinnedPanels = JSON.parse(pinnedPanelsRaw) as Array<{ id: string; pinned?: boolean; visible?: boolean; order?: number }>;
++				if (Array.isArray(pinnedPanels)) {
++					let changed = false;
++					const chatPanel = pinnedPanels.find(item => item.id === ChatViewContainerId);
++					if (chatPanel && (chatPanel.pinned !== false || chatPanel.visible !== false)) {
++						chatPanel.pinned = false;
++						chatPanel.visible = false;
++						changed = true;
++					}
++					if (changed) {
++						this.storageService.store(pinnedPanelsKey, JSON.stringify(pinnedPanels), StorageScope.PROFILE, StorageTarget.USER);
++					}
++				}
++			}
++		} catch (error) {
++			this.logService.warn('[chat setup] Failed to hide Copilot Chat view state', error);
 +		}
 +	}
 +
@@ -232,6 +316,8 @@ index 2ea65ba8917..e9e2f37e6d5 100644
 +			context.update({ installed, disabled, untrusted, disabledInWorkspace });
 +			if (installed && !disabled && !disabledInWorkspace) {
 +				this.revealCopilotChatViewState();
++			} else if (!installed) {
++				this.hideCopilotChatViewState();
 +			}
 +		}));
 +	}
@@ -335,10 +421,9 @@ index 2ea65ba8917..e9e2f37e6d5 100644
 +		registerAction2(ChatSetupTriggerSupportAnonymousAction);
 +	}
 +}
-+
+ 
  export class ChatSetupContribution extends Disposable implements IWorkbenchContribution {
  
- 	static readonly ID = 'workbench.contrib.chatSetup';
 diff --git a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
 index e1486cb5c58..6cf78728d39 100644
 --- a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
@@ -364,3 +449,38 @@ index e1486cb5c58..6cf78728d39 100644
  
  /**
   * Variation A — Classic Wizard Modal
+diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
+index bc6003e2f44..4892443897a 100644
+--- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
++++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
+@@ -31,6 +31,10 @@ import { GestureEvent } from '../../../base/browser/touch.js';
+ import { IPaneCompositePart } from './paneCompositePart.js';
+ import { IConfigurationService } from '../../../platform/configuration/common/configuration.js';
+ import { IViewsService } from '../../services/views/common/viewsService.js';
++import { IPaneCompositePartService } from '../../services/panecomposite/browser/panecomposite.js';
++
++const RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID = 'workbench.view.ritemark.copilotChatLauncher';
++const RITEMARK_COPILOT_CHAT_VIEW_CONTAINER_ID = 'workbench.panel.chat';
+ 
+ interface IPlaceholderViewContainer {
+ 	readonly id: string;
+@@ -776,6 +780,7 @@ class ViewContainerActivityAction extends CompositeBarAction {
+ 		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
+ 		@IConfigurationService private readonly configurationService: IConfigurationService,
+ 		@IActivityService private readonly activityService: IActivityService,
++		@IPaneCompositePartService private readonly paneCompositeService: IPaneCompositePartService,
+ 	) {
+ 		super(compositeBarActionItem);
+ 		this.updateActivity();
+@@ -809,6 +814,11 @@ class ViewContainerActivityAction extends CompositeBarAction {
+ 		const focus = (event && 'preserveFocus' in event) ? !event.preserveFocus : true;
+ 
+ 		if (this.part === Parts.ACTIVITYBAR_PART) {
++			if (this.compositeBarActionItem.id === RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID) {
++				await this.paneCompositeService.openPaneComposite(RITEMARK_COPILOT_CHAT_VIEW_CONTAINER_ID, ViewContainerLocation.AuxiliaryBar, focus);
++				return;
++			}
++
+ 			const sideBarVisible = this.layoutService.isVisible(Parts.SIDEBAR_PART);
+ 			const activeViewlet = this.paneCompositePart.getActivePaneComposite();
+ 			const focusBehavior = this.configurationService.getValue<string>('workbench.activityBar.iconClickBehavior');

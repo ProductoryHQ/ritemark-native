@@ -19,7 +19,7 @@ Marketplace-installed GitHub Copilot Chat appears in the Extensions view, but th
 - The renderer log also shows `CodeExpectedError: No default agent registered`; this follows from starting a chat session before Copilot has registered an implementation.
 - The active `productory-consulting` workspace storage contains `workbench.panel.chat.view.copilot` with `isHidden: true`. Several older workspaces have the same stale hidden state.
 - The profile auxiliary bar state also contains `workbench.panel.chat` with `pinned: false` and `visible: false`, matching the observed behavior where the sign-in panel appears briefly in a new window and is then removed from the bar.
-- Follow-up UI validation showed the contained Chat view can be visible while still missing from the primary Activity Bar. Marketplace Copilot Chat contributes only a debug-only `copilot-chat` Activity Bar container; the real user Chat surface is the core `workbench.panel.chat` container.
+- Follow-up UI validation clarified the desired split: Marketplace Copilot Chat contributes only a debug-only `copilot-chat` Activity Bar container, while the real user Chat surface is the core `workbench.panel.chat` container and must stay in the Auxiliary Bar.
 - A post-closeout edit had removed the `chatParticipant.contribution.ts` hunk from `patches/vscode/003-ritemark-menu-cleanup.patch`. That means future clean production patch application could lose the intended `isDefault: false` containment for the Chat container.
 
 ## Root Cause
@@ -31,7 +31,7 @@ That was too narrow for cold or migrated production profiles:
 - it did not run the install-state check that marks Marketplace Copilot Chat as installed and reopens Chat setup visibility;
 - it did not clear stale per-workspace view state from the earlier “hide upstream chat” era;
 - it did not repin the Chat container after older profile state had recorded it as intentionally hidden;
-- it did not move/pin the real `workbench.panel.chat` container into the primary Activity Bar when Marketplace Copilot Chat was installed;
+- it did not provide a primary Activity Bar launcher that opens the real `workbench.panel.chat` container in the Auxiliary Bar when Marketplace Copilot Chat was installed;
 - therefore an already-installed Copilot Chat extension could activate while its intended `workbench.panel.chat.view.copilot` view remained hidden.
 
 Dev acceptance likely missed this because the dev profile had a warmer/authenticated layout state than the production profile.
@@ -41,13 +41,38 @@ Dev acceptance likely missed this because the dev profile had a warmer/authentic
 - Keep full `ChatSetupContribution` and `ChatTeardownContribution` disabled.
 - Extend the narrow `ChatSetupActionsContribution` to run the Copilot install-state check.
 - When Marketplace Copilot Chat is installed and enabled, clear stale hidden state for `workbench.panel.chat.view.copilot` in both workspace and profile view storage.
-- Move and pin the real `workbench.panel.chat` container into the primary Activity Bar when Marketplace Copilot Chat is installed and enabled. Do not rely on the extension's debug-only `copilot-chat` view container for user Chat access.
-- When a prior profile already has `workbench.panel.chat` in the auxiliary bar cache, repin and show that container while preserving Ritemark AI as order `0`.
+- Keep the real `workbench.panel.chat` container in the Auxiliary Bar when Marketplace Copilot Chat is installed and enabled. Do not rely on the extension's debug-only `copilot-chat` view container for user Chat access.
+- When a prior profile already has `workbench.panel.chat` in the auxiliary bar cache, repin and show that container while forcing the order to Ritemark AI, GitHub Chat, Terminal.
+- Add a primary Activity Bar launcher that opens the Auxiliary Bar Chat container without moving the real Chat surface out of the right side.
 - Restore the `003` patch hunk that keeps the Chat container non-default (`isDefault: false`) so Copilot remains beside Ritemark AI instead of becoming the primary auxiliary bar surface.
 
 ## Build Follow-Up
 
-- Rebuilt macOS arm64 production app on 2026-05-24 after the Activity Bar correction.
-- Verified the built workbench bundle contains the `ritemark-copilot-chat` Activity Bar move/pin path.
+- Rebuilt macOS arm64 production app on 2026-05-24 after the first Activity Bar correction; this was later superseded by the Auxiliary Bar + Activity Bar launcher correction.
+- The corrected path should verify that `ritemark-copilot-chat` moves Chat to `ViewContainerLocation.AuxiliaryBar` and that the launcher id opens that auxiliary container.
 - A sandbox-safe DMG was generated during investigation after standard `create-dmg` failed with `/Volumes/Ritemark/Ritemark.app - Operation not permitted`, but that artifact is explicitly not a release candidate because it bypassed the repository release-manager protocol.
 - Proper DMG delivery remains blocked until the signed/notarized release workflow is run end-to-end: `codesign-app`, standard `create-dmg`, `notarize-dmg`, `verify-notarization`, mounted-DMG hard checks, and Jarmo Gate 1 approval.
+
+## 2026-05-25 — Re-release build attempt blocked by corruption + tsc incremental trap
+
+Second-pass production rebuild of v1.7.1 (with Codex's Auxiliary Bar + Activity Bar launcher fix) hit two compounding failures:
+
+1. **0-byte corruption mid-process.** The v1.0.1-pattern disk corruption fired during the build cycle, zeroing thousands of files across `extensions/ritemark/` including most of `node_modules`, all icon SVGs, multiple `.ts` sources, and the `out/` build artifacts. Symptom: pre-flight validator reported corrupt `webview.js`, `vite.config.ts`, and missing icon files.
+
+2. **Incremental tsc preserves 0-byte `.js` after restore.** The first recovery attempt — `git checkout HEAD -- extensions/ritemark/` + `npm install` + `build-prod.sh` — produced a signed DMG that *passed* all build-time validation (`extension.js` was 31449 bytes) but failed at runtime with `'ritemark.ritemark' failed: Invalid or unexpected token` and a blank editor pane. Root cause: `git checkout` does not restore gitignored `out/`, leaving ~26 zero-byte `.js` files (codexManager, versionService, RitemarkSettingsProvider, FlowsViewProvider, etc.). `tsc -p ./` ran in incremental mode against an intact `.tsbuildinfo` cache, decided no recompilation was needed, and the zeroes shipped. At runtime, `extension.js` `require()`d a zero-byte module and V8 raised a parse error, killing extension activation.
+
+   Detection (post-corruption / post-restore):
+
+   ```bash
+   find extensions/ritemark/out -type f -size 0 -name "*.js"   # must be empty list
+   ```
+
+   Fix:
+
+   ```bash
+   cd extensions/ritemark && rm -rf out && npm run compile     # force full tsc recompile
+   ```
+
+   Then re-run `build-prod.sh`. The third-pass DMG (SHA `4272876…`) installed cleanly and the Copilot Chat AuxiliaryBar + Activity Bar launcher placement worked.
+
+This is documented in `.claude/skills/release/SKILL.md` under "v1.7.1 — corruption + incremental tsc trap" and added as a key-takeaway rule.

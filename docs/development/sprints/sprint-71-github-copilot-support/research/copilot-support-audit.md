@@ -17,7 +17,7 @@ The highest-confidence implementation path is still **not** to broadly restore V
 3. restore only the core Chat view registration required for Copilot Chat to open;
 4. keep setup/status/titlebar/command-center takeover surfaces suppressed;
 5. validate inline completions and Copilot Chat together;
-6. allow Copilot Chat Activity Bar / Auxiliary Bar access only if it lives beside `ritemark-ai`, never over it.
+6. allow Copilot Chat in the Auxiliary Bar beside `ritemark-ai`, with Activity Bar access only as a launcher.
 
 ## Current Blockers
 
@@ -201,7 +201,7 @@ Chosen direction: **Option A for Sprint 71**.
 3. Restore the smallest upstream Chat surface required for Copilot Chat: the core Chat view descriptor registration in the auxiliary bar.
 4. Do not restore broad setup/status/titlebar/command-center contributions unless validation proves they are mandatory.
 5. Do not add a separate Ritemark Copilot setting; the Marketplace extension install/uninstall state is the user-facing control.
-6. Ship Copilot Chat in the same sprint if it can live next to Ritemark AI in the Activity Bar / Auxiliary Bar without overtaking it.
+6. Ship Copilot Chat in the same sprint if it can live next to Ritemark AI in the Auxiliary Bar without overtaking it.
 7. Preserve Ritemark AI Chat Panel as the primary agentic UI.
 
 ## Technical Answer: Which VS Code Chat Contributions to Restore
@@ -264,7 +264,7 @@ Allowed for Sprint 71:
 - Marketplace installation of GitHub Copilot / Copilot Chat.
 - GitHub sign-in and entitlement checks.
 - Inline completions.
-- Copilot Chat in the Activity Bar / Auxiliary Bar after the user installs Copilot.
+- Copilot Chat in the Auxiliary Bar after the user installs Copilot, with a primary Activity Bar launcher.
 - Copilot Chat commands that open the contained chat view.
 
 Keep suppressed:
@@ -331,7 +331,7 @@ Risk: still needs Option 1's core Chat view and product metadata, so this is pol
 - Auth completes for an account with Copilot entitlement.
 - Inline completions appear in a normal editor.
 - Copilot context menu items do not overwhelm Ritemark document UI.
-- Copilot Chat opens in its own Activity Bar / Auxiliary Bar surface without hiding or replacing Ritemark AI.
+- Copilot Chat opens in the Auxiliary Bar without hiding or replacing Ritemark AI.
 - Marketplace uninstall removes Copilot access without requiring a Ritemark-specific setting.
 - Ritemark AI side panel remains accessible and unchanged.
 
@@ -347,12 +347,12 @@ Risk: still needs Option 1's core Chat view and product metadata, so this is pol
 - Install path: Marketplace-installed Copilot. Bundled Copilot is out of scope for Sprint 71.
 - Copilot Chat: in scope for the same sprint.
 - User-facing setting: no extra Ritemark setting. Marketplace install/uninstall is the control.
-- Access point: Activity Bar access is acceptable when the user installed the extension.
+- Access point: Activity Bar launcher access is acceptable when the user installed the extension.
 - Primary UI: Ritemark AI Chat Panel remains the primary agentic UI; Copilot can live next to it but must not overtake or hide it.
 
 ## Remaining Open Questions
 
-- What is the smallest automated/dev-smoke validation that proves Copilot and Ritemark AI can coexist in the Activity Bar / Auxiliary Bar?
+- What is the smallest automated/dev-smoke validation that proves Copilot and Ritemark AI can coexist in the Auxiliary Bar while the Activity Bar launcher opens the right-side Chat panel?
 
 ## Implementation Update: 2026-05-18
 

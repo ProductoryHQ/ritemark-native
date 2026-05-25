@@ -216,15 +216,26 @@ index 8b8e25bb3d1..8f56387817e 100644
  // Register a placeholder action to the submenu so it appears (required for submenus)
  MenuRegistry.appendMenuItem(MenuId.AgentsTitleBarControlMenu, {
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-index 8ac8f531427..e4067aea77d 100644
+index 8ac8f531427..3051a1b66c9 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-@@ -45,7 +45,7 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
+@@ -45,7 +45,18 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
  	storageId: ChatViewContainerId,
  	hideIfEmpty: true,
  	order: 1,
 -}, ViewContainerLocation.AuxiliaryBar, { isDefault: true, doNotRegisterOpenCommand: true });
 +}, ViewContainerLocation.AuxiliaryBar, { isDefault: false, doNotRegisterOpenCommand: true });
++
++// Ritemark: keep the real Chat view in the auxiliary bar, but expose a primary Activity Bar launcher.
++Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer({
++	id: 'workbench.view.ritemark.copilotChatLauncher',
++	title: localize2('chat.viewContainer.activityLauncher.label', "Chat"),
++	icon: chatViewIcon,
++	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, ['workbench.view.ritemark.copilotChatLauncher', { mergeViewWithContainerWhenSingleView: true }]),
++	storageId: 'workbench.view.ritemark.copilotChatLauncher',
++	hideIfEmpty: false,
++	order: 0.5,
++}, ViewContainerLocation.Sidebar, { isDefault: false, doNotRegisterOpenCommand: true });
  
  const chatViewDescriptor: IViewDescriptor = {
  	id: ChatViewId,

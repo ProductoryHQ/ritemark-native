@@ -182,6 +182,31 @@ Three root causes compounded:
 2. ~~**`Info.plist` version not updated**~~ — **RETRACTED (2026-05-12).** `Info.plist CFBundleShortVersionString` always shows the VS Code base version (e.g. `1.117.0`) for ALL Ritemark releases — this is expected and correct. Ritemark's version is authoritative only in `product.json` (`ritemarkVersion`). The About dialog and update system (`versionService.ts`) both read from `product.json`, not `Info.plist`. Do NOT run PlistBuddy to patch the bundle version; do NOT flag this in release audits.
 3. **0-byte source file corruption** (random source files became 0 bytes — TS, SVG, configs, even node_modules type defs). Detection: `find extensions/ritemark/src -name "*.ts" -size 0`. Fix: `git checkout HEAD -- extensions/ritemark/`, reinstall node_modules, rebuild webview. Root cause unconfirmed (disk / sync tool / system process).
 
+### v1.7.1 — corruption + incremental tsc trap (2026-05-25)
+
+Rebuilding v1.7.1 after the same 0-byte corruption pattern produced a DMG that installed cleanly but the editor was blank — Ritemark extension failed to activate with `'ritemark.ritemark' failed: Invalid or unexpected token`.
+
+Root cause: when corruption zeroes `.js` files in `extensions/ritemark/out/`, **`git checkout HEAD -- extensions/ritemark/` does not restore them** because `out/` is gitignored. The subsequent build then runs `tsc -p ./` in incremental mode (`.tsbuildinfo` cache). tsc sees the `.ts` source unchanged vs. the cache, decides nothing needs recompilation, and leaves the 0-byte `.js` files in place. `build-prod.sh` copies the broken extension into the app bundle. Pre-flight only checks `extension.js` and `ritemarkEditor.js` sizes, not the deep tree, so the broken DMG passes Gate 1's automated checks.
+
+At runtime, VS Code loads `extension.js` (non-empty), which `require()`s `./codex/codexManager` (0 bytes) → V8 throws "Invalid or unexpected token" → entire Ritemark extension fails to activate → editor pane blank.
+
+**Detection (run after any corruption restore, before rebuild):**
+
+```bash
+find extensions/ritemark/out -type f -size 0 -name "*.js" | wc -l    # should be 0
+find VSCode-darwin-arm64/Ritemark.app/Contents/Resources/app/extensions/ritemark/out -type f -size 0 -name "*.js" | wc -l    # should be 0 after build
+```
+
+**Fix:**
+
+```bash
+cd extensions/ritemark && rm -rf out && npm run compile    # forces tsc to rebuild every .js
+```
+
+Then re-run `build-prod.sh`. Don't trust tsc incremental after a corruption event — the `.tsbuildinfo` cache is now lying.
+
+**Rule:** any time you've restored corrupted files via `git checkout`, treat `extensions/ritemark/out/` as poisoned and force a clean recompile before the production build.
+
 ### Quick comparison test
 
 When TipTap doesn't load, mount the working previous DMG and the broken new DMG side-by-side, then `diff` the extension folder listings:
@@ -201,6 +226,7 @@ hdiutil detach /tmp/v100; hdiutil detach /tmp/v101
 3. Compare with the last working build when debugging — diff reveals missing pieces fast.
 4. Watch for 0-byte files (corruption signal); restore from git.
 5. Test the actual DMG, not just the source app bundle.
+6. After any corruption restore: `rm -rf extensions/ritemark/out && npm run compile` before `build-prod.sh`. Incremental tsc will silently keep 0-byte `.js` artifacts otherwise (v1.7.1).
 
 ## CI workflow editing — pre-push audit (HARD RULE)
 

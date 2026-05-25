@@ -39,7 +39,7 @@ Some users can use GitHub Copilot Business or Enterprise through Microsoft/GitHu
   - **No separate user-facing Ritemark flag for Sprint 71.** The Marketplace extension install/uninstall state is the user control surface.
   - Implementation still keeps the risky upstream UI surfaces suppressed: command center, titlebar/setup badge, and chat status bar remain off.
   - Expected behavior without Copilot installed: current Ritemark behavior should remain unchanged.
-  - Expected behavior with Marketplace Copilot installed: Copilot can authenticate, inline completions can run, and Copilot Chat is allowed in the Activity Bar / Auxiliary Bar only if Ritemark AI remains the primary/default agentic UI.
+  - Expected behavior with Marketplace Copilot installed: Copilot can authenticate, inline completions can run, and Copilot Chat lives in the Auxiliary Bar beside Ritemark AI while the primary Activity Bar exposes only a launcher.
 
 ## Success Criteria
 
@@ -57,8 +57,8 @@ Some users can use GitHub Copilot Business or Enterprise through Microsoft/GitHu
 - **Install path:** Marketplace-installed Copilot only for this sprint. Ritemark should allow users to install GitHub Copilot from the Marketplace and manage/uninstall it there.
 - **Copilot Chat:** in scope for the same sprint.
 - **User-facing setting:** no extra Ritemark Copilot setting. The Marketplace extension install/uninstall state is the user-facing control.
-- **Activity Bar:** acceptable if the user installed the Copilot extension.
-- **Primary AI surface:** Ritemark AI Chat Panel remains the primary agentic UI. GitHub Copilot may live next to it in the Activity Bar / Auxiliary Bar, as long as it does not overtake, hide, or replace the Ritemark panel.
+- **Activity Bar:** acceptable as a launcher if the user installed the Copilot extension.
+- **Primary AI surface:** Ritemark AI Chat Panel remains the primary agentic UI. GitHub Copilot Chat lives next to it in the Auxiliary Bar, ordered after Ritemark AI and before Terminal, and must not overtake, hide, or replace the Ritemark panel.
 
 ## Current Findings
 
@@ -71,7 +71,7 @@ Regression follow-up on 2026-05-24:
 - The active production profile had stale workspace state hiding `workbench.panel.chat.view.copilot`, so Copilot Chat could be installed and active without a visible Chat surface.
 - The same profile had `workbench.panel.chat` cached in the auxiliary bar as unpinned/hidden, explaining why the sign-in panel could appear briefly in a new window and then be removed.
 - The narrow Sprint 71 setup replacement registered setup commands but did not run the install-state/layout-state repair that full `ChatSetupContribution` used to perform.
-- Follow-up UI validation confirmed Chat could be visible without the intended primary Activity Bar entry. The fix now moves and pins the real `workbench.panel.chat` container to the Activity Bar when Marketplace Copilot Chat is installed and enabled.
+- Follow-up UI validation clarified the intended layout: the real `workbench.panel.chat` container must remain in the Auxiliary Bar, and the primary Activity Bar should expose only a launcher that opens that right-side Chat panel.
 - A post-closeout patch edit also removed the `chatParticipant.contribution.ts` hunk that kept the Chat container non-default in clean production patch application.
 - A corrected macOS arm64 production build was produced on 2026-05-24. A later sandbox-safe DMG attempt is not a release candidate because it bypassed the repository release-manager protocol; a proper DMG must follow the signed/notarized release workflow.
 
@@ -116,20 +116,20 @@ Short version:
   - `trustedExtensionAuthAccess.github = ["github.copilot-chat"]`
   - `extensionEnabledApiProposals["github.copilot-chat"]` copied from the compatible Copilot package
 - [x] Restore only the core Chat view registration in `chatParticipant.contribution.ts`.
-- [x] Keep upstream setup/status/titlebar/command-center takeover hidden unless explicitly needed; Activity Bar access for installed Copilot is allowed.
+- [x] Keep upstream setup/status/titlebar/command-center takeover hidden unless explicitly needed; Activity Bar launcher access for installed Copilot is allowed.
 
 ### Phase 2: UI containment
 
 - [x] Verify Ritemark AI auxiliary bar remains default and visible.
 - [x] Verify Copilot does not overwrite `ritemark-ai` or `ritemark.unifiedView`.
 - [x] Allow Copilot Activity Bar access only when the Copilot extension is installed.
-- [x] Allow Copilot Chat to live beside Ritemark AI in Auxiliary Bar/Activity Bar if it does not hide or replace Ritemark AI.
-- [x] Pin the real `workbench.panel.chat` container to the primary Activity Bar for Marketplace-installed Copilot Chat.
+- [x] Allow Copilot Chat to live beside Ritemark AI in the Auxiliary Bar if it does not hide or replace Ritemark AI.
+- [x] Add a primary Activity Bar launcher that opens the Auxiliary Bar `workbench.panel.chat` container for Marketplace-installed Copilot Chat.
 - [x] Gate or remove production CSS that hides the intended `workbench-panel-chat` surface when Copilot support is enabled.
 - [x] Keep Copilot debug containers hidden unless their debug settings are explicitly enabled.
 - [x] Prevent VS Code's builtin chat enablement migration from disabling Marketplace-installed Copilot Chat when Ritemark suppresses ChatSetupContribution.
 - [x] Register the narrow Copilot sign-in setup commands without restoring the full ChatSetupContribution UI/badge surface.
-- [x] Force `ritemark-ai` to order first in the Auxiliary Bar for new profiles and migrate existing profile order storage so Ritemark stays before Copilot Chat.
+- [x] Force Auxiliary Bar order to Ritemark AI, GitHub Chat, Terminal for repaired profiles.
 - [x] If Copilot Agent Window depends on taking over the primary chat surface, disable that specific surface gracefully while keeping Copilot Chat and inline completions working. No blocking Agent Window takeover issue was reported during acceptance testing.
 
 ### Phase 3: Validation
