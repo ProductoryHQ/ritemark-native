@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Copilot sign-in path:** Copilot's contained Sign In button now has the narrow setup commands it needs without restoring the full upstream VS Code Chat setup UI
 - **Copilot Chat disabled state:** VS Code's builtin chat enablement migration no longer disables Marketplace-installed Copilot Chat when Ritemark suppresses the upstream setup contribution
+- **Copilot Chat production visibility:** Marketplace-installed Copilot Chat now repairs stale hidden view state and pins the real Chat entry to the Activity Bar in macOS production builds
 
 ---
 

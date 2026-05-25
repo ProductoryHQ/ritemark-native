@@ -16,7 +16,10 @@
 #      "Chat Debug" item with a setup badge to the activity bar — even
 #      though Ritemark already gates the chat view via patch 003. Disable
 #      both full contribution registrations, but keep a narrow action-only
-#      contribution so Marketplace Copilot can launch GitHub sign-in.
+#      contribution so Marketplace Copilot can launch GitHub sign-in. The narrow
+#      contribution also mirrors the install-state check, reveals the real Chat
+#      view in the primary Activity Bar for Marketplace-installed Copilot Chat,
+#      and clears stale hidden Chat view layout state.
 #
 # File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
 #          src/vs/workbench/contrib/chat/browser/chat.contribution.ts,
@@ -55,10 +58,27 @@ index e76d44b8645..91b73daa38a 100644
  registerWorkbenchContribution2(BuiltinToolsContribution.ID, BuiltinToolsContribution, WorkbenchPhase.Eventually);
  registerWorkbenchContribution2(UsagesToolContribution.ID, UsagesToolContribution, WorkbenchPhase.BlockRestore);
 diff --git a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
-index 2ea65ba8917..dcd1e54127a 100644
+index 2ea65ba8917..e9e2f37e6d5 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
-@@ -67,6 +67,126 @@ const defaultChat = {
+@@ -32,6 +32,7 @@ import { IMarkerService } from '../../../../../platform/markers/common/markers.j
+ import { IOpenerService } from '../../../../../platform/opener/common/opener.js';
+ import product from '../../../../../platform/product/common/product.js';
+ import { IProductService } from '../../../../../platform/product/common/productService.js';
++import { IStorageService, StorageScope, StorageTarget } from '../../../../../platform/storage/common/storage.js';
+ import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
+ import { IWorkbenchContribution } from '../../../../common/contributions.js';
+ import { IViewDescriptorService, ViewContainerLocation } from '../../../../common/views.js';
+@@ -49,7 +50,7 @@ import { IChatModeService } from '../../common/chatModes.js';
+ import { IChatSessionsService } from '../../common/chatSessionsService.js';
+ import { ChatAgentLocation, ChatConfiguration, ChatModeKind } from '../../common/constants.js';
+ import { CHAT_CATEGORY, CHAT_SETUP_ACTION_ID, CHAT_SETUP_SUPPORT_ANONYMOUS_ACTION_ID } from '../actions/chatActions.js';
+-import { ChatViewContainerId, IChatWidgetService } from '../chat.js';
++import { ChatViewContainerId, ChatViewId, IChatWidgetService } from '../chat.js';
+ import { chatViewsWelcomeRegistry } from '../viewsWelcome/chatViewsWelcome.js';
+ import { ChatSetupAnonymous, ChatSetupStrategy } from './chatSetup.js';
+ import { ChatSetupController } from './chatSetupController.js';
+@@ -67,6 +68,260 @@ const defaultChat = {
  
  const SIGN_IN_TITLE_BAR_ACTION_ID = 'workbench.action.chat.signInIndicator';
  
@@ -68,6 +88,13 @@ index 2ea65ba8917..dcd1e54127a 100644
 +
 +	constructor(
 +		@IInstantiationService private readonly instantiationService: IInstantiationService,
++		@IExtensionService private readonly extensionService: IExtensionService,
++		@IExtensionsWorkbenchService private readonly extensionsWorkbenchService: IExtensionsWorkbenchService,
++		@IWorkbenchExtensionEnablementService private readonly extensionEnablementService: IWorkbenchExtensionEnablementService,
++		@IEnvironmentService private readonly environmentService: IEnvironmentService,
++		@IStorageService private readonly storageService: IStorageService,
++		@IViewDescriptorService private readonly viewDescriptorService: IViewDescriptorService,
++		@ILogService private readonly logService: ILogService,
 +		@IChatEntitlementService chatEntitlementService: ChatEntitlementService,
 +	) {
 +		super();
@@ -80,6 +107,133 @@ index 2ea65ba8917..dcd1e54127a 100644
 +
 +		const controller = new Lazy(() => this._register(this.instantiationService.createInstance(ChatSetupController, context, requests)));
 +		this.registerActions(context, controller);
++		this.checkExtensionInstallation(context).catch(error => this.logService.error(error));
++	}
++
++	private revealCopilotChatViewState(): void {
++		try {
++			const chatViewContainer = this.viewDescriptorService.getViewContainerById(ChatViewContainerId);
++			if (chatViewContainer && this.viewDescriptorService.getViewContainerLocation(chatViewContainer) !== ViewContainerLocation.Sidebar) {
++				this.viewDescriptorService.moveViewContainerToLocation(chatViewContainer, ViewContainerLocation.Sidebar, undefined, 'ritemark-copilot-chat');
++			}
++
++			const workspaceStateRaw = this.storageService.get(ChatViewContainerId, StorageScope.WORKSPACE);
++			if (workspaceStateRaw) {
++				const workspaceState = JSON.parse(workspaceStateRaw) as Record<string, { collapsed?: boolean; isHidden?: boolean; size?: number; order?: number }>;
++				if (workspaceState[ChatViewId]?.isHidden === true) {
++					workspaceState[ChatViewId] = { ...workspaceState[ChatViewId], isHidden: false };
++					this.storageService.store(ChatViewContainerId, JSON.stringify(workspaceState), StorageScope.WORKSPACE, StorageTarget.MACHINE);
++				}
++			}
++
++			const globalStateKey = `${ChatViewContainerId}.hidden`;
++			const globalStateRaw = this.storageService.get(globalStateKey, StorageScope.PROFILE);
++			if (globalStateRaw) {
++				const globalState = JSON.parse(globalStateRaw) as Array<{ id: string; isHidden?: boolean; order?: number }>;
++				let changed = false;
++				const nextGlobalState = globalState.map(item => {
++					if (item.id === ChatViewId && item.isHidden === true) {
++						changed = true;
++						return { ...item, isHidden: false };
++					}
++					return item;
++				});
++				if (changed) {
++					this.storageService.store(globalStateKey, JSON.stringify(nextGlobalState), StorageScope.PROFILE, StorageTarget.USER);
++				}
++			}
++
++			const pinnedViewletsKey = 'workbench.activity.pinnedViewlets2';
++			const pinnedViewletsRaw = this.storageService.get(pinnedViewletsKey, StorageScope.PROFILE);
++			if (pinnedViewletsRaw) {
++				const pinnedViewlets = JSON.parse(pinnedViewletsRaw) as Array<{ id: string; pinned?: boolean; visible?: boolean; order?: number }>;
++				if (Array.isArray(pinnedViewlets)) {
++					const chatViewlet = pinnedViewlets.find(item => item.id === ChatViewContainerId);
++					if (chatViewlet) {
++						if (chatViewlet.pinned !== true) {
++							chatViewlet.pinned = true;
++							this.storageService.store(pinnedViewletsKey, JSON.stringify(pinnedViewlets), StorageScope.PROFILE, StorageTarget.USER);
++						}
++					} else {
++						const sourceControlViewlet = pinnedViewlets.find(item => item.id === 'workbench.view.scm');
++						pinnedViewlets.push({ id: ChatViewContainerId, pinned: true, visible: false, order: (sourceControlViewlet?.order ?? 2) + 1 });
++						this.storageService.store(pinnedViewletsKey, JSON.stringify(pinnedViewlets), StorageScope.PROFILE, StorageTarget.USER);
++					}
++				}
++			}
++
++			const pinnedPanelsKey = 'workbench.auxiliarybar.pinnedPanels';
++			const pinnedPanelsRaw = this.storageService.get(pinnedPanelsKey, StorageScope.PROFILE);
++			if (pinnedPanelsRaw) {
++				const pinnedPanels = JSON.parse(pinnedPanelsRaw) as Array<{ id: string; pinned?: boolean; visible?: boolean; order?: number }>;
++				if (Array.isArray(pinnedPanels)) {
++					const chatPanel = pinnedPanels.find(item => item.id === ChatViewContainerId);
++					if (chatPanel) {
++						if (chatPanel.pinned !== true || chatPanel.visible !== true) {
++							chatPanel.pinned = true;
++							chatPanel.visible = true;
++							this.storageService.store(pinnedPanelsKey, JSON.stringify(pinnedPanels), StorageScope.PROFILE, StorageTarget.USER);
++						}
++					} else {
++						const ritemarkPanel = pinnedPanels.find(item => item.id === 'workbench.view.extension.ritemark-ai');
++						pinnedPanels.push({ id: ChatViewContainerId, pinned: true, visible: true, order: (ritemarkPanel?.order ?? 0) + 1 });
++						this.storageService.store(pinnedPanelsKey, JSON.stringify(pinnedPanels), StorageScope.PROFILE, StorageTarget.USER);
++					}
++				}
++			}
++		} catch (error) {
++			this.logService.warn('[chat setup] Failed to reveal Copilot Chat view state', error);
++		}
++	}
++
++	private async checkExtensionInstallation(context: ChatEntitlementContext): Promise<void> {
++
++		if (!defaultChat.chatExtensionId) {
++			return;
++		}
++
++		if (this.environmentService.isExtensionDevelopment) {
++			await this.extensionService.whenInstalledExtensionsRegistered();
++			if (this.extensionService.extensions.find(ext => ExtensionIdentifier.equals(ext.identifier, defaultChat.chatExtensionId))) {
++				await context.update({ installed: true, disabled: false, untrusted: false, disabledInWorkspace: false });
++				this.revealCopilotChatViewState();
++				return;
++			}
++		}
++
++		await this.extensionsWorkbenchService.queryLocal();
++
++		this._register(Event.runAndSubscribe<IExtension | undefined>(this.extensionsWorkbenchService.onChange, e => {
++			if (e && !ExtensionIdentifier.equals(e.identifier.id, defaultChat.chatExtensionId)) {
++				return;
++			}
++
++			const defaultChatExtension = this.extensionsWorkbenchService.local.find(value => ExtensionIdentifier.equals(value.identifier.id, defaultChat.chatExtensionId));
++			const installed = !!defaultChatExtension?.local;
++
++			let disabled: boolean;
++			let untrusted = false;
++			let disabledInWorkspace = false;
++			if (installed) {
++				disabled = !this.extensionEnablementService.isEnabled(defaultChatExtension.local);
++				if (disabled) {
++					const state = this.extensionEnablementService.getEnablementState(defaultChatExtension.local);
++					if (state === EnablementState.DisabledByTrustRequirement) {
++						disabled = false;
++						untrusted = true;
++					} else if (state === EnablementState.DisabledWorkspace) {
++						disabledInWorkspace = true;
++					}
++				}
++			} else {
++				disabled = false;
++			}
++
++			context.update({ installed, disabled, untrusted, disabledInWorkspace });
++			if (installed && !disabled && !disabledInWorkspace) {
++				this.revealCopilotChatViewState();
++			}
++		}));
 +	}
 +
 +	private registerActions(context: ChatEntitlementContext, controller: Lazy<ChatSetupController>): void {

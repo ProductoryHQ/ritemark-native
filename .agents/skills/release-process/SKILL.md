@@ -1,72 +1,124 @@
 ---
 name: release-process
-description: Run the Ritemark release workflow for full app releases and extension-only releases. Use for version bumps, tags, GitHub releases, DMG creation, notarization, Windows/macOS build coordination, and release readiness checks.
+description: Mandatory Ritemark release and distribution workflow. Use for release, publish, ship, deploy, DMG, notarization, GitHub release, update feed, version bump, signing, Windows/macOS build coordination, or release readiness checks. Enforces two hard gates, DMG content verification, notarization, and canonical update-feed publication.
 ---
 
 # Release Process
 
-This skill covers distribution work. Treat releases as scripted operations with explicit gates, not as ad hoc shell sessions.
+This skill is Codex's release-manager guardrail for Ritemark Native. It was adapted from `.claude/agents/release-manager.md` and `.claude/skills/release/SKILL.md`. Do not modify `.claude/**` when using it.
 
-## Mandatory Release Metadata Rule
+## Prime Directive
 
-A release is not complete when binaries are uploaded. It is complete only when the canonical update feed / release metadata has also been regenerated and published.
+Never describe a release or DMG as ready unless both gates are cleared:
 
-Apply this to both:
+| Gate | Cleared By | Blocks |
+| --- | --- | --- |
+| Gate 1 Technical | automated checks, signed/notarized arm64 DMG, mounted DMG hard checks | tag push and CI fan-out |
+| Gate 2 Human | Jarmo explicitly says tested locally / approved / ship it | GitHub release and update publication |
 
-- full app releases
-- extension-only releases
+If a gate is open, say `RELEASE BLOCKED` and name the missing item.
 
-Use the current contract in:
+## Start Every Release Discussion
 
-- `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`
-
-## Start Here
-
-From repo root:
+Run or require these before version bumps, tags, DMG distribution, GitHub release, or upload:
 
 ```bash
+gh release list --repo jarmo-productory/ritemark-public --limit 10
 ./scripts/release-preflight.sh
 ```
 
-Do not proceed to version bumps, tags, build, or upload steps until preflight passes.
+Report latest existing release, next valid version, preflight status, blockers, and warnings. Never suggest or reuse a version that already exists.
 
-## Choose Release Type
+## Full Release Workflow
 
-- Full release: VS Code core changes, branding changes, patch changes, or app bundle distribution.
-- Extension-only release: only extension/webview code changes, distributed via update manifest and release artifacts.
+Use this for VS Code core changes, `patches/vscode`, branding, app bundle changes, or any app installer/DMG distribution.
 
-## Common Commands
-
-Full release:
+1. Preflight: `./scripts/release-preflight.sh` must pass.
+2. Version bump commit: update `branding/product.json` and `extensions/ritemark/package.json`, commit, push. Do not tag yet.
+3. Build local arm64 only: `./scripts/build-prod.sh`.
+4. Sign, DMG, notarize arm64:
 
 ```bash
-./scripts/build-prod.sh
-./scripts/build-prod.sh darwin-x64
+./scripts/codesign-app.sh
 ./scripts/create-dmg.sh
-./scripts/create-dmg.sh x64
 ./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg
 ./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg
 ```
 
-Extension-only release:
+5. Mount the DMG and run content hard checks against the mounted app.
+6. Generate `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.
+7. Gate 1: stop and ask Jarmo to install and test the notarized arm64 DMG. Do not push the tag until he explicitly approves.
+8. Switch repo private, tag, push tag. This triggers x64 macOS and Windows CI.
+9. Download x64 artifact from CI, sign, DMG, notarize, verify.
+10. Gate 2: Jarmo tests x64 DMG and Windows installer.
+11. Create GitHub release and publish canonical update feed together.
+12. Switch repo public and recommend product-marketer handoff unless user says to skip.
 
-```bash
-./scripts/create-extension-release.sh X.Y.Z-ext.N
+## DMG Rules
+
+- Use the project scripts. Do not hand-roll or patch around release packaging unless Jarmo explicitly asks.
+- `./scripts/create-dmg.sh` is packaging only. A release-candidate DMG still needs signing, notarization, verification, and mounted-content checks.
+- Notarize the DMG, not the `.app`.
+- If `create-dmg` fails with `/Volumes/... Operation not permitted`, block and report it. Do not silently use `--sandbox-safe`, a plain `hdiutil` fallback, or a non-standard DMG layout.
+- Do not call an unsigned, unnotarized, sandbox-safe, or locally hacked DMG “ready”.
+
+## DMG Hard Checks
+
+Mount the DMG and verify the mounted `Ritemark.app`, not only the source app bundle:
+
+- `Contents/Resources/app/extensions/ritemark` exists.
+- `media/webview.js` is greater than 500 KB.
+- `out/extension.js` and `out/ritemarkEditor.js` exist and are non-trivial.
+- `extensions/ritemark/node_modules` exists and has runtime dependencies; do not strip it.
+- `product.json` contains the target `ritemarkVersion`. Do not use `Info.plist CFBundleShortVersionString` as Ritemark version; it is the VS Code base version.
+- App and DMG signatures are Developer ID signed, not ad hoc.
+- App bundle timestamps are recent, not 1980.
+
+If any hard check fails, the DMG is broken and the release is blocked.
+
+## Update Feed Requirement
+
+Every release must regenerate, verify, and publish canonical update metadata with the shipped assets. This applies to full releases and extension-only releases.
+
+Contract: `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`.
+
+Binaries without matching update feed metadata are not a complete release.
+
+## Extension-Only Release
+
+Use only when changes are confined to `extensions/ritemark/`.
+
+1. Bump `extensions/ritemark/package.json` to `X.Y.Z-ext.N`.
+2. Build extension and webview.
+3. Package `.vsix`.
+4. Verify bundle integrity and `minimumAppVersion`.
+5. Gate 1: Jarmo tests on a current Ritemark install.
+6. GitHub release with `.vsix` and extension-only update metadata.
+
+## Platform Rules
+
+- arm64 macOS builds locally on Apple Silicon.
+- x64 macOS comes from GitHub Actions; never cross-compile x64 from arm64.
+- Windows comes from GitHub Actions. Before pushing a release tag, switch `ProductoryHQ/ritemark-native` private because larger Windows runners are not available on public repos. Switch back after CI finishes.
+- Push the version commit before pushing the tag.
+
+## Blocking Output
+
+Use this shape when blocking:
+
+```text
+RELEASE BLOCKED
+Gate: Pre-flight | Gate 1 | Gate 2 | Update feed | DMG verification
+Reason: ...
+Fix: ...
 ```
-
-## Rules
-
-1. Report preflight status before discussing release readiness.
-2. For macOS distribution, notarize the DMG, not the `.app`.
-3. Verify notarization before upload.
-4. Keep release notes and versioned docs under `docs/releases/`.
-5. Regenerate and publish canonical update feed / metadata for every release.
-6. For extension-only releases, verify `minimumAppVersion` is correct before upload.
-7. Block the release if assets and feed metadata are out of sync.
 
 ## Deep References
 
-- `docs/development/release-process/NOTARIZATION.md`
+Read these only when details are needed:
+
 - `.claude/agents/release-manager.md`
+- `.claude/skills/release/SKILL.md`
+- `docs/development/release-process/NOTARIZATION.md`
 - `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`
 - `docs/development/analysis/2026-02-03-multi-platform-build.md`

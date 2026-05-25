@@ -64,6 +64,17 @@ Some users can use GitHub Copilot Business or Enterprise through Microsoft/GitHu
 
 See [research/copilot-support-audit.md](research/copilot-support-audit.md).
 
+Regression follow-up on 2026-05-24:
+
+- See [research/prod-copilot-chat-regression-2026-05-24.md](research/prod-copilot-chat-regression-2026-05-24.md).
+- Production macOS `1.7.1` contains the expected Copilot product metadata and the Marketplace-installed `github.copilot-chat` extension activates.
+- The active production profile had stale workspace state hiding `workbench.panel.chat.view.copilot`, so Copilot Chat could be installed and active without a visible Chat surface.
+- The same profile had `workbench.panel.chat` cached in the auxiliary bar as unpinned/hidden, explaining why the sign-in panel could appear briefly in a new window and then be removed.
+- The narrow Sprint 71 setup replacement registered setup commands but did not run the install-state/layout-state repair that full `ChatSetupContribution` used to perform.
+- Follow-up UI validation confirmed Chat could be visible without the intended primary Activity Bar entry. The fix now moves and pins the real `workbench.panel.chat` container to the Activity Bar when Marketplace Copilot Chat is installed and enabled.
+- A post-closeout patch edit also removed the `chatParticipant.contribution.ts` hunk that kept the Chat container non-default in clean production patch application.
+- A corrected macOS arm64 production build was produced on 2026-05-24. A later sandbox-safe DMG attempt is not a release candidate because it bypassed the repository release-manager protocol; a proper DMG must follow the signed/notarized release workflow.
+
 Short version:
 
 - Production builds currently remove `extensions/copilot`.
@@ -72,7 +83,7 @@ Short version:
 - `branding/product.json` / generated `vscode/product.json` currently do not define `defaultChatAgent` or trusted auth access for `github.copilot-chat`.
 - Patch 003 disables upstream chat view registration, status bar entry, and several chat/menu surfaces.
 - Patch 007 disables VS Code 1.117's `ChatSetupContribution` / `ChatTeardownContribution` because they leaked a "Chat Debug" activity bar item.
-- Build CSS has a belt-and-suspenders rule hiding `workbench-panel-chat` and `copilot-chat` activity bar items.
+- Build CSS has a belt-and-suspenders rule hiding Copilot's debug-only `copilot-chat` Activity Bar container. The user-facing Chat entry is the core `workbench.panel.chat` container.
 - Copilot Chat 0.45.0 contributes many proposed APIs, chat participants, tools, prompt files, chat sessions, and activity bar debug views. This cannot be treated as a simple inline-completion extension.
 - Normal Copilot Chat appears to depend on the core VS Code Chat view (`workbench.panel.chat.view.copilot`), not the Copilot extension's debug-only `copilot-chat` Activity Bar container.
 - Recommended minimum restore is the core Chat view registration in `chatParticipant.contribution.ts`, while keeping Chat setup/status/titlebar/command-center contributions suppressed.
@@ -113,6 +124,7 @@ Short version:
 - [x] Verify Copilot does not overwrite `ritemark-ai` or `ritemark.unifiedView`.
 - [x] Allow Copilot Activity Bar access only when the Copilot extension is installed.
 - [x] Allow Copilot Chat to live beside Ritemark AI in Auxiliary Bar/Activity Bar if it does not hide or replace Ritemark AI.
+- [x] Pin the real `workbench.panel.chat` container to the primary Activity Bar for Marketplace-installed Copilot Chat.
 - [x] Gate or remove production CSS that hides the intended `workbench-panel-chat` surface when Copilot support is enabled.
 - [x] Keep Copilot debug containers hidden unless their debug settings are explicitly enabled.
 - [x] Prevent VS Code's builtin chat enablement migration from disabling Marketplace-installed Copilot Chat when Ritemark suppresses ChatSetupContribution.
@@ -188,7 +200,7 @@ References:
 
 ## Status
 
-**Track:** Closed
-**Current phase:** Closed on 2026-05-23
-**Branch:** `codex/sprint-71-github-copilot-support`  
+**Track:** Reopened for production regression follow-up
+**Current phase:** Regression fix/audit on 2026-05-24
+**Branch:** `codex/sprint-71-github-copilot-regression-audit`
 **Worktree:** `/Users/jarmotuisk/Projects/ritemark-native`
