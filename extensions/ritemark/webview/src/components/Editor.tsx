@@ -17,6 +17,8 @@ import { createTurndownService } from '../utils/turndownService'
 import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
+import { FileLinkSuggestions } from '../extensions/FileLinkSuggestions'
+import { HeadingLevelShortcuts } from '../extensions/HeadingLevelShortcuts'
 import { SearchExtension } from '../extensions/SearchExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
@@ -24,6 +26,7 @@ import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { TableOverlayControls } from './TableOverlayControls'
 import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
+import { classifyLinkTarget } from '../lib/linkTargets'
 
 // Initialize Turndown for HTML to Markdown conversion.
 // Base config + GFM plugins + pipe-escape rule live in utils/turndownService;
@@ -373,6 +376,10 @@ export function Editor({
           },
         },
       }),
+      // Sprint 72 R4/R5: makes Mod-Alt-1..6 work from any cursor position
+      // including the TOC click landing boundary. Must come after StarterKit
+      // so this binding gets the first dispatch chance.
+      HeadingLevelShortcuts,
       CodeBlockWithCopyExtension.configure({
         lowlight,
         defaultLanguage: 'plaintext',
@@ -415,7 +422,17 @@ export function Editor({
           class: 'tiptap-link',
         },
         validate: (url) => {
-          return url.startsWith('https://') || url.startsWith('http://')
+          const target = classifyLinkTarget(url)
+          // Allow external URLs, in-workspace relative paths, and same-document
+          // anchor links (`#section`). Anchor links are valid Markdown and
+          // shouldn't be stripped by the TipTap Link extension — Sprint 72
+          // separated them out from `internal` so Cmd-click doesn't try to
+          // resolve them as files, but they're still legitimate link targets.
+          return (
+            target.kind === 'external' ||
+            target.kind === 'internal' ||
+            target.kind === 'anchor'
+          )
         },
         onLinkClick: (href) => {
           setExternalLinkEdit({ url: href })
@@ -424,6 +441,7 @@ export function Editor({
       ...tableExtensions,
       ImageExtension,
       SlashCommands,
+      FileLinkSuggestions,
       SearchExtension,
       GlobalDragHandle.configure({
         dragHandleWidth: 24,

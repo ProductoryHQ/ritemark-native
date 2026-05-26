@@ -37,6 +37,7 @@ const { PostHog } = require('posthog-node') as {
       host: string;
       flushAt: number;
       flushInterval: number;
+      disableGeoip?: boolean;
     }
   ) => AnalyticsClient;
 };
@@ -81,6 +82,10 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
     host: config.host,
     flushAt: 1,
     flushInterval: 0,
+    // posthog-node defaults disableGeoip=true (server-SDK assumption). Ritemark
+    // runs on the user's machine, so the request IP is the user's real IP and
+    // GeoIP should be enabled for country/city analytics.
+    disableGeoip: false,
   });
 
   client.on('error', (error) => {
