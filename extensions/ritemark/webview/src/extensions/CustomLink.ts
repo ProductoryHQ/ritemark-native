@@ -10,7 +10,8 @@
 
 import Link, { type LinkOptions } from '@tiptap/extension-link'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { openExternalUrl } from '../bridge'
+import { openExternalUrl, openInternalLink } from '../bridge'
+import { canOpenExternally, classifyLinkTarget } from '../lib/linkTargets'
 
 export interface CustomLinkOptions extends Partial<LinkOptions> {
   /**
@@ -18,6 +19,14 @@ export interface CustomLinkOptions extends Partial<LinkOptions> {
    * Used to open the link edit dialog
    */
   onLinkClick?: (href: string) => void
+
+  /**
+   * Sprint 72 R7: callback when the user modifier-clicks an internal link.
+   * Should hand off to the extension host so the target file is opened
+   * (Ritemark for Markdown, VS Code default opener otherwise). When
+   * undefined, the default `openInternalLink` bridge helper is used.
+   */
+  onInternalLinkActivate?: (href: string) => void
 }
 
 export const CustomLink = Link.extend<CustomLinkOptions>({
@@ -26,12 +35,13 @@ export const CustomLink = Link.extend<CustomLinkOptions>({
       ...this.parent?.(),
       openOnClick: false, // We handle clicks ourselves
       onLinkClick: undefined,
+      onInternalLinkActivate: undefined,
     }
   },
 
   addProseMirrorPlugins() {
     const plugins = this.parent?.() || []
-    const { onLinkClick } = this.options
+    const { onLinkClick, onInternalLinkActivate } = this.options
 
     const linkClickHandler = new Plugin({
       key: new PluginKey('customLinkClickHandler'),
@@ -50,9 +60,30 @@ export const CustomLink = Link.extend<CustomLinkOptions>({
             event.preventDefault()
             event.stopPropagation()
 
-            // Cmd+click (Mac) or Ctrl+click (Windows/Linux) opens in browser
+            // Cmd+click (Mac) or Ctrl+click (Windows/Linux):
+            //   external → open in default browser
+            //   internal → ask extension host to open the target file (R7)
             if (event.metaKey || event.ctrlKey) {
-              openExternalUrl(href)
+              if (canOpenExternally(href)) {
+                openExternalUrl(href)
+                return true
+              }
+
+              const target = classifyLinkTarget(href)
+              if (target.kind === 'internal') {
+                if (onInternalLinkActivate) {
+                  onInternalLinkActivate(target.href)
+                } else {
+                  openInternalLink(target.href)
+                }
+                return true
+              }
+
+              // Empty / dangerous → fall through to edit dialog so the
+              // user can see and fix the link.
+              if (onLinkClick) {
+                onLinkClick(href)
+              }
               return true
             }
 

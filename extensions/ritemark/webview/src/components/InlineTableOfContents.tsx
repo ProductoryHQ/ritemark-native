@@ -1,7 +1,18 @@
 import type React from 'react'
+import { useCallback, useRef } from 'react'
 import type { Editor } from '@tiptap/react'
-import { scrollToHeading } from '../lib/headingUtils'
-import type { Heading } from '../lib/headingUtils'
+import { scrollToHeading, setHeadingLevel } from '../lib/headingUtils'
+import type { Heading, HeadingLevel } from '../lib/headingUtils'
+import { isMac } from '../hooks/usePlatform'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from './ui/context-menu'
 
 export const INLINE_TOC_WIDTH = 220
 
@@ -90,7 +101,34 @@ function getItemStyle(
   }
 }
 
+const SHORTCUT_LABEL = isMac ? '⌥⌘' : 'Ctrl+Alt+'
+
 export function InlineTableOfContents({ editor, headings, activeHeadingPos }: Props) {
+  const itemsRef = useRef<Array<HTMLButtonElement | null>>([])
+
+  const handleHeadingLevel = useCallback(
+    (pos: number, level: HeadingLevel) => {
+      setHeadingLevel(editor, pos, level)
+    },
+    [editor]
+  )
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, pos: number) => {
+      // Sprint 72 R4/R5: Cmd/Ctrl+Alt+1-6 changes the heading level of the
+      // focused TOC row without leaving the row.
+      if (event.altKey && (isMac ? event.metaKey : event.ctrlKey)) {
+        const digit = event.key
+        if (digit >= '1' && digit <= '6') {
+          event.preventDefault()
+          const level = Number(digit) as HeadingLevel
+          setHeadingLevel(editor, pos, level)
+        }
+      }
+    },
+    [editor]
+  )
+
   if (headings.length < 2) return null
 
   return (
@@ -133,22 +171,48 @@ export function InlineTableOfContents({ editor, headings, activeHeadingPos }: Pr
         const isActive = heading.pos === activeHeadingPos
         const restingBg = isActive ? 'var(--vscode-sideBar-background)' : 'transparent'
         return (
-          <button
-            key={`${heading.pos}-${i}`}
-            aria-current={isActive ? 'true' : undefined}
-            title={heading.text}
-            onClick={() => scrollToHeading(editor, heading.pos)}
-            style={getItemStyle(heading, isActive)}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.background =
-                'var(--vscode-sideBar-background)'
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.background = restingBg
-            }}
-          >
-            {heading.text}
-          </button>
+          <ContextMenu key={`${heading.pos}-${i}`}>
+            <ContextMenuTrigger asChild>
+              <button
+                ref={(el) => {
+                  itemsRef.current[i] = el
+                }}
+                aria-current={isActive ? 'true' : undefined}
+                title={heading.text}
+                onClick={() => scrollToHeading(editor, heading.pos)}
+                onKeyDown={(event) => handleKeyDown(event, heading.pos)}
+                style={getItemStyle(heading, isActive)}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLButtonElement).style.background =
+                    'var(--vscode-sideBar-background)'
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLButtonElement).style.background = restingBg
+                }}
+              >
+                {heading.text}
+              </button>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuLabel>Change heading level</ContextMenuLabel>
+              <ContextMenuSeparator />
+              {([1, 2, 3, 4, 5, 6] as HeadingLevel[]).map((level) => {
+                const isCurrent = heading.level === level
+                return (
+                  <ContextMenuItem
+                    key={level}
+                    disabled={isCurrent}
+                    onSelect={() => handleHeadingLevel(heading.pos, level)}
+                  >
+                    <span>H{level}</span>
+                    <ContextMenuShortcut>
+                      {`${SHORTCUT_LABEL}${level}`}
+                    </ContextMenuShortcut>
+                  </ContextMenuItem>
+                )
+              })}
+            </ContextMenuContent>
+          </ContextMenu>
         )
       })}
     </nav>

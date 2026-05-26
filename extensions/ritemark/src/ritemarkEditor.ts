@@ -11,10 +11,25 @@ import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
 import { writeImageRelativeTo } from './utils/imageWriter';
 import { trackEvent } from './analytics/posthog';
+import { resolveInternalLinkTarget, isMarkdownFile } from './internalLinkResolver';
+import {
+  buildWorkspaceFileLinkResult,
+  isSearchableFile,
+  shouldSkipWorkspacePath,
+  sortWorkspaceFileResults,
+  type WorkspaceFileLinkResult,
+} from './workspaceFileLinks';
 
 // Properties type for front-matter
 export interface DocumentProperties {
   [key: string]: unknown;
+}
+
+interface SearchWorkspaceFilesMessage {
+  type: 'searchWorkspaceFiles';
+  requestId?: string;
+  query?: string;
+  limit?: number;
 }
 
 function buildCsvTemplate(columns = 10, rows = 20): string {
@@ -218,6 +233,204 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     return imageMappings;
   }
 
+  private async handleSearchWorkspaceFiles(
+    document: vscode.TextDocument,
+    webview: vscode.Webview,
+    message: SearchWorkspaceFilesMessage
+  ): Promise<void> {
+    const requestId = typeof message.requestId === 'string' ? message.requestId : '';
+    const query = typeof message.query === 'string' ? message.query : '';
+    const limit = Math.max(1, Math.min(50, Number(message.limit) || 20));
+
+    if (document.isUntitled || document.uri.scheme !== 'file' || !document.uri.fsPath) {
+      void webview.postMessage({
+        type: 'workspaceFileSearchResults',
+        requestId,
+        results: [],
+        unavailableReason: 'Save this document before linking local files.',
+      });
+      return;
+    }
+
+    try {
+      const results = await this.searchWorkspaceFiles(document.uri.fsPath, query, limit);
+      void webview.postMessage({
+        type: 'workspaceFileSearchResults',
+        requestId,
+        results,
+      });
+    } catch (error) {
+      console.warn('[Ritemark] Workspace file search failed:', error);
+      void webview.postMessage({
+        type: 'workspaceFileSearchResults',
+        requestId,
+        results: [],
+        unavailableReason: 'File search is unavailable right now.',
+      });
+    }
+  }
+
+  private async searchWorkspaceFiles(
+    documentPath: string,
+    query: string,
+    limit: number
+  ): Promise<WorkspaceFileLinkResult[]> {
+    const candidates: WorkspaceFileLinkResult[] = [];
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+
+    if (workspaceFolders.length > 0) {
+      const uris = await vscode.workspace.findFiles(
+        '**/*',
+        '{**/.git/**,**/node_modules/**,**/dist/**,**/out/**,**/build/**,**/.next/**,**/.turbo/**,**/coverage/**,**/VSCode-*/**,**/*.app/**}',
+        1200
+      );
+
+      for (const uri of uris) {
+        if (uri.scheme !== 'file') continue;
+        const filePath = uri.fsPath;
+        if (filePath === documentPath) continue;
+        if (!isSearchableFile(filePath) || shouldSkipWorkspacePath(filePath)) continue;
+
+        const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath;
+        candidates.push(buildWorkspaceFileLinkResult(documentPath, filePath, workspaceRoot));
+      }
+    } else {
+      candidates.push(...this.findNearbyFiles(path.dirname(documentPath), documentPath, 1200));
+    }
+
+    return sortWorkspaceFileResults(candidates, query).slice(0, limit);
+  }
+
+  private findNearbyFiles(
+    rootDir: string,
+    documentPath: string,
+    maxFiles: number
+  ): WorkspaceFileLinkResult[] {
+    const results: WorkspaceFileLinkResult[] = [];
+    const stack = [rootDir];
+
+    while (stack.length > 0 && results.length < maxFiles) {
+      const currentDir = stack.pop();
+      if (!currentDir || shouldSkipWorkspacePath(currentDir)) continue;
+
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(currentDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+
+      for (const entry of entries) {
+        const filePath = path.join(currentDir, entry.name);
+        if (shouldSkipWorkspacePath(filePath)) continue;
+
+        if (entry.isDirectory()) {
+          stack.push(filePath);
+          continue;
+        }
+
+        if (!entry.isFile() || filePath === documentPath || !isSearchableFile(filePath)) {
+          continue;
+        }
+
+        results.push(buildWorkspaceFileLinkResult(documentPath, filePath, rootDir));
+        if (results.length >= maxFiles) break;
+      }
+    }
+
+    return results;
+  }
+
+  private openSafeExternalTarget(rawUrl: unknown): void {
+    if (typeof rawUrl !== 'string') return;
+
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return;
+
+    let externalUrl = trimmed;
+    if (/^https?:\/\//i.test(trimmed)) {
+      externalUrl = trimmed.replace(/^HTTPS?:\/\//i, match => match.toLowerCase());
+    } else if (/^[^\s@/]+\.[^\s@/]+/.test(trimmed) && !trimmed.includes('/') && !trimmed.startsWith('.')) {
+      externalUrl = `https://${trimmed}`;
+    } else {
+      return;
+    }
+
+    try {
+      const parsed = vscode.Uri.parse(externalUrl);
+      if (parsed.scheme === 'http' || parsed.scheme === 'https') {
+        void vscode.env.openExternal(parsed);
+      }
+    } catch {
+      // Ignore malformed external targets. Relative document links are handled in-editor.
+    }
+  }
+
+  /**
+   * Sprint 72 R7: open the file pointed to by an internal Markdown link.
+   *
+   * The webview posts this when the user Cmd/Ctrl-clicks a link whose
+   * `classifyLinkTarget(href).kind === 'internal'`. We resolve the target
+   * relative to the sending document, validate workspace containment via
+   * `resolveInternalLinkTarget`, and either open the file or surface a
+   * non-blocking notification.
+   */
+  private async openInternalLink(document: vscode.TextDocument, rawHref: unknown): Promise<void> {
+    if (typeof rawHref !== 'string') return;
+    const href = rawHref.trim();
+    if (!href) return;
+    if (document.uri.scheme !== 'file') {
+      // We can only resolve relative paths against on-disk documents.
+      void vscode.window.showWarningMessage(
+        'Save this document to disk before following internal links.'
+      );
+      return;
+    }
+
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    const result = await resolveInternalLinkTarget({
+      documentPath: document.uri.fsPath,
+      href,
+      workspaceFolderPath: workspaceFolder?.uri.fsPath,
+    });
+
+    if (result.rejection === 'out-of-workspace') {
+      const scope = result.containmentScope === 'workspace' ? 'workspace' : 'current document folder';
+      void vscode.window.showWarningMessage(
+        `Link target is outside the ${scope}: ${href}`
+      );
+      return;
+    }
+
+    if (result.rejection === 'not-found') {
+      void vscode.window.showInformationMessage(`File not found: ${href}`);
+      return;
+    }
+
+    const targetUri = vscode.Uri.file(result.realPath);
+    try {
+      if (isMarkdownFile(result.realPath)) {
+        // Dispatch through Ritemark's custom editor so navigation feels
+        // continuous within the app. The viewType (`ritemark.editor`)
+        // matches the registration in `package.json` — using anything
+        // else (e.g. `ritemark.markdownEditor`) silently falls back to
+        // VS Code's default text editor.
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          targetUri,
+          'ritemark.editor'
+        );
+      } else {
+        // Defer to VS Code's default opener for everything else.
+        await vscode.commands.executeCommand('vscode.open', targetUri);
+      }
+    } catch (err) {
+      void vscode.window.showErrorMessage(
+        `Could not open ${href}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
   async resolveCustomTextEditor(
     document: vscode.TextDocument,
     webviewPanel: vscode.WebviewPanel,
@@ -303,6 +516,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             // Store file load time for conflict detection
             this.updateFileLoadTime(document.uri.fsPath);
             webview.postMessage(this.buildLoadMessage(document, webview));
+            return;
+
+          case 'searchWorkspaceFiles':
+            void this.handleSearchWorkspaceFiles(document, webview, message as SearchWorkspaceFilesMessage);
             return;
 
           case 'contentChanged': {
@@ -502,12 +719,17 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             return;
 
           case 'openExternal':
-            // Open URL in external browser
-            if (message.url) {
-              const url = message.url as string;
-              // Ensure URL has protocol
-              const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-              vscode.env.openExternal(vscode.Uri.parse(fullUrl));
+            // Open only explicit external browser targets.
+            this.openSafeExternalTarget(message.url);
+            return;
+
+          case 'openInternalLink':
+            // Sprint 72 R7: Cmd/Ctrl-click on an internal Markdown link.
+            // Resolve relative to this document, enforce workspace
+            // containment, and dispatch to Ritemark (for .md) or VS Code's
+            // default opener (everything else).
+            if (typeof message.href === 'string') {
+              void this.openInternalLink(document, message.href);
             }
             return;
 

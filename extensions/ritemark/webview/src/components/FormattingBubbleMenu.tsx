@@ -4,7 +4,12 @@ import { Icon } from './ui/Icon'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
 import { modKey } from '@/hooks/usePlatform'
-import { openExternalUrl } from '../bridge'
+import { openExternalUrl, openInternalLink } from '../bridge'
+import { classifyLinkTarget } from '../lib/linkTargets'
+import {
+  requestWorkspaceFileSearch,
+  type WorkspaceFileLinkResult,
+} from '../lib/workspaceFileSearch'
 
 /**
  * FormattingBubbleMenu Component
@@ -24,53 +29,6 @@ interface FormattingBubbleMenuProps {
   onExternalLinkEditDone?: () => void
 }
 
-/**
- * Normalizes URLs by auto-prepending https:// if no protocol is present.
- * Converts protocol to lowercase for TipTap Link validator compatibility.
- *
- * @param url - Raw URL input from user
- * @returns Normalized URL with protocol, or empty string if input was empty
- *
- * @example
- * normalizeUrl('example.com') // Returns: 'https://example.com'
- * normalizeUrl('https://example.com') // Returns: 'https://example.com' (unchanged)
- * normalizeUrl('HTTPS://example.com') // Returns: 'https://example.com' (protocol lowercased)
- */
-function normalizeUrl(url: string): string {
-  const trimmed = url.trim()
-  if (!trimmed) return ''
-
-  // Auto-add https:// if no protocol
-  if (!/^https?:\/\//i.test(trimmed)) {
-    return `https://${trimmed}`
-  }
-
-  // Convert protocol to lowercase for TipTap Link validator
-  return trimmed.replace(/^HTTPS?:\/\//i, (match) => match.toLowerCase())
-}
-
-/**
- * Validates URL format using native URL() constructor.
- * Only allows http:// and https:// protocols for security.
- *
- * @param url - URL to validate (will be normalized before validation)
- * @returns true if URL is valid and uses http/https protocol
- *
- * @example
- * isValidUrl('example.com') // true (after normalization)
- * isValidUrl('not a url') // false
- * isValidUrl('ftp://example.com') // false (unsupported protocol)
- */
-function isValidUrl(url: string): boolean {
-  try {
-    const normalized = normalizeUrl(url)
-    const urlObj = new URL(normalized)
-    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
 export function FormattingBubbleMenu({
   editor,
   externalLinkEdit,
@@ -80,7 +38,12 @@ export function FormattingBubbleMenu({
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [urlError, setUrlError] = useState('')
+  const [fileSearchResults, setFileSearchResults] = useState<WorkspaceFileLinkResult[]>([])
+  const [fileSearchReason, setFileSearchReason] = useState('')
+  const [fileSearchLoading, setFileSearchLoading] = useState(false)
+  const [selectedFileIndex, setSelectedFileIndex] = useState(0)
   const linkInputRef = useRef<HTMLInputElement>(null)
+  const isFileSearchMode = linkUrl.trim().startsWith('@')
 
   // Handle external link edit trigger (from clicking a link in the editor)
   useEffect(() => {
@@ -98,6 +61,35 @@ export function FormattingBubbleMenu({
       setTimeout(() => linkInputRef.current?.focus(), 100)
     }
   }, [showLinkDialog])
+
+  useEffect(() => {
+    if (!showLinkDialog || !isFileSearchMode) {
+      setFileSearchResults([])
+      setFileSearchReason('')
+      setFileSearchLoading(false)
+      setSelectedFileIndex(0)
+      return
+    }
+
+    let cancelled = false
+    const query = linkUrl.trim().slice(1)
+    setFileSearchLoading(true)
+
+    const timer = setTimeout(() => {
+      requestWorkspaceFileSearch(query, 20).then((response) => {
+        if (cancelled) return
+        setFileSearchResults(response.results)
+        setFileSearchReason(response.unavailableReason ?? '')
+        setSelectedFileIndex(0)
+        setFileSearchLoading(false)
+      })
+    }, 150)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [showLinkDialog, isFileSearchMode, linkUrl])
 
   // Global keyboard shortcut handler for Cmd+K / Ctrl+K (link dialog)
   useEffect(() => {
@@ -136,20 +128,20 @@ export function FormattingBubbleMenu({
    */
   const handleSetLink = () => {
     if (!linkUrl.trim()) {
-      setUrlError('Please enter a URL')
+      setUrlError('Please enter a URL or local file path')
       return
     }
 
-    const normalized = normalizeUrl(linkUrl)
-    if (!isValidUrl(linkUrl)) {
-      setUrlError('Please enter a valid URL (e.g., example.com or https://example.com)')
+    const target = classifyLinkTarget(linkUrl)
+    if (target.kind === 'dangerous' || target.kind === 'empty') {
+      setUrlError('Please enter a valid web URL or relative file path')
       return
     }
 
     const success = editor
       .chain()
       .focus()
-      .setLink({ href: normalized })
+      .setLink({ href: target.href })
       .run()
 
     if (success) {
@@ -179,6 +171,41 @@ export function FormattingBubbleMenu({
     setLinkUrl(previousUrl || '')
     setUrlError('')
     setShowLinkDialog(true)
+  }
+
+  const selectFileSearchResult = (result: WorkspaceFileLinkResult) => {
+    setLinkUrl(result.relativePath)
+    setUrlError('')
+    setFileSearchResults([])
+    setFileSearchReason('')
+    linkInputRef.current?.focus()
+  }
+
+  const handleLinkInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isFileSearchMode) {
+      if (e.key === 'ArrowDown' && fileSearchResults.length > 0) {
+        e.preventDefault()
+        setSelectedFileIndex((selectedFileIndex + 1) % fileSearchResults.length)
+        return
+      }
+
+      if (e.key === 'ArrowUp' && fileSearchResults.length > 0) {
+        e.preventDefault()
+        setSelectedFileIndex((selectedFileIndex + fileSearchResults.length - 1) % fileSearchResults.length)
+        return
+      }
+
+      if (e.key === 'Enter' && fileSearchResults[selectedFileIndex]) {
+        e.preventDefault()
+        selectFileSearchResult(fileSearchResults[selectedFileIndex])
+        return
+      }
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSetLink()
+    }
   }
 
   return (
@@ -359,39 +386,85 @@ export function FormattingBubbleMenu({
                 <div className="flex gap-2">
                   <input
                     ref={linkInputRef}
-                    type="url"
+                    type="text"
                     value={linkUrl}
                     onChange={(e) => {
                       setLinkUrl(e.target.value)
                       setUrlError('') // Clear validation error while user types
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleSetLink() // Submit on Enter key
-                      }
-                    }}
-                    placeholder="example.com or https://example.com"
+                    onKeyDown={handleLinkInputKeyDown}
+                    placeholder="example.com, https://example.com, or @file"
                     className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  {/* Open in browser button - only shown when URL exists */}
-                  {linkUrl && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
-                        openExternalUrl(url)
-                      }}
-                      className="px-3 py-2 border rounded text-ink-muted hover:text-ink-strong hover:bg-surface-muted transition-colors"
-                      title={`Open in browser (${modKey}+click also works)`}
-                    >
-                      <Icon name="arrow-square-out" size={16} />
-                    </button>
-                  )}
+                  {/*
+                    Open-target icon — Sprint 72 R7 follow-up. Same affordance
+                    for both external URLs and internal relative paths so
+                    `Cmd+click` is not the only way to follow a link from the
+                    dialog. Hidden while the user is typing an `@search`
+                    query because that text is not yet a real target.
+                  */}
+                  {linkUrl && !isFileSearchMode && (() => {
+                    const target = classifyLinkTarget(linkUrl)
+                    if (target.kind === 'dangerous' || target.kind === 'empty') return null
+                    const isExternal = target.kind === 'external'
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isExternal) {
+                            openExternalUrl(target.href)
+                          } else {
+                            openInternalLink(target.href)
+                          }
+                          setShowLinkDialog(false)
+                        }}
+                        className="px-3 py-2 border rounded text-ink-muted hover:text-ink-strong hover:bg-surface-muted transition-colors"
+                        title={
+                          isExternal
+                            ? `Open in browser (${modKey}+click also works)`
+                            : `Open file (${modKey}+click also works)`
+                        }
+                      >
+                        <Icon name="arrow-square-out" size={16} />
+                      </button>
+                    )
+                  })()}
                 </div>
                 {/* Inline validation error message */}
                 {urlError && (
                   <p className="text-sm text-ritemark-error mt-1">{urlError}</p>
+                )}
+                {isFileSearchMode && (
+                  <div className="mt-2 rounded border border-hairline-strong bg-white shadow-sm max-h-56 overflow-y-auto">
+                    {fileSearchLoading ? (
+                      <div className="px-3 py-2 text-sm text-ink-muted">Searching files...</div>
+                    ) : fileSearchReason ? (
+                      <div className="px-3 py-2 text-sm text-ink-muted">{fileSearchReason}</div>
+                    ) : fileSearchResults.length > 0 ? (
+                      fileSearchResults.map((result, index) => (
+                        <button
+                          key={result.workspacePath}
+                          type="button"
+                          className="w-full px-3 py-2 text-left text-sm border-none bg-transparent hover:bg-surface-soft"
+                          style={{
+                            background: index === selectedFileIndex
+                              ? 'var(--r-surface-soft)'
+                              : 'transparent',
+                          }}
+                          onMouseEnter={() => setSelectedFileIndex(index)}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => selectFileSearchResult(result)}
+                        >
+                          <span className="block font-medium truncate">{result.label}</span>
+                          <span className="block text-xs text-ink-muted truncate">
+                            {result.directory || result.relativePath}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-ink-muted">No matching files</div>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="flex gap-2 justify-end">

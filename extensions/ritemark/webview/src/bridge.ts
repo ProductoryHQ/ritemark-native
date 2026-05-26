@@ -154,3 +154,14 @@ export function onInternalEvent(
 export function openExternalUrl(url: string) {
   sendToExtension('openExternal', { url })
 }
+
+/**
+ * Sprint 72 R7: ask the extension host to navigate to an internal Markdown
+ * link target. The host resolves `href` relative to the current document,
+ * enforces workspace containment, and either opens the file (Ritemark for
+ * Markdown, VS Code default opener for everything else) or surfaces a
+ * non-blocking notification (out-of-workspace / not-found).
+ */
+export function openInternalLink(href: string) {
+  sendToExtension('openInternalLink', { href })
+}
