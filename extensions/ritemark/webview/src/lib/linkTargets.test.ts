@@ -75,4 +75,60 @@ assert.deepEqual(classifyLinkTarget('foo.io'), {
   href: 'https://foo.io',
 });
 
+// Codex review #1 (PR #89 / v1.7.2): hostnames with a path were falling
+// through to the internal-link branch because `looksLikeExternalHost`
+// rejected anything containing a `/`. With R7 internal-link navigation
+// shipping in v1.7.2, that made Cmd-click try to open
+// `example.com/docs/getting-started` as an on-disk file. The host portion
+// is now extracted and tested in isolation.
+assert.deepEqual(classifyLinkTarget('example.com/docs/getting-started'), {
+  kind: 'external',
+  href: 'https://example.com/docs/getting-started',
+});
+assert.deepEqual(classifyLinkTarget('subdomain.example.com/path/to/page'), {
+  kind: 'external',
+  href: 'https://subdomain.example.com/path/to/page',
+});
+assert.equal(canOpenExternally('example.com/docs/getting-started'), true);
+// Single-segment first parts (no `.` in host) are still internal — a path
+// like `not-a-host/file.md` is an in-workspace nested file, not a URL.
+assert.deepEqual(classifyLinkTarget('not-a-host/file.md'), {
+  kind: 'internal',
+  href: 'not-a-host/file.md',
+});
+assert.deepEqual(classifyLinkTarget('path/to/file.md'), {
+  kind: 'internal',
+  href: 'path/to/file.md',
+});
+
+// Codex review #2 (PR #89 / v1.7.2): fragment-only hrefs (`#section`)
+// were classifying as internal, which routed Cmd-click through the R7
+// resolver — it stripped the fragment, resolved an empty path to the
+// document directory, and `vscode.open`'d that directory. Anchor links
+// are now their own kind so consumers can route them separately.
+assert.deepEqual(classifyLinkTarget('#section-two'), {
+  kind: 'anchor',
+  href: '#section-two',
+});
+assert.deepEqual(classifyLinkTarget('#'), {
+  kind: 'anchor',
+  href: '#',
+});
+assert.equal(canOpenExternally('#section-two'), false);
+
+// Self-discovered while fixing the above: an internal file path with a
+// fragment (`plan.md#section`) was mis-classified as an external host
+// because the file-extension check looked at `md#section` (not in
+// KNOWN_FILE_EXTENSIONS) instead of `md`. The fragment / query are now
+// stripped before the extension comparison.
+assert.deepEqual(classifyLinkTarget('plan.md#section'), {
+  kind: 'internal',
+  href: 'plan.md#section',
+});
+assert.equal(canOpenExternally('plan.md#section'), false);
+assert.deepEqual(classifyLinkTarget('docs/plan.md#section'), {
+  kind: 'internal',
+  href: 'docs/plan.md#section',
+});
+
 console.log('linkTargets tests passed');

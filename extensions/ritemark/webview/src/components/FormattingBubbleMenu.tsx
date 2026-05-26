@@ -405,7 +405,11 @@ export function FormattingBubbleMenu({
                   */}
                   {linkUrl && !isFileSearchMode && (() => {
                     const target = classifyLinkTarget(linkUrl)
-                    if (target.kind === 'dangerous' || target.kind === 'empty') return null
+                    // Only external URLs and in-workspace internal paths are
+                    // openable from this dialog. Same-document anchors
+                    // (`#section`), dangerous protocols, and empty targets
+                    // have no "open" action — no icon, no surprise.
+                    if (target.kind !== 'external' && target.kind !== 'internal') return null
                     const isExternal = target.kind === 'external'
                     return (
                       <button

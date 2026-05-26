@@ -423,7 +423,16 @@ export function Editor({
         },
         validate: (url) => {
           const target = classifyLinkTarget(url)
-          return target.kind === 'external' || target.kind === 'internal'
+          // Allow external URLs, in-workspace relative paths, and same-document
+          // anchor links (`#section`). Anchor links are valid Markdown and
+          // shouldn't be stripped by the TipTap Link extension — Sprint 72
+          // separated them out from `internal` so Cmd-click doesn't try to
+          // resolve them as files, but they're still legitimate link targets.
+          return (
+            target.kind === 'external' ||
+            target.kind === 'internal' ||
+            target.kind === 'anchor'
+          )
         },
         onLinkClick: (href) => {
           setExternalLinkEdit({ url: href })

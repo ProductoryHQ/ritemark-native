@@ -63,6 +63,10 @@ export const CustomLink = Link.extend<CustomLinkOptions>({
             // Cmd+click (Mac) or Ctrl+click (Windows/Linux):
             //   external → open in default browser
             //   internal → ask extension host to open the target file (R7)
+            //   anchor   → fall through to the edit dialog for now
+            //              (future: scroll to that heading within the doc)
+            //   empty / dangerous → fall through to edit dialog so the
+            //              user can see and fix the link.
             if (event.metaKey || event.ctrlKey) {
               if (canOpenExternally(href)) {
                 openExternalUrl(href)
@@ -79,8 +83,9 @@ export const CustomLink = Link.extend<CustomLinkOptions>({
                 return true
               }
 
-              // Empty / dangerous → fall through to edit dialog so the
-              // user can see and fix the link.
+              // Anchor (`#section`), empty, or dangerous → don't dispatch a
+              // navigation request, but still hand off to onLinkClick so the
+              // user can edit/inspect the link.
               if (onLinkClick) {
                 onLinkClick(href)
               }
