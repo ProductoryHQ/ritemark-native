@@ -60,6 +60,8 @@ Determine sprint size on entry. **Lightweight track** if ALL hold:
 
 Otherwise → **full 6-phase track**.
 
+For full-track sprints, do a second decision pass: **SDD style or plain full track?** See "Track Decision: SDD vs Plain Full Track" below.
+
 ### Lightweight track
 
 1. **Plan** — `sprint-plan.md` only (goal + checklist + success criteria). No `research/`, no `notes/` subdirectories. Skip the Feature Flag Check section.
@@ -73,6 +75,46 @@ Lightweight skips Phase 4/5/6 ceremony. Most bug fixes go here.
 ### Full 6-phase track
 
 For: net-new features, multi-domain refactors, > 200 LOC, anything that needs a release. Keep all phases below.
+
+## Track Decision: SDD vs Plain Full Track
+
+After Sprint Sizing picks **full track**, decide whether the sprint should be **spec-driven (SDD)** or **plain full track**. SDD ships extra artifacts (`spec.md`, `scenarios.md`, `technical-plan.md`) on top of `sprint-plan.md` + `tasks.md`. The skill that owns the SDD playbook is `.claude/skills/spec-driven-sprint/SKILL.md` — surface a recommendation to the user to pull it.
+
+### Signals (in priority order)
+
+**Signal 1 — explicit user keyword.** Honour these without further heuristic:
+
+| Keywords in user input | Track |
+| --- | --- |
+| `SDD`, `spec-driven`, `spec driven`, requirements numbered as `R1`/`R2`/… | **SDD** |
+| `light track`, `lightweight sprint`, `quick sprint`, `kerge sprint`, `quick fix sprint` | **Plain full track** (or even lightweight if Sprint Sizing already chose it) |
+
+**Signal 2 — auto-detect heuristic.** If no keyword, recommend **SDD** when ANY holds:
+
+- The sprint description lists ≥3 distinct user-facing requirements (numbered list, multiple linked issues, conjunctions splitting scope chunks).
+- Edge-case-heavy domain: path traversal, link/permission/protocol classification, security boundaries, symlink resolution, cross-platform path handling.
+- Multi-component flow: webview ↔ bridge ↔ extension host ↔ filesystem / external command.
+- Mid-sprint scope expansion is likely (an unfinished feature on top of a larger flow, ambiguous-but-large scope).
+
+Otherwise → **plain full track**.
+
+### Output
+
+State the track decision in the first line of `sprint-plan.md`:
+
+```
+Track: SDD (auto-detected: 3 user-facing requirements + path-traversal-class edge cases)
+Override with: "use plain full track" / "use SDD track"
+```
+
+When SDD is chosen, surface this to the user before writing the plan:
+
+```
+Recommend pulling `spec-driven-sprint` skill — this sprint matches the SDD signals (X, Y).
+The skill defines the five-artifact structure (spec / scenarios / technical-plan / tasks / sprint-plan).
+```
+
+The user can override with one sentence. Do NOT silently switch tracks mid-sprint; if a track change is requested after Phase 2, treat it as a documented Mid-Sprint Scope Change Protocol step.
 
 ## The 6-Phase Workflow
 
@@ -160,10 +202,12 @@ Lightweight sprints create only `sprint-plan.md`. Don't pre-create empty `resear
 - [ ] Jarmo approved this sprint plan
 ```
 
-### Full template
+### Full template (plain track)
 
 ```markdown
 # Sprint XX: [Title]
+
+Track: Plain full track
 
 ## Goal
 [One sentence describing the sprint objective]
@@ -203,6 +247,61 @@ Lightweight sprints create only `sprint-plan.md`. Don't pre-create empty `resear
 ## Approval
 - [ ] Jarmo approved this sprint plan
 ```
+
+### SDD template
+
+For sprints where Track Decision selected **SDD**, the sprint directory contains the five SDD artifacts (see `.claude/skills/spec-driven-sprint/SKILL.md`):
+
+```
+docs/development/sprints/sprint-NN-short-name/
+├── sprint-plan.md       # higher-level intent + status + product decisions
+├── spec.md              # behaviour contract (R1, R2, …)
+├── scenarios.md         # BDD-style examples (becomes manual QA matrix)
+├── technical-plan.md    # workstreams, message shapes, helpers
+├── tasks.md             # implementation checklist organised by phase
+└── research/            # audits (audit-first for risky requirements)
+    └── *.md
+```
+
+`sprint-plan.md` for SDD sprints starts:
+
+```markdown
+# Sprint XX: [Title]
+
+Track: SDD
+Branch: sprint-NN-short-name
+Status: Phase X (NAME)
+
+## SDD Artifacts
+- [spec.md](spec.md) — behaviour contract (source of truth)
+- [scenarios.md](scenarios.md) — BDD examples
+- [technical-plan.md](technical-plan.md) — architecture
+- [tasks.md](tasks.md) — implementation tracker
+- [sprint-plan.md](sprint-plan.md) — this file (intent + status)
+
+## Goal
+[One sentence]
+
+## Linked Issues
+- [#NN] Description
+
+## MVP Scope
+[Workstream-level summary; full requirements live in spec.md]
+
+## Product Decisions
+- **YYYY-MM-DD:** [Decision] — [Rationale]
+
+## Success Criteria
+- [ ] [Mirrors spec.md acceptance criteria at high level]
+
+## Pre-Implementation Gate
+[Adversarial review note, if applicable]
+
+## Approval
+- [ ] Jarmo approved this sprint plan
+```
+
+When operating on an SDD sprint, pull `.claude/skills/spec-driven-sprint/SKILL.md` for the playbook (artifact rules, scope-change protocol, audit-first pattern, requirement-ID discipline).
 
 ## Your Responsibilities
 
