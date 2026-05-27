@@ -223,11 +223,14 @@ This makes `grep -rn "R7"` a real cross-artefact query. Without ID discipline, e
 
 The most common SDD failure: `tasks.md` shows `[x]` for items that aren't actually done in code. This is what Sprint 72's first dev verification caught — Phase 4 was marked complete but the TOC right-click code didn't exist on the branch.
 
-To detect this proactively:
+This is a **manual discipline, not an automated check.** A grep-driven "did you type `setHeadingLevel` somewhere?" verifies naming, not correctness — the implementer could satisfy the grep without satisfying the requirement. The real safety nets are code review (the `pr-reviewer` agent + human PR review) and manual dev verification of every requirement.
 
-1. **At Phase 4/QA, grep changed files for each `[x]`-ed requirement ID.** If R4 is marked done but `grep -rn "R4\|setHeadingLevel" extensions/ritemark/...` returns nothing in modified files, that is a red flag.
-2. **The `qa-validator` agent has a `[x]`-vs-code consistency check** (added 2026-05-26 alongside this skill). It's a soft warning — not a hard block — but you should resolve every mismatch before committing.
+What to actually do:
+
+1. **Before ticking `[x]`, verify the code change is on the active branch.** `git diff main...HEAD -- <file>` should show the work; `git log --oneline main..HEAD` should reference the requirement. If you cannot point at a commit that did the work, do not tick the box.
+2. **At Phase 4/QA, walk every `[x]`-ed task and ask "where is this in the code?"** For a task like `Add \`setHeadingLevel\` helper`, that means opening `headingUtils.ts` and confirming the function exists. For a task like `Wire context menu`, that means opening the component and confirming the JSX is there.
 3. **When in doubt, demote `[x]` back to `[ ]`** rather than ship a lie. Sprint 72's first dev verification did exactly this for Phase 4 and reopened the work.
+4. **Trust pr-reviewer and the human reviewer to catch what discipline misses.** Sprint 72's Codex review caught two P1 issues the unit tests had not anticipated; that is the safety net that actually fires.
 
 ## Anti-Patterns to Avoid
 
@@ -244,10 +247,11 @@ When you (the agent) are operating under this skill:
 - Reference requirement IDs in code comments and commit messages.
 - Before writing code for a new requirement, confirm the requirement exists in `spec.md`. If not, either pause for spec update or write the spec first.
 - When a scope change is requested mid-sprint, refuse to write code until the Mid-Sprint Scope Change Protocol above is followed.
-- At Phase 4 / QA / sprint-end, run the `[x]`-vs-code discrepancy detection before declaring "ready to commit".
+- At Phase 4 / QA / sprint-end, walk every `[x]`-ed task and confirm the matching code change is on the active branch before declaring "ready to commit". This is a manual discipline; no automated check enforces it.
 
 ## See Also
 
-- `sprint-manager` agent — picks SDD vs lightweight track at sprint kickoff and surfaces the decision for user override.
-- `qa-validator` agent — runs the `[x]`-vs-code consistency check at sprint-end.
+- `sprint-manager` agent — picks SDD vs plain full track at sprint kickoff and surfaces the decision for user override.
+- `qa-validator` agent — runs the build / patches / TypeScript / debug-code gate at sprint-end. It does **not** check `[x]`-vs-code consistency (see Discrepancy Detection above for why that is a manual discipline).
+- `pr-reviewer` agent — the real safety net for "did the code do what `tasks.md` claimed?" — catches what discipline misses.
 - Sprint 72 (`docs/development/sprints/sprint-72-markdown-navigation-annotations/`) is the canonical worked example — read its spec.md, scenarios.md, technical-plan.md, tasks.md, and sprint-plan.md to see this skill in practice.
