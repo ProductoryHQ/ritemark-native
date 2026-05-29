@@ -1,10 +1,13 @@
 ---
 date: 'TBD'
-title: 'Ritemark v1.7.2 — Local file links and TOC restructuring'
+title: 'Ritemark v1.7.2 — Markdown workflow + AI runtime clarity'
 author: Jarmo Tuisk
 tags:
   - sprint-72
+  - sprint-73
   - markdown-navigation
+  - ai-runtime
+  - model-selector
   - file-links
   - table-of-contents
   - heading-levels
@@ -12,11 +15,11 @@ tags:
   - draft
 ---
 
-# Ritemark v1.7.2 — Local file links and TOC restructuring
+# Ritemark v1.7.2 — Markdown workflow + AI runtime clarity
 
 **Status:** Draft
 **Type:** Feature release
-**Focus:** Make Ritemark's everyday Markdown editing loop faster and calmer. Type `@` anywhere in the editor to link any local file in seconds, restructure long documents from the table of contents with a right-click or `⌥⌘1-6`, and Cmd-click a link to jump straight to the file. No more bouncing through the Finder to find a relative path.
+**Focus:** v1.7.2 combines two threads: faster everyday Markdown navigation/editing (Sprint 72) and more trustworthy AI runtime/model visibility (Sprint 73). You can link local files via `@`, restructure documents directly from the TOC, and see clearer model/version information in the AI selector and Settings diagnostics.
 
 * * *
 
@@ -30,15 +33,20 @@ The release page will list every shipped asset (macOS DMGs and the Windows insta
 
 ## Why This Release
 
-v1.7.2 is built around one observation: the moment a writer wants to **link to another local file** is also the moment they have to leave Ritemark to find the path. They open Finder, click into a folder, count `..` segments, and come back to type something that looks like `../../briefs/q2-plan.md`. Then, when they want to follow that link two weeks later, there is no way to do it from inside Ritemark — the link is just text that styles itself like a link without acting like one.
+v1.7.2 started from one observation: the moment a writer wants to **link to another local file** is often the moment they have to leave Ritemark to find the path. They open Finder, click folders, count `..` segments, and return to type `../../briefs/q2-plan.md`. Later, following that link is equally clunky.
 
-This release closes that loop in three pieces:
+Sprint 72 closed that loop in three pieces:
 
 - **Type `@` anywhere in the editor** and a file-search picker opens. Type a few characters of any filename in the workspace. Press Enter — Ritemark inserts a Markdown link with the correct relative path and the basename as the visible text. The Add Link dialog (Cmd+K) understands the same `@`-prefix so the two flows feel identical.
 - **Cmd-click that link to follow it.** Markdown targets open as Ritemark documents; PDFs, images, CSVs, source files open through VS Code's default opener so a doc-set can include diagrams, spreadsheets, and code references without dead links. Out-of-workspace traversal attempts and missing files surface non-blocking notifications instead of failing silently.
 - **Right-click any row in the persistent Table of Contents** and pick a heading level (H1–H6), or press `⌥⌘1-6` while a TOC row is focused. The whole change is a single undo step and the scroll position stays put — restructuring a long document no longer ricochets the viewport up and down.
 
-This is Sprint 72 — a deliberate pivot to day-to-day Markdown editing instead of more agent infrastructure. The full sprint trail (spec, scenarios, technical plan, tasks, BDD-style verification matrix) lives under `docs/development/sprints/sprint-72-markdown-navigation-annotations/`.
+Sprint 73 then addressed a separate trust/usability gap in AI runtime surfaces: users need model/version clarity and visible overflow behavior in long model lists, not only binary-level diagnostics.
+
+Together, this release improves both the Markdown workflow and the AI sidebar runtime/model experience.  
+Sprint docs:
+- Sprint 72: `docs/development/sprints/sprint-72-markdown-navigation-annotations/`
+- Sprint 73: `docs/development/sprints/sprint-73-bundled-runtime-updates/`
 
 Closes [#79](https://github.com/ProductoryHQ/ritemark-native/issues/79) (TOC heading-level changes from the context menu) and [#80](https://github.com/ProductoryHQ/ritemark-native/issues/80) (`@`-mention local file links). Defers [#81](https://github.com/ProductoryHQ/ritemark-native/issues/81) (Markdown comment callouts) — audit recorded the `marked` → TipTap → Turndown pipeline does not round-trip comments reliably enough to ship without rework.
 
@@ -106,8 +114,10 @@ The header-dropdown TOC variant (`components/header/TableOfContents.tsx`) is **r
 ## Tests and Validation
 
 - `validate-qa.sh` passes on the sprint branch.
+- `cd extensions/ritemark/webview && npm run build` passes after model selector UI updates.
 - Unit tests (run via `npx tsx`): `workspaceFileLinks.test.ts`, `linkTargets.test.ts` (covers the `KNOWN_FILE_EXTENSIONS` regression — `spec.md`, `Notes.PDF`, `test-utils.js`, `Cargo.toml` all classify as internal; `example.com` and `foo.io` still classify as external), and `internalLinkResolver.test.ts` (11 cases including symlinked workspace root, symlink escape, path-traversal escape, missing file under symlinked parent, fragment/query stripping, URL-encoded paths).
 - Manual dev-mode QA matrix is recorded in `docs/development/sprints/sprint-72-markdown-navigation-annotations/tasks.md` Phase 7.5.
+- Sprint 73 dev-mode manual QA accepted: selector rows (model/version + tagline), visible vertical scrollbar for long lists, and pointer cursor on selectable model rows.
 
 * * *
 

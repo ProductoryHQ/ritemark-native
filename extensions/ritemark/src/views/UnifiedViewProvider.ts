@@ -882,6 +882,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     } else if (reason === 'login-finished') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
+      // Auth context may have changed (different logged-in account), and
+      // model availability can be account-specific. Drop cache so fresh
+      // discovery runs on next config send.
+      cachedDiscoveredClaudeModels = null;
     } else if (reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
