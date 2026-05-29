@@ -19,6 +19,23 @@ import {
 } from '../ui/select';
 import type { AgentId } from './types';
 
+/**
+ * Trim model descriptions to a tight 3-4 word tail.
+ *
+ * Many SDK descriptions repeat the model version that already appears in the
+ * row label (e.g. "Sonnet 4.6 · Best for everyday tasks"). Strip the prefix
+ * up to and including " · " when present, then keep at most 4 words so the
+ * dropdown row never overflows the sidebar width.
+ */
+function shortenDescription(description: string | undefined): string {
+  if (!description) return '';
+  const dot = description.indexOf(' · ');
+  const tail = dot >= 0 ? description.slice(dot + 3) : description;
+  const words = tail.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 4) return words.join(' ');
+  return words.slice(0, 4).join(' ') + '…';
+}
+
 export function AgentSelector() {
   const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
   const selectedModel = useAISidebarStore((s) => s.selectedModel);
@@ -82,7 +99,7 @@ export function AgentSelector() {
           <span className="truncate">{triggerLabel}</span>
         </SelectTrigger>
 
-        <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
+        <SelectContent className="max-w-[280px]">
           {/* Claude — grouped by model */}
           {visibleAgents.some((a) => a.id === 'claude-code') && models.length > 0 && (
             <>
@@ -96,7 +113,11 @@ export function AgentSelector() {
                     className="text-xs"
                   >
                     {model.label}
-                    <span className="ml-1.5 text-[10px] opacity-50">{model.description}</span>
+                    {model.description && (
+                      <span className="ml-1.5 text-[10px] opacity-60">
+                        {shortenDescription(model.description)}
+                      </span>
+                    )}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -116,7 +137,11 @@ export function AgentSelector() {
                     className="text-xs"
                   >
                     {model.label}
-                    <span className="ml-1.5 text-[10px] opacity-50">{model.description}</span>
+                    {model.description && (
+                      <span className="ml-1.5 text-[10px] opacity-60">
+                        {shortenDescription(model.description)}
+                      </span>
+                    )}
                   </SelectItem>
                 ))}
               </SelectGroup>

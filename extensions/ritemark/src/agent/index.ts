@@ -30,6 +30,7 @@ export {
 } from './claudeStatusEvents';
 export { AGENTS, CLAUDE_MODELS, CODEX_MODELS, DEFAULT_MODEL } from './types';
 export { CLAUDE_FALLBACK_MODELS } from './claudeModels';
+export { discoverClaudeModels } from './discoverModels';
 export type {
   ModelOption,
   AgentId,

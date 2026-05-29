@@ -178,6 +178,7 @@ interface AISidebarState {
   setupInProgress: boolean;
   setupError: string | null;
   hasSeenWelcome: boolean;
+  claudeSdkVersion: string | null;
 
   // ── Onboarding state ──
   onboardingStatus: OnboardingStatus | null;
@@ -322,6 +323,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   setupInProgress: false,
   setupError: null,
   hasSeenWelcome: false,
+  claudeSdkVersion: null,
 
   onboardingStatus: null,
   onboardingDismissed: false,
@@ -1141,6 +1143,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
           discoveredAgents: message.discoveredAgents || [],
           discoveredCommands: message.discoveredCommands || [],
+          claudeSdkVersion: message.claudeSdkVersion ?? get().claudeSdkVersion,
         });
         break;
 

@@ -46,6 +46,12 @@ Closes [#79](https://github.com/ProductoryHQ/ritemark-native/issues/79) (TOC hea
 
 ## What's New
 
+### Sprint 73 follow-up: bundled runtime + model selector clarity
+
+- **Claude/Codex runtime diagnostics are now more trustworthy in Settings.** Claude shows CLI + SDK version in one chip when both exist; Codex app-server version now comes from runtime detection (`--version`) instead of manifest-only reporting when supported.
+- **AI model picker now better reflects real available models.** Claude model options are warmed up from the bundled runtime metadata, then rendered as a clearer two-line row (model/version + short purpose line).
+- **Long model lists are now easier to discover.** The picker has a constrained height with a thin vertical scrollbar and pointer cursor rows so overflow is visually obvious and interaction feels native.
+
 ### Type `@` to link any local file
 
 Anywhere in a Markdown document, type `@` and a search picker appears at the cursor. Start typing — results filter on the fly. Arrow keys move through the list, Enter inserts the file as a Markdown link with the basename as the visible text and a relative path as the target. Escape dismisses the picker without inserting anything.

@@ -36,6 +36,32 @@ const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',
 /** Max text file size (500KB — larger files should be read by the agent from disk) */
 const MAX_TEXT_SIZE = 512 * 1024;
 
+/**
+ * Split a Claude SDK model description into two parts so the dropdown can
+ * mirror Claude Desktop's layout: large version line on top, short purpose
+ * tagline underneath.
+ *
+ * Input examples from the SDK's `supportedModels()`:
+ *   "Opus 4.8 with 1M context · Most capable"
+ *   "Sonnet 4.6 · Best for everyday tasks"
+ *   "Haiku 4.5 · Fastest for quick answers"
+ *
+ * For Codex (no " · " separator) the whole string is the tagline and the
+ * version line stays empty — Codex labels already carry the version.
+ */
+function parseModelDescription(description: string | undefined): {
+  versionLine: string | null;
+  tagline: string;
+} {
+  if (!description) return { versionLine: null, tagline: '' };
+  const sep = description.indexOf(' · ');
+  if (sep < 0) return { versionLine: null, tagline: description.trim() };
+  return {
+    versionLine: description.slice(0, sep).trim(),
+    tagline: description.slice(sep + 3).trim(),
+  };
+}
+
 /** Dropped file path chip */
 interface PathChip {
   id: string;
@@ -920,28 +946,75 @@ export function ChatInput() {
                 {runtimeFooterLabel}
               </div>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent
+              className={[
+                'max-h-[min(72vh,28rem)]',
+                '[&_[data-radix-select-viewport]]:max-h-[min(72vh,28rem)]',
+                '[&_[data-radix-select-viewport]]:overflow-y-scroll',
+                '[&_[data-radix-select-viewport]]:pr-1',
+                '[&_[data-radix-select-viewport]]:[scrollbar-gutter:stable]',
+                '[&_[data-radix-select-viewport]]:[scrollbar-width:thin]',
+                '[&_[data-radix-select-viewport]]:[scrollbar-color:var(--vscode-scrollbarSlider-background,rgba(120,120,120,0.45))_transparent]',
+                '[&_[data-radix-select-viewport]::-webkit-scrollbar]:w-1.5',
+                '[&_[data-radix-select-viewport]::-webkit-scrollbar-track]:bg-transparent',
+                '[&_[data-radix-select-viewport]::-webkit-scrollbar-thumb]:rounded-full',
+                '[&_[data-radix-select-viewport]::-webkit-scrollbar-thumb]:bg-[var(--vscode-scrollbarSlider-background,rgba(120,120,120,0.45))]',
+                '[&_[data-radix-select-viewport]::-webkit-scrollbar-thumb:hover]:bg-[var(--vscode-scrollbarSlider-hoverBackground,rgba(120,120,120,0.65))]',
+              ].join(' ')}
+            >
               {canUseClaude && models.length > 0 && (
                 <SelectGroup>
                   <SelectLabel className="text-[10px]">Claude</SelectLabel>
-                  {models.map((model) => (
-                    <SelectItem key={model.id} value={`claude-code:${model.id}`} className="text-xs">
-                      {model.label}
-                      <span className="ml-1.5 text-[10px] opacity-50">{model.description}</span>
-                    </SelectItem>
-                  ))}
+                  {models.map((model) => {
+                    const { versionLine, tagline } = parseModelDescription(model.description);
+                    const primary = versionLine || model.label;
+                    return (
+                      <SelectItem
+                        key={model.id}
+                        value={`claude-code:${model.id}`}
+                        className="items-start py-1.5"
+                      >
+                        <div className="block w-full">
+                          <div className="text-[13px] font-medium text-[var(--r-ink-strong)] leading-tight">
+                            {primary}
+                          </div>
+                          {tagline && (
+                            <div className="text-[11px] text-[var(--r-ink-muted)] leading-snug mt-0.5">
+                              {tagline}
+                            </div>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectGroup>
               )}
               {canUseClaude && models.length > 0 && canUseCodex && codexModels.length > 0 && <SelectSeparator />}
               {canUseCodex && codexModels.length > 0 && (
                 <SelectGroup>
                   <SelectLabel className="text-[10px]">Codex</SelectLabel>
-                  {codexModels.map((model) => (
-                    <SelectItem key={model.id} value={`codex:${model.id}`} className="text-xs">
-                      {model.label}
-                      <span className="ml-1.5 text-[10px] opacity-50">{model.description}</span>
-                    </SelectItem>
-                  ))}
+                  {codexModels.map((model) => {
+                    const { versionLine, tagline } = parseModelDescription(model.description);
+                    const primary = versionLine || model.label;
+                    return (
+                      <SelectItem
+                        key={model.id}
+                        value={`codex:${model.id}`}
+                        className="items-start py-1.5"
+                      >
+                        <div className="block w-full">
+                          <div className="text-[13px] font-medium text-[var(--r-ink-strong)] leading-tight">
+                            {primary}
+                          </div>
+                          {tagline && (
+                            <div className="text-[11px] text-[var(--r-ink-muted)] leading-snug mt-0.5">
+                              {tagline}
+                            </div>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectGroup>
               )}
             </SelectContent>

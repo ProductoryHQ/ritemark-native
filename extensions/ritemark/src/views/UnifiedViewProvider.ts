@@ -19,6 +19,26 @@ import {
   type EditorSelection,
   type ConversationMessage
 } from '../ai/index';
+
+// Read once at module load — Node's require cache makes this effectively a
+// one-time read. Mirrors the pattern in RitemarkSettingsProvider so the AI
+// sidebar's model picker can surface the SDK version without an extra IPC.
+const CLAUDE_AGENT_SDK_VERSION: string | null = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pkg = require('@anthropic-ai/claude-agent-sdk/package.json') as { version?: string };
+    return pkg.version ?? null;
+  } catch {
+    return null;
+  }
+})();
+
+// Memoised result of `discoverClaudeModels()`. Populated on the first sidebar
+// open after Claude becomes `ready`, reused across subsequent renders.
+// Invalidated whenever the Claude runtime changes (install, settings update,
+// status refresh) — see `_handleExternalClaudeStatusInvalidation`.
+let cachedDiscoveredClaudeModels: ModelOption[] | null = null;
+let claudeModelDiscoveryInFlight = false;
 import { searchDocuments, buildRAGContext, RAGSearchResult } from '../rag/search';
 import { VectorStore, getDefaultDbPath } from '../rag/vectorStore';
 import {
@@ -27,6 +47,7 @@ import {
   CLAUDE_FALLBACK_MODELS,
   DEFAULT_MODEL,
   DEFAULT_TOOLS,
+  discoverClaudeModels,
   getSetupStatus,
   getAgentEnvironmentStatus,
   clearSetupCache,
@@ -49,6 +70,7 @@ import {
   type AgentProgress,
   type AgentQuestion,
   type FileAttachment,
+  type ModelOption,
   type SetupStatus,
   type AgentEnvironmentStatus,
   type OnboardingStatus,
@@ -759,6 +781,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return true;
     });
 
+    const claudeModels = cachedDiscoveredClaudeModels ?? CLAUDE_FALLBACK_MODELS;
+
     this._view?.webview.postMessage({
       type: 'agent:config',
       agenticEnabled,
@@ -766,7 +790,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       selectedAgent,
       selectedModel,
       agents: visibleAgents,
-      models: CLAUDE_FALLBACK_MODELS,
+      models: claudeModels,
       codexModels: getCodexModels(),
       codexStatus,
       setupStatus,
@@ -775,7 +799,47 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       discoveredAgents,
       discoveredCommands,
       workspacePath: this._workspacePath,
+      claudeSdkVersion: CLAUDE_AGENT_SDK_VERSION,
     });
+
+    // Warmup: when Claude is ready but we haven't yet asked the bundled SDK
+    // for its canonical model list, kick off discovery now. The result is
+    // posted as `agent:models-update` so the dropdown swaps in real display
+    // names (e.g. "Claude Sonnet 4.5") in place of the generic fallback.
+    if (
+      setupStatus?.state === 'ready' &&
+      !cachedDiscoveredClaudeModels &&
+      !claudeModelDiscoveryInFlight
+    ) {
+      void this._warmupClaudeModels(setupStatus);
+    }
+  }
+
+  private async _warmupClaudeModels(setupStatus: SetupStatus): Promise<void> {
+    if (!setupStatus.binaryPath || !this._workspacePath) {
+      return;
+    }
+    claudeModelDiscoveryInFlight = true;
+    try {
+      let anthropicApiKey: string | undefined;
+      if (setupStatus.authMethod === 'api-key' && this._secrets) {
+        anthropicApiKey = await this._secrets.get('anthropic-api-key');
+      }
+      const models = await discoverClaudeModels({
+        workspacePath: this._workspacePath,
+        pathToClaudeCodeExecutable: setupStatus.binaryPath,
+        ...(anthropicApiKey ? { anthropicApiKey } : {}),
+      });
+      if (models && models.length > 0) {
+        cachedDiscoveredClaudeModels = models;
+        this._view?.webview.postMessage({
+          type: 'agent:models-update',
+          models,
+        });
+      }
+    } finally {
+      claudeModelDiscoveryInFlight = false;
+    }
   }
 
   private async _handleExternalCodexStatusInvalidation(
@@ -821,6 +885,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     } else if (reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
+      // Runtime may have changed (new binary, new settings) — drop the cached
+      // model list so the next _sendAgentConfig triggers fresh discovery.
+      cachedDiscoveredClaudeModels = null;
     }
 
     await this._sendAgentConfig();
