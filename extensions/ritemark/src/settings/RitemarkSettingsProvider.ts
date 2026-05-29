@@ -105,6 +105,24 @@ function isArchMismatch(binaryArch: string | null, machineArch: string): boolean
   return normalise(binaryArch) !== normalise(machineArch);
 }
 
+// Read at module load — Node's require cache makes repeat calls free, but
+// resolving once here also keeps the per-settings-open path cheap and means
+// we surface SDK load failures (missing peer dep, etc.) in the extension
+// host log at startup rather than per request.
+const CLAUDE_AGENT_SDK_VERSION: string | null = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pkg = require('@anthropic-ai/claude-agent-sdk/package.json') as { version?: string };
+    return pkg.version ?? null;
+  } catch {
+    return null;
+  }
+})();
+
+function readClaudeAgentSdkVersion(): string | null {
+  return CLAUDE_AGENT_SDK_VERSION;
+}
+
 const RITEMARK_THEMES = [
   {
     id: 'ritemark-light',
@@ -492,6 +510,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
             runnable: false,
             authenticated: false,
             version: null,
+            sdkVersion: null,
             binaryPath: null,
             authMethod: null,
             managedBy: 'user' as const,
@@ -573,6 +592,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       runnable: boolean;
       authenticated: boolean;
       version: string | null;
+      sdkVersion: string | null;
       binaryPath: string | null;
       authMethod: 'claude-oauth' | 'api-key' | null;
       managedBy: 'user';
@@ -648,6 +668,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         runnable: claudeStatus.runnable,
         authenticated: claudeStatus.authenticated,
         version: claudeStatus.cliVersion ?? null,
+        sdkVersion: readClaudeAgentSdkVersion(),
         binaryPath: claudeStatus.binaryPath ?? null,
         authMethod: claudeStatus.authMethod,
         managedBy: 'user',

@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
-import { findBundledAgentRuntime, isBundledAgentRuntimePath, readAgentRuntimePreference } from '../utils/bundledAgentRuntime';
+import { findBundledAgentRuntime, isBundledAgentRuntimePath, readAgentRuntimePreference, readBundledRuntimeVersion } from '../utils/bundledAgentRuntime';
 import { onClaudeStatusInvalidated } from './claudeStatusEvents';
 import type {
   AgentEnvironmentStatus,
@@ -263,6 +263,15 @@ function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): 
       // not the .cmd wrapper (the SDK runs `node <path>`, not `shell .cmd`).
       const sdkPath = resolveJsEntryFromCmd(candidate) || candidate;
       const runtimeSource: ClaudeRuntimeSource = isBundledAgentRuntimePath(candidate) ? 'bundled' : 'system';
+      if (runtimeSource === 'bundled') {
+        const manifestVersion = readBundledRuntimeVersion(candidate);
+        const runtimeSemver = version.match(/^([\d.]+)/)?.[1];
+        if (manifestVersion && runtimeSemver && manifestVersion !== runtimeSemver) {
+          console.warn(
+            `[ritemark] Runtime drift: claude reports ${runtimeSemver} but manifest says ${manifestVersion} (${candidate})`,
+          );
+        }
+      }
       return {
         installed: true,
         runnable: true,

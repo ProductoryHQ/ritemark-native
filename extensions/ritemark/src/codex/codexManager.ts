@@ -270,31 +270,59 @@ export class CodexManager {
     const installNodeVersion = this.extractNvmNodeVersion(binaryPath);
     const installNodeArch = this.getBinaryArchitecture(binaryPath);
 
-    // The bundled `codex-app-server` binary does NOT accept `--version` (it
-    // exits with `error: unexpected argument '--version' found` and code 2).
-    // For app-server launch mode the canonical version comes from the
-    // manifest the build script ships alongside the binary. We still need
-    // to confirm the binary is actually launchable so a corrupt or non-
-    // executable file doesn't show as "Ready" until the first turn fails
-    // (Codex review on PR #57). `--help` works on codex-app-server, exits 0
-    // quickly, and gives us a real spawn check.
+    // `codex-app-server` supports `--version` from 0.135.0 onwards (output:
+    // `codex-app-server <semver>`). Older bundled releases (≤ 0.130.0) rejected
+    // it with exit code 2 — for those, fall back to the manifest version and
+    // verify the binary spawns via `--help`. Successful `--version` confirms
+    // both the real runtime version AND that the binary is launchable, so
+    // we don't need a separate `--help` probe on the happy path. The drift
+    // detection below warns if the runtime version disagrees with the
+    // manifest, so a silent fallback to manifest never hides upgrade drift.
     if (binary.launchMode === 'codex-app-server') {
       const manifestVersion = readBundledRuntimeVersion(binaryPath);
-      const probe = this.spawnResolvedBinarySync(binaryPath, ['--help'], {
+      const versionProbe = this.spawnResolvedBinarySync(binaryPath, ['--version'], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: 3000,
       });
-      const probeOk = probe.status === 0;
-      const probeError = probeOk
-        ? null
-        : this.summarizeFailure(
-            String(probe.stderr || probe.stdout || `app-server --help exited ${probe.status ?? 'null'}`),
-          );
+      let runtimeVersion: string | null = null;
+      if (versionProbe.status === 0) {
+        const match = String(versionProbe.stdout || '').match(/codex(?:-app-server|-cli)?\s+([\d.]+)/i);
+        runtimeVersion = match ? match[1] : null;
+      }
+
+      let probeOk: boolean;
+      let probeError: string | null;
+      if (runtimeVersion) {
+        probeOk = true;
+        probeError = null;
+      } else {
+        // Fallback for older bundled binaries that reject `--version`.
+        const helpProbe = this.spawnResolvedBinarySync(binaryPath, ['--help'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 3000,
+        });
+        probeOk = helpProbe.status === 0;
+        probeError = probeOk
+          ? null
+          : this.summarizeFailure(
+              String(helpProbe.stderr || helpProbe.stdout || `app-server --help exited ${helpProbe.status ?? 'null'}`),
+            );
+      }
+
+      const reportedVersion = runtimeVersion ?? manifestVersion;
+
+      if (probeOk && runtimeVersion && manifestVersion && runtimeVersion !== manifestVersion) {
+        console.warn(
+          `[ritemark] Runtime drift: codex-app-server reports ${runtimeVersion} but manifest says ${manifestVersion} (${binaryPath})`,
+        );
+      }
+
       return {
         available: true,
         runnable: probeOk,
-        version: manifestVersion,
+        version: reportedVersion,
         error: probeError,
         binaryPath,
         installNodeVersion,
@@ -304,7 +332,7 @@ export class CodexManager {
         installNodeArch,
         runtimeNodeArch,
         machineArch,
-        compatibility: probeOk ? this.inspectCompatibility(binaryPath, manifestVersion, binary.launchMode) : null,
+        compatibility: probeOk ? this.inspectCompatibility(binaryPath, reportedVersion, binary.launchMode) : null,
         runtimeSource: binary.runtimeSource,
         launchMode: binary.launchMode,
       };

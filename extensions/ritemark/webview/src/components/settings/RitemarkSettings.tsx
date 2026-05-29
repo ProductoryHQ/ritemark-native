@@ -63,6 +63,7 @@ interface SettingsData {
       runnable: boolean;
       authenticated: boolean;
       version: string | null;
+      sdkVersion: string | null;
       binaryPath: string | null;
       authMethod: 'claude-oauth' | 'api-key' | null;
       managedBy: 'user';
@@ -1254,6 +1255,7 @@ export function RitemarkSettings() {
                 title="Claude"
                 runtimeStatus={settings.componentStatus.claudeCode.runtimeStatus}
                 version={settings.componentStatus.claudeCode.version}
+                sdkVersion={settings.componentStatus.claudeCode.sdkVersion}
                 errorMessage={settings.componentStatus.claudeCode.error}
                 diagnostics={settings.componentStatus.claudeCode.diagnostics}
               >
@@ -1474,6 +1476,7 @@ function RuntimeStatusCard({
   title,
   runtimeStatus,
   version,
+  sdkVersion,
   errorMessage,
   diagnostics,
   children,
@@ -1482,6 +1485,7 @@ function RuntimeStatusCard({
   title: string;
   runtimeStatus: RuntimeStatusModel;
   version: string | null;
+  sdkVersion?: string | null;
   errorMessage: string | null;
   diagnostics: string[];
   children?: React.ReactNode;
@@ -1489,7 +1493,11 @@ function RuntimeStatusCard({
   const copy = getRuntimeStatusCopy(runtimeStatus);
   const dot = getRuntimeDotClass(runtimeStatus);
   const sourceLabel = getSourceChipLabel(runtimeStatus.source);
-  const versionLabel = version ? `v${version.replace(/^v/, '')}` : null;
+  const cliLabel = version ? `v${version.replace(/^v/, '')}` : null;
+  const sdkLabel = sdkVersion ? `SDK ${sdkVersion.replace(/^v/, '')}` : null;
+  const versionLabel = cliLabel && sdkLabel
+    ? `${cliLabel} · ${sdkLabel}`
+    : cliLabel ?? sdkLabel;
   // Auto-expand diagnostics when launch failed — user needs the detail immediately.
   const autoOpenDiagnostics = runtimeStatus.runtime === 'launch_failed';
   const showError = errorMessage && runtimeStatus.runtime !== 'installed';
