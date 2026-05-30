@@ -26,6 +26,15 @@ Companion skill to `release-manager` agent. The agent owns workflow + gate enfor
 
 ## Workflow — Full release (DMG)
 
+### ⛔⛔ TWO HARD RULES THAT GOVERN NOTARIZATION ORDER ⛔⛔
+
+These override the convenience of doing sign+DMG+notarize in one shot. Notarization is a limited Apple resource (a team-eligibility hold once cost weeks — case 102892219755). Never spend a submission on an untested or unsettled build.
+
+1. **Jarmo tests the UN-notarized build, never the notarized one.** Gate 1 (arm64) and Gate 2 (x64/Windows) happen on the signed-but-not-notarized DMG. Notarization is the LAST step before publish, run only after the relevant gate has passed. By the time anything is notarized, it is already approved — so Jarmo never tests a notarized app.
+2. **60-minute hardening period between DMG build and notarization.** After a DMG is built, wait ≥60 min before notarizing it — even if Gate approval comes sooner. This settling window is to let late bugs surface. If a bug surfaces in the window, rebuild and reset both the clock and the gate. The build timestamp starts the clock; Gate-approval time does not.
+
+Sequence: **build DMG → Jarmo tests un-notarized → ≥60 min hardening (no new bugs) → notarize → publish.**
+
 ### Step 0 — Pre-flight
 
 ```bash
@@ -53,21 +62,38 @@ Run as background task with `timeout: 600000` (10 min cap). Never pipe through `
 
 Generate test checklist in `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.
 
-### Step 3 — Sign + DMG + Notarize arm64
+### Step 3 — Sign + DMG arm64 (NO notarization yet)
 
 ```bash
 ./scripts/codesign-app.sh
 ./scripts/create-dmg.sh
+```
+
+Output: `dist/Ritemark-X.Y.Z-darwin-arm64.dmg` (signed Developer ID, **NOT notarized, NOT stapled**).
+
+⛔ **DO NOT run `notarize-dmg.sh` here.** Notarization happens only AFTER Gate 1 passes (see HARD RULE below). Record the DMG build timestamp — the 60-min hardening clock starts now.
+
+### ⛔ Gate 1 — Jarmo tests the UNNOTARIZED signed DMG
+
+**Jarmo always tests the un-notarized build.** Notarized binaries are never the thing Jarmo tests — by the time we notarize, the build is already approved.
+
+Surface to user: "Signed (un-notarized) arm64 DMG ready at `dist/Ritemark-X.Y.Z-darwin-arm64.dmg`. Please install and test. Because it isn't notarized yet, Gatekeeper will warn — right-click the app → **Open**, or run `xattr -dr com.apple.quarantine '/Applications/Ritemark.app'` after copying it in."
+
+Wait for: "approved", "DMG approved", "GATE 1 passed".
+
+### Step 4 — Hardening period + notarize arm64
+
+⛔ **HARD RULE — hardening period (min 60 min between DMG build and notarization).** After the DMG is built (Step 3), wait **at least 60 minutes** before notarizing — even after Gate 1 approval. This window lets late-surfacing bugs appear before we spend an Apple notarization submission. If Gate 1 takes longer than 60 min, the window is already satisfied; if Jarmo approves fast, **still wait out the remainder of the hour.** If ANY bug surfaces during the window → rebuild, and the clock + Gate 1 reset.
+
+Why: Apple notarization submissions are a limited/rate-sensitive resource and a long team-eligibility hold (case 102892219755, lifted 2026-05-29) cost weeks. Never burn a submission on a build that hasn't been tested and allowed to settle.
+
+Only once **(a)** Gate 1 has passed AND **(b)** ≥60 min have elapsed since the DMG build with no new bugs:
+
+```bash
 ./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg
 ```
 
-Output: `dist/Ritemark-X.Y.Z-darwin-arm64.dmg` (signed + notarized).
-
-### ⛔ Gate 1 — Jarmo tests arm64 DMG
-
-Surface to user: "arm64 DMG ready at `dist/Ritemark-X.Y.Z-darwin-arm64.dmg`. Please install and test."
-
-Wait for: "approved", "DMG approved", "GATE 1 passed".
+This notarizes AND staples. Verify staple + Gatekeeper acceptance before proceeding.
 
 ### Step 5 — Tag + push (triggers CI)
 
@@ -85,7 +111,7 @@ After Windows build completes (Step 6), toggle back:
 gh repo edit ProductoryHQ/ritemark-native --visibility public --accept-visibility-change-consequences
 ```
 
-### Step 6 — Download + sign macOS x64
+### Step 6 — Download + sign macOS x64 (NO notarization yet)
 
 Wait for `build-macos-x64.yml` to finish:
 
@@ -94,17 +120,28 @@ gh run list --workflow=build-macos-x64.yml --limit 3
 gh run download <run-id> --name ritemark-darwin-x64 --dir VSCode-darwin-x64
 ./scripts/codesign-app.sh darwin-x64
 ./scripts/create-dmg.sh x64
-./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg
 ```
 
-### ⛔ Gate 2 — Jarmo tests x64 DMG + Windows installer
+Output: `dist/Ritemark-X.Y.Z-darwin-x64.dmg` (signed, **NOT notarized**). Same rule as arm64 — record the DMG build timestamp; **do NOT notarize until Gate 2 passes AND ≥60 min hardening have elapsed.**
+
+### ⛔ Gate 2 — Jarmo tests UNNOTARIZED x64 DMG + Windows installer
 
 ```bash
 gh run list --workflow=build-windows.yml --limit 3
-# Jarmo downloads Windows artifact, tests installer
+# Jarmo downloads Windows artifact + the signed (un-notarized) x64 DMG, tests both
 ```
 
-Wait for: "x64 approved", "Windows approved", "GATE 2 passed".
+Same as Gate 1: Jarmo tests the **un-notarized** x64 build (Gatekeeper right-click → Open). Wait for: "x64 approved", "Windows approved", "GATE 2 passed".
+
+### Step 7 — Hardening period + notarize x64
+
+Apply the same ⛔ **60-min hardening rule** as Step 4. Only after Gate 2 passes AND ≥60 min have elapsed since the x64 DMG build with no new bugs:
+
+```bash
+./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg
+```
+
+Notarizes + staples. Verify before proceeding to Step 8.
 
 ### Step 8 — GitHub Release + update feed
 
