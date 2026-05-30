@@ -182,7 +182,13 @@ jobs:
         shell: bash
         working-directory: r/vscode
         env:
-          NODE_OPTIONS: --max-old-space-size=8192
+          # --require preloads graceful-fs to give fs.createReadStream EMFILE
+          # retry/queue behaviour. vsce/yazl opens the whole production
+          # node_modules tree concurrently when packaging the ritemark extension
+          # (claude-agent-sdk's peer @modelcontextprotocol/sdk drags express/hono/
+          # ajv/... into prod), which exceeds the Windows fd limit -> EMFILE.
+          # Path is relative to cwd (r/vscode): ../scripts -> r/scripts.
+          NODE_OPTIONS: --max-old-space-size=8192 --require ../scripts/graceful-fs-preload.cjs
         run: |
           echo "Starting Windows build at $(date)"
           npx gulp vscode-win32-x64-min
