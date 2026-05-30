@@ -33,6 +33,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Python 3.11
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -80,16 +81,29 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Force node-gyp to use the setup-python 3.11 interpreter instead of
+          # whatever is first on PATH. The runner image now ships Python 3.14.5,
+          # which node-gyp auto-selects and which breaks native module builds.
+          # NODE_GYP_FORCE_PYTHON is the authoritative node-gyp 11 override
+          # (npm_config_python is no longer honoured as of npm 9).
+          NODE_GYP_FORCE_PYTHON: ${{ steps.setup-python.outputs.python-path }}
         run: |
           success=0
           for i in 1 2 3; do
             echo "Attempt $i..."
-            if npm ci --prefer-offline --no-audit --progress=false; then
+            # --foreground-scripts serializes native (node-gyp) builds, avoiding
+            # the parallel race on the shared node-addon-api/node_addon_api.sln
+            # that throws FileExistsError (WinError 183) on Windows.
+            if npm ci --prefer-offline --no-audit --progress=false --foreground-scripts; then
               success=1
               break
             fi
             echo "Attempt $i failed, retrying..."
-            sleep 10
+            # A failed install leaves Windows handles open on native module dirs
+            # (@vscode/sqlite3, @parcel/watcher, node-pty, ...), so the next attempt
+            # otherwise dies with EBUSY rmdir during npm's own cleanup. Clear it.
+            rm -rf node_modules 2>/dev/null || true
+            sleep 15
           done
           if [ "$success" -ne 1 ]; then
             echo "VS Code dependency install failed after 3 attempts" >&2
@@ -99,6 +113,10 @@ jobs:
       - name: Install extension dependencies
         shell: bash
         working-directory: r/vscode/extensions/ritemark
+        env:
+          # Forward defense: keep node-gyp on Python 3.11 if a future extension
+          # dependency adds a native module (none today).
+          NODE_GYP_FORCE_PYTHON: ${{ steps.setup-python.outputs.python-path }}
         run: npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false
 
       - name: Remove non-Windows binaries from claude-agent-sdk
