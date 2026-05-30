@@ -199,15 +199,23 @@ jobs:
       - name: Build VS Code (win32-x64-min)
         shell: bash
         working-directory: r/vscode
-        env:
-          # --require preloads graceful-fs to give fs.createReadStream EMFILE
-          # retry/queue behaviour. vsce/yazl opens the whole production
-          # node_modules tree concurrently when packaging the ritemark extension
-          # (claude-agent-sdk's peer @modelcontextprotocol/sdk drags express/hono/
-          # ajv/... into prod), which exceeds the Windows fd limit -> EMFILE.
-          # Path is relative to cwd (r/vscode): ../scripts -> r/scripts.
-          NODE_OPTIONS: --max-old-space-size=8192 --require ../scripts/graceful-fs-preload.cjs
         run: |
+          # Preload graceful-fs so fs.createReadStream gets EMFILE retry/queue
+          # behaviour. vsce/yazl opens the whole production node_modules tree
+          # concurrently when packaging the ritemark extension (claude-agent-sdk's
+          # peer @modelcontextprotocol/sdk drags express/hono/ajv/... into prod),
+          # which exceeds the Windows fd limit -> EMFILE.
+          #
+          # The --require path MUST be absolute: NODE_OPTIONS is inherited by child
+          # processes, and VS Code's build spawns `npm ls` from a DIFFERENT cwd
+          # (build/lib/dependencies.ts execSync, cwd=<root>/extensions) to enumerate
+          # production deps. A relative path fails to resolve there, crashing the
+          # child, corrupting the dep list, and surfacing as "Invalid glob argument"
+          # in doPackageLocalExtensionsStream. pwd -W gives a Windows-style absolute
+          # path (C:/...) that Node accepts and that resolves from any cwd.
+          PRELOAD="$(cd ../scripts && pwd -W)/graceful-fs-preload.cjs"
+          export NODE_OPTIONS="--max-old-space-size=8192 --require ${PRELOAD}"
+          echo "NODE_OPTIONS=$NODE_OPTIONS"
           echo "Starting Windows build at $(date)"
           npx gulp vscode-win32-x64-min
           echo "Build completed at $(date)"
