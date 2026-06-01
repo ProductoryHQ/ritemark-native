@@ -1192,13 +1192,16 @@ export function Editor({
         }
 
         /* Code block styling with dark theme */
+        /* Sprint 74 R3 (#84): overflow visible on the pre so the absolutely
+           positioned copy-button tooltip never creates a spurious horizontal
+           scrollbar; the inner code element carries the scroll instead. */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block {
           background: #1f2937 !important;
           color: #f9fafb !important;
           border-radius: 8px !important;
           padding: 1rem !important;
           margin: 1em 0 !important;
-          overflow-x: auto !important;
+          overflow: visible !important;
           font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace !important;
           font-size: 16px !important;
           line-height: 1.5 !important;
@@ -1210,6 +1213,9 @@ export function Editor({
           padding: 0 !important;
           font-size: inherit !important;
           color: inherit !important;
+          display: block !important;
+          overflow-x: auto !important;
+          min-width: 0 !important;
         }
 
         /* Syntax highlighting tokens */

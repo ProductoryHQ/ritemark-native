@@ -17,6 +17,7 @@ import {
 } from '../ui/select';
 import { useAISidebarStore } from './store';
 import { SelectedContextTab } from './SelectedContextTab';
+import { shouldQueueInsteadOfSend, shouldAutoSendQueuedPrompt } from './composerQueue';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
@@ -142,6 +143,8 @@ function getDisplayPath(fullPath: string): string {
 
 export function ChatInput() {
   const [value, setValue] = useState('');
+  // Sprint 74 R2 (#82): prompt parked while the agent runs; auto-sends on completion
+  const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [pathChips, setPathChips] = useState<PathChip[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -188,6 +191,9 @@ export function ChatInput() {
   const clearPinnedAgentDismissal = useAISidebarStore((s) => s.clearPinnedAgentDismissal);
   const activeFilePath = useAISidebarStore((s) => s.activeFilePath);
   const currentBrowserContext = useAISidebarStore((s) => s.currentBrowserContext);
+  // Selection state — needed to stack the queue notch under SelectedContextTab
+  // without a visible seam (Sprint 74 R2 notch-stack rule).
+  const selection = useAISidebarStore((s) => s.selection);
 
   // Merge built-in + discovered commands
   const allCommands = useMemo(() => mergeCommands(discoveredCommands), [discoveredCommands]);
@@ -205,11 +211,16 @@ export function ChatInput() {
   // Check both arrays — cancel routes by active turn, not by selected agent
   const agentRunning = (lastTurn?.isRunning ?? false) || (lastCodexTurn?.isRunning ?? false);
   const isLoading = isAgentMode ? agentRunning : isStreaming;
-  const placeholder = isClaudeCode
-    ? 'Ask Claude... (type @ to mention an agent, / for commands)'
-    : isCodex
-      ? 'Ask Codex... (type / for commands)'
-      : 'Ask anything... (type / for commands)';
+  // Sprint 74 R2 (#82): while an agent runs, the composer stays unlocked and
+  // Enter queues the next prompt instead of sending it.
+  const placeholder = isLoading && isAgentMode
+    ? 'Add a follow-up… (Enter queues it for when the agent finishes)'
+    : isClaudeCode
+      ? 'Ask Claude... (type @ to mention an agent, / for commands)'
+      : isCodex
+        ? 'Ask Codex... (type / for commands)'
+        : 'Ask anything... (type / for commands)';
+  const hasSelectedContext = !selection.isEmpty && !!selection.text;
 
   // Build final message with path chips and pinned agent prepended
   const buildFinalPrompt = useCallback((): string => {
@@ -226,9 +237,25 @@ export function ChatInput() {
     return prompt;
   }, [value, pathChips]);
 
-  const handleSend = useCallback(() => {
-    const prompt = buildFinalPrompt();
-    if (!prompt || !isOnline || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
+  const handleSend = useCallback((overridePrompt?: string) => {
+    const prompt = overridePrompt ?? buildFinalPrompt();
+    if (!prompt) return;
+
+    // Sprint 74 R2 (#82): while the agent runs, park the prompt in the queue
+    // instead of dropping the send. Auto-sent when the run completes.
+    if (shouldQueueInsteadOfSend({ isLoading, isAgentMode, hasOverridePrompt: overridePrompt !== undefined })) {
+      setQueuedPrompt(prompt);
+      setValue('');
+      setPathChips([]);
+      setShowMentionPopup(false);
+      setShowCommandPopup(false);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+      return;
+    }
+
+    if (!isOnline || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
 
     // Build hidden context (agent instructions — sent to AI but not shown in chat).
     // Dismissal + new pin can both be active when switching agents A → B.
@@ -248,8 +275,11 @@ export function ChatInput() {
     const hiddenContext = hiddenParts.length > 0 ? hiddenParts.join('\n\n') : undefined;
 
     // Collect file paths for @mentioned agents so the extension can load their instructions
-    // Parsed inline to avoid referencing `mentions` which is defined later in this component
-    const mentionedAgentPaths = parseMentions(discoveredAgents, value)
+    // Parsed inline to avoid referencing `mentions` which is defined later in this component.
+    // Parse from the prompt actually being sent (#82): on the queued auto-send path
+    // `value` has already been cleared, so an @agent mention in the queued prompt would
+    // otherwise be dropped. `overridePrompt` carries the queued text in that case.
+    const mentionedAgentPaths = parseMentions(discoveredAgents, overridePrompt ?? value)
       .map((m) => discoveredAgents.find((a) => a.id === m.agentId)?.filePath)
       .filter((p): p is string => !!p);
 
@@ -271,7 +301,21 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isAgentMode, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+
+  // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
+  // transition. The ref-based transition check prevents double-sends on
+  // unrelated re-renders while idle.
+  const prevAgentRunningRef = useRef(agentRunning);
+  useEffect(() => {
+    const wasRunning = prevAgentRunningRef.current;
+    prevAgentRunningRef.current = agentRunning;
+    if (shouldAutoSendQueuedPrompt({ wasRunning, isRunning: agentRunning, queuedPrompt })) {
+      const prompt = queuedPrompt as string;
+      setQueuedPrompt(null);
+      handleSend(prompt);
+    }
+  }, [agentRunning, queuedPrompt, handleSend]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
   const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
@@ -356,6 +400,16 @@ export function ChatInput() {
           if (parsed.command.action === 'custom') {
             // Custom commands are sent as slash-command prompts to the agent
             const prompt = `/${parsed.command.id}${parsed.args ? ' ' + parsed.args : ''}`;
+            // Respect the running-agent queue (#82): a slash command typed while
+            // the agent is running must park in the queue like any other prompt,
+            // not bypass straight to send (which drops it for Claude / misroutes
+            // for Codex). Auto-send re-runs it through handleSend on completion.
+            if (shouldQueueInsteadOfSend({ isLoading, isAgentMode, hasOverridePrompt: false })) {
+              setQueuedPrompt(prompt);
+              setValue('');
+              setShowCommandPopup(false);
+              return;
+            }
             sendAgentMessage(prompt);
             setValue('');
             setShowCommandPopup(false);
@@ -373,7 +427,7 @@ export function ChatInput() {
         setShowCommandPopup(false);
       }
     },
-    [handleSend, showMentionPopup, showCommandPopup, value, executeCommandAction]
+    [handleSend, showMentionPopup, showCommandPopup, value, executeCommandAction, isLoading, isAgentMode]
   );
 
   // Handle text changes, @ mention detection, and / command detection
@@ -735,9 +789,12 @@ export function ChatInput() {
   return (
     <div
       ref={containerRef}
-      className={`relative px-3 py-2.5 border-t border-[var(--r-hairline)] ${
-        isDragOver ? 'bg-[var(--r-surface-soft)]' : ''
-      }`}
+      className={`relative px-3 py-2.5 ${
+        // Sprint 74 R2: no separator stripe above a notch — the notch visually
+        // belongs to the input card, so the container border-top is dropped
+        // whenever any notch (selected text / queued prompt) is showing.
+        hasSelectedContext || queuedPrompt ? '' : 'border-t border-[var(--r-hairline)]'
+      } ${isDragOver ? 'bg-[var(--r-surface-soft)]' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -748,6 +805,47 @@ export function ChatInput() {
           card below; the negative -mb-px on the tab overlaps the card's
           top border by 1px so there's no seam. */}
       <SelectedContextTab />
+
+      {/* Sprint 74 R2 (#82): queued-prompt notch. Same SelectedContextTab notch
+          pattern. When stacked below the selected-text tab it drops its top
+          rounding/border and uses a thin internal divider instead — one visual
+          block, zero seams (notch-stack rule, see prototypes/composer-queue.html). */}
+      {queuedPrompt && (
+        <div
+          className={`mx-2.5 -mb-px px-2.5 py-1.5 border-[rgba(148,163,184,0.20)]
+            bg-gradient-to-b from-[rgba(248,250,252,0.82)] to-[rgba(248,250,252,0.52)]
+            dark:from-[rgba(25,22,53,0.62)] dark:to-[rgba(25,22,53,0.62)] dark:border-[rgba(129,140,248,0.16)]
+            ${hasSelectedContext
+              ? 'border-l border-r border-t border-t-[rgba(148,163,184,0.14)] dark:border-t-[rgba(129,140,248,0.10)]'
+              : 'rounded-t-lg border border-b-0'}`}
+          role="status"
+          aria-label="Queued prompt"
+        >
+          <div className="flex items-center gap-1.5">
+            <Icon name="clock" size={12} className="shrink-0 opacity-60" />
+            <span className="text-[11px] font-medium text-[var(--r-ink-muted)] flex-1 truncate">
+              Queued — sends when the agent finishes
+            </span>
+            <button
+              onClick={() => setQueuedPrompt(null)}
+              className="
+                shrink-0 inline-flex items-center justify-center
+                w-4 h-4 rounded
+                text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]
+                focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]
+                transition-colors
+              "
+              aria-label="Discard queued prompt"
+              title="Discard queued prompt"
+            >
+              <Icon name="x" size={12} />
+            </button>
+          </div>
+          <div className="mt-0.5 text-[11px] leading-snug text-[var(--r-ink-body)] truncate">
+            {queuedPrompt}
+          </div>
+        </div>
+      )}
 
       {/* Drag overlay indicator */}
       {isDragOver && (
@@ -867,6 +965,9 @@ export function ChatInput() {
           </div>
         )}
 
+        {/* Sprint 74 R2 (#82): textarea stays unlocked during agent runs so the
+            user can draft + queue the next prompt. It is disabled only while a
+            prompt is already queued (one queued prompt at a time). */}
         <textarea
           ref={textareaRef}
           value={value}
@@ -874,7 +975,7 @@ export function ChatInput() {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={placeholder}
-          disabled={isLoading}
+          disabled={!!queuedPrompt}
           rows={2}
           className="block w-full resize-none bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ fontSize: 'var(--chat-font-size, 13px)' }}
@@ -1057,7 +1158,7 @@ export function ChatInput() {
               </button>
             ) : (
               <button
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={!value.trim() || !isOnline}
                 className="flex h-7 w-7 items-center justify-center rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-strong)] disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
                 title={sendTitle}

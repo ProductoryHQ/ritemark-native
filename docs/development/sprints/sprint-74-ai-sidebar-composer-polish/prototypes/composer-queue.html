@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sprint 74 · Composer Queue — v2 (notch pattern)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --r-surface: #FFFFFF;
+      --r-surface-muted: #F8FAFC;
+      --r-surface-soft: #F1F5F9;
+      --r-hairline: #E2E8F0;
+      --r-hairline-strong: #CBD5E1;
+      --r-ink-strong: #1E1B4B;
+      --r-ink-body: #475569;
+      --r-ink-muted: #64748B;
+      --r-ink-faint: #94A3B8;
+      --r-accent: #4338CA;
+      --r-accent-deep: #3730A3;
+      --r-accent-soft: #E0E7FF;
+      --r-accent-fainter: #C7D2FE;
+      --r-error: #EF4444;
+      --r-error-soft: #FEE2E2;
+      --r-shadow-sm: 0 1px 2px rgba(30,27,75,0.06), 0 1px 3px rgba(30,27,75,0.04);
+      --r-shadow-indigo: 0 4px 6px -1px rgba(67,56,202,0.25);
+
+      --notch-border: rgba(148,163,184,0.20);
+      --notch-bg-from: rgba(248,250,252,0.92);
+      --notch-bg-to:   rgba(248,250,252,0.60);
+      --notch-mx: 10px;
+      --notch-divider: rgba(148,163,184,0.14);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      background: #D6DCE4;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+      gap: 36px;
+      flex-wrap: wrap;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .col { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    .tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase;
+      display: inline-block; padding: 3px 10px; border-radius: 4px;
+    }
+    .tag.before { background:#FEE2E2; color:#B91C1C; }
+    .tag.after  { background:#DCFCE7; color:#15803D; }
+    .tag.plus   { background:#E0E7FF; color:#3730A3; }
+
+    /* ── panel ── */
+    .panel {
+      width: 310px; background: var(--r-surface-muted);
+      border-radius: 8px; overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: 0 8px 40px rgba(30,27,75,0.18);
+      border: 1px solid #C8D0DA;
+    }
+    .panel-bar {
+      height: 35px; background: #E2E8F0;
+      border-bottom: 1px solid var(--r-hairline);
+      display: flex; align-items: center;
+      padding: 0 10px; flex-shrink: 0;
+    }
+    .panel-bar-title { font-size:10.5px; font-weight:700; color:var(--r-ink-body); text-transform:uppercase; letter-spacing:0.6px; flex:1; }
+    .pib { width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:4px;color:var(--r-ink-muted);cursor:pointer; }
+    .pib:hover { background:var(--r-hairline); }
+
+    /* ── messages ── */
+    .messages { flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:12px; }
+    .msg-u { display:flex;justify-content:flex-end; }
+    .msg-u-b {
+      max-width:88%;padding:7px 11px;
+      background:var(--r-accent-soft);border:1px solid var(--r-accent-fainter);
+      border-radius:10px 10px 3px 10px;
+      font-size:12px;color:var(--r-accent-deep);line-height:1.55;
+    }
+    .msg-a { display:flex;flex-direction:column;gap:5px; }
+    .msg-a-meta { display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--r-ink-faint);text-transform:uppercase;letter-spacing:0.5px; }
+    .msg-a-body { font-size:12px;color:var(--r-ink-body);line-height:1.6; }
+
+    .run-status {
+      display:flex;align-items:center;gap:6px;
+      padding:5px 8px;font-size:11px;color:var(--r-accent);
+      background:var(--r-accent-soft);border:1px solid var(--r-accent-fainter);border-radius:5px;
+    }
+    .tool-row {
+      display:flex;align-items:center;gap:5px;
+      padding:3px 8px;font-size:10.5px;color:var(--r-ink-muted);
+      background:var(--r-surface-soft);border:1px solid var(--r-hairline);border-radius:5px;
+      font-family:'SF Mono',Menlo,Consolas,monospace;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .spin { animation:spin .8s linear infinite;display:inline-block; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+    .dot { width:6px;height:6px;border-radius:50%;background:var(--r-accent);animation:pulse 1.4s ease-in-out infinite; }
+
+    /* ══════════════════════════════════════════════════
+       NOTCH — exact SelectedContextTab pattern
+       ══════════════════════════════════════════════════ */
+    .notch {
+      margin: 0 var(--notch-mx) -1px;
+      border-radius: 8px 8px 0 0;        /* rounded-t-lg */
+      border: 1px solid var(--notch-border);
+      border-bottom: none;               /* border-b-0 */
+      background: linear-gradient(to bottom, var(--notch-bg-from), var(--notch-bg-to));
+      overflow: hidden;
+    }
+    /* Second notch stacked below a first — no top rounding, no top border */
+    .notch.stacked-below {
+      border-radius: 0;
+      border-top: none;
+      margin-bottom: -1px;               /* still eats the next element's top border */
+    }
+
+    /* ── Notch stack — single container, multiple sections, zero seam ──
+       Use this instead of two separate .notch elements when stacking.
+       One outer border + radius; sections are divided by a thin internal line. */
+    .notch-stack {
+      margin: 0 var(--notch-mx) -1px;
+      border-radius: 8px 8px 0 0;
+      border: 1px solid var(--notch-border);
+      border-bottom: none;
+      background: linear-gradient(to bottom, var(--notch-bg-from), var(--notch-bg-to));
+      overflow: hidden;
+    }
+    /* internal divider between sections (only between adjacent siblings) */
+    .ns-section + .ns-section {
+      border-top: 1px solid var(--notch-divider);
+    }
+
+    /* ── queue item rows (inside the notch) ── */
+    .q-item {
+      display: flex; align-items: center; gap: 0;
+      padding: 6px 10px;
+      border-top: 1px solid var(--notch-divider);
+      position: relative;
+      transition: background 100ms;
+    }
+    .q-item:first-child { border-top: none; }
+    .q-item:hover { background: rgba(241,245,249,0.7); }
+
+    /* pending circle (unfilled) */
+    .q-bullet {
+      width: 16px; height: 16px; flex-shrink: 0;
+      border: 1.5px solid var(--r-hairline-strong);
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    /* prompt text */
+    .q-text {
+      flex: 1; min-width: 0;
+      font-size: 12px; color: var(--r-ink-body);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.4;
+    }
+    .q-text.hidden { display: none; }
+
+    /* inline edit input */
+    .q-edit-input {
+      display: none; flex: 1; min-width: 0;
+      font-size: 12px; font-family: inherit;
+      color: var(--r-ink-strong);
+      background: var(--r-surface);
+      border: 1px solid var(--r-accent);
+      border-radius: 4px;
+      padding: 2px 7px; outline: none;
+      box-shadow: 0 0 0 3px rgba(67,56,202,0.10);
+    }
+    .q-item.is-editing .q-text { display: none; }
+    .q-item.is-editing .q-edit-input { display: block; }
+
+    /* action buttons — hidden until hover or edit */
+    .q-actions {
+      display: flex; align-items: center; gap: 0;
+      margin-left: 4px; flex-shrink: 0;
+      opacity: 0; transition: opacity 120ms;
+    }
+    .q-item:hover .q-actions,
+    .q-item.is-editing .q-actions { opacity: 1; }
+
+    .qa {
+      width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px; border: none;
+      background: transparent; color: var(--r-ink-muted);
+      cursor: pointer; font-family: inherit;
+      transition: background 100ms, color 100ms;
+      position: relative;
+    }
+    .qa:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+    .qa.del:hover { background: var(--r-error-soft); color: var(--r-error); }
+    .qa.prm:hover { background: var(--r-accent-soft); color: var(--r-accent); }
+
+    /* tooltip */
+    .qa::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 4px);
+      left: 50%; transform: translateX(-50%);
+      background: #1E1B4B; color: #F8FAFC;
+      font-size: 9.5px; padding: 3px 7px; border-radius: 3px;
+      white-space: nowrap;
+      opacity: 0; pointer-events: none; transition: opacity 120ms;
+    }
+    .qa:hover::after { opacity: 1; }
+
+    /* the "N queued" header row inside the notch */
+    .notch-header-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px;
+      cursor: pointer; user-select: none;
+      transition: background 100ms;
+    }
+    .notch-header-row:hover { background: rgba(241,245,249,0.6); }
+    .q-count-pill {
+      width: 16px; height: 16px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--r-accent-soft); color: var(--r-accent-deep);
+      border: 1px solid var(--r-accent-fainter);
+      border-radius: 50%;
+      font-size: 9.5px; font-weight: 700; flex-shrink: 0;
+    }
+    .notch-header-label { font-size: 11px; font-weight: 600; color: var(--r-ink-muted); flex: 1; }
+    .notch-header-hint { font-size: 10px; color: var(--r-ink-faint); }
+    .chevron {
+      color: var(--r-ink-faint);
+      transition: transform 180ms cubic-bezier(0.22,0.61,0.36,1);
+    }
+    .notch.collapsed .chevron { transform: rotate(-90deg); }
+
+    /* collapsible body */
+    .notch-body {
+      overflow: hidden; max-height: 300px;
+      transition: max-height 200ms cubic-bezier(0.22,0.61,0.36,1);
+    }
+    .notch.collapsed .notch-body { max-height: 0; }
+
+    /* ── SelectedContextTab-style row (for stacking demo) ── */
+    .sct-row {
+      display: flex; flex-direction: column;
+      padding: 6px 10px;
+    }
+    .sct-head { display:flex;align-items:center;gap:6px; }
+    .sct-title { flex:1;font-size:11px;font-weight:600;color:var(--r-ink-muted); }
+    .sct-preview { margin-top:2px;font-size:11px;color:var(--r-ink-body);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .sct-close {
+      width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+      border:none;background:transparent;border-radius:3px;cursor:pointer;
+      color:var(--r-ink-muted);
+    }
+    .sct-close:hover { color:var(--r-ink-strong);background:var(--r-surface-soft); }
+
+    /* ── chat input bar ── */
+    .input-wrap { flex-shrink:0;padding:8px 10px;border-top:1px solid var(--r-hairline); }
+    .input-wrap.no-top { padding-top:0; border-top:none; }
+    .input-box {
+      border:1px solid var(--r-hairline);border-radius:8px;
+      background:var(--r-surface);box-shadow:var(--r-shadow-sm);overflow:hidden;
+      transition:border-color 150ms,box-shadow 150ms;
+    }
+    .input-box:focus-within { border-color:var(--r-hairline-strong); }
+    textarea {
+      display:block;width:100%;padding:8px 10px 4px;
+      font-size:12px;font-family:inherit;
+      background:transparent;border:none;outline:none;resize:none;line-height:1.5;
+    }
+    textarea::placeholder { color:var(--r-ink-faint); }
+    textarea.locked { opacity:.4;cursor:not-allowed; }
+    .input-footer { display:flex;align-items:center;padding:4px 6px 6px;gap:4px; }
+    .rtl { flex:1;font-size:11px;font-weight:500;color:var(--r-ink-muted); }
+    .ib {
+      width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+      border-radius:5px;border:1px solid var(--r-hairline);
+      background:var(--r-surface-soft);color:var(--r-ink-body);cursor:pointer;
+      transition:background 100ms;
+    }
+    .ib:hover { background:var(--r-surface-muted); }
+    .ib.stop { background:var(--r-ink-strong);color:#FFF;border-color:var(--r-ink-strong); }
+    .ib.stop:hover { background:#312E81; }
+
+    /* promote flash */
+    @keyframes fadeOut { to{opacity:0;max-height:0;padding:0 10px;border:none} }
+    .q-item.removing { animation: fadeOut 200ms cubic-bezier(0.4,0,0.2,1) forwards;overflow:hidden; }
+
+    /* desc */
+    .desc { width:310px;font-size:11px;color:#64748B;line-height:1.6;text-align:center; }
+    .desc strong { color:#475569; }
+    code { font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     COL A — BEFORE: locked input, no queue
+     ══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="tag before">Before — locked</div>
+  <div class="panel" style="height:460px">
+    <div class="panel-bar">
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
+    </div>
+    <div class="messages">
+      <div class="msg-u"><div class="msg-u-b">pls review open issues and suggest a sprint</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
+          Claude · <span class="dot"></span>
+        </div>
+        <div class="run-status">
+          <svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>
+          Fetching issues…
+        </div>
+        <div class="tool-row">mcp__github__list_issues(…)</div>
+      </div>
+    </div>
+    <!-- no notch above — just locked input -->
+    <div class="input-wrap">
+      <div class="input-box">
+        <textarea rows="2" placeholder="Ask Claude..." class="locked" disabled></textarea>
+        <div class="input-footer">
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib" style="opacity:.35;cursor:default"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <div class="ib stop"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="52" y="52" width="152" height="152" rx="4"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="desc"><strong>Problem:</strong> <code>disabled={isLoading}</code> locks the textarea. User cannot type or prepare the next prompt while the agent runs.</div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     COL B — AFTER: queue notch, unlocked input (interactive)
+     ══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="tag after">After — queue notch</div>
+  <div class="panel" style="height:460px">
+    <div class="panel-bar">
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
+    </div>
+    <div class="messages">
+      <div class="msg-u"><div class="msg-u-b">pls review open issues and suggest a sprint</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
+          Claude · <span class="dot"></span>
+        </div>
+        <div class="run-status">
+          <svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>
+          Fetching issues…
+        </div>
+        <div class="tool-row">mcp__github__list_issues(…)</div>
+      </div>
+    </div>
+
+    <div class="input-wrap no-top">
+      <!-- QUEUE NOTCH — same pattern as SelectedContextTab -->
+      <div class="notch" id="queue-notch-b">
+        <!-- header row: count + label + hint + collapse chevron -->
+        <div class="notch-header-row" onclick="toggleQueueB()">
+          <svg class="chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
+          <span class="q-count-pill" id="count-b">1</span>
+          <span class="notch-header-label">Queued</span>
+          <span class="notch-header-hint">sends when done</span>
+        </div>
+        <!-- items list (collapsible) -->
+        <div class="notch-body" id="qlist-b">
+          <!-- item pre-seeded from screenshot -->
+          <div class="q-item" id="qb-1">
+            <div class="q-bullet"></div>
+            <div class="q-text" id="qb-1-t">and review existing sprints</div>
+            <input class="q-edit-input" id="qb-1-i" value="and review existing sprints"
+              onkeydown="editKey(event,'qb-1','b')" onblur="cancelEdit('qb-1')">
+            <div class="q-actions">
+              <button class="qa" data-tip="Edit" onclick="startEdit('qb-1')">
+                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
+              </button>
+              <button class="qa prm" data-tip="Stop current &amp; send now" onclick="promoteB('qb-1')">
+                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
+              </button>
+              <button class="qa del" data-tip="Remove" onclick="deleteItem('qb-1','b')">
+                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192Z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- input box — unlocked, notch's -mb-px eats the top border -->
+      <div class="input-box">
+        <textarea rows="2" id="composer-b" placeholder="Add a follow-up…"
+          onkeydown="composerKey(event,'b')"></textarea>
+        <div class="input-footer">
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib" title="Attach"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <!-- while running: stop button -->
+          <div class="ib stop" title="Stop agent"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="52" y="52" width="152" height="152" rx="4"/></svg></div>
+        </div>
+      </div>
+      <div style="padding:4px 0 0;text-align:center;font-size:10px;color:var(--r-ink-faint)">
+        Enter queues · Shift+Enter queues &amp; promotes to top
+      </div>
+    </div>
+  </div>
+  <div class="desc"><strong>Fixed:</strong> Queue notch (same pattern as "Working on selected text"). Type in unlocked composer, Enter queues. Hover items for Edit / Promote / Delete. Try adding more items.</div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     COL C — Coexistence: queue + selected text stacked
+     ══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="tag plus">+ Selected text stacked</div>
+  <div class="panel" style="height:460px">
+    <div class="panel-bar">
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
+    </div>
+    <div class="messages">
+      <div class="msg-u"><div class="msg-u-b">pls review open issues and suggest a sprint</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
+          Claude · <span class="dot"></span>
+        </div>
+        <div class="run-status">
+          <svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>
+          Fetching issues…
+        </div>
+      </div>
+    </div>
+
+    <div class="input-wrap no-top">
+      <!--
+        NOTCH STACK — one bordered container, two sections separated by a thin internal line.
+        No two separate borders = no seam between sections.
+      -->
+      <div class="notch-stack" id="notch-stack-c">
+
+        <!-- Section 1: Selected text context -->
+        <div class="ns-section" id="sct-notch">
+          <div class="sct-row">
+            <div class="sct-head">
+              <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.6"><path d="M208,40H48A16,16,0,0,0,32,56V200a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40ZM48,56H208V88H48ZM48,200V104H208V200Z"/></svg>
+              <span class="sct-title">Working on selected text</span>
+              <button class="sct-close" onclick="dismissSct()"><svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></button>
+            </div>
+            <div class="sct-preview">It's 2:00 PM on a Tuesday. You're in a conference room with seven o…</div>
+          </div>
+        </div>
+
+        <!-- Section 2: Queue items (internal divider from CSS: .ns-section + .ns-section) -->
+        <div class="ns-section" id="queue-notch-c">
+        <div class="notch-header-row" onclick="toggleQueueC()">
+          <svg class="chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
+          <span class="q-count-pill" id="count-c">2</span>
+          <span class="notch-header-label">Queued</span>
+          <span class="notch-header-hint">sends when done</span>
+        </div>
+        <div class="notch-body" id="qlist-c">
+          <div class="q-item" id="qc-1">
+            <div class="q-bullet"></div>
+            <div class="q-text" id="qc-1-t">and review existing sprints</div>
+            <input class="q-edit-input" id="qc-1-i" value="and review existing sprints"
+              onkeydown="editKey(event,'qc-1','c')" onblur="cancelEdit('qc-1')">
+            <div class="q-actions">
+              <button class="qa" data-tip="Edit" onclick="startEdit('qc-1')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg></button>
+              <button class="qa prm" data-tip="Stop current &amp; send now" onclick="deleteItem('qc-1','c')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg></button>
+              <button class="qa del" data-tip="Remove" onclick="deleteItem('qc-1','c')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192Z"/></svg></button>
+            </div>
+          </div>
+          <div class="q-item" id="qc-2">
+            <div class="q-bullet"></div>
+            <div class="q-text" id="qc-2-t">also check if sprint 73 is still open</div>
+            <input class="q-edit-input" id="qc-2-i" value="also check if sprint 73 is still open"
+              onkeydown="editKey(event,'qc-2','c')" onblur="cancelEdit('qc-2')">
+            <div class="q-actions">
+              <button class="qa" data-tip="Edit" onclick="startEdit('qc-2')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg></button>
+              <button class="qa prm" data-tip="Stop current &amp; send now" onclick="deleteItem('qc-2','c')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg></button>
+              <button class="qa del" data-tip="Remove" onclick="deleteItem('qc-2','c')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192Z"/></svg></button>
+            </div>
+          </div>
+        </div>
+        </div><!-- /ns-section queue -->
+
+      </div><!-- /notch-stack -->
+
+      <!-- input — seamlessly connected via notch-stack's -mb-px -->
+      <div class="input-box">
+        <textarea rows="2" id="composer-c" placeholder="Add a follow-up…"
+          onkeydown="composerKey(event,'c')"></textarea>
+        <div class="input-footer">
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <div class="ib stop"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="52" y="52" width="152" height="152" rx="4"/></svg></div>
+        </div>
+      </div>
+      <div style="padding:4px 0 0;text-align:center;font-size:10px;color:var(--r-ink-faint)">
+        Enter queues · Dismiss "Working on selected text" with ×
+      </div>
+    </div>
+  </div>
+  <div class="desc">
+    <strong>Stacking:</strong> upper = <code>rounded-t-lg</code>, lower = <code>stacked-below</code> (no top rounding, no top border — merges seamlessly). Dismiss selected text → queue promotes to topmost, gains <code>rounded-t-lg</code>.
+  </div>
+</div>
+
+<script>
+  /* ── state ── */
+  const counts = { b: 1, c: 2 };
+  let nextId = 10;
+
+  /* ── toggles ── */
+  function toggleQueueB() { document.getElementById('queue-notch-b').classList.toggle('collapsed'); }
+  function toggleQueueC() { document.getElementById('queue-notch-c').classList.toggle('collapsed'); }
+
+  /* ── selected text dismiss ── */
+  function dismissSct() {
+    const sct = document.getElementById('sct-notch');
+    sct.style.transition = 'opacity 150ms';
+    sct.style.opacity = '0';
+    setTimeout(() => {
+      sct.remove();
+      /* queue section is now the only .ns-section — the + sibling selector
+         no longer applies, so border-top is gone automatically. No JS needed. */
+    }, 150);
+  }
+
+  /* ── edit ── */
+  function startEdit(id) {
+    document.getElementById(id).classList.add('is-editing');
+    document.getElementById(id + '-i').focus();
+    document.getElementById(id + '-i').select();
+  }
+  function cancelEdit(id) {
+    const el = document.getElementById(id);
+    const input = document.getElementById(id + '-i');
+    input.value = document.getElementById(id + '-t').textContent;
+    el.classList.remove('is-editing');
+  }
+  function editKey(e, id, col) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const t = document.getElementById(id + '-t');
+      t.textContent = document.getElementById(id + '-i').value;
+      document.getElementById(id).classList.remove('is-editing');
+    }
+    if (e.key === 'Escape') cancelEdit(id);
+  }
+
+  /* ── delete ── */
+  function deleteItem(id, col) {
+    const el = document.getElementById(id);
+    el.classList.add('removing');
+    setTimeout(() => {
+      el.remove();
+      counts[col]--;
+      updateCount(col);
+    }, 200);
+  }
+  function updateCount(col) {
+    const pill = document.getElementById('count-' + col);
+    if (pill) pill.textContent = counts[col];
+  }
+
+  /* ── promote (col B only) ── */
+  function promoteB(id) {
+    const el = document.getElementById(id);
+    const txt = document.getElementById(id + '-t').textContent;
+    el.style.background = 'rgba(220,252,231,0.7)';
+    setTimeout(() => deleteItem(id, 'b'), 200);
+  }
+
+  /* ── queue from composer ── */
+  function composerKey(e, col) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const ta = document.getElementById('composer-' + col);
+      const val = ta.value.trim();
+      if (!val) return;
+      addQueueItem(val, col);
+      ta.value = '';
+    }
+  }
+
+  function addQueueItem(text, col) {
+    const id = 'q' + col + '-' + nextId++;
+    const list = document.getElementById('qlist-' + col);
+    const item = document.createElement('div');
+    item.className = 'q-item';
+    item.id = id;
+    item.style.opacity = '0';
+    item.innerHTML = `
+      <div class="q-bullet"></div>
+      <div class="q-text" id="${id}-t">${esc(text)}</div>
+      <input class="q-edit-input" id="${id}-i" value="${esc(text)}"
+        onkeydown="editKey(event,'${id}','${col}')" onblur="cancelEdit('${id}')">
+      <div class="q-actions">
+        <button class="qa" data-tip="Edit" onclick="startEdit('${id}')">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
+        </button>
+        <button class="qa prm" data-tip="Stop current &amp; send now" onclick="deleteItem('${id}','${col}')">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
+        </button>
+        <button class="qa del" data-tip="Remove" onclick="deleteItem('${id}','${col}')">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192Z"/></svg>
+        </button>
+      </div>`;
+    list.appendChild(item);
+    counts[col]++;
+    updateCount(col);
+    requestAnimationFrame(() => {
+      item.style.transition = 'opacity 150ms';
+      item.style.opacity = '1';
+    });
+    /* ensure notch is expanded */
+    const notch = col === 'b' ? 'queue-notch-b' : 'queue-notch-c';
+    document.getElementById(notch).classList.remove('collapsed');
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

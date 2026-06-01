@@ -188,10 +188,17 @@ body {
   font-family: var(--vscode-editor-font-family, monospace);
 }
 
+/* Sprint 74 R3 (#84): the pre never scrolls (avoids spurious scrollbar from
+   absolutely positioned children); the code element carries the scroll. */
 .ProseMirror pre {
   background-color: var(--muted);
   padding: 1em;
   border-radius: 6px;
+  overflow-x: hidden;
+}
+
+.ProseMirror pre code {
+  display: block;
   overflow-x: auto;
 }
 

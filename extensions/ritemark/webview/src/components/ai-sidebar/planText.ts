@@ -1,29 +1,29 @@
-function isListParagraph(paragraph: string): boolean {
-  return paragraph
-    .split('\n')
-    .some((line) => /^(\s*[-*+]\s+|\s*\d+\.\s+)/.test(line.trimStart()));
-}
-
-function isHeadingParagraph(paragraph: string): boolean {
-  return /^#{1,6}\s+/.test(paragraph.trimStart());
-}
+/**
+ * Plan text helpers for the plan-approval flow (Sprint 74, R1 / issue #86).
+ *
+ * extractPlanDisplayText used to scan backwards and return only the last
+ * list/heading block of the plan, which made multi-section plans unreadable
+ * in the review card. It now returns the full plan text; the card body
+ * handles long plans with max-height + scroll.
+ */
 
 export function extractPlanDisplayText(planText: string): string {
-  const normalized = planText.trim();
-  if (!normalized) {
-    return '';
-  }
+  return planText.trim();
+}
 
-  const paragraphs = normalized.split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
-  for (let i = paragraphs.length - 1; i >= 0; i--) {
-    if (isListParagraph(paragraphs[i]) || isHeadingParagraph(paragraphs[i])) {
-      return paragraphs.slice(i).join('\n\n');
-    }
-  }
-
-  if (paragraphs.length > 2) {
-    return paragraphs.slice(-2).join('\n\n');
-  }
-
-  return normalized;
+/**
+ * A turn needs the plan-approval UI only while the agent is actually blocked
+ * waiting on ExitPlanMode — i.e. `pendingPlanApproval` is present.
+ *
+ * Regression guard for issue #86: the old condition used
+ * `!turn.pendingPlanApproval`, which showed Approve/Reject buttons exactly
+ * when the approval request was already gone (post-result), so clicking them
+ * silently did nothing (`approvePlan` returns early without a pending request).
+ */
+export function planTurnNeedsApproval(turn: {
+  isPlan?: boolean;
+  planHandled?: boolean;
+  pendingPlanApproval?: unknown;
+}): boolean {
+  return !!turn.isPlan && !turn.planHandled && !!turn.pendingPlanApproval;
 }
