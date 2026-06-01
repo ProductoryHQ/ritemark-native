@@ -62,13 +62,13 @@
       (`openrouter-api-key`, flag-gated handlers + test routing)
 - [x] Spawn-env injection: `src/acp/acpKeyEnv.ts` (`buildByokEnv`/`byokProviderFlags` + tests);
       keys → spawn env only, webview gets booleans
-- [ ] **[WEBVIEW — Mac session]** Settings page: update "Used for:" copy on 3 existing cards;
-      add OpenRouter card (flag-gated, optional)
-- [ ] **[WEBVIEW — Mac session]** Remove stale "Imagen 3 (coming soon)" from Google AI card copy
-      (not flag-gated — ships unconditionally; Jarmo 2026-06-01)
-- [ ] AI sidebar empty-state "Set up your API keys" card + `open-settings-api-keys` deep link
-- [ ] Verify keys never appear in webview messages (trace channel inspection — scenarios.md
-      "Keys never leak")
+- [x] **[WEBVIEW]** Settings page: flag-gated "Used for:" OpenCode copy on 3 existing cards;
+      OpenRouter card (flag-gated). Host `RitemarkSettingsProvider` now sends `opencodeEnabled`
+- [x] **[WEBVIEW]** Removed stale "Imagen 3 (coming soon)" from Google AI card (unconditional)
+- [x] AI sidebar empty-state `OpenCodeSetupView` ("Set up your API keys") + `codex:openSettings`
+      deep link (the invented `settings:openBYOK` message was unhandled — fixed)
+- [x] Keys never appear in webview messages — verified via ACP trace: host sends only
+      `acpProviders` booleans + curated models, never key values (scenarios.md "Keys never leak")
 
 ## Phase 4: Approval gating + dispatch + streaming (R4, R5) — host side ✅ 2026-06-01
 
@@ -80,15 +80,18 @@
       in `UnifiedViewProvider.ts`
 - [x] Normalize ACP + Codex approval payloads to one webview message shape (`codex-approval` with
       acp- prefixed requestId; progress reuses `codex-progress`/`codex-streaming`/`codex-result`)
-- [ ] **[Mac session]** Progress streaming verified end-to-end in dev mode (text, tool_use, error,
-      cancel ≤ 2s) — needs runnable webview + real binary
+- [x] **[Mac session]** Progress streaming verified end-to-end in dev mode (text, tool_use, error,
+      cancel ≤ 2s, approval approve/reject). Fixes landed: single approval per edit (permission is
+      the gate; redundant fs/write auto-allowed), OpenCode reasoning coalesced (was 1 activity/word)
 
 ## Phase 5: Model selection (R6) — host side ✅ 2026-06-01
 
 - [x] `BYOK_PROVIDER_MODELS` in `src/ai/modelConfig.ts` (+ `ByokProvider` type,
       `toOpenCodeModelValue()`; surfaced via `agent:config` and `flow:modelConfig`)
-- [ ] **[WEBVIEW — Mac session]** `opencode:` composite values + provider-filtered model list
-      in `AgentSelector.tsx`
+- [x] **[WEBVIEW]** `opencode:` composite values + provider-filtered model list — implemented in
+      the LIVE picker `ChatInput.tsx` (the handoff pointed at `AgentSelector.tsx`, which was dead/
+      never-imported code; deleted). Model IDs validated against OpenCode 1.15.13 registry
+      (gemini-3-pro/-flash don't exist → 3.1-pro-preview / 3.5-flash)
 - [x] Model selection mechanism (`setSessionConfigOption(configId: 'model')` per audit)
       implemented in `acpClient.setModel()`, wired in `acp-execute`
 
@@ -98,8 +101,11 @@
       + `opencodeFlag.test.ts`
 - [x] Gate (host side): AGENTS registry exposure to webview, `acp-execute`/key handlers inert
       when off, `acpProviders`/`byokProviderModels` excluded from `agent:config` when off
-- [ ] **[WEBVIEW — Mac session]** Gate: AgentSelector entry, Settings OpenRouter card
-- [ ] **[Mac session]** Verify flag-off hides everything (scenarios.md R7 scenario)
+- [x] **[WEBVIEW]** Gate: OpenCode model group + Settings OpenRouter card render only when
+      `opencodeEnabled` (from `agent:config`) is true
+- [x] **[Mac session]** Flag-off gating — code-verified (group/card gated on `opencodeEnabled`;
+      `opencodeFlag.test.ts` covers the flag). Runtime flag-off not manually exercised (no UI
+      toggle; flag is `stable`/ON by default — flipping needs a flags.ts edit)
 
 ## Phase 7: QA and Closeout
 
