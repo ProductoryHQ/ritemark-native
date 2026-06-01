@@ -3,905 +3,1103 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Editor (ritemark.agentEditor) — Sprint 77 Prototype</title>
+<title>Agent Editor (agent mode) — Sprint 77 Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ════════════════════════════════════════════════════════════
+   RITEMARK DESIGN TOKENS  (from webview/src/index.css)
+   ════════════════════════════════════════════════════════════ */
+:root {
+  --r-surface:         #ffffff;
+  --r-surface-muted:   #f8fafc;
+  --r-surface-soft:    #f1f5f9;
+  --r-hairline:        #e2e8f0;
+  --r-hairline-strong: #cbd5e1;
+  --r-ink-strong:      #1e1b4b;
+  --r-ink-body:        #475569;
+  --r-ink-muted:       #64748b;
+  --r-ink-faint:       #94a3b8;
+  --r-ink-disabled:    #cbd5e1;
+  --r-accent:          #4338ca;
+  --r-accent-deep:     #3730a3;
+  --r-accent-darker:   #312e81;
+  --r-accent-soft:     #e0e7ff;
+  --r-accent-fainter:  #c7d2fe;
+  --r-success:         #22c55e;
+  --r-success-soft:    #dcfce7;
+  --r-warning:         #f59e0b;
+  --r-warning-soft:    #fef3c7;
+  --r-error:           #ef4444;
+  --r-error-soft:      #fee2e2;
+  --r-radius-sm:       4px;
+  --r-radius-md:       6px;
+  --r-radius-lg:       10px;
+  --ui-font:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --editor-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+html.dark {
+  --r-surface:         #0F172A;
+  --r-surface-muted:   #020617;
+  --r-surface-soft:    #1E293B;
+  --r-hairline:        #1E293B;
+  --r-hairline-strong: #334155;
+  --r-ink-strong:      #f8fafc;
+  --r-ink-body:        #CBD5E1;
+  --r-ink-muted:       #94a3b8;
+  --r-ink-faint:       #64748b;
+  --r-ink-disabled:    #475569;
+  --r-accent:          #818cf8;
+  --r-accent-deep:     #6366f1;
+  --r-accent-darker:   #4f46e5;
+  --r-accent-soft:     rgba(129, 140, 248, 0.16);
+  --r-accent-fainter:  rgba(129, 140, 248, 0.28);
+  --r-success:         #4ade80;
+  --r-success-soft:    rgba(34, 197, 94, 0.18);
+  --r-warning:         #fbbf24;
+  --r-warning-soft:    rgba(245, 158, 11, 0.18);
+  --r-error:           #f87171;
+  --r-error-soft:      rgba(239, 68, 68, 0.18);
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESET + BASE
+   ════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', sans-serif;
-  background: #161616;
-  color: #CCCCCC;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+  font-family: var(--ui-font);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--r-surface);
+  color: var(--r-ink-strong);
   overflow: hidden;
 }
 
-/* ── Proto banner ── */
+/* ════════════════════════════════════════════════════════════
+   PROTO BANNER (not part of real UI)
+   ════════════════════════════════════════════════════════════ */
 .proto-banner {
-  background: #4C1D95;
+  background: var(--r-accent);
   color: white;
   font-size: 11px;
   font-weight: 600;
-  padding: 6px 16px;
+  letter-spacing: 0.02em;
+  padding: 5px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  gap: 12px;
 }
-.proto-tag {
-  background: rgba(255,255,255,0.18);
-  border-radius: 3px;
-  padding: 2px 8px;
+.proto-banner-left { display: flex; align-items: center; gap: 8px; }
+.proto-badge {
+  background: rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 2px 7px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
-
-/* ── VS Code shell ── */
-.vscode {
-  flex: 1; display: flex; flex-direction: column; overflow: hidden;
-}
-.vs-titlebar {
-  height: 36px; background: #323233;
-  border-bottom: 1px solid #1A1A1A;
-  display: flex; align-items: center; padding: 0 16px; gap: 8px; flex-shrink: 0;
-}
-.tl { width: 12px; height: 12px; border-radius: 50%; }
-.tl-r { background: #FF5F57; }
-.tl-y { background: #FEBC2E; }
-.tl-g { background: #28C840; }
-.vs-bar-title { font-size: 12px; color: #666; margin-left: 8px; }
-
-/* Tabs row */
-.tab-row {
-  height: 36px; background: #2D2D2D;
-  display: flex; align-items: flex-end;
-  border-bottom: 1px solid #1A1A1A; flex-shrink: 0;
-}
-.file-tab {
-  padding: 6px 16px 0;
-  font-size: 12px; color: #CCC;
-  background: #1E1E1E;
-  border-top: 2px solid #4338CA;
-  border-right: 1px solid #1A1A1A;
-  display: flex; align-items: center; gap: 8px; height: 36px;
-  cursor: default;
-}
-.file-tab-icon { font-size: 13px; }
-.file-tab-close {
-  width: 16px; height: 16px;
-  border-radius: 3px; background: none; border: none;
-  color: #666; cursor: pointer; font-size: 14px;
-  display: flex; align-items: center; justify-content: center;
-}
-.file-tab-close:hover { background: rgba(255,255,255,0.1); color: #CCC; }
-.inactive-tab {
-  padding: 6px 16px 0;
-  font-size: 12px; color: #666;
-  background: #2D2D2D;
-  border-right: 1px solid #1A1A1A;
-  display: flex; align-items: center; gap: 8px; height: 36px; cursor: pointer;
-}
-.inactive-tab:hover { color: #999; }
-
-/* Main editor body */
-.editor-body {
-  flex: 1; display: flex; overflow: hidden;
-}
-
-/* ── Left: Markdown editor ── */
-.md-editor {
-  flex: 1; display: flex; flex-direction: column;
-  background: #1E1E1E; overflow: hidden;
-  border-right: 1px solid #1A1A1A;
-  position: relative;
-}
-
-/* Breadcrumb */
-.breadcrumb {
-  padding: 4px 16px; font-size: 11px; color: #555;
-  background: #1E1E1E; border-bottom: 1px solid rgba(255,255,255,0.04);
-  flex-shrink: 0;
-}
-
-/* TipTap toolbar */
-.editor-toolbar {
-  padding: 4px 12px;
-  display: flex; align-items: center; gap: 2px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  flex-shrink: 0; background: #1E1E1E;
-}
-.tb-btn {
-  height: 26px; padding: 0 8px;
-  background: transparent; border: none; border-radius: 4px;
-  color: #888; cursor: pointer; font-size: 12px; font-family: inherit;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.08s, color 0.08s;
-}
-.tb-btn:hover { background: rgba(255,255,255,0.07); color: #CCC; }
-.tb-btn.active { background: rgba(67,56,202,0.18); color: #818CF8; }
-.tb-btn strong { font-weight: 700; }
-.tb-sep {
-  width: 1px; height: 18px; background: rgba(255,255,255,0.1); margin: 0 4px;
-}
-
-/* Editor content area */
-.editor-content {
-  flex: 1; overflow-y: auto; padding: 32px 48px;
-  line-height: 1.7;
-}
-.editor-content::-webkit-scrollbar { width: 6px; }
-.editor-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-.editor-content::-webkit-scrollbar-track { background: transparent; }
-
-.doc-text { max-width: 640px; }
-.doc-text p { margin-bottom: 14px; font-size: 14px; color: #CCCCCC; line-height: 1.75; }
-.doc-text p .cursor { display: inline-block; width: 2px; height: 1em; background: #4338CA; vertical-align: text-bottom; margin-left: 1px; animation: blink 1.1s step-end infinite; }
-
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-
-/* Anno marker (for editor area) */
-.area-anno {
-  position: absolute; top: 8px; left: 8px;
-  display: flex; align-items: center; gap: 6px;
-  background: rgba(91,33,182,0.9); color: white;
-  font-size: 10px; font-weight: 600;
-  padding: 3px 8px 3px 5px; border-radius: 12px;
-  backdrop-filter: blur(4px);
-  z-index: 10;
-  pointer-events: none;
-}
-.area-anno-num {
-  width: 17px; height: 17px; border-radius: 50%;
-  background: rgba(255,255,255,0.25);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 9px; font-weight: 800;
-}
-
-/* ── Right: Configurator panel ── */
-.configurator {
-  width: 340px; min-width: 340px;
-  background: #252526;
-  display: flex; flex-direction: column;
-  overflow: hidden; flex-shrink: 0;
-}
-
-.cfg-header {
-  height: 36px;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 12px 0 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  flex-shrink: 0;
-}
-.cfg-title {
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.8px; text-transform: uppercase; color: #888;
-}
-.cfg-actions { display: flex; gap: 2px; }
-.ib {
-  width: 22px; height: 22px; border-radius: 4px;
-  background: transparent; border: none;
-  color: #555; cursor: pointer; font-size: 14px;
-  display: flex; align-items: center; justify-content: center;
-}
-.ib:hover { background: rgba(255,255,255,0.07); color: #CCC; }
-
-.cfg-scroll {
-  flex: 1; overflow-y: auto; padding: 0;
-}
-.cfg-scroll::-webkit-scrollbar { width: 5px; }
-.cfg-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.09); border-radius: 3px; }
-.cfg-scroll::-webkit-scrollbar-track { background: transparent; }
-
-/* Configurator sections */
-.cfg-section {
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  padding: 12px 14px;
-  position: relative;
-}
-
-.cfg-sec-title {
-  font-size: 10px; font-weight: 700;
-  letter-spacing: 0.8px; text-transform: uppercase;
-  color: #555; margin-bottom: 10px;
-  display: flex; align-items: center; gap: 8px;
-}
-
-.cfg-field { margin-bottom: 10px; }
-.cfg-field:last-child { margin-bottom: 0; }
-
-.cfg-label {
-  font-size: 10px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  color: #5A5A5A; margin-bottom: 5px;
-  display: block;
-}
-
-/* Text inputs in configurator */
-.cfg-input {
-  width: 100%; height: 32px;
-  padding: 0 9px;
-  background: #1E1E1E; border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 5px; outline: none;
-  font-size: 12px; font-family: inherit; color: #CCC;
-  transition: border-color 0.1s;
-}
-.cfg-input:focus { border-color: #4338CA; box-shadow: 0 0 0 2px rgba(67,56,202,0.15); }
-.cfg-input::placeholder { color: #444; }
-
-.cfg-textarea {
-  width: 100%; padding: 8px 9px;
-  background: #1E1E1E; border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 5px; outline: none; resize: vertical;
-  font-size: 12px; font-family: inherit; color: #CCC; line-height: 1.5;
-  min-height: 60px;
-}
-.cfg-textarea:focus { border-color: #4338CA; box-shadow: 0 0 0 2px rgba(67,56,202,0.15); }
-
-/* Dropdown */
-.cfg-select {
-  width: 100%; height: 32px;
-  padding: 0 9px;
-  background: #1E1E1E; border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 5px; outline: none; cursor: pointer;
-  font-size: 12px; font-family: inherit; color: #CCC;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23666' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 28px;
-}
-.cfg-select:focus { border-color: #4338CA; box-shadow: 0 0 0 2px rgba(67,56,202,0.15); }
-
-/* Icon and color row */
-.icon-row {
-  display: flex; gap: 6px; flex-wrap: wrap;
-}
-.icon-opt {
-  width: 32px; height: 32px; border-radius: 7px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px; cursor: pointer;
-  background: rgba(255,255,255,0.04);
-  border: 2px solid transparent;
-  transition: border-color 0.1s, background 0.1s;
-}
-.icon-opt.sel { border-color: #4338CA; background: rgba(67,56,202,0.18); }
-.icon-opt:hover:not(.sel) { background: rgba(255,255,255,0.08); }
-
-.color-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.color-opt {
-  width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
-  border: 2px solid transparent; transition: border-color 0.1s, transform 0.1s;
-}
-.color-opt.sel { border-color: white; transform: scale(1.15); }
-.color-opt:hover:not(.sel) { transform: scale(1.1); }
-
-/* ③ Runtime picker */
-.runtime-opts { display: flex; flex-direction: column; gap: 6px; }
-.runtime-opt {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.07);
-  cursor: pointer; background: rgba(255,255,255,0.02);
-  transition: border-color 0.1s, background 0.1s;
-}
-.runtime-opt.sel { border-color: #4338CA; background: rgba(67,56,202,0.1); }
-.runtime-opt:hover:not(.sel) { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); }
-.runtime-radio {
-  width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  transition: border-color 0.1s;
-}
-.runtime-opt.sel .runtime-radio { border-color: #4338CA; }
-.runtime-radio-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: #4338CA; display: none;
-}
-.runtime-opt.sel .runtime-radio-dot { display: block; }
-
-.runtime-info { flex: 1; min-width: 0; }
-.runtime-name { font-size: 12px; font-weight: 500; color: #CCC; }
-.runtime-cost { font-size: 10px; color: #5A5A5A; margin-top: 1px; }
-
-.auth-badge {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
-}
-.auth-ok { background: rgba(16,185,129,0.15); color: #34D399; }
-.auth-warn { background: rgba(245,158,11,0.15); color: #FBBF24; }
-.auth-err { background: rgba(239,68,68,0.12); color: #F87171; }
-
-/* ④ Cron input area */
-.cron-wrap { position: relative; }
-.cron-preview {
-  margin-top: 5px; padding: 5px 9px;
-  background: rgba(67,56,202,0.08);
-  border: 1px solid rgba(67,56,202,0.18);
-  border-radius: 5px;
-  font-size: 11px; color: #818CF8;
-  display: flex; align-items: center; gap: 6px;
-}
-
-/* ⑤ K6 warning banner */
-.k6-banner {
-  margin-top: 8px; padding: 8px 10px;
-  background: rgba(245,158,11,0.08);
-  border: 1px solid rgba(245,158,11,0.2);
-  border-radius: 6px;
-  display: flex; align-items: flex-start; gap: 8px;
-}
-.k6-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
-.k6-text { flex: 1; font-size: 11px; color: #D1A100; line-height: 1.45; }
-.k6-text strong { font-weight: 600; color: #FBBF24; display: block; margin-bottom: 2px; }
-.k6-dismiss {
-  font-size: 13px; color: #8A7000; cursor: pointer;
-  background: none; border: none; flex-shrink: 0; line-height: 1;
-  padding: 2px;
-}
-.k6-dismiss:hover { color: #FBBF24; }
-
-/* ⑦ Skills chips */
-.skills-area {
-  display: flex; flex-wrap: wrap; gap: 6px;
-  padding: 8px; min-height: 38px;
-  background: #1E1E1E; border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 5px; cursor: text;
-}
-.skill-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px; border-radius: 5px;
-  font-size: 11px; font-weight: 500; cursor: default;
-}
-.sc-claude { background: rgba(67,56,202,0.18); color: #818CF8; border: 1px solid rgba(67,56,202,0.25); }
-.sc-shared { background: rgba(100,116,139,0.15); color: #94A3B8; border: 1px solid rgba(100,116,139,0.2); }
-.sc-codex  { background: rgba(16,185,129,0.13); color: #34D399; border: 1px solid rgba(16,185,129,0.2); }
-
-.skill-badge-sm {
-  font-size: 8px; font-weight: 700; letter-spacing: 0.3px;
-  padding: 1px 4px; border-radius: 2px;
-}
-.sbs-claude { background: rgba(67,56,202,0.3); color: #C7D2FE; }
-.sbs-shared { background: rgba(100,116,139,0.3); color: #CBD5E1; }
-.sbs-codex  { background: rgba(16,185,129,0.25); color: #A7F3D0; }
-
-.chip-remove { cursor: pointer; color: inherit; opacity: 0.5; font-size: 13px; line-height: 1; }
-.chip-remove:hover { opacity: 1; }
-
-.skills-add-hint { font-size: 11px; color: #444; font-style: italic; }
-
-/* Tools checkboxes */
-.tool-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 4px 8px;
-}
-.tool-item {
-  display: flex; align-items: center; gap: 7px;
-  padding: 4px 6px; border-radius: 4px;
-  cursor: pointer; transition: background 0.08s;
-}
-.tool-item:hover { background: rgba(255,255,255,0.04); }
-.cb {
-  width: 14px; height: 14px; border-radius: 3px;
-  border: 1.5px solid rgba(255,255,255,0.2); flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: transparent; font-size: 9px;
-  transition: border-color 0.1s, background 0.1s;
-}
-.cb.checked { background: #4338CA; border-color: #4338CA; color: white; }
-.tool-label { font-size: 12px; color: #999; }
-.tool-item:hover .tool-label { color: #CCC; }
-
-/* Budget row */
-.budget-row { display: flex; gap: 8px; align-items: flex-start; }
-.budget-input-wrap { position: relative; flex: 1; }
-.budget-input-wrap::before {
-  content: '$'; position: absolute; left: 9px; top: 50%;
-  transform: translateY(-50%); color: #666; font-size: 12px;
-  pointer-events: none;
-}
-.budget-input {
-  width: 100%; height: 32px; padding: 0 9px 0 22px;
-  background: #1E1E1E; border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 5px; outline: none;
-  font-size: 12px; font-family: inherit; color: #CCC;
-}
-.budget-input:focus { border-color: #4338CA; box-shadow: 0 0 0 2px rgba(67,56,202,0.15); }
-.budget-estimate {
-  font-size: 11px; color: #4A4A4A; padding-top: 9px; white-space: nowrap;
-}
-.budget-est-val { color: #818CF8; }
-
-/* ⑧ Worktree toggle */
-.toggle-row {
-  display: flex; align-items: center; justify-content: space-between;
-}
-.toggle-label-wrap { }
-.toggle-label { font-size: 12px; color: #999; }
-.toggle-desc { font-size: 10px; color: #4A4A4A; margin-top: 2px; }
-.toggle {
-  width: 36px; height: 20px; border-radius: 10px;
-  background: rgba(255,255,255,0.1); cursor: pointer;
-  border: none; position: relative; flex-shrink: 0;
+.proto-toggle {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--ui-font);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
   transition: background 0.15s;
 }
-.toggle.on { background: #4338CA; }
-.toggle::after {
-  content: ''; position: absolute;
-  width: 14px; height: 14px; border-radius: 50%;
-  background: white; top: 3px; left: 3px;
-  transition: left 0.15s; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
-.toggle.on::after { left: 19px; }
+.proto-toggle:hover { background: rgba(255,255,255,0.25); }
 
-/* Annotation markers for configurator */
-.cfg-anno {
-  position: absolute; top: 10px; right: 10px;
-  width: 17px; height: 17px; border-radius: 50%;
-  background: #5B21B6; color: white;
-  font-size: 9px; font-weight: 800;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.5);
-  pointer-events: none;
+/* ════════════════════════════════════════════════════════════
+   APP SHELL  (mirrors App.tsx h-screen flex flex-col)
+   ════════════════════════════════════════════════════════════ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 32px); /* subtract proto banner */
+  background: var(--r-surface);
+  overflow: hidden;
 }
 
-/* Routine row with button */
-.routine-row { display: flex; gap: 6px; }
-.create-flow-btn {
-  height: 32px; padding: 0 10px;
-  background: transparent; border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 5px; color: #818CF8; cursor: pointer;
-  font-size: 11px; font-family: inherit; white-space: nowrap;
-  transition: background 0.1s, border-color 0.1s;
+/* ────────────────────────────────────────────────────────────
+   DOCUMENT HEADER  (mirrors DocumentHeader.tsx  h-10 = 40px)
+   ────────────────────────────────────────────────────────────
+   sticky top-0 left-0 right-0 h-10 bg-surface border-b border-hairline z-[60]
+   ─────────────────────────────────────────────────────────── */
+.doc-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: var(--r-surface);
+  border-bottom: 1px solid var(--r-hairline);
+  z-index: 60;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 6px;
 }
-.create-flow-btn:hover { background: rgba(67,56,202,0.12); border-color: rgba(67,56,202,0.3); }
+.header-left  { display: flex; align-items: center; gap: 6px; }
+.header-mid   { flex: 1; }
+.header-right { display: flex; align-items: center; gap: 6px; }
 
-/* Save bar */
-.cfg-save-bar {
-  flex-shrink: 0; padding: 8px 14px;
-  border-top: 1px solid rgba(255,255,255,0.05);
-  display: flex; justify-content: flex-end;
-  background: #252526;
-}
-.save-btn {
-  height: 30px; padding: 0 16px;
-  background: #4338CA; border: none; border-radius: 5px;
-  color: white; font-size: 12px; font-weight: 500; font-family: inherit;
+/* Toolbar buttons  (variant="toolbar" size="icon-sm") */
+.tbtn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--r-ink-muted);
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(67,56,202,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+  position: relative;
+}
+.tbtn:hover  { background: var(--r-surface-soft); color: var(--r-ink-body); }
+.tbtn.active { background: var(--r-accent-soft);  color: var(--r-accent); }
+.tbtn svg    { width: 14px; height: 14px; stroke-width: 2; fill: none; stroke: currentColor; }
+
+/* Filename breadcrumb chip */
+.filename-chip {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--r-ink-muted);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--r-radius-sm);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.filename-chip .path { color: var(--r-ink-faint); }
+
+/* ────────────────────────────────────────────────────────────
+   EDITOR ROW  (flex-1 flex overflow-hidden)
+   ─────────────────────────────────────────────────────────── */
+.editor-row {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ────────────────────────────────────────────────────────────
+   AGENT CONFIGURATOR PANEL  (220px, matches PropertiesSidePanel)
+   PropertiesSidePanel: w-[220px] flex-shrink-0 h-full overflow-y-auto
+                        border-r border-hairline
+   Inner: flex flex-col gap-3 px-4 py-4
+   ─────────────────────────────────────────────────────────── */
+.agent-panel {
+  width: 220px;
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  border-right: 1px solid var(--r-hairline);
+  background: var(--r-surface);
+}
+.agent-panel-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+/* Panel heading (text-[15px] font-semibold text-ink-strong) */
+.panel-heading {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--r-ink-strong);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.panel-heading svg {
+  width: 16px; height: 16px;
+  stroke: var(--r-accent); fill: none; stroke-width: 2;
+  flex-shrink: 0;
+}
+
+/* Section divider */
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--r-ink-faint);
+}
+.panel-divider {
+  border: none;
+  border-top: 1px solid var(--r-hairline);
+  margin: 4px 0;
+}
+
+/* Input field (compact, matching Ritemark inputs) */
+.p-input {
+  width: 100%;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--r-ink-strong);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-sm);
+  padding: 5px 8px;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.p-input:focus {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 2px var(--r-accent-soft);
+}
+.p-input::placeholder { color: var(--r-ink-faint); }
+
+/* Textarea variant */
+textarea.p-input {
+  resize: none;
+  min-height: 56px;
+  line-height: 1.4;
+}
+
+/* Select (dropdown) */
+.p-select {
+  width: 100%;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--r-ink-strong);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-sm);
+  padding: 5px 8px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 14px;
+  padding-right: 24px;
+  cursor: pointer;
+  outline: none;
+}
+.p-select:focus {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 2px var(--r-accent-soft);
+}
+
+/* Runtime picker — segmented control */
+.runtime-picker {
+  display: flex;
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-sm);
+  overflow: hidden;
+  gap: 0;
+}
+.runtime-btn {
+  flex: 1;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--r-ink-muted);
+  background: transparent;
+  border: none;
+  padding: 5px 0;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  text-align: center;
+}
+.runtime-btn:not(:last-child) { border-right: 1px solid var(--r-hairline); }
+.runtime-btn:hover  { background: var(--r-surface); }
+.runtime-btn.active { background: var(--r-accent-soft); color: var(--r-accent); font-weight: 600; }
+
+/* Auth status row */
+.auth-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--r-ink-muted);
+}
+.auth-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.auth-dot.ok      { background: var(--r-success); }
+.auth-dot.missing { background: var(--r-error); }
+.auth-link {
+  color: var(--r-accent);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: none;
+  margin-left: auto;
+}
+.auth-link:hover { text-decoration: underline; }
+
+/* Toggle row (checkbox-style) */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--r-ink-body);
+  cursor: pointer;
+}
+.toggle-row input[type=checkbox] { accent-color: var(--r-accent); cursor: pointer; }
+
+/* Cron preview pill */
+.cron-preview {
+  font-size: 11px;
+  color: var(--r-ink-muted);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--r-radius-sm);
+  padding: 3px 7px;
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+}
+.cron-human {
+  font-size: 11px;
+  color: var(--r-ink-muted);
+  margin-top: 2px;
+}
+
+/* K6 warning banner */
+.k6-banner {
+  background: var(--r-warning-soft);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--r-radius-sm);
+  padding: 7px 9px;
+  font-size: 11px;
+  color: #78350f;
+  line-height: 1.4;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  position: relative;
+}
+html.dark .k6-banner { color: #fef3c7; }
+.k6-banner svg {
+  width: 13px; height: 13px; flex-shrink: 0; margin-top: 1px;
+  stroke: #92400e; fill: none; stroke-width: 2;
+}
+html.dark .k6-banner svg { stroke: #fbbf24; }
+.k6-dismiss {
+  position: absolute; top: 5px; right: 6px;
+  background: none; border: none; cursor: pointer;
+  color: #92400e; font-size: 14px; line-height: 1;
+  padding: 0; opacity: 0.6;
+}
+html.dark .k6-dismiss { color: #fef3c7; }
+.k6-dismiss:hover { opacity: 1; }
+
+/* Skills multiselect area */
+.skills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.skill-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--r-ink-body);
+  padding: 4px 6px;
+  border-radius: var(--r-radius-sm);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  cursor: pointer;
   transition: background 0.1s;
 }
-.save-btn:hover { background: #3730A3; }
-.save-info { font-size: 11px; color: #4A4A4A; padding: 0 10px; display: flex; align-items: center; }
+.skill-item:hover { background: var(--r-accent-soft); }
+.skill-item input[type=checkbox] { accent-color: var(--r-accent); flex-shrink: 0; }
+.skill-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Provenance badge */
+.prov {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.prov-claude { background: rgba(67,56,202,0.1);  color: #4338CA; border: 1px solid rgba(67,56,202,0.2); }
+.prov-codex  { background: rgba(5,150,105,0.1);  color: #059669; border: 1px solid rgba(5,150,105,0.2); }
+.prov-shared { background: rgba(100,116,139,0.1); color: #475569; border: 1px solid rgba(100,116,139,0.2); }
+
+html.dark .prov-claude { background: rgba(129,140,248,0.15); color: #a5b4fc; border-color: rgba(129,140,248,0.3); }
+html.dark .prov-codex  { background: rgba(52,211,153,0.15);  color: #6ee7b7; border-color: rgba(52,211,153,0.3); }
+html.dark .prov-shared { background: rgba(148,163,184,0.12); color: #94a3b8; border-color: rgba(148,163,184,0.25); }
+
+/* Tools checkboxes */
+.tools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.tool-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--r-ink-body);
+}
+.tool-item input { accent-color: var(--r-accent); }
+
+/* Budget row */
+.budget-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.budget-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.budget-input {
+  width: 72px;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--r-ink-strong);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-sm);
+  padding: 5px 8px;
+  outline: none;
+}
+.budget-input:focus {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 2px var(--r-accent-soft);
+}
+.budget-unit {
+  font-size: 12px;
+  color: var(--r-ink-muted);
+}
+.budget-estimate {
+  font-size: 11px;
+  color: var(--r-ink-muted);
+}
+.budget-estimate strong { color: var(--r-ink-body); font-weight: 600; }
+
+/* Identity icon+color picker row */
+.icon-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.icon-preview {
+  width: 30px; height: 30px;
+  border-radius: var(--r-radius-md);
+  background: var(--r-accent-soft);
+  border: 1px solid var(--r-accent-fainter);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.12s;
+}
+.icon-preview:hover { border-color: var(--r-accent); }
+.color-swatches {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.swatch {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.swatch:hover  { transform: scale(1.15); }
+.swatch.active { border-color: var(--r-ink-strong); }
+
+/* ────────────────────────────────────────────────────────────
+   EDITOR AREA  (flex-1 overflow-y-auto)
+   ─────────────────────────────────────────────────────────── */
+.editor-area {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--r-surface);
+  position: relative;
+}
+.editor-content {
+  font-family: var(--editor-font);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--r-ink-body);
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 40px 64px;
+}
+
+/* Fake TipTap ProseMirror styles */
+.editor-content h1 {
+  font-size: 1.75em; font-weight: 700; color: var(--r-ink-strong);
+  margin: 0 0 0.5em; line-height: 1.2;
+}
+.editor-content h2 {
+  font-size: 1.25em; font-weight: 600; color: var(--r-ink-strong);
+  margin: 1.4em 0 0.4em;
+}
+.editor-content h3 {
+  font-size: 1em; font-weight: 600; color: var(--r-ink-strong);
+  margin: 1.2em 0 0.3em;
+}
+.editor-content p  { margin: 0.6em 0; }
+.editor-content ul { margin: 0.5em 0; padding-left: 1.5em; }
+.editor-content li { margin: 0.25em 0; }
+.editor-content code {
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-size: 0.88em;
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--r-ink-strong);
+}
+.editor-content pre {
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--r-radius-md);
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.editor-content pre code {
+  background: none; border: none; padding: 0; font-size: 0.85em;
+}
+.editor-content blockquote {
+  border-left: 3px solid var(--r-accent);
+  margin: 0.8em 0;
+  padding-left: 1em;
+  color: var(--r-ink-muted);
+}
+
+/* Frontmatter badge (shown at top of editor in agent mode instead of raw YAML) */
+.fm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--ui-font);
+  font-weight: 500;
+  color: var(--r-ink-muted);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--r-radius-sm);
+  padding: 3px 9px;
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+.fm-badge:hover { border-color: var(--r-accent); color: var(--r-accent); }
+.fm-badge svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+/* TipTap cursor */
+.cursor {
+  display: inline-block;
+  width: 2px; height: 1.1em;
+  background: var(--r-accent);
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ════════════════════════════════════════════════════════════
+   ANNOTATION CALLOUTS
+   ════════════════════════════════════════════════════════════ */
+.anno {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  background: #f59e0b;
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: var(--ui-font);
+  border-radius: 50%;
+  flex-shrink: 0;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Annotation tooltips */
+.anno-wrap { position: relative; display: inline-flex; align-items: center; }
+.anno-tip {
+  display: none;
+  position: absolute;
+  left: 24px; top: 50%;
+  transform: translateY(-50%);
+  background: var(--r-ink-strong);
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 5px;
+  z-index: 200;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.anno-tip::before {
+  content: '';
+  position: absolute;
+  right: 100%; top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: var(--r-ink-strong);
+}
+.anno-wrap:hover .anno-tip { display: block; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--r-hairline-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--r-ink-faint); }
+
 </style>
 </head>
 <body>
 
+<!-- ══════════════════════════════════════════════════════════
+     PROTO BANNER  (not part of real UI)
+     ══════════════════════════════════════════════════════════ -->
 <div class="proto-banner">
-  Sprint 77 Prototype · ritemark.agentEditor combined webview · Annotated new elements ①–⑧
-  <span class="proto-tag">DESIGN REVIEW</span>
+  <div class="proto-banner-left">
+    <span class="proto-badge">Sprint 77</span>
+    <span>ritemark.editor — Agent Mode &middot; 220px left panel (same pattern as TOC / Properties)</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="proto-toggle" onclick="toggleDark()" id="dark-btn">Dark mode</button>
+    <button class="proto-toggle" onclick="togglePanel()" id="panel-btn">Hide panel</button>
+  </div>
 </div>
 
-<div class="vscode">
-  <div class="vs-titlebar">
-    <div class="tl tl-r"></div>
-    <div class="tl tl-y"></div>
-    <div class="tl tl-g"></div>
-    <span class="vs-bar-title">Ritemark — bug-cruncher.md</span>
-  </div>
+<!-- ══════════════════════════════════════════════════════════
+     APP SHELL
+     ══════════════════════════════════════════════════════════ -->
+<div class="app" id="app">
 
-  <!-- File tabs row -->
-  <div class="tab-row">
-    <div class="file-tab">
-      <span class="file-tab-icon">📄</span>
-      bug-cruncher.md
-      <button class="file-tab-close">✕</button>
+  <!-- ── DOCUMENT HEADER ── -->
+  <header class="doc-header">
+    <!-- Left: toggle buttons -->
+    <div class="header-left">
+      <!-- Contents (TOC) button — inactive, greyed out -->
+      <button class="tbtn" title="Contents">
+        <svg viewBox="0 0 16 16"><line x1="3" y1="4" x2="13" y2="4"/><line x1="3" y1="8" x2="10" y2="8"/><line x1="3" y1="12" x2="11" y2="12"/></svg>
+      </button>
+      <!-- Properties button — inactive -->
+      <button class="tbtn" title="Properties (frontmatter)">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.8" fill="currentColor"/></svg>
+      </button>
+      <!-- ① NEW: Agent Config toggle — ACTIVE (only for .claude/agents/*.md) -->
+      <div class="anno-wrap" style="display:inline-flex;align-items:center;gap:4px;">
+        <button class="tbtn active" title="Agent Configurator" id="agent-toggle-btn" onclick="togglePanel()">
+          <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><line x1="9" y1="7" x2="12" y2="7"/><line x1="9" y1="9.5" x2="11" y2="9.5"/><line x1="4" y1="11" x2="12" y2="11" stroke-dasharray="1.5 1.5"/></svg>
+        </button>
+        <span class="anno">①</span>
+        <span class="anno-tip">NEW: "Agent Config" toggle button — auto-activates for .claude/agents/*.md files. Same toolbar button pattern as Contents / Properties.</span>
+      </div>
     </div>
-    <div class="inactive-tab">CLAUDE.md</div>
-    <div class="inactive-tab">pr-reviewer.md</div>
-  </div>
 
-  <!-- Editor body: left (TipTap) + right (Configurator) -->
-  <div class="editor-body">
+    <!-- Centre: filename breadcrumb -->
+    <div class="header-mid" style="display:flex;justify-content:center;">
+      <span class="filename-chip">
+        <span class="path">.claude/agents/</span>sprint-manager.md
+      </span>
+    </div>
 
-    <!-- ① Left: Markdown editor (TipTap body) -->
-    <div class="md-editor">
-      <!-- ①② Annotations for editor area -->
-      <div class="area-anno">
-        <div class="area-anno-num">1</div>
-        ritemark.agentEditor — new custom editor (not ritemark.editor)
-      </div>
+    <!-- Right: export -->
+    <div class="header-right">
+      <button class="tbtn" title="Export">
+        <svg viewBox="0 0 16 16"><path d="M8 3v7M5 7l3 3 3-3"/><path d="M3 12h10"/></svg>
+      </button>
+    </div>
+  </header>
 
-      <div class="breadcrumb">.claude › agents › bug-cruncher.md</div>
+  <!-- ── EDITOR ROW ── -->
+  <div class="editor-row">
 
-      <!-- TipTap-style toolbar -->
-      <div class="editor-toolbar">
-        <button class="tb-btn active" title="Bold"><strong>B</strong></button>
-        <button class="tb-btn" title="Italic"><em>I</em></button>
-        <button class="tb-btn" title="Code" style="font-family:monospace">&lt;/&gt;</button>
-        <div class="tb-sep"></div>
-        <button class="tb-btn" title="Heading 1" style="font-size:11px">H1</button>
-        <button class="tb-btn" title="Heading 2" style="font-size:11px">H2</button>
-        <div class="tb-sep"></div>
-        <button class="tb-btn" title="Bullet list">• list</button>
-        <button class="tb-btn" title="Numbered list">1. list</button>
-        <div class="tb-sep"></div>
-        <button class="tb-btn" title="Link">🔗</button>
-        <div class="tb-sep" style="margin-left:auto"></div>
-        <button class="tb-btn" title="Undo" style="font-size:14px">↩</button>
-        <button class="tb-btn" title="Redo" style="font-size:14px">↪</button>
-      </div>
+    <!-- ════════════════════════════════════════════════
+         AGENT CONFIGURATOR PANEL  (220px)
+         Matches PropertiesSidePanel exactly:
+           w-[220px] flex-shrink-0 h-full overflow-y-auto
+           border-r border-hairline   bg: vscode-editor-background
+         Inner: flex flex-col gap-3 px-4 py-4
+         ════════════════════════════════════════════════ -->
+    <div class="agent-panel" id="agent-panel">
+      <div class="agent-panel-inner">
 
-      <!-- Editor content -->
+        <!-- Panel heading -->
+        <div class="panel-heading">
+          <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><line x1="9" y1="7" x2="12" y2="7"/><line x1="9" y1="9.5" x2="11" y2="9.5"/></svg>
+          Agent
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── IDENTITY ── -->
+        <div class="panel-section">
+          <span class="section-label">Identity</span>
+
+          <!-- Icon + color row -->
+          <div class="icon-color-row">
+            <div class="icon-preview" title="Click to change icon">🤖</div>
+            <div class="color-swatches">
+              <div class="swatch active" style="background:#4338ca;" title="Indigo (default)"></div>
+              <div class="swatch" style="background:#0891b2;" title="Cyan"></div>
+              <div class="swatch" style="background:#059669;" title="Emerald"></div>
+              <div class="swatch" style="background:#dc2626;" title="Red"></div>
+              <div class="swatch" style="background:#d97706;" title="Amber"></div>
+              <div class="swatch" style="background:#7c3aed;" title="Violet"></div>
+              <div class="swatch" style="background:#64748b;" title="Slate"></div>
+            </div>
+          </div>
+
+          <!-- Name -->
+          <input class="p-input" type="text" value="sprint-manager" placeholder="agent-name">
+
+          <!-- Description -->
+          <textarea class="p-input" placeholder="Short description…" rows="3">Sprint manager agent for Ritemark Native. Enforces 6-phase workflow with hard approval gates.</textarea>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── RUNTIME ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Runtime</span>
+            <div class="anno-wrap">
+              <span class="anno">②</span>
+              <span class="anno-tip">NEW: Runtime picker — segmented control. Defaults to claude. Auth status indicator shows API key health.</span>
+            </div>
+          </div>
+
+          <!-- Segmented runtime picker -->
+          <div class="runtime-picker">
+            <button class="runtime-btn active">Claude</button>
+            <button class="runtime-btn">Codex</button>
+            <button class="runtime-btn">OpenAI</button>
+          </div>
+
+          <!-- Auth status row -->
+          <div class="auth-row">
+            <div class="auth-dot ok"></div>
+            <span>API key configured</span>
+            <a class="auth-link" href="#">Settings</a>
+          </div>
+
+          <!-- Model dropdown -->
+          <select class="p-select" title="Model">
+            <option>claude-opus-4-8 (latest)</option>
+            <option selected>claude-sonnet-4-6</option>
+            <option>claude-haiku-4-5</option>
+          </select>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── SCHEDULE ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Schedule</span>
+            <div class="anno-wrap">
+              <span class="anno">③</span>
+              <span class="anno-tip">NEW: Schedule section with cron input and cron-parser preview. Shows K6 warning banner when enabled.</span>
+            </div>
+          </div>
+
+          <label class="toggle-row">
+            <input type="checkbox" id="sched-toggle" onchange="toggleSchedule(this)"> Enable schedule
+          </label>
+
+          <div id="sched-fields" style="display:none;flex-direction:column;gap:6px;">
+            <!-- Cron expression -->
+            <input class="p-input" type="text" id="cron-input" value="0 */6 * * *"
+              placeholder="0 9 * * 1-5" oninput="updateCron(this.value)">
+            <!-- Human-readable preview (cron-parser) -->
+            <div class="anno-wrap">
+              <div class="cron-preview" id="cron-preview">0 */6 * * *</div>
+              <div class="anno" style="margin-left:4px;">④</div>
+              <span class="anno-tip">NEW: cron-parser preview — "0 */6 * * *" → "Every 6 hours". Rendered by cron-parser npm package at runtime.</span>
+            </div>
+            <div class="cron-human" id="cron-human">Every 6 hours</div>
+
+            <!-- K6 Warning Banner -->
+            <div class="anno-wrap" style="width:100%;">
+              <div class="k6-banner">
+                <svg viewBox="0 0 16 16"><path d="M8 2L14 13H2L8 2z"/><line x1="8" y1="7" x2="8" y2="10"/><circle cx="8" cy="11.5" r="0.5" fill="currentColor"/></svg>
+                <span>Scheduled runs execute only while Ritemark is open. Reliable background execution ships in Phase 2.</span>
+                <button class="k6-dismiss" title="Dismiss">×</button>
+              </div>
+              <span class="anno" style="position:absolute;top:-6px;right:-6px;">⑤</span>
+            </div>
+          </div>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── ROUTINE ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Routine</span>
+            <div class="anno-wrap">
+              <span class="anno">⑥</span>
+              <span class="anno-tip">NEW: Routine — when should this agent auto-run? Maps to Claude Code lifecycle hooks.</span>
+            </div>
+          </div>
+          <select class="p-select">
+            <option value="">Manual only</option>
+            <option value="on_open" selected>On file open</option>
+            <option value="on_save">On save</option>
+            <option value="on_commit">Pre-commit</option>
+          </select>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── SKILLS ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Skills</span>
+            <div class="anno-wrap">
+              <span class="anno">⑦</span>
+              <span class="anno-tip">NEW: Skills multiselect with provenance badges [claude] / [codex] / [shared]. Shared = present in both .claude/skills/ and .agents/skills/.</span>
+            </div>
+          </div>
+          <div class="skills-list">
+            <label class="skill-item">
+              <input type="checkbox" checked>
+              <span class="skill-name">vscode-development</span>
+              <span class="prov prov-claude">claude</span>
+            </label>
+            <label class="skill-item">
+              <input type="checkbox" checked>
+              <span class="skill-name">feature-flags</span>
+              <span class="prov prov-shared">shared</span>
+            </label>
+            <label class="skill-item">
+              <input type="checkbox">
+              <span class="skill-name">release</span>
+              <span class="prov prov-claude">claude</span>
+            </label>
+            <label class="skill-item">
+              <input type="checkbox">
+              <span class="skill-name">code-review</span>
+              <span class="prov prov-codex">codex</span>
+            </label>
+            <label class="skill-item">
+              <input type="checkbox">
+              <span class="skill-name">ritemark-flows</span>
+              <span class="prov prov-shared">shared</span>
+            </label>
+          </div>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── ALLOWED TOOLS ── -->
+        <div class="panel-section">
+          <span class="section-label">Allowed Tools</span>
+          <div class="tools-grid">
+            <label class="tool-item"><input type="checkbox" checked> Read</label>
+            <label class="tool-item"><input type="checkbox" checked> Edit</label>
+            <label class="tool-item"><input type="checkbox" checked> Write</label>
+            <label class="tool-item"><input type="checkbox" checked> Bash</label>
+            <label class="tool-item"><input type="checkbox" checked> Glob</label>
+            <label class="tool-item"><input type="checkbox" checked> Grep</label>
+            <label class="tool-item"><input type="checkbox"> Agent</label>
+            <label class="tool-item"><input type="checkbox"> WebFetch</label>
+          </div>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── BUDGET ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Budget</span>
+            <div class="anno-wrap">
+              <span class="anno">⑧</span>
+              <span class="anno-tip">NEW: Per-run token budget + monthly cost estimate. Estimate = budget × schedule frequency.</span>
+            </div>
+          </div>
+          <div class="budget-row">
+            <div class="budget-input-row">
+              <span class="budget-unit">$</span>
+              <input class="budget-input" type="number" value="0.05" step="0.01" min="0" placeholder="0.05">
+              <span class="budget-unit">per run</span>
+            </div>
+            <div class="budget-estimate">
+              Estimate: <strong>~$0.90 / month</strong> at current schedule
+            </div>
+          </div>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── WORKTREE ── -->
+        <div class="panel-section" style="padding-bottom:8px;">
+          <span class="section-label">Isolation</span>
+          <label class="toggle-row">
+            <input type="checkbox"> Run in git worktree
+          </label>
+          <div style="font-size:11px;color:var(--r-ink-faint);margin-top:2px;line-height:1.4;">
+            Isolates agent runs in a separate working tree
+          </div>
+        </div>
+
+      </div><!-- /agent-panel-inner -->
+    </div><!-- /agent-panel -->
+
+    <!-- ════════════════════════════════════════════════
+         EDITOR AREA  (flex-1)
+         Mirrors: <div class="flex-1 overflow-y-auto">
+                    <Editor … />
+                  </div>
+         ════════════════════════════════════════════════ -->
+    <div class="editor-area">
       <div class="editor-content">
-        <div class="doc-text">
-          <p>You are a release-stability triager. When invoked by your routine, you inspect new issues on the project repo, classify them by severity, and write a digest into <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:12px">docs/bug-digests/&lt;YYYY-MM-DD&gt;.md</code>. Be terse.</p>
-          <p>For each issue, assess:</p>
-          <p>1. <strong>Severity</strong> — P0 (regression / data loss), P1 (broken feature), P2 (cosmetic / minor), Wishlist</p>
-          <p>2. <strong>Component</strong> — which subsystem is affected</p>
-          <p>3. <strong>Actionability</strong> — clear repro steps, or needs more info<span class="cursor"></span></p>
+
+        <!-- "Frontmatter managed by Agent Configurator" pill -->
+        <div class="fm-badge" title="Frontmatter fields are managed by the Agent Configurator panel">
+          <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><line x1="5" y1="7" x2="11" y2="7"/><line x1="5" y1="10" x2="9" y2="10"/></svg>
+          Frontmatter managed by Agent Configurator
         </div>
+
+        <!-- Fake TipTap content — body of sprint-manager.md -->
+        <h1>Sprint Manager Agent</h1>
+
+        <p>Sprint manager agent for Ritemark Native. Enforces a strict 6-phase workflow with <strong>hard approval gates</strong>. REFUSES to write code without explicit approval from Jarmo.</p>
+
+        <h2>Instructions</h2>
+
+        <p>You are the sprint manager for Ritemark Native. Your job is to plan and manage development sprints following the SDD (Spec-Driven Development) process.</p>
+
+        <h3>Phase workflow</h3>
+
+        <ul>
+          <li><strong>Phase 1 — Investigate:</strong> Gather requirements, read relevant files, ask clarifying questions</li>
+          <li><strong>Phase 2 — Plan:</strong> Produce 5 SDD artifacts (spec, scenarios, technical-plan, tasks, sprint-plan)</li>
+          <li><strong>Phase 3 — Implement:</strong> Only after explicit approval. One workstream at a time.</li>
+          <li><strong>Phase 4 — QA:</strong> Run <code>qa-validator</code> before any commit</li>
+          <li><strong>Phase 5 — Release:</strong> Invoke <code>release-manager</code> with both gates satisfied</li>
+          <li><strong>Phase 6 — Retrospective:</strong> Document learnings, update skills</li>
+        </ul>
+
+        <h3>Hard rules</h3>
+
+        <blockquote>
+          Never write implementation code before Jarmo types "approved", "Jarmo approved", or "proceed". If you receive ambiguous approval, ask for confirmation.
+        </blockquote>
+
+        <p>Sprint branches follow the pattern <code>sprint-NN-short-name</code>. Create the branch immediately after approval, before touching any source file.</p>
+
+        <h2>When to invoke expert agents</h2>
+
+        <p>Subagent routing is mandatory — do not implement VS Code build changes, webview changes, or UX design without first invoking the relevant expert agent:</p>
+
+        <ul>
+          <li><code>vscode-expert</code> — builds, patches, extension errors</li>
+          <li><code>webview-expert</code> — TipTap, Vite, React webview</li>
+          <li><code>ux-expert</code> — all UI/UX design decisions</li>
+          <li><code>qa-validator</code> — before every commit</li>
+        </ul>
+
+        <p>Use <code>sprint-manager</code> (this agent) for all sprint planning and workflow enforcement.<span class="cursor"></span></p>
+
       </div>
-    </div>
+    </div><!-- /editor-area -->
 
-    <!-- ② Right: Agent Configurator -->
-    <div class="configurator">
-      <div class="cfg-header">
-        <span class="cfg-title">Agent Configurator</span>
-        <div class="cfg-actions">
-          <button class="ib" title="Open in editor">⬡</button>
-          <button class="ib" title="More">⋯</button>
-        </div>
-      </div>
-
-      <div class="cfg-scroll">
-
-        <!-- IDENTITY -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">Identity</div>
-
-          <div class="cfg-field">
-            <label class="cfg-label">Name</label>
-            <input class="cfg-input" type="text" value="Bug Cruncher">
-          </div>
-
-          <div class="cfg-field">
-            <label class="cfg-label">Icon</label>
-            <div class="icon-row">
-              <div class="icon-opt sel" title="Bug">🐛</div>
-              <div class="icon-opt" title="Search">🔍</div>
-              <div class="icon-opt" title="Lightning">⚡</div>
-              <div class="icon-opt" title="Robot">🤖</div>
-              <div class="icon-opt" title="Wrench">🔧</div>
-              <div class="icon-opt" title="Sparkle">✨</div>
-              <div class="icon-opt" title="Document">📄</div>
-              <div class="icon-opt" title="More icons…" style="font-size:11px;color:#555">···</div>
-            </div>
-          </div>
-
-          <div class="cfg-field">
-            <label class="cfg-label">Color</label>
-            <div class="color-row">
-              <div class="color-opt sel" style="background:#EF4444" title="Red"></div>
-              <div class="color-opt" style="background:#4338CA" title="Indigo"></div>
-              <div class="color-opt" style="background:#8B5CF6" title="Violet"></div>
-              <div class="color-opt" style="background:#10B981" title="Emerald"></div>
-              <div class="color-opt" style="background:#14B8A6" title="Teal"></div>
-              <div class="color-opt" style="background:#F59E0B" title="Amber"></div>
-              <div class="color-opt" style="background:#F43F5E" title="Rose"></div>
-              <div class="color-opt" style="background:#64748B" title="Slate"></div>
-            </div>
-          </div>
-
-          <div class="cfg-field">
-            <label class="cfg-label">Description</label>
-            <textarea class="cfg-textarea" rows="2">Triages new GitHub issues every 6 hours and writes a digest.</textarea>
-          </div>
-        </div>
-
-        <!-- ③ RUNTIME -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">
-            Runtime
-            <div class="cfg-anno">3</div>
-          </div>
-
-          <div class="runtime-opts">
-            <div class="runtime-opt sel" onclick="selectRuntime(this)">
-              <div class="runtime-radio"><div class="runtime-radio-dot"></div></div>
-              <div class="runtime-info">
-                <div class="runtime-name">claude_local</div>
-                <div class="runtime-cost">Claude Agent SDK · agent SDK credit</div>
-              </div>
-              <span class="auth-badge auth-ok">✓ authed</span>
-            </div>
-            <div class="runtime-opt" onclick="selectRuntime(this)">
-              <div class="runtime-radio"><div class="runtime-radio-dot"></div></div>
-              <div class="runtime-info">
-                <div class="runtime-name">codex_local</div>
-                <div class="runtime-cost">Codex CLI · ChatGPT OAuth</div>
-              </div>
-              <span class="auth-badge auth-ok">✓ authed</span>
-            </div>
-            <div class="runtime-opt" onclick="selectRuntime(this)">
-              <div class="runtime-radio"><div class="runtime-radio-dot"></div></div>
-              <div class="runtime-info">
-                <div class="runtime-name">openai_api</div>
-                <div class="runtime-cost">OpenAI API · BYO key</div>
-              </div>
-              <span class="auth-badge auth-warn">⚠ key needed</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- MODEL -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">Model</div>
-          <div class="cfg-field">
-            <select class="cfg-select">
-              <option>claude-sonnet-4-6 (default)</option>
-              <option>claude-opus-4-8</option>
-              <option>claude-haiku-4-5</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- ④⑤ SCHEDULE -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">
-            Schedule
-            <div class="cfg-anno" style="right:30px">4</div>
-            <div class="cfg-anno">5</div>
-          </div>
-
-          <div class="cfg-field">
-            <label class="cfg-label">Cron expression</label>
-            <div class="cron-wrap">
-              <input class="cfg-input" type="text" id="cronInput" value="0 */6 * * *" placeholder="e.g. 0 9 * * MON-FRI" oninput="updateCronPreview(this.value)">
-              <!-- ④ Human-readable preview -->
-              <div class="cron-preview" id="cronPreview">
-                <span>↻</span>
-                <span id="cronPreviewText">Every 6 hours</span>
-              </div>
-            </div>
-            <!-- ⑤ K6 warning banner -->
-            <div class="k6-banner" id="k6Banner">
-              <span class="k6-icon">⚠</span>
-              <div class="k6-text">
-                <strong>Background execution not yet available</strong>
-                Scheduled runs execute only while Ritemark is open. Reliable background execution ships in Phase 2.
-              </div>
-              <button class="k6-dismiss" title="Dismiss" onclick="dismissK6()">✕</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ⑥ ROUTINE -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">
-            Routine
-            <div class="cfg-anno">6</div>
-          </div>
-          <div class="cfg-field">
-            <label class="cfg-label">Flow file</label>
-            <div class="routine-row">
-              <select class="cfg-select">
-                <option>bug-cruncher.flow.json</option>
-                <option>standalone.flow.json</option>
-              </select>
-              <button class="create-flow-btn" title="Create new flow">+ New flow</button>
-            </div>
-            <div style="margin-top:5px;font-size:10px;color:#4A4A4A">↳ <span style="color:#818CF8;cursor:pointer">Open in Flow Editor</span></div>
-          </div>
-        </div>
-
-        <!-- ⑦ SKILLS -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">
-            Skills
-            <div class="cfg-anno">7</div>
-          </div>
-          <div class="cfg-field">
-            <label class="cfg-label">Scoped skills (resolved across .claude/ + .agents/)</label>
-            <div class="skills-area" id="skillsArea">
-              <span class="skill-chip sc-claude">
-                gh-issue-reader
-                <span class="skill-badge-sm sbs-claude">claude</span>
-                <span class="chip-remove" onclick="removeSkill(this)">✕</span>
-              </span>
-              <span class="skill-chip sc-shared">
-                markdown-digest-writer
-                <span class="skill-badge-sm sbs-shared">shared</span>
-                <span class="chip-remove" onclick="removeSkill(this)">✕</span>
-              </span>
-              <span class="skills-add-hint">+ Add skill…</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- ALLOWED TOOLS -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">Allowed Tools</div>
-          <div class="cfg-field">
-            <div class="tool-grid">
-              <div class="tool-item" onclick="toggleCb(this)">
-                <div class="cb checked">✓</div>
-                <span class="tool-label">Read</span>
-              </div>
-              <div class="tool-item" onclick="toggleCb(this)">
-                <div class="cb checked">✓</div>
-                <span class="tool-label">Write</span>
-              </div>
-              <div class="tool-item" onclick="toggleCb(this)">
-                <div class="cb checked">✓</div>
-                <span class="tool-label">Bash</span>
-              </div>
-              <div class="tool-item" onclick="toggleCb(this)">
-                <div class="cb checked">✓</div>
-                <span class="tool-label">Edit</span>
-              </div>
-              <div class="tool-item" onclick="toggleCb(this)">
-                <div class="cb"></div>
-                <span class="tool-label">Glob</span>
-              </div>
-              <div class="tool-item" onclick="toggleCb(this)">
-                <div class="cb"></div>
-                <span class="tool-label">Grep</span>
-              </div>
-              <div class="tool-item" onclick="toggleCb(this)">
-                <div class="cb"></div>
-                <span class="tool-label">Agent</span>
-              </div>
-              <div class="tool-item" onclick="toggleCb(this)">
-                <div class="cb"></div>
-                <span class="tool-label">WebFetch</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ⑧ BUDGET -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">
-            Budget
-            <div class="cfg-anno">8</div>
-          </div>
-          <div class="cfg-field">
-            <label class="cfg-label">Max cost per run (USD)</label>
-            <div class="budget-row">
-              <div class="budget-input-wrap">
-                <input class="budget-input" type="number" min="0" step="0.01" value="0.50" id="budgetInput" oninput="updateEstimate()">
-              </div>
-              <div class="budget-estimate" id="budgetEstimate">~ <span class="budget-est-val">$0.12</span> est / run</div>
-            </div>
-            <div style="margin-top:5px;font-size:10px;color:#3A3A3A">Budget enforcement active in Phase 2. Shown as estimate only.</div>
-          </div>
-        </div>
-
-        <!-- WORKTREE -->
-        <div class="cfg-section">
-          <div class="cfg-sec-title">Worktree Isolation</div>
-          <div class="cfg-field">
-            <div class="toggle-row">
-              <div class="toggle-label-wrap">
-                <div class="toggle-label">Isolated git worktree per run</div>
-                <div class="toggle-desc">Each scheduled run executes inside a temporary worktree (Phase 2).</div>
-              </div>
-              <button class="toggle" id="worktreeToggle" onclick="toggleWorktree(this)"></button>
-            </div>
-          </div>
-        </div>
-
-        <!-- bottom padding -->
-        <div style="height:16px"></div>
-
-      </div><!-- /cfg-scroll -->
-
-      <!-- Save bar -->
-      <div class="cfg-save-bar">
-        <span class="save-info">Edits write to frontmatter</span>
-        <button class="save-btn">Save</button>
-      </div>
-    </div><!-- /configurator -->
-
-  </div><!-- /editor-body -->
-</div><!-- /vscode -->
-
-<!-- Annotation legend overlay (collapsible) -->
-<div style="position:fixed;bottom:0;left:0;right:0;background:#1A1A2E;border-top:1px solid rgba(255,255,255,0.06);padding:8px 16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;z-index:100" id="annoLegend">
-  <span style="font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#818CF8;white-space:nowrap">New in Sprint 77:</span>
-  <span style="font-size:10px;color:#6B7280">
-    <span style="background:#5B21B6;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;margin-right:4px">1</span>ritemark.agentEditor custom editor
-  </span>
-  <span style="font-size:10px;color:#6B7280">
-    <span style="background:#5B21B6;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;margin-right:4px">2</span>Split editor + Configurator layout
-  </span>
-  <span style="font-size:10px;color:#6B7280">
-    <span style="background:#5B21B6;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;margin-right:4px">3</span>Runtime picker + auth status
-  </span>
-  <span style="font-size:10px;color:#6B7280">
-    <span style="background:#5B21B6;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;margin-right:4px">4</span>Cron + human-readable preview
-  </span>
-  <span style="font-size:10px;color:#6B7280">
-    <span style="background:#5B21B6;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;margin-right:4px">5</span>K6 warning banner
-  </span>
-  <span style="font-size:10px;color:#6B7280">
-    <span style="background:#5B21B6;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;margin-right:4px">6</span>Routine → flow link
-  </span>
-  <span style="font-size:10px;color:#6B7280">
-    <span style="background:#5B21B6;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;margin-right:4px">7</span>Skills multiselect + provenance
-  </span>
-  <span style="font-size:10px;color:#6B7280">
-    <span style="background:#5B21B6;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;margin-right:4px">8</span>Budget + cost estimate
-  </span>
-  <button onclick="document.getElementById('annoLegend').style.display='none'" style="margin-left:auto;background:none;border:none;color:#4A4A6A;cursor:pointer;font-size:12px">✕</button>
-</div>
+  </div><!-- /editor-row -->
+</div><!-- /app -->
 
 <script>
-// ③ Runtime selection
-function selectRuntime(el) {
-  document.querySelectorAll('.runtime-opt').forEach(o => o.classList.remove('sel'));
-  el.classList.add('sel');
+function toggleDark() {
+  const html = document.documentElement;
+  const btn  = document.getElementById('dark-btn');
+  html.classList.toggle('dark');
+  btn.textContent = html.classList.contains('dark') ? 'Light mode' : 'Dark mode';
 }
 
-// ④ Cron preview (simplified mapping for prototype)
-const cronPreviews = {
-  '0 */6 * * *': 'Every 6 hours',
-  '0 9 * * MON-FRI': 'Weekdays at 9:00 AM',
-  '0 9 * * 1-5': 'Weekdays at 9:00 AM',
-  '*/30 * * * *': 'Every 30 minutes',
-  '0 0 * * *': 'Daily at midnight',
-  '0 8 * * 1': 'Mondays at 8:00 AM',
-  '0 */2 * * *': 'Every 2 hours',
-};
-function updateCronPreview(val) {
-  const preview = cronPreviews[val.trim()] || (val.trim() ? 'Custom schedule' : '');
-  document.getElementById('cronPreviewText').textContent = preview || '—';
+function togglePanel() {
+  const panel = document.getElementById('agent-panel');
+  const btn   = document.getElementById('panel-btn');
+  const tbtn  = document.getElementById('agent-toggle-btn');
+  const hidden = panel.style.display === 'none';
+  panel.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? 'Hide panel' : 'Show panel';
+  tbtn.classList.toggle('active', hidden);
 }
 
-// ⑤ K6 dismiss
-function dismissK6() {
-  document.getElementById('k6Banner').style.display = 'none';
+function toggleSchedule(cb) {
+  const fields = document.getElementById('sched-fields');
+  fields.style.display = cb.checked ? 'flex' : 'none';
 }
 
-// ⑦ Skill chip removal
-function removeSkill(btn) {
-  btn.closest('.skill-chip').remove();
+function updateCron(val) {
+  document.getElementById('cron-preview').textContent = val || '—';
+  // Simplified human-readable mapping (real impl uses cron-parser package)
+  const humanMap = {
+    '0 */6 * * *':  'Every 6 hours',
+    '0 9 * * 1-5':  'Weekdays at 9:00 AM',
+    '0 9 * * *':    'Every day at 9:00 AM',
+    '0 0 * * *':    'Every day at midnight',
+    '*/30 * * * *': 'Every 30 minutes',
+    '0 * * * *':    'Every hour',
+  };
+  document.getElementById('cron-human').textContent = humanMap[val] || '(cron-parser preview)';
 }
 
-// Tool toggle
-function toggleCb(item) {
-  const cb = item.querySelector('.cb');
-  cb.classList.toggle('checked');
-  cb.textContent = cb.classList.contains('checked') ? '✓' : '';
-}
+// Dismiss K6 banner
+document.querySelector('.k6-dismiss').addEventListener('click', function() {
+  this.closest('.k6-banner').style.display = 'none';
+});
 
-// ⑧ Budget estimate
-function updateEstimate() {
-  const val = parseFloat(document.getElementById('budgetInput').value) || 0;
-  const est = (val * 0.24).toFixed(2);
-  document.getElementById('budgetEstimate').innerHTML = '~ <span class="budget-est-val">$' + est + '</span> est / run';
-}
-
-// Worktree toggle
-function toggleWorktree(btn) {
-  btn.classList.toggle('on');
-}
-
-// Icon picker
-document.querySelectorAll('.icon-opt').forEach(o => {
-  o.addEventListener('click', function() {
-    document.querySelectorAll('.icon-opt').forEach(x => x.classList.remove('sel'));
-    this.classList.add('sel');
+// Color swatch selection
+document.querySelectorAll('.swatch').forEach(s => {
+  s.addEventListener('click', function() {
+    document.querySelectorAll('.swatch').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
   });
 });
 
-// Color picker
-document.querySelectorAll('.color-opt').forEach(o => {
-  o.addEventListener('click', function() {
-    document.querySelectorAll('.color-opt').forEach(x => x.classList.remove('sel'));
-    this.classList.add('sel');
+// Runtime button selection
+document.querySelectorAll('.runtime-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.runtime-btn').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+    // Update auth status based on runtime
+    const dot  = document.querySelector('.auth-dot');
+    const text = dot.nextSibling;
+    const link = document.querySelector('.auth-link');
+    if (this.textContent === 'Codex') {
+      dot.className = 'auth-dot missing';
+      text.textContent = 'API key missing';
+      link.textContent = 'Configure';
+    } else {
+      dot.className = 'auth-dot ok';
+      text.textContent = 'API key configured';
+      link.textContent = 'Settings';
+    }
   });
 });
 </script>
