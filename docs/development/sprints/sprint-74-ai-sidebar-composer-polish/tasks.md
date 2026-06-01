@@ -2,10 +2,22 @@
 
 ## Phase 1: R1 — Plan Review Card Fix
 
-- [ ] In `AgentResponse.tsx`, change `needsApproval` condition: `!turn.pendingPlanApproval` → `!!turn.pendingPlanApproval`
-- [ ] Verify that the plan-text display path (`extractPlanDisplayText(turn.planText)` → `RenderedMarkdown`) renders correctly with the fix active
+**Logic fix (AgentResponse.tsx):**
+- [ ] Change `needsApproval` condition: `!turn.pendingPlanApproval` → `!!turn.pendingPlanApproval`
 - [ ] Verify `approvePlan(turn.id)` and `rejectPlan(turn.id, feedback)` are still called correctly by the inline approval buttons in `AgentResponse`
 - [ ] (Optional, non-blocking) Evaluate whether the duplicate inline approval UI in `AgentResponse` (lines ~118-158) can be removed in favour of `AgentPlanApproval` — document decision in this file
+
+**Plan text fix (planText.ts):**
+- [ ] Simplify `extractPlanDisplayText` to return `planText.trim()` — remove the backward-scan logic that returns only the last list/heading block (see technical-plan.md § Plan Card Visual Redesign)
+
+**Visual redesign (PlanReviewCard.tsx):**
+> Reference: `prototypes/plan-review-card.html` Column B. Plan card = Claude's chat artifact, not a composer element.
+- [ ] Remove the nested inner card (`max-h-[300px]` div with "Plan" eyebrow label and inner border) from `PlanReviewCard.tsx`
+- [ ] Add indigo-tinted header row: clipboard icon + "Claude is waiting for plan approval" + pulse dot; background `rgba(224,231,255,0.35)`; bottom border `rgba(67,56,202,0.10)`
+- [ ] Place `<RenderedMarkdown>` directly in the card body (no wrapper card): `px-2.5 py-2 max-h-[150px] overflow-y-auto`
+- [ ] Move action row (`Approve plan` + `Reject`) into a `border-top: rgba(67,56,202,0.08)` footer row; Approve = indigo filled (`bg-[var(--r-accent)] text-white`), Reject = ghost
+- [ ] Change outer card border from `var(--r-hairline)` to `rgba(67,56,202,0.18)` to give subtle indigo tint
+- [ ] Verify: card renders correctly in chat feed; Approve/Reject fire the same callbacks as before; reject feedback input still works
 
 ## Phase 2: R2 Level 1 — Unlock Textarea
 
@@ -21,7 +33,9 @@
 - [ ] Modify `handleSend` to accept an optional `overridePrompt?: string` parameter — use `overridePrompt ?? buildFinalPrompt()` as the prompt source
 - [ ] In `handleSend`, add queue branch: if `isLoading && isAgentMode && !overridePrompt`, queue the prompt via `setQueuedPrompt(buildFinalPrompt())`, clear `value`, and return early
 - [ ] Add `useEffect` that fires on `agentRunning` change: when transition from `true` → `false` and `queuedPrompt` is set, call `handleSend(queuedPrompt)` and clear queue
-- [ ] Add queue indicator chip JSX inside the input card (below `<textarea>`, inside the `overflow-hidden rounded-lg border` div): shows "Queued: [prompt text]" truncated + X discard button
+- [ ] Add queue notch JSX **above** the input-box div (same location as `SelectedContextTab`, not inside the input card): pending circle + truncated prompt text + X discard button; use `mx-2.5 -mb-px rounded-t-lg border border-b-0` pattern matching `SelectedContextTab` (see technical-plan.md § Queue notch and `prototypes/composer-queue.html` Column B)
+- [ ] When both `queuedPrompt` and `selectedContext` are active, wrap both notch rows in a single `.notch-stack` container with `.ns-section` children so there is no visible seam between them (see `prototypes/composer-queue.html` Column C)
+- [ ] Ensure parent `input-wrap` has no `border-top` when any notch is present (prevents separator stripe between messages area and notch)
 - [ ] When `queuedPrompt` is set, change textarea `disabled` to `true` (prevents second queue entry)
 - [ ] When X on queue chip is clicked, clear `queuedPrompt` and re-enable textarea
 - [ ] Verify end-to-end: type → Enter queues → chip shows → agent finishes → prompt auto-sends → chip clears

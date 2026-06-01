@@ -53,6 +53,89 @@ This is a one-character change (`!` → `!!`). Everything downstream (plan text 
 
 **Optional cleanup (not blocking Phase 3 start):** Remove the inline approval UI from `AgentResponse` and rely solely on `AgentPlanApproval` from `AgentView`. This would be a cosmetic refactor, not a correctness fix. Deferred per R1 Open Question.
 
+### Plan Card Visual Redesign (PlanReviewCard.tsx + planText.ts)
+
+> **Source of truth:** `prototypes/plan-review-card.html` Column B.
+> **Design rule:** Plan card is Claude's response artifact — it lives in the chat feed, never in the composer area.
+
+**`planText.ts` — return full text:**
+
+`extractPlanDisplayText` currently scans backward and returns only the last list/heading block, causing partial plan display. Change to return the full normalized text:
+
+```ts
+export function extractPlanDisplayText(planText: string): string {
+  return planText.trim();
+}
+```
+
+The `max-height` + `overflow-y: auto` on the card body handles long plans without needing truncation.
+
+**`PlanReviewCard.tsx` — flatten the card:**
+
+Remove the nested inner card (`pc-inner` pattern). The new structure is a single-level card:
+
+```
+┌─ plan-card (border: 1px solid rgba(67,56,202,0.18), rounded-lg) ───────────┐
+│ header: [clipboard icon] "Claude is waiting for plan approval"  [pulse dot] │
+│         background: rgba(224,231,255,0.35), border-bottom: rgba(67,56,202,0.10) │
+├────────────────────────────────────────────────────────────────────────────│
+│ body: <RenderedMarkdown> — flat, max-h-[150px] overflow-y-auto, no wrapper │
+├────────────────────────────────────────────────────────────────────────────│
+│ [reject feedback input — shown on Reject click, hidden by default]         │
+├────────────────────────────────────────────────────────────────────────────│
+│ actions: [✓ Approve plan — indigo primary]  [✗ Reject — ghost]             │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+Tailwind translation:
+
+```tsx
+// Outer card — replaces the existing rounded-lg border px-3 py-3 space-y-3 structure
+<div className="rounded-lg border overflow-hidden"
+  style={{ borderColor: 'rgba(67,56,202,0.18)' }}>
+
+  {/* Header */}
+  <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold"
+    style={{ color: 'var(--r-accent)',
+             background: 'rgba(224,231,255,0.35)',
+             borderBottom: '1px solid rgba(67,56,202,0.10)' }}>
+    <Icon name="bookmark" size={11} className="shrink-0" />
+    <span className="flex-1">Claude is waiting for plan approval</span>
+    <span className="w-1.5 h-1.5 rounded-full bg-[var(--r-accent)] animate-pulse" />
+  </div>
+
+  {/* Body — flat, no inner card */}
+  {displayText && (
+    <div className="px-2.5 py-2 max-h-[150px] overflow-y-auto text-[var(--chat-font-size,13px)]">
+      <RenderedMarkdown content={displayText} />
+    </div>
+  )}
+
+  {/* Reject feedback (conditional) */}
+  {showRejectInput && (
+    <div className="px-2.5 pb-2">
+      <input ... />
+    </div>
+  )}
+
+  {/* Actions */}
+  <div className="flex items-center gap-2 px-2.5 py-2"
+    style={{ borderTop: '1px solid rgba(67,56,202,0.08)' }}>
+    <button onClick={onApprove}
+      className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-white"
+      style={{ background: 'var(--r-accent)' }}>
+      <Icon name="check" size={12} /> {approveLabel}
+    </button>
+    <button onClick={handleReject}
+      className="flex items-center gap-1.5 rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-1.5 text-xs font-medium text-[var(--r-ink-body)] hover:bg-[var(--r-surface-soft)]">
+      <Icon name="x" size={12} /> {showRejectInput ? 'Send feedback' : rejectLabel}
+    </button>
+  </div>
+</div>
+```
+
+**`AgentPlanApproval.tsx`** — no changes needed; the title prop is already "Claude is waiting for plan approval".
+
 ---
 
 ## Workstream 2: Composer Input Unlock + Queue (R2)
@@ -106,25 +189,60 @@ if (isLoading && isAgentMode) {
 // ... existing send logic
 ```
 
-**Queue indicator chip:** Render below the textarea (inside the input card container, below the `<textarea>` element):
+**Queue notch:** Render as a notch *above* the input box using the same pattern as `SelectedContextTab` — NOT a chip inside the input card.
+
+> **Source of truth:** `prototypes/composer-queue.html` Column B.
+> **Design rule:** Notches belong to the composer area, not inside the input card. The input card is for user text only.
+
+The notch structure mirrors `SelectedContextTab` exactly:
+- `mx-2.5 -mb-px rounded-t-lg border border-b-0` — eats the input box's top border for a seamless seam
+- The parent `input-wrap` must have `border-top: none` when any notch is present (add `no-top` class or inline style)
 
 ```tsx
 {queuedPrompt && (
-  <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-t border-[var(--r-hairline)]">
-    <Icon name="clock" size={12} className="shrink-0 text-[var(--r-ink-muted)]" />
-    <span className="flex-1 truncate text-[11px] text-[var(--r-ink-muted)]">
-      Queued: {queuedPrompt}
-    </span>
-    <button
-      onClick={() => setQueuedPrompt(null)}
-      className="shrink-0 rounded hover:text-[var(--r-error)]"
-      title="Discard queued prompt"
-    >
-      <Icon name="x" size={12} />
-    </button>
+  // Same CSS as SelectedContextTab — placed ABOVE the input-box div, INSIDE input-wrap
+  <div className="mx-2.5 -mb-px rounded-t-lg border border-b-0 px-2.5 py-1.5 overflow-hidden"
+    style={{
+      borderColor: 'rgba(148,163,184,0.20)',
+      background: 'linear-gradient(to bottom, rgba(248,250,252,0.92), rgba(248,250,252,0.60))',
+    }}>
+    <div className="flex items-center gap-1.5">
+      {/* pending circle */}
+      <span className="w-4 h-4 shrink-0 rounded-full border border-[var(--r-hairline-strong)]" />
+      <span className="flex-1 truncate text-[12px] text-[var(--r-ink-body)]">
+        {queuedPrompt}
+      </span>
+      <button
+        onClick={() => setQueuedPrompt(null)}
+        className="shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--r-surface-soft)] text-[var(--r-ink-muted)] hover:text-[var(--r-error)]"
+        title="Discard queued prompt"
+      >
+        <Icon name="x" size={12} />
+      </button>
+    </div>
   </div>
 )}
+// input-box div immediately follows — notch's -mb-px eats its top border:
+<div className="rounded-lg border border-[var(--r-hairline)] ...">
+  <textarea ... />
+</div>
 ```
+
+**Stacking with `SelectedContextTab`:** If `queuedPrompt` is set AND `selectedContext` is also active, both notches must stack seamlessly. Use the `.notch-stack` wrapper pattern (one outer border, sections divided by a thin internal line) to avoid any visible seam between sections. See `prototypes/composer-queue.html` Column C for the reference implementation. In CSS terms:
+
+```
+┌─ notch-stack (mx-2.5 -mb-px rounded-t-lg border border-b-0) ──────────────┐
+│  .ns-section: "Working on selected text" (SelectedContextTab row)          │
+│  ─── internal divider (1px rgba(148,163,184,0.14)) ────────────────────────│
+│  .ns-section: "[queued prompt text]  [X]"                                  │
+└────────────────────────────────────────────────────────────────────────────┘
+         ↕ -mb-px overlap
+┌─ input-box ────────────────────────────────────────────────────────────────┐
+│  <textarea> ...                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+For the MVP, `SelectedContextTab` renders as a sibling component in `ChatInput`. The cleanest approach is to extract the existing `SelectedContextTab` and the new queue notch into a shared `<ComposerNotches>` wrapper that uses `.notch-stack` when both are visible and falls back to a single `.notch` when only one is.
 
 **Auto-send on agent completion:** Add a `useEffect` that fires when `agentRunning` transitions from `true` to `false`:
 

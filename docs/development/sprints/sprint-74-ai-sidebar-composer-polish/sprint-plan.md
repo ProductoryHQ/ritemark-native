@@ -52,6 +52,15 @@ Full requirements and acceptance criteria: [spec.md](spec.md).
 - **2026-06-01:** R3 fix strategy: `overflow: visible` on `pre.tiptap-code-block`, `overflow-x: auto` on `code` child, to avoid tooltip clipping. Alternative (`overflow-x: hidden` on `pre`) rejected due to tooltip clip risk.
 - **2026-06-01:** R4 "Display text" field is always shown (when not in file-search mode), not conditional on whether text is already selected. Pre-population from selection makes it convenient; leaving it empty is a no-op.
 
+### Prototype-validated decisions (2026-06-01, after prototype review)
+
+- **R1 — Plan card stays in chat feed:** Plan approval card is Claude's response artifact. It lives in the chat message stream, not above the composer. The composer area is reserved exclusively for user input. (Earlier draft incorrectly placed the card as a notch above the composer — rejected.)
+- **R1 — Flat card, no nested inner card:** `PlanReviewCard.tsx` is redesigned as a single-level card: indigo-tinted header row, flat `<RenderedMarkdown>` body, action footer. The existing nested inner card ("Plan" eyebrow + inner border) is removed. Reference: `prototypes/plan-review-card.html` Column B.
+- **R1 — Full plan text shown:** `extractPlanDisplayText` simplified to `planText.trim()` — the backward-scan-for-last-block logic is removed. The card body uses `max-h-[150px] overflow-y-auto` to contain long plans visually.
+- **R2 — Queue UI is a notch above the input box:** The queue indicator uses the existing `SelectedContextTab` notch pattern (`mx-2.5 -mb-px rounded-t-lg border border-b-0`), not a chip inside the input card. Reference: `prototypes/composer-queue.html` Column B. This keeps the input card clean for user text only.
+- **R2 — Notch stacking with `.notch-stack`:** When both queue notch and `SelectedContextTab` ("Working on selected text") are visible simultaneously, they are wrapped in a single `.notch-stack` container with `.ns-section` children separated by a thin internal divider. This avoids any visible seam between stacked notch sections. Reference: `prototypes/composer-queue.html` Column C.
+- **R2 — No `border-top` on `input-wrap` when notch is present:** The stripe that appears between the messages area and the notch is caused by `border-top` on the `input-wrap` container. It must be removed whenever any notch is active.
+
 ## Pre-Implementation Gate
 
 Phase 3 (DEVELOP) must not begin until:
