@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sprint 74 · Plan Review Card Prototype</title>
+  <title>Sprint 74 · Plan Review Card — v2 (notch pattern)</title>
   <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -22,9 +22,14 @@
       --r-accent-fainter: #C7D2FE;
       --r-shadow-indigo: 0 4px 6px -1px rgba(67,56,202,0.25);
       --r-shadow-sm: 0 1px 2px rgba(30,27,75,0.06), 0 1px 3px rgba(30,27,75,0.04);
+
+      /* ── notch token ── matches SelectedContextTab exactly */
+      --notch-border: rgba(148,163,184,0.20);
+      --notch-bg-from: rgba(248,250,252,0.92);
+      --notch-bg-to:   rgba(248,250,252,0.60);
+      --notch-mx: 10px;  /* mx-2.5 = 2.5 * 4px */
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 13px;
@@ -39,32 +44,20 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── layout wrapper ─────────────────────────────── */
-    .col {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      align-items: center;
-    }
-    .col-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
+    /* ── layout ── */
+    .col { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    .tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
       text-transform: uppercase;
-      color: #64748B;
+      display: inline-block; padding: 3px 10px; border-radius: 4px;
     }
-    .col-label span {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 4px;
-    }
-    .col-label.broken span  { background: #FEE2E2; color: #B91C1C; }
-    .col-label.fixed span   { background: #DCFCE7; color: #15803D; }
+    .tag.before { background:#FEE2E2; color:#B91C1C; }
+    .tag.after  { background:#DCFCE7; color:#15803D; }
+    .tag.plus   { background:#E0E7FF; color:#3730A3; }
 
-    /* ── VS Code panel shell ────────────────────────── */
+    /* ── VS Code panel shell ── */
     .panel {
       width: 330px;
-      height: 590px;
       background: var(--r-surface-muted);
       border-radius: 8px;
       overflow: hidden;
@@ -73,580 +66,494 @@
       box-shadow: 0 8px 40px rgba(30,27,75,0.18);
       border: 1px solid #C8D0DA;
     }
-
-    /* panel title bar */
     .panel-bar {
-      height: 35px;
-      background: #E2E8F0;
+      height: 35px; background: #E2E8F0;
       border-bottom: 1px solid var(--r-hairline);
-      display: flex;
-      align-items: center;
-      padding: 0 10px;
-      gap: 6px;
-      flex-shrink: 0;
+      display: flex; align-items: center;
+      padding: 0 10px; gap: 6px; flex-shrink: 0;
     }
     .panel-bar-title {
-      font-size: 10.5px;
-      font-weight: 700;
-      color: var(--r-ink-body);
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      flex: 1;
+      font-size: 10.5px; font-weight: 700; color: var(--r-ink-body);
+      text-transform: uppercase; letter-spacing: 0.6px; flex: 1;
     }
-    .panel-icon-btn {
-      width: 22px; height: 22px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 4px;
-      color: var(--r-ink-muted);
-      cursor: pointer;
-      transition: background 100ms;
-    }
-    .panel-icon-btn:hover { background: var(--r-hairline); color: var(--r-ink-strong); }
+    .pib { width:22px; height:22px; display:flex; align-items:center; justify-content:center; border-radius:4px; color:var(--r-ink-muted); cursor:pointer; }
+    .pib:hover { background:var(--r-hairline); }
 
-    /* ── messages scroll area ───────────────────────── */
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background: var(--r-surface-muted);
+    /* ── messages ── */
+    .messages { flex:1; overflow-y:auto; padding:12px 10px; display:flex; flex-direction:column; gap:12px; }
+    .msg-u { display:flex; justify-content:flex-end; }
+    .msg-u-b {
+      max-width:88%; padding:7px 11px;
+      background:var(--r-accent-soft); border:1px solid var(--r-accent-fainter);
+      border-radius:10px 10px 3px 10px;
+      font-size:12px; color:var(--r-accent-deep); line-height:1.55;
     }
+    .msg-a { display:flex; flex-direction:column; gap:5px; }
+    .msg-a-meta {
+      display:flex; align-items:center; gap:5px;
+      font-size:10px; font-weight:700; color:var(--r-ink-faint);
+      text-transform:uppercase; letter-spacing:0.5px;
+    }
+    .msg-a-body { font-size:12px; color:var(--r-ink-body); line-height:1.6; }
 
-    /* user bubble */
-    .msg-user { display: flex; justify-content: flex-end; }
-    .msg-user-bubble {
-      max-width: 88%;
-      padding: 7px 11px;
-      background: var(--r-accent-soft);
-      border: 1px solid var(--r-accent-fainter);
-      border-radius: 10px 10px 3px 10px;
-      font-size: 12px;
-      color: var(--r-accent-deep);
-      line-height: 1.55;
+    /* turn status pill */
+    .pill {
+      display:inline-flex; align-items:center; gap:4px;
+      padding:2px 7px; border-radius:4px;
+      font-size:10px; font-weight:600;
     }
+    .pill.waiting { background:var(--r-accent-soft); color:var(--r-accent-deep); border:1px solid var(--r-accent-fainter); }
+    .pill.done    { background:var(--r-surface-soft); color:var(--r-ink-muted);  border:1px solid var(--r-hairline); }
 
-    /* assistant message */
-    .msg-asst { display: flex; flex-direction: column; gap: 5px; }
-    .msg-asst-meta {
-      display: flex; align-items: center; gap: 5px;
-      font-size: 10px; font-weight: 700;
-      color: var(--r-ink-faint);
-      text-transform: uppercase; letter-spacing: 0.5px;
-    }
-    .msg-asst-body {
-      font-size: 12px; color: var(--r-ink-body); line-height: 1.6;
-    }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+    .dot { width:6px; height:6px; border-radius:50%; background:var(--r-accent); animation:pulse 1.4s ease-in-out infinite; }
 
-    /* turn status badge */
-    .turn-status {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 10px; font-weight: 600;
-      padding: 2px 8px; border-radius: 4px;
-      margin-bottom: 2px;
+    /* ── OLD nested plan card (Before column) ── */
+    .plan-card-old {
+      border:1px solid var(--r-hairline); border-radius:10px;
+      background:var(--r-surface); box-shadow:var(--r-shadow-sm); overflow:hidden;
     }
-    .turn-status.complete {
-      background: var(--r-surface-soft);
-      color: var(--r-ink-muted);
-      border: 1px solid var(--r-hairline);
+    .pc-header {
+      display:flex; align-items:center; gap:7px;
+      padding:9px 12px 7px; font-size:11px; font-weight:600; color:var(--r-ink-muted);
+      border-bottom:1px solid var(--r-hairline);
     }
-    .turn-status.waiting {
-      background: var(--r-accent-soft);
-      color: var(--r-accent-deep);
-      border: 1px solid var(--r-accent-fainter);
+    .pc-inner {
+      margin:10px 12px;
+      border:1px solid var(--r-hairline); border-radius:6px;
+      background:var(--r-surface-muted); overflow:hidden;
     }
+    .pc-inner-eye {
+      padding:5px 10px 4px; font-size:9px; font-weight:700;
+      text-transform:uppercase; letter-spacing:1px; color:var(--r-ink-faint);
+      background:var(--r-surface-soft); border-bottom:1px solid var(--r-hairline);
+    }
+    .pc-inner-body {
+      padding:9px 10px; max-height:120px; overflow-y:auto;
+      font-size:11.5px; color:var(--r-ink-body); line-height:1.65;
+    }
+    .pc-inner-body h3 { font-size:12px; font-weight:700; color:var(--r-ink-strong); margin-bottom:6px; }
+    .pc-inner-body ol { padding-left:16px; display:flex; flex-direction:column; gap:3px; }
+    .pc-actions { display:flex; gap:6px; padding:0 12px 12px; }
+    .pc-note { font-size:10.5px; color:var(--r-ink-faint); font-style:italic; margin-top:4px; }
 
-    /* ── Plan Review Card ───────────────────────────── */
-    .plan-card {
-      border: 1px solid var(--r-hairline);
-      border-radius: 10px;
-      background: var(--r-surface);
-      box-shadow: var(--r-shadow-sm);
+    /* ── NOTCH — matches SelectedContextTab exactly ── */
+    /*
+      mx-2.5  = margin-left/right: 10px
+      -mb-px  = margin-bottom: -1px  (eats the input box's top border)
+      rounded-t-lg = border-radius: 8px 8px 0 0
+      border border-b-0 = 1px solid on top/left/right, none on bottom
+      bg-gradient-to-b from-[rgba(248,250,252,0.92)] to-[rgba(248,250,252,0.60)]
+    */
+    .notch {
+      margin: 0 var(--notch-mx) -1px;
+      border-radius: 8px 8px 0 0;
+      border: 1px solid var(--notch-border);
+      border-bottom: none;
+      background: linear-gradient(to bottom, var(--notch-bg-from), var(--notch-bg-to));
       overflow: hidden;
     }
 
-    .plan-card-header {
-      display: flex; align-items: center; gap: 7px;
-      padding: 9px 12px 7px;
-      font-size: 11px; font-weight: 600;
-      color: var(--r-ink-muted);
-      border-bottom: 1px solid var(--r-hairline);
-    }
-    .plan-card-header.waiting-state {
-      color: var(--r-accent);
+    /* When a second notch stacks directly below this one — no top rounding (first covers it) */
+    .notch.stacked-below {
+      border-radius: 0;
+      border-top: none; /* upper notch's bottom covers us; its no-border-bottom + our no-border-top = seamless */
     }
 
-    /* plan body scroll area */
-    .plan-body {
-      margin: 10px 12px;
-      border: 1px solid var(--r-hairline);
-      border-radius: 6px;
-      background: var(--r-surface-muted);
-      overflow: hidden;
-    }
-    .plan-body-eyebrow {
-      padding: 5px 10px 4px;
-      font-size: 9px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 1px;
-      color: var(--r-ink-faint);
-      background: var(--r-surface-soft);
-      border-bottom: 1px solid var(--r-hairline);
-    }
-    .plan-body-scroll {
-      padding: 9px 10px;
-      max-height: 160px;
-      overflow-y: auto;
-      font-size: 11.5px;
-      color: var(--r-ink-body);
-      line-height: 1.65;
-    }
-    .plan-body-scroll h3 {
-      font-size: 12px; font-weight: 700;
-      color: var(--r-ink-strong);
-      margin-bottom: 7px;
-    }
-    .plan-body-scroll ol {
-      padding-left: 16px;
-      display: flex; flex-direction: column; gap: 4px;
-    }
-    .plan-body-scroll li { font-size: 11.5px; }
-
-    /* fragment warning annotation */
-    .fragment-notice {
-      display: flex; align-items: flex-start; gap: 6px;
-      margin: 0 12px 8px;
-      padding: 6px 9px;
-      background: #FEF3C7;
-      border: 1px solid #FDE68A;
-      border-radius: 5px;
-      font-size: 10.5px;
-      color: #92400E;
-      line-height: 1.5;
-    }
-
-    /* actions row */
-    .plan-actions { display: flex; gap: 6px; padding: 0 12px 12px; }
-
-    .btn {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-size: 11.5px; font-weight: 600;
-      cursor: pointer;
-      transition: background 120ms, box-shadow 120ms, opacity 120ms;
-      border: 1px solid transparent;
-      font-family: inherit;
-    }
-    .btn-approve-soft {
-      background: var(--r-accent-soft);
-      border-color: var(--r-accent-fainter);
-      color: var(--r-accent-deep);
-    }
-    .btn-approve-soft:hover { background: var(--r-accent-fainter); }
-
-    .btn-approve-primary {
-      background: var(--r-accent);
-      border-color: var(--r-accent);
-      color: #FFF;
-      box-shadow: var(--r-shadow-indigo);
-    }
-    .btn-approve-primary:hover { background: var(--r-accent-deep); }
-    .btn-approve-primary:active { background: #312E81; transform: scale(0.98); }
-
-    .btn-reject {
-      background: var(--r-surface-muted);
-      border-color: var(--r-hairline);
-      color: var(--r-ink-body);
-    }
-    .btn-reject:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
-
-    /* broken approve — clicks do nothing */
-    .btn-broken {
-      background: var(--r-accent-soft);
-      border-color: var(--r-accent-fainter);
-      color: var(--r-accent-deep);
-      position: relative;
-      cursor: not-allowed;
-    }
-    .btn-broken::after {
-      content: 'pendingPlanApproval is undefined — returns immediately';
-      position: absolute;
-      bottom: calc(100% + 6px);
-      left: 0;
-      white-space: nowrap;
-      background: #1E1B4B;
-      color: #F8FAFC;
-      font-size: 9.5px;
-      font-weight: 400;
-      padding: 4px 8px;
-      border-radius: 4px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 150ms;
-      font-family: 'SF Mono', Menlo, monospace;
-    }
-    .btn-broken:hover::after { opacity: 1; }
-
-    /* approved overlay */
-    .approved-banner {
-      display: none;
-      align-items: center; gap: 7px;
-      padding: 9px 12px;
-      background: #DCFCE7;
-      border-top: 1px solid #BBF7D0;
-      font-size: 11.5px;
-      color: #15803D;
-      font-weight: 500;
-    }
-    .plan-card.is-approved .approved-banner { display: flex; }
-    .plan-card.is-approved .plan-actions { display: none; }
-    .plan-card.is-approved .plan-body { opacity: 0.55; }
-
-    /* reject feedback input */
-    .reject-feedback {
-      display: none;
-      margin: 0 12px 12px;
-    }
-    .reject-feedback input {
-      width: 100%;
+    /* ── notch header row (same structure as SelectedContextTab) ── */
+    .notch-head {
+      display: flex; align-items: center; gap: 6px;
       padding: 6px 10px;
-      font-size: 11.5px;
-      font-family: inherit;
-      border: 1px solid var(--r-hairline);
-      border-radius: 6px;
-      background: var(--r-surface);
-      color: var(--r-ink-strong);
-      outline: none;
+      cursor: pointer; user-select: none;
     }
-    .reject-feedback input:focus {
-      border-color: var(--r-accent);
-      box-shadow: 0 0 0 4px rgba(67,56,202,0.10);
-    }
-    .reject-feedback.open { display: block; }
-
-    /* spinner */
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spin { animation: spin 0.75s linear infinite; }
-    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
-    .dot-pulse {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--r-accent);
-      animation: pulse 1.4s ease-in-out infinite;
-      flex-shrink: 0;
-    }
-
-    /* ── Chat input bar ─────────────────────────────── */
-    .input-area {
-      flex-shrink: 0;
-      padding: 8px 10px;
-      border-top: 1px solid var(--r-hairline);
-    }
-    .input-box {
-      border: 1px solid var(--r-hairline);
-      border-radius: 8px;
-      background: var(--r-surface);
-      box-shadow: var(--r-shadow-sm);
-      overflow: hidden;
-    }
-    textarea.composer {
-      display: block; width: 100%;
-      padding: 8px 10px 4px;
-      font-size: 12px; font-family: inherit;
-      color: var(--r-ink-faint);
-      background: transparent;
-      border: none; outline: none; resize: none;
-      line-height: 1.5;
-    }
-    textarea.composer.locked {
-      opacity: 0.45; cursor: not-allowed;
-    }
-    .input-footer {
-      display: flex; align-items: center;
-      padding: 4px 6px 6px; gap: 4px;
-    }
-    .runtime-label {
+    .notch-head-title {
       flex: 1;
-      font-size: 11px; font-weight: 500;
-      color: var(--r-ink-muted);
+      font-size: 11px; font-weight: 600; color: var(--r-ink-muted);
     }
-    .icon-btn {
-      width: 26px; height: 26px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 5px;
-      border: 1px solid var(--r-hairline);
-      background: var(--r-surface-soft);
-      color: var(--r-ink-body);
-      cursor: pointer;
-      transition: background 100ms;
+    .notch-head-title.accent { color: var(--r-accent); }
+    .notch-chevron {
+      color: var(--r-ink-faint);
+      transition: transform 180ms cubic-bezier(0.22,0.61,0.36,1);
+      flex-shrink: 0;
     }
-    .icon-btn:hover { background: var(--r-surface-muted); }
+    .notch.collapsed .notch-chevron { transform: rotate(-90deg); }
 
-    /* ── bottom description strip ───────────────────── */
-    .description {
-      width: 330px;
-      font-size: 11px;
-      color: #64748B;
-      line-height: 1.6;
-      text-align: center;
+    /* notch body (collapses) */
+    .notch-body {
+      overflow: hidden;
+      max-height: 200px;
+      transition: max-height 200ms cubic-bezier(0.22,0.61,0.36,1);
     }
-    .description strong { color: #475569; }
+    .notch.collapsed .notch-body { max-height: 0; }
+
+    /* plan text inside notch — no nested card, just text */
+    .plan-text {
+      padding: 0 10px 8px;
+      font-size: 11.5px; color: var(--r-ink-body); line-height: 1.65;
+      max-height: 110px; overflow-y: auto;
+      border-top: 1px solid rgba(148,163,184,0.12);
+    }
+    .plan-text h3 { font-size:12px; font-weight:700; color:var(--r-ink-strong); margin:8px 0 5px; }
+    .plan-text ol { padding-left:16px; display:flex; flex-direction:column; gap:3px; }
+
+    /* actions row at bottom of notch */
+    .notch-actions {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px;
+      border-top: 1px solid rgba(148,163,184,0.12);
+    }
+
+    /* ── buttons ── */
+    .btn {
+      display:inline-flex; align-items:center; gap:5px;
+      padding:4px 11px; border-radius:5px;
+      font-size:11px; font-weight:600;
+      cursor:pointer; border:1px solid transparent;
+      font-family:inherit; transition:background 110ms, box-shadow 110ms;
+    }
+    .btn-approve {
+      background:var(--r-accent); color:#FFF; border-color:var(--r-accent);
+      box-shadow:var(--r-shadow-indigo);
+    }
+    .btn-approve:hover { background:var(--r-accent-deep); }
+    .btn-approve:active { transform:scale(0.98); }
+    .btn-reject {
+      background:transparent; color:var(--r-ink-body);
+      border-color:var(--r-hairline);
+    }
+    .btn-reject:hover { background:var(--r-surface-soft); color:var(--r-ink-strong); }
+
+    /* approved flash */
+    .notch-approved {
+      display:none;
+      align-items:center; gap:6px;
+      padding:7px 10px;
+      background:rgba(220,252,231,0.7);
+      border-top:1px solid rgba(187,247,208,0.6);
+      font-size:11px; font-weight:500; color:#15803D;
+    }
+    .notch.is-approved .notch-actions { display:none; }
+    .notch.is-approved .notch-approved { display:flex; }
+
+    /* reject feedback */
+    .notch-feedback { display:none; padding:0 10px 8px; }
+    .notch-feedback input {
+      width:100%; padding:5px 9px; font-size:11.5px; font-family:inherit;
+      border:1px solid var(--r-hairline); border-radius:5px;
+      background:var(--r-surface); color:var(--r-ink-strong); outline:none;
+    }
+    .notch-feedback input:focus { border-color:var(--r-accent); box-shadow:0 0 0 3px rgba(67,56,202,0.10); }
+    .notch-feedback.open { display:block; }
+
+    /* ── chat input bar ── */
+    .input-wrap { flex-shrink:0; padding:8px 10px; border-top:1px solid var(--r-hairline); }
+    .input-box {
+      border:1px solid var(--r-hairline); border-radius:8px;
+      background:var(--r-surface); box-shadow:var(--r-shadow-sm); overflow:hidden;
+    }
+    textarea {
+      display:block; width:100%; padding:8px 10px 4px;
+      font-size:12px; font-family:inherit;
+      background:transparent; border:none; outline:none; resize:none; line-height:1.5;
+    }
+    textarea::placeholder { color:var(--r-ink-faint); }
+    .input-footer { display:flex; align-items:center; padding:4px 6px 6px; gap:4px; }
+    .rtl { flex:1; font-size:11px; font-weight:500; color:var(--r-ink-muted); }
+    .ib {
+      width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+      border-radius:5px; border:1px solid var(--r-hairline); background:var(--r-surface-soft);
+      color:var(--r-ink-body); cursor:pointer;
+    }
+    .ib:hover { background:var(--r-surface-muted); }
+
+    /* description */
+    .desc { width:330px; font-size:11px; color:#64748B; line-height:1.6; text-align:center; }
+    .desc strong { color:#475569; }
+    code { font-size:10px; background:#F1F5F9; padding:1px 4px; border-radius:3px; }
   </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════
-     COLUMN A — BEFORE (broken)
-     ═══════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════
+     COLUMN A — BEFORE  (nested card, broken)
+     ══════════════════════════════════════════════════════ -->
 <div class="col">
-  <div class="col-label broken"><span>Before — broken (#86)</span></div>
+  <div class="tag before">Before — nested cards</div>
 
-  <div class="panel">
-    <!-- panel chrome -->
+  <div class="panel" style="height:540px">
     <div class="panel-bar">
-      <div class="panel-bar-title">AI Chat</div>
-      <!-- new conversation -->
-      <div class="panel-icon-btn" title="New conversation">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z" opacity="0.15"/><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,208Zm40-80a8,8,0,0,1-8,8H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24A8,8,0,0,1,168,128Z"/></svg>
-      </div>
-      <!-- history -->
-      <div class="panel-icon-btn" title="History">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15L52,52a8,8,0,0,0-13.66,5.63A176.18,176.18,0,0,0,38,70.37L37.7,87.65A8,8,0,0,0,45.64,96H45.7l17.35-.31a8,8,0,0,0,.31-16L52.87,79.83A80,80,0,1,1,48,128a8,8,0,0,0-16,0,96,96,0,1,0,96-96Z"/></svg>
-      </div>
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
     </div>
-
-    <!-- messages -->
     <div class="messages">
-      <!-- user turn -->
-      <div class="msg-user">
-        <div class="msg-user-bubble">Review AgentRunner.ts and plan the changes needed to fix the ExitPlanMode approval bug</div>
-      </div>
-
-      <!-- assistant — turn COMPLETED (this is the bug: approval shown post-turn) -->
-      <div class="msg-asst">
-        <div class="msg-asst-meta">
-          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132ZM128,52a68.07,68.07,0,0,0-68,68v12H196V120A68.07,68.07,0,0,0,128,52ZM92,168a8,8,0,1,0-8-8A8,8,0,0,0,92,168Zm36,0a8,8,0,1,0-8-8A8,8,0,0,0,128,168Zm36,0a8,8,0,1,0-8-8A8,8,0,0,0,164,168Z"/></svg>
+      <div class="msg-u"><div class="msg-u-b">Review AgentRunner.ts and plan fixes for the ExitPlanMode approval bug</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
           Claude
-          <!-- Turn is complete — this is post-turn, wrong place to show approval -->
-          <span class="turn-status complete">
-            <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
-            Turn complete
-          </span>
+          <span class="pill done"><svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></svg>Turn complete</span>
         </div>
-        <div class="msg-asst-body">
-          I've reviewed <code style="background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-size:11px">AgentRunner.ts</code> and traced the <code style="background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-size:11px">ExitPlanMode</code> approval flow. Here's the plan:
-        </div>
+        <div class="msg-a-body">I've reviewed the code. Here's my plan:</div>
 
-        <!-- THE BROKEN PLAN CARD -->
-        <div class="plan-card" id="broken-card">
-          <!-- header: generic, no waiting indicator -->
-          <div class="plan-card-header">
+        <!-- old nested card -->
+        <div class="plan-card-old">
+          <div class="pc-header">
             <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
             PLAN
+            <span style="flex:1"></span>
+            <span style="font-size:9px;font-weight:400;color:var(--r-ink-faint);background:var(--r-surface-soft);padding:2px 6px;border-radius:3px;border:1px solid var(--r-hairline)">card-in-card #1</span>
           </div>
 
-          <!-- fragment warning -->
-          <div class="fragment-notice">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="#D97706" style="flex-shrink:0;margin-top:1px"><path d="M236.8,188.09,149.35,36.22a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></svg>
-            <span><strong>extractPlanDisplayText</strong> truncated to last block only — steps 4–5 of 5 shown</span>
-          </div>
-
-          <!-- plan body — TRUNCATED (only last list block) -->
-          <div class="plan-body">
-            <div class="plan-body-eyebrow">Plan</div>
-            <div class="plan-body-scroll">
-              <!-- Only shows last matching block, not the full plan -->
-              <ol start="4">
-                <li>Test the full flow: plan → approve → execution continues</li>
-                <li>Add regression notes to <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">scenarios.md</code></li>
+          <!-- nested inner card -->
+          <div class="pc-inner">
+            <div class="pc-inner-eye">Plan <span style="font-size:8px;margin-left:4px;color:#F59E0B">← card-in-card #2</span></div>
+            <div class="pc-inner-body">
+              <h3>Fix ExitPlanMode Approval Bug</h3>
+              <ol>
+                <li>Audit <code>store.ts</code> — trace <code>pendingPlanApproval</code> lifecycle</li>
+                <li>Fix <code>AgentResponse.tsx</code> — remove <code>!pendingPlanApproval</code> gate</li>
+                <li>Fix <code>planText.ts</code> — return full plan text</li>
+                <li>Test full flow end-to-end</li>
               </ol>
             </div>
           </div>
 
-          <!-- actions — Approve is broken -->
-          <div class="plan-actions">
-            <button class="btn btn-broken" onclick="showBrokenFeedback()">
+          <div class="pc-actions">
+            <button class="btn btn-approve" style="background:var(--r-accent-soft);border-color:var(--r-accent-fainter);color:var(--r-accent-deep);box-shadow:none;cursor:not-allowed;opacity:.75" title="pendingPlanApproval is undefined — returns immediately">
               <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></svg>
               Approve plan
             </button>
-            <button class="btn btn-reject" onclick="toggleRejectBroken()">
+            <button class="btn btn-reject">
               <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>
               Reject
             </button>
           </div>
-          <div class="reject-feedback" id="reject-broken">
-            <input type="text" placeholder="What should be different? (sends new user message — workaround)">
-          </div>
-          <div class="approved-banner">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
-            Approved
-          </div>
         </div>
-        <!-- note: user had to type "approved" manually -->
-        <div style="font-size:10.5px;color:var(--r-ink-faint);font-style:italic;margin-top:4px">
-          ↳ User typed "approved" manually to continue
-        </div>
+        <div class="pc-note">↳ Approve does nothing (post-turn). User typed "approved" manually.</div>
       </div>
     </div>
-
-    <!-- input — locked -->
-    <div class="input-area">
+    <div class="input-wrap">
       <div class="input-box">
-        <textarea class="composer locked" rows="2" placeholder="Ask Claude..." disabled></textarea>
+        <textarea rows="2" placeholder="Ask Claude..." style="opacity:.4;cursor:not-allowed" disabled></textarea>
         <div class="input-footer">
-          <span class="runtime-label">Claude · Sonnet 4.6</span>
-          <div class="icon-btn" title="Attach">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg>
-          </div>
-          <div class="icon-btn" title="Stop (agent locked)">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm40-120H88a8,8,0,0,0-8,8v80a8,8,0,0,0,8,8h80a8,8,0,0,0,8-8V104A8,8,0,0,0,168,96Z"/></svg>
-          </div>
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <div class="ib"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="48" y="48" width="160" height="160" rx="4"/></svg></div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="description">
-    <strong>Two bugs:</strong> (1) Plan body shows only the last 2 steps — <code style="font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px">extractPlanDisplayText</code> strips context. (2) Approve does nothing — <code style="font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px">pendingPlanApproval</code> is undefined by the time this card renders (post-turn).
+  <div class="desc">
+    <strong>Problems:</strong> card-in-card nesting adds visual weight with no information gain. Approve button is post-turn (broken). Turn is marked "complete" — wrong placement.
   </div>
 </div>
 
 
-<!-- ═══════════════════════════════════════════════════════
-     COLUMN B — AFTER (fixed)
-     ═══════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════
+     COLUMN B — AFTER  (notch above composer, flat)
+     ══════════════════════════════════════════════════════ -->
 <div class="col">
-  <div class="col-label fixed"><span>After — fixed</span></div>
+  <div class="tag after">After — single notch</div>
 
-  <div class="panel">
+  <div class="panel" style="height:540px">
     <div class="panel-bar">
-      <div class="panel-bar-title">AI Chat</div>
-      <div class="panel-icon-btn" title="New conversation">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,208Zm40-80a8,8,0,0,1-8,8H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24A8,8,0,0,1,168,128Z"/></svg>
-      </div>
-      <div class="panel-icon-btn">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15L52,52a8,8,0,0,0-13.66,5.63A176.18,176.18,0,0,0,38,70.37L37.7,87.65A8,8,0,0,0,45.64,96H45.7l17.35-.31a8,8,0,0,0,.31-16L52.87,79.83A80,80,0,1,1,48,128a8,8,0,0,0-16,0,96,96,0,1,0,96-96Z"/></svg>
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
+    </div>
+    <div class="messages">
+      <div class="msg-u"><div class="msg-u-b">Review AgentRunner.ts and plan fixes for the ExitPlanMode approval bug</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
+          Claude
+          <!-- turn is BLOCKED — waiting, not complete -->
+          <span class="pill waiting"><span class="dot"></span>Waiting for approval</span>
+        </div>
+        <div class="msg-a-body">I've reviewed the code. My plan is shown below — approve to proceed.</div>
       </div>
     </div>
 
-    <div class="messages">
-      <div class="msg-user">
-        <div class="msg-user-bubble">Review AgentRunner.ts and plan the changes needed to fix the ExitPlanMode approval bug</div>
-      </div>
+    <!-- ── PLAN APPROVAL NOTCH — same pattern as SelectedContextTab ── -->
+    <div class="input-wrap" style="padding-bottom:0">
 
-      <div class="msg-asst">
-        <div class="msg-asst-meta">
-          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132ZM128,52a68.07,68.07,0,0,0-68,68v12H196V120A68.07,68.07,0,0,0,128,52ZM92,168a8,8,0,1,0-8-8A8,8,0,0,0,92,168Zm36,0a8,8,0,1,0-8-8A8,8,0,0,0,128,168Zm36,0a8,8,0,1,0-8-8A8,8,0,0,0,164,168Z"/></svg>
-          Claude
-          <!-- Turn BLOCKED — waiting for approval (live state) -->
-          <span class="turn-status waiting">
-            <span class="dot-pulse"></span>
-            Waiting for approval
-          </span>
-        </div>
-        <div class="msg-asst-body">
-          I've reviewed <code style="background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-size:11px">AgentRunner.ts</code> and traced the <code style="background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-size:11px">ExitPlanMode</code> approval flow. Here's my plan:
+      <!-- The notch: rounded-t-lg border border-b-0 -mb-px  (matches SelectedContextTab) -->
+      <div class="notch" id="plan-notch">
+
+        <!-- header row: same layout as SelectedContextTab -->
+        <div class="notch-head" onclick="togglePlan()">
+          <!-- clipboard icon (same size as SelectedContextTab's selection icon) -->
+          <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.7;color:var(--r-accent)"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
+          <span class="notch-head-title accent">Claude is waiting for plan approval</span>
+          <!-- chevron — same close-button slot as SelectedContextTab's ×  -->
+          <svg class="notch-chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
         </div>
 
-        <!-- THE FIXED PLAN CARD -->
-        <div class="plan-card" id="fixed-card">
-          <!-- header: clear waiting indicator + indigo accent -->
-          <div class="plan-card-header waiting-state">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" style="color:var(--r-accent)"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
-            Claude is waiting for plan approval
+        <div class="notch-body">
+          <!-- plan text — flat, no inner card -->
+          <div class="plan-text" id="plan-text-area">
+            <h3>Fix ExitPlanMode Approval Bug</h3>
+            <ol>
+              <li>Audit <code>store.ts</code> — trace <code>pendingPlanApproval</code> lifecycle from <code>agent-plan-approval</code> to <code>agent-result</code></li>
+              <li>Fix <code>AgentResponse.tsx</code> — remove <code>!pendingPlanApproval</code> gate from <code>needsApproval</code></li>
+              <li>Fix <code>planText.ts</code> — return full plan text, not last-block fragment</li>
+              <li>Test full flow: plan → approve → execution continues</li>
+              <li>Add regression notes to <code>scenarios.md</code></li>
+            </ol>
           </div>
 
-          <!-- plan body — FULL content -->
-          <div class="plan-body">
-            <div class="plan-body-eyebrow">Plan</div>
-            <div class="plan-body-scroll">
-              <h3>Fix ExitPlanMode Approval Bug</h3>
-              <ol>
-                <li>Audit <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">store.ts</code> — trace <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">pendingPlanApproval</code> lifecycle from <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">agent-plan-approval</code> to <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">agent-result</code></li>
-                <li>Fix <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">AgentResponse.tsx</code> — remove <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">!pendingPlanApproval</code> gate from <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">needsApproval</code></li>
-                <li>Fix <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">planText.ts</code> — return full plan text instead of last-paragraph fragment</li>
-                <li>Test full flow: plan → approve → execution continues without typing "approved"</li>
-                <li>Add regression notes to <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">scenarios.md</code></li>
-              </ol>
-            </div>
+          <!-- reject feedback (hidden by default) -->
+          <div class="notch-feedback" id="plan-feedback">
+            <input type="text" placeholder="What should be different? (optional — press Enter)">
           </div>
 
-          <!-- actions — Approve is the primary CTA, works correctly -->
-          <div class="plan-actions">
-            <button class="btn btn-approve-primary" onclick="approveFixed()">
+          <!-- action row — inside the notch body, separated by a hairline -->
+          <div class="notch-actions">
+            <button class="btn btn-approve" onclick="approvePlan()">
               <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></svg>
               Approve plan
             </button>
-            <button class="btn btn-reject" onclick="toggleRejectFixed()">
+            <button class="btn btn-reject" onclick="rejectPlan()">
               <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>
               Reject
             </button>
           </div>
-          <div class="reject-feedback" id="reject-fixed">
-            <input type="text" placeholder="What should be different? (optional — press Enter to send)">
-          </div>
-          <div class="approved-banner">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
-            Plan approved — execution continuing…
+
+          <!-- approved state -->
+          <div class="notch-approved" id="plan-approved">
+            <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+            Approved — execution continuing…
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- input — unlocked (agent is blocked, not running) -->
-    <div class="input-area">
+      <!-- input box — notch's -mb-px eats this top border (seamless seam) -->
       <div class="input-box">
-        <textarea class="composer" rows="2" placeholder="Add a follow-up…"></textarea>
+        <textarea rows="2" placeholder="Add a follow-up…"></textarea>
         <div class="input-footer">
-          <span class="runtime-label">Claude · Sonnet 4.6</span>
-          <div class="icon-btn" title="Attach">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg>
-          </div>
-          <div class="icon-btn" style="opacity:0.4;cursor:not-allowed" title="Send (waiting for approval first)">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102.65,154l41.39,85.57A15.86,15.86,0,0,0,158.44,248H158.7a15.88,15.88,0,0,0,14.1-9.75l76.14-191.19c0-.05,0-.1.06-.15A16,16,0,0,0,227.32,28.68Z"/></svg>
-          </div>
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <div class="ib" style="opacity:.35;cursor:default"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08L19.57,82.84a16,16,0,0,0-2.49,29.8L102.65,154l41.39,85.57A15.86,15.86,0,0,0,158.44,248H158.7a15.88,15.88,0,0,0,14.1-9.75l76.14-191.19A16,16,0,0,0,227.32,28.68Z"/></svg></div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="description">
-    <strong>Fixed:</strong> Plan card appears while the turn is <em>blocked</em> at <code style="font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px">ExitPlanMode</code> — <code style="font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px">pendingPlanApproval</code> is live. Full plan body shown. Approve resolves the tool use and continues execution.
+  <div class="desc">
+    <strong>Fixed:</strong> Single flat notch (same pattern as "Working on selected text"). Plan text inline — no inner card. Approve is the primary indigo CTA. Turn stays "waiting", not "complete". Click Approve or Reject to interact.
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     COLUMN C — PLUS: plan notch + selected text stacked
+     ══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="tag plus">Coexistence: plan + selected text</div>
+
+  <div class="panel" style="height:540px">
+    <div class="panel-bar">
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
+    </div>
+    <div class="messages">
+      <div class="msg-u"><div class="msg-u-b">Review AgentRunner.ts and plan fixes for the ExitPlanMode approval bug</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
+          Claude
+          <span class="pill waiting"><span class="dot"></span>Waiting for approval</span>
+        </div>
+        <div class="msg-a-body">I've reviewed the code. My plan is shown below — approve to proceed.</div>
+      </div>
+    </div>
+
+    <div class="input-wrap" style="padding-bottom:0">
+
+      <!-- UPPER notch: plan approval — rounded-t-lg, no border-bottom -->
+      <div class="notch" id="plan-notch-c" style="margin-bottom:0">
+        <div class="notch-head" onclick="togglePlanC()">
+          <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.7;color:var(--r-accent)"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
+          <span class="notch-head-title accent">Claude is waiting for plan approval</span>
+          <svg class="notch-chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
+        </div>
+        <div class="notch-body">
+          <div class="plan-text" style="max-height:80px">
+            <h3>Fix ExitPlanMode Approval Bug</h3>
+            <ol>
+              <li>Audit <code>store.ts</code> — trace <code>pendingPlanApproval</code> lifecycle</li>
+              <li>Fix <code>AgentResponse.tsx</code> — remove <code>!pendingPlanApproval</code> gate</li>
+              <li>Fix <code>planText.ts</code> — return full plan text</li>
+              <li>Test full flow end-to-end</li>
+            </ol>
+          </div>
+          <div class="notch-actions">
+            <button class="btn btn-approve" style="font-size:10.5px;padding:3px 10px">
+              <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></svg>
+              Approve plan
+            </button>
+            <button class="btn btn-reject" style="font-size:10.5px;padding:3px 10px">
+              <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>
+              Reject
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!--
+        LOWER notch: selected text context (SelectedContextTab)
+        stacked-below: no top-rounding (upper notch covers it), no top-border (merged)
+        still has -mb-px to eat the input box's top border
+      -->
+      <div class="notch stacked-below" style="margin-bottom:-1px">
+        <div class="notch-head" style="cursor:default">
+          <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.6"><path d="M208,48H48A16,16,0,0,0,32,64V192a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V64A16,16,0,0,0,208,48ZM72,96H184a8,8,0,0,1,0,16H72a8,8,0,0,1,0-16Zm0,32H184a8,8,0,0,1,0,16H72a8,8,0,0,1,0-16Zm72,32H72a8,8,0,0,1,0-16h72a8,8,0,0,1,0,16Z"/></svg>
+          <span class="notch-head-title">Working on selected text</span>
+          <button style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;border-radius:3px;cursor:pointer;color:var(--r-ink-muted)">
+            <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>
+          </button>
+        </div>
+        <!-- preview text — same as SelectedContextTab's second line -->
+        <div style="padding:0 10px 6px;font-size:11px;color:var(--r-ink-body);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          It's 2:00 PM on a Tuesday. You're in a conference room with seve…
+        </div>
+      </div>
+
+      <!-- input box — seamlessly connected via -mb-px -->
+      <div class="input-box">
+        <textarea rows="2" placeholder="Ask Claude… (type @ to mention an agent, / for commands)"></textarea>
+        <div class="input-footer">
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <div class="ib" style="opacity:.35;cursor:default"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08L19.57,82.84a16,16,0,0,0-2.49,29.8L102.65,154l41.39,85.57A15.86,15.86,0,0,0,158.44,248H158.7a15.88,15.88,0,0,0,14.1-9.75l76.14-191.19A16,16,0,0,0,227.32,28.68Z"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="desc">
+    <strong>Stacking rule:</strong> upper notch keeps <code>rounded-t-lg</code>. Lower notch is <code>stacked-below</code> — no top rounding, no top border. Both use <code>-mb-px</code> to eat the element below's top border. Two notches, zero extra seams.
   </div>
 </div>
 
 <script>
-  function showBrokenFeedback() {
-    // Demonstrate the broken state — clicking does literally nothing
-    const btn = event.currentTarget;
-    btn.style.outline = '2px solid #EF4444';
-    btn.style.outlineOffset = '2px';
-    setTimeout(() => { btn.style.outline = ''; btn.style.outlineOffset = ''; }, 600);
+  function togglePlan() {
+    document.getElementById('plan-notch').classList.toggle('collapsed');
   }
-
-  function toggleRejectBroken() {
-    const el = document.getElementById('reject-broken');
-    el.classList.toggle('open');
-    if (el.classList.contains('open')) el.querySelector('input').focus();
+  function approvePlan() {
+    const n = document.getElementById('plan-notch');
+    n.classList.add('is-approved');
+    n.classList.remove('collapsed');
+    const approved = document.getElementById('plan-approved');
+    approved.style.display = 'flex';
   }
-
-  function approveFixed() {
-    const card = document.getElementById('fixed-card');
-    card.classList.add('is-approved');
-    // Update turn status badge
-    const badge = card.closest('.msg-asst').querySelector('.turn-status');
-    badge.className = 'turn-status complete';
-    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>Execution resuming`;
-    badge.style.background = '#DCFCE7';
-    badge.style.color = '#15803D';
-    badge.style.borderColor = '#BBF7D0';
+  function rejectPlan() {
+    const fb = document.getElementById('plan-feedback');
+    fb.classList.toggle('open');
+    if (fb.classList.contains('open')) fb.querySelector('input').focus();
   }
-
-  function toggleRejectFixed() {
-    const el = document.getElementById('reject-fixed');
-    el.classList.toggle('open');
-    if (el.classList.contains('open')) el.querySelector('input').focus();
+  function togglePlanC() {
+    document.getElementById('plan-notch-c').classList.toggle('collapsed');
   }
 </script>
 </body>

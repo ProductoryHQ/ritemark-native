@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sprint 74 · Composer Queue Prototype</title>
+  <title>Sprint 74 · Composer Queue — v2 (notch pattern)</title>
   <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -24,9 +24,14 @@
       --r-error-soft: #FEE2E2;
       --r-shadow-sm: 0 1px 2px rgba(30,27,75,0.06), 0 1px 3px rgba(30,27,75,0.04);
       --r-shadow-indigo: 0 4px 6px -1px rgba(67,56,202,0.25);
+
+      --notch-border: rgba(148,163,184,0.20);
+      --notch-bg-from: rgba(248,250,252,0.92);
+      --notch-bg-to:   rgba(248,250,252,0.60);
+      --notch-mx: 10px;
+      --notch-divider: rgba(148,163,184,0.14);
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 13px;
@@ -36,722 +41,583 @@
       align-items: flex-start;
       justify-content: center;
       padding: 40px 24px;
-      gap: 40px;
+      gap: 36px;
       flex-wrap: wrap;
       -webkit-font-smoothing: antialiased;
     }
 
     .col { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-    .col-label {
-      font-size: 10px; font-weight: 700;
-      letter-spacing: 1px; text-transform: uppercase;
-      color: #64748B;
-    }
-    .col-label span {
+    .tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase;
       display: inline-block; padding: 3px 10px; border-radius: 4px;
     }
-    .col-label.before span { background: #FEE2E2; color: #B91C1C; }
-    .col-label.after  span { background: #DCFCE7; color: #15803D; }
-    .col-label.detail span { background: #E0E7FF; color: #3730A3; }
+    .tag.before { background:#FEE2E2; color:#B91C1C; }
+    .tag.after  { background:#DCFCE7; color:#15803D; }
+    .tag.plus   { background:#E0E7FF; color:#3730A3; }
 
-    /* ── VS Code panel shell ────────────────────────── */
+    /* ── panel ── */
     .panel {
-      width: 330px;
-      background: var(--r-surface-muted);
-      border-radius: 8px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      width: 310px; background: var(--r-surface-muted);
+      border-radius: 8px; overflow: hidden;
+      display: flex; flex-direction: column;
       box-shadow: 0 8px 40px rgba(30,27,75,0.18);
       border: 1px solid #C8D0DA;
     }
     .panel-bar {
-      height: 35px;
-      background: #E2E8F0;
+      height: 35px; background: #E2E8F0;
       border-bottom: 1px solid var(--r-hairline);
       display: flex; align-items: center;
-      padding: 0 10px; gap: 6px;
-      flex-shrink: 0;
+      padding: 0 10px; flex-shrink: 0;
     }
-    .panel-bar-title {
-      font-size: 10.5px; font-weight: 700;
-      color: var(--r-ink-body);
-      text-transform: uppercase; letter-spacing: 0.6px; flex: 1;
-    }
-    .panel-icon-btn {
-      width: 22px; height: 22px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 4px; color: var(--r-ink-muted); cursor: pointer;
-    }
-    .panel-icon-btn:hover { background: var(--r-hairline); color: var(--r-ink-strong); }
+    .panel-bar-title { font-size:10.5px; font-weight:700; color:var(--r-ink-body); text-transform:uppercase; letter-spacing:0.6px; flex:1; }
+    .pib { width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:4px;color:var(--r-ink-muted);cursor:pointer; }
+    .pib:hover { background:var(--r-hairline); }
 
-    /* ── messages ───────────────────────────────────── */
-    .messages {
-      flex: 1; overflow-y: auto;
-      padding: 12px 10px;
-      display: flex; flex-direction: column; gap: 12px;
+    /* ── messages ── */
+    .messages { flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:12px; }
+    .msg-u { display:flex;justify-content:flex-end; }
+    .msg-u-b {
+      max-width:88%;padding:7px 11px;
+      background:var(--r-accent-soft);border:1px solid var(--r-accent-fainter);
+      border-radius:10px 10px 3px 10px;
+      font-size:12px;color:var(--r-accent-deep);line-height:1.55;
     }
-    .msg-user { display: flex; justify-content: flex-end; }
-    .msg-user-bubble {
-      max-width: 88%;
-      padding: 7px 11px;
-      background: var(--r-accent-soft);
-      border: 1px solid var(--r-accent-fainter);
-      border-radius: 10px 10px 3px 10px;
-      font-size: 12px; color: var(--r-accent-deep); line-height: 1.55;
-    }
-    .msg-asst { display: flex; flex-direction: column; gap: 5px; }
-    .msg-asst-meta {
-      display: flex; align-items: center; gap: 5px;
-      font-size: 10px; font-weight: 700;
-      color: var(--r-ink-faint);
-      text-transform: uppercase; letter-spacing: 0.5px;
-    }
-    .msg-asst-body {
-      font-size: 12px; color: var(--r-ink-body); line-height: 1.6;
-    }
+    .msg-a { display:flex;flex-direction:column;gap:5px; }
+    .msg-a-meta { display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--r-ink-faint);text-transform:uppercase;letter-spacing:0.5px; }
+    .msg-a-body { font-size:12px;color:var(--r-ink-body);line-height:1.6; }
 
-    /* running status strip */
     .run-status {
-      display: flex; align-items: center; gap: 6px;
-      padding: 5px 8px;
-      background: var(--r-surface-soft);
-      border: 1px solid var(--r-hairline);
-      border-radius: 6px;
-      font-size: 11px; color: var(--r-ink-muted);
+      display:flex;align-items:center;gap:6px;
+      padding:5px 8px;font-size:11px;color:var(--r-accent);
+      background:var(--r-accent-soft);border:1px solid var(--r-accent-fainter);border-radius:5px;
     }
-    .run-status.active { color: var(--r-accent); background: var(--r-accent-soft); border-color: var(--r-accent-fainter); }
-
-    /* tool call row */
     .tool-row {
-      display: flex; align-items: center; gap: 6px;
-      padding: 4px 8px;
-      background: var(--r-surface-soft);
-      border: 1px solid var(--r-hairline);
-      border-radius: 5px;
-      font-size: 10.5px; color: var(--r-ink-muted);
-      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      display:flex;align-items:center;gap:5px;
+      padding:3px 8px;font-size:10.5px;color:var(--r-ink-muted);
+      background:var(--r-surface-soft);border:1px solid var(--r-hairline);border-radius:5px;
+      font-family:'SF Mono',Menlo,Consolas,monospace;
     }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spin { animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .spin { animation:spin .8s linear infinite;display:inline-block; }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
-    .dot-pulse {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--r-accent);
-      animation: pulse 1.4s ease-in-out infinite;
-      flex-shrink: 0;
-    }
+    .dot { width:6px;height:6px;border-radius:50%;background:var(--r-accent);animation:pulse 1.4s ease-in-out infinite; }
 
-    /* ── Queue section ──────────────────────────────── */
-    .queue-section {
-      flex-shrink: 0;
-      border-top: 1px solid var(--r-hairline);
-    }
-
-    /* queue header bar */
-    .queue-header {
-      display: flex; align-items: center; gap: 5px;
-      padding: 5px 10px;
-      background: var(--r-surface-soft);
-      cursor: pointer;
-      user-select: none;
-      font-size: 11px; font-weight: 600; color: var(--r-ink-muted);
-      transition: background 100ms;
-    }
-    .queue-header:hover { background: var(--r-hairline); }
-    .queue-chevron {
-      transition: transform 200ms cubic-bezier(0.22,0.61,0.36,1);
-      color: var(--r-ink-faint);
-    }
-    .queue-section.collapsed .queue-chevron { transform: rotate(-90deg); }
-    .queue-count-pill {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 16px; height: 16px;
-      background: var(--r-accent-soft);
-      color: var(--r-accent-deep);
-      border-radius: 50%;
-      font-size: 10px; font-weight: 700;
-      border: 1px solid var(--r-accent-fainter);
-    }
-    .queue-list {
-      display: flex; flex-direction: column;
+    /* ══════════════════════════════════════════════════
+       NOTCH — exact SelectedContextTab pattern
+       ══════════════════════════════════════════════════ */
+    .notch {
+      margin: 0 var(--notch-mx) -1px;
+      border-radius: 8px 8px 0 0;        /* rounded-t-lg */
+      border: 1px solid var(--notch-border);
+      border-bottom: none;               /* border-b-0 */
+      background: linear-gradient(to bottom, var(--notch-bg-from), var(--notch-bg-to));
       overflow: hidden;
-      max-height: 200px;
-      transition: max-height 200ms cubic-bezier(0.22,0.61,0.36,1);
     }
-    .queue-section.collapsed .queue-list { max-height: 0; }
+    /* Second notch stacked below a first — no top rounding, no top border */
+    .notch.stacked-below {
+      border-radius: 0;
+      border-top: none;
+      margin-bottom: -1px;               /* still eats the next element's top border */
+    }
 
-    /* queue item */
-    .queue-item {
+    /* ── queue item rows (inside the notch) ── */
+    .q-item {
       display: flex; align-items: center; gap: 0;
       padding: 6px 10px;
-      border-top: 1px solid var(--r-hairline);
-      background: var(--r-surface);
+      border-top: 1px solid var(--notch-divider);
       position: relative;
       transition: background 100ms;
     }
-    .queue-item:hover { background: var(--r-surface-muted); }
+    .q-item:first-child { border-top: none; }
+    .q-item:hover { background: rgba(241,245,249,0.7); }
 
-    /* status circle */
-    .queue-item-bullet {
-      width: 18px; height: 18px; flex-shrink: 0;
+    /* pending circle (unfilled) */
+    .q-bullet {
+      width: 16px; height: 16px; flex-shrink: 0;
       border: 1.5px solid var(--r-hairline-strong);
       border-radius: 50%;
       margin-right: 8px;
-      display: flex; align-items: center; justify-content: center;
     }
 
-    .queue-item-text {
+    /* prompt text */
+    .q-text {
       flex: 1; min-width: 0;
       font-size: 12px; color: var(--r-ink-body);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       line-height: 1.4;
     }
-    .queue-item-text.editing {
-      display: none;
-    }
-    .queue-item-edit-input {
-      display: none;
-      flex: 1; min-width: 0;
+    .q-text.hidden { display: none; }
+
+    /* inline edit input */
+    .q-edit-input {
+      display: none; flex: 1; min-width: 0;
       font-size: 12px; font-family: inherit;
       color: var(--r-ink-strong);
       background: var(--r-surface);
       border: 1px solid var(--r-accent);
       border-radius: 4px;
-      padding: 2px 6px;
-      outline: none;
+      padding: 2px 7px; outline: none;
       box-shadow: 0 0 0 3px rgba(67,56,202,0.10);
     }
-    .queue-item.is-editing .queue-item-text { display: none; }
-    .queue-item.is-editing .queue-item-edit-input { display: block; }
+    .q-item.is-editing .q-text { display: none; }
+    .q-item.is-editing .q-edit-input { display: block; }
 
-    /* item action buttons — shown on hover or always */
-    .queue-item-actions {
-      display: flex; align-items: center; gap: 1px;
-      flex-shrink: 0;
-      margin-left: 6px;
-      opacity: 0;
-      transition: opacity 120ms;
+    /* action buttons — hidden until hover or edit */
+    .q-actions {
+      display: flex; align-items: center; gap: 0;
+      margin-left: 4px; flex-shrink: 0;
+      opacity: 0; transition: opacity 120ms;
     }
-    .queue-item:hover .queue-item-actions,
-    .queue-item.is-editing .queue-item-actions { opacity: 1; }
+    .q-item:hover .q-actions,
+    .q-item.is-editing .q-actions { opacity: 1; }
 
-    .qi-btn {
-      width: 26px; height: 26px;
+    .qa {
+      width: 24px; height: 24px;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 5px;
-      border: none; background: transparent;
-      color: var(--r-ink-muted);
-      cursor: pointer;
+      border-radius: 4px; border: none;
+      background: transparent; color: var(--r-ink-muted);
+      cursor: pointer; font-family: inherit;
       transition: background 100ms, color 100ms;
+      position: relative;
     }
-    .qi-btn:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
-    .qi-btn.delete:hover { background: var(--r-error-soft); color: var(--r-error); }
-    .qi-btn.promote:hover { background: var(--r-accent-soft); color: var(--r-accent); }
+    .qa:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+    .qa.del:hover { background: var(--r-error-soft); color: var(--r-error); }
+    .qa.prm:hover { background: var(--r-accent-soft); color: var(--r-accent); }
 
-    /* tooltip on action buttons */
-    .qi-btn { position: relative; }
-    .qi-btn .tip {
-      position: absolute;
-      bottom: calc(100% + 5px);
+    /* tooltip */
+    .qa::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 4px);
       left: 50%; transform: translateX(-50%);
       background: #1E1B4B; color: #F8FAFC;
-      font-size: 10px; padding: 3px 8px;
-      border-radius: 4px; white-space: nowrap;
-      opacity: 0; pointer-events: none;
-      transition: opacity 120ms;
-      font-family: 'Sofia Sans', sans-serif;
+      font-size: 9.5px; padding: 3px 7px; border-radius: 3px;
+      white-space: nowrap;
+      opacity: 0; pointer-events: none; transition: opacity 120ms;
     }
-    .qi-btn:hover .tip { opacity: 1; }
+    .qa:hover::after { opacity: 1; }
 
-    /* removed-item animation */
-    @keyframes slideOut {
-      to { max-height: 0; opacity: 0; padding: 0 10px; border: none; }
+    /* the "N queued" header row inside the notch */
+    .notch-header-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px;
+      cursor: pointer; user-select: none;
     }
-    .queue-item.removing {
-      animation: slideOut 200ms cubic-bezier(0.4,0,0.2,1) forwards;
-      overflow: hidden;
+    .q-count-pill {
+      width: 16px; height: 16px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--r-accent-soft); color: var(--r-accent-deep);
+      border: 1px solid var(--r-accent-fainter);
+      border-radius: 50%;
+      font-size: 9.5px; font-weight: 700; flex-shrink: 0;
     }
-
-    /* ── Chat input area ────────────────────────────── */
-    .input-area {
-      flex-shrink: 0;
-      padding: 8px 10px;
-      border-top: 1px solid var(--r-hairline);
-    }
-    .input-box {
-      border: 1px solid var(--r-hairline);
-      border-radius: 8px;
-      background: var(--r-surface);
-      box-shadow: var(--r-shadow-sm);
-      overflow: hidden;
-      transition: border-color 150ms, box-shadow 150ms;
-    }
-    .input-box:focus-within {
-      border-color: var(--r-hairline-strong);
-      box-shadow: 0 0 0 1px rgba(100,116,139,0.08);
-    }
-    textarea.composer {
-      display: block; width: 100%;
-      padding: 8px 10px 4px;
-      font-size: 12px; font-family: inherit;
-      color: var(--r-ink-strong);
-      background: transparent;
-      border: none; outline: none; resize: none;
-      line-height: 1.5;
-    }
-    textarea.composer::placeholder { color: var(--r-ink-faint); }
-    textarea.composer.locked {
-      opacity: 0.4; cursor: not-allowed;
+    .notch-header-label { font-size: 11px; font-weight: 600; color: var(--r-ink-muted); flex: 1; }
+    .notch-header-hint { font-size: 10px; color: var(--r-ink-faint); }
+    .chevron {
       color: var(--r-ink-faint);
+      transition: transform 180ms cubic-bezier(0.22,0.61,0.36,1);
     }
-    .input-footer {
-      display: flex; align-items: center;
-      padding: 4px 6px 6px; gap: 4px;
-    }
-    .runtime-label {
-      flex: 1; font-size: 11px; font-weight: 500; color: var(--r-ink-muted);
-      cursor: default;
-    }
-    .icon-btn {
-      width: 26px; height: 26px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 5px;
-      border: 1px solid var(--r-hairline);
-      background: var(--r-surface-soft);
-      color: var(--r-ink-body); cursor: pointer;
-      transition: background 100ms;
-    }
-    .icon-btn:hover { background: var(--r-surface-muted); }
-    .icon-btn.stop {
-      background: var(--r-ink-strong); color: #FFF;
-      border-color: var(--r-ink-strong);
-    }
-    .icon-btn.stop:hover { background: #312E81; border-color: #312E81; }
-    .icon-btn.disabled { opacity: 0.35; cursor: not-allowed; }
+    .notch.collapsed .chevron { transform: rotate(-90deg); }
 
-    /* ── description strip ──────────────────────────── */
-    .description {
-      width: 330px;
-      font-size: 11px; color: #64748B; line-height: 1.6;
-      text-align: center;
+    /* collapsible body */
+    .notch-body {
+      overflow: hidden; max-height: 300px;
+      transition: max-height 200ms cubic-bezier(0.22,0.61,0.36,1);
     }
-    .description strong { color: #475569; }
-    code {
-      font-size: 10px; background: #F1F5F9;
-      padding: 1px 4px; border-radius: 3px;
-    }
+    .notch.collapsed .notch-body { max-height: 0; }
 
-    /* ── Detail annotation panel ────────────────────── */
-    .annotation-panel {
-      width: 330px;
-      background: var(--r-surface);
-      border-radius: 8px;
-      border: 1px solid var(--r-hairline);
-      padding: 16px;
-      box-shadow: var(--r-shadow-sm);
+    /* ── SelectedContextTab-style row (for stacking demo) ── */
+    .sct-row {
+      display: flex; flex-direction: column;
+      padding: 6px 10px;
     }
-    .annotation-panel h4 {
-      font-size: 12px; font-weight: 700; color: var(--r-ink-strong);
-      margin-bottom: 10px;
+    .sct-head { display:flex;align-items:center;gap:6px; }
+    .sct-title { flex:1;font-size:11px;font-weight:600;color:var(--r-ink-muted); }
+    .sct-preview { margin-top:2px;font-size:11px;color:var(--r-ink-body);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .sct-close {
+      width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+      border:none;background:transparent;border-radius:3px;cursor:pointer;
+      color:var(--r-ink-muted);
     }
-    .annotation-row {
-      display: flex; align-items: flex-start; gap: 8px;
-      margin-bottom: 8px;
+    .sct-close:hover { color:var(--r-ink-strong);background:var(--r-surface-soft); }
+
+    /* ── chat input bar ── */
+    .input-wrap { flex-shrink:0;padding:8px 10px;border-top:1px solid var(--r-hairline); }
+    .input-wrap.no-top { padding-top:0; }
+    .input-box {
+      border:1px solid var(--r-hairline);border-radius:8px;
+      background:var(--r-surface);box-shadow:var(--r-shadow-sm);overflow:hidden;
+      transition:border-color 150ms,box-shadow 150ms;
     }
-    .annotation-row:last-child { margin-bottom: 0; }
-    .annotation-icon {
-      width: 24px; height: 24px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 5px;
+    .input-box:focus-within { border-color:var(--r-hairline-strong); }
+    textarea {
+      display:block;width:100%;padding:8px 10px 4px;
+      font-size:12px;font-family:inherit;
+      background:transparent;border:none;outline:none;resize:none;line-height:1.5;
     }
-    .annotation-icon.delete  { background: var(--r-error-soft); color: var(--r-error); }
-    .annotation-icon.promote { background: var(--r-accent-soft); color: var(--r-accent); }
-    .annotation-icon.edit    { background: var(--r-surface-soft); color: var(--r-ink-body); }
-    .annotation-text {
-      font-size: 11.5px; color: var(--r-ink-body); line-height: 1.55;
+    textarea::placeholder { color:var(--r-ink-faint); }
+    textarea.locked { opacity:.4;cursor:not-allowed; }
+    .input-footer { display:flex;align-items:center;padding:4px 6px 6px;gap:4px; }
+    .rtl { flex:1;font-size:11px;font-weight:500;color:var(--r-ink-muted); }
+    .ib {
+      width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+      border-radius:5px;border:1px solid var(--r-hairline);
+      background:var(--r-surface-soft);color:var(--r-ink-body);cursor:pointer;
+      transition:background 100ms;
     }
-    .annotation-text strong { color: var(--r-ink-strong); }
-    hr.divider {
-      border: none; border-top: 1px solid var(--r-hairline);
-      margin: 12px 0;
-    }
-    .state-label {
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.8px; color: var(--r-ink-faint);
-      margin-bottom: 6px;
-    }
+    .ib:hover { background:var(--r-surface-muted); }
+    .ib.stop { background:var(--r-ink-strong);color:#FFF;border-color:var(--r-ink-strong); }
+    .ib.stop:hover { background:#312E81; }
+
+    /* promote flash */
+    @keyframes fadeOut { to{opacity:0;max-height:0;padding:0 10px;border:none} }
+    .q-item.removing { animation: fadeOut 200ms cubic-bezier(0.4,0,0.2,1) forwards;overflow:hidden; }
+
+    /* desc */
+    .desc { width:310px;font-size:11px;color:#64748B;line-height:1.6;text-align:center; }
+    .desc strong { color:#475569; }
+    code { font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px; }
   </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════
-     COLUMN A — BEFORE (input locked)
-     ═══════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════
+     COL A — BEFORE: locked input, no queue
+     ══════════════════════════════════════════════════════ -->
 <div class="col">
-  <div class="col-label before"><span>Before — input locked</span></div>
-
-  <div class="panel" style="height:500px">
+  <div class="tag before">Before — locked</div>
+  <div class="panel" style="height:460px">
     <div class="panel-bar">
-      <div class="panel-bar-title">AI Chat</div>
-      <div class="panel-icon-btn"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,208Zm40-80a8,8,0,0,1-8,8H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24A8,8,0,0,1,168,128Z"/></svg></div>
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
     </div>
-
     <div class="messages">
-      <div class="msg-user">
-        <div class="msg-user-bubble">pls review open issues and suggest a sprint</div>
-      </div>
-      <div class="msg-asst">
-        <div class="msg-asst-meta">
-          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132ZM128,52a68.07,68.07,0,0,0-68,68v12H196V120A68.07,68.07,0,0,0,128,52Z"/></svg>
-          Claude · Running
-          <span class="dot-pulse"></span>
+      <div class="msg-u"><div class="msg-u-b">pls review open issues and suggest a sprint</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
+          Claude · <span class="dot"></span>
         </div>
-        <div class="run-status active">
+        <div class="run-status">
           <svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>
-          Fetching GitHub issues…
+          Fetching issues…
         </div>
-        <div class="tool-row">
-          <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M232,112a16,16,0,0,0-16-16H160V72A48.05,48.05,0,0,0,112,24H88a8,8,0,0,0-8,8V56H40A16,16,0,0,0,24,72v40a16,16,0,0,0,16,16H80v80a16,16,0,0,0,16,16h64a16,16,0,0,0,16-16V128h40A16,16,0,0,0,232,112Z"/></svg>
-          mcp__github__list_issues(owner: "productoryhq" …)
-        </div>
+        <div class="tool-row">mcp__github__list_issues(…)</div>
       </div>
     </div>
-
-    <!-- no queue section — input is just locked -->
-    <div class="input-area">
+    <!-- no notch above — just locked input -->
+    <div class="input-wrap">
       <div class="input-box">
-        <textarea class="composer locked" rows="2" placeholder="Ask Claude..." disabled></textarea>
+        <textarea rows="2" placeholder="Ask Claude..." class="locked" disabled></textarea>
         <div class="input-footer">
-          <span class="runtime-label">Claude · Sonnet 4.6</span>
-          <div class="icon-btn" style="opacity:0.35;cursor:not-allowed">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg>
-          </div>
-          <div class="icon-btn stop">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="48" y="48" width="160" height="160" rx="4"/></svg>
-          </div>
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib" style="opacity:.35;cursor:default"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <div class="ib stop"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="52" y="52" width="152" height="152" rx="4"/></svg></div>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="description">
-    <strong>Current state:</strong> textarea is <code>disabled={isLoading}</code> while the agent runs — user cannot type or prepare the next prompt. Dead time.
-  </div>
+  <div class="desc"><strong>Problem:</strong> <code>disabled={isLoading}</code> locks the textarea. User cannot type or prepare the next prompt while the agent runs.</div>
 </div>
 
 
-<!-- ═══════════════════════════════════════════════════════
-     COLUMN B — AFTER (queue UX, interactive)
-     ═══════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════
+     COL B — AFTER: queue notch, unlocked input (interactive)
+     ══════════════════════════════════════════════════════ -->
 <div class="col">
-  <div class="col-label after"><span>After — queue + unlocked input</span></div>
-
-  <div class="panel" style="height:500px">
+  <div class="tag after">After — queue notch</div>
+  <div class="panel" style="height:460px">
     <div class="panel-bar">
-      <div class="panel-bar-title">AI Chat</div>
-      <div class="panel-icon-btn"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,208Zm40-80a8,8,0,0,1-8,8H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24A8,8,0,0,1,168,128Z"/></svg></div>
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
     </div>
-
     <div class="messages">
-      <div class="msg-user">
-        <div class="msg-user-bubble">pls review open issues and suggest a sprint</div>
-      </div>
-      <div class="msg-asst">
-        <div class="msg-asst-meta">
-          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132ZM128,52a68.07,68.07,0,0,0-68,68v12H196V120A68.07,68.07,0,0,0,128,52Z"/></svg>
-          Claude · Running
-          <span class="dot-pulse"></span>
+      <div class="msg-u"><div class="msg-u-b">pls review open issues and suggest a sprint</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
+          Claude · <span class="dot"></span>
         </div>
-        <div class="run-status active">
+        <div class="run-status">
           <svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>
-          Fetching GitHub issues…
+          Fetching issues…
         </div>
-        <div class="tool-row">
-          <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M232,112a16,16,0,0,0-16-16H160V72A48.05,48.05,0,0,0,112,24H88a8,8,0,0,0-8,8V56H40A16,16,0,0,0,24,72v40a16,16,0,0,0,16,16H80v80a16,16,0,0,0,16,16h64a16,16,0,0,0,16-16V128h40A16,16,0,0,0,232,112Z"/></svg>
-          mcp__github__list_issues(owner: "productoryhq" …)
-        </div>
+        <div class="tool-row">mcp__github__list_issues(…)</div>
       </div>
     </div>
 
-    <!-- ── QUEUE SECTION ── -->
-    <div class="queue-section" id="queue-section">
-      <div class="queue-header" onclick="toggleQueue()">
-        <!-- collapse chevron -->
-        <svg class="queue-chevron" width="12" height="12" viewBox="0 0 256 256" fill="currentColor">
-          <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
-        </svg>
-        <span class="queue-count-pill" id="queue-count">1</span>
-        <span id="queue-label">Queued</span>
-        <span style="flex:1"></span>
-        <span style="font-size:10px;font-weight:400;color:var(--r-ink-faint)">sends when turn completes</span>
-      </div>
-
-      <div class="queue-list" id="queue-list">
-        <!-- Queue item 1 — from Cursor screenshot -->
-        <div class="queue-item" id="qi-1">
-          <div class="queue-item-bullet">
-            <!-- empty circle — pending -->
-          </div>
-          <div class="queue-item-text" id="qi-1-text">and review existing sprints</div>
-          <input class="queue-item-edit-input" id="qi-1-input" value="and review existing sprints" onkeydown="onQueueEditKey(event, 'qi-1')" onblur="cancelEdit('qi-1')">
-          <div class="queue-item-actions">
-            <!-- Edit -->
-            <button class="qi-btn edit" onclick="startEdit('qi-1')" title="Edit">
-              <div class="tip">Edit prompt</div>
-              <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
-            </button>
-            <!-- Promote (stop current + send now) -->
-            <button class="qi-btn promote" onclick="promoteItem('qi-1')" title="Send now">
-              <div class="tip">Stop current &amp; send now</div>
-              <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
-            </button>
-            <!-- Delete -->
-            <button class="qi-btn delete" onclick="deleteItem('qi-1')" title="Remove from queue">
-              <div class="tip">Remove</div>
-              <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>
-            </button>
+    <div class="input-wrap no-top">
+      <!-- QUEUE NOTCH — same pattern as SelectedContextTab -->
+      <div class="notch" id="queue-notch-b">
+        <!-- header row: count + label + hint + collapse chevron -->
+        <div class="notch-header-row" onclick="toggleQueueB()">
+          <svg class="chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
+          <span class="q-count-pill" id="count-b">1</span>
+          <span class="notch-header-label">Queued</span>
+          <span class="notch-header-hint">sends when done</span>
+        </div>
+        <!-- items list (collapsible) -->
+        <div class="notch-body" id="qlist-b">
+          <!-- item pre-seeded from screenshot -->
+          <div class="q-item" id="qb-1">
+            <div class="q-bullet"></div>
+            <div class="q-text" id="qb-1-t">and review existing sprints</div>
+            <input class="q-edit-input" id="qb-1-i" value="and review existing sprints"
+              onkeydown="editKey(event,'qb-1','b')" onblur="cancelEdit('qb-1')">
+            <div class="q-actions">
+              <button class="qa" data-tip="Edit" onclick="startEdit('qb-1')">
+                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
+              </button>
+              <button class="qa prm" data-tip="Stop current &amp; send now" onclick="promoteB('qb-1')">
+                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
+              </button>
+              <button class="qa del" data-tip="Remove" onclick="deleteItem('qb-1','b')">
+                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192Z"/></svg>
+              </button>
+            </div>
           </div>
         </div>
-        <!-- empty state shown when all items removed -->
-        <div id="queue-empty" style="display:none;padding:10px 14px;font-size:11px;color:var(--r-ink-faint);text-align:center;border-top:1px solid var(--r-hairline);">
-          Queue empty — send button will queue while agent runs
-        </div>
       </div>
-    </div>
 
-    <!-- ── INPUT AREA — unlocked ── -->
-    <div class="input-area">
+      <!-- input box — unlocked, notch's -mb-px eats the top border -->
       <div class="input-box">
-        <textarea class="composer" rows="2" id="composer-input"
-          placeholder="Add a follow-up…"
-          onkeydown="onComposerKey(event)"></textarea>
+        <textarea rows="2" id="composer-b" placeholder="Add a follow-up…"
+          onkeydown="composerKey(event,'b')"></textarea>
         <div class="input-footer">
-          <span class="runtime-label">Claude · Sonnet 4.6</span>
-          <!-- paperclip — enabled -->
-          <div class="icon-btn" title="Attach files">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg>
-          </div>
-          <!-- send → queues while running -->
-          <div class="icon-btn" id="send-btn" title="Queue prompt (agent is running)" onclick="queueFromComposer()" style="cursor:pointer">
-            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102.65,154l41.39,85.57A15.86,15.86,0,0,0,158.44,248H158.7a15.88,15.88,0,0,0,14.1-9.75l76.14-191.19c0-.05,0-.1.06-.15A16,16,0,0,0,227.32,28.68Z"/></svg>
-          </div>
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib" title="Attach"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <!-- while running: stop button -->
+          <div class="ib stop" title="Stop agent"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="52" y="52" width="152" height="152" rx="4"/></svg></div>
         </div>
       </div>
-      <!-- hint text below composer -->
-      <div style="font-size:10px;color:var(--r-ink-faint);text-align:center;margin-top:5px">
-        <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor" style="vertical-align:-1px"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></svg>
-        Enter queues · Shift+Enter queues and bumps to top
+      <div style="padding:4px 0 0;text-align:center;font-size:10px;color:var(--r-ink-faint)">
+        Enter queues · Shift+Enter queues &amp; promotes to top
       </div>
     </div>
   </div>
-
-  <div class="description">
-    <strong>Proposed:</strong> input stays editable. Pressing Enter while agent runs <em>queues</em> the prompt. Queue shows above composer — hover any item for Edit / Promote / Delete. Turn completes → queue auto-fires.
-  </div>
+  <div class="desc"><strong>Fixed:</strong> Queue notch (same pattern as "Working on selected text"). Type in unlocked composer, Enter queues. Hover items for Edit / Promote / Delete. Try adding more items.</div>
 </div>
 
 
-<!-- ═══════════════════════════════════════════════════════
-     COLUMN C — action detail cards
-     ═══════════════════════════════════════════════════════ -->
-<div class="col" style="justify-content:flex-start;padding-top:32px">
-  <div class="col-label detail"><span>Queue item actions</span></div>
-
-  <div class="annotation-panel">
-    <div class="state-label">Three actions per item</div>
-
-    <div class="annotation-row">
-      <div class="annotation-icon edit">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
-      </div>
-      <div class="annotation-text">
-        <strong>Edit</strong> — click to edit the queued prompt inline. Confirm with Enter, cancel with Escape.
+<!-- ══════════════════════════════════════════════════════
+     COL C — Coexistence: queue + selected text stacked
+     ══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="tag plus">+ Selected text stacked</div>
+  <div class="panel" style="height:460px">
+    <div class="panel-bar">
+      <span class="panel-bar-title">AI Chat</span>
+      <div class="pib"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm40,104H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24a8,8,0,0,1,0,16Z"/></svg></div>
+    </div>
+    <div class="messages">
+      <div class="msg-u"><div class="msg-u-b">pls review open issues and suggest a sprint</div></div>
+      <div class="msg-a">
+        <div class="msg-a-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
+          Claude · <span class="dot"></span>
+        </div>
+        <div class="run-status">
+          <svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>
+          Fetching issues…
+        </div>
       </div>
     </div>
 
-    <div class="annotation-row">
-      <div class="annotation-icon promote">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
+    <div class="input-wrap no-top">
+      <!--
+        UPPER NOTCH: "Working on selected text" (SelectedContextTab)
+        → stays rounded-t-lg (topmost element, no element above it)
+        → margin-bottom: 0 (NOT -1px) because queue notch below provides the connection
+      -->
+      <div class="notch" style="margin-bottom:0" id="sct-notch">
+        <div class="sct-row">
+          <div class="sct-head">
+            <!-- selection icon — same as SelectedContextTab -->
+            <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.6"><path d="M208,40H48A16,16,0,0,0,32,56V200a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40ZM48,56H208V88H48ZM48,200V104H208V200Z"/></svg>
+            <span class="sct-title">Working on selected text</span>
+            <button class="sct-close" onclick="dismissSct()"><svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></button>
+          </div>
+          <div class="sct-preview">It's 2:00 PM on a Tuesday. You're in a conference room with seven o…</div>
+        </div>
       </div>
-      <div class="annotation-text">
-        <strong>Promote</strong> — stop the current agent run and immediately send this queued prompt. Same as the user clicking Stop and sending manually, but one click.
-      </div>
-    </div>
 
-    <div class="annotation-row">
-      <div class="annotation-icon delete">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>
+      <!--
+        LOWER NOTCH: queue items
+        → stacked-below: no top-rounding, no top-border (upper notch covers/provides it)
+        → -mb-px eats the input box's top border
+      -->
+      <div class="notch stacked-below" id="queue-notch-c">
+        <div class="notch-header-row" onclick="toggleQueueC()">
+          <svg class="chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
+          <span class="q-count-pill" id="count-c">2</span>
+          <span class="notch-header-label">Queued</span>
+          <span class="notch-header-hint">sends when done</span>
+        </div>
+        <div class="notch-body" id="qlist-c">
+          <div class="q-item" id="qc-1">
+            <div class="q-bullet"></div>
+            <div class="q-text" id="qc-1-t">and review existing sprints</div>
+            <input class="q-edit-input" id="qc-1-i" value="and review existing sprints"
+              onkeydown="editKey(event,'qc-1','c')" onblur="cancelEdit('qc-1')">
+            <div class="q-actions">
+              <button class="qa" data-tip="Edit" onclick="startEdit('qc-1')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg></button>
+              <button class="qa prm" data-tip="Stop current &amp; send now" onclick="deleteItem('qc-1','c')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg></button>
+              <button class="qa del" data-tip="Remove" onclick="deleteItem('qc-1','c')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192Z"/></svg></button>
+            </div>
+          </div>
+          <div class="q-item" id="qc-2">
+            <div class="q-bullet"></div>
+            <div class="q-text" id="qc-2-t">also check if sprint 73 is still open</div>
+            <input class="q-edit-input" id="qc-2-i" value="also check if sprint 73 is still open"
+              onkeydown="editKey(event,'qc-2','c')" onblur="cancelEdit('qc-2')">
+            <div class="q-actions">
+              <button class="qa" data-tip="Edit" onclick="startEdit('qc-2')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg></button>
+              <button class="qa prm" data-tip="Stop current &amp; send now" onclick="deleteItem('qc-2','c')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg></button>
+              <button class="qa del" data-tip="Remove" onclick="deleteItem('qc-2','c')"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192Z"/></svg></button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="annotation-text">
-        <strong>Delete</strong> — remove the queued prompt. Does not affect the running turn.
-      </div>
-    </div>
 
-    <hr class="divider">
-    <div class="state-label">Keyboard shortcuts</div>
-    <div class="annotation-row" style="margin-bottom:5px">
-      <div style="font-size:11.5px;color:var(--r-ink-body);line-height:1.6">
-        <strong>Enter</strong> while agent running → queue prompt<br>
-        <strong>Shift+Enter</strong> → queue and promote to top<br>
-        <strong>Escape</strong> while editing → cancel, restore original
+      <!-- input — seamlessly connected -->
+      <div class="input-box">
+        <textarea rows="2" id="composer-c" placeholder="Add a follow-up…"
+          onkeydown="composerKey(event,'c')"></textarea>
+        <div class="input-footer">
+          <span class="rtl">Claude · Sonnet 4.6</span>
+          <div class="ib"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          <div class="ib stop"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="52" y="52" width="152" height="152" rx="4"/></svg></div>
+        </div>
+      </div>
+      <div style="padding:4px 0 0;text-align:center;font-size:10px;color:var(--r-ink-faint)">
+        Enter queues · Dismiss "Working on selected text" with ×
       </div>
     </div>
-
-    <hr class="divider">
-    <div class="state-label">Auto-send logic</div>
-    <div class="annotation-row" style="margin-bottom:0">
-      <div style="font-size:11.5px;color:var(--r-ink-body);line-height:1.6">
-        When the current turn completes, the first queued item is sent automatically via <code>useEffect</code> on <code>agentRunning</code> transition <code>true→false</code>. Multiple items in FIFO order.
-      </div>
-    </div>
+  </div>
+  <div class="desc">
+    <strong>Stacking:</strong> upper = <code>rounded-t-lg</code>, lower = <code>stacked-below</code> (no top rounding, no top border — merges seamlessly). Dismiss selected text → queue promotes to topmost, gains <code>rounded-t-lg</code>.
   </div>
 </div>
 
 <script>
-  let queueItems = ['qi-1'];
+  /* ── state ── */
+  const counts = { b: 1, c: 2 };
+  let nextId = 10;
 
-  function toggleQueue() {
-    document.getElementById('queue-section').classList.toggle('collapsed');
+  /* ── toggles ── */
+  function toggleQueueB() { document.getElementById('queue-notch-b').classList.toggle('collapsed'); }
+  function toggleQueueC() { document.getElementById('queue-notch-c').classList.toggle('collapsed'); }
+
+  /* ── selected text dismiss ── */
+  function dismissSct() {
+    const sct = document.getElementById('sct-notch');
+    sct.style.transition = 'opacity 150ms';
+    sct.style.opacity = '0';
+    setTimeout(() => {
+      sct.remove();
+      /* queue notch is now topmost — give it top rounding */
+      const qn = document.getElementById('queue-notch-c');
+      qn.classList.remove('stacked-below');
+      qn.style.borderRadius = '8px 8px 0 0';
+      qn.style.borderTop = '';
+      qn.style.marginBottom = '-1px';
+    }, 150);
   }
 
-  function updateQueueCount() {
-    const count = queueItems.length;
-    document.getElementById('queue-count').textContent = count;
-    document.getElementById('queue-label').textContent = count === 1 ? 'Queued' : 'Queued';
-    document.getElementById('queue-empty').style.display = count === 0 ? 'block' : 'none';
-    if (count === 0) {
-      document.getElementById('queue-count').style.display = 'none';
-    } else {
-      document.getElementById('queue-count').style.display = 'flex';
-    }
+  /* ── edit ── */
+  function startEdit(id) {
+    document.getElementById(id).classList.add('is-editing');
+    document.getElementById(id + '-i').focus();
+    document.getElementById(id + '-i').select();
   }
-
-  function deleteItem(id) {
+  function cancelEdit(id) {
     const el = document.getElementById(id);
-    if (!el) return;
+    const input = document.getElementById(id + '-i');
+    input.value = document.getElementById(id + '-t').textContent;
+    el.classList.remove('is-editing');
+  }
+  function editKey(e, id, col) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const t = document.getElementById(id + '-t');
+      t.textContent = document.getElementById(id + '-i').value;
+      document.getElementById(id).classList.remove('is-editing');
+    }
+    if (e.key === 'Escape') cancelEdit(id);
+  }
+
+  /* ── delete ── */
+  function deleteItem(id, col) {
+    const el = document.getElementById(id);
     el.classList.add('removing');
     setTimeout(() => {
       el.remove();
-      queueItems = queueItems.filter(i => i !== id);
-      updateQueueCount();
+      counts[col]--;
+      updateCount(col);
     }, 200);
   }
+  function updateCount(col) {
+    const pill = document.getElementById('count-' + col);
+    if (pill) pill.textContent = counts[col];
+  }
 
-  function promoteItem(id) {
+  /* ── promote (col B only) ── */
+  function promoteB(id) {
     const el = document.getElementById(id);
-    if (!el) return;
-    const text = document.getElementById(id + '-text').textContent;
-    // visual feedback: flash the item green, then remove it
-    el.style.background = '#DCFCE7';
-    el.style.borderColor = '#BBF7D0';
-    setTimeout(() => {
-      deleteItem(id);
-      // Show a "Sending now" flash
-      const list = document.getElementById('queue-list');
-      const flash = document.createElement('div');
-      flash.style.cssText = 'padding:7px 14px;font-size:11px;color:#15803D;background:#DCFCE7;border-top:1px solid #BBF7D0;display:flex;align-items:center;gap:6px';
-      flash.innerHTML = `<svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08L19.57,82.84a16,16,0,0,0-2.49,29.8L102.65,154l41.39,85.57A15.86,15.86,0,0,0,158.44,248H158.7a15.88,15.88,0,0,0,14.1-9.75l76.14-191.19A16,16,0,0,0,227.32,28.68Z"/></svg>Stopping current run and sending: "${text}"`;
-      list.appendChild(flash);
-      setTimeout(() => flash.remove(), 2200);
-    }, 300);
+    const txt = document.getElementById(id + '-t').textContent;
+    el.style.background = 'rgba(220,252,231,0.7)';
+    setTimeout(() => deleteItem(id, 'b'), 200);
   }
 
-  function startEdit(id) {
-    const el = document.getElementById(id);
-    const input = document.getElementById(id + '-input');
-    el.classList.add('is-editing');
-    input.focus();
-    input.select();
-  }
-
-  function onQueueEditKey(e, id) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const input = document.getElementById(id + '-input');
-      const text = document.getElementById(id + '-text');
-      text.textContent = input.value;
-      document.getElementById(id).classList.remove('is-editing');
-    }
-    if (e.key === 'Escape') {
-      cancelEdit(id);
-    }
-  }
-
-  function cancelEdit(id) {
-    const el = document.getElementById(id);
-    const input = document.getElementById(id + '-input');
-    const text = document.getElementById(id + '-text');
-    // restore original text
-    input.value = text.textContent;
-    el.classList.remove('is-editing');
-  }
-
-  let nextId = 2;
-  function queueFromComposer() {
-    const input = document.getElementById('composer-input');
-    const val = input.value.trim();
-    if (!val) {
-      // shake the input
-      input.style.outline = '2px solid #F59E0B';
-      setTimeout(() => input.style.outline = '', 500);
-      return;
-    }
-
-    const id = 'qi-' + nextId++;
-    const list = document.getElementById('queue-list');
-    const emptyEl = document.getElementById('queue-empty');
-
-    const item = document.createElement('div');
-    item.className = 'queue-item';
-    item.id = id;
-    item.style.opacity = '0';
-    item.style.transform = 'translateY(4px)';
-    item.innerHTML = `
-      <div class="queue-item-bullet"></div>
-      <div class="queue-item-text" id="${id}-text">${escapeHtml(val)}</div>
-      <input class="queue-item-edit-input" id="${id}-input" value="${escapeHtml(val)}" onkeydown="onQueueEditKey(event, '${id}')" onblur="cancelEdit('${id}')">
-      <div class="queue-item-actions">
-        <button class="qi-btn edit" onclick="startEdit('${id}')">
-          <div class="tip">Edit prompt</div>
-          <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
-        </button>
-        <button class="qi-btn promote" onclick="promoteItem('${id}')">
-          <div class="tip">Stop current &amp; send now</div>
-          <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
-        </button>
-        <button class="qi-btn delete" onclick="deleteItem('${id}')">
-          <div class="tip">Remove</div>
-          <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>
-        </button>
-      </div>`;
-
-    list.insertBefore(item, emptyEl);
-    queueItems.push(id);
-    requestAnimationFrame(() => {
-      item.style.transition = 'opacity 150ms, transform 150ms';
-      item.style.opacity = '1';
-      item.style.transform = '';
-    });
-
-    input.value = '';
-    input.style.height = 'auto';
-    updateQueueCount();
-    if (document.getElementById('queue-section').classList.contains('collapsed')) {
-      document.getElementById('queue-section').classList.remove('collapsed');
-    }
-  }
-
-  function onComposerKey(e) {
+  /* ── queue from composer ── */
+  function composerKey(e, col) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      queueFromComposer();
+      const ta = document.getElementById('composer-' + col);
+      const val = ta.value.trim();
+      if (!val) return;
+      addQueueItem(val, col);
+      ta.value = '';
     }
   }
 
-  function escapeHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function addQueueItem(text, col) {
+    const id = 'q' + col + '-' + nextId++;
+    const list = document.getElementById('qlist-' + col);
+    const item = document.createElement('div');
+    item.className = 'q-item';
+    item.id = id;
+    item.style.opacity = '0';
+    item.innerHTML = `
+      <div class="q-bullet"></div>
+      <div class="q-text" id="${id}-t">${esc(text)}</div>
+      <input class="q-edit-input" id="${id}-i" value="${esc(text)}"
+        onkeydown="editKey(event,'${id}','${col}')" onblur="cancelEdit('${id}')">
+      <div class="q-actions">
+        <button class="qa" data-tip="Edit" onclick="startEdit('${id}')">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
+        </button>
+        <button class="qa prm" data-tip="Stop current &amp; send now" onclick="deleteItem('${id}','${col}')">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
+        </button>
+        <button class="qa del" data-tip="Remove" onclick="deleteItem('${id}','${col}')">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192Z"/></svg>
+        </button>
+      </div>`;
+    list.appendChild(item);
+    counts[col]++;
+    updateCount(col);
+    requestAnimationFrame(() => {
+      item.style.transition = 'opacity 150ms';
+      item.style.opacity = '1';
+    });
+    /* ensure notch is expanded */
+    const notch = col === 'b' ? 'queue-notch-b' : 'queue-notch-c';
+    document.getElementById(notch).classList.remove('collapsed');
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 </script>
 </body>
