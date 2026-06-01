@@ -52,6 +52,7 @@ mode, custom agent binary picker, Linux packaging, ACP session resume.
 | 2026-06-01 | Single key UI in Ritemark Settings; env-injection to agent | TO BE architecture alignment — avoid key-management fragmentation |
 | 2026-06-01 | Sprint named by Jarmo: `sprint-76-acp-opencode`; SDD track | Multi-requirement, multi-component, security-sensitive (approval gating) |
 | 2026-06-01 | UI label = "OpenCode"; flag status = `stable`; proceed without waiting for typed-protocol refactor | Jarmo's answers to spec Q2/Q3/Q4 |
+| 2026-06-01 | **UX prototypes of Settings BYOK section and model picker must be approved before implementation** — added to Phase 0 | Jarmo: user-facing surfaces are prototyped first, not designed mid-implementation |
 
 ## Risks
 

@@ -3,18 +3,30 @@
 > Status legend: tick `[x]` only when the change exists on `sprint-76-acp-opencode`
 > (`git diff main...HEAD` shows it). Do not pre-tick.
 
-## Phase 0: Audits (R1, R2 risk reduction) — BEFORE implementation code
+## Phase 0: Audits + UX prototypes (R1, R2 risk reduction; R3, R6 surface approval) — BEFORE implementation code
 
+### 0a: Technical audits
 - [ ] Write `research/acp-e2e-audit.md`: drive real `opencode acp` binary with
-      `@agentclientprotocol/sdk` test script on darwin-arm64 (handshake, prompt with Gemini key,
-      fs proxying, permission request, cancel). Record ship/fallback/defer decision.
+      `@agentclientprotocol/sdk` test script (Linux binary in remote env — protocol behavior is
+      platform-independent; darwin-arm64 binary re-validated during first production build).
+      Verify handshake, prompt with BYOK key, fs proxying, permission request, cancel.
+      Record ship/fallback/defer decision.
 - [ ] Resolve R6 mechanism in the audit: how OpenCode receives model selection over ACP.
-- [ ] Write `research/opencode-bundling-audit.md`: binary size, license/NOTICE source,
-      codesign + notarization test of Bun-compiled binary. Record bundle vs first-use-download
-      decision (answers spec Q1).
-- [ ] Get Jarmo's answers to spec Open Questions Q1–Q4; move them to Resolved Questions.
+- [ ] Write `research/opencode-bundling-audit.md`: binary sizes (all platforms), license/NOTICE
+      source, sha256s. Codesign/notarization verification deferred to first production build
+      (Gate 2). Record bundle vs first-use-download recommendation (answers spec Q1).
 
-**⛔ GATE: Jarmo approves spec + audit results before Phase 1 (CLAUDE.md Sprint Phase 2→3 gate).**
+### 0b: UX prototypes (added 2026-06-01 per Jarmo — user-facing surfaces approved before development)
+- [ ] ux-expert design pass: Settings → BYOK section (key fields, validation states, empty/configured states)
+- [ ] ux-expert design pass: agent selector + model picker with OpenCode entries
+      (provider-grouped models, "no keys configured" state)
+- [ ] Build reviewable HTML prototypes of both surfaces (ritemark-design tokens) under
+      `research/prototypes/`
+- [ ] Jarmo reviews and approves both prototypes
+
+### 0c: Gate
+- [ ] Jarmo's Q1 decision (bundle vs download) based on audit data
+- [ ] **⛔ GATE: Jarmo approves spec + audits + prototypes before Phase 1 (CLAUDE.md Sprint Phase 2→3 gate).**
 
 ## Phase 1: ACP client core (R1)
 
