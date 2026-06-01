@@ -83,7 +83,9 @@ Acceptance criteria:
   reads the same SecretStorage values those cards write.
 - The existing cards' "Used for:" lines are extended to mention OpenCode:
   - OpenAI: "AI Chat, Flows (LLM), Image Generation (GPT Image 1.5), **OpenCode (GPT models)**"
-  - Google AI: "Gemini models in **OpenCode** and Flows, Imagen 3 (coming soon)"
+  - Google AI: "Gemini models in **OpenCode** and Flows" — note: the stale "Imagen 3 (coming
+    soon)" mention in today's production copy is **removed** (Jarmo, 2026-06-01: no such feature),
+    regardless of flag state
   - Anthropic: "Claude in Ritemark (alternative to signing in with Claude.ai), **OpenCode (Claude models)**"
 - **One new card only:** "OpenRouter API Key" *(optional)* — added to the API Keys section after
   Anthropic. "Used for: OpenCode — hundreds of models from multiple providers through a single key."

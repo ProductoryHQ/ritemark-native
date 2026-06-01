@@ -54,7 +54,9 @@ credential cards. The revised design principle:
 1. **OpenAI API Key** — "Used for:" becomes:
    `AI Chat, Flows (LLM), Image Generation (GPT Image 1.5), OpenCode (GPT models)`
 2. **Google AI API Key** — "Used for:" becomes:
-   `Gemini models in OpenCode and Flows, Imagen 3 (coming soon)`
+   `Gemini models in OpenCode and Flows`
+   (the stale "Imagen 3 (coming soon)" in today's production copy is removed — no such feature;
+   this cleanup ships regardless of flag state)
 3. **Anthropic API Key** — "Used for:" becomes:
    `Claude in Ritemark (alternative to signing in with Claude.ai), OpenCode (Claude models)`
 4. **NEW: OpenRouter API Key** *(optional)* — identical card anatomy to the existing key cards:

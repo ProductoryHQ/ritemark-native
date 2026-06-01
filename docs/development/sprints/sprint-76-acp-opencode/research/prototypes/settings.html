@@ -246,8 +246,8 @@ function apiKeysSection({ flagOn = true, googleConfigured = false, openrouterCon
     placeholder: 'AIza...',
     banner: googleBanner ? `<div class="success-banner">${icon('check',16,'var(--r-success)')} Key saved — Gemini models are now available in OpenCode</div>` : '',
     usedFor: flagOn
-      ? [{ text: 'Gemini models in OpenCode' }, 'Flows', 'Imagen 3 (coming soon)']
-      : ['Gemini models', 'Imagen 3 (coming soon)'],
+      ? [{ text: 'Gemini models in OpenCode' }, 'Flows']
+      : ['Gemini models', 'Flows'],
     getKeyText: 'Get API key',
     changed: flagOn, changedLabel: 'COPY CHANGE ONLY'
   }));
@@ -319,7 +319,7 @@ function buildState(id) {
       };
     case 'S5':
       return {
-        anno: '<strong>S5 — Feature flag OFF.</strong> The page is identical to today\'s production page: no OpenRouter card, no OpenCode mentions in any "Used for:" line. (Amber outlines absent because nothing is changed.)',
+        anno: '<strong>S5 — Feature flag OFF.</strong> No OpenRouter card, no OpenCode mentions in any "Used for:" line. One difference from today\'s production page: the stale "Imagen 3 (coming soon)" copy on the Google AI card is removed regardless of flag state (Jarmo, 2026-06-01 — no such feature).',
         html: wholePage({ flagOn: false })
       };
   }

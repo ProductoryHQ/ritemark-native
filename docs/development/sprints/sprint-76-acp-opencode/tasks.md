@@ -59,6 +59,8 @@
 - [ ] Spawn-env injection in `acpManager.ts` reading existing key storage
 - [ ] Settings page: update "Used for:" copy on 3 existing cards; add OpenRouter card
       (flag-gated, optional)
+- [ ] Remove stale "Imagen 3 (coming soon)" from Google AI card copy (not flag-gated —
+      ships unconditionally; Jarmo 2026-06-01)
 - [ ] AI sidebar empty-state "Set up your API keys" card + `open-settings-api-keys` deep link
 - [ ] Verify keys never appear in webview messages (trace channel inspection — scenarios.md
       "Keys never leak")
