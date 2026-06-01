@@ -29,7 +29,6 @@
     "onCommand:ritemark.openSearch",
     "onCustomEditor:ritemark.flowEditor",
     "onView:ritemark.agentLibraryView",
-    "onView:ritemark.flowsView",
     "onCustomEditor:ritemark.pdfViewer",
     "onCustomEditor:ritemark.docxViewer",
     "onCommand:ritemark.browser.openUrl",
@@ -368,11 +367,6 @@
           "icon": "media/agent-library-icon.svg"
         },
         {
-          "id": "ritemark-flows",
-          "title": "Flows",
-          "icon": "media/flows-icon.svg"
-        },
-        {
           "id": "ritemark-browser",
           "title": "Browser",
           "icon": "media/browser-icon.svg"
@@ -402,15 +396,6 @@
           "id": "ritemark.agentLibraryView",
           "name": "Agent Library",
           "contextualTitle": "Agent Library",
-          "visibility": "visible"
-        }
-      ],
-      "ritemark-flows": [
-        {
-          "type": "webview",
-          "id": "ritemark.flowsView",
-          "name": "Flows",
-          "contextualTitle": "Ritemark Flows",
           "visibility": "visible"
         }
       ],
@@ -460,21 +445,6 @@
         {
           "command": "ritemark.aiSettings",
           "when": "view == ritemark.unifiedView",
-          "group": "navigation@3"
-        },
-        {
-          "command": "ritemark.flows.new",
-          "when": "view == ritemark.flowsView",
-          "group": "navigation@1"
-        },
-        {
-          "command": "ritemark.flows.refresh",
-          "when": "view == ritemark.flowsView",
-          "group": "navigation@2"
-        },
-        {
-          "command": "ritemark.flows.settings",
-          "when": "view == ritemark.flowsView",
           "group": "navigation@3"
         },
         {
@@ -663,6 +633,7 @@
     "@types/pdfkit": "^0.17.4",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
+    "cron-parser": "^4.9.0",
     "docx": "^8.5.0",
     "gray-matter": "^4.0.3",
     "marked": "^4.3.0",
