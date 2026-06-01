@@ -16,6 +16,7 @@ import { CodexView } from './CodexView';
 import { UnifiedConversationView } from './UnifiedConversationView';
 import { LegacyConversationView } from './LegacyConversationView';
 import { CodexSetupView } from './CodexSetupView';
+import { OpenCodeSetupView } from './OpenCodeSetupView';
 import { ChatInput } from './ChatInput';
 import { SelectionIndicator } from './SelectionIndicator';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
@@ -110,17 +111,23 @@ export function AISidebar() {
     loadConversationList();
   }, [loadConversationList]);
 
+  const acpProviders = useAISidebarStore((s) => s.acpProviders);
   const isClaudeCode = selectedAgent === 'claude-code';
   const isCodex = selectedAgent === 'codex';
+  const isOpenCode = selectedAgent === 'opencode';
   const needsSetup = isClaudeCode && setupStatus !== null
     && setupStatus.state !== 'ready';
   const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
   const showWelcome = isClaudeCode && setupStatus !== null
     && setupStatus.state === 'ready' && !hasSeenWelcome && !hasAnyRuntimeConversation;
   const showCodexSetup = isCodex && codexStatus.state !== 'ready';
+  // OpenCode zero-key: no conversation yet and all four provider booleans are false
+  const showOpenCodeSetup = isOpenCode && !hasAnyRuntimeConversation
+    && acpProviders
+    && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
   const currentApprovedPlan = isClaudeCode
     ? getActiveApprovedPlanForClaude(agentConversation)
-    : isCodex
+    : (isCodex || isOpenCode)
       ? getActiveApprovedPlanForCodex(codexConversation)
       : null;
   const visibleCurrentPlan = currentApprovedPlan && currentApprovedPlan.key !== dismissedCurrentPlanKey
@@ -152,6 +159,13 @@ export function AISidebar() {
           <SelectionIndicator />
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <CodexSetupView />
+          </div>
+        </>
+      ) : ready && showOpenCodeSetup ? (
+        <>
+          <SelectionIndicator />
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <OpenCodeSetupView />
           </div>
         </>
       ) : (

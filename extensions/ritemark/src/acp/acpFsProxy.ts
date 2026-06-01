@@ -151,13 +151,14 @@ function sliceByLines(content: string, line: number | null, limit: number | null
 }
 
 /**
- * Default backend backed by `vscode.workspace.fs`. Loaded through a
- * Function-wrapped require so this module compiles and unit-tests without the
- * editor host (mirrors runtimeTrace.ts).
+ * Default backend backed by `vscode.workspace.fs`. Uses a lazy direct `require`
+ * (not a top-level import) so this module compiles and unit-tests without the
+ * editor host. A `new Function('return require(name)')` wrapper would execute in
+ * global scope, where `require` is undefined → "require is not defined"; a plain
+ * `require` runs in module scope and works (matches bundledAgentRuntime.ts).
  */
 function createVscodeFsBackend(): AcpFsBackend {
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  const dynamicRequire = new Function('name', 'return require(name)') as (name: string) => {
+  const vscode = require('vscode') as {
     Uri: { file: (p: string) => unknown };
     workspace: {
       fs: {
@@ -166,7 +167,6 @@ function createVscodeFsBackend(): AcpFsBackend {
       };
     };
   };
-  const vscode = dynamicRequire('vscode');
 
   return {
     async readFile(absPath: string): Promise<string> {

@@ -281,6 +281,12 @@
             ],
             "description": "What Codex is allowed to do on your filesystem.",
             "scope": "application"
+          },
+          "ritemark.opencode.autoApprove": {
+            "type": "boolean",
+            "default": false,
+            "description": "Auto-approve OpenCode file edits and tool calls within the workspace without showing the approval card. Writes outside the workspace are still blocked. Use with caution.",
+            "scope": "application"
           }
         }
       },

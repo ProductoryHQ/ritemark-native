@@ -1804,6 +1804,11 @@ ${prompt}`;
     const file = params.toolCall?.locations?.[0]?.path;
     const sessionKey = `${tool}:${file ?? ''}`;
 
+    // Settings auto-approve mode — skip the card entirely (off by default).
+    if (this._isAcpAutoApprove()) {
+      return this._acpSelectOutcome(params, true);
+    }
+
     // Session "always allow" short-circuit (R4 parity with Codex).
     if (this._acpSessionAlwaysAllow.has(sessionKey)) {
       return this._acpSelectOutcome(params, true);
@@ -1827,6 +1832,12 @@ ${prompt}`;
    */
   private async _handleAcpWriteApproval(request: WriteTextFileRequest): Promise<boolean> {
     const sessionKey = `write:${request.path}`;
+    // Settings auto-approve mode (off by default). Out-of-workspace writes are
+    // already rejected by AcpFsProxy before this runs, so this only auto-approves
+    // in-workspace edits.
+    if (this._isAcpAutoApprove()) {
+      return true;
+    }
     if (this._acpSessionAlwaysAllow.has(sessionKey)) {
       return true;
     }
@@ -1838,6 +1849,13 @@ ${prompt}`;
       this._acpSessionAlwaysAllow.add(sessionKey);
     }
     return approved;
+  }
+
+  /** Settings toggle: auto-approve OpenCode tool calls / edits (off by default). */
+  private _isAcpAutoApprove(): boolean {
+    return vscode.workspace
+      .getConfiguration('ritemark')
+      .get<boolean>('opencode.autoApprove', false) === true;
   }
 
   /**

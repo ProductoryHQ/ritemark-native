@@ -115,6 +115,7 @@ export function UnifiedConversationView() {
               turn={item.turn}
               isMixedRuntime={isMixedRuntime}
               onApprove={(requestId) => handleCodexApproval(requestId, true)}
+              onApproveAlways={(requestId) => handleCodexApproval(requestId, true, true)}
               onReject={(requestId) => handleCodexApproval(requestId, false)}
               onAnswerQuestion={answerCodexQuestion}
               onApprovePlan={approveCodexPlan}

@@ -563,6 +563,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         codexApprovalPolicy: config.get('codex.approvalPolicy', 'on-request'),
         codexSandboxMode: config.get('codex.sandboxMode', 'workspace-write'),
 
+        // Sprint 76 R4: OpenCode auto-approve mode (skip approval cards).
+        opencodeAutoApprove: config.get('opencode.autoApprove', false),
+
         // Agent runtime preference (bundled vs system)
         agentRuntimePreference: config.get('agentRuntime.preference', 'bundled'),
 
@@ -588,8 +591,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         googleKeyConfigured: !!googleKey,
         anthropicKey: anthropicKey || '',
         anthropicKeyConfigured: !!anthropicKey,
-        // Sprint 76 R3a: OpenRouter (optional, flag-gated). `openrouterEnabled`
-        // tells the Settings webview whether to render the card at all.
+        // Sprint 76 R3a: OpenCode flag-gating. `opencodeEnabled` tells the
+        // Settings webview whether the "Used for:" lines mention OpenCode.
+        // `openrouterEnabled` tells it whether to render the OpenRouter card.
+        opencodeEnabled: openrouterEnabled,
         openrouterEnabled,
         openrouterKey: openrouterKey || '',
         openrouterKeyConfigured: !!openrouterKey,

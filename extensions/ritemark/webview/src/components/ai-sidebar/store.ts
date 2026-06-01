@@ -44,6 +44,8 @@ import type {
   OnboardingStatus,
   OnboardingDependency,
   OnboardingInstallState,
+  AcpProviderFlags,
+  ByokModelOption,
 } from './types';
 
 let msgCounter = 0;
@@ -164,7 +166,14 @@ interface AISidebarState {
   dismissedCurrentPlanKey: string | null;
 
   // ── Pending runtime (per-run draft selection) ──
-  pendingRuntime: { runtimeId: 'claude-code' | 'codex'; modelId: string; mode: 'plan' | 'edit' };
+  pendingRuntime: { runtimeId: 'claude-code' | 'codex' | 'opencode'; modelId: string; mode: 'plan' | 'edit' };
+
+  // ── OpenCode / ACP state ──
+  opencodeEnabled: boolean;
+  acpProviders: AcpProviderFlags;
+  byokProviderModels: Record<string, ByokModelOption[]> | undefined;
+  /** Full composite value: "opencode:<provider>/<model>" */
+  opencodeSelectedModel: string;
 
   // ── Chat history state ──
   currentConversationId: string | null;
@@ -208,7 +217,7 @@ interface AISidebarState {
   // ── Actions ──
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
-  setPendingRuntime: (partial: Partial<{ runtimeId: 'claude-code' | 'codex'; modelId: string; mode: 'plan' | 'edit' }>) => void;
+  setPendingRuntime: (partial: Partial<{ runtimeId: 'claude-code' | 'codex' | 'opencode'; modelId: string; mode: 'plan' | 'edit' }>) => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
   /**
@@ -240,7 +249,11 @@ interface AISidebarState {
   dismissWelcome: () => void;
   sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'plan' | 'edit', skipBrowserContext?: boolean) => void;
   selectCodexModel: (modelId: string) => void;
-  handleCodexApproval: (requestId: string | number, approved: boolean) => void;
+  /** Select an OpenCode model. compositeValue is the full "opencode:<provider>/<model>" string. */
+  selectOpenCodeModel: (compositeValue: string) => void;
+  /** Send a message to the OpenCode (ACP) runtime. */
+  sendOpenCodeMessage: (prompt: string) => void;
+  handleCodexApproval: (requestId: string | number, approved: boolean, alwaysAllow?: boolean) => void;
   answerCodexQuestion: (turnId: string, question: CodexQuestion, answers: Record<string, string>) => void;
   approveCodexPlan: (turnId: string) => void;
   discardCodexPlan: (turnId: string) => void;
@@ -303,6 +316,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   dismissedCurrentPlanKey: null,
 
   pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'edit' },
+
+  opencodeEnabled: false,
+  acpProviders: { google: false, openai: false, anthropic: false, openrouter: false },
+  byokProviderModels: undefined,
+  opencodeSelectedModel: '',
 
   currentConversationId: null,
   savedConversations: [],
@@ -537,7 +555,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const hasRunningClaude = state.agentConversation.some((t) => t.isRunning);
 
     if (hasRunningCodex) {
-      vscode.postMessage({ type: 'codex-cancel' });
+      // OpenCode uses acp-cancel; Codex uses codex-cancel
+      if (state.selectedAgent === 'opencode') {
+        vscode.postMessage({ type: 'acp-cancel' });
+      } else {
+        vscode.postMessage({ type: 'codex-cancel' });
+      }
       const conv = [...state.codexConversation];
       const last = conv[conv.length - 1];
       if (last?.isRunning) {
@@ -752,14 +775,58 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     set({ codexSelectedModel: modelId });
   },
 
-  handleCodexApproval: (requestId, approved) => {
+  selectOpenCodeModel: (compositeValue) => {
+    set({ opencodeSelectedModel: compositeValue });
+  },
+
+  sendOpenCodeMessage: (prompt) => {
+    const state = get();
+    const lastTurn = state.codexConversation[state.codexConversation.length - 1];
+    if (lastTurn?.isRunning) return;
+
+    // Strip the "opencode:" prefix — host expects bare "provider/model"
+    const compositeValue = state.opencodeSelectedModel;
+    const model = compositeValue.startsWith('opencode:')
+      ? compositeValue.slice('opencode:'.length)
+      : compositeValue;
+
+    const turn: CodexConversationTurn = {
+      id: nextId(),
+      runtime: 'opencode',
+      userPrompt: prompt,
+      requestedPlanMode: false,
+      activeFilePath: state.activeFilePath || undefined,
+      streamingText: '',
+      activities: [],
+      pendingQuestion: undefined,
+      executionContinuation: false,
+      requiresPlanReview: false,
+      planText: '',
+      planExplanation: undefined,
+      planSteps: [],
+      planHandled: false,
+      planDecision: undefined,
+      isRunning: true,
+      timestamp: Date.now(),
+    };
+
+    set({ codexConversation: [...state.codexConversation, turn] });
+    vscode.postMessage({ type: 'acp-execute', prompt, model });
+  },
+
+  handleCodexApproval: (requestId, approved, alwaysAllow?) => {
     const state = get();
     // Clear the approval from the current turn
     const conv = state.codexConversation.map((t) =>
       t.approval?.requestId === requestId ? { ...t, approval: undefined } : t
     );
     set({ codexConversation: conv });
-    vscode.postMessage({ type: 'codex-approve', requestId, approved });
+    // ACP approvals (requestId starts with "acp-") use a different message type
+    if (typeof requestId === 'string' && requestId.startsWith('acp-')) {
+      vscode.postMessage({ type: 'acp-approval-response', requestId, approved, alwaysAllow });
+    } else {
+      vscode.postMessage({ type: 'codex-approve', requestId, approved });
+    }
   },
 
   answerCodexQuestion: (turnId, question, answers) => {
@@ -1078,7 +1145,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         set({ isOnline: message.isOnline });
         break;
 
-      case 'agent:config':
+      case 'agent:config': {
         // Set workspace context for per-project history scoping, then immediately
         // reload the conversation list so the history panel shows all saved entries.
         if (message.workspacePath) {
@@ -1097,11 +1164,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           ? currentClaude
           : (newClaudeModels[0]?.id || currentClaude);
         const incomingCodexStatus = message.codexStatus ?? get().codexStatus;
-        const incomingRuntimeId = message.selectedAgent === 'codex' ? 'codex' : 'claude-code';
+        const incomingAgent = (message.selectedAgent as AgentId) || 'claude-code';
+        const incomingRuntimeId: 'claude-code' | 'codex' | 'opencode' =
+          incomingAgent === 'codex' ? 'codex'
+          : incomingAgent === 'opencode' ? 'opencode'
+          : 'claude-code';
         set({
           agenticEnabled: message.agenticEnabled,
           codexEnabled: message.codexEnabled ?? false,
-          selectedAgent: (message.selectedAgent as AgentId) || 'claude-code',
+          selectedAgent: incomingAgent,
           selectedModel,
           pendingRuntime: { ...get().pendingRuntime, runtimeId: incomingRuntimeId, modelId: selectedModel },
           agents: message.agents,
@@ -1118,8 +1189,21 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           discoveredAgents: message.discoveredAgents || [],
           discoveredCommands: message.discoveredCommands || [],
           claudeSdkVersion: message.claudeSdkVersion ?? get().claudeSdkVersion,
+          // Sprint 76: OpenCode / ACP fields
+          opencodeEnabled: message.opencodeEnabled ?? get().opencodeEnabled,
+          acpProviders: message.acpProviders ?? get().acpProviders,
+          byokProviderModels: message.byokProviderModels ?? get().byokProviderModels,
         });
         break;
+      }
+
+      case 'acp-providers': {
+        set({
+          opencodeEnabled: message.enabled,
+          acpProviders: message.providers,
+        });
+        break;
+      }
 
       case 'pin-agent': {
         const newAgentId = message.agentId ?? null;

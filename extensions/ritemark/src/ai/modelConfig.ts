@@ -294,7 +294,7 @@ export const GEMINI_IMAGE_MODELS: ImageModelConfig[] = [
  * truth for the curated default model list per provider (CLAUDE.md hard rule —
  * no model IDs hardcoded elsewhere). The `id` here is the BARE model id; the
  * ACP layer joins it with the provider key (`google/`, `openai/`, …) and the
- * AgentSelector composite value is `opencode:<provider>/<model>`.
+ * ChatInput model-picker composite value is `opencode:<provider>/<model>`.
  *
  * Each entry follows the `ModelOption` convention from agent/types.ts
  * (id + label + description) so the webview model picker renders BYOK models
@@ -316,10 +316,13 @@ export interface ByokModelOption {
 }
 
 export const BYOK_PROVIDER_MODELS: Record<ByokProvider, ByokModelOption[]> = {
+  // Model IDs validated against OpenCode 1.15.13's registry (`opencode models google`)
+  // and Google's current developer lineup (gemini-3-pro-preview was retired and now
+  // aliases gemini-3.1-pro-preview; gemini-3.5-flash is the latest GA flash model).
   google: [
-    { id: 'gemini-3-pro', label: 'Gemini 3 Pro', description: 'Google — most capable, deep reasoning' },
-    { id: 'gemini-3-flash', label: 'Gemini 3 Flash', description: 'Google — fast for everyday tasks' },
-    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Google — powerful, large context' },
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning (1M context)' },
+    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', description: 'Google — latest, fast & capable' },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Google — proven, large context' },
   ],
   openai: [
     { id: 'gpt-5.2', label: 'GPT-5.2', description: 'OpenAI — latest flagship reasoning model' },
@@ -331,7 +334,7 @@ export const BYOK_PROVIDER_MODELS: Record<ByokProvider, ByokModelOption[]> = {
   ],
   openrouter: [
     { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', description: 'OpenRouter — Anthropic via OpenRouter' },
-    { id: 'google/gemini-3-pro', label: 'Gemini 3 Pro', description: 'OpenRouter — Google via OpenRouter' },
+    { id: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', description: 'OpenRouter — Google via OpenRouter' },
     { id: 'openai/gpt-5.2', label: 'GPT-5.2', description: 'OpenRouter — OpenAI via OpenRouter' },
     { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', description: 'OpenRouter — open-weight, low cost' },
   ],
