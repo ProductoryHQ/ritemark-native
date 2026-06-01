@@ -82,24 +82,11 @@ version** (pre-1.0 SDK).
 ### Extension Host
 - `src/utils/bundledAgentRuntime.ts`: add `'opencode'` to `AgentRuntimeKind` (line 4); extend
   `executableNames()` (`opencode` / `opencode.exe`) and reuse `candidateRuntimePaths()` unchanged.
-- `binaries/agents/manifest.json`: add three entries (darwin-arm64, darwin-x64, win32-x64):
-
-```jsonc
-{
-  "agent": "opencode",
-  "vendor": "sst",
-  "version": "<pin at sprint start>",
-  "platform": "darwin",
-  "arch": "arm64",
-  "sourceType": "github-release",
-  "sourceUrl": "https://github.com/sst/opencode/releases/download/v<ver>/opencode-darwin-arm64.zip",
-  "sha256": "<computed>",
-  "installName": "opencode",
-  "invocationMode": "acp",
-  "validationArgs": ["--version"],
-  "license": { "spdx": "MIT", "redistribution": "permitted", "noticeUrl": "https://github.com/sst/opencode/blob/dev/LICENSE" }
-}
-```
+- `binaries/agents/manifest.json`: add three entries (darwin-arm64, darwin-x64, win32-x64) using
+  the **`npm-optional-package` sourceType** (same pattern as the Claude binary entries — confirmed
+  by the bundling audit; supersedes the earlier github-release draft). Exact entries with real npm
+  tarball URLs and sha256s, pinned to OpenCode 1.15.13, are in
+  `research/opencode-bundling-audit.md` — copy them verbatim at implementation time.
 
 - `src/agent/types.ts`: `AgentId` gains `'opencode'`; `AGENTS` registry entry. Note:
   `AgentInfo.requiresApiKey` type (`'anthropic' | 'openai' | null`) gains `'byok'` to drive the
@@ -142,12 +129,24 @@ const env = {
 ## Workstream 4: Approval gating + progress streaming (R4, R5)
 
 ### Extension Host
+- **MANDATORY (audit finding):** `acpManager.ts` must inject
+  `OPENCODE_PERMISSION={"edit":"ask","bash":"ask","webfetch":"ask"}` into the spawn env. Without
+  it, OpenCode writes files directly to disk and never calls the client's fs/permission handlers —
+  R4's "no silent writes" invariant is violated. See `research/acp-e2e-audit.md`.
 - `acpApproval.ts` validates every `fs/write_text_file`:
   1. Path inside workspace root (resolve symlinks, reject `..` traversal) — auto-reject otherwise.
   2. Session "always allow" check.
   3. Otherwise → post approval request to webview, await user response, send ACP outcome.
-- `session/request_permission` (non-file permissions, e.g. terminal commands) routes through the
-  same approval surface with the ACP-provided option set.
+- `session/request_permission` options observed from OpenCode: `allow_once` / `allow_always` /
+  `reject_once` — map directly onto the existing Codex approval semantics (incl. "always allow
+  for this session").
+- **Cancellation (audit finding):** OpenCode 1.15.13 returns `-32601` for `session/cancel`.
+  To meet R5's 2-second-idle criterion, cancel = kill + respawn the agent process (session is
+  abandoned). Re-check newer OpenCode versions for native cancel support before pinning the
+  bundle version.
+- **Error surfacing (audit finding):** a bad/missing provider key produces a silent empty turn
+  (`end_turn`, 0 tokens, no error). `acpManager.ts` treats a 0-token `end_turn` with empty content
+  as a soft error and emits an `error` progress event.
 
 ### Webview Side
 - Reuse the existing Codex approval card component; it receives the same payload shape
@@ -165,9 +164,13 @@ const env = {
   curated default models per provider (Gemini 3 Pro/Flash, GPT-5.x, Claude 4.x, plus an
   OpenRouter free-form entry). This is the single source (CLAUDE.md rule); webview receives it
   via the existing `flow:modelConfig` message channel.
-- Mechanism for telling OpenCode which model to use: resolved by Phase 0 audit
-  (candidates: ACP session mode, `--model` flag at spawn, `OPENCODE_MODEL` env, or generated
-  `opencode.json` in a temp config dir).
+- **Mechanism (resolved by Phase 0 audit):** OpenCode exposes model choice as an ACP **session
+  config option**. `session/new` returns `configOptions[id="model"]` listing `provider/model`
+  values for every provider whose key is present in the spawn env. Set it with
+  `conn.setSessionConfigOption({ sessionId, configId: "model", value: "<provider>/<model>" })`
+  (param key is `configId`, not `optionId`). This maps 1:1 onto the `opencode:<provider>/<model>`
+  composite value format. The live model list can also be read from `configOptions` instead of
+  (or as a cross-check against) the curated `modelConfig.ts` list.
 
 ### Webview Side
 - `AgentSelector.tsx`: OpenCode group lists models filtered by configured providers
