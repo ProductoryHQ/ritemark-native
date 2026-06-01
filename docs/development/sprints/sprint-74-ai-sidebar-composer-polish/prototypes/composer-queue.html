@@ -121,6 +121,22 @@
       margin-bottom: -1px;               /* still eats the next element's top border */
     }
 
+    /* ── Notch stack — single container, multiple sections, zero seam ──
+       Use this instead of two separate .notch elements when stacking.
+       One outer border + radius; sections are divided by a thin internal line. */
+    .notch-stack {
+      margin: 0 var(--notch-mx) -1px;
+      border-radius: 8px 8px 0 0;
+      border: 1px solid var(--notch-border);
+      border-bottom: none;
+      background: linear-gradient(to bottom, var(--notch-bg-from), var(--notch-bg-to));
+      overflow: hidden;
+    }
+    /* internal divider between sections (only between adjacent siblings) */
+    .ns-section + .ns-section {
+      border-top: 1px solid var(--notch-divider);
+    }
+
     /* ── queue item rows (inside the notch) ── */
     .q-item {
       display: flex; align-items: center; gap: 0;
@@ -427,28 +443,25 @@
 
     <div class="input-wrap no-top">
       <!--
-        UPPER NOTCH: "Working on selected text" (SelectedContextTab)
-        → stays rounded-t-lg (topmost element, no element above it)
-        → margin-bottom: 0 (NOT -1px) because queue notch below provides the connection
+        NOTCH STACK — one bordered container, two sections separated by a thin internal line.
+        No two separate borders = no seam between sections.
       -->
-      <div class="notch" style="margin-bottom:0" id="sct-notch">
-        <div class="sct-row">
-          <div class="sct-head">
-            <!-- selection icon — same as SelectedContextTab -->
-            <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.6"><path d="M208,40H48A16,16,0,0,0,32,56V200a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40ZM48,56H208V88H48ZM48,200V104H208V200Z"/></svg>
-            <span class="sct-title">Working on selected text</span>
-            <button class="sct-close" onclick="dismissSct()"><svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></button>
-          </div>
-          <div class="sct-preview">It's 2:00 PM on a Tuesday. You're in a conference room with seven o…</div>
-        </div>
-      </div>
+      <div class="notch-stack" id="notch-stack-c">
 
-      <!--
-        LOWER NOTCH: queue items
-        → stacked-below: no top-rounding, no top-border (upper notch covers/provides it)
-        → -mb-px eats the input box's top border
-      -->
-      <div class="notch stacked-below" id="queue-notch-c">
+        <!-- Section 1: Selected text context -->
+        <div class="ns-section" id="sct-notch">
+          <div class="sct-row">
+            <div class="sct-head">
+              <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.6"><path d="M208,40H48A16,16,0,0,0,32,56V200a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40ZM48,56H208V88H48ZM48,200V104H208V200Z"/></svg>
+              <span class="sct-title">Working on selected text</span>
+              <button class="sct-close" onclick="dismissSct()"><svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></button>
+            </div>
+            <div class="sct-preview">It's 2:00 PM on a Tuesday. You're in a conference room with seven o…</div>
+          </div>
+        </div>
+
+        <!-- Section 2: Queue items (internal divider from CSS: .ns-section + .ns-section) -->
+        <div class="ns-section" id="queue-notch-c">
         <div class="notch-header-row" onclick="toggleQueueC()">
           <svg class="chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
           <span class="q-count-pill" id="count-c">2</span>
@@ -479,9 +492,11 @@
             </div>
           </div>
         </div>
-      </div>
+        </div><!-- /ns-section queue -->
 
-      <!-- input — seamlessly connected -->
+      </div><!-- /notch-stack -->
+
+      <!-- input — seamlessly connected via notch-stack's -mb-px -->
       <div class="input-box">
         <textarea rows="2" id="composer-c" placeholder="Add a follow-up…"
           onkeydown="composerKey(event,'c')"></textarea>
@@ -517,12 +532,8 @@
     sct.style.opacity = '0';
     setTimeout(() => {
       sct.remove();
-      /* queue notch is now topmost — give it top rounding */
-      const qn = document.getElementById('queue-notch-c');
-      qn.classList.remove('stacked-below');
-      qn.style.borderRadius = '8px 8px 0 0';
-      qn.style.borderTop = '';
-      qn.style.marginBottom = '-1px';
+      /* queue section is now the only .ns-section — the + sibling selector
+         no longer applies, so border-top is gone automatically. No JS needed. */
     }, 150);
   }
 

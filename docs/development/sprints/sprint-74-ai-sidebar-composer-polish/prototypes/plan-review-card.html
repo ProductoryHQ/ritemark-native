@@ -268,6 +268,49 @@
     }
     .ib:hover { background:var(--r-surface-muted); }
 
+    /* ── Flat plan card — Claude's chat artifact, no nesting ── */
+    .plan-card {
+      border-radius: 8px;
+      border: 1px solid rgba(67,56,202,0.18);
+      background: var(--r-surface);
+      overflow: hidden;
+    }
+    .plan-card-header {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 10px 6px;
+      font-size: 11px; font-weight: 600; color: var(--r-accent);
+      background: rgba(224,231,255,0.35);
+      border-bottom: 1px solid rgba(67,56,202,0.10);
+    }
+    .plan-card-body {
+      padding: 8px 10px;
+      max-height: 150px; overflow-y: auto;
+      font-size: 11.5px; color: var(--r-ink-body); line-height: 1.65;
+    }
+    .plan-card-body h3 { font-size:12px; font-weight:700; color:var(--r-ink-strong); margin-bottom:5px; }
+    .plan-card-body ol { padding-left:16px; display:flex; flex-direction:column; gap:3px; }
+    .plan-card-actions {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 10px;
+      border-top: 1px solid rgba(67,56,202,0.08);
+    }
+    .plan-card-feedback { display:none; padding:0 10px 7px; }
+    .plan-card-feedback input {
+      width:100%; padding:5px 9px; font-size:11.5px; font-family:inherit;
+      border:1px solid var(--r-hairline); border-radius:5px;
+      background:var(--r-surface); color:var(--r-ink-strong); outline:none;
+    }
+    .plan-card-feedback input:focus { border-color:var(--r-accent); box-shadow:0 0 0 3px rgba(67,56,202,0.10); }
+    .plan-card-feedback.open { display:block; }
+    .plan-card-approved {
+      display:none; align-items:center; gap:6px;
+      padding:7px 10px;
+      background:rgba(220,252,231,0.7); border-top:1px solid rgba(187,247,208,0.6);
+      font-size:11px; font-weight:500; color:#15803D;
+    }
+    .plan-card.is-approved .plan-card-actions { display:none; }
+    .plan-card.is-approved .plan-card-approved { display:flex; }
+
     /* description */
     .desc { width:330px; font-size:11px; color:#64748B; line-height:1.6; text-align:center; }
     .desc strong { color:#475569; }
@@ -353,10 +396,10 @@
 
 
 <!-- ══════════════════════════════════════════════════════
-     COLUMN B — AFTER  (notch above composer, flat)
+     COLUMN B — AFTER  (flat plan card in chat feed)
      ══════════════════════════════════════════════════════ -->
 <div class="col">
-  <div class="tag after">After — single notch</div>
+  <div class="tag after">After — flat card in chat</div>
 
   <div class="panel" style="height:540px">
     <div class="panel-bar">
@@ -369,31 +412,19 @@
         <div class="msg-a-meta">
           <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132Z"/></svg>
           Claude
-          <!-- turn is BLOCKED — waiting, not complete -->
           <span class="pill waiting"><span class="dot"></span>Waiting for approval</span>
         </div>
-        <div class="msg-a-body">I've reviewed the code. My plan is shown below — approve to proceed.</div>
-      </div>
-    </div>
+        <div class="msg-a-body">I've reviewed the code. Approve the plan below to proceed.</div>
 
-    <!-- ── PLAN APPROVAL NOTCH — same pattern as SelectedContextTab ── -->
-    <div class="input-wrap" style="padding-bottom:0;border-top:none">
-
-      <!-- The notch: rounded-t-lg border border-b-0 -mb-px  (matches SelectedContextTab) -->
-      <div class="notch" id="plan-notch">
-
-        <!-- header row: same layout as SelectedContextTab -->
-        <div class="notch-head" onclick="togglePlan()">
-          <!-- clipboard icon (same size as SelectedContextTab's selection icon) -->
-          <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.7;color:var(--r-accent)"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
-          <span class="notch-head-title accent">Claude is waiting for plan approval</span>
-          <!-- chevron — same close-button slot as SelectedContextTab's ×  -->
-          <svg class="notch-chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
-        </div>
-
-        <div class="notch-body">
-          <!-- plan text — flat, no inner card -->
-          <div class="plan-text" id="plan-text-area">
+        <!-- FLAT plan card — Claude's response artifact, lives in the chat feed.
+             Composer area is strictly for user input — no plan UI there. -->
+        <div class="plan-card" id="plan-card-b">
+          <div class="plan-card-header">
+            <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
+            Claude is waiting for plan approval
+            <span class="dot" style="margin-left:auto"></span>
+          </div>
+          <div class="plan-card-body">
             <h3>Fix ExitPlanMode Approval Bug</h3>
             <ol>
               <li>Audit <code>store.ts</code> — trace <code>pendingPlanApproval</code> lifecycle from <code>agent-plan-approval</code> to <code>agent-result</code></li>
@@ -403,14 +434,11 @@
               <li>Add regression notes to <code>scenarios.md</code></li>
             </ol>
           </div>
-
-          <!-- reject feedback (hidden by default) -->
-          <div class="notch-feedback" id="plan-feedback">
-            <input type="text" placeholder="What should be different? (optional — press Enter)">
+          <div class="plan-card-feedback" id="pfeedback-b">
+            <input type="text" placeholder="What should be different? (optional — press Enter)"
+              onkeydown="if(event.key==='Enter') approvePlan()">
           </div>
-
-          <!-- action row — inside the notch body, separated by a hairline -->
-          <div class="notch-actions">
+          <div class="plan-card-actions">
             <button class="btn btn-approve" onclick="approvePlan()">
               <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></svg>
               Approve plan
@@ -420,16 +448,16 @@
               Reject
             </button>
           </div>
-
-          <!-- approved state -->
-          <div class="notch-approved" id="plan-approved">
+          <div class="plan-card-approved">
             <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
             Approved — execution continuing…
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- input box — notch's -mb-px eats this top border (seamless seam) -->
+    <!-- Composer — user input only, unaffected by plan state in chat -->
+    <div class="input-wrap">
       <div class="input-box">
         <textarea rows="2" placeholder="Add a follow-up…"></textarea>
         <div class="input-footer">
@@ -442,16 +470,17 @@
   </div>
 
   <div class="desc">
-    <strong>Fixed:</strong> Single flat notch (same pattern as "Working on selected text"). Plan text inline — no inner card. Approve is the primary indigo CTA. Turn stays "waiting", not "complete". Click Approve or Reject to interact.
+    <strong>Fixed:</strong> Flat plan card lives in the chat feed — it's Claude's artifact, not a composer element. No nested cards. Approve (primary indigo CTA) and Reject are inside the card. Composer stays clean for user input. Click Approve or Reject to interact.
   </div>
 </div>
 
 
 <!-- ══════════════════════════════════════════════════════
-     COLUMN C — PLUS: plan notch + selected text stacked
+     COLUMN C — PLUS: plan card in chat + selected text notch
+     Two independent surfaces: chat (Claude's) vs composer (user's)
      ══════════════════════════════════════════════════════ -->
 <div class="col">
-  <div class="tag plus">Coexistence: plan + selected text</div>
+  <div class="tag plus">Chat card + composer notch independent</div>
 
   <div class="panel" style="height:540px">
     <div class="panel-bar">
@@ -466,21 +495,16 @@
           Claude
           <span class="pill waiting"><span class="dot"></span>Waiting for approval</span>
         </div>
-        <div class="msg-a-body">I've reviewed the code. My plan is shown below — approve to proceed.</div>
-      </div>
-    </div>
+        <div class="msg-a-body">I've reviewed the code. Approve the plan below to proceed.</div>
 
-    <div class="input-wrap" style="padding-bottom:0;border-top:none">
-
-      <!-- UPPER notch: plan approval — rounded-t-lg, no border-bottom -->
-      <div class="notch" id="plan-notch-c" style="margin-bottom:0">
-        <div class="notch-head" onclick="togglePlanC()">
-          <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.7;color:var(--r-accent)"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
-          <span class="notch-head-title accent">Claude is waiting for plan approval</span>
-          <svg class="notch-chevron" width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
-        </div>
-        <div class="notch-body">
-          <div class="plan-text" style="max-height:80px">
+        <!-- Plan card lives in chat — Claude's artifact -->
+        <div class="plan-card">
+          <div class="plan-card-header">
+            <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
+            Claude is waiting for plan approval
+            <span class="dot" style="margin-left:auto"></span>
+          </div>
+          <div class="plan-card-body" style="max-height:90px">
             <h3>Fix ExitPlanMode Approval Bug</h3>
             <ol>
               <li>Audit <code>store.ts</code> — trace <code>pendingPlanApproval</code> lifecycle</li>
@@ -489,7 +513,7 @@
               <li>Test full flow end-to-end</li>
             </ol>
           </div>
-          <div class="notch-actions">
+          <div class="plan-card-actions">
             <button class="btn btn-approve" style="font-size:10.5px;padding:3px 10px">
               <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></svg>
               Approve plan
@@ -501,29 +525,26 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <!--
-        LOWER notch: selected text context (SelectedContextTab)
-        stacked-below: no top-rounding (upper notch covers it), no top-border (merged)
-        still has -mb-px to eat the input box's top border
-      -->
-      <div class="notch stacked-below" style="margin-bottom:-1px">
+    <!-- Composer area — independent from the plan card above.
+         "Working on selected text" notch: user context, belongs here. -->
+    <div class="input-wrap" style="padding-bottom:0">
+      <!-- selected text notch — user's composer context, no relation to plan card -->
+      <div class="notch">
         <div class="notch-head" style="cursor:default">
-          <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.6"><path d="M208,48H48A16,16,0,0,0,32,64V192a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V64A16,16,0,0,0,208,48ZM72,96H184a8,8,0,0,1,0,16H72a8,8,0,0,1,0-16Zm0,32H184a8,8,0,0,1,0,16H72a8,8,0,0,1,0-16Zm72,32H72a8,8,0,0,1,0-16h72a8,8,0,0,1,0,16Z"/></svg>
+          <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0;opacity:.6"><path d="M208,40H48A16,16,0,0,0,32,56V200a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40ZM48,56H208V88H48ZM48,200V104H208V200Z"/></svg>
           <span class="notch-head-title">Working on selected text</span>
           <button style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;border-radius:3px;cursor:pointer;color:var(--r-ink-muted)">
             <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>
           </button>
         </div>
-        <!-- preview text — same as SelectedContextTab's second line -->
         <div style="padding:0 10px 6px;font-size:11px;color:var(--r-ink-body);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           It's 2:00 PM on a Tuesday. You're in a conference room with seve…
         </div>
       </div>
-
-      <!-- input box — seamlessly connected via -mb-px -->
       <div class="input-box">
-        <textarea rows="2" placeholder="Ask Claude… (type @ to mention an agent, / for commands)"></textarea>
+        <textarea rows="2" placeholder="Add a follow-up…"></textarea>
         <div class="input-footer">
           <span class="rtl">Claude · Sonnet 4.6</span>
           <div class="ib"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
@@ -534,28 +555,18 @@
   </div>
 
   <div class="desc">
-    <strong>Stacking rule:</strong> upper notch keeps <code>rounded-t-lg</code>. Lower notch is <code>stacked-below</code> — no top rounding, no top border. Both use <code>-mb-px</code> to eat the element below's top border. Two notches, zero extra seams.
+    <strong>Two independent surfaces:</strong> plan card = Claude's chat artifact (approve/reject there). Selected text notch = user's composer context (belongs above input). They coexist without conflict.
   </div>
 </div>
 
 <script>
-  function togglePlan() {
-    document.getElementById('plan-notch').classList.toggle('collapsed');
-  }
   function approvePlan() {
-    const n = document.getElementById('plan-notch');
-    n.classList.add('is-approved');
-    n.classList.remove('collapsed');
-    const approved = document.getElementById('plan-approved');
-    approved.style.display = 'flex';
+    document.getElementById('plan-card-b').classList.add('is-approved');
   }
   function rejectPlan() {
-    const fb = document.getElementById('plan-feedback');
+    const fb = document.getElementById('pfeedback-b');
     fb.classList.toggle('open');
     if (fb.classList.contains('open')) fb.querySelector('input').focus();
-  }
-  function togglePlanC() {
-    document.getElementById('plan-notch-c').classList.toggle('collapsed');
   }
 </script>
 </body>
