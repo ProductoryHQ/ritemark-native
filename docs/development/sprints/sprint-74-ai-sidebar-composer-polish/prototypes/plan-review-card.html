@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sprint 74 · Plan Review Card Prototype</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --r-surface: #FFFFFF;
+      --r-surface-muted: #F8FAFC;
+      --r-surface-soft: #F1F5F9;
+      --r-hairline: #E2E8F0;
+      --r-hairline-strong: #CBD5E1;
+      --r-ink-strong: #1E1B4B;
+      --r-ink-body: #475569;
+      --r-ink-muted: #64748B;
+      --r-ink-faint: #94A3B8;
+      --r-accent: #4338CA;
+      --r-accent-deep: #3730A3;
+      --r-accent-soft: #E0E7FF;
+      --r-accent-fainter: #C7D2FE;
+      --r-shadow-indigo: 0 4px 6px -1px rgba(67,56,202,0.25);
+      --r-shadow-sm: 0 1px 2px rgba(30,27,75,0.06), 0 1px 3px rgba(30,27,75,0.04);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      background: #D6DCE4;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+      gap: 40px;
+      flex-wrap: wrap;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── layout wrapper ─────────────────────────────── */
+    .col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+    .col-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #64748B;
+    }
+    .col-label span {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+    .col-label.broken span  { background: #FEE2E2; color: #B91C1C; }
+    .col-label.fixed span   { background: #DCFCE7; color: #15803D; }
+
+    /* ── VS Code panel shell ────────────────────────── */
+    .panel {
+      width: 330px;
+      height: 590px;
+      background: var(--r-surface-muted);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 40px rgba(30,27,75,0.18);
+      border: 1px solid #C8D0DA;
+    }
+
+    /* panel title bar */
+    .panel-bar {
+      height: 35px;
+      background: #E2E8F0;
+      border-bottom: 1px solid var(--r-hairline);
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .panel-bar-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--r-ink-body);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      flex: 1;
+    }
+    .panel-icon-btn {
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px;
+      color: var(--r-ink-muted);
+      cursor: pointer;
+      transition: background 100ms;
+    }
+    .panel-icon-btn:hover { background: var(--r-hairline); color: var(--r-ink-strong); }
+
+    /* ── messages scroll area ───────────────────────── */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--r-surface-muted);
+    }
+
+    /* user bubble */
+    .msg-user { display: flex; justify-content: flex-end; }
+    .msg-user-bubble {
+      max-width: 88%;
+      padding: 7px 11px;
+      background: var(--r-accent-soft);
+      border: 1px solid var(--r-accent-fainter);
+      border-radius: 10px 10px 3px 10px;
+      font-size: 12px;
+      color: var(--r-accent-deep);
+      line-height: 1.55;
+    }
+
+    /* assistant message */
+    .msg-asst { display: flex; flex-direction: column; gap: 5px; }
+    .msg-asst-meta {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 700;
+      color: var(--r-ink-faint);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .msg-asst-body {
+      font-size: 12px; color: var(--r-ink-body); line-height: 1.6;
+    }
+
+    /* turn status badge */
+    .turn-status {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 8px; border-radius: 4px;
+      margin-bottom: 2px;
+    }
+    .turn-status.complete {
+      background: var(--r-surface-soft);
+      color: var(--r-ink-muted);
+      border: 1px solid var(--r-hairline);
+    }
+    .turn-status.waiting {
+      background: var(--r-accent-soft);
+      color: var(--r-accent-deep);
+      border: 1px solid var(--r-accent-fainter);
+    }
+
+    /* ── Plan Review Card ───────────────────────────── */
+    .plan-card {
+      border: 1px solid var(--r-hairline);
+      border-radius: 10px;
+      background: var(--r-surface);
+      box-shadow: var(--r-shadow-sm);
+      overflow: hidden;
+    }
+
+    .plan-card-header {
+      display: flex; align-items: center; gap: 7px;
+      padding: 9px 12px 7px;
+      font-size: 11px; font-weight: 600;
+      color: var(--r-ink-muted);
+      border-bottom: 1px solid var(--r-hairline);
+    }
+    .plan-card-header.waiting-state {
+      color: var(--r-accent);
+    }
+
+    /* plan body scroll area */
+    .plan-body {
+      margin: 10px 12px;
+      border: 1px solid var(--r-hairline);
+      border-radius: 6px;
+      background: var(--r-surface-muted);
+      overflow: hidden;
+    }
+    .plan-body-eyebrow {
+      padding: 5px 10px 4px;
+      font-size: 9px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: var(--r-ink-faint);
+      background: var(--r-surface-soft);
+      border-bottom: 1px solid var(--r-hairline);
+    }
+    .plan-body-scroll {
+      padding: 9px 10px;
+      max-height: 160px;
+      overflow-y: auto;
+      font-size: 11.5px;
+      color: var(--r-ink-body);
+      line-height: 1.65;
+    }
+    .plan-body-scroll h3 {
+      font-size: 12px; font-weight: 700;
+      color: var(--r-ink-strong);
+      margin-bottom: 7px;
+    }
+    .plan-body-scroll ol {
+      padding-left: 16px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .plan-body-scroll li { font-size: 11.5px; }
+
+    /* fragment warning annotation */
+    .fragment-notice {
+      display: flex; align-items: flex-start; gap: 6px;
+      margin: 0 12px 8px;
+      padding: 6px 9px;
+      background: #FEF3C7;
+      border: 1px solid #FDE68A;
+      border-radius: 5px;
+      font-size: 10.5px;
+      color: #92400E;
+      line-height: 1.5;
+    }
+
+    /* actions row */
+    .plan-actions { display: flex; gap: 6px; padding: 0 12px 12px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 11.5px; font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms, box-shadow 120ms, opacity 120ms;
+      border: 1px solid transparent;
+      font-family: inherit;
+    }
+    .btn-approve-soft {
+      background: var(--r-accent-soft);
+      border-color: var(--r-accent-fainter);
+      color: var(--r-accent-deep);
+    }
+    .btn-approve-soft:hover { background: var(--r-accent-fainter); }
+
+    .btn-approve-primary {
+      background: var(--r-accent);
+      border-color: var(--r-accent);
+      color: #FFF;
+      box-shadow: var(--r-shadow-indigo);
+    }
+    .btn-approve-primary:hover { background: var(--r-accent-deep); }
+    .btn-approve-primary:active { background: #312E81; transform: scale(0.98); }
+
+    .btn-reject {
+      background: var(--r-surface-muted);
+      border-color: var(--r-hairline);
+      color: var(--r-ink-body);
+    }
+    .btn-reject:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+
+    /* broken approve — clicks do nothing */
+    .btn-broken {
+      background: var(--r-accent-soft);
+      border-color: var(--r-accent-fainter);
+      color: var(--r-accent-deep);
+      position: relative;
+      cursor: not-allowed;
+    }
+    .btn-broken::after {
+      content: 'pendingPlanApproval is undefined — returns immediately';
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      white-space: nowrap;
+      background: #1E1B4B;
+      color: #F8FAFC;
+      font-size: 9.5px;
+      font-weight: 400;
+      padding: 4px 8px;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 150ms;
+      font-family: 'SF Mono', Menlo, monospace;
+    }
+    .btn-broken:hover::after { opacity: 1; }
+
+    /* approved overlay */
+    .approved-banner {
+      display: none;
+      align-items: center; gap: 7px;
+      padding: 9px 12px;
+      background: #DCFCE7;
+      border-top: 1px solid #BBF7D0;
+      font-size: 11.5px;
+      color: #15803D;
+      font-weight: 500;
+    }
+    .plan-card.is-approved .approved-banner { display: flex; }
+    .plan-card.is-approved .plan-actions { display: none; }
+    .plan-card.is-approved .plan-body { opacity: 0.55; }
+
+    /* reject feedback input */
+    .reject-feedback {
+      display: none;
+      margin: 0 12px 12px;
+    }
+    .reject-feedback input {
+      width: 100%;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      font-family: inherit;
+      border: 1px solid var(--r-hairline);
+      border-radius: 6px;
+      background: var(--r-surface);
+      color: var(--r-ink-strong);
+      outline: none;
+    }
+    .reject-feedback input:focus {
+      border-color: var(--r-accent);
+      box-shadow: 0 0 0 4px rgba(67,56,202,0.10);
+    }
+    .reject-feedback.open { display: block; }
+
+    /* spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.75s linear infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+    .dot-pulse {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--r-accent);
+      animation: pulse 1.4s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    /* ── Chat input bar ─────────────────────────────── */
+    .input-area {
+      flex-shrink: 0;
+      padding: 8px 10px;
+      border-top: 1px solid var(--r-hairline);
+    }
+    .input-box {
+      border: 1px solid var(--r-hairline);
+      border-radius: 8px;
+      background: var(--r-surface);
+      box-shadow: var(--r-shadow-sm);
+      overflow: hidden;
+    }
+    textarea.composer {
+      display: block; width: 100%;
+      padding: 8px 10px 4px;
+      font-size: 12px; font-family: inherit;
+      color: var(--r-ink-faint);
+      background: transparent;
+      border: none; outline: none; resize: none;
+      line-height: 1.5;
+    }
+    textarea.composer.locked {
+      opacity: 0.45; cursor: not-allowed;
+    }
+    .input-footer {
+      display: flex; align-items: center;
+      padding: 4px 6px 6px; gap: 4px;
+    }
+    .runtime-label {
+      flex: 1;
+      font-size: 11px; font-weight: 500;
+      color: var(--r-ink-muted);
+    }
+    .icon-btn {
+      width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px;
+      border: 1px solid var(--r-hairline);
+      background: var(--r-surface-soft);
+      color: var(--r-ink-body);
+      cursor: pointer;
+      transition: background 100ms;
+    }
+    .icon-btn:hover { background: var(--r-surface-muted); }
+
+    /* ── bottom description strip ───────────────────── */
+    .description {
+      width: 330px;
+      font-size: 11px;
+      color: #64748B;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .description strong { color: #475569; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     COLUMN A — BEFORE (broken)
+     ═══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="col-label broken"><span>Before — broken (#86)</span></div>
+
+  <div class="panel">
+    <!-- panel chrome -->
+    <div class="panel-bar">
+      <div class="panel-bar-title">AI Chat</div>
+      <!-- new conversation -->
+      <div class="panel-icon-btn" title="New conversation">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z" opacity="0.15"/><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,208Zm40-80a8,8,0,0,1-8,8H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24A8,8,0,0,1,168,128Z"/></svg>
+      </div>
+      <!-- history -->
+      <div class="panel-icon-btn" title="History">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15L52,52a8,8,0,0,0-13.66,5.63A176.18,176.18,0,0,0,38,70.37L37.7,87.65A8,8,0,0,0,45.64,96H45.7l17.35-.31a8,8,0,0,0,.31-16L52.87,79.83A80,80,0,1,1,48,128a8,8,0,0,0-16,0,96,96,0,1,0,96-96Z"/></svg>
+      </div>
+    </div>
+
+    <!-- messages -->
+    <div class="messages">
+      <!-- user turn -->
+      <div class="msg-user">
+        <div class="msg-user-bubble">Review AgentRunner.ts and plan the changes needed to fix the ExitPlanMode approval bug</div>
+      </div>
+
+      <!-- assistant — turn COMPLETED (this is the bug: approval shown post-turn) -->
+      <div class="msg-asst">
+        <div class="msg-asst-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132ZM128,52a68.07,68.07,0,0,0-68,68v12H196V120A68.07,68.07,0,0,0,128,52ZM92,168a8,8,0,1,0-8-8A8,8,0,0,0,92,168Zm36,0a8,8,0,1,0-8-8A8,8,0,0,0,128,168Zm36,0a8,8,0,1,0-8-8A8,8,0,0,0,164,168Z"/></svg>
+          Claude
+          <!-- Turn is complete — this is post-turn, wrong place to show approval -->
+          <span class="turn-status complete">
+            <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+            Turn complete
+          </span>
+        </div>
+        <div class="msg-asst-body">
+          I've reviewed <code style="background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-size:11px">AgentRunner.ts</code> and traced the <code style="background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-size:11px">ExitPlanMode</code> approval flow. Here's the plan:
+        </div>
+
+        <!-- THE BROKEN PLAN CARD -->
+        <div class="plan-card" id="broken-card">
+          <!-- header: generic, no waiting indicator -->
+          <div class="plan-card-header">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
+            PLAN
+          </div>
+
+          <!-- fragment warning -->
+          <div class="fragment-notice">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="#D97706" style="flex-shrink:0;margin-top:1px"><path d="M236.8,188.09,149.35,36.22a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></svg>
+            <span><strong>extractPlanDisplayText</strong> truncated to last block only — steps 4–5 of 5 shown</span>
+          </div>
+
+          <!-- plan body — TRUNCATED (only last list block) -->
+          <div class="plan-body">
+            <div class="plan-body-eyebrow">Plan</div>
+            <div class="plan-body-scroll">
+              <!-- Only shows last matching block, not the full plan -->
+              <ol start="4">
+                <li>Test the full flow: plan → approve → execution continues</li>
+                <li>Add regression notes to <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">scenarios.md</code></li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- actions — Approve is broken -->
+          <div class="plan-actions">
+            <button class="btn btn-broken" onclick="showBrokenFeedback()">
+              <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></svg>
+              Approve plan
+            </button>
+            <button class="btn btn-reject" onclick="toggleRejectBroken()">
+              <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>
+              Reject
+            </button>
+          </div>
+          <div class="reject-feedback" id="reject-broken">
+            <input type="text" placeholder="What should be different? (sends new user message — workaround)">
+          </div>
+          <div class="approved-banner">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+            Approved
+          </div>
+        </div>
+        <!-- note: user had to type "approved" manually -->
+        <div style="font-size:10.5px;color:var(--r-ink-faint);font-style:italic;margin-top:4px">
+          ↳ User typed "approved" manually to continue
+        </div>
+      </div>
+    </div>
+
+    <!-- input — locked -->
+    <div class="input-area">
+      <div class="input-box">
+        <textarea class="composer locked" rows="2" placeholder="Ask Claude..." disabled></textarea>
+        <div class="input-footer">
+          <span class="runtime-label">Claude · Sonnet 4.6</span>
+          <div class="icon-btn" title="Attach">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg>
+          </div>
+          <div class="icon-btn" title="Stop (agent locked)">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm40-120H88a8,8,0,0,0-8,8v80a8,8,0,0,0,8,8h80a8,8,0,0,0,8-8V104A8,8,0,0,0,168,96Z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="description">
+    <strong>Two bugs:</strong> (1) Plan body shows only the last 2 steps — <code style="font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px">extractPlanDisplayText</code> strips context. (2) Approve does nothing — <code style="font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px">pendingPlanApproval</code> is undefined by the time this card renders (post-turn).
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     COLUMN B — AFTER (fixed)
+     ═══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="col-label fixed"><span>After — fixed</span></div>
+
+  <div class="panel">
+    <div class="panel-bar">
+      <div class="panel-bar-title">AI Chat</div>
+      <div class="panel-icon-btn" title="New conversation">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,208Zm40-80a8,8,0,0,1-8,8H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24A8,8,0,0,1,168,128Z"/></svg>
+      </div>
+      <div class="panel-icon-btn">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15L52,52a8,8,0,0,0-13.66,5.63A176.18,176.18,0,0,0,38,70.37L37.7,87.65A8,8,0,0,0,45.64,96H45.7l17.35-.31a8,8,0,0,0,.31-16L52.87,79.83A80,80,0,1,1,48,128a8,8,0,0,0-16,0,96,96,0,1,0,96-96Z"/></svg>
+      </div>
+    </div>
+
+    <div class="messages">
+      <div class="msg-user">
+        <div class="msg-user-bubble">Review AgentRunner.ts and plan the changes needed to fix the ExitPlanMode approval bug</div>
+      </div>
+
+      <div class="msg-asst">
+        <div class="msg-asst-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132ZM128,52a68.07,68.07,0,0,0-68,68v12H196V120A68.07,68.07,0,0,0,128,52ZM92,168a8,8,0,1,0-8-8A8,8,0,0,0,92,168Zm36,0a8,8,0,1,0-8-8A8,8,0,0,0,128,168Zm36,0a8,8,0,1,0-8-8A8,8,0,0,0,164,168Z"/></svg>
+          Claude
+          <!-- Turn BLOCKED — waiting for approval (live state) -->
+          <span class="turn-status waiting">
+            <span class="dot-pulse"></span>
+            Waiting for approval
+          </span>
+        </div>
+        <div class="msg-asst-body">
+          I've reviewed <code style="background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-size:11px">AgentRunner.ts</code> and traced the <code style="background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-size:11px">ExitPlanMode</code> approval flow. Here's my plan:
+        </div>
+
+        <!-- THE FIXED PLAN CARD -->
+        <div class="plan-card" id="fixed-card">
+          <!-- header: clear waiting indicator + indigo accent -->
+          <div class="plan-card-header waiting-state">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" style="color:var(--r-accent)"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></svg>
+            Claude is waiting for plan approval
+          </div>
+
+          <!-- plan body — FULL content -->
+          <div class="plan-body">
+            <div class="plan-body-eyebrow">Plan</div>
+            <div class="plan-body-scroll">
+              <h3>Fix ExitPlanMode Approval Bug</h3>
+              <ol>
+                <li>Audit <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">store.ts</code> — trace <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">pendingPlanApproval</code> lifecycle from <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">agent-plan-approval</code> to <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">agent-result</code></li>
+                <li>Fix <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">AgentResponse.tsx</code> — remove <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">!pendingPlanApproval</code> gate from <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">needsApproval</code></li>
+                <li>Fix <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">planText.ts</code> — return full plan text instead of last-paragraph fragment</li>
+                <li>Test full flow: plan → approve → execution continues without typing "approved"</li>
+                <li>Add regression notes to <code style="background:var(--r-surface-soft);padding:1px 4px;border-radius:3px;font-size:10.5px">scenarios.md</code></li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- actions — Approve is the primary CTA, works correctly -->
+          <div class="plan-actions">
+            <button class="btn btn-approve-primary" onclick="approveFixed()">
+              <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></svg>
+              Approve plan
+            </button>
+            <button class="btn btn-reject" onclick="toggleRejectFixed()">
+              <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>
+              Reject
+            </button>
+          </div>
+          <div class="reject-feedback" id="reject-fixed">
+            <input type="text" placeholder="What should be different? (optional — press Enter to send)">
+          </div>
+          <div class="approved-banner">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+            Plan approved — execution continuing…
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- input — unlocked (agent is blocked, not running) -->
+    <div class="input-area">
+      <div class="input-box">
+        <textarea class="composer" rows="2" placeholder="Add a follow-up…"></textarea>
+        <div class="input-footer">
+          <span class="runtime-label">Claude · Sonnet 4.6</span>
+          <div class="icon-btn" title="Attach">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg>
+          </div>
+          <div class="icon-btn" style="opacity:0.4;cursor:not-allowed" title="Send (waiting for approval first)">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102.65,154l41.39,85.57A15.86,15.86,0,0,0,158.44,248H158.7a15.88,15.88,0,0,0,14.1-9.75l76.14-191.19c0-.05,0-.1.06-.15A16,16,0,0,0,227.32,28.68Z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="description">
+    <strong>Fixed:</strong> Plan card appears while the turn is <em>blocked</em> at <code style="font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px">ExitPlanMode</code> — <code style="font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px">pendingPlanApproval</code> is live. Full plan body shown. Approve resolves the tool use and continues execution.
+  </div>
+</div>
+
+<script>
+  function showBrokenFeedback() {
+    // Demonstrate the broken state — clicking does literally nothing
+    const btn = event.currentTarget;
+    btn.style.outline = '2px solid #EF4444';
+    btn.style.outlineOffset = '2px';
+    setTimeout(() => { btn.style.outline = ''; btn.style.outlineOffset = ''; }, 600);
+  }
+
+  function toggleRejectBroken() {
+    const el = document.getElementById('reject-broken');
+    el.classList.toggle('open');
+    if (el.classList.contains('open')) el.querySelector('input').focus();
+  }
+
+  function approveFixed() {
+    const card = document.getElementById('fixed-card');
+    card.classList.add('is-approved');
+    // Update turn status badge
+    const badge = card.closest('.msg-asst').querySelector('.turn-status');
+    badge.className = 'turn-status complete';
+    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>Execution resuming`;
+    badge.style.background = '#DCFCE7';
+    badge.style.color = '#15803D';
+    badge.style.borderColor = '#BBF7D0';
+  }
+
+  function toggleRejectFixed() {
+    const el = document.getElementById('reject-fixed');
+    el.classList.toggle('open');
+    if (el.classList.contains('open')) el.querySelector('input').focus();
+  }
+</script>
+</body>
+</html>

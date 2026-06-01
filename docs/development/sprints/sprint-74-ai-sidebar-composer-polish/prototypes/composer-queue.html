@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sprint 74 · Composer Queue Prototype</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --r-surface: #FFFFFF;
+      --r-surface-muted: #F8FAFC;
+      --r-surface-soft: #F1F5F9;
+      --r-hairline: #E2E8F0;
+      --r-hairline-strong: #CBD5E1;
+      --r-ink-strong: #1E1B4B;
+      --r-ink-body: #475569;
+      --r-ink-muted: #64748B;
+      --r-ink-faint: #94A3B8;
+      --r-accent: #4338CA;
+      --r-accent-deep: #3730A3;
+      --r-accent-soft: #E0E7FF;
+      --r-accent-fainter: #C7D2FE;
+      --r-error: #EF4444;
+      --r-error-soft: #FEE2E2;
+      --r-shadow-sm: 0 1px 2px rgba(30,27,75,0.06), 0 1px 3px rgba(30,27,75,0.04);
+      --r-shadow-indigo: 0 4px 6px -1px rgba(67,56,202,0.25);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      background: #D6DCE4;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+      gap: 40px;
+      flex-wrap: wrap;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .col { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    .col-label {
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: #64748B;
+    }
+    .col-label span {
+      display: inline-block; padding: 3px 10px; border-radius: 4px;
+    }
+    .col-label.before span { background: #FEE2E2; color: #B91C1C; }
+    .col-label.after  span { background: #DCFCE7; color: #15803D; }
+    .col-label.detail span { background: #E0E7FF; color: #3730A3; }
+
+    /* ── VS Code panel shell ────────────────────────── */
+    .panel {
+      width: 330px;
+      background: var(--r-surface-muted);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 40px rgba(30,27,75,0.18);
+      border: 1px solid #C8D0DA;
+    }
+    .panel-bar {
+      height: 35px;
+      background: #E2E8F0;
+      border-bottom: 1px solid var(--r-hairline);
+      display: flex; align-items: center;
+      padding: 0 10px; gap: 6px;
+      flex-shrink: 0;
+    }
+    .panel-bar-title {
+      font-size: 10.5px; font-weight: 700;
+      color: var(--r-ink-body);
+      text-transform: uppercase; letter-spacing: 0.6px; flex: 1;
+    }
+    .panel-icon-btn {
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px; color: var(--r-ink-muted); cursor: pointer;
+    }
+    .panel-icon-btn:hover { background: var(--r-hairline); color: var(--r-ink-strong); }
+
+    /* ── messages ───────────────────────────────────── */
+    .messages {
+      flex: 1; overflow-y: auto;
+      padding: 12px 10px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .msg-user { display: flex; justify-content: flex-end; }
+    .msg-user-bubble {
+      max-width: 88%;
+      padding: 7px 11px;
+      background: var(--r-accent-soft);
+      border: 1px solid var(--r-accent-fainter);
+      border-radius: 10px 10px 3px 10px;
+      font-size: 12px; color: var(--r-accent-deep); line-height: 1.55;
+    }
+    .msg-asst { display: flex; flex-direction: column; gap: 5px; }
+    .msg-asst-meta {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 700;
+      color: var(--r-ink-faint);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .msg-asst-body {
+      font-size: 12px; color: var(--r-ink-body); line-height: 1.6;
+    }
+
+    /* running status strip */
+    .run-status {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 8px;
+      background: var(--r-surface-soft);
+      border: 1px solid var(--r-hairline);
+      border-radius: 6px;
+      font-size: 11px; color: var(--r-ink-muted);
+    }
+    .run-status.active { color: var(--r-accent); background: var(--r-accent-soft); border-color: var(--r-accent-fainter); }
+
+    /* tool call row */
+    .tool-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 8px;
+      background: var(--r-surface-soft);
+      border: 1px solid var(--r-hairline);
+      border-radius: 5px;
+      font-size: 10.5px; color: var(--r-ink-muted);
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+    .dot-pulse {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--r-accent);
+      animation: pulse 1.4s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    /* ── Queue section ──────────────────────────────── */
+    .queue-section {
+      flex-shrink: 0;
+      border-top: 1px solid var(--r-hairline);
+    }
+
+    /* queue header bar */
+    .queue-header {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px;
+      background: var(--r-surface-soft);
+      cursor: pointer;
+      user-select: none;
+      font-size: 11px; font-weight: 600; color: var(--r-ink-muted);
+      transition: background 100ms;
+    }
+    .queue-header:hover { background: var(--r-hairline); }
+    .queue-chevron {
+      transition: transform 200ms cubic-bezier(0.22,0.61,0.36,1);
+      color: var(--r-ink-faint);
+    }
+    .queue-section.collapsed .queue-chevron { transform: rotate(-90deg); }
+    .queue-count-pill {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px;
+      background: var(--r-accent-soft);
+      color: var(--r-accent-deep);
+      border-radius: 50%;
+      font-size: 10px; font-weight: 700;
+      border: 1px solid var(--r-accent-fainter);
+    }
+    .queue-list {
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      max-height: 200px;
+      transition: max-height 200ms cubic-bezier(0.22,0.61,0.36,1);
+    }
+    .queue-section.collapsed .queue-list { max-height: 0; }
+
+    /* queue item */
+    .queue-item {
+      display: flex; align-items: center; gap: 0;
+      padding: 6px 10px;
+      border-top: 1px solid var(--r-hairline);
+      background: var(--r-surface);
+      position: relative;
+      transition: background 100ms;
+    }
+    .queue-item:hover { background: var(--r-surface-muted); }
+
+    /* status circle */
+    .queue-item-bullet {
+      width: 18px; height: 18px; flex-shrink: 0;
+      border: 1.5px solid var(--r-hairline-strong);
+      border-radius: 50%;
+      margin-right: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .queue-item-text {
+      flex: 1; min-width: 0;
+      font-size: 12px; color: var(--r-ink-body);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.4;
+    }
+    .queue-item-text.editing {
+      display: none;
+    }
+    .queue-item-edit-input {
+      display: none;
+      flex: 1; min-width: 0;
+      font-size: 12px; font-family: inherit;
+      color: var(--r-ink-strong);
+      background: var(--r-surface);
+      border: 1px solid var(--r-accent);
+      border-radius: 4px;
+      padding: 2px 6px;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(67,56,202,0.10);
+    }
+    .queue-item.is-editing .queue-item-text { display: none; }
+    .queue-item.is-editing .queue-item-edit-input { display: block; }
+
+    /* item action buttons — shown on hover or always */
+    .queue-item-actions {
+      display: flex; align-items: center; gap: 1px;
+      flex-shrink: 0;
+      margin-left: 6px;
+      opacity: 0;
+      transition: opacity 120ms;
+    }
+    .queue-item:hover .queue-item-actions,
+    .queue-item.is-editing .queue-item-actions { opacity: 1; }
+
+    .qi-btn {
+      width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px;
+      border: none; background: transparent;
+      color: var(--r-ink-muted);
+      cursor: pointer;
+      transition: background 100ms, color 100ms;
+    }
+    .qi-btn:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+    .qi-btn.delete:hover { background: var(--r-error-soft); color: var(--r-error); }
+    .qi-btn.promote:hover { background: var(--r-accent-soft); color: var(--r-accent); }
+
+    /* tooltip on action buttons */
+    .qi-btn { position: relative; }
+    .qi-btn .tip {
+      position: absolute;
+      bottom: calc(100% + 5px);
+      left: 50%; transform: translateX(-50%);
+      background: #1E1B4B; color: #F8FAFC;
+      font-size: 10px; padding: 3px 8px;
+      border-radius: 4px; white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: opacity 120ms;
+      font-family: 'Sofia Sans', sans-serif;
+    }
+    .qi-btn:hover .tip { opacity: 1; }
+
+    /* removed-item animation */
+    @keyframes slideOut {
+      to { max-height: 0; opacity: 0; padding: 0 10px; border: none; }
+    }
+    .queue-item.removing {
+      animation: slideOut 200ms cubic-bezier(0.4,0,0.2,1) forwards;
+      overflow: hidden;
+    }
+
+    /* ── Chat input area ────────────────────────────── */
+    .input-area {
+      flex-shrink: 0;
+      padding: 8px 10px;
+      border-top: 1px solid var(--r-hairline);
+    }
+    .input-box {
+      border: 1px solid var(--r-hairline);
+      border-radius: 8px;
+      background: var(--r-surface);
+      box-shadow: var(--r-shadow-sm);
+      overflow: hidden;
+      transition: border-color 150ms, box-shadow 150ms;
+    }
+    .input-box:focus-within {
+      border-color: var(--r-hairline-strong);
+      box-shadow: 0 0 0 1px rgba(100,116,139,0.08);
+    }
+    textarea.composer {
+      display: block; width: 100%;
+      padding: 8px 10px 4px;
+      font-size: 12px; font-family: inherit;
+      color: var(--r-ink-strong);
+      background: transparent;
+      border: none; outline: none; resize: none;
+      line-height: 1.5;
+    }
+    textarea.composer::placeholder { color: var(--r-ink-faint); }
+    textarea.composer.locked {
+      opacity: 0.4; cursor: not-allowed;
+      color: var(--r-ink-faint);
+    }
+    .input-footer {
+      display: flex; align-items: center;
+      padding: 4px 6px 6px; gap: 4px;
+    }
+    .runtime-label {
+      flex: 1; font-size: 11px; font-weight: 500; color: var(--r-ink-muted);
+      cursor: default;
+    }
+    .icon-btn {
+      width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px;
+      border: 1px solid var(--r-hairline);
+      background: var(--r-surface-soft);
+      color: var(--r-ink-body); cursor: pointer;
+      transition: background 100ms;
+    }
+    .icon-btn:hover { background: var(--r-surface-muted); }
+    .icon-btn.stop {
+      background: var(--r-ink-strong); color: #FFF;
+      border-color: var(--r-ink-strong);
+    }
+    .icon-btn.stop:hover { background: #312E81; border-color: #312E81; }
+    .icon-btn.disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── description strip ──────────────────────────── */
+    .description {
+      width: 330px;
+      font-size: 11px; color: #64748B; line-height: 1.6;
+      text-align: center;
+    }
+    .description strong { color: #475569; }
+    code {
+      font-size: 10px; background: #F1F5F9;
+      padding: 1px 4px; border-radius: 3px;
+    }
+
+    /* ── Detail annotation panel ────────────────────── */
+    .annotation-panel {
+      width: 330px;
+      background: var(--r-surface);
+      border-radius: 8px;
+      border: 1px solid var(--r-hairline);
+      padding: 16px;
+      box-shadow: var(--r-shadow-sm);
+    }
+    .annotation-panel h4 {
+      font-size: 12px; font-weight: 700; color: var(--r-ink-strong);
+      margin-bottom: 10px;
+    }
+    .annotation-row {
+      display: flex; align-items: flex-start; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .annotation-row:last-child { margin-bottom: 0; }
+    .annotation-icon {
+      width: 24px; height: 24px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px;
+    }
+    .annotation-icon.delete  { background: var(--r-error-soft); color: var(--r-error); }
+    .annotation-icon.promote { background: var(--r-accent-soft); color: var(--r-accent); }
+    .annotation-icon.edit    { background: var(--r-surface-soft); color: var(--r-ink-body); }
+    .annotation-text {
+      font-size: 11.5px; color: var(--r-ink-body); line-height: 1.55;
+    }
+    .annotation-text strong { color: var(--r-ink-strong); }
+    hr.divider {
+      border: none; border-top: 1px solid var(--r-hairline);
+      margin: 12px 0;
+    }
+    .state-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--r-ink-faint);
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     COLUMN A — BEFORE (input locked)
+     ═══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="col-label before"><span>Before — input locked</span></div>
+
+  <div class="panel" style="height:500px">
+    <div class="panel-bar">
+      <div class="panel-bar-title">AI Chat</div>
+      <div class="panel-icon-btn"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,208Zm40-80a8,8,0,0,1-8,8H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24A8,8,0,0,1,168,128Z"/></svg></div>
+    </div>
+
+    <div class="messages">
+      <div class="msg-user">
+        <div class="msg-user-bubble">pls review open issues and suggest a sprint</div>
+      </div>
+      <div class="msg-asst">
+        <div class="msg-asst-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132ZM128,52a68.07,68.07,0,0,0-68,68v12H196V120A68.07,68.07,0,0,0,128,52Z"/></svg>
+          Claude · Running
+          <span class="dot-pulse"></span>
+        </div>
+        <div class="run-status active">
+          <svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>
+          Fetching GitHub issues…
+        </div>
+        <div class="tool-row">
+          <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M232,112a16,16,0,0,0-16-16H160V72A48.05,48.05,0,0,0,112,24H88a8,8,0,0,0-8,8V56H40A16,16,0,0,0,24,72v40a16,16,0,0,0,16,16H80v80a16,16,0,0,0,16,16h64a16,16,0,0,0,16-16V128h40A16,16,0,0,0,232,112Z"/></svg>
+          mcp__github__list_issues(owner: "productoryhq" …)
+        </div>
+      </div>
+    </div>
+
+    <!-- no queue section — input is just locked -->
+    <div class="input-area">
+      <div class="input-box">
+        <textarea class="composer locked" rows="2" placeholder="Ask Claude..." disabled></textarea>
+        <div class="input-footer">
+          <span class="runtime-label">Claude · Sonnet 4.6</span>
+          <div class="icon-btn" style="opacity:0.35;cursor:not-allowed">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg>
+          </div>
+          <div class="icon-btn stop">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="48" y="48" width="160" height="160" rx="4"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="description">
+    <strong>Current state:</strong> textarea is <code>disabled={isLoading}</code> while the agent runs — user cannot type or prepare the next prompt. Dead time.
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     COLUMN B — AFTER (queue UX, interactive)
+     ═══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="col-label after"><span>After — queue + unlocked input</span></div>
+
+  <div class="panel" style="height:500px">
+    <div class="panel-bar">
+      <div class="panel-bar-title">AI Chat</div>
+      <div class="panel-icon-btn"><svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M128,32a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,32Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,208Zm40-80a8,8,0,0,1-8,8H136v24a8,8,0,0,1-16,0V136H96a8,8,0,0,1,0-16h24V96a8,8,0,0,1,16,0v24h24A8,8,0,0,1,168,128Z"/></svg></div>
+    </div>
+
+    <div class="messages">
+      <div class="msg-user">
+        <div class="msg-user-bubble">pls review open issues and suggest a sprint</div>
+      </div>
+      <div class="msg-asst">
+        <div class="msg-asst-meta">
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M220,132v28a28,28,0,0,1-28,28H64a28,28,0,0,1-28-28V132a4,4,0,0,1,4-4H48V116a80,80,0,0,1,160,0v12h8A4,4,0,0,1,220,132ZM128,52a68.07,68.07,0,0,0-68,68v12H196V120A68.07,68.07,0,0,0,128,52Z"/></svg>
+          Claude · Running
+          <span class="dot-pulse"></span>
+        </div>
+        <div class="run-status active">
+          <svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>
+          Fetching GitHub issues…
+        </div>
+        <div class="tool-row">
+          <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M232,112a16,16,0,0,0-16-16H160V72A48.05,48.05,0,0,0,112,24H88a8,8,0,0,0-8,8V56H40A16,16,0,0,0,24,72v40a16,16,0,0,0,16,16H80v80a16,16,0,0,0,16,16h64a16,16,0,0,0,16-16V128h40A16,16,0,0,0,232,112Z"/></svg>
+          mcp__github__list_issues(owner: "productoryhq" …)
+        </div>
+      </div>
+    </div>
+
+    <!-- ── QUEUE SECTION ── -->
+    <div class="queue-section" id="queue-section">
+      <div class="queue-header" onclick="toggleQueue()">
+        <!-- collapse chevron -->
+        <svg class="queue-chevron" width="12" height="12" viewBox="0 0 256 256" fill="currentColor">
+          <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
+        </svg>
+        <span class="queue-count-pill" id="queue-count">1</span>
+        <span id="queue-label">Queued</span>
+        <span style="flex:1"></span>
+        <span style="font-size:10px;font-weight:400;color:var(--r-ink-faint)">sends when turn completes</span>
+      </div>
+
+      <div class="queue-list" id="queue-list">
+        <!-- Queue item 1 — from Cursor screenshot -->
+        <div class="queue-item" id="qi-1">
+          <div class="queue-item-bullet">
+            <!-- empty circle — pending -->
+          </div>
+          <div class="queue-item-text" id="qi-1-text">and review existing sprints</div>
+          <input class="queue-item-edit-input" id="qi-1-input" value="and review existing sprints" onkeydown="onQueueEditKey(event, 'qi-1')" onblur="cancelEdit('qi-1')">
+          <div class="queue-item-actions">
+            <!-- Edit -->
+            <button class="qi-btn edit" onclick="startEdit('qi-1')" title="Edit">
+              <div class="tip">Edit prompt</div>
+              <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
+            </button>
+            <!-- Promote (stop current + send now) -->
+            <button class="qi-btn promote" onclick="promoteItem('qi-1')" title="Send now">
+              <div class="tip">Stop current &amp; send now</div>
+              <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
+            </button>
+            <!-- Delete -->
+            <button class="qi-btn delete" onclick="deleteItem('qi-1')" title="Remove from queue">
+              <div class="tip">Remove</div>
+              <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>
+            </button>
+          </div>
+        </div>
+        <!-- empty state shown when all items removed -->
+        <div id="queue-empty" style="display:none;padding:10px 14px;font-size:11px;color:var(--r-ink-faint);text-align:center;border-top:1px solid var(--r-hairline);">
+          Queue empty — send button will queue while agent runs
+        </div>
+      </div>
+    </div>
+
+    <!-- ── INPUT AREA — unlocked ── -->
+    <div class="input-area">
+      <div class="input-box">
+        <textarea class="composer" rows="2" id="composer-input"
+          placeholder="Add a follow-up…"
+          onkeydown="onComposerKey(event)"></textarea>
+        <div class="input-footer">
+          <span class="runtime-label">Claude · Sonnet 4.6</span>
+          <!-- paperclip — enabled -->
+          <div class="icon-btn" title="Attach files">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg>
+          </div>
+          <!-- send → queues while running -->
+          <div class="icon-btn" id="send-btn" title="Queue prompt (agent is running)" onclick="queueFromComposer()" style="cursor:pointer">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102.65,154l41.39,85.57A15.86,15.86,0,0,0,158.44,248H158.7a15.88,15.88,0,0,0,14.1-9.75l76.14-191.19c0-.05,0-.1.06-.15A16,16,0,0,0,227.32,28.68Z"/></svg>
+          </div>
+        </div>
+      </div>
+      <!-- hint text below composer -->
+      <div style="font-size:10px;color:var(--r-ink-faint);text-align:center;margin-top:5px">
+        <svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor" style="vertical-align:-1px"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></svg>
+        Enter queues · Shift+Enter queues and bumps to top
+      </div>
+    </div>
+  </div>
+
+  <div class="description">
+    <strong>Proposed:</strong> input stays editable. Pressing Enter while agent runs <em>queues</em> the prompt. Queue shows above composer — hover any item for Edit / Promote / Delete. Turn completes → queue auto-fires.
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     COLUMN C — action detail cards
+     ═══════════════════════════════════════════════════════ -->
+<div class="col" style="justify-content:flex-start;padding-top:32px">
+  <div class="col-label detail"><span>Queue item actions</span></div>
+
+  <div class="annotation-panel">
+    <div class="state-label">Three actions per item</div>
+
+    <div class="annotation-row">
+      <div class="annotation-icon edit">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
+      </div>
+      <div class="annotation-text">
+        <strong>Edit</strong> — click to edit the queued prompt inline. Confirm with Enter, cancel with Escape.
+      </div>
+    </div>
+
+    <div class="annotation-row">
+      <div class="annotation-icon promote">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
+      </div>
+      <div class="annotation-text">
+        <strong>Promote</strong> — stop the current agent run and immediately send this queued prompt. Same as the user clicking Stop and sending manually, but one click.
+      </div>
+    </div>
+
+    <div class="annotation-row">
+      <div class="annotation-icon delete">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>
+      </div>
+      <div class="annotation-text">
+        <strong>Delete</strong> — remove the queued prompt. Does not affect the running turn.
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="state-label">Keyboard shortcuts</div>
+    <div class="annotation-row" style="margin-bottom:5px">
+      <div style="font-size:11.5px;color:var(--r-ink-body);line-height:1.6">
+        <strong>Enter</strong> while agent running → queue prompt<br>
+        <strong>Shift+Enter</strong> → queue and promote to top<br>
+        <strong>Escape</strong> while editing → cancel, restore original
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="state-label">Auto-send logic</div>
+    <div class="annotation-row" style="margin-bottom:0">
+      <div style="font-size:11.5px;color:var(--r-ink-body);line-height:1.6">
+        When the current turn completes, the first queued item is sent automatically via <code>useEffect</code> on <code>agentRunning</code> transition <code>true→false</code>. Multiple items in FIFO order.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let queueItems = ['qi-1'];
+
+  function toggleQueue() {
+    document.getElementById('queue-section').classList.toggle('collapsed');
+  }
+
+  function updateQueueCount() {
+    const count = queueItems.length;
+    document.getElementById('queue-count').textContent = count;
+    document.getElementById('queue-label').textContent = count === 1 ? 'Queued' : 'Queued';
+    document.getElementById('queue-empty').style.display = count === 0 ? 'block' : 'none';
+    if (count === 0) {
+      document.getElementById('queue-count').style.display = 'none';
+    } else {
+      document.getElementById('queue-count').style.display = 'flex';
+    }
+  }
+
+  function deleteItem(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('removing');
+    setTimeout(() => {
+      el.remove();
+      queueItems = queueItems.filter(i => i !== id);
+      updateQueueCount();
+    }, 200);
+  }
+
+  function promoteItem(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const text = document.getElementById(id + '-text').textContent;
+    // visual feedback: flash the item green, then remove it
+    el.style.background = '#DCFCE7';
+    el.style.borderColor = '#BBF7D0';
+    setTimeout(() => {
+      deleteItem(id);
+      // Show a "Sending now" flash
+      const list = document.getElementById('queue-list');
+      const flash = document.createElement('div');
+      flash.style.cssText = 'padding:7px 14px;font-size:11px;color:#15803D;background:#DCFCE7;border-top:1px solid #BBF7D0;display:flex;align-items:center;gap:6px';
+      flash.innerHTML = `<svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08L19.57,82.84a16,16,0,0,0-2.49,29.8L102.65,154l41.39,85.57A15.86,15.86,0,0,0,158.44,248H158.7a15.88,15.88,0,0,0,14.1-9.75l76.14-191.19A16,16,0,0,0,227.32,28.68Z"/></svg>Stopping current run and sending: "${text}"`;
+      list.appendChild(flash);
+      setTimeout(() => flash.remove(), 2200);
+    }, 300);
+  }
+
+  function startEdit(id) {
+    const el = document.getElementById(id);
+    const input = document.getElementById(id + '-input');
+    el.classList.add('is-editing');
+    input.focus();
+    input.select();
+  }
+
+  function onQueueEditKey(e, id) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const input = document.getElementById(id + '-input');
+      const text = document.getElementById(id + '-text');
+      text.textContent = input.value;
+      document.getElementById(id).classList.remove('is-editing');
+    }
+    if (e.key === 'Escape') {
+      cancelEdit(id);
+    }
+  }
+
+  function cancelEdit(id) {
+    const el = document.getElementById(id);
+    const input = document.getElementById(id + '-input');
+    const text = document.getElementById(id + '-text');
+    // restore original text
+    input.value = text.textContent;
+    el.classList.remove('is-editing');
+  }
+
+  let nextId = 2;
+  function queueFromComposer() {
+    const input = document.getElementById('composer-input');
+    const val = input.value.trim();
+    if (!val) {
+      // shake the input
+      input.style.outline = '2px solid #F59E0B';
+      setTimeout(() => input.style.outline = '', 500);
+      return;
+    }
+
+    const id = 'qi-' + nextId++;
+    const list = document.getElementById('queue-list');
+    const emptyEl = document.getElementById('queue-empty');
+
+    const item = document.createElement('div');
+    item.className = 'queue-item';
+    item.id = id;
+    item.style.opacity = '0';
+    item.style.transform = 'translateY(4px)';
+    item.innerHTML = `
+      <div class="queue-item-bullet"></div>
+      <div class="queue-item-text" id="${id}-text">${escapeHtml(val)}</div>
+      <input class="queue-item-edit-input" id="${id}-input" value="${escapeHtml(val)}" onkeydown="onQueueEditKey(event, '${id}')" onblur="cancelEdit('${id}')">
+      <div class="queue-item-actions">
+        <button class="qi-btn edit" onclick="startEdit('${id}')">
+          <div class="tip">Edit prompt</div>
+          <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
+        </button>
+        <button class="qi-btn promote" onclick="promoteItem('${id}')">
+          <div class="tip">Stop current &amp; send now</div>
+          <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>
+        </button>
+        <button class="qi-btn delete" onclick="deleteItem('${id}')">
+          <div class="tip">Remove</div>
+          <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>
+        </button>
+      </div>`;
+
+    list.insertBefore(item, emptyEl);
+    queueItems.push(id);
+    requestAnimationFrame(() => {
+      item.style.transition = 'opacity 150ms, transform 150ms';
+      item.style.opacity = '1';
+      item.style.transform = '';
+    });
+
+    input.value = '';
+    input.style.height = 'auto';
+    updateQueueCount();
+    if (document.getElementById('queue-section').classList.contains('collapsed')) {
+      document.getElementById('queue-section').classList.remove('collapsed');
+    }
+  }
+
+  function onComposerKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      queueFromComposer();
+    }
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
