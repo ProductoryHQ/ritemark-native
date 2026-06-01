@@ -6,7 +6,7 @@
 
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
-export type AgentId = 'ritemark-agent' | 'claude-code' | 'codex';
+export type AgentId = 'claude-code' | 'codex';
 
 export interface AgentInfo {
   id: AgentId;
@@ -90,15 +90,6 @@ export interface EditorSelection {
   contextAfter?: string;
 }
 
-export interface RAGCitation {
-  source: string;
-  page?: number;
-  section?: string;
-  score: number;
-  citation: string;
-  snippet: string;
-}
-
 export interface WidgetData {
   toolName: string;
   args: Record<string, unknown>;
@@ -110,7 +101,6 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'error';
   content: string;
-  citations?: RAGCitation[];
   widget?: WidgetData;
   timestamp: number;
 }
@@ -218,19 +208,6 @@ export interface AgentConversationTurn {
   pendingQuestion?: AgentQuestion;
   pendingPlanApproval?: AgentPlanApprovalRequest;
   timestamp: number;
-}
-
-// ── Index types ──
-
-export interface IndexStatus {
-  totalDocs: number;
-  totalChunks: number;
-}
-
-export interface IndexProgress {
-  processed: number;
-  total: number;
-  current: string;
 }
 
 // ── Discovered agents/commands from .claude/ directory ──
@@ -345,15 +322,11 @@ export type ExtensionMessage =
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
   | { type: 'ai-streaming'; content: string }
-  | { type: 'ai-result'; success: boolean; message?: string; hasRagContext?: boolean }
-  | { type: 'rag-results'; results: RAGCitation[] }
+  | { type: 'ai-result'; success: boolean; message?: string }
   | { type: 'ai-widget'; toolName: string; args: Record<string, unknown>; selection: EditorSelection }
   | { type: 'ai-error'; error: string }
   | { type: 'ai-stopped' }
   | { type: 'clear-chat' }
-  | { type: 'index-status'; totalDocs: number; totalChunks: number }
-  | { type: 'index-progress'; processed: number; total: number; current: string }
-  | { type: 'index-done' }
   | { type: 'agent-progress'; progress: AgentProgress }
   | { type: 'agent-question'; question: AgentQuestion }
   | { type: 'agent-plan-approval'; request: AgentPlanApprovalRequest }

@@ -8,7 +8,7 @@
 /**
  * Available agent identifiers
  */
-export type AgentId = 'ritemark-agent' | 'claude-code' | 'codex';
+export type AgentId = 'claude-code' | 'codex';
 export type AgentSettingSource = 'user' | 'project' | 'local';
 
 /**
@@ -40,14 +40,6 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
     description: 'OpenAI coding agent with ChatGPT authentication',
     experimental: true,
     requiresApiKey: null, // Uses ChatGPT OAuth, not API key
-  },
-  'ritemark-agent': {
-    id: 'ritemark-agent',
-    label: 'Ritemark Document Agent',
-    description: 'Chat & document search',
-    experimental: false,
-    requiresApiKey: null, // Uses whatever AI provider is configured
-    deprecated: true,
   },
 };
 

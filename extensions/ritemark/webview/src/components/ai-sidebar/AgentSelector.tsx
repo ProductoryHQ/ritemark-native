@@ -6,7 +6,6 @@
  * The trigger displays "Claude · Sonnet" etc.
  */
 
-import React from 'react';
 import { useAISidebarStore } from './store';
 import {
   Select,
@@ -54,23 +53,21 @@ export function AgentSelector() {
 
   if (visibleAgents.length <= 1 && models.length === 0) return null;
 
-  // Build the composite value: "ritemark-agent", "claude-code:model", or "codex:model"
+  // Build the composite value: "claude-code:model" or "codex:model"
   const currentValue =
-    selectedAgent === 'claude-code'
-      ? `claude-code:${selectedModel}`
-      : selectedAgent === 'codex'
-        ? `codex:${codexSelectedModel}`
-        : selectedAgent;
+    selectedAgent === 'codex'
+      ? `codex:${codexSelectedModel}`
+      : `claude-code:${selectedModel}`;
 
   // Build display label for the trigger
   const currentModelLabel = models.find((m) => m.id === selectedModel)?.label;
   const currentCodexModelLabel = codexModels.find((m) => m.id === codexSelectedModel)?.label;
   const triggerLabel =
-    selectedAgent === 'claude-code' && currentModelLabel
-      ? `Claude · ${currentModelLabel}`
-      : selectedAgent === 'codex' && currentCodexModelLabel
-        ? `Codex · ${currentCodexModelLabel}`
-        : agents.find((a) => a.id === selectedAgent)?.label || (selectedAgent === 'ritemark-agent' ? 'Legacy Agent' : 'Select agent...');
+    selectedAgent === 'codex' && currentCodexModelLabel
+      ? `Codex · ${currentCodexModelLabel}`
+      : currentModelLabel
+        ? `Claude · ${currentModelLabel}`
+        : 'Select agent...';
 
   function handleChange(value: string) {
     if (value.startsWith('claude-code:')) {
@@ -148,17 +145,6 @@ export function AgentSelector() {
             </>
           )}
 
-          {/* Ritemark Document Agent — last */}
-          {visibleAgents
-            .filter((a) => a.id !== 'claude-code' && a.id !== 'codex')
-            .map((agent) => (
-              <React.Fragment key={agent.id}>
-                <SelectSeparator />
-                <SelectItem value={agent.id} className="text-xs">
-                  {agent.label}
-                </SelectItem>
-              </React.Fragment>
-            ))}
         </SelectContent>
       </Select>
 
