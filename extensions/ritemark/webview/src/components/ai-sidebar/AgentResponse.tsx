@@ -11,7 +11,7 @@ import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
 import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
-import { extractPlanDisplayText } from './planText';
+import { extractPlanDisplayText, planTurnNeedsApproval } from './planText';
 import type { AgentConversationTurn } from './types';
 
 const OVERFLOW_PATTERNS = [
@@ -86,7 +86,11 @@ export function AgentResponse({ turn }: AgentResponseProps) {
     );
   }
 
-  const needsApproval = turn.isPlan && !turn.planHandled && !turn.pendingPlanApproval;
+  // Sprint 74 R1 (#86): approval UI renders only while the agent is actually
+  // blocked waiting on ExitPlanMode (pendingPlanApproval present). The old
+  // condition (`!turn.pendingPlanApproval`) showed dead Approve/Reject buttons
+  // after the request was already cleared — clicking them silently did nothing.
+  const needsApproval = planTurnNeedsApproval(turn);
 
   // Extract plan content from thinking activities (plan text arrives as 'thinking' type)
   const planText = needsApproval

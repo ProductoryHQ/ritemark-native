@@ -56,38 +56,12 @@ Ritemark auto-saves after 1 second. If changes aren't saving:
 
 ---
 
-## AI Assistant
-
-### "AI Offline" in status bar
-
-The AI assistant can't connect. Check:
-
-1. **Internet connection** - Are you online?
-2. **API key** - Is one configured?
-3. **API credits** - Do you have OpenAI credits?
-
-### No response from AI
-
-1. Wait longer - some requests take time
-2. Check for error messages in the AI sidebar
-3. Try a simpler request
-4. Verify your API key is valid
-
-### "Invalid API key" error
-
-1. **Cmd+Shift+P** → "Configure OpenAI API Key"
-2. Enter a valid key (starts with `sk-`)
-3. Make sure no extra spaces were copied
-
-### AI changes wrong text
-
-1. **Select text first** before making a request
-2. Check the selection indicator in the AI sidebar
-3. Be specific about what you want changed
-
----
-
 ## AI Agents and Agent Library
+
+> The earlier built-in "Ritemark Agent" chat assistant was removed in v1.7.2. The AI sidebar now runs
+> **Claude** and **Codex** only. For per-agent setup and troubleshooting (sign-in, "needs repair",
+> spawn errors), see [AI Agents](features/ai-agents.md). For OpenAI-key issues in Flows, see
+> [Set Up AI → OpenAI API Key for Flows](setup-ai.md#openai-api-key-for-flows).
 
 ### New helpers do not appear in the Agent Library
 

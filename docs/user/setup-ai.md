@@ -4,53 +4,12 @@
 
 Ritemark works great without any AI features. But if you want AI-powered editing, here's how to set everything up.
 
----
+Ritemark's AI sidebar runs two agents — **Claude Code** and **Codex**. Set up whichever one you want
+to use below. If you use **Flows**, you'll also need an OpenAI API key (see [OpenAI API Key for Flows](#openai-api-key-for-flows)).
 
-## Built-in AI Assistant (OpenAI)
-
-Ritemark's built-in AI assistant helps you rephrase text, make bulk replacements, and insert content. It requires an OpenAI API key.
-
-### Step 1: Get an API Key
-
-1. Go to [platform.openai.com](https://platform.openai.com)
-2. Sign in or create an account
-3. Navigate to **API Keys** (under your profile menu)
-4. Click **Create new secret key**
-5. Name it something like "Ritemark"
-6. Copy the key (starts with `sk-`)
-
-**Important:** You can only see the key once. Save it somewhere safe.
-
-#### API Credits
-
-OpenAI requires prepaid credits:
-- New accounts may include free credits
-- Add payment method and credits at the Billing section
-- Typical usage costs pennies per session
-
-### Step 2: Add Key to Ritemark
-
-1. Open Ritemark
-2. Click the **gear icon** to open Settings
-3. Paste your API key in the OpenAI field
-4. Your key is stored securely in your system's credential store
-
-### Step 3: Verify It Works
-
-1. Open any markdown file
-2. Look at the status bar (bottom)
-3. You should see **AI Ready**
-
-If you see **AI Offline**, check your internet connection, verify the API key, and make sure you have API credits.
-
-### Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| "AI Offline" in status bar | Check internet connection |
-| No response from AI | Verify API key and credits |
-| "Invalid API key" error | Re-enter key in Settings |
-| Slow responses | Normal for longer text; wait for completion |
+> **Changed in v1.7.2:** The earlier built-in "Ritemark Agent" — a direct OpenAI chat assistant with
+> rephrase / find-and-replace / insert tools and document search — has been removed. The OpenAI API
+> key is no longer used by a chat agent; it now only powers Flows LLM and Image nodes.
 
 ---
 
@@ -140,6 +99,40 @@ export OPENAI_API_KEY='your-key-here'
 
 ---
 
+## OpenAI API Key for Flows
+
+[Flows](features/flows.md) use an OpenAI API key for their **LLM Prompt** and **Image Generation**
+nodes. This key is not needed for the Claude or Codex sidebar agents — only for running Flows.
+
+### Step 1: Get an API Key
+
+1. Go to [platform.openai.com](https://platform.openai.com)
+2. Sign in or create an account
+3. Navigate to **API Keys** (under your profile menu)
+4. Click **Create new secret key**
+5. Name it something like "Ritemark"
+6. Copy the key (starts with `sk-`)
+
+**Important:** You can only see the key once. Save it somewhere safe.
+
+#### API Credits
+
+OpenAI requires prepaid credits:
+- New accounts may include free credits
+- Add payment method and credits at the Billing section
+- Typical usage costs pennies per session
+
+### Step 2: Add Key to Ritemark
+
+1. Open Ritemark
+2. Open **Settings** (gear icon), or open the **Settings** panel inside Flows
+3. Paste your API key in the OpenAI field
+4. Your key is stored securely in your system's credential store
+
+For Flows-specific configuration (default LLM and image models), see [Flows → Requirements](features/flows.md#requirements).
+
+---
+
 ## Agent Runtime (v1.7.0+)
 
 By default, Ritemark ships its own bundled Claude and Codex binaries. If you prefer to use your own system-installed versions:
@@ -183,6 +176,6 @@ You can always add AI later.
 
 ## Related
 
-- [AI Assistant](../features/ai-assistant.md) - How to use AI features
-- [AI Agents](../features/ai-agents.md) - Built-in Claude, Codex, and Ritemark Agent
+- [AI Agents](features/ai-agents.md) - Built-in Claude and Codex agents
+- [Flows](features/flows.md) - Visual AI workflows (use the OpenAI key)
 - [Getting Started](getting-started.md) - Basic setup
