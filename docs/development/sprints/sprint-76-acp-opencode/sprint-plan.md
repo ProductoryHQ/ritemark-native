@@ -70,7 +70,11 @@ mode, custom agent binary picker, Linux packaging, ACP session resume.
 - [technical-plan.md](technical-plan.md) records the architecture.
 - [scenarios.md](scenarios.md) captures behavior examples.
 - [tasks.md](tasks.md) is the implementation checklist.
-- [research/](research/) holds the Phase 0 audits (created during Phase 0).
+- [research/](research/) holds the Phase 0 audits (`acp-e2e-audit.md`, `opencode-bundling-audit.md`).
+- [research/ux-design-spec.md](research/ux-design-spec.md) + [research/prototypes/](research/prototypes/)
+  are the **approved design contract** for the two user-facing surfaces — implementation must match
+  them (referenced from spec R3a and R6 acceptance criteria). Model picker: approved 2026-06-01.
+  Settings: under review.
 
 ## Status Log
 

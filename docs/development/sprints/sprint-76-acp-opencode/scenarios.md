@@ -45,31 +45,53 @@ When the fetch script runs
 Then installation fails loudly with a checksum error
 And no binary is installed
 
-## Feature: BYOK Key Configuration (R3)
+## Feature: Provider Key Configuration (R3a — revised 2026-06-01, supersedes R3 scenarios)
 
-### Scenario: Gemini key configured, Gemini models available
-Given the user has saved a Google Gemini API key in Ritemark Settings → BYOK
-When the user opens the model dropdown with OpenCode selected
-Then Gemini models appear in the list
-And selecting one and prompting produces a streamed response generated via the user's key
+> **Revision note:** the original R3 scenarios below referenced a separate "Settings → BYOK"
+> section. That design was rejected (see spec.md R3 revision); OpenCode consumes the **existing**
+> provider keys. Scenarios rewritten accordingly. The approved design contract is
+> `research/prototypes/settings.html` (S1–S5).
 
-### Scenario: No keys configured
-Given no BYOK keys are saved
+### Scenario: Existing key works for OpenCode without re-entry
+Given the user saved a Google AI API key in Settings before Sprint 76 shipped (for Flows)
+When the user updates Ritemark and opens the model dropdown with OpenCode selected
+Then Gemini models appear in the list with no additional setup
+And selecting one and prompting produces a streamed response generated via that existing key
+
+### Scenario: New key configured on the existing card
+Given no Google AI key is saved
+When the user saves a key on the existing "Google AI API Key" card in Settings
+Then the card's "Used for:" line shows "Gemini models in OpenCode, Flows"
+And Gemini models appear under OpenCode in the model dropdown on next open
+
+### Scenario: No provider keys configured
+Given none of the four provider keys (OpenAI, Google AI, Anthropic, OpenRouter) are saved
 When the user selects OpenCode in the agent selector
-Then the sidebar shows a "Set up your keys" prompt with a button that opens Settings → BYOK
-And no prompt can be sent until at least one key is saved
+Then the sidebar shows the "Set up your API keys" card with a button that opens Settings → API Keys section
+And no prompt can be sent until at least one provider key is saved
 
 ### Scenario: Key removed after configuration
-Given the user previously configured an OpenAI key and used OpenCode with it
-When the user deletes the key in Settings and starts a new OpenCode session
+Given the user previously had an OpenAI key saved and used OpenCode with it
+When the user clears the key on the OpenAI card and starts a new OpenCode session
 Then OpenAI models no longer appear in the model dropdown
 And the agent process spawned for the new session does not receive `OPENAI_API_KEY` in its environment
 
 ### Scenario: Keys never leak to the webview (negative, security)
-Given BYOK keys are configured
+Given provider keys are configured
 When any webview message is inspected in the trace channel during an OpenCode session
 Then no message payload contains a key value
 And keys appear only in the spawned process environment
+
+### Scenario: OpenRouter card visibility follows the feature flag
+Given the `opencode-integration` flag is enabled
+When the user opens Settings
+Then the OpenRouter API Key card appears after the Anthropic card
+And when the flag is disabled, the OpenRouter card is absent and no "Used for:" line mentions OpenCode
+
+### Scenario: Stale Imagen 3 copy removed (unconditional)
+Given any flag state
+When the user views the Google AI API Key card
+Then its "Used for:" line does not mention "Imagen 3 (coming soon)"
 
 ## Feature: File-Edit Approval Gating (R4)
 

@@ -97,6 +97,8 @@ Acceptance criteria:
   shows a setup prompt that deep-links to the Settings API Keys section (no dead-end error).
 - Keys configured in Ritemark are not required to also exist in `~/.config/opencode` — the env
   injection alone is sufficient for OpenCode to list and use those providers.
+- **Design contract:** the implemented Settings page matches the approved prototype
+  `research/prototypes/settings.html` (states S1–S5). Deviations require Jarmo's sign-off.
 
 ### R4: File-edit approval gating
 
@@ -142,6 +144,10 @@ Acceptance criteria:
   no model IDs hardcoded elsewhere).
 - Selected model is passed to the ACP session (via `session/new` `mcpServers`/mode params or
   OpenCode's model env/config — exact mechanism resolved in technical plan).
+- **Design contract:** the implemented selector matches the approved prototype
+  `research/prototypes/model-picker.html` (states A1–A6, **approved by Jarmo 2026-06-01**):
+  trigger in the chat input footer, dropdown opens upward, two-line model rows with provider on
+  the description line. Deviations require Jarmo's sign-off.
 
 ### R7: Feature flag and platform gating
 
