@@ -17,6 +17,7 @@ import {
   setWorkspaceContext,
   type SavedConversationV2,
 } from './chatHistoryStorage';
+import type { LegacyRitemarkConversationRun } from './conversationModel';
 import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult, shouldRequestPlanMode } from './lifecycle';
 import type {
   AgentId,
@@ -147,6 +148,8 @@ interface AISidebarState {
   conversationHistory: ConversationEntry[];
   streamingContent: string;
   isStreaming: boolean;
+  /** Populated when a saved legacy-ritemark conversation is loaded. Read-only — no send path. */
+  legacyConversation: LegacyRitemarkConversationRun | null;
 
   // ── Agent state (Claude Code) ──
   agentConversation: AgentConversationTurn[];
@@ -287,6 +290,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   conversationHistory: [],
   streamingContent: '',
   isStreaming: false,
+  legacyConversation: null,
 
   agentConversation: [],
 
@@ -937,10 +941,31 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
     // Coerce legacy 'ritemark-agent' agentId to 'claude-code' — legacy agent is
     // no longer selectable; legacy conversations are read-only via compat shim.
+    const isLegacyAgent = data.agentId === 'ritemark-agent';
     const loadedAgentId: AgentId =
       data.agentId === 'claude-code' || data.agentId === 'codex'
         ? data.agentId
         : 'claude-code';
+
+    // Build a LegacyRitemarkConversationRun so AISidebar can display it read-only
+    // when agentConversation and codexConversation are both empty.
+    const chatMessages = data.chatMessages || [];
+    const conversationHistory = data.conversationHistory || [];
+    const hasOnlyLegacyMessages =
+      chatMessages.length > 0 && agentConv.length === 0 && codexConv.length === 0;
+    let legacyConversation: LegacyRitemarkConversationRun | null = null;
+    if (isLegacyAgent || hasOnlyLegacyMessages) {
+      const firstUserMsg = chatMessages.find((m) => m.role === 'user');
+      legacyConversation = {
+        id: `${id}-legacy`,
+        runtimeId: 'legacy-ritemark',
+        userPrompt: firstUserMsg?.content ?? '',
+        status: 'complete',
+        timestamp: chatMessages[0]?.timestamp ?? data.createdAt,
+        completedAt: data.updatedAt,
+        providerTurn: { messages: chatMessages, conversationHistory },
+      };
+    }
 
     const contextState = computeContextState(agentConv);
     set({
@@ -949,8 +974,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       agentConversation: agentConv,
       codexConversation: codexConv,
       dismissedCurrentPlanKey: null,
-      chatMessages: data.chatMessages || [],
-      conversationHistory: data.conversationHistory || [],
+      chatMessages,
+      conversationHistory,
+      legacyConversation,
       showHistoryPanel: false,
       ...contextState,
     });
@@ -969,6 +995,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         currentConversationId: null,
         chatMessages: [],
         conversationHistory: [],
+        legacyConversation: null,
         agentConversation: [],
         codexConversation: [],
         dismissedCurrentPlanKey: null,
@@ -1000,6 +1027,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       conversationHistory: [],
       streamingContent: '',
       isStreaming: false,
+      legacyConversation: null,
       agentConversation: [],
       codexConversation: [],
       dismissedCurrentPlanKey: null,
@@ -1026,6 +1054,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       conversationHistory: [],
       streamingContent: '',
       isStreaming: false,
+      legacyConversation: null,
       agentConversation: [],
       codexConversation: [],
       dismissedCurrentPlanKey: null,

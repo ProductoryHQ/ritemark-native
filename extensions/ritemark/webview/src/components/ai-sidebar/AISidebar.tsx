@@ -14,6 +14,7 @@ import { SetupWizard } from './SetupWizard';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
 import { UnifiedConversationView } from './UnifiedConversationView';
+import { LegacyConversationView } from './LegacyConversationView';
 import { CodexSetupView } from './CodexSetupView';
 import { ChatInput } from './ChatInput';
 import { SelectionIndicator } from './SelectionIndicator';
@@ -97,6 +98,7 @@ export function AISidebar() {
   const chatFontSize = useAISidebarStore((s) => s.chatFontSize);
   const agentConversation = useAISidebarStore((s) => s.agentConversation);
   const codexConversation = useAISidebarStore((s) => s.codexConversation);
+  const legacyConversation = useAISidebarStore((s) => s.legacyConversation);
 
   // Initialize chat font size CSS variable
   useEffect(() => {
@@ -163,6 +165,8 @@ export function AISidebar() {
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {agentConversation.length > 0 || codexConversation.length > 0
               ? <UnifiedConversationView />
+              : legacyConversation !== null
+              ? <LegacyConversationView />
               : isCodex ? <CodexView />
               : <AgentView />}
           </div>
