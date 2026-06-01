@@ -1,8 +1,8 @@
 # v1.7.2 Test Checklist
 
 **Release:** Ritemark v1.7.2 — Markdown workflow + AI runtime clarity
-**Date:** TBD (2026-05-29 build)
-**Scope:** Sprint 72 (Markdown `@`-mentions, internal Cmd-click links, TOC heading-level shortcuts) + Sprint 73 (bundled-runtime updates + AI model-selector clarity)
+**Date:** TBD (2026-06-01 rebuild — RAG removal + Windows dep fix)
+**Scope:** Sprint 72 (Markdown `@`-mentions, internal Cmd-click links, TOC heading-level shortcuts) + Sprint 73 (bundled-runtime updates + AI model-selector clarity) + Sprint 74 (Legacy Agent + RAG removal) + Windows packaging dep fix (claude-agent-sdk peer stubs)
 
 > Before opening the new DMG: **quit any running Ritemark.app** (two instances share the user-data dir and will cause a blank webview / SW `InvalidStateError`).
 
@@ -98,6 +98,25 @@
 #### Account switch invalidates model cache (review fix from PR #91)
 - [ ] Trigger Claude logout (or use Settings to switch identity if available)
 - [ ] After `login-finished` event for a new identity, open the model picker → list reflects the **new account's** models, not the previous account's cached list
+
+---
+
+### Sprint 74 — Legacy Agent + RAG removal (NEW — verify nothing broke)
+
+> This build removed the deprecated "Legacy Agent" chat runtime, the document-search (RAG) subsystem, and slimmed the AI dependency tree (claude-agent-sdk peer SDKs replaced with stubs; `@orama/orama` dropped). The AI sidebar must still work with **only Claude Code and Codex**.
+
+#### AI sidebar still works
+- [ ] Open the AI sidebar → it loads (no blank panel / no console errors about missing `rag`/`openAIClient`/`ChatView`)
+- [ ] Agent selector offers **only Claude Code and Codex** — no "Legacy Agent" / OpenAI option
+- [ ] Start a **Claude Code** chat with a workspace open → sends + streams a reply normally
+- [ ] Start a **Codex** chat → sends + streams a reply normally
+- [ ] Switch runtime mid-session (Claude ↔ Codex) → works, no crash
+- [ ] No semantic-search UI: no "Re-index Documents" affordance doing anything, **no citation chips**, **no index footer** in the sidebar
+- [ ] An existing saved "Legacy Agent" conversation (if any) still **opens read-only** without crashing
+
+#### Dependency-slimming sanity (the EMFILE fix)
+- [ ] Claude Code actually runs (this is the real check that the stubbed `@anthropic-ai/sdk` / `@modelcontextprotocol/sdk` peers don't break the bundled SDK at runtime — it loads `ajv` which IS shipped)
+- [ ] Flows: open a flow with an LLM node and run it → executes (API-key config + flow runtime unaffected by the removal)
 
 ---
 
