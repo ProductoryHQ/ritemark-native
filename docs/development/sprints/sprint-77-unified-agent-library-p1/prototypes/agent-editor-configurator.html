@@ -405,30 +405,63 @@ html.dark .k6-banner svg { stroke: #fbbf24; }
 html.dark .k6-dismiss { color: #fef3c7; }
 .k6-dismiss:hover { opacity: 1; }
 
-/* Skills multiselect area */
-.skills-list {
+/* Skills tag autocomplete */
+.skills-tag-input {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
+  padding: 5px 7px;
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-md);
+  background: var(--r-surface);
+  cursor: text;
+  min-height: 34px;
+}
+.skills-tag-input:focus-within {
+  outline: 2px solid rgba(67,56,202,0.25);
+  border-color: var(--r-accent);
+}
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--r-radius-pill, 999px);
+  background: var(--r-accent-soft);
+  color: var(--r-accent);
+  border: 1px solid var(--r-accent-fainter);
+  white-space: nowrap;
+}
+.skill-tag-remove {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--r-accent); font-size: 13px; line-height: 1;
+  opacity: 0.6; display: flex; align-items: center;
+}
+.skill-tag-remove:hover { opacity: 1; }
+.skill-tag-search {
+  border: none; outline: none; background: transparent;
+  font-size: 11px; color: var(--r-ink-strong);
+  min-width: 80px; flex: 1;
+}
+.skill-tag-search::placeholder { color: var(--r-ink-faint); }
+.skills-dropdown {
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-md);
+  background: var(--r-surface);
+  box-shadow: 0 4px 12px rgba(30,27,75,0.1);
   max-height: 120px;
   overflow-y: auto;
+  margin-top: 3px;
 }
-.skill-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: var(--r-ink-body);
-  padding: 4px 6px;
-  border-radius: var(--r-radius-sm);
-  background: var(--r-surface-soft);
-  border: 1px solid var(--r-hairline);
+.skill-option {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 8px; font-size: 11px; color: var(--r-ink-body);
   cursor: pointer;
-  transition: background 0.1s;
 }
-.skill-item:hover { background: var(--r-accent-soft); }
-.skill-item input[type=checkbox] { accent-color: var(--r-accent); flex-shrink: 0; }
-.skill-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.skill-option:hover { background: var(--r-accent-soft); }
+.skill-option-name { flex: 1; }
 
 /* Provenance badge */
 .prov {
@@ -447,20 +480,23 @@ html.dark .prov-claude { background: rgba(129,140,248,0.15); color: #a5b4fc; bor
 html.dark .prov-codex  { background: rgba(52,211,153,0.15);  color: #6ee7b7; border-color: rgba(52,211,153,0.3); }
 html.dark .prov-shared { background: rgba(148,163,184,0.12); color: #94a3b8; border-color: rgba(148,163,184,0.25); }
 
-/* Tools checkboxes */
-.tools-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
+/* Tools checkboxes — single column with descriptions */
+.tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 .tool-item {
   display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: var(--r-ink-body);
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--r-hairline);
 }
-.tool-item input { accent-color: var(--r-accent); }
+.tool-item:last-child { border-bottom: none; }
+.tool-item input { accent-color: var(--r-accent); flex-shrink: 0; margin-top: 2px; }
+.tool-label { font-size: 11px; font-weight: 500; color: var(--r-ink-strong); flex-shrink: 0; width: 56px; }
+.tool-desc  { font-size: 11px; color: var(--r-ink-faint); }
 
 /* Budget row */
 .budget-row {
@@ -786,7 +822,7 @@ html.dark .prov-shared { background: rgba(148,163,184,0.12); color: #94a3b8; bor
         <!-- ── RUNTIME ── -->
         <div class="panel-section">
           <div style="display:flex;align-items:center;gap:4px;">
-            <span class="section-label" style="flex:1">Runtime</span>
+            <span class="section-label" style="flex:1">Agent runtimes</span>
             <div class="anno-wrap">
               <span class="anno">②</span>
               <span class="anno-tip">NEW: Runtime picker — segmented control. Defaults to claude. Auth status indicator shows API key health.</span>
@@ -857,19 +893,22 @@ html.dark .prov-shared { background: rgba(148,163,184,0.12); color: #94a3b8; bor
 
         <hr class="panel-divider">
 
-        <!-- ── ROUTINE ── -->
+        <!-- ── LINKED FLOW ── -->
         <div class="panel-section">
           <div style="display:flex;align-items:center;gap:4px;">
-            <span class="section-label" style="flex:1">Routine</span>
+            <span class="section-label" style="flex:1">Linked flow</span>
             <div class="anno-wrap">
               <span class="anno">⑥</span>
-              <span class="anno-tip">NEW: Routine — when should this agent auto-run? Maps to Claude Code lifecycle hooks.</span>
+              <span class="anno-tip">NEW: Which Ritemark flow runs when this agent's schedule fires. "Manual only" = agent never runs automatically.</span>
             </div>
           </div>
+          <div style="font-size:11px;color:var(--r-ink-faint);margin-bottom:5px;line-height:1.4;">
+            Flow to execute on schedule. Leave empty for manual-only agents.
+          </div>
           <select class="p-select">
-            <option value="">Manual only</option>
-            <option value="standup" selected>.ritemark/flows/standup.flow.json</option>
-            <option value="weekly">.ritemark/flows/weekly-digest.flow.json</option>
+            <option value="">— Manual only —</option>
+            <option value="standup" selected>standup.flow.json</option>
+            <option value="weekly">weekly-digest.flow.json</option>
             <option value="__new__">＋ Create new flow…</option>
           </select>
         </div>
@@ -885,33 +924,21 @@ html.dark .prov-shared { background: rgba(148,163,184,0.12); color: #94a3b8; bor
               <span class="anno-tip">NEW: Skills multiselect with provenance badges [claude] / [codex] / [shared]. Shared = present in both .claude/skills/ and .agents/skills/.</span>
             </div>
           </div>
-          <div class="skills-list">
-            <label class="skill-item">
-              <input type="checkbox" checked>
-              <span class="skill-name">vscode-development</span>
-              <span class="prov prov-claude">claude</span>
-            </label>
-            <label class="skill-item">
-              <input type="checkbox" checked>
-              <span class="skill-name">feature-flags</span>
-              <span class="prov prov-shared">shared</span>
-            </label>
-            <label class="skill-item">
-              <input type="checkbox">
-              <span class="skill-name">release</span>
-              <span class="prov prov-claude">claude</span>
-            </label>
-            <label class="skill-item">
-              <input type="checkbox">
-              <span class="skill-name">code-review</span>
-              <span class="prov prov-codex">codex</span>
-            </label>
-            <label class="skill-item">
-              <input type="checkbox">
-              <span class="skill-name">ritemark-flows</span>
-              <span class="prov prov-shared">shared</span>
-            </label>
+          <!-- Tag input: shows selected skills as removable tags, type to filter -->
+          <div class="skills-tag-input" onclick="document.getElementById('skill-search').focus()">
+            <span class="skill-tag">vscode-development <span class="prov prov-claude" style="margin:0 2px">claude</span><button class="skill-tag-remove" title="Remove">×</button></span>
+            <span class="skill-tag">feature-flags <span class="prov prov-shared" style="margin:0 2px">shared</span><button class="skill-tag-remove" title="Remove">×</button></span>
+            <input class="skill-tag-search" id="skill-search" type="text" placeholder="Add skill…" oninput="filterSkills(this.value)" onfocus="showSkillDrop()" onblur="setTimeout(hideSkillDrop,150)">
           </div>
+          <!-- Dropdown (shown on focus / typing) -->
+          <div class="skills-dropdown" id="skill-drop" style="display:none">
+            <div class="skill-option"><span class="skill-option-name">release</span><span class="prov prov-claude">claude</span></div>
+            <div class="skill-option"><span class="skill-option-name">code-review</span><span class="prov prov-codex">codex</span></div>
+            <div class="skill-option"><span class="skill-option-name">ritemark-flows</span><span class="prov prov-shared">shared</span></div>
+            <div class="skill-option"><span class="skill-option-name">spec-driven-sprint</span><span class="prov prov-claude">claude</span></div>
+            <div class="skill-option"><span class="skill-option-name">deep-research</span><span class="prov prov-claude">claude</span></div>
+          </div>
+          <div style="font-size:10px;color:var(--r-ink-faint);margin-top:3px;">Type to search 30+ skills. Selected skills are injected into the agent's system prompt.</div>
         </div>
 
         <hr class="panel-divider">
@@ -919,53 +946,19 @@ html.dark .prov-shared { background: rgba(148,163,184,0.12); color: #94a3b8; bor
         <!-- ── ALLOWED TOOLS ── -->
         <div class="panel-section">
           <span class="section-label">Allowed Tools</span>
-          <div class="tools-grid">
-            <label class="tool-item"><input type="checkbox" checked> Read</label>
-            <label class="tool-item"><input type="checkbox" checked> Edit</label>
-            <label class="tool-item"><input type="checkbox" checked> Write</label>
-            <label class="tool-item"><input type="checkbox" checked> Bash</label>
-            <label class="tool-item"><input type="checkbox" checked> Glob</label>
-            <label class="tool-item"><input type="checkbox" checked> Grep</label>
-            <label class="tool-item"><input type="checkbox"> Agent</label>
-            <label class="tool-item"><input type="checkbox"> WebFetch</label>
+          <div class="tools-list">
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Read</span><span class="tool-desc">Read files from disk</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Edit</span><span class="tool-desc">Make targeted file edits</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Write</span><span class="tool-desc">Create or overwrite files</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Bash</span><span class="tool-desc">Run terminal commands</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Glob</span><span class="tool-desc">Find files by pattern</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Grep</span><span class="tool-desc">Search file contents</span></label>
+            <label class="tool-item"><input type="checkbox"><span class="tool-label">Agent</span><span class="tool-desc">Spawn sub-agents</span></label>
+            <label class="tool-item"><input type="checkbox"><span class="tool-label">WebFetch</span><span class="tool-desc">Fetch URLs from the web</span></label>
+            <label class="tool-item"><input type="checkbox"><span class="tool-label">WebSearch</span><span class="tool-desc">Search the web</span></label>
           </div>
         </div>
 
-        <hr class="panel-divider">
-
-        <!-- ── BUDGET ── -->
-        <div class="panel-section">
-          <div style="display:flex;align-items:center;gap:4px;">
-            <span class="section-label" style="flex:1">Budget</span>
-            <div class="anno-wrap">
-              <span class="anno">⑧</span>
-              <span class="anno-tip">NEW: Per-run token budget + monthly cost estimate. Estimate = budget × schedule frequency.</span>
-            </div>
-          </div>
-          <div class="budget-row">
-            <div class="budget-input-row">
-              <span class="budget-unit">$</span>
-              <input class="budget-input" type="number" value="0.05" step="0.01" min="0" placeholder="0.05">
-              <span class="budget-unit">per run</span>
-            </div>
-            <div class="budget-estimate">
-              Estimate: <strong>~$0.90 / month</strong> at current schedule
-            </div>
-          </div>
-        </div>
-
-        <hr class="panel-divider">
-
-        <!-- ── WORKTREE ── -->
-        <div class="panel-section" style="padding-bottom:8px;">
-          <span class="section-label">Isolation</span>
-          <label class="toggle-row">
-            <input type="checkbox"> Run in git worktree
-          </label>
-          <div style="font-size:11px;color:var(--r-ink-faint);margin-top:2px;line-height:1.4;">
-            Isolates agent runs in a separate working tree
-          </div>
-        </div>
 
       </div><!-- /agent-panel-inner -->
     </div><!-- /agent-panel -->
@@ -1097,6 +1090,17 @@ function updateCron(val) {
   if (k6 && k6.dataset.dismissed !== '1') {
     k6.style.display = isValid ? '' : 'none';
   }
+}
+
+// Skill tag autocomplete
+function showSkillDrop() { document.getElementById('skill-drop').style.display = ''; }
+function hideSkillDrop() { document.getElementById('skill-drop').style.display = 'none'; }
+function filterSkills(val) {
+  const drop = document.getElementById('skill-drop');
+  drop.style.display = '';
+  drop.querySelectorAll('.skill-option').forEach(opt => {
+    opt.style.display = opt.querySelector('.skill-option-name').textContent.includes(val) ? '' : 'none';
+  });
 }
 
 // Dismiss K6 banner (persists via data attribute for this session)
