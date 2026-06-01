@@ -130,7 +130,7 @@ export class AcpManager {
 
     this.sawContentThisTurn = false;
     const result = await client.prompt(sessionId, text);
-
+    this.flushThoughts(); // emit any trailing reasoning as one entry
     const totalTokens = result.usage?.totalTokens ?? null;
     const emptyTurn = result.stopReason === 'end_turn'
       && !this.sawContentThisTurn
@@ -173,6 +173,20 @@ export class AcpManager {
   /** Whether the current turn produced any streamed content (for soft-error). */
   private sawContentThisTurn = false;
 
+  /**
+   * OpenCode streams reasoning as per-word `agent_thought_chunk`s. Emitting each
+   * as its own 'thinking' progress floods the activity list (hundreds of one-word
+   * entries), so buffer them and flush one coalesced 'thinking' entry per burst.
+   */
+  private thoughtBuffer = '';
+
+  private flushThoughts(): void {
+    if (this.thoughtBuffer) {
+      this.emit('thinking', this.thoughtBuffer);
+      this.thoughtBuffer = '';
+    }
+  }
+
   private requireSession(): { client: AcpClient; sessionId: string } {
     if (!this.client || !this.sessionId) {
       throw new Error('ACP session is not running');
@@ -205,6 +219,11 @@ export class AcpManager {
    */
   private handleSessionUpdate(params: SessionNotification): void {
     const update = params.update;
+    // Any non-thought update ends the current reasoning burst — flush it as a
+    // single coalesced 'thinking' entry before handling the new update.
+    if (update.sessionUpdate !== 'agent_thought_chunk') {
+      this.flushThoughts();
+    }
     switch (update.sessionUpdate) {
       case 'agent_message_chunk': {
         const text = update.content.type === 'text' ? update.content.text : '';
@@ -218,11 +237,12 @@ export class AcpManager {
         const text = update.content.type === 'text' ? update.content.text : '';
         if (text) {
           this.sawContentThisTurn = true;
-          this.emit('thinking', text);
+          this.thoughtBuffer += text;
         }
         break;
       }
       case 'tool_call': {
+        traceAcp('manager', 'update:tool_call', { title: update.title, kind: update.kind });
         this.sawContentThisTurn = true;
         this.emit('tool_use', update.title, {
           tool: update.title,

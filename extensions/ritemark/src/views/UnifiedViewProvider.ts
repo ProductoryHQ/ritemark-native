@@ -74,7 +74,7 @@ import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
-import { AcpManager, buildByokEnv, byokProviderFlags, type ByokKeys, type ByokProviderFlags } from '../acp';
+import { AcpManager, buildByokEnv, byokProviderFlags, traceAcp, type ByokKeys, type ByokProviderFlags } from '../acp';
 import { findBundledAgentRuntime } from '../utils/bundledAgentRuntime';
 import { BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
 import type {
@@ -232,6 +232,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _acpApprovalSeq = 0;
   /** Provider/model pairs the user "always allowed" for the current session. */
   private _acpSessionAlwaysAllow = new Set<string>();
+  // Files whose `edit` was just approved via session/request_permission. The
+  // follow-up fs/write_text_file for the same file is auto-allowed so the user
+  // is not prompted twice for one edit (the permission is the real gate).
+  private _acpRecentlyPermissionedWrites = new Set<string>();
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -1802,25 +1806,41 @@ ${prompt}`;
   ): Promise<RequestPermissionResponse> {
     const tool = params.toolCall?.title ?? 'tool call';
     const file = params.toolCall?.locations?.[0]?.path;
+    const isFileEdit = params.toolCall?.kind === 'edit' && !!file;
     const sessionKey = `${tool}:${file ?? ''}`;
+    traceAcp('approval', 'permission-requested', { tool, file, kind: params.toolCall?.kind });
+
+    // A file `edit` is the user-facing gate; its follow-up fs/write_text_file is
+    // auto-allowed (no duplicate prompt), so remember the file whenever we let
+    // an edit through.
+    const rememberEdit = () => {
+      if (isFileEdit && file) this._acpRecentlyPermissionedWrites.add(file);
+    };
 
     // Settings auto-approve mode — skip the card entirely (off by default).
     if (this._isAcpAutoApprove()) {
+      rememberEdit();
       return this._acpSelectOutcome(params, true);
     }
 
     // Session "always allow" short-circuit (R4 parity with Codex).
     if (this._acpSessionAlwaysAllow.has(sessionKey)) {
+      rememberEdit();
       return this._acpSelectOutcome(params, true);
     }
 
-    const { approved, alwaysAllow } = await this._postAcpApproval({
-      approvalType: 'command',
-      command: tool,
-      workingDir: file ?? '',
-    });
+    // Label an edit as a file change (with the target path) rather than a shell
+    // command — it is not a shell command, and this is the single card the user
+    // sees for the edit.
+    const payload = isFileEdit && file
+      ? { approvalType: 'fileChange' as const, fileChanges: { [file]: { type: 'edit' } } }
+      : { approvalType: 'command' as const, command: tool, workingDir: file ?? '' };
+    const { approved, alwaysAllow } = await this._postAcpApproval(payload);
     if (approved && alwaysAllow) {
       this._acpSessionAlwaysAllow.add(sessionKey);
+    }
+    if (approved) {
+      rememberEdit();
     }
     return this._acpSelectOutcome(params, approved);
   }
@@ -1832,6 +1852,13 @@ ${prompt}`;
    */
   private async _handleAcpWriteApproval(request: WriteTextFileRequest): Promise<boolean> {
     const sessionKey = `write:${request.path}`;
+    traceAcp('approval', 'write-requested', { path: request.path });
+    // This write is the execution of an `edit` the user just approved via
+    // session/request_permission — don't prompt a second time for the same file.
+    if (this._acpRecentlyPermissionedWrites.has(request.path)) {
+      this._acpRecentlyPermissionedWrites.delete(request.path);
+      return true;
+    }
     // Settings auto-approve mode (off by default). Out-of-workspace writes are
     // already rejected by AcpFsProxy before this runs, so this only auto-approves
     // in-workspace edits.
@@ -1934,6 +1961,7 @@ ${prompt}`;
   private _disposeAcpRuntime(): void {
     this._rejectPendingAcpApprovals();
     this._acpSessionAlwaysAllow.clear();
+    this._acpRecentlyPermissionedWrites.clear();
     try {
       this._acpManager?.dispose();
     } catch {
