@@ -8,18 +8,21 @@
 /**
  * Available agent identifiers
  */
-export type AgentId = 'claude-code' | 'codex';
+export type AgentId = 'claude-code' | 'codex' | 'opencode';
 export type AgentSettingSource = 'user' | 'project' | 'local';
 
 /**
  * Agent metadata for the selector dropdown
+ *
+ * requiresApiKey: 'byok' = bring-your-own-key — the agent uses whichever
+ * provider keys the user has configured in Settings (Sprint 76 R3a).
  */
 export interface AgentInfo {
   id: AgentId;
   label: string;
   description: string;
   experimental: boolean;
-  requiresApiKey: 'anthropic' | 'openai' | null;
+  requiresApiKey: 'anthropic' | 'openai' | 'byok' | null;
   deprecated?: boolean;
 }
 
@@ -40,6 +43,14 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
     description: 'OpenAI coding agent with ChatGPT authentication',
     experimental: true,
     requiresApiKey: null, // Uses ChatGPT OAuth, not API key
+  },
+  // Sprint 76 R2: OpenCode — open-source ACP agent, BYOK (Gemini, GPT, Claude, OpenRouter)
+  'opencode': {
+    id: 'opencode',
+    label: 'OpenCode',
+    description: 'Open-source agent that uses your own API keys (Gemini, GPT, Claude)',
+    experimental: false,
+    requiresApiKey: 'byok',
   },
 };
 

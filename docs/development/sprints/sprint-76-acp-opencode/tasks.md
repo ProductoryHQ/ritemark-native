@@ -42,15 +42,17 @@
 - [x] Write `src/acp/acpClient.test.ts` + `acpManager.test.ts` (mock child process, scripted JSON-RPC)
 - [x] `npm test` green for new tests (all src/ tests pass; webview tests can't run in Linux remote env — EBADPLATFORM on darwin-pinned deps, pre-existing)
 
-## Phase 2: Bundling & runtime discovery (R2)
+## Phase 2: Bundling & runtime discovery (R2) — ✅ complete 2026-06-01
 
-- [ ] Add `'opencode'` to `AgentRuntimeKind` + `executableNames()` in `src/utils/bundledAgentRuntime.ts`
-- [ ] Add OpenCode entries (darwin-arm64, darwin-x64, win32-x64) to `binaries/agents/manifest.json`
-      with computed sha256
-- [ ] Verify/generalize fetch script handles the new entries; run it; binary installs and
-      `--version` validation passes
-- [ ] Add `'opencode'` to `AgentId` + `AGENTS` registry in `src/agent/types.ts`
-      (incl. `requiresApiKey: 'byok'` type extension)
+- [x] Add `'opencode'` to `AgentRuntimeKind` + `executableNames()` in `src/utils/bundledAgentRuntime.ts`
+- [x] Add OpenCode entries (darwin-arm64, darwin-x64, win32-x64) to `binaries/agents/manifest.json`
+      with computed sha256 (sha256 of darwin-arm64 tarball independently re-verified against npm)
+- [x] Verify/generalize fetch script handles the new entries (accepts any --agent filter; help text
+      updated). NOTE: full fetch + file(1) arch check + `--version` smoke test are Mac-side
+      validations (cross-platform entries skip smoke test by design) — exercised at first
+      production build on darwin, same as existing claude/codex entries
+- [x] Add `'opencode'` to `AgentId` + `AGENTS` registry in `src/agent/types.ts`
+      (incl. `requiresApiKey: 'byok'` type extension; label "OpenCode" per Q2)
 
 ## Phase 3: Provider keys for OpenCode (R3a — revised 2026-06-01)
 
