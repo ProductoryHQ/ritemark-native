@@ -84,7 +84,8 @@ export interface ConversationDocument {
 export interface SavedConversationRaw {
   id: string;
   title: string;
-  agentId: AgentId;
+  /** May contain 'ritemark-agent' for backward-compat with old saved conversations */
+  agentId: AgentId | 'ritemark-agent';
   createdAt: number;
   updatedAt: number;
   agentConversation: AgentConversationTurn[];

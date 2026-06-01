@@ -13,7 +13,8 @@ import type { RuntimeId, ConversationRun } from './conversationModel';
 export interface SavedConversation {
   id: string;
   title: string;
-  agentId: AgentId;
+  /** May contain 'ritemark-agent' for backward-compat with old saved conversations */
+  agentId: AgentId | 'ritemark-agent';
   createdAt: number;
   updatedAt: number;
 }
@@ -22,7 +23,8 @@ export interface SavedConversation {
 export interface SavedConversationV2 {
   id: string;
   title: string;
-  agentId?: AgentId;
+  /** May contain 'ritemark-agent' for backward-compat with old saved conversations */
+  agentId?: AgentId | 'ritemark-agent';
   primaryRuntimeId?: RuntimeId;
   runtimeSummary: RuntimeId[];
   createdAt: number;
@@ -34,6 +36,7 @@ export interface SavedConversationData extends SavedConversation {
   codexConversation?: CodexConversationTurn[];
   chatMessages: ChatMessage[];
   conversationHistory: ConversationEntry[];
+  // agentId inherited from SavedConversation (may be 'ritemark-agent' for legacy compat)
 }
 
 /** v2 data record — preserves old fields for downgrade compatibility */
@@ -62,7 +65,7 @@ export function enableV2Storage(): void {
 
 // ── Metadata normalization ────────────────────────────────────────────
 
-function agentIdToRuntimeId(agentId: AgentId): RuntimeId {
+function agentIdToRuntimeId(agentId: AgentId | 'ritemark-agent'): RuntimeId {
   if (agentId === 'claude-code') return 'claude-code';
   if (agentId === 'codex') return 'codex';
   return 'legacy-ritemark';

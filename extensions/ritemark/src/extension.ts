@@ -18,7 +18,6 @@ import { RitemarkSettingsProvider } from './settings/RitemarkSettingsProvider';
 import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLMNodeExecutor';
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
 import { registerFlowTestCommand } from './flows/FlowTestRunner';
-import { DocumentIndexer } from './rag/indexer';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
 import { initAnalytics, shutdownAnalytics } from './analytics/posthog';
@@ -50,8 +49,6 @@ let flowScheduler: FlowScheduler | null = null;
 // Settings provider
 let settingsProvider: RitemarkSettingsProvider | null = null;
 
-// RAG infrastructure
-let documentIndexer: DocumentIndexer | null = null;
 const DEFAULT_DRAFTS_DIR_NAME = 'Ritemark';
 
 function buildCsvTemplate(columns = 10, rows = 20): string {
@@ -683,78 +680,8 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register reindex command (initializes indexer on-demand if needed)
-  context.subscriptions.push(
-    vscode.commands.registerCommand('ritemark.reindexDocuments', async () => {
-      if (!documentIndexer) {
-        const wp = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!wp) {
-          vscode.window.showWarningMessage('Open a folder first to index documents.');
-          return;
-        }
-        documentIndexer = new DocumentIndexer({ workspacePath: wp });
-        await documentIndexer.init();
-        documentIndexer.onProgress((p) => {
-          unifiedViewProvider.sendIndexProgress(p.processed, p.total, p.current);
-        });
-      }
-      try {
-        const result = await documentIndexer!.indexAll();
-        unifiedViewProvider.sendIndexDone();
-        if (result.errors.length > 0) {
-          // Show first error, offer to see all
-          const firstError = result.errors[0];
-          const action = await vscode.window.showWarningMessage(
-            `Indexed ${result.processed} docs with ${result.errors.length} error(s). First: ${firstError}`,
-            'Show All Errors'
-          );
-          if (action === 'Show All Errors') {
-            const errorList = result.errors.map((e, i) => `${i + 1}. ${e}`).join('\n');
-            vscode.window.showInformationMessage(errorList, { modal: true });
-          }
-        } else {
-          const stats = await documentIndexer!.getStats();
-          vscode.window.showInformationMessage(
-            `Indexed ${result.processed} documents (${stats.totalChunks} chunks)`
-          );
-        }
-      } catch (err) {
-        unifiedViewProvider.sendIndexDone();
-        const msg = err instanceof Error ? err.message : String(err);
-        console.log('[RAG] Indexing error:', msg);
-      }
-    })
-  );
-
-  // Register cancel indexing command
-  context.subscriptions.push(
-    vscode.commands.registerCommand('ritemark.cancelIndexing', () => {
-      documentIndexer?.cancelIndexing();
-    })
-  );
-
-  // Initialize RAG indexer (if workspace available)
-  if (workspacePath) {
-    documentIndexer = new DocumentIndexer({ workspacePath });
-
-    // Initialize vector store asynchronously
-    documentIndexer.init().catch(() => {
-      // Vector store init failed - RAG features won't work
-    });
-
-    // Send progress to sidebar during indexing
-    documentIndexer.onProgress((p) => {
-      unifiedViewProvider.sendIndexProgress(p.processed, p.total, p.current);
-    });
-
-    // Show existing index status on startup (no auto-indexing)
-    setTimeout(() => {
-      unifiedViewProvider.updateIndexStatus();
-    }, 2000);
-  }
 }
 
 export async function deactivate() {
   await shutdownAnalytics();
-  documentIndexer?.dispose();
 }

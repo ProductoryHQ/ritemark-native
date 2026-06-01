@@ -169,7 +169,7 @@ function testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns() {
   }
 }
 
-function testCancelRequestFallsBackToLegacyChatCancelWhenNeitherRuntimeIsRunning() {
+function testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning() {
   const posted: unknown[] = [];
   const originalPostMessage = vscode.postMessage;
   vscode.postMessage = (message: unknown) => { posted.push(message); };
@@ -184,10 +184,6 @@ function testCancelRequestFallsBackToLegacyChatCancelWhenNeitherRuntimeIsRunning
     useAISidebarStore.getState().cancelRequest();
 
     assert.ok(
-      posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'ai-cancel'),
-      'cancelRequest must fall back to legacy ai-cancel when no agent runtime is running'
-    );
-    assert.ok(
       !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'codex-cancel'),
       'cancelRequest must not send codex-cancel when Codex is not running'
     );
@@ -195,6 +191,7 @@ function testCancelRequestFallsBackToLegacyChatCancelWhenNeitherRuntimeIsRunning
       !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'ai-cancel-agent'),
       'cancelRequest must not send ai-cancel-agent when Claude is not running'
     );
+    assert.equal(posted.length, 0, 'cancelRequest must post no messages when neither runtime is running');
   } finally {
     vscode.postMessage = originalPostMessage;
     resetStore();
@@ -207,7 +204,7 @@ function main() {
   testCancelRequestRoutesToCodexWhenCodexIsRunning();
   testCancelRequestRoutesToClaudeWhenClaudeIsRunning();
   testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns();
-  testCancelRequestFallsBackToLegacyChatCancelWhenNeitherRuntimeIsRunning();
+  testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning();
   console.log('Runtime switching tests passed.');
 }
 

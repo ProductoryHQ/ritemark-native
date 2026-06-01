@@ -17,6 +17,7 @@ import {
   setWorkspaceContext,
   type SavedConversationV2,
 } from './chatHistoryStorage';
+import type { LegacyRitemarkConversationRun } from './conversationModel';
 import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult, shouldRequestPlanMode } from './lifecycle';
 import type {
   AgentId,
@@ -25,7 +26,6 @@ import type {
   ChatMessage,
   ConversationEntry,
   EditorSelection,
-  RAGCitation,
   WidgetData,
   AgentConversationTurn,
   AgentPlanApprovalRequest,
@@ -36,8 +36,6 @@ import type {
   FileAttachment,
   DiscoveredAgent,
   DiscoveredCommand,
-  IndexStatus,
-  IndexProgress,
   AgentEnvironmentStatus,
   SetupStatus,
   ExtensionMessage,
@@ -145,12 +143,13 @@ interface AISidebarState {
   activeFilePath: string | null;
   currentBrowserContext: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null;
 
-  // ── Chat state (Ritemark Agent) ──
+  // ── Chat state (legacy read-only compat) ──
   chatMessages: ChatMessage[];
   conversationHistory: ConversationEntry[];
   streamingContent: string;
   isStreaming: boolean;
-  pendingCitations: RAGCitation[];
+  /** Populated when a saved legacy-ritemark conversation is loaded. Read-only — no send path. */
+  legacyConversation: LegacyRitemarkConversationRun | null;
 
   // ── Agent state (Claude Code) ──
   agentConversation: AgentConversationTurn[];
@@ -185,11 +184,6 @@ interface AISidebarState {
   onboardingDismissed: boolean;
   onboardingInstallStates: Record<OnboardingDependency, OnboardingInstallState>;
 
-  // ── Index state ──
-  indexStatus: IndexStatus;
-  indexProgress: IndexProgress | null;
-  isIndexing: boolean;
-
   // ── Discovered agents/commands from .claude/ ──
   discoveredAgents: DiscoveredAgent[];
   discoveredCommands: DiscoveredCommand[];
@@ -215,7 +209,6 @@ interface AISidebarState {
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
   setPendingRuntime: (partial: Partial<{ runtimeId: 'claude-code' | 'codex'; modelId: string; mode: 'plan' | 'edit' }>) => void;
-  sendChatMessage: (prompt: string) => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
   /**
@@ -234,9 +227,6 @@ interface AISidebarState {
   applyWidget: (widget: WidgetData) => void;
   discardWidget: (messageId: string) => void;
   configureApiKey: () => void;
-  reindex: () => void;
-  cancelIndex: () => void;
-  openSource: (filePath: string, page?: number) => void;
   clearChat: () => void;
   startInstall: () => void;
   startLogin: () => void;
@@ -300,7 +290,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   conversationHistory: [],
   streamingContent: '',
   isStreaming: false,
-  pendingCitations: [],
+  legacyConversation: null,
 
   agentConversation: [],
 
@@ -334,10 +324,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     'codex-cli': 'unknown',
   },
 
-  indexStatus: { totalDocs: 0, totalChunks: 0 },
-  indexProgress: null,
   chatFontSize: 13,
-  isIndexing: false,
   discoveredAgents: [],
   discoveredCommands: [],
   pinnedAgent: null,
@@ -383,33 +370,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   setPendingRuntime: (partial) => {
     set({ pendingRuntime: { ...get().pendingRuntime, ...partial } });
-  },
-
-  sendChatMessage: (prompt) => {
-    const state = get();
-    if (state.isStreaming) return;
-
-    const userMsg: ChatMessage = {
-      id: nextId(),
-      role: 'user',
-      content: prompt,
-      timestamp: Date.now(),
-    };
-
-    set({
-      chatMessages: [...state.chatMessages, userMsg],
-      conversationHistory: [...state.conversationHistory, { role: 'user', content: prompt }],
-      isStreaming: true,
-      streamingContent: '',
-      pendingCitations: [],
-    });
-
-    vscode.postMessage({
-      type: 'ai-execute',
-      prompt,
-      selection: state.selection,
-      conversationHistory: [...state.conversationHistory, { role: 'user', content: prompt }],
-    });
   },
 
   sendAgentMessage: (prompt, attachments?, options?) => {
@@ -596,9 +556,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         };
       }
       set({ agentConversation: conv });
-    } else {
-      vscode.postMessage({ type: 'ai-cancel' });
-      set({ isStreaming: false, streamingContent: '' });
     }
   },
 
@@ -630,18 +587,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   configureApiKey: () => {
     vscode.postMessage({ type: 'ai-configure-key' });
-  },
-
-  reindex: () => {
-    vscode.postMessage({ type: 'reindex' });
-  },
-
-  cancelIndex: () => {
-    vscode.postMessage({ type: 'cancelIndex' });
-  },
-
-  openSource: (filePath, page) => {
-    vscode.postMessage({ type: 'open-source', filePath, page });
   },
 
   startInstall: () => {
@@ -936,7 +881,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       } else if (status.codexCliAuthenticated) {
         get().selectAgent('codex');
       }
-      // Ritemark Agent is lowest priority — only if user explicitly has OpenAI key
     }
   },
 
@@ -995,21 +939,50 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       agentConv = [];
     }
 
+    // Coerce legacy 'ritemark-agent' agentId to 'claude-code' — legacy agent is
+    // no longer selectable; legacy conversations are read-only via compat shim.
+    const isLegacyAgent = data.agentId === 'ritemark-agent';
+    const loadedAgentId: AgentId =
+      data.agentId === 'claude-code' || data.agentId === 'codex'
+        ? data.agentId
+        : 'claude-code';
+
+    // Build a LegacyRitemarkConversationRun so AISidebar can display it read-only
+    // when agentConversation and codexConversation are both empty.
+    const chatMessages = data.chatMessages || [];
+    const conversationHistory = data.conversationHistory || [];
+    const hasOnlyLegacyMessages =
+      chatMessages.length > 0 && agentConv.length === 0 && codexConv.length === 0;
+    let legacyConversation: LegacyRitemarkConversationRun | null = null;
+    if (isLegacyAgent || hasOnlyLegacyMessages) {
+      const firstUserMsg = chatMessages.find((m) => m.role === 'user');
+      legacyConversation = {
+        id: `${id}-legacy`,
+        runtimeId: 'legacy-ritemark',
+        userPrompt: firstUserMsg?.content ?? '',
+        status: 'complete',
+        timestamp: chatMessages[0]?.timestamp ?? data.createdAt,
+        completedAt: data.updatedAt,
+        providerTurn: { messages: chatMessages, conversationHistory },
+      };
+    }
+
     const contextState = computeContextState(agentConv);
     set({
       currentConversationId: id,
-      selectedAgent: data.agentId,
+      selectedAgent: loadedAgentId,
       agentConversation: agentConv,
       codexConversation: codexConv,
       dismissedCurrentPlanKey: null,
-      chatMessages: data.chatMessages || [],
-      conversationHistory: data.conversationHistory || [],
+      chatMessages,
+      conversationHistory,
+      legacyConversation,
       showHistoryPanel: false,
       ...contextState,
     });
 
     // Update agent selection in extension
-    vscode.postMessage({ type: 'ai-select-agent', agentId: data.agentId });
+    vscode.postMessage({ type: 'ai-select-agent', agentId: loadedAgentId });
   },
 
   deleteSavedConversation: (id) => {
@@ -1022,6 +995,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         currentConversationId: null,
         chatMessages: [],
         conversationHistory: [],
+        legacyConversation: null,
         agentConversation: [],
         codexConversation: [],
         dismissedCurrentPlanKey: null,
@@ -1053,7 +1027,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       conversationHistory: [],
       streamingContent: '',
       isStreaming: false,
-      pendingCitations: [],
+      legacyConversation: null,
       agentConversation: [],
       codexConversation: [],
       dismissedCurrentPlanKey: null,
@@ -1080,7 +1054,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       conversationHistory: [],
       streamingContent: '',
       isStreaming: false,
-      pendingCitations: [],
+      legacyConversation: null,
       agentConversation: [],
       codexConversation: [],
       dismissedCurrentPlanKey: null,
@@ -1233,7 +1207,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           id: nextId(),
           role: 'assistant',
           content: message.message || '',
-          citations: message.hasRagContext ? state.pendingCitations : undefined,
           timestamp: Date.now(),
         };
         set({
@@ -1250,10 +1223,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         setTimeout(() => get().saveCurrentConversation(), 100);
         break;
       }
-
-      case 'rag-results':
-        set({ pendingCitations: message.results });
-        break;
 
       case 'ai-widget': {
         const preview =
@@ -1308,7 +1277,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           conversationHistory: [],
           streamingContent: '',
           isStreaming: false,
-          pendingCitations: [],
           agentConversation: [],
           codexConversation: [],
           dismissedCurrentPlanKey: null,
@@ -1322,29 +1290,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       case 'files-dropped':
         // Dispatch to ChatInput via DOM event (ChatInput manages its own pathChips state)
         window.dispatchEvent(new CustomEvent('ritemark:files-dropped', { detail: message.paths }));
-        break;
-
-      case 'index-status':
-        set({
-          indexStatus: { totalDocs: message.totalDocs, totalChunks: message.totalChunks },
-          isIndexing: false,
-          indexProgress: null,
-        });
-        break;
-
-      case 'index-progress':
-        set({
-          isIndexing: true,
-          indexProgress: {
-            processed: message.processed,
-            total: message.total,
-            current: message.current,
-          },
-        });
-        break;
-
-      case 'index-done':
-        set({ isIndexing: false, indexProgress: null });
         break;
 
       case 'agent-progress': {

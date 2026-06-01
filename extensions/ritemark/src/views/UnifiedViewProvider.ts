@@ -1,23 +1,15 @@
 /**
  * Unified AI View Provider
- * Merges AI Assistant + RAG into one chat in the left sidebar (Primary Sidebar).
- *
- * Features:
- * - Smart context detection (selection → edit, question → RAG search)
- * - Document search with citations
- * - Text editing (rephrase, find-replace, insert)
- * - Index status footer
+ * Hosts the AI chat sidebar (Primary Sidebar) for the Claude Code and Codex runtimes.
  */
 
 import * as vscode from 'vscode';
 import {
-  executeCommand,
   getAPIKeyManager,
   apiKeyChanged,
   isOnline,
   connectivityChanged,
-  type EditorSelection,
-  type ConversationMessage
+  type EditorSelection
 } from '../ai/index';
 
 // Read once at module load — Node's require cache makes this effectively a
@@ -39,8 +31,6 @@ const CLAUDE_AGENT_SDK_VERSION: string | null = (() => {
 // status refresh) — see `_handleExternalClaudeStatusInvalidation`.
 let cachedDiscoveredClaudeModels: ModelOption[] | null = null;
 let claudeModelDiscoveryInFlight = false;
-import { searchDocuments, buildRAGContext, RAGSearchResult } from '../rag/search';
-import { VectorStore, getDefaultDbPath } from '../rag/vectorStore';
 import {
   AgentSession,
   AGENTS,
@@ -205,7 +195,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _agentSession: AgentSession | null = null;
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
-  private _vectorStore: VectorStore | null = null;
 
   // Codex state
   private _codexAppServer: CodexAppServer | null = null;
@@ -227,28 +216,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     private readonly _workspacePath: string | undefined,
     private readonly _secrets?: vscode.SecretStorage
   ) {
-    // Initialize vector store if workspace is available
-    if (_workspacePath) {
-      this._initVectorStore(_workspacePath);
-    }
-
     this._disposeCodexStatusListener = onCodexStatusInvalidated((event) => {
       void this._handleExternalCodexStatusInvalidation(event.reason);
     });
     this._disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
       void this._handleExternalClaudeStatusInvalidation(event.reason);
     });
-  }
-
-  private async _initVectorStore(workspacePath: string): Promise<void> {
-    try {
-      const dbPath = getDefaultDbPath(workspacePath);
-      this._vectorStore = new VectorStore(dbPath);
-      await this._vectorStore.init();
-    } catch (err) {
-      console.warn('[UnifiedViewProvider] Vector store init failed:', err);
-      this._vectorStore = null;
-    }
   }
 
   /**
@@ -293,7 +266,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'ready':
           this._sendApiKeyStatus();
           this._sendConnectivityStatus();
-          this._sendIndexStatus();
           // Await agent config first — it boots Codex runtime and hydrates auth.
           // Onboarding status needs that to correctly detect authenticated users.
           await this._sendAgentConfig();
@@ -305,14 +277,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'ai-configure-key':
           vscode.commands.executeCommand('ritemark.configureApiKey');
-          break;
-
-        case 'ai-execute':
-          await this._handleExecute(
-            message.prompt,
-            message.selection,
-            message.conversationHistory || []
-          );
           break;
 
         case 'ai-cancel':
@@ -328,19 +292,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             message.args as Record<string, unknown>,
             message.selection as EditorSelection
           );
-          break;
-
-        case 'reindex':
-          vscode.commands.executeCommand('ritemark.reindexDocuments');
-          break;
-
-        case 'cancelIndex':
-          vscode.commands.executeCommand('ritemark.cancelIndexing');
-          break;
-
-        case 'open-source':
-          // Open source document at specific location
-          this._openSourceDocument(message.filePath, message.page);
           break;
 
         case 'ai-select-agent':
@@ -596,37 +547,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  /**
-   * Update index status in the UI (called by indexer when docs change)
-   */
-  public updateIndexStatus() {
-    this._sendIndexStatus();
-  }
-
-  /**
-   * Send indexing progress to webview (called during indexing)
-   */
-  public sendIndexProgress(processed: number, total: number, current: string) {
-    this._view?.webview.postMessage({
-      type: 'index-progress',
-      processed,
-      total,
-      current,
-    });
-  }
-
-  /**
-   * Signal indexing completed to webview
-   */
-  public async sendIndexDone() {
-    this._view?.webview.postMessage({ type: 'index-done' });
-    // Reload vector store from disk to get fresh stats
-    if (this._vectorStore) {
-      await this._vectorStore.init();
-    }
-    this._sendIndexStatus();
-  }
-
   public show() {
     if (this._view) {
       this._view.show(true);
@@ -668,7 +588,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   public dispose() {
     this._agentSession?.close();
-    this._vectorStore?.close();
     this._codexAppServer?.dispose();
     this._stopCodexLoginPolling();
     this._stopClaudeLoginPolling();
@@ -2007,138 +1926,12 @@ ${prompt}`;
     }
   }
 
-  private async _sendIndexStatus() {
-    if (!this._vectorStore) {
-      this._view?.webview.postMessage({
-        type: 'index-status',
-        totalDocs: 0,
-        totalChunks: 0,
-        sources: []
-      });
-      return;
-    }
-
-    try {
-      const stats = await this._vectorStore.getStats();
-      this._view?.webview.postMessage({
-        type: 'index-status',
-        totalDocs: stats.totalSources,
-        totalChunks: stats.totalChunks,
-        sources: stats.sources
-      });
-    } catch {
-      this._view?.webview.postMessage({
-        type: 'index-status',
-        totalDocs: 0,
-        totalChunks: 0,
-        sources: []
-      });
-    }
-  }
-
-  /**
-   * Smart context detection + execution.
-   * If text is selected → editing mode.
-   * If question about docs → RAG mode.
-   */
-  private async _handleExecute(
-    prompt: string,
-    selection: EditorSelection,
-    conversationHistory: ConversationMessage[]
-  ) {
-    this._activeAbortController = new AbortController();
-    const abortSignal = this._activeAbortController.signal;
-
-    const activeSelection = selection.isEmpty ? this._currentSelection : selection;
-    const hasSelection = !activeSelection.isEmpty && activeSelection.text.length > 0;
-
-    try {
-      // Determine mode: RAG or Edit
-      let ragContext = '';
-      let ragResults: RAGSearchResult[] = [];
-
-      if (!hasSelection && this._vectorStore) {
-        // No text selected → try RAG search
-        ragResults = await searchDocuments(this._vectorStore, prompt, { topK: 5 });
-        if (ragResults.length > 0) {
-          ragContext = buildRAGContext(ragResults);
-
-          // Send RAG results to webview for citation display
-          this._view?.webview.postMessage({
-            type: 'rag-results',
-            results: ragResults.map(r => ({
-              source: r.source,
-              page: r.page,
-              section: r.section,
-              score: r.score,
-              citation: r.citation,
-              snippet: r.content.substring(0, 150) + '...'
-            }))
-          });
-        }
-      }
-
-      // Build enhanced prompt with RAG context
-      const enhancedPrompt = ragContext
-        ? `Context from workspace documents:\n${ragContext}\n\nUser question: ${prompt}`
-        : prompt;
-
-      const result = await executeCommand(
-        enhancedPrompt,
-        this._documentContent,
-        activeSelection,
-        conversationHistory,
-        (content: string) => {
-          this._view?.webview.postMessage({ type: 'ai-streaming', content });
-        },
-        abortSignal
-      );
-
-      this._activeAbortController = null;
-
-      if (result.success) {
-        if (result.toolCall) {
-          this._view?.webview.postMessage({
-            type: 'ai-widget',
-            toolName: result.toolCall.name,
-            args: result.toolCall.arguments,
-            selection: activeSelection
-          });
-        } else {
-          this._view?.webview.postMessage({
-            type: 'ai-result',
-            success: true,
-            message: result.message,
-            hasRagContext: ragResults.length > 0
-          });
-        }
-      } else {
-        if (result.error === '__USER_STOPPED__') {
-          this._view?.webview.postMessage({ type: 'ai-stopped' });
-        } else {
-          this._view?.webview.postMessage({ type: 'ai-error', error: result.error });
-        }
-      }
-    } catch (error) {
-      this._activeAbortController = null;
-      this._view?.webview.postMessage({
-        type: 'ai-error',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  }
-
   private _executeToolInEditor(
     toolName: string,
     args: Record<string, unknown>,
     selection: EditorSelection
   ) {
     vscode.commands.executeCommand('ritemark.executeAITool', { toolName, args, selection });
-  }
-
-  private _openSourceDocument(filePath: string, page?: number) {
-    const uri = vscode.Uri.file(filePath);
-    vscode.commands.executeCommand('vscode.open', uri);
   }
 
   /**

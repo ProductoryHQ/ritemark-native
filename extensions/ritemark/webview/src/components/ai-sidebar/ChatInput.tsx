@@ -175,7 +175,6 @@ export function ChatInput() {
   const selectModel = useAISidebarStore((s) => s.selectModel);
   const selectCodexModel = useAISidebarStore((s) => s.selectCodexModel);
   const setPendingRuntime = useAISidebarStore((s) => s.setPendingRuntime);
-  const sendChatMessage = useAISidebarStore((s) => s.sendChatMessage);
   const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
   const cancelRequest = useAISidebarStore((s) => s.cancelRequest);
   const discoveredAgents = useAISidebarStore((s) => s.discoveredAgents);
@@ -256,10 +255,8 @@ export function ChatInput() {
 
     if (isCodex) {
       sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined, pendingRuntime.mode, hideBrowserContext);
-    } else if (isClaudeCode) {
-      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext: hideBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
     } else {
-      sendChatMessage(prompt);
+      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext: hideBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
     }
     setValue('');
     setAttachments([]);
@@ -274,7 +271,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendChatMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
   const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
@@ -311,11 +308,7 @@ export function ChatInput() {
             '  /cancel — Cancel current request\n' +
             '  /cost — Show cost of last turn\n' +
             '  /help — Show this help';
-          if (isClaudeCode) {
-            sendAgentMessage(helpText);
-          } else {
-            sendChatMessage(helpText);
-          }
+          sendAgentMessage(helpText);
           break;
         }
         case 'settings':
@@ -333,11 +326,7 @@ export function ChatInput() {
             const duration = m.durationMs ? `${(m.durationMs / 1000).toFixed(1)}s` : 'N/A';
             const model = m.model || 'unknown';
             const msg = `Last turn: ${cost} | ${duration} | ${model}`;
-            if (isClaudeCode) {
-              sendAgentMessage(msg);
-            } else {
-              sendChatMessage(msg);
-            }
+            sendAgentMessage(msg);
           }
           break;
         }
@@ -345,7 +334,7 @@ export function ChatInput() {
       setValue('');
       setShowCommandPopup(false);
     },
-    [clearChat, startNewConversation, toggleHistoryPanel, openApiKeySettings, cancelRequest, agentConversation, isClaudeCode, sendAgentMessage, sendChatMessage]
+    [clearChat, startNewConversation, toggleHistoryPanel, openApiKeySettings, cancelRequest, agentConversation, isClaudeCode, sendAgentMessage]
   );
 
   const handleKeyDown = useCallback(
@@ -367,11 +356,7 @@ export function ChatInput() {
           if (parsed.command.action === 'custom') {
             // Custom commands are sent as slash-command prompts to the agent
             const prompt = `/${parsed.command.id}${parsed.args ? ' ' + parsed.args : ''}`;
-            if (isClaudeCode) {
-              sendAgentMessage(prompt);
-            } else {
-              sendChatMessage(prompt);
-            }
+            sendAgentMessage(prompt);
             setValue('');
             setShowCommandPopup(false);
           } else {
@@ -493,18 +478,14 @@ export function ChatInput() {
       if (command.action === 'custom') {
         // Custom commands are sent as slash-command prompts to the agent
         const prompt = `/${command.id}`;
-        if (isClaudeCode) {
-          sendAgentMessage(prompt);
-        } else {
-          sendChatMessage(prompt);
-        }
+        sendAgentMessage(prompt);
         setValue('');
         setShowCommandPopup(false);
       } else {
         executeCommandAction(command.action);
       }
     },
-    [executeCommandAction, isClaudeCode, sendAgentMessage, sendChatMessage]
+    [executeCommandAction, sendAgentMessage]
   );
 
   // Handle command popup close

@@ -5,7 +5,6 @@
 
 import { Icon } from '../ui/Icon';
 import { RenderedMarkdown } from './RenderedMarkdown';
-import { CitationChips } from './CitationChips';
 import { WidgetPreview } from './WidgetPreview';
 import type { ChatMessage as ChatMessageType } from './types';
 
@@ -44,7 +43,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
   return (
     <div style={chatFontStyle}>
       <RenderedMarkdown content={message.content} />
-      {message.citations && <CitationChips citations={message.citations} />}
       {message.widget && (
         <WidgetPreview widget={message.widget} messageId={message.id} />
       )}

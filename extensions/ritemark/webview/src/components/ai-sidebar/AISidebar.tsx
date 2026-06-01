@@ -9,16 +9,14 @@ import { useEffect } from 'react';
 import { useAISidebarStore } from './store';
 import { vscode } from '../../lib/vscode';
 import { OfflineBanner } from './OfflineBanner';
-import { NoApiKey } from './NoApiKey';
 import { OnboardingWizard } from './OnboardingWizard';
 import { SetupWizard } from './SetupWizard';
-import { ChatView } from './ChatView';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
 import { UnifiedConversationView } from './UnifiedConversationView';
+import { LegacyConversationView } from './LegacyConversationView';
 import { CodexSetupView } from './CodexSetupView';
 import { ChatInput } from './ChatInput';
-import { IndexFooter } from './IndexFooter';
 import { SelectionIndicator } from './SelectionIndicator';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
 import { ActivePlanBanner } from './ActivePlanBanner';
@@ -28,7 +26,6 @@ import type { ExtensionMessage } from './types';
 
 export function AISidebar() {
   const handleMessage = useAISidebarStore((s) => s.handleExtensionMessage);
-  const hasApiKey = useAISidebarStore((s) => s.hasApiKey);
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const ready = useAISidebarStore((s) => s.ready);
   const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
@@ -101,6 +98,7 @@ export function AISidebar() {
   const chatFontSize = useAISidebarStore((s) => s.chatFontSize);
   const agentConversation = useAISidebarStore((s) => s.agentConversation);
   const codexConversation = useAISidebarStore((s) => s.codexConversation);
+  const legacyConversation = useAISidebarStore((s) => s.legacyConversation);
 
   // Initialize chat font size CSS variable
   useEffect(() => {
@@ -114,8 +112,6 @@ export function AISidebar() {
 
   const isClaudeCode = selectedAgent === 'claude-code';
   const isCodex = selectedAgent === 'codex';
-  const isAgentMode = isClaudeCode || isCodex;
-  const needsOpenAIKey = !isAgentMode && !hasApiKey;
   const needsSetup = isClaudeCode && setupStatus !== null
     && setupStatus.state !== 'ready';
   const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
@@ -146,11 +142,6 @@ export function AISidebar() {
       {/* Onboarding wizard — shown on first run when no agent is ready */}
       {ready && onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed ? (
         <OnboardingWizard />
-      ) : ready && needsOpenAIKey ? (
-        <>
-          <NoApiKey />
-          <ChatInput />
-        </>
       ) : ready && (needsSetup || showWelcome) ? (
         <>
           <SelectionIndicator />
@@ -174,9 +165,10 @@ export function AISidebar() {
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {agentConversation.length > 0 || codexConversation.length > 0
               ? <UnifiedConversationView />
+              : legacyConversation !== null
+              ? <LegacyConversationView />
               : isCodex ? <CodexView />
-              : isClaudeCode ? <AgentView />
-              : <ChatView />}
+              : <AgentView />}
           </div>
 
           {/* Shared input */}
@@ -193,8 +185,6 @@ export function AISidebar() {
         </>
       )}
 
-      {/* Index footer — only for Ritemark Agent (RAG) */}
-      {!isAgentMode && <IndexFooter />}
     </div>
   );
 }
