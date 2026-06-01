@@ -72,22 +72,20 @@ Acceptance criteria:
 - Agents with one or more validation errors show a yellow warning chip in the Agent Library item row. Hovering the chip shows the first error string.
 - Agents with no validation errors show no chip.
 
-### R5: `ritemark.agentEditor` custom editor
+### R5: Agent mode in existing `ritemark.editor`
 
-As an agent author, I want opening an agent definition file (`.claude/agents/*.md`) to show a structured editor instead of raw Markdown text, so I can configure agents without manually editing YAML.
+As an agent author, I want opening an agent definition file (`.claude/agents/*.md`) to automatically reveal a structured Configurator panel inside the normal Ritemark editor, so I can configure agents without manually editing YAML.
 
 Acceptance criteria:
 
-- A new `AgentEditorProvider` implements `vscode.CustomTextEditorProvider` and is registered in `package.json` as a custom editor with:
-  - `viewType: 'ritemark.agentEditor'`
-  - `selector: [{ "filenamePattern": "**/.claude/agents/*.md" }]`
-  - `priority: "default"`
-- Opening a file matching `**/.claude/agents/*.md` launches the agent editor webview instead of VS Code's text editor.
-- The agent editor webview is served from a new Vite bundle entry (`agent-editor.js`), loaded via a dedicated HTML file.
-- The webview displays a two-panel layout: a TipTap body editor on the left (~60% width) for the free-text body of the `.md` file, and a Configurator panel on the right (~40% width) for structured frontmatter fields.
-- The TipTap body editor is initialised with the file content below the frontmatter block (i.e. everything after the closing `---` line).
-- Changes in the TipTap body are reflected back to the `.md` file via `vscode.workspace.applyEdit`.
-- The webview is initialised with the current file state on open. When the file is modified externally (e.g. by git or another editor), the webview refreshes.
+- The existing `RitemarkEditorProvider` (which registers `ritemark.editor`) detects when the active document path matches `**/.claude/agents/*.md` and sets `isAgentMode: true` in the `init` message it sends to the webview.
+- No new `CustomTextEditorProvider`, no new Vite bundle entry, no new HTML entry point. The agent panel is an extension of the **existing** `webview.js` bundle and `App.tsx`.
+- In `App.tsx`, `activePanel` state is extended from `'none' | 'toc' | 'properties'` to `'none' | 'toc' | 'properties' | 'agent'`.
+- When `isAgentMode` is `true`, `activePanel` is automatically set to `'agent'` and the `AgentConfiguratorPanel` is rendered in the left-panel slot (width 220px, same slot as `InlineTableOfContents` and `PropertiesSidePanel`).
+- The `AgentConfiguratorPanel` component mirrors `PropertiesSidePanel` structure exactly: `w-[220px] flex-shrink-0 h-full overflow-y-auto border-r border-hairline`, inner `flex flex-col gap-3 px-4 py-4`.
+- When `isAgentMode` is `false` (any non-agent `.md` file), agent mode is not activated, the panel is not shown, and no behaviour changes.
+- The TipTap editor continues to show the file content below the frontmatter block. The frontmatter YAML is not visible in the TipTap body (unchanged from current behaviour).
+- When the file is modified externally, the webview refreshes using the existing `onDidChangeTextDocument` mechanism already in `RitemarkEditorProvider`.
 
 ### R6: Configurator panel
 
@@ -95,16 +93,15 @@ As an agent author, I want the Configurator panel to let me edit all supported f
 
 Acceptance criteria:
 
+- All Configurator UI uses **existing shadcn/ui components** from `webview/src/components/ui/` (`Input`, `Textarea`, `Select`, `Label`, `Checkbox`, `Switch`, `Badge`) with Tailwind CSS utility classes. No custom CSS is introduced for the panel — Ritemark design tokens flow through Tailwind. The panel structure mirrors `PropertiesSidePanel` exactly (see R5).
 - The Configurator panel exposes the following field groups, each described below:
-  - **Identity:** `name` (text input), `icon` (Phosphor icon picker), `color` (swatch picker — 8 Ritemark brand colors), `description` (textarea).
-  - **Runtime:** radio group with options `claude_local`, `codex_local`, `openai_api`, `anthropic_api`. Each option shows a small auth-status indicator (green dot = credentials present, grey dot = not configured). Credential presence is checked on the extension host and sent to the webview via an `authStatus` message.
-  - **Model:** dropdown scoped to the chosen runtime. Model lists are sourced from `extensions/ritemark/src/ai/modelConfig.ts` and delivered via a `modelConfig` message (same pattern as the main webview).
-  - **Schedule:** cron expression text input. When non-empty, shows a human-readable preview line below the input (e.g. "Every 6 hours") computed by `cronUtils.parseCronExpression()`.
-  - **Routine:** dropdown listing `.ritemark/flows/*.flow.json` files in the workspace, plus a "Create new flow…" option that scaffolds a new blank flow and selects it.
-  - **Skills:** multiselect from all discovered skills (both `.claude/skills/` and `.agents/skills/`), each item showing its provenance badge from R2.
-  - **Allowed Tools:** multiselect checkboxes. Default preset is `DEFAULT_TOOLS` from `AgentRunner.ts`.
-  - **Budget:** USD number input bound to `maxBudgetUsd`.
-  - **Worktree:** boolean toggle.
+  - **Identity:** `name` (shadcn `Input`), `icon` (Phosphor icon picker using shadcn `Select`), `color` (swatch row — 7 Ritemark brand colors as `button` swatches), `description` (shadcn `Textarea`).
+  - **Agent runtimes:** segmented control (`claude_local`, `codex_local`, `openai_api`, `anthropic_api`) using `ritemark-filter-chip` pattern (see ritemark-design components reference). Each option shows a `ritemark-dot` auth-status indicator (green = credentials present, grey = not configured). Credential presence is checked on the extension host and sent to the webview via an `authStatus` message.
+  - **Model:** shadcn `Select` scoped to the chosen runtime. Model lists from `modelConfig.ts` delivered via `modelConfig` message (same pattern as main webview).
+  - **Schedule:** shadcn `Input` for cron expression. Non-empty input shows a human-readable preview line (e.g. "Every 6 hours") computed by `cronUtils.parseCronExpression()`. Invalid expressions show "Invalid cron expression" in `--r-error` colour.
+  - **Linked flow:** shadcn `Select` listing `.ritemark/flows/*.flow.json` stems in the workspace, with a "＋ Create new flow…" option that scaffolds a blank flow and selects it. Helper text: "Flow to execute on schedule. Leave empty for manual-only agents." Bound to the `routine` frontmatter field.
+  - **Skills:** tag autocomplete input. Type to search from all discovered skills (30+ total from `.claude/skills/` and `.agents/skills/`). Selected skills appear as removable pill tags (`ritemark-pill-soft.is-accent`) each showing its provenance badge (R2). Tag autocomplete uses shadcn `Input` with a dropdown overlay showing matching skill options. Bound to the `skills` frontmatter array.
+  - **Allowed tools:** single-column list. Each row: shadcn `Checkbox`, tool name (56px fixed width, `font-medium`), short human-readable description (3–5 words, `text-ink-faint`). Tools: Read — "Read files from disk", Edit — "Make targeted file edits", Write — "Create or overwrite files", Bash — "Run terminal commands", Glob — "Find files by pattern", Grep — "Search file contents", Agent — "Spawn sub-agents", WebFetch — "Fetch URLs from the web", WebSearch — "Search the web". Default preset from `DEFAULT_TOOLS`. Bound to `allowedTools` frontmatter array.
 - Every field change immediately calls `vscode.workspace.applyEdit` to write the updated frontmatter back to the `.md` file. Edits are debounced 300 ms to avoid excessive file I/O.
 - The Configurator initialises from the parsed frontmatter when the webview opens. It reflects external edits (same mechanism as R5).
 - The TipTap body and Configurator panel share a single webview HTML context and communicate via local React state (no separate bridge).
@@ -140,7 +137,7 @@ Acceptance criteria:
 
 - No execution of scheduled agents in this sprint (Phase 2 work).
 - No Codex agent discovery via `.agents/agents/` — the directory convention does not exist and the scan is removed (see R1).
-- No changes to the main Ritemark Markdown editor (`ritemark.editor`).
+- No new `CustomTextEditorProvider` or separate webview bundle for agent editing — agent mode is an extension of `ritemark.editor`, not a replacement.
 - No UI for creating new flows from scratch (beyond the "Create new flow…" scaffold in the Routine dropdown of R6).
 - No sync of agent definitions to a remote server.
 - No changes to `.claude/agents/*.md` file format beyond what YAML frontmatter already supports.
@@ -152,7 +149,7 @@ Acceptance criteria:
 - **Sprint scope**: Full solution in one sprint — issue #70 (discovery fix) plus issue #69 Phase 1 (UX unification). Decided by Jarmo before sprint kickoff.
 - **Phase 1 mandatory items**: All four Phase 1 items from issue #69 are in scope: agentEditor custom editor, frontmatter extension + validator, sidebar merge, and schedule UI + K6 banner.
 - **Open questions from #69**: Resolved as follows — local timezone for cron previews; per-agent configurable approval (default: auto-approve); broken routine = warning + disable; no commands schedule support; auth-expiry = notify-on-next-open (Phase 2 recovery flow is deferred).
-- **agentEditor implementation**: New combined webview — brand new custom editor with TipTap body + Configurator panel in the same webview, not a sidebar panel. New Vite entry in `webview/vite.config.ts`.
+- **agentEditor implementation**: Agent mode in the **existing** `ritemark.editor`. No new Vite entry, no new bundle, no new CustomTextEditorProvider. `RitemarkEditorProvider` sends `isAgentMode: true` for `.claude/agents/*.md` files. `App.tsx` adds `'agent'` to the `activePanel` union and renders `AgentConfiguratorPanel` in the existing 220px left-panel slot (same width and structure as `PropertiesSidePanel`). Decided by Jarmo after prototype review.
 - **Flows section scope**: List + click-to-edit only. Run/schedule controls stay in the flow editor; R3 does not replicate the Flows panel's execution controls in the sidebar.
 - **Feature flags**: No flag for this sprint. All features on by default per CLAUDE.md hard rule.
 

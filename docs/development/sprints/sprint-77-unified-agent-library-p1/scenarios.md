@@ -223,20 +223,20 @@ When the user views the Runtime section
 Then the `anthropic_api` option shows a green auth-status dot
 And `openai_api` shows a grey dot if `OPENAI_API_KEY` is not set
 
-### Scenario: Routine dropdown lists available flows
+### Scenario: Linked flow dropdown lists available flows
 
 Given the workspace has flows at `.ritemark/flows/standup.flow.json` and `weekly.flow.json`
-When the Configurator Routine dropdown is opened
+When the Configurator "Linked flow" dropdown is opened
 Then both `standup` and `weekly` appear as options
-And a "Create new flow..." option is also present
+And a "＋ Create new flow…" option is also present at the bottom
 
 ### Scenario: Create new flow scaffolds a blank flow and selects it
 
-Given the user selects "Create new flow..." in the Routine dropdown
+Given the user selects "＋ Create new flow…" in the Linked flow dropdown
 And types the name `sprint-review`
 When the scaffold action completes
 Then a new `.ritemark/flows/sprint-review.flow.json` is created
-And the Routine dropdown automatically selects `sprint-review`
+And the Linked flow dropdown automatically selects `sprint-review`
 And the frontmatter `routine:` field is updated on disk
 
 ### Scenario: Skills multiselect saves back to frontmatter
@@ -245,12 +245,6 @@ Given the Configurator panel is open
 When the user checks `spec-driven-sprint` in the Skills multiselect
 And 300 ms elapses
 Then the `.md` file on disk contains `skills: [spec-driven-sprint]` in frontmatter
-
-### Scenario: Budget input writes maxBudgetUsd to frontmatter
-
-Given the Configurator panel is open
-When the user enters `5.00` in the Budget field
-Then the `.md` file on disk contains `maxBudgetUsd: 5` in frontmatter
 
 ## Feature: Schedule UI and K6 warning banner (R7)
 

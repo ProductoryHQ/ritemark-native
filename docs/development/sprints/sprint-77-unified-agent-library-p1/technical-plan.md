@@ -6,13 +6,13 @@ Sprint 77 touches three layers:
 
 1. **Extension host — discovery layer** (`extensions/ritemark/src/agent/discovery.ts`): Fixes the Codex discovery bug, adds provenance tracking and deduplication, extends frontmatter parsing to handle YAML arrays and numbers, and adds a frontmatter validator. All data flows from here to the views.
 
-2. **Extension host — views layer** (`extensions/ritemark/src/views/AgentLibraryViewProvider.ts`, `extensions/ritemark/src/views/AgentEditorProvider.ts`): The Agent Library gains a Flows section and provenance badge rendering. The new `AgentEditorProvider` registers as a custom text editor for `.claude/agents/*.md` files.
+2. **Extension host — views layer** (`extensions/ritemark/src/views/AgentLibraryViewProvider.ts`): The Agent Library gains a Flows section and provenance badge rendering. No new view provider is created.
 
-3. **Webview bundle** (`extensions/ritemark/webview/`): A new Vite entry (`agent-editor`) provides the React component tree for the agent editor — TipTap body on the left, Configurator panel on the right. This bundle is separate from the main `webview.js` bundle to keep the entry point clean.
+3. **Existing webview bundle** (`extensions/ritemark/webview/`): The **existing** `webview.js` bundle gains the `AgentConfiguratorPanel` component. No new Vite entry, no new HTML entry point. `App.tsx` gains `'agent'` in the `activePanel` union, which renders the 220px left panel when `isAgentMode` is true. The existing `ritemark.editor` (`RitemarkEditorProvider`) sends `isAgentMode: boolean` in the `init` message — true when the file path matches `**/.claude/agents/*.md`.
 
-4. **Extension entry** (`extensions/ritemark/src/extension.ts`, `extensions/ritemark/package.json`): The `ritemark-flows` activity bar container and `ritemark.flowsView` view registration are removed. The `ritemark.agentEditor` custom editor is registered.
+4. **Extension entry** (`extensions/ritemark/src/extension.ts`, `extensions/ritemark/package.json`): The `ritemark-flows` activity bar container and `ritemark.flowsView` view registration are removed. No new custom editor registration.
 
-Components that are NOT touched by this sprint: `ritemarkEditor.ts`, `FlowStorage.ts`, `FlowExecutor.ts`, `FlowScheduleState.ts`, the main `webview.js` bundle entry, and VS Code patches.
+Components that are NOT touched by this sprint: `FlowStorage.ts`, `FlowExecutor.ts`, `FlowScheduleState.ts`, VS Code patches, and the Vite build configuration.
 
 ---
 
@@ -211,65 +211,45 @@ This opens the `.flow.json` file via VS Code's default handler, which the existi
 
 ---
 
-## Workstream 4: agentEditor custom editor (R5 + R6)
+## Workstream 4: Agent mode in existing editor (R5 + R6)
 
 ### Files
 
-- `extensions/ritemark/src/views/AgentEditorProvider.ts` — NEW file
-- `extensions/ritemark/package.json` — register custom editor
-- `extensions/ritemark/webview/src/agent-editor/` — NEW React component tree
-- `extensions/ritemark/webview/vite.config.ts` — add `agent-editor` entry
-- `extensions/ritemark/webview/agent-editor.html` — NEW HTML entry point
+- `extensions/ritemark/src/views/RitemarkEditorProvider.ts` — add `isAgentMode` detection + new message fields to `init`
+- `extensions/ritemark/webview/src/App.tsx` — add `'agent'` to `activePanel` union, render `AgentConfiguratorPanel`
+- `extensions/ritemark/webview/src/components/agent/AgentConfiguratorPanel.tsx` — NEW component (220px panel)
+- `extensions/ritemark/webview/src/components/agent/ScheduleField.tsx` — NEW sub-component
+- `extensions/ritemark/webview/src/components/agent/ProvenanceBadge.tsx` — NEW sub-component (reusable)
 
-### AgentEditorProvider (extension host)
+No new Vite entry. No new HTML file. No new extension host provider.
 
-Implements `vscode.CustomTextEditorProvider`:
+### RitemarkEditorProvider changes (extension host)
 
-```typescript
-export class AgentEditorProvider implements vscode.CustomTextEditorProvider {
-  public static readonly viewType = 'ritemark.agentEditor';
-
-  public static register(context: vscode.ExtensionContext): vscode.Disposable {
-    return vscode.window.registerCustomEditorProvider(
-      AgentEditorProvider.viewType,
-      new AgentEditorProvider(context),
-      { supportsMultipleEditorsPerDocument: false }
-    );
-  }
-
-  async resolveCustomTextEditor(
-    document: vscode.TextDocument,
-    webviewPanel: vscode.WebviewPanel,
-    _token: vscode.CancellationToken
-  ): Promise<void> { ... }
-}
-```
-
-On `resolveCustomTextEditor`:
-1. Set `webviewPanel.webview.options = { enableScripts: true, localResourceRoots: [this._context.extensionUri] }`.
-2. Set `webviewPanel.webview.html` to the `agent-editor.html` contents with nonce and resource URIs injected.
-3. Parse the document text using `parseFrontmatter` (re-exported from `discovery.ts`) and send an `init` message to the webview:
+In `resolveCustomTextEditor` (or wherever the `init` message is built), detect agent mode:
 
 ```typescript
-type AgentEditorInitMessage = {
-  type: 'init';
-  frontmatter: Record<string, FrontmatterValue>;
-  body: string;              // content below closing ---
-  filePath: string;          // absolute path of the .md file
-  flows: string[];           // list of .flow.json stems in .ritemark/flows/
-  skills: DiscoveredCommand[]; // all discovered skills (with provenance)
-  authStatus: Record<string, boolean>; // { claude_local: true, ... }
-  modelConfig: ModelConfigMessage;     // same shape used by main webview
-};
+const isAgentMode = /[\/\\]\.claude[\/\\]agents[\/\\][^\/\\]+\.md$/.test(document.uri.fsPath);
 ```
 
-4. Register a `vscode.workspace.onDidChangeTextDocument` listener on the document to re-send `init` when the file changes externally (debounced 200 ms).
-5. Handle incoming webview messages:
-   - `{ type: 'applyEdit', frontmatter, body }` — reconstruct the full `.md` file text (frontmatter YAML + body) and apply via `vscode.workspace.applyEdit`.
-   - `{ type: 'createFlow', name }` — scaffold a new `.flow.json`, send updated flows list back.
-   - `{ type: 'checkAuthStatus' }` — re-check credential env vars and send updated `authStatus`.
+Extend the existing `init` message payload with:
 
-**`applyEdit` frontmatter serialisation helper:**
+```typescript
+isAgentMode: boolean;
+frontmatter: Record<string, FrontmatterValue>;  // parsed via parseFrontmatter()
+flows: string[];           // .flow.json stems in .ritemark/flows/
+skills: DiscoveredCommand[];  // all discovered skills with provenance
+authStatus: Record<string, boolean>;  // { claude_local: true, ... }
+k6Dismissed: boolean;      // workspaceState key: 'agentEditor.k6Dismissed.<filePath>'
+```
+
+These fields are only populated when `isAgentMode` is true. Non-agent files continue to receive the existing `init` shape unchanged.
+
+Handle two new incoming message types:
+- `{ type: 'applyFrontmatter', frontmatter }` — serialise frontmatter back to YAML block and apply to file via `vscode.workspace.applyEdit` (debounced 300 ms; body unchanged).
+- `{ type: 'dismissK6Banner', filePath }` — write `workspaceState.update('agentEditor.k6Dismissed.' + filePath, true)`.
+- `{ type: 'createFlow', name }` — scaffold new `.flow.json`, send `{ type: 'flowsUpdated', flows: string[] }` back.
+
+**Frontmatter serialiser** (add to `RitemarkEditorProvider`):
 
 ```typescript
 function serializeFrontmatter(fm: Record<string, FrontmatterValue>): string {
@@ -281,7 +261,6 @@ function serializeFrontmatter(fm: Record<string, FrontmatterValue>): string {
     } else if (typeof v === 'boolean' || typeof v === 'number') {
       lines.push(`${k}: ${v}`);
     } else {
-      // string — quote if contains special chars
       const safe = /[:#\[\]{}&*!|>'",%@`]/.test(String(v)) || String(v).includes('\n')
         ? JSON.stringify(v) : v;
       lines.push(`${k}: ${safe}`);
@@ -292,35 +271,88 @@ function serializeFrontmatter(fm: Record<string, FrontmatterValue>): string {
 }
 ```
 
-### package.json registration
+### App.tsx changes (webview)
 
-Add to `contributes.customEditors`:
-
-```json
-{
-  "viewType": "ritemark.agentEditor",
-  "displayName": "Agent Editor",
-  "selector": [{ "filenamePattern": "**/.claude/agents/*.md" }],
-  "priority": "default"
-}
+```typescript
+// Extend activePanel union
+type ActivePanel = 'none' | 'toc' | 'properties' | 'agent';
 ```
 
-### Vite entry (`webview/vite.config.ts`)
+In the init message handler, if `isAgentMode` is true, set `activePanel` to `'agent'` (overrides any persisted value for that document).
 
-Add `'agent-editor': resolve(__dirname, 'agent-editor.html')` to the `rollupOptions.input` map alongside the existing `index` entry.
+In the panel render row (the `flex-1 flex overflow-hidden` row):
 
-### Webview component tree
+```tsx
+{activePanel === 'agent' && (
+  <AgentConfiguratorPanel
+    frontmatter={agentFrontmatter}
+    flows={agentFlows}
+    skills={agentSkills}
+    authStatus={agentAuthStatus}
+    k6Dismissed={agentK6Dismissed}
+    onFrontmatterChange={handleFrontmatterChange}  // debounced 300ms → posts applyFrontmatter
+    onCreateFlow={handleCreateFlow}
+    onDismissK6Banner={handleDismissK6Banner}
+  />
+)}
+{/* existing TOC and Properties panels below */}
+{activePanel === 'toc' && <InlineTableOfContents />}
+{activePanel === 'properties' && <PropertiesSidePanel />}
+<div className="flex-1 overflow-y-auto"><Editor /></div>
+```
 
-Directory: `extensions/ritemark/webview/src/agent-editor/`
+### AgentConfiguratorPanel component
 
-Key files:
-- `AgentEditorApp.tsx` — root component; receives `init` message, owns state, splits TipTap body (left) and Configurator (right)
-- `AgentEditorBody.tsx` — TipTap editor initialised with `body` from `init`. Uses the same TipTap setup as the main editor (StarterKit + basic marks). On change, fires `onBodyChange(markdown: string)` to parent.
-- `Configurator.tsx` — controlled form component. Props: `frontmatter`, `flows`, `skills`, `authStatus`, `modelConfig`. On any field change, fires `onFrontmatterChange(updated: Record<string, FrontmatterValue>)`. All changes are debounced 300 ms in `AgentEditorApp` before posting `applyEdit`.
-- `ScheduleField.tsx` — handles schedule input + cron preview (calls `parseCronExpression` imported from the extension host via a webview-accessible copy or re-implemented in the webview; see note below) + K6 banner logic.
-- `ProvenanceBadge.tsx` — reusable badge component (`claude` / `codex` / `shared`).
+Location: `webview/src/components/agent/AgentConfiguratorPanel.tsx`
 
-**Note on `cronUtils` in the webview:** `cron-parser` is a Node package that works in browsers with a bundler. Import it directly in the webview bundle. Do not call back to the extension host for cron preview — the latency would make the UI feel sluggish.
+**Structure must mirror `PropertiesSidePanel` exactly:**
+
+```tsx
+<div className="w-[220px] flex-shrink-0 h-full overflow-y-auto border-r border-hairline"
+     style={{ background: 'var(--vscode-editor-background)' }}>
+  <div className="flex flex-col gap-3 px-4 py-4">
+    <h2 className="text-[15px] font-semibold text-ink-strong">Agent</h2>
+    {/* field sections */}
+  </div>
+</div>
+```
+
+**UI component rules (enforced, no exceptions):**
+
+| Field | shadcn component | Notes |
+|---|---|---|
+| name | `Input` | text, debounce 300ms |
+| description | `Textarea` | rows=3 |
+| icon | `Select` | Phosphor icon names |
+| color | `button` swatches | 7 Ritemark brand colours |
+| Agent runtimes | `ritemark-filter-chip` row | 4 options; `ritemark-dot` auth status |
+| Model | `Select` | filtered by runtime |
+| Schedule | `Input` | + preview line + `ScheduleField` |
+| Linked flow | `Select` | flow stems + "＋ Create new flow…" |
+| Skills | `Input` + tag pills | tag autocomplete; `ritemark-pill-soft.is-accent` tags; `ProvenanceBadge` |
+| Allowed tools | `Checkbox` rows | single column; tool-name 56px + description text |
+
+**Section dividers** use `<hr className="border-hairline my-1" />`. Section labels use `<Label className="text-[11px] font-semibold text-ink-strong uppercase tracking-wide">` — same pattern as `PropertiesSidePanel` group headers.
+
+### Provenance badge component
+
+```tsx
+// webview/src/components/agent/ProvenanceBadge.tsx
+// Reuses ritemark-pill-soft pattern from components.md
+const variants = {
+  claude: 'bg-accent-soft text-accent border border-accent-fainter',
+  codex:  'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  shared: 'bg-surface-soft text-ink-muted border border-hairline',
+} as const;
+
+export function ProvenanceBadge({ provenance }: { provenance: 'claude' | 'codex' | 'shared' }) {
+  return (
+    <span className={`inline-flex items-center px-1.5 py-px rounded text-[9px] font-bold tracking-wide ${variants[provenance]}`}>
+      {provenance}
+    </span>
+  );
+}
+```
 
 ---
 
@@ -401,8 +433,8 @@ The banner's per-file dismiss state is managed via a `workspaceState` key on the
 
 ### Manual smoke tests
 
-- Open `.claude/agents/sprint-manager.md` in Ritemark dev build → agent editor launches (not text editor).
-- Edit name field → file on disk updates within ~300 ms.
+- Open `.claude/agents/sprint-manager.md` in Ritemark dev build → AgentConfiguratorPanel appears on the left (220px); TipTap editor takes remaining width.
+- Edit name field in Configurator → file on disk updates within ~300 ms.
 - Add a `schedule:` with no `runtime:` → yellow chip appears in Agent Library.
 - Skills list shows `[shared]` badge for a skill that exists in both roots.
 - Flows section appears in Agent Library; clicking a flow opens the editor.
@@ -414,5 +446,5 @@ The banner's per-file dismiss state is managed via a `workspaceState` key on the
 - `.agents/skills/*/SKILL.md` still appears in Skills (already worked; R1 removal must not regress).
 - All existing agent rows still appear after R1 removal (no regression to Claude-only workspaces).
 - `npm run compile` passes in `extensions/ritemark`.
-- `npm run build` passes in `extensions/ritemark/webview` (both `index` and `agent-editor` entries).
+- `npm run build` passes in `extensions/ritemark/webview` (`index` entry only — no new entry added).
 - `./scripts/validate-qa.sh` passes.

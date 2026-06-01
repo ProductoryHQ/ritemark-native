@@ -105,47 +105,49 @@
 
 ---
 
-## Phase 4: agentEditor custom editor (WS4 — R5 + R6)
+## Phase 4: Agent mode in existing editor (WS4 — R5 + R6)
 
-### 4.1 New Vite entry for agent-editor bundle (R5)
+### 4.1 Extend RitemarkEditorProvider with agent mode (R5)
 
-- [ ] Create `extensions/ritemark/webview/agent-editor.html` — minimal HTML that loads `agent-editor.js` and mounts `<div id="root">`.
-- [ ] Add `'agent-editor': resolve(__dirname, 'agent-editor.html')` to `rollupOptions.input` in `extensions/ritemark/webview/vite.config.ts`.
-- [ ] Run `npm run build` in `extensions/ritemark/webview` — both `index` and `agent-editor` entries must build successfully.
-
-### 4.2 New AgentEditorProvider (R5)
-
-- [ ] Create `extensions/ritemark/src/views/AgentEditorProvider.ts` implementing `vscode.CustomTextEditorProvider`.
-- [ ] Implement `resolveCustomTextEditor`: parse document, send `init` message with frontmatter, body, flows, skills, authStatus, modelConfig, and `k6Dismissed` per spec tech plan.
-- [ ] Register `vscode.workspace.onDidChangeTextDocument` listener (debounced 200 ms) to resend `init` on external file changes.
-- [ ] Handle incoming messages: `applyEdit`, `createFlow`, `checkAuthStatus`, `dismissK6Banner`.
-- [ ] Implement `serializeFrontmatter` helper per tech plan.
-- [ ] Register the provider in `extensions/ritemark/src/extension.ts` via `AgentEditorProvider.register(context)`.
-- [ ] Register custom editor in `extensions/ritemark/package.json` under `contributes.customEditors` per tech plan shape.
+- [ ] In `extensions/ritemark/src/views/RitemarkEditorProvider.ts`, detect agent mode: `const isAgentMode = /[\/\\]\.claude[\/\\]agents[\/\\][^\/\\]+\.md$/.test(document.uri.fsPath)`.
+- [ ] When `isAgentMode` is true, extend the `init` message with: `frontmatter` (parsed via `parseFrontmatter`), `flows` (list of `.flow.json` stems), `skills` (all discovered skills with provenance), `authStatus`, `k6Dismissed` (from `workspaceState`).
+- [ ] Add `serializeFrontmatter` helper to the provider file (per tech plan).
+- [ ] Handle `applyFrontmatter` incoming message: serialise frontmatter, apply via `vscode.workspace.applyEdit` (debounce 300 ms, body preserved).
+- [ ] Handle `dismissK6Banner` incoming message: write to `workspaceState`.
+- [ ] Handle `createFlow` incoming message: scaffold blank `.flow.json`, send `flowsUpdated` back.
 - [ ] Run `npm run compile` — must pass.
 
-### 4.3 Webview component tree (R5 + R6)
+### 4.2 Extend App.tsx with 'agent' panel slot (R5)
 
-- [ ] Create `extensions/ritemark/webview/src/agent-editor/` directory.
-- [ ] Create `AgentEditorApp.tsx`: root component, receives `init` message, owns combined state (frontmatter + body), renders side-by-side layout.
-- [ ] Create `AgentEditorBody.tsx`: TipTap editor initialised with `body` prop. On change fires `onBodyChange`.
-- [ ] Create `Configurator.tsx`: controlled form with field groups per spec (Identity, Runtime, Model, Schedule, Routine, Skills, Allowed Tools, Budget, Worktree). On any field change fires `onFrontmatterChange`.
-- [ ] Create `ScheduleField.tsx`: cron text input + preview line + K6 banner with dismiss.
-- [ ] Create `ProvenanceBadge.tsx`: renders `[claude]` / `[codex]` / `[shared]` pill.
-- [ ] Wire `AgentEditorApp` to post `applyEdit` to the extension host on frontmatter or body change (debounced 300 ms).
-- [ ] Wire `AgentEditorApp` to receive `flowsUpdated` and `authStatusUpdated` messages from the extension host.
+- [ ] Add `'agent'` to the `activePanel` union: `'none' | 'toc' | 'properties' | 'agent'`.
+- [ ] In the `init` message handler: if `isAgentMode`, set `activePanel` to `'agent'` and store the agent-specific payload in state (`agentFrontmatter`, `agentFlows`, `agentSkills`, `agentAuthStatus`, `agentK6Dismissed`).
+- [ ] In the panel render row, add `{activePanel === 'agent' && <AgentConfiguratorPanel ... />}` — **before** the existing TOC/Properties conditionals.
+- [ ] Handle `flowsUpdated` and `authStatusUpdated` messages from extension host; update state accordingly.
+
+### 4.3 Create AgentConfiguratorPanel (R5 + R6)
+
+- [ ] Create `extensions/ritemark/webview/src/components/agent/AgentConfiguratorPanel.tsx`.
+- [ ] Panel outer div: `w-[220px] flex-shrink-0 h-full overflow-y-auto border-r border-hairline` with `style={{ background: 'var(--vscode-editor-background)' }}` — **identical to `PropertiesSidePanel`**.
+- [ ] Panel inner: `flex flex-col gap-3 px-4 py-4`.
+- [ ] Section heading `h2`: `text-[15px] font-semibold text-ink-strong` — "Agent".
+- [ ] All form fields use **shadcn/ui components from `webview/src/components/ui/`** — no custom inputs, no custom CSS. Use `Input`, `Textarea`, `Select`, `Label`, `Checkbox`. Use Tailwind utilities for layout only.
+- [ ] Section labels: `text-[11px] font-semibold text-ink-strong uppercase tracking-wide` (matches `PropertiesSidePanel` group header style).
+- [ ] Section dividers: `<hr className="border-hairline my-1" />`.
+- [ ] Run `npm run build` in `webview` — must pass.
 
 ### 4.4 Configurator field wiring (R6)
 
-- [ ] Identity fields (name, icon, color, description) — bound to frontmatter; write back on change.
-- [ ] Runtime radio group — bound to `runtime`; sends `checkAuthStatus` on mount and on runtime change.
-- [ ] Model dropdown — options filtered by selected runtime from `modelConfig`; bound to `runtimeModel`.
-- [ ] Schedule field — cron input bound to `schedule`; preview via `parseCronExpression`; K6 banner visibility controlled by `schedule !== ''` and `!k6Dismissed`.
-- [ ] Routine dropdown — lists `flows` from `init` message; "Create new flow..." option posts `createFlow` message; bound to `routine`.
-- [ ] Skills multiselect — lists `skills` from `init` message with provenance badges; bound to `skills[]` in frontmatter.
-- [ ] Allowed Tools multiselect — preset from `DEFAULT_TOOLS`; bound to `allowedTools[]`.
-- [ ] Budget number input — bound to `maxBudgetUsd`.
-- [ ] Worktree toggle — bound to `worktree`.
+All fields debounce 300 ms before posting `applyFrontmatter`. Fields:
+
+- [ ] **Identity** — `name` (shadcn `Input`), `description` (shadcn `Textarea` rows=3), `icon` (shadcn `Select` with Phosphor icon options), `color` (7 swatch `button`s).
+- [ ] **Agent runtimes** — 4 `ritemark-filter-chip` buttons (`claude_local`, `codex_local`, `openai_api`, `anthropic_api`). Each shows a `ritemark-dot` auth status. On mount and on change, read `authStatus` from prop.
+- [ ] **Model** — shadcn `Select`, options from `modelConfig` filtered by selected runtime.
+- [ ] **Schedule** (`ScheduleField.tsx`) — shadcn `Input` for cron; preview line using `parseCronExpression` (updated in real time, no round-trip); K6 banner when non-empty and not dismissed; banner dismiss posts `dismissK6Banner`.
+- [ ] **Linked flow** — shadcn `Select`, options = `flows` prop stems + "＋ Create new flow…" at bottom. "Create new flow…" posts `createFlow`. Bound to `routine` frontmatter field.
+- [ ] **Skills** — tag autocomplete: shadcn `Input` + dropdown overlay showing `skills` filtered by typed text. Selected skills shown as `ritemark-pill-soft.is-accent` tags with `ProvenanceBadge` and `×` remove button. Bound to `skills[]` frontmatter array.
+- [ ] **Allowed tools** — single-column `Checkbox` list. Each row: checkbox, tool name (56px `w-14 font-medium`), description (`text-ink-faint text-[11px]`). Default from `DEFAULT_TOOLS`. Bound to `allowedTools[]`.
+- [ ] Create `ProvenanceBadge.tsx` per tech plan snippet — used in skills tags and dropdown options.
+- [ ] Run `npm run compile` — must pass.
 
 ---
 
@@ -197,17 +199,16 @@ Run all scenarios from `scenarios.md` in dev build:
 - [ ] Scenario: Agent with schedule and runtime but no routine shows warning chip (R4).
 - [ ] Scenario: Agent with routine pointing to non-existent file shows warning chip (R4).
 - [ ] Scenario: Fully valid agent shows no warning chip (R4).
-- [ ] Scenario: Opening an agent file launches the structured editor (R5).
+- [ ] Scenario: Opening an agent file activates agent mode — 220px Configurator panel appears on left (R5).
 - [ ] Scenario: TipTap body initialised with content below frontmatter (R5).
 - [ ] Scenario: External file edit refreshes the webview (R5).
-- [ ] Scenario: Non-agent markdown files are not intercepted (R5).
+- [ ] Scenario: Non-agent markdown files open without agent mode panel (R5).
 - [ ] Scenario: Changing the name field updates frontmatter (R6).
 - [ ] Scenario: Selecting a runtime shows the correct model dropdown options (R6).
 - [ ] Scenario: Auth status indicators reflect credential state (R6).
-- [ ] Scenario: Routine dropdown lists available flows (R6).
+- [ ] Scenario: Linked flow dropdown lists available flows (R6).
 - [ ] Scenario: Create new flow scaffolds a blank flow and selects it (R6).
-- [ ] Scenario: Skills multiselect saves back to frontmatter (R6).
-- [ ] Scenario: Budget input writes maxBudgetUsd to frontmatter (R6).
+- [ ] Scenario: Skills tag autocomplete saves selection back to frontmatter (R6).
 - [ ] Scenario: Valid cron expression shows human-readable preview (R7).
 - [ ] Scenario: Invalid cron expression shows error text (R7).
 - [ ] Scenario: K6 banner appears when schedule is non-empty (R7).
