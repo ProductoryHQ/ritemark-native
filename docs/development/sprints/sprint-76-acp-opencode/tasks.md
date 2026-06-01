@@ -54,38 +54,51 @@
 - [x] Add `'opencode'` to `AgentId` + `AGENTS` registry in `src/agent/types.ts`
       (incl. `requiresApiKey: 'byok'` type extension; label "OpenCode" per Q2)
 
-## Phase 3: Provider keys for OpenCode (R3a — revised 2026-06-01)
+## Phase 3: Provider keys for OpenCode (R3a — revised 2026-06-01) — host side ✅ 2026-06-01
 
-- [ ] Locate existing provider-key SecretStorage helpers (OpenAI / Google AI / Anthropic cards);
-      add ONE new stored key for OpenRouter
-- [ ] Spawn-env injection in `acpManager.ts` reading existing key storage
-- [ ] Settings page: update "Used for:" copy on 3 existing cards; add OpenRouter card
-      (flag-gated, optional)
-- [ ] Remove stale "Imagen 3 (coming soon)" from Google AI card copy (not flag-gated —
-      ships unconditionally; Jarmo 2026-06-01)
+- [x] Locate existing provider-key SecretStorage helpers (`openai-api-key`, `google-ai-key`,
+      `anthropic-api-key` in RitemarkSettingsProvider); add ONE new stored key for OpenRouter
+      (`openrouter-api-key`, flag-gated handlers + test routing)
+- [x] Spawn-env injection: `src/acp/acpKeyEnv.ts` (`buildByokEnv`/`byokProviderFlags` + tests);
+      keys → spawn env only, webview gets booleans
+- [ ] **[WEBVIEW — Mac session]** Settings page: update "Used for:" copy on 3 existing cards;
+      add OpenRouter card (flag-gated, optional)
+- [ ] **[WEBVIEW — Mac session]** Remove stale "Imagen 3 (coming soon)" from Google AI card copy
+      (not flag-gated — ships unconditionally; Jarmo 2026-06-01)
 - [ ] AI sidebar empty-state "Set up your API keys" card + `open-settings-api-keys` deep link
 - [ ] Verify keys never appear in webview messages (trace channel inspection — scenarios.md
       "Keys never leak")
 
-## Phase 4: Approval gating + dispatch + streaming (R4, R5)
+## Phase 4: Approval gating + dispatch + streaming (R4, R5) — host side ✅ 2026-06-01
 
-- [ ] Write `src/acp/acpApproval.ts` (workspace-root validation, always-allow, webview round-trip)
-- [ ] Write `src/acp/acpApproval.test.ts` (approve / reject / auto-reject traversal)
-- [ ] Wire `'acp-execute'`, `'acp-cancel'`, `'acp-approval-response'` cases in `UnifiedViewProvider.ts`
-- [ ] Normalize ACP + Codex approval payloads to one webview message shape; reuse Codex approval card
-- [ ] Progress streaming verified end-to-end in dev mode (text, tool_use, error, cancel ≤ 2s)
+- [x] Workspace-root validation + always-allow + approval round-trip (in `acpFsProxy.ts` from
+      Phase 1 + `_handleAcpWriteApproval`/`_handleAcpPermission`/`_acpSessionAlwaysAllow` in
+      UnifiedViewProvider — structure differs from planned `acpApproval.ts`, same behavior)
+- [x] Approval behavior covered by `acpClient.test.ts` + `acpManager.test.ts` permission tests
+- [x] Wire `'acp-execute'`, `'acp-cancel'`, `'acp-approval-response'`, `'acp-get-providers'` cases
+      in `UnifiedViewProvider.ts`
+- [x] Normalize ACP + Codex approval payloads to one webview message shape (`codex-approval` with
+      acp- prefixed requestId; progress reuses `codex-progress`/`codex-streaming`/`codex-result`)
+- [ ] **[Mac session]** Progress streaming verified end-to-end in dev mode (text, tool_use, error,
+      cancel ≤ 2s) — needs runnable webview + real binary
 
-## Phase 5: Model selection (R6)
+## Phase 5: Model selection (R6) — host side ✅ 2026-06-01
 
-- [ ] `BYOK_PROVIDER_MODELS` in `src/ai/modelConfig.ts`
-- [ ] `opencode:` composite values + provider-filtered model list in `AgentSelector.tsx`
-- [ ] Model selection mechanism (per Phase 0 audit finding) implemented in `acpManager.ts`
+- [x] `BYOK_PROVIDER_MODELS` in `src/ai/modelConfig.ts` (+ `ByokProvider` type,
+      `toOpenCodeModelValue()`; surfaced via `agent:config` and `flow:modelConfig`)
+- [ ] **[WEBVIEW — Mac session]** `opencode:` composite values + provider-filtered model list
+      in `AgentSelector.tsx`
+- [x] Model selection mechanism (`setSessionConfigOption(configId: 'model')` per audit)
+      implemented in `acpClient.setModel()`, wired in `acp-execute`
 
-## Phase 6: Feature flag (R7)
+## Phase 6: Feature flag (R7) — host side ✅ 2026-06-01
 
-- [ ] `'opencode-integration'` flag in `src/features/flags.ts` (experimental, all platforms)
-- [ ] Gate: AGENTS registry exposure, AgentSelector entry, Settings BYOK section
-- [ ] Verify flag-off hides everything (scenarios.md R7 scenario)
+- [x] `'opencode-integration'` flag in `src/features/flags.ts` (**stable** per Q3, all platforms)
+      + `opencodeFlag.test.ts`
+- [x] Gate (host side): AGENTS registry exposure to webview, `acp-execute`/key handlers inert
+      when off, `acpProviders`/`byokProviderModels` excluded from `agent:config` when off
+- [ ] **[WEBVIEW — Mac session]** Gate: AgentSelector entry, Settings OpenRouter card
+- [ ] **[Mac session]** Verify flag-off hides everything (scenarios.md R7 scenario)
 
 ## Phase 7: QA and Closeout
 

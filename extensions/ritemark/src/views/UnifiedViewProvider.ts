@@ -73,6 +73,15 @@ import { browserNavigate, formatActionResultForAgent } from '../browser/BrowserA
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
+// Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
+import { AcpManager, buildByokEnv, byokProviderFlags, type ByokKeys, type ByokProviderFlags } from '../acp';
+import { findBundledAgentRuntime } from '../utils/bundledAgentRuntime';
+import { BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
+import type {
+  RequestPermissionRequest,
+  RequestPermissionResponse,
+  WriteTextFileRequest,
+} from '@agentclientprotocol/sdk';
 
 type CodexSidebarStatus = {
   enabled: boolean;
@@ -210,6 +219,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
   private _disposeClaudeStatusListener: (() => void) | null = null;
   private _browserContextPoll: ReturnType<typeof setInterval> | null = null;
+
+  // Sprint 76 R4/R5: ACP/OpenCode runtime state. One manager per live session;
+  // model is applied per turn. Pending permission/write approvals are keyed by a
+  // request id and resolved when the webview posts 'acp-approval-response'.
+  private _acpManager: AcpManager | null = null;
+  private _acpModel: string | null = null;
+  private _acpPendingApprovals = new Map<
+    string,
+    (decision: { approved: boolean; alwaysAllow: boolean }) => void
+  >();
+  private _acpApprovalSeq = 0;
+  /** Provider/model pairs the user "always allowed" for the current session. */
+  private _acpSessionAlwaysAllow = new Set<string>();
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -479,6 +501,30 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           traceCodex('webview->extension', 'conversation:reset');
           this._resetProviderSessions();
           break;
+
+        // ── ACP / OpenCode (Sprint 76 R4/R5/R6) ──
+        // Mirrors the codex-execute / codex-cancel / codex-approve trio.
+        case 'acp-execute':
+          await this._handleAcpExecution(message.prompt, message.model);
+          break;
+
+        case 'acp-cancel':
+          await this._handleAcpCancel();
+          break;
+
+        case 'acp-approval-response':
+          this._handleAcpApprovalResponse(
+            message.requestId,
+            message.approved === true,
+            message.alwaysAllow === true,
+          );
+          break;
+
+        // Sprint 76 R3a: return provider-configured booleans (never key values)
+        // for the webview model-picker filter + setup prompt.
+        case 'acp-get-providers':
+          await this._sendAcpProviders();
+          break;
       }
     });
 
@@ -589,6 +635,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public dispose() {
     this._agentSession?.close();
     this._codexAppServer?.dispose();
+    this._disposeAcpRuntime(); // Sprint 76 R5
     this._stopCodexLoginPolling();
     this._stopClaudeLoginPolling();
     this._disposeCodexStatusListener?.();
@@ -694,11 +741,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const codexStatus = await this._getCodexSidebarStatus();
 
     // Filter agents based on feature flags; exclude deprecated agents from the selector
+    const opencodeEnabled = isEnabled('opencode-integration');
     const visibleAgents = Object.values(AGENTS).filter(a => {
       if (a.deprecated) return false;
       if (a.id === 'codex') return codexEnabled;
+      // Sprint 76 R7: gate OpenCode in the agent registry exposure to the webview.
+      if (a.id === 'opencode') return opencodeEnabled;
       return true;
     });
+
+    // Sprint 76 R3a/R6: which BYOK providers are configured (booleans only —
+    // never key values) + curated models, so the OpenCode model picker can
+    // filter. Empty/false when the flag is off.
+    const acpProviders: ByokProviderFlags = opencodeEnabled
+      ? byokProviderFlags(await this._readByokKeys())
+      : { google: false, openai: false, anthropic: false, openrouter: false };
 
     const claudeModels = cachedDiscoveredClaudeModels ?? CLAUDE_FALLBACK_MODELS;
 
@@ -711,6 +768,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       agents: visibleAgents,
       models: claudeModels,
       codexModels: getCodexModels(),
+      // Sprint 76 R6/R7: OpenCode availability + BYOK provider booleans + curated
+      // models. The webview model picker filters models by configured providers.
+      opencodeEnabled,
+      acpProviders,
+      byokProviderModels: opencodeEnabled ? BYOK_PROVIDER_MODELS : undefined,
       codexStatus,
       setupStatus,
       environmentStatus,
@@ -911,6 +973,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._agentSession?.close();
     this._agentSession = null;
     this._disposeCodexRuntime();
+    // Sprint 76 R5: tear down the OpenCode session too.
+    this._disposeAcpRuntime();
+    this._acpModel = null;
   }
 
   private _resetCodexSessionState(): void {
@@ -1555,6 +1620,308 @@ ${prompt}`;
   private _handleCodexQuestionAnswer(requestId: string | number, answers: Record<string, { answers: string[] }>) {
     if (!this._codexAppServer) return;
     this._codexAppServer.sendToolRequestUserInputResponse(requestId, answers);
+  }
+
+  // ── ACP / OpenCode runtime (Sprint 76 R3a/R4/R5/R6) ──────────────────────
+  //
+  // Structural mirror of the Codex execution path. Progress, approvals and
+  // results are deliberately posted using the SAME webview message types Codex
+  // uses ('codex-progress', 'codex-streaming', 'codex-approval', 'codex-result')
+  // so the existing AI-sidebar rendering works without any webview change
+  // (spec Q4: normalize ACP + Codex approvals to one webview payload shape).
+
+  /**
+   * Read the BYOK provider keys from SecretStorage. These are the SAME values
+   * the Settings cards write ('openai-api-key', 'google-ai-key',
+   * 'anthropic-api-key', 'openrouter-api-key') — OpenCode reuses them (R3a).
+   * Returned only to the host-side env builder; never sent to the webview.
+   */
+  private async _readByokKeys(): Promise<ByokKeys> {
+    if (!this._secrets) return {};
+    const [openai, google, anthropic, openrouter] = await Promise.all([
+      this._secrets.get('openai-api-key'),
+      this._secrets.get('google-ai-key'),
+      this._secrets.get('anthropic-api-key'),
+      this._secrets.get('openrouter-api-key'),
+    ]);
+    return { openai, google, anthropic, openrouter };
+  }
+
+  /**
+   * Sprint 76 R3a: send the provider-configured booleans to the webview (model
+   * picker filter + setup prompt). Only booleans — never key values.
+   */
+  private async _sendAcpProviders(): Promise<void> {
+    const enabled = isEnabled('opencode-integration');
+    const providers: ByokProviderFlags = enabled
+      ? byokProviderFlags(await this._readByokKeys())
+      : { google: false, openai: false, anthropic: false, openrouter: false };
+    this._view?.webview.postMessage({
+      type: 'acp-providers',
+      enabled,
+      providers,
+    });
+  }
+
+  /**
+   * Sprint 76 R4/R5/R6: run an OpenCode turn. `model` is the
+   * `<provider>/<model>` value (the 'opencode:' composite prefix is stripped by
+   * the webview before this call). Resolves the bundled binary, injects the
+   * BYOK keys, sets the model, and sends the prompt — forwarding progress via
+   * the shared Codex webview message shapes.
+   */
+  private async _handleAcpExecution(prompt: string, model?: string): Promise<void> {
+    // R7: flag gate — inert when off.
+    if (!isEnabled('opencode-integration')) {
+      this._view?.webview.postMessage({
+        type: 'codex-result',
+        error: 'OpenCode integration is not enabled.',
+      });
+      return;
+    }
+
+    if (typeof prompt !== 'string' || !prompt.trim()) {
+      return;
+    }
+
+    try {
+      // R3a: a turn requires at least one configured provider key.
+      const keys = await this._readByokKeys();
+      const flags = byokProviderFlags(keys);
+      if (!flags.google && !flags.openai && !flags.anthropic && !flags.openrouter) {
+        this._view?.webview.postMessage({
+          type: 'codex-result',
+          error: 'No API keys configured. Add a provider key in Settings → API Keys to use OpenCode.',
+        });
+        return;
+      }
+
+      const workspaceRoot = this._workspacePath
+        ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        this._view?.webview.postMessage({
+          type: 'codex-result',
+          error: 'Open a folder before using OpenCode.',
+        });
+        return;
+      }
+
+      // R2: resolve the bundled OpenCode binary (system-PATH fallback inside
+      // findBundledAgentRuntime). 'opencode' kind.
+      const runtime = findBundledAgentRuntime('opencode');
+      if (!runtime) {
+        this._view?.webview.postMessage({
+          type: 'codex-result',
+          error: 'OpenCode runtime not found. Reinstall Ritemark to restore the bundled agent.',
+        });
+        return;
+      }
+
+      // Start (or reuse) the session. cancel() abandons the session, so a null
+      // manager means a fresh start is needed.
+      if (!this._acpManager || !this._acpManager.isRunning()) {
+        this._disposeAcpRuntime();
+        // R3a: workspace-root is wired into the fs proxy via the manager config.
+        this._acpManager = new AcpManager({
+          binaryPath: runtime.path,
+          workspaceRoot,
+          byokEnv: buildByokEnv(keys),
+          requestPermission: (params) => this._handleAcpPermission(params),
+          approveWrite: (request) => this._handleAcpWriteApproval(request),
+          onProgress: (progress) => this._postAcpProgress(progress),
+        });
+        await this._acpManager.start();
+        this._acpSessionAlwaysAllow.clear();
+      }
+
+      // R6: apply model selection for this turn.
+      if (model && model !== this._acpModel) {
+        await this._acpManager.setModel(model);
+        this._acpModel = model;
+      } else if (this._acpModel) {
+        await this._acpManager.setModel(this._acpModel);
+      }
+
+      this._view?.webview.postMessage({
+        type: 'codex-progress',
+        progress: { type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() },
+      });
+
+      const activeFile = this._getActiveFileContext();
+      const promptBody = activeFile
+        ? `[Currently editing: ${activeFile.path}]\n\n${prompt}`
+        : prompt;
+
+      const result = await this._acpManager.prompt(promptBody);
+
+      // R4: the agent writes through the approval-gated fs proxy, so the
+      // explorer can be stale after a turn — blanket refresh like Codex.
+      this._refreshExplorerForAgentWrites(undefined);
+
+      this._view?.webview.postMessage({
+        type: 'codex-result',
+        status: result.stopReason === 'end_turn' ? 'completed' : result.stopReason,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this._view?.webview.postMessage({
+        type: 'codex-result',
+        error: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Sprint 76 R5: cancel the in-flight OpenCode turn. OpenCode 1.15.13 has no
+   * native session/cancel, so AcpManager.cancel kills the process (audit). The
+   * session is abandoned; the next execute starts a fresh one. UI returns to
+   * idle within 2s.
+   */
+  private async _handleAcpCancel(): Promise<void> {
+    const manager = this._acpManager;
+    this._acpManager = null;
+    this._rejectPendingAcpApprovals();
+    try {
+      await manager?.cancel();
+    } catch {
+      // Process may already be gone.
+    }
+    this._view?.webview.postMessage({
+      type: 'codex-result',
+      status: 'cancelled',
+    });
+  }
+
+  /**
+   * Sprint 76 R4: a session/request_permission from the agent. Normalize to the
+   * shared Codex approval webview shape and await the user's decision. "Always
+   * allow for this session" mirrors the Codex allow_always semantics.
+   */
+  private async _handleAcpPermission(
+    params: RequestPermissionRequest,
+  ): Promise<RequestPermissionResponse> {
+    const tool = params.toolCall?.title ?? 'tool call';
+    const file = params.toolCall?.locations?.[0]?.path;
+    const sessionKey = `${tool}:${file ?? ''}`;
+
+    // Session "always allow" short-circuit (R4 parity with Codex).
+    if (this._acpSessionAlwaysAllow.has(sessionKey)) {
+      return this._acpSelectOutcome(params, true);
+    }
+
+    const { approved, alwaysAllow } = await this._postAcpApproval({
+      approvalType: 'command',
+      command: tool,
+      workingDir: file ?? '',
+    });
+    if (approved && alwaysAllow) {
+      this._acpSessionAlwaysAllow.add(sessionKey);
+    }
+    return this._acpSelectOutcome(params, approved);
+  }
+
+  /**
+   * Sprint 76 R4: a fs/write_text_file approval (gated by AcpFsProxy). Writes
+   * outside the workspace root are already auto-rejected in the proxy before
+   * this runs. Normalize to the shared Codex 'fileChange' approval shape.
+   */
+  private async _handleAcpWriteApproval(request: WriteTextFileRequest): Promise<boolean> {
+    const sessionKey = `write:${request.path}`;
+    if (this._acpSessionAlwaysAllow.has(sessionKey)) {
+      return true;
+    }
+    const { approved, alwaysAllow } = await this._postAcpApproval({
+      approvalType: 'fileChange',
+      fileChanges: { [request.path]: { newContent: request.content } },
+    });
+    if (approved && alwaysAllow) {
+      this._acpSessionAlwaysAllow.add(sessionKey);
+    }
+    return approved;
+  }
+
+  /**
+   * Map an approval decision onto the ACP RequestPermissionResponse outcome,
+   * choosing the matching option id from the agent's offered options.
+   */
+  private _acpSelectOutcome(
+    params: RequestPermissionRequest,
+    approved: boolean,
+  ): RequestPermissionResponse {
+    const wantKinds = approved
+      ? ['allow_once', 'allow_always']
+      : ['reject_once', 'reject_always'];
+    const option = params.options.find((o) => wantKinds.includes(o.kind));
+    if (option) {
+      return { outcome: { outcome: 'selected', optionId: option.optionId } };
+    }
+    // No matching option offered — cancel is the safe ACP fallback.
+    return { outcome: { outcome: 'cancelled' } };
+  }
+
+  /**
+   * Post an approval request to the webview using the SAME 'codex-approval'
+   * message shape Codex uses, and return a promise that resolves when the
+   * webview posts 'acp-approval-response'.
+   */
+  private _postAcpApproval(
+    payload:
+      | { approvalType: 'command'; command: string; workingDir: string }
+      | { approvalType: 'fileChange'; fileChanges: Record<string, unknown> },
+  ): Promise<{ approved: boolean; alwaysAllow: boolean }> {
+    const requestId = `acp-${++this._acpApprovalSeq}`;
+    return new Promise<{ approved: boolean; alwaysAllow: boolean }>((resolve) => {
+      this._acpPendingApprovals.set(requestId, resolve);
+      this._view?.webview.postMessage({
+        type: 'codex-approval',
+        requestId,
+        ...payload,
+      });
+    });
+  }
+
+  /**
+   * Sprint 76 R4: resolve a pending ACP approval from the webview response. The
+   * webview reuses the Codex approval card, posting back via 'acp-approval-
+   * response' with the requestId we issued (and an optional alwaysAllow flag).
+   */
+  private _handleAcpApprovalResponse(
+    requestId: string,
+    approved: boolean,
+    alwaysAllow: boolean,
+  ): void {
+    const resolve = this._acpPendingApprovals.get(requestId);
+    if (!resolve) return;
+    this._acpPendingApprovals.delete(requestId);
+    resolve({ approved, alwaysAllow });
+  }
+
+  /** Forward an AgentProgress event to the webview via the shared Codex shape. */
+  private _postAcpProgress(progress: AgentProgress): void {
+    if (progress.type === 'text') {
+      // Stream assistant text the same way Codex deltas render.
+      this._view?.webview.postMessage({ type: 'codex-streaming', delta: progress.message });
+      return;
+    }
+    this._view?.webview.postMessage({ type: 'codex-progress', progress });
+  }
+
+  private _rejectPendingAcpApprovals(): void {
+    for (const resolve of this._acpPendingApprovals.values()) {
+      resolve({ approved: false, alwaysAllow: false });
+    }
+    this._acpPendingApprovals.clear();
+  }
+
+  private _disposeAcpRuntime(): void {
+    this._rejectPendingAcpApprovals();
+    this._acpSessionAlwaysAllow.clear();
+    try {
+      this._acpManager?.dispose();
+    } catch {
+      // best effort
+    }
+    this._acpManager = null;
   }
 
   /**

@@ -294,7 +294,14 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         break;
 
       case 'setApiKey':
-        // Store API key in SecretStorage
+        // Sprint 76 R3a/R7: the OpenRouter key handler is inert while the
+        // opencode-integration flag is off (the card is hidden too). All other
+        // provider keys are unaffected.
+        if (message.key === 'openrouter-api-key' && !isEnabled('opencode-integration')) {
+          break;
+        }
+        // Store API key in SecretStorage. Generic on `message.key`, so the new
+        // 'openrouter-api-key' (Sprint 76 R3a) saves/clears with no extra branch.
         if (message.key && typeof message.value === 'string') {
           if (message.value.trim()) {
             await this.context.secrets.store(message.key, message.value.trim());
@@ -325,6 +332,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           await this.testGoogleAIKey(webview);
         } else if (message.key === 'anthropic-api-key') {
           await this.testAnthropicKey(webview);
+        } else if (message.key === 'openrouter-api-key' && isEnabled('opencode-integration')) {
+          // Sprint 76 R3a (Q-UX4): validate against the OpenRouter key endpoint.
+          await this.testOpenRouterKey(webview);
         }
         break;
 
@@ -470,9 +480,19 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       : configuredTheme;
 
     // Get API keys (masked)
+    // SecretStorage key names (single source for BYOK / Sprint 76 R3a):
+    //   'openai-api-key', 'google-ai-key', 'anthropic-api-key', and the new
+    //   'openrouter-api-key'. These same values power the OpenCode runtime —
+    //   no separate key store (spec R3a: configure each provider once).
     const openaiKey = await this.context.secrets.get('openai-api-key');
     const googleKey = await this.context.secrets.get('google-ai-key');
     const anthropicKey = await this.context.secrets.get('anthropic-api-key');
+    // Sprint 76 R3a: OpenRouter card is only surfaced when opencode-integration
+    // is on. When off the key handlers are inert (R7 gating).
+    const openrouterEnabled = isEnabled('opencode-integration');
+    const openrouterKey = openrouterEnabled
+      ? await this.context.secrets.get('openrouter-api-key')
+      : undefined;
 
     const initialUpdateSnapshot = await this.updateService.getStatusSnapshot();
     const updateCenterPromise = initialUpdateSnapshot.lastCheckedAt === 0
@@ -568,6 +588,11 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         googleKeyConfigured: !!googleKey,
         anthropicKey: anthropicKey || '',
         anthropicKeyConfigured: !!anthropicKey,
+        // Sprint 76 R3a: OpenRouter (optional, flag-gated). `openrouterEnabled`
+        // tells the Settings webview whether to render the card at all.
+        openrouterEnabled,
+        openrouterKey: openrouterKey || '',
+        openrouterKeyConfigured: !!openrouterKey,
 
         // Update-adjacent components
         componentStatus,
@@ -1034,6 +1059,40 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       webview.postMessage({
         type: 'testResult',
         key: 'anthropic',
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Sprint 76 R3a (Q-UX4): test OpenRouter API key. Hits the lightweight
+   * /api/v1/key endpoint (no token spend) — same card pattern as the other
+   * provider keys.
+   */
+  private async testOpenRouterKey(webview: vscode.Webview): Promise<void> {
+    const key = await this.context.secrets.get('openrouter-api-key');
+    if (!key) {
+      webview.postMessage({ type: 'testResult', key: 'openrouter', success: false, error: 'No API key configured' });
+      return;
+    }
+
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/key', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${key}` },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: response.statusText } }));
+        throw new Error(error.error?.message || `HTTP ${response.status}`);
+      }
+
+      webview.postMessage({ type: 'testResult', key: 'openrouter', success: true, message: 'API key is valid' });
+    } catch (err) {
+      webview.postMessage({
+        type: 'testResult',
+        key: 'openrouter',
         success: false,
         error: err instanceof Error ? err.message : 'Unknown error',
       });
