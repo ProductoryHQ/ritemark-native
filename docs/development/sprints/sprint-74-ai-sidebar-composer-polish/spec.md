@@ -38,26 +38,34 @@ Acceptance criteria:
 - The `AgentPlanApproval` plan text box shows rendered Markdown (via `RenderedMarkdown`) at a readable font size, not raw text.
 - If `planText` is empty (the agent sent no thinking text), the plan preview section is hidden but the buttons remain visible.
 
-### R2: Composer — unlock input while agent is running (Level 1)
+### R2: Composer — unlock input while agent is running (Level 1 + Level 2)
 
-As a user waiting for an agent to finish, I want to be able to type my next prompt while the agent is still running, so I am not blocked from preparing follow-up work.
+As a user waiting for an agent to finish, I want to be able to type my next prompt — and optionally queue it — while the agent is still running, so I am not blocked from preparing follow-up work.
 
-**Scope: Level 1 only.** Level 2 (queuing and auto-send on completion) is explicitly out of scope for this sprint. Only the input-unlock (textarea enabled, value accepted, send deferred until agent completes) is delivered here.
+**Level 1 — Unlock input (must ship):**
 
 Acceptance criteria:
-- While `isLoading` is true (agent running), the `ChatInput` textarea is **not** disabled — the user can type freely.
-- The Send button remains hidden/replaced by Stop while the agent is running (pressing Send before completion does nothing; only Stop is actionable).
-- The value typed while the agent runs is preserved and available to send once the Stop button transitions back to Send.
-- The attach-file button remains disabled while the agent is running (it opens a dialog that would disrupt workflow).
-- Placeholder text does not change — it continues to read the normal prompt hint.
-- Switching away from agent mode to chat mode while the textarea has pre-typed content clears the textarea (existing `setValue('')` on handleSend already handles this for normal sends; no regression).
+- AC2.1: While `isLoading` is true (agent running), the `ChatInput` textarea is **not** disabled — the user can type freely.
+- AC2.2: The Send button remains disabled (or replaced by Stop) while the agent is running — pressing it while the agent is running has no effect; Stop is the only actionable button.
+- AC2.3: The value typed while the agent runs is preserved and available to send once the agent finishes.
+- AC2.4: The attach-file button remains disabled while the agent is running (opening a file dialog mid-run would disrupt workflow).
+- AC2.5: Placeholder text updates to "Agent is running — type your next message…" while `isLoading` is true and the textarea is empty.
+
+**Level 2 — Queue prompt:**
+
+Acceptance criteria:
+- AC2.6: When the user presses Enter (or clicks a "Queue" button) while `agentRunning` is true and the textarea has content, the current prompt is stored as `queuedPrompt` in local `ChatInput` state (no Zustand store change required).
+- AC2.7: A visual indicator appears below/above the textarea: a chip showing "Queued: [truncated prompt]" with an X button to discard.
+- AC2.8: When `agentRunning` transitions to `false`, the queued prompt is automatically dispatched via `handleSend` and the queue indicator clears.
+- AC2.9: Pressing X on the queue chip discards the queued prompt and restores normal empty-textarea state.
+- AC2.10: Only one prompt may be queued at a time. After a prompt is queued, the textarea is disabled until the agent finishes or the queue is discarded (preventing a second queue).
 
 ### R3: Code block — remove unnecessary horizontal scrollbar
 
 As a user reading content with code blocks, I want code blocks to not show a horizontal scrollbar when the code fits within the visible width, so the UI does not look broken.
 
 **Root cause (established during research):**
-`index.css` sets `overflow-x: auto` on `pre` elements (the code block container). `overflow-x: auto` shows a scrollbar whenever the scroll content width slightly exceeds the container, which happens due to padding/border-box rounding even when no code line is actually long enough to warrant scrolling.
+`Editor.tsx` (the inline `<style>` block) sets `overflow-x: auto !important` on `.wysiwyg-editor .ProseMirror pre.tiptap-code-block`. `overflow-x: auto` shows a scrollbar whenever the scroll content width slightly exceeds the container, which happens due to padding/border-box rounding even when no code line is actually long enough to warrant scrolling. A separate `overflow-x: auto` rule in `index.css` affects `pre` in non-editor contexts.
 
 Acceptance criteria:
 - Short code blocks (content narrower than the panel width) show no horizontal scrollbar.
@@ -84,7 +92,8 @@ Acceptance criteria:
 
 ## Non-Requirements
 
-- R2 Level 2 (prompt queue — store queued prompt, auto-send when agent completes): explicitly deferred. A separate sprint or issue should track this.
+- Multi-message queue for R2 (only one queued prompt at a time).
+- Persistence of R2 queue across page reloads or conversation resets.
 - Changing the visual design of the plan review card beyond fixing readability.
 - Adding syntax highlighting to code blocks (separate concern).
 - Changing the link modal to support multi-line display text (out of scope; single-line is sufficient).
@@ -94,10 +103,12 @@ Acceptance criteria:
 
 ## Resolved Questions
 
-- **2026-06-01:** R2 scope bounded to Level 1 only. Level 2 adds queue complexity (store state, auto-send trigger, ordering guarantees) and is not justified by the issue description alone.
+- **2026-06-01:** R2 includes both Level 1 (unlock) and Level 2 (queue). Level 2 queue is scoped to local `ChatInput` state — no Zustand changes — keeping blast radius minimal. Auto-send trigger fires on the `agentRunning` false transition via `useEffect`.
 - **2026-06-01:** R1 root cause confirmed: the `!turn.pendingPlanApproval` guard in `AgentResponse` is inverted. The live-approval path (via `AgentView` → `AgentPlanApproval`) works correctly; only the post-result display path in `AgentResponse` is broken.
 - **2026-06-01:** R4 Display text field: "optional and non-destructive" chosen over "always required". Forcing the user to re-enter text when editing only the URL would be regressive.
 
 ## Open Questions
 
-- R1: Should `AgentResponse` be simplified to remove its duplicate plan-approval UI entirely (since `AgentView` already handles the live case with `AgentPlanApproval`)? Or is the `AgentResponse` duplicate serving a legitimate "replay history" purpose? — **Decision deferred to Phase 3; the minimal fix is to correct the `needsApproval` condition; cleanup of the duplicate is optional.**
+- R1: Should `AgentResponse` be simplified to remove its duplicate plan-approval UI entirely (since `AgentView` already handles the live case with `AgentPlanApproval`)? Or is the `AgentResponse` duplicate serving a legitimate "replay history" purpose? Decision deferred to Phase 3; the minimal fix is to correct the `needsApproval` condition; cleanup of the duplicate is optional.
+- R3: Whether `overflow-x: hidden` on the `pre.tiptap-code-block` clips the absolutely-positioned copy-button tooltip. The tooltip uses `position: absolute; z-index: 100` — CSS clips absolutely-positioned children of an `overflow: hidden` ancestor regardless of z-index. If clipping is observed during QA, the fallback is `overflow: visible` on `pre` with `overflow-x: auto` on the `code` child rule only.
+- R4: Whether TipTap's `deleteSelection().insertContentAt()` chain is the correct API for replacing selected text with display text + link mark, or whether a direct `setLink` after `insertContent` is more reliable — to be confirmed during Phase 3.
