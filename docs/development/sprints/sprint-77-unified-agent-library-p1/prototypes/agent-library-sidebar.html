@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Library Sidebar — Sprint 77 Prototype</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', sans-serif;
+  background: #161616;
+  color: #CCCCCC;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Proto banner ── */
+.proto-banner {
+  background: #4C1D95;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 7px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+.proto-tag {
+  background: rgba(255,255,255,0.18);
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+/* ── Page layout ── */
+.page {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Legend ── */
+.legend {
+  width: 210px;
+  background: #16162A;
+  border-right: 1px solid rgba(255,255,255,0.04);
+  padding: 18px 14px;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+.legend::-webkit-scrollbar { width: 4px; }
+.legend::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+.legend-heading {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #818CF8;
+  margin-bottom: 14px;
+}
+
+.anno-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 13px;
+}
+
+.anno-num {
+  min-width: 19px; height: 19px;
+  border-radius: 50%;
+  background: #5B21B6;
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.anno-text strong {
+  display: block;
+  font-size: 11px;
+  color: #E2E8F0;
+  margin-bottom: 2px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.anno-text span {
+  font-size: 10px;
+  color: #4A5568;
+  line-height: 1.4;
+}
+
+.legend-sep {
+  height: 1px;
+  background: rgba(255,255,255,0.04);
+  margin: 14px 0;
+}
+
+.legend-existing-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #3D3D5C;
+  margin-bottom: 8px;
+}
+.legend-existing-item {
+  font-size: 10px;
+  color: #3D3D5C;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-existing-item::before {
+  content: '–';
+  color: #2D2D4A;
+}
+
+/* ── VS Code window ── */
+.vscode {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vs-titlebar {
+  height: 36px;
+  background: #323233;
+  border-bottom: 1px solid #1A1A1A;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tl { width: 12px; height: 12px; border-radius: 50%; }
+.tl-r { background: #FF5F57; }
+.tl-y { background: #FEBC2E; }
+.tl-g { background: #28C840; }
+.vs-bar-title { font-size: 12px; color: #666; margin-left: 8px; }
+
+.vs-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Activity bar ── */
+.actbar {
+  width: 48px;
+  background: #2C2C2C;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ab {
+  width: 36px; height: 36px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: #555;
+  font-size: 18px;
+  position: relative;
+  transition: color 0.1s;
+}
+.ab:hover { color: #CCC; }
+.ab.on { color: #CCC; background: rgba(255,255,255,0.06); }
+.ab.on::before {
+  content: '';
+  position: absolute;
+  left: -8px; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 22px;
+  background: #4338CA;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ── Sidebar panel ── */
+.sidebar {
+  width: 300px;
+  background: #252526;
+  border-right: 1px solid rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sb-titlerow {
+  height: 36px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 8px 0 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+.sb-title {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  color: #BBBBBB;
+}
+.sb-actions { display: flex; gap: 2px; }
+.ib {
+  width: 22px; height: 22px;
+  border-radius: 4px;
+  background: transparent; border: none;
+  color: #555; cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+}
+.ib:hover { background: rgba(255,255,255,0.07); color: #CCC; }
+
+.header-counts {
+  padding: 5px 20px 1px;
+  font-size: 10px;
+  color: #4A4A4A;
+}
+
+/* Search */
+.search-wrap {
+  padding: 6px 10px 5px;
+  display: flex; gap: 6px; align-items: center;
+}
+.search-inner {
+  flex: 1;
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px;
+  background: #3C3C3C;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+.search-inner:focus-within {
+  border-color: #4338CA;
+  box-shadow: 0 0 0 2px rgba(67,56,202,0.18);
+}
+.search-inner input {
+  flex: 1; background: none; border: none; outline: none;
+  font-size: 12px; color: #CCC; font-family: inherit;
+}
+.search-inner input::placeholder { color: #4A4A4A; }
+.sico { color: #4A4A4A; font-size: 12px; }
+.sort-b {
+  width: 28px; height: 28px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 6px;
+  color: #555; cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Scope tabs */
+.tabs {
+  display: flex;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+.tab {
+  flex: 1; padding: 6px 4px;
+  font-size: 12px; font-weight: 500; text-align: center;
+  cursor: pointer; color: #666;
+  border-bottom: 2px solid transparent;
+  transition: all 0.1s; user-select: none;
+}
+.tab:hover { color: #CCC; }
+.tab.on { color: #CCC; border-bottom-color: #4338CA; font-weight: 600; }
+
+/* Scrollable content */
+.sb-content {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+}
+.sb-content::-webkit-scrollbar { width: 5px; }
+.sb-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.09); border-radius: 3px; }
+.sb-content::-webkit-scrollbar-track { background: transparent; }
+
+/* Section header */
+.sec-h {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 10px 4px 20px;
+  background: rgba(255,255,255,0.02);
+  cursor: pointer; user-select: none;
+}
+.sec-h-left {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.7px; text-transform: uppercase;
+  color: #686868;
+}
+.chev {
+  font-size: 8px; color: #4A4A4A;
+  transition: transform 0.12s;
+  line-height: 1;
+}
+.sec-h.coll .chev { transform: rotate(-90deg); }
+.sec-meta { display: flex; align-items: center; gap: 8px; }
+.sec-cnt { font-size: 11px; color: #3E3E3E; font-weight: 400; }
+.add-b {
+  width: 16px; height: 16px;
+  background: none; border: none; cursor: pointer;
+  color: #4A4A4A; font-size: 17px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px;
+  transition: background 0.1s, color 0.1s;
+}
+.add-b:hover { background: rgba(67,56,202,0.15); color: #818CF8; }
+
+.sec-body.coll { display: none; }
+
+/* Items */
+.item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 7px 12px 7px 14px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  position: relative;
+  transition: background 0.08s;
+}
+.item:hover { background: rgba(255,255,255,0.03); }
+.item.sel { background: rgba(67,56,202,0.09); border-left-color: #4338CA; }
+
+/* Icon chip */
+.chip {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0; margin-top: 2px;
+}
+.c-red  { background: rgba(239,68,68,0.13); }
+.c-ind  { background: rgba(67,56,202,0.13); }
+.c-em   { background: rgba(16,185,129,0.13); }
+.c-vio  { background: rgba(139,92,246,0.13); }
+.c-amb  { background: rgba(245,158,11,0.13); }
+.c-sla  { background: rgba(100,116,139,0.13); }
+.c-tea  { background: rgba(20,184,166,0.13); }
+.c-rose { background: rgba(244,63,94,0.13); }
+
+.item-body { flex: 1; min-width: 0; }
+
+.item-name {
+  font-size: 13px; font-weight: 500;
+  color: #CCCCCC; line-height: 1.35;
+  display: flex; align-items: center; gap: 6px;
+}
+.nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.item-desc {
+  font-size: 11px; color: #6A6A6A;
+  line-height: 1.4; margin-top: 2px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.item-desc.ph { font-style: italic; color: #4A4A4A; }
+
+.more-b {
+  width: 20px; height: 20px;
+  background: none; border: none; color: #444;
+  cursor: pointer; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; opacity: 0; flex-shrink: 0; margin-top: 4px;
+  transition: opacity 0.08s;
+}
+.item:hover .more-b { opacity: 1; }
+.more-b:hover { background: rgba(67,56,202,0.15); color: #818CF8; }
+
+/* ① Provenance badges (NEW) */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
+  flex-shrink: 0; white-space: nowrap;
+}
+.b-claude { background: rgba(67,56,202,0.2); color: #818CF8; border: 1px solid rgba(67,56,202,0.28); }
+.b-codex  { background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(16,185,129,0.22); }
+.b-shared { background: rgba(100,116,139,0.14); color: #94A3B8; border: 1px solid rgba(100,116,139,0.2); }
+
+/* ④ Schedule chip (NEW) */
+.sched-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-top: 4px; padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(245,158,11,0.1);
+  border: 1px solid rgba(245,158,11,0.18);
+  color: #FBBF24; font-size: 10px; font-weight: 500;
+}
+
+/* ⑤ Frontmatter validation warning (NEW) */
+.val-warn {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 4px; padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.18);
+  color: #F87171; font-size: 10px;
+}
+
+/* ③ Flow attachment (NEW) */
+.flow-attach { font-size: 10px; color: #818CF8; margin-top: 3px; display: flex; align-items: center; gap: 3px; }
+.flow-standalone { font-size: 10px; color: #3E3E3E; margin-top: 3px; font-style: italic; }
+
+/* Annotation markers */
+.anno-m {
+  position: absolute; top: 5px; right: 30px;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: #5B21B6; color: white;
+  font-size: 9px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+  z-index: 5; pointer-events: none;
+}
+.sec-anno {
+  display: inline-flex;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: #5B21B6; color: white;
+  font-size: 9px; font-weight: 800;
+  align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Editor placeholder */
+.editor-ph {
+  flex: 1;
+  background: #1E1E1E;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 10px;
+  color: #2A2A2A;
+  font-size: 13px;
+  font-style: italic;
+}
+.editor-ph-icon { font-size: 32px; opacity: 0.15; }
+</style>
+</head>
+<body>
+
+<div class="proto-banner">
+  Sprint 77 Prototype · Agent Library Sidebar · Annotated new elements ①–⑤
+  <span class="proto-tag">DESIGN REVIEW</span>
+</div>
+
+<div class="page">
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-heading">New in Sprint 77</div>
+
+    <div class="anno-item">
+      <div class="anno-num">1</div>
+      <div class="anno-text">
+        <strong>Provenance badges</strong>
+        <span><code style="font-size:9px;background:rgba(67,56,202,0.2);color:#818CF8;padding:1px 4px;border-radius:2px">claude</code> / <code style="font-size:9px;background:rgba(16,185,129,0.14);color:#34D399;padding:1px 4px;border-radius:2px">codex</code> / <code style="font-size:9px;background:rgba(100,116,139,0.14);color:#94A3B8;padding:1px 4px;border-radius:2px">shared</code> on each skill. Shared = same skill folder in both .claude/ and .agents/.</span>
+      </div>
+    </div>
+
+    <div class="anno-item">
+      <div class="anno-num">2</div>
+      <div class="anno-text">
+        <strong>Flows section</strong>
+        <span>4th section, previously a separate activity-bar entry. Shows all .ritemark/flows/*.flow.json files.</span>
+      </div>
+    </div>
+
+    <div class="anno-item">
+      <div class="anno-num">3</div>
+      <div class="anno-text">
+        <strong>Attached-agent indicator</strong>
+        <span>Flow items show → Agent Name when referenced in an agent's routine: field. Standalone flows show "no agent attached".</span>
+      </div>
+    </div>
+
+    <div class="anno-item">
+      <div class="anno-num">4</div>
+      <div class="anno-text">
+        <strong>Schedule chip</strong>
+        <span>Agents with schedule: frontmatter show a ⏱ amber chip. Visible while Phase 2 daemon is not shipped.</span>
+      </div>
+    </div>
+
+    <div class="anno-item">
+      <div class="anno-num">5</div>
+      <div class="anno-text">
+        <strong>Validation warning</strong>
+        <span>Malformed frontmatter (e.g. schedule without runtime) shows a red warning chip below the description.</span>
+      </div>
+    </div>
+
+    <div class="legend-sep"></div>
+    <div class="legend-existing-label">Unchanged</div>
+    <div class="legend-existing-item">Agents section (3 existing items)</div>
+    <div class="legend-existing-item">Commands section</div>
+    <div class="legend-existing-item">Search, sort, scope tabs</div>
+    <div class="legend-existing-item">Context menu, Launch Chat</div>
+    <div class="legend-existing-item">Create / duplicate / move scope</div>
+  </div>
+
+  <!-- VS Code window -->
+  <div class="vscode">
+    <div class="vs-titlebar">
+      <div class="tl tl-r"></div>
+      <div class="tl tl-y"></div>
+      <div class="tl tl-g"></div>
+      <span class="vs-bar-title">Ritemark — workspace</span>
+    </div>
+
+    <div class="vs-body">
+
+      <!-- Activity bar -->
+      <div class="actbar">
+        <div class="ab on" title="Agent Library">🤖</div>
+        <div class="ab" title="Browser">🌐</div>
+        <div class="ab" title="Explorer" style="margin-top:auto">📁</div>
+        <div class="ab" title="Settings">⚙️</div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+
+        <div class="sb-titlerow">
+          <span class="sb-title">Agent Library</span>
+          <div class="sb-actions">
+            <button class="ib" title="Refresh">↻</button>
+            <button class="ib" title="More">⋯</button>
+          </div>
+        </div>
+
+        <div class="header-counts" id="counts">9 agents · 3 skills · 1 command · 2 flows</div>
+
+        <div class="search-wrap">
+          <div class="search-inner">
+            <span class="sico">🔍</span>
+            <input type="text" placeholder="Search" id="searchInput">
+          </div>
+          <button class="sort-b" title="Sort">↕</button>
+        </div>
+
+        <div class="tabs">
+          <div class="tab on" onclick="setTab('project',this)">Project</div>
+          <div class="tab" onclick="setTab('user',this)">User</div>
+        </div>
+
+        <div class="sb-content">
+
+          <!-- ── Agents ── -->
+          <div class="sec-h" onclick="toggleSec(this)">
+            <div class="sec-h-left">
+              <span class="chev">▾</span>
+              Agents
+            </div>
+            <div class="sec-meta">
+              <span class="sec-cnt">2</span>
+              <button class="add-b" title="New agent" onclick="event.stopPropagation()">+</button>
+            </div>
+          </div>
+          <div class="sec-body">
+
+            <!-- Bug Cruncher — has schedule -->
+            <div class="item sel" title=".claude/agents/bug-cruncher.md">
+              <div class="chip c-red">🐛</div>
+              <div class="item-body">
+                <div class="item-name"><span class="nm">Bug Cruncher</span></div>
+                <div class="item-desc">Triages new GitHub issues every 6 hours and writes a digest.</div>
+                <!-- ④ Schedule chip -->
+                <div class="sched-chip">⏱ every 6h · claude_local · ⚠ runs while Ritemark is open</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+              <div class="anno-m">4</div>
+            </div>
+
+            <!-- PR Reviewer — normal state -->
+            <div class="item" title=".claude/agents/pr-reviewer.md">
+              <div class="chip c-ind">🔍</div>
+              <div class="item-body">
+                <div class="item-name"><span class="nm">PR Reviewer</span></div>
+                <div class="item-desc">Reviews code changes, checks for issues, and manages the merge workflow.</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+            </div>
+
+          </div>
+
+          <!-- ── Skills ── -->
+          <div class="sec-h" onclick="toggleSec(this)">
+            <div class="sec-h-left">
+              <span class="chev">▾</span>
+              Skills
+              <!-- ① annotation on section header -->
+              <span class="sec-anno" style="margin-left:4px">1</span>
+            </div>
+            <div class="sec-meta">
+              <span class="sec-cnt">3</span>
+              <button class="add-b" title="New skill" onclick="event.stopPropagation()">+</button>
+            </div>
+          </div>
+          <div class="sec-body">
+
+            <!-- gh-issue-reader — claude only -->
+            <div class="item" title=".claude/skills/gh-issue-reader/SKILL.md">
+              <div class="chip c-em">⚡</div>
+              <div class="item-body">
+                <div class="item-name">
+                  <span class="nm">gh-issue-reader</span>
+                  <span class="badge b-claude">claude</span>
+                </div>
+                <div class="item-desc">Fetches and formats GitHub issues for agent consumption.</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+              <div class="anno-m">1</div>
+            </div>
+
+            <!-- markdown-digest-writer — shared (both locations) -->
+            <div class="item" title=".claude/skills/markdown-digest-writer/SKILL.md · .agents/skills/markdown-digest-writer/SKILL.md">
+              <div class="chip c-vio">📝</div>
+              <div class="item-body">
+                <div class="item-name">
+                  <span class="nm">markdown-digest-writer</span>
+                  <span class="badge b-shared">shared</span>
+                </div>
+                <div class="item-desc">Writes structured markdown digest documents from issue data.</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+              <div class="anno-m">1</div>
+            </div>
+
+            <!-- codex-summariser — codex only -->
+            <div class="item" title=".agents/skills/codex-summariser/SKILL.md">
+              <div class="chip c-tea">🤖</div>
+              <div class="item-body">
+                <div class="item-name">
+                  <span class="nm">codex-summariser</span>
+                  <span class="badge b-codex">codex</span>
+                </div>
+                <div class="item-desc">Summarises long documents using OpenAI Codex headless mode.</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+              <div class="anno-m">1</div>
+            </div>
+
+          </div>
+
+          <!-- ── Commands ── -->
+          <div class="sec-h" onclick="toggleSec(this)">
+            <div class="sec-h-left">
+              <span class="chev">▾</span>
+              Commands
+            </div>
+            <div class="sec-meta">
+              <span class="sec-cnt">1</span>
+            </div>
+          </div>
+          <div class="sec-body">
+
+            <div class="item" title=".claude/commands/triage-now.md">
+              <div class="chip c-amb">⚡</div>
+              <div class="item-body">
+                <div class="item-name"><span class="nm">/triage-now</span></div>
+                <div class="item-desc">Run the bug-cruncher triage immediately on demand.</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+            </div>
+
+          </div>
+
+          <!-- ── Flows (NEW ②) ── -->
+          <div class="sec-h" onclick="toggleSec(this)">
+            <div class="sec-h-left">
+              <span class="chev">▾</span>
+              Flows
+              <span class="sec-anno" style="margin-left:4px">2</span>
+            </div>
+            <div class="sec-meta">
+              <span class="sec-cnt">2</span>
+              <button class="add-b" title="New flow" onclick="event.stopPropagation()">+</button>
+            </div>
+          </div>
+          <div class="sec-body">
+
+            <!-- Attached flow -->
+            <div class="item" title=".ritemark/flows/bug-cruncher.flow.json">
+              <div class="chip c-red">🔄</div>
+              <div class="item-body">
+                <div class="item-name"><span class="nm">bug-cruncher.flow.json</span></div>
+                <!-- ③ Attachment indicator -->
+                <div class="flow-attach">↳ Bug Cruncher</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+              <div class="anno-m">3</div>
+            </div>
+
+            <!-- Standalone flow -->
+            <div class="item" title=".ritemark/flows/standalone.flow.json">
+              <div class="chip c-sla">🔄</div>
+              <div class="item-body">
+                <div class="item-name"><span class="nm">standalone.flow.json</span></div>
+                <div class="flow-standalone">no agent attached</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+              <div class="anno-m">2</div>
+            </div>
+
+          </div>
+
+          <!-- ── Validation example (collapsed by default, toggle to reveal) ── -->
+          <div class="sec-h coll" onclick="toggleSec(this)" style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.04)">
+            <div class="sec-h-left">
+              <span class="chev">▾</span>
+              ⚠ Validation example
+              <span class="sec-anno" style="margin-left:4px">5</span>
+            </div>
+            <div class="sec-meta">
+              <span class="sec-cnt" style="color:#F87171">1</span>
+            </div>
+          </div>
+          <div class="sec-body coll">
+            <div class="item" title=".claude/agents/broken-agent.md">
+              <div class="chip c-rose">💥</div>
+              <div class="item-body">
+                <div class="item-name"><span class="nm">broken-agent</span></div>
+                <div class="item-desc ph">No description in frontmatter</div>
+                <!-- ⑤ Validation warning -->
+                <div class="val-warn">⚠ schedule: requires runtime: and routine:</div>
+              </div>
+              <button class="more-b" title="More">⋯</button>
+              <div class="anno-m">5</div>
+            </div>
+          </div>
+
+        </div><!-- /sb-content -->
+      </div><!-- /sidebar -->
+
+      <!-- Editor area placeholder -->
+      <div class="editor-ph">
+        <div class="editor-ph-icon">📄</div>
+        <span>Editor area — see agent-editor-configurator.html for the new agent editor</span>
+      </div>
+
+    </div><!-- /vs-body -->
+  </div><!-- /vscode -->
+
+</div><!-- /page -->
+
+<script>
+function toggleSec(header) {
+  header.classList.toggle('coll');
+  const body = header.nextElementSibling;
+  if (body && body.classList.contains('sec-body')) {
+    body.classList.toggle('coll');
+  }
+}
+
+function setTab(scope, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  // In production: filter items by scope. For prototype, show all.
+}
+
+// Live search filter
+document.getElementById('searchInput').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.item').forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = !q || text.includes(q) ? '' : 'none';
+  });
+});
+</script>
+</body>
+</html>
