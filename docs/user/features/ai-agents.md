@@ -1,10 +1,12 @@
 # AI Agents
 
-> Three built-in AI agents for different workflows: Ritemark Agent, Claude, and Codex.
+> Two built-in AI agents for different workflows: Claude and Codex.
 
-Ritemark includes three AI agents in the sidebar, each with different capabilities and authentication methods. Switch between them using the dropdown at the top of the AI sidebar.
+Ritemark includes two AI agents in the sidebar, each with different capabilities and authentication methods. Switch between them using the dropdown at the top of the AI sidebar.
 
 If you want to manage custom helpers, see [Agent Library](agent-library.md) for creating, launching, and organizing your own agents and skills.
+
+> **Changed in v1.7.2:** The earlier "Ritemark Agent" runtime (a direct OpenAI/Gemini chat runtime, also known as the Legacy Agent) has been removed, along with the document-search (RAG) subsystem. Claude Code and Codex are now the only chat runtimes. Conversations you previously had with the Ritemark Agent still open **read-only** so your history is preserved.
 
 ---
 
@@ -12,28 +14,10 @@ If you want to manage custom helpers, see [Agent Library](agent-library.md) for 
 
 | Agent | Best for | Authentication | Status |
 |-------|----------|---------------|--------|
-| **Ritemark Agent** | Quick edits, document search, rephrasing | OpenAI or Google API key | Stable |
 | **Claude** | Autonomous file work, multi-turn sessions | Claude.ai account or Anthropic API key | Stable |
 | **Codex** | Coding tasks, autonomous coding agent | ChatGPT account (OAuth) | Experimental |
 
-In v1.6.3, agent selection is per turn inside a conversation. You can keep one thread open and switch runtimes without starting over.
-
----
-
-## Ritemark Agent
-
-The built-in agent for everyday writing tasks. It uses whichever AI provider you have configured (OpenAI or Google).
-
-**Capabilities:**
-- Rephrase selected text (shorter, longer, formal, casual)
-- Find and replace across documents
-- Insert new content at specific positions
-- Document search with RAG (retrieves relevant context from your workspace)
-- Chat naturally about your documents
-
-**Setup:** Configure an OpenAI or Google API key in Ritemark Settings (gear icon in titlebar).
-
-**No external installation required** - works immediately after API key configuration.
+Agent selection is per turn inside a conversation. You can keep one thread open and switch runtimes without starting over.
 
 ---
 
@@ -199,7 +183,6 @@ After installing a prerequisite, you may need to **reload the window** for Ritem
 
 ## Privacy
 
-- **Ritemark Agent**: Text is sent to OpenAI or Google's API
 - **Claude**: Text is sent to Anthropic's API via Claude Code
 - **Codex**: Text is sent to OpenAI's API via ChatGPT
 
@@ -209,5 +192,4 @@ All API keys and credentials are stored locally on your machine. Ritemark has no
 
 ## Related
 
-- [AI Assistant](ai-assistant.md) - Ritemark Agent tools (rephrase, replace, insert)
 - [Flows](flows.md) - Visual AI workflows using agents

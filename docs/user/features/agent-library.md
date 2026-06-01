@@ -110,6 +110,6 @@ The starter pack gives you a few working examples you can read, edit, duplicate,
 
 ## Related
 
-- [AI Agents](ai-agents.md) - Built-in Claude, Codex, and Ritemark Agent
+- [AI Agents](ai-agents.md) - Built-in Claude and Codex agents
 - [Set Up AI](../setup-ai.md) - Sign in and configure the built-in runtimes
 - [Getting Started](../getting-started.md) - First-run walkthrough

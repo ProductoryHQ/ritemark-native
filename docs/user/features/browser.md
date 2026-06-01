@@ -176,6 +176,5 @@ These are tracked as candidates for future sprints.
 
 ## Related
 
-- [AI Assistant](ai-assistant.md) — how to use the AI sidebar
 - [AI Agents](ai-agents.md) — Claude, Codex, and how to switch between them
 - [Set Up AI](../setup-ai.md) — configure AI and agent runtimes

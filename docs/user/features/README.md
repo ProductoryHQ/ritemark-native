@@ -25,7 +25,7 @@ Write and edit markdown with a visual editor.
 | [Core Editor](editor.md) | WYSIWYG markdown editing with auto-save |
 | [Text Formatting](formatting.md) | Bold, italic, links, and inline styles |
 | [Block Types](blocks.md) | Headings, lists, tables, code blocks |
-| [AI Assistant](ai-assistant.md) | Built-in chat sidebar with text tools |
+| [AI Agents](ai-agents.md) | Built-in Claude and Codex agents in the sidebar |
 | [Keyboard Shortcuts](keyboard-shortcuts.md) | Complete shortcut reference |
 
 ---
@@ -55,9 +55,8 @@ Build and run AI workflows.
 
 | Feature | Description |
 |---------|-------------|
-| [AI Agents](ai-agents.md) | Three built-in agents: Ritemark Agent, Claude, and Codex |
+| [AI Agents](ai-agents.md) | Two built-in agents: Claude and Codex |
 | [Agent Library](agent-library.md) | Create, launch, and manage custom agents and skills |
-| [AI Assistant](ai-assistant.md) | Ritemark Agent tools: rephrase, replace, insert |
 | [Browser](browser.md) | In-app browser with AI context — open `.html` files and localhost next to your markdown |
 | [Ritemark Flows](flows.md) | Visual AI workflow automation |
 
@@ -97,18 +96,15 @@ These work across all modes.
 
 ### AI Tools
 
-| Tool | What It Does |
-|------|--------------|
-| Rephrase | Rewrite selected text (shorter, formal, etc.) |
-| Find & Replace | Replace all occurrences |
-| Insert | Add text at specific position |
+Ritemark's AI lives in the sidebar as two agents — **Claude** and **Codex** — that can read and
+edit your files in a multi-turn conversation.
 
-[AI Assistant guide →](ai-assistant.md)
+[AI Agents guide →](ai-agents.md)
 
 ---
 
 ## Guides
 
 - [Getting Started](../guides/getting-started.md) - First-run walkthrough
-- [Set Up AI](../guides/setup-ai.md) - Configure OpenAI API key
+- [Set Up AI](../setup-ai.md) - Set up Claude and Codex (and OpenAI keys for Flows)
 - [Troubleshooting](../troubleshooting/common-issues.md) - Common issues and solutions

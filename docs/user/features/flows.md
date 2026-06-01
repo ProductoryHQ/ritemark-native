@@ -181,5 +181,5 @@ Flows require API keys configured in Ritemark Settings:
 
 ## Related
 
-- [AI Assistant](ai-assistant.md) - For single-prompt AI tasks
+- [AI Agents](ai-agents.md) - Claude and Codex in the sidebar
 - [Document Properties](document-properties.md) - YAML frontmatter for metadata
