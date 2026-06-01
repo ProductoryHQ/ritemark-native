@@ -77,4 +77,5 @@ mode, custom agent binary picker, Linux packaging, ACP session resume.
 | Date | Update |
 | --- | --- |
 | 2026-06-01 | Sprint created from issue #52 research. Branch renamed from `claude/serene-ride-STPCa` → `sprint-76-acp-opencode`. Five SDD artifacts drafted. |
-| 2026-06-01 | Spec Q2/Q3/Q4 resolved by Jarmo. **Next: Phase 0 audits (ACP e2e + bundling/notarization), then Q1 decision and Phase 2→3 approval.** Note: both audits require darwin-arm64 — to run on Jarmo's Mac or a local session, not in the remote (Linux) environment. |
+| 2026-06-01 | Spec Q2/Q3/Q4 resolved by Jarmo. |
+| 2026-06-01 | **Phase 0 deliverables complete:** ACP e2e audit (DECISION: ship via ACP), bundling audit (RECOMMENDATION: bundle, 103.7 MB), UX design spec, 13-state HTML prototypes. **Awaiting Jarmo: prototype review, Q1 + Q-UX1..5 decisions, Phase 2→3 approval.** Residual risks: OpenCode 1.15.13 lacks session/cancel (process-kill fallback planned); Bun-binary notarization unverified until first production build. |

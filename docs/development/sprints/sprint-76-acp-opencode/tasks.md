@@ -19,11 +19,12 @@
       **→ RECOMMENDATION: bundle (103.7 MB, half of Claude's binary)** (commit bf844d7)
 
 ### 0b: UX prototypes (added 2026-06-01 per Jarmo — user-facing surfaces approved before development)
-- [ ] ux-expert design pass: Settings → BYOK section (key fields, validation states, empty/configured states)
-- [ ] ux-expert design pass: agent selector + model picker with OpenCode entries
-      (provider-grouped models, "no keys configured" state)
-- [ ] Build reviewable HTML prototypes of both surfaces (ritemark-design tokens) under
-      `research/prototypes/`
+- [x] ux-expert design pass: Settings → BYOK section (key fields, validation states, empty/configured states)
+      **→ `research/ux-design-spec.md`** (commit 817dec8)
+- [x] ux-expert design pass: agent selector + model picker with OpenCode entries
+      (provider-grouped models, "no keys configured" state) **→ same spec** (commit 817dec8)
+- [x] Build reviewable HTML prototypes of both surfaces (ritemark-design tokens) under
+      `research/prototypes/` **→ index.html + settings.html (S1–S7) + model-picker.html (A1–A6)**
 - [ ] Jarmo reviews and approves both prototypes
 
 ### 0c: Gate

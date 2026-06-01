@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Settings — BYOK Provider Keys · Sprint 76 Prototype</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&display=swap');
+  :root {
+    --r-surface: #FFFFFF;
+    --r-surface-muted: #F8FAFC;
+    --r-surface-soft: #F1F5F9;
+    --r-hairline: #E2E8F0;
+    --r-hairline-strong: #CBD5E1;
+    --r-ink-strong: #1E1B4B;
+    --r-ink-body: #475569;
+    --r-ink-muted: #64748B;
+    --r-ink-faint: #94A3B8;
+    --r-accent: #4338CA;
+    --r-accent-deep: #3730A3;
+    --r-accent-soft: #E0E7FF;
+    --r-success: #22C55E;
+    --r-success-soft: #DCFCE7;
+    --r-error: #EF4444;
+    --r-error-soft: #FEE2E2;
+    --r-ring-color: rgba(67, 56, 202, 0.10);
+    --r-shadow-indigo-sm: 0 4px 6px -1px rgba(67, 56, 202, 0.25);
+    --r-shadow-sm: 0 1px 2px rgba(30,27,75,0.06), 0 1px 3px rgba(30,27,75,0.04);
+    --r-font-ui: 'Sofia Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  body { font-family: var(--r-font-ui); background: var(--r-surface-muted); color: var(--r-ink-strong); -webkit-font-smoothing: antialiased; }
+
+  /* primary CTA */
+  .btn-primary {
+    background: var(--r-accent); color: #fff; font-weight: 600; font-size: 13px;
+    padding: 9px 16px; border: 0; border-radius: 10px; cursor: pointer; line-height: 1;
+    box-shadow: var(--r-shadow-indigo-sm); transition: background 200ms ease;
+  }
+  .btn-primary:hover { background: var(--r-accent-deep); }
+  .btn-secondary {
+    background: var(--r-surface-soft); color: var(--r-ink-strong); font-weight: 500; font-size: 13px;
+    padding: 9px 16px; border: 0; border-radius: 10px; cursor: pointer; line-height: 1;
+  }
+  .btn-secondary:hover { background: var(--r-hairline); }
+  .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .rm-input {
+    width: 100%; padding: 8px 40px 8px 12px; font-size: 14px; border-radius: 6px;
+    background: var(--r-surface-soft); color: var(--r-ink-strong);
+    border: 1px solid var(--r-hairline-strong); outline: none;
+  }
+  .rm-input::placeholder { color: var(--r-ink-faint); }
+  .rm-input:focus { border-color: var(--r-accent); box-shadow: 0 0 0 4px var(--r-ring-color); }
+
+  /* state switcher */
+  .switch-btn {
+    padding: 5px 12px; font-size: 12px; font-weight: 500; border-radius: 4px;
+    border: 1px solid var(--r-hairline); background: var(--r-surface); color: var(--r-ink-body);
+    cursor: pointer; font-variant-numeric: tabular-nums;
+  }
+  .switch-btn:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+  .switch-btn.active { background: var(--r-accent-soft); border-color: var(--r-accent); color: var(--r-accent-deep); }
+  a.home-link:hover { text-decoration: underline; }
+  .anno {
+    background: #FEF9C3; border: 1px solid #FDE68A; color: #713F12;
+    border-radius: 8px; padding: 8px 11px; font-size: 11.5px; line-height: 1.45; max-width: 280px;
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Fixed state switcher bar -->
+  <div class="sticky top-0 z-20 border-b" style="background:var(--r-surface);border-color:var(--r-hairline)">
+    <div class="max-w-4xl mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
+      <a href="index.html" class="home-link text-xs font-medium" style="color:var(--r-accent-deep)">&larr; All states</a>
+      <span class="text-xs font-semibold" style="color:var(--r-ink-strong)">Settings · BYOK</span>
+      <div class="flex items-center gap-1.5 ml-auto" id="switcher"></div>
+    </div>
+  </div>
+
+  <!-- Page body: Settings "API Keys" section -->
+  <div class="max-w-4xl mx-auto px-6 py-8 relative">
+    <div id="stage"></div>
+  </div>
+
+<script>
+const MASK = '••••••••••••••••';
+
+// ---- Existing context cards (static, simplified) ----
+function existingCard({label, optional, configured, placeholder, masked, usedFor, linkText, linkHref}) {
+  return `
+  <div class="mb-4 p-5 rounded-[10px] bg-white border shadow-sm" style="border-color:var(--r-hairline)">
+    <div class="flex items-center justify-between mb-2">
+      <label class="text-sm font-medium" style="color:var(--r-ink-strong)">
+        ${label}${optional ? `<span class="ml-2 text-xs" style="color:var(--r-ink-muted)">(optional)</span>` : ''}
+      </label>
+      ${configured ? badge() : ''}
+    </div>
+    <div class="flex gap-2 mb-2">
+      <div class="flex-1 relative">
+        <input class="rm-input" type="${masked ? 'password' : 'text'}" ${masked ? `value="${MASK}"` : ''} placeholder="${placeholder}" />
+        ${eyeBtn()}
+      </div>
+      <button class="btn-primary">Save</button>
+      <button class="btn-secondary"${configured ? '' : ' disabled'}>Test</button>
+    </div>
+    <p class="text-xs mt-2" style="color:var(--r-ink-muted)">
+      Used for: ${usedFor}
+      <a href="#" class="ml-2 inline-flex items-center gap-1" style="color:var(--r-accent-deep)">${linkText} ${extLink()}</a>
+    </p>
+  </div>`;
+}
+
+// ---- BYOK provider card ----
+// opts: configured, masked, banner ('success'|'error'|null), hint(bool), inputValue(str)
+function byokCard(p, opts={}) {
+  const { configured=false, masked=false, banner=null, hint=false, inputValue=null } = opts;
+  const inputType = masked ? 'password' : 'text';
+  let valueAttr = '';
+  if (masked) valueAttr = `value="${MASK}"`;
+  else if (inputValue != null) valueAttr = `value="${inputValue}"`;
+  return `
+  <div class="mb-4 p-5 rounded-[10px] bg-white border shadow-sm" style="border-color:var(--r-hairline)">
+    <div class="flex items-center justify-between mb-2">
+      <label class="text-sm font-medium" style="color:var(--r-ink-strong)">
+        ${p.label}${p.optional ? `<span class="ml-2 text-xs" style="color:var(--r-ink-muted)">(optional)</span>` : ''}${p.subLabel ? `<span class="ml-2 text-xs" style="color:var(--r-ink-muted)">${p.subLabel}</span>` : ''}
+      </label>
+      ${configured ? badge() : ''}
+    </div>
+    <div class="flex gap-2 mb-2">
+      <div class="flex-1 relative">
+        <input class="rm-input" type="${inputType}" ${valueAttr} placeholder="${p.placeholder}" />
+        ${eyeBtn()}
+      </div>
+      <button class="btn-primary">Save</button>
+      <button class="btn-secondary"${configured ? '' : ' disabled'}>Test</button>
+    </div>
+    ${banner === 'success' ? successBanner() : ''}
+    ${banner === 'error' ? errorBanner('Invalid API key — check your key and try again.') : ''}
+    ${hint ? `<p class="text-xs mt-1" style="color:var(--r-ink-muted)">${p.hint} — double-check your key.</p>` : ''}
+    <p class="text-xs mt-2" style="color:var(--r-ink-muted)">
+      Used for: ${p.usedFor}
+      <a href="#" class="ml-2 inline-flex items-center gap-1" style="color:var(--r-accent-deep)">${p.linkText} ${extLink()}</a>
+    </p>
+  </div>`;
+}
+
+function badge() {
+  return `<span class="flex items-center gap-1 text-xs" style="color:var(--r-success)">${checkIcon('var(--r-success)',12)} Configured</span>`;
+}
+function successBanner() {
+  return `<div class="text-xs p-2 rounded mb-2 flex items-center gap-1" style="background:var(--r-success-soft);color:#15803D">${checkIcon('#15803D',12)} API key is valid</div>`;
+}
+function errorBanner(msg) {
+  return `<div class="text-xs p-2 rounded mb-2 flex items-center gap-1" style="background:var(--r-error-soft);color:#B91C1C">${xIcon('#B91C1C',12)} ${msg}</div>`;
+}
+function eyeBtn() {
+  return `<button class="absolute right-2 top-1/2 -translate-y-1/2 p-1" style="color:var(--r-ink-muted)" title="Show / hide">
+    <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,168a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z"/></svg>
+  </button>`;
+}
+function extLink() {
+  return `<svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" style="display:inline-block;vertical-align:-1px"><path d="M224,104a8,8,0,0,1-16,0V59.32l-66.33,66.34a8,8,0,0,1-11.32-11.32L196.68,48H152a8,8,0,0,1,0-16h64a8,8,0,0,1,8,8Zm-40,24a8,8,0,0,0-8,8v72H48V80h72a8,8,0,0,0,0-16H48A16,16,0,0,0,32,80V208a16,16,0,0,0,16,16H176a16,16,0,0,0,16-16V136A8,8,0,0,0,184,128Z"/></svg>`;
+}
+function checkIcon(color,s) {
+  return `<svg width="${s}" height="${s}" viewBox="0 0 256 256" fill="${color}"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>`;
+}
+function xIcon(color,s) {
+  return `<svg width="${s}" height="${s}" viewBox="0 0 256 256" fill="${color}"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>`;
+}
+function keyReturnIcon() {
+  return `<svg width="20" height="20" viewBox="0 0 256 256" fill="var(--r-ink-strong)"><path d="M160,16A80,80,0,0,0,84.4,121.18L26.34,179.27A20,20,0,0,0,20,193.93V224a8,8,0,0,0,8,8H64a8,8,0,0,0,8-8V208H88a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l11.51-11.51A80,80,0,1,0,160,16Zm12,72a16,16,0,1,1,16-16A16,16,0,0,1,172,88Z"/></svg>`;
+}
+
+// ---- Provider copy (exact from spec) ----
+const PROVIDERS = {
+  gemini: {
+    label: 'Google Gemini API Key', placeholder: 'AIza...',
+    hint: 'Gemini keys start with "AIza"',
+    usedFor: 'OpenCode — Gemini models (Gemini 3 Pro, Gemini 3 Flash, and others)',
+    linkText: 'Get a Gemini key', linkHref: 'https://aistudio.google.com/apikey'
+  },
+  openai: {
+    label: 'OpenAI API Key', subLabel: 'for OpenCode', placeholder: 'sk-...',
+    hint: 'OpenAI keys start with "sk-"',
+    usedFor: 'OpenCode — GPT models (GPT-5.2, GPT-4o, and others)',
+    linkText: 'Get an OpenAI key', linkHref: 'https://platform.openai.com/api-keys'
+  },
+  anthropic: {
+    label: 'Anthropic API Key', subLabel: 'for OpenCode', placeholder: 'sk-ant-...',
+    hint: 'Anthropic keys start with "sk-ant-"',
+    usedFor: 'OpenCode — Claude models via direct API key',
+    linkText: 'Get an Anthropic key', linkHref: 'https://console.anthropic.com/settings/keys'
+  },
+  openrouter: {
+    label: 'OpenRouter API Key', optional: true, placeholder: 'sk-or-...',
+    hint: 'OpenRouter keys start with "sk-or-"',
+    usedFor: 'OpenCode — hundreds of models from multiple providers through a single key',
+    linkText: 'Get an OpenRouter key', linkHref: 'https://openrouter.ai/keys'
+  }
+};
+
+// ---- Existing context cards (always rendered above BYOK) ----
+function existingSection() {
+  return `
+    ${existingCard({label:'OpenAI API Key', configured:true, masked:true, usedFor:'AI Chat, Flows (LLM), Image Generation (GPT Image 1.5)', linkText:'Get API key'})}
+    ${existingCard({label:'Google AI API Key', optional:true, placeholder:'AIza...', usedFor:'Flows (Gemini), Vision', linkText:'Get API key'})}
+    ${existingCard({label:'Anthropic API Key', optional:true, placeholder:'sk-ant-...', usedFor:'AI Chat (Claude), Flows (Claude)', linkText:'Get API key'})}
+  `;
+}
+
+// ---- BYOK sub-section wrapper ----
+function byokSubSection(cardsHTML) {
+  return `
+  <div class="mt-8 pt-8 border-t" style="border-color:var(--r-hairline)">
+    <div class="flex items-center gap-2 mb-1">
+      ${keyReturnIcon()}
+      <h3 class="text-lg font-semibold" style="color:var(--r-ink-strong)">Your Keys for OpenCode</h3>
+    </div>
+    <p class="text-sm mb-4 max-w-2xl leading-relaxed" style="color:var(--r-ink-muted)">
+      OpenCode is a local AI assistant that uses your own provider accounts. Add a key for any provider you have, and those models will appear in the OpenCode section of the AI assistant.
+    </p>
+    ${cardsHTML}
+  </div>`;
+}
+
+// ---- API Keys section shell ----
+function apiKeysSection(byokHTML) {
+  return `
+  <section class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <svg width="20" height="20" viewBox="0 0 256 256" fill="var(--r-ink-strong)"><path d="M160,16A80,80,0,0,0,84.4,121.18L26.34,179.27A20,20,0,0,0,20,193.93V224a8,8,0,0,0,8,8H64a8,8,0,0,0,8-8V208H88a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l11.51-11.51A80,80,0,1,0,160,16Zm12,72a16,16,0,1,1,16-16A16,16,0,0,1,172,88Z"/></svg>
+      <h2 class="text-lg font-semibold" style="color:var(--r-ink-strong)">API Keys</h2>
+    </div>
+    ${existingSection()}
+    ${byokHTML}
+  </section>`;
+}
+
+// ---- Annotation box ----
+function anno(id, text) {
+  return `<div class="absolute top-8 right-6 anno z-10"><strong>${id}</strong> — ${text}</div>`;
+}
+
+// ---- States ----
+function buildState(id) {
+  let byok = '';
+  let annotation = '';
+  switch (id) {
+    case 'S1':
+      byok = byokSubSection(
+        byokCard(PROVIDERS.gemini) + byokCard(PROVIDERS.openai) +
+        byokCard(PROVIDERS.anthropic) + byokCard(PROVIDERS.openrouter)
+      );
+      annotation = anno('S1', 'BYOK sub-section visible, all 4 provider cards empty. No status badges; Test disabled.');
+      break;
+    case 'S2':
+      byok = byokSubSection(
+        byokCard(PROVIDERS.gemini, {configured:true, masked:true}) +
+        byokCard(PROVIDERS.openai) + byokCard(PROVIDERS.anthropic) + byokCard(PROVIDERS.openrouter)
+      );
+      annotation = anno('S2', 'Gemini configured: green Configured badge + full-mask input + Test enabled. Other 3 empty.');
+      break;
+    case 'S3':
+      byok = byokSubSection(
+        byokCard(PROVIDERS.gemini, {configured:true, masked:true, banner:'success'}) +
+        byokCard(PROVIDERS.openai) + byokCard(PROVIDERS.anthropic) + byokCard(PROVIDERS.openrouter)
+      );
+      annotation = anno('S3', 'Gemini test success: green banner with check below input row.');
+      break;
+    case 'S4':
+      byok = byokSubSection(
+        byokCard(PROVIDERS.gemini, {configured:true, masked:true, banner:'error'}) +
+        byokCard(PROVIDERS.openai) + byokCard(PROVIDERS.anthropic) + byokCard(PROVIDERS.openrouter)
+      );
+      annotation = anno('S4', 'Gemini test failure: red banner with x — "Invalid API key — check your key and try again."');
+      break;
+    case 'S5':
+      byok = byokSubSection(
+        byokCard(PROVIDERS.gemini, {hint:true, inputValue:'my-key-here'}) +
+        byokCard(PROVIDERS.openai) + byokCard(PROVIDERS.anthropic) + byokCard(PROVIDERS.openrouter)
+      );
+      annotation = anno('S5', 'Gemini format hint: wrong-shape value "my-key-here" shows light inline hint. Does not block Save.');
+      break;
+    case 'S6':
+      byok = byokSubSection(
+        byokCard(PROVIDERS.gemini, {configured:true, masked:true}) +
+        byokCard(PROVIDERS.openai, {configured:true, masked:true}) +
+        byokCard(PROVIDERS.anthropic, {configured:true, masked:true}) +
+        byokCard(PROVIDERS.openrouter, {configured:true, masked:true})
+      );
+      annotation = anno('S6', 'All 4 BYOK cards configured: badge + masked input + Test enabled on each.');
+      break;
+    case 'S7':
+      byok = `<div class="mt-8 pt-8 border-t border-dashed" style="border-color:var(--r-hairline-strong)">
+        <p class="text-xs italic" style="color:var(--r-ink-faint)">[ Flag off — the &ldquo;Your Keys for OpenCode&rdquo; sub-section does not render here. No placeholder, no hidden div. The OpenAI / Google AI / Anthropic cards above are unaffected. ]</p>
+      </div>`;
+      annotation = anno('S7', 'opencode-integration flag OFF: BYOK sub-section absent entirely. Only existing cards remain. Dashed line + note here only annotate the absence; it is not part of the real UI.');
+      break;
+  }
+  return annotation + apiKeysSection(byok);
+}
+
+const STATES = ['S1','S2','S3','S4','S5','S6','S7'];
+
+function render(id) {
+  if (!STATES.includes(id)) id = 'S1';
+  document.getElementById('stage').innerHTML = buildState(id);
+  document.querySelectorAll('.switch-btn').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+  if (location.hash !== '#'+id) history.replaceState(null,'','#'+id);
+}
+
+// Build switcher
+const sw = document.getElementById('switcher');
+sw.innerHTML = STATES.map(s => `<button class="switch-btn" data-id="${s}">${s}</button>`).join('');
+sw.addEventListener('click', e => { if (e.target.dataset.id) render(e.target.dataset.id); });
+
+render((location.hash || '#S1').slice(1));
+window.addEventListener('hashchange', () => render((location.hash||'#S1').slice(1)));
+</script>
+</body>
+</html>
