@@ -1,4 +1,5 @@
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
+import { getMarkRange } from '@tiptap/core'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from './ui/Icon'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -51,10 +52,24 @@ export function FormattingBubbleMenu({
   useEffect(() => {
     if (externalLinkEdit) {
       setLinkUrl(externalLinkEdit.url)
-      // Pre-populate display text from current selection (Sprint 74 R4)
+      // Pre-populate display text (Sprint 74 R4 / #93). Clicking a link leaves
+      // a collapsed cursor inside it, so read the full link-mark range for the
+      // field. NOTE: do NOT mutate the editor selection here — dispatching a
+      // transaction inside this effect triggers a React render loop (#185).
+      // handleSetLink recomputes the same range when applying the update.
       if (editor) {
         const { from, to } = editor.state.selection
-        setLinkDisplayText(from !== to ? editor.state.doc.textBetween(from, to, ' ') : '')
+        if (from !== to) {
+          setLinkDisplayText(editor.state.doc.textBetween(from, to, ' '))
+        } else {
+          const range = getMarkRange(
+            editor.state.selection.$from,
+            editor.state.schema.marks.link,
+          )
+          setLinkDisplayText(
+            range ? editor.state.doc.textBetween(range.from, range.to, ' ') : '',
+          )
+        }
       }
       setUrlError('')
       setShowLinkDialog(true)
@@ -152,7 +167,19 @@ export function FormattingBubbleMenu({
     // with that text carrying the link mark. Empty/unchanged display text
     // preserves the original setLink behaviour.
     const displayText = linkDisplayText.trim()
-    const { from, to } = editor.state.selection
+    // When the cursor sits collapsed inside an existing link, operate on the
+    // whole link-mark range so Update replaces its text instead of inserting
+    // at the cursor (#93). With a real selection, respect it as-is.
+    const sel = editor.state.selection
+    let from = sel.from
+    let to = sel.to
+    if (sel.empty) {
+      const markRange = getMarkRange(sel.$from, editor.state.schema.marks.link)
+      if (markRange) {
+        from = markRange.from
+        to = markRange.to
+      }
+    }
     const selectedText = from !== to ? editor.state.doc.textBetween(from, to, ' ') : ''
 
     let success: boolean
