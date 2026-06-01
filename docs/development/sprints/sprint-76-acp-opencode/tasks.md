@@ -25,11 +25,12 @@
       (provider-grouped models, "no keys configured" state) **→ same spec** (commit 817dec8)
 - [x] Build reviewable HTML prototypes of both surfaces (ritemark-design tokens) under
       `research/prototypes/` **→ index.html + settings.html (S1–S7) + model-picker.html (A1–A6)**
-- [ ] Jarmo reviews and approves both prototypes
+- [x] Jarmo reviews and approves both prototypes (model picker explicitly approved; Settings
+      approved 2026-06-01 "last time I checked it was all good")
 
 ### 0c: Gate
-- [ ] Jarmo's Q1 decision (bundle vs download) based on audit data
-- [ ] **⛔ GATE: Jarmo approves spec + audits + prototypes before Phase 1 (CLAUDE.md Sprint Phase 2→3 gate).**
+- [x] Jarmo's Q1 decision (bundle vs download) based on audit data **→ BUNDLE** (sprint approval)
+- [x] **GATE PASSED 2026-06-01: sprint approved by Jarmo ("the sprint is approved, please proceed")**
 
 ## Phase 1: ACP client core (R1) — ✅ complete 2026-06-01
 
