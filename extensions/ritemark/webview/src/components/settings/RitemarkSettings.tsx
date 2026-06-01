@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
+import { Switch } from '../ui/switch';
 import { vscode } from '../../lib/vscode';
 import { Slider } from '../ui/slider';
 
@@ -24,6 +25,11 @@ interface SettingsData {
   googleKeyConfigured: boolean;
   anthropicKey: string;
   anthropicKeyConfigured: boolean;
+  opencodeEnabled: boolean;
+  opencodeAutoApprove: boolean;
+  openrouterEnabled: boolean;
+  openrouterKey: string;
+  openrouterKeyConfigured: boolean;
   chatFontSize: number;
   currentTheme: string;
   availableThemes: ThemeInfo[];
@@ -127,7 +133,7 @@ interface CodexAuthStatus {
 }
 
 interface TestResult {
-  key: 'openai' | 'google' | 'anthropic';
+  key: 'openai' | 'google' | 'anthropic' | 'openrouter';
   success: boolean;
   error?: string;
   message?: string;
@@ -138,12 +144,15 @@ export function RitemarkSettings() {
   const [openaiKey, setOpenaiKey] = useState('');
   const [googleKey, setGoogleKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
+  const [openrouterKey, setOpenrouterKey] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
+  const [showOpenrouterKey, setShowOpenrouterKey] = useState(false);
   const [testingOpenai, setTestingOpenai] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
+  const [testingOpenrouter, setTestingOpenrouter] = useState(false);
   // Track last manual update-check click. Used to show the spinner during the
   // brief gap between click and the backend's first 'checking' state push,
   // and to time-out the spinner if the backend never reports back (defensive
@@ -174,6 +183,9 @@ export function RitemarkSettings() {
           if (!anthropicKey && message.data.anthropicKey) {
             setAnthropicKey(message.data.anthropicKey);
           }
+          if (!openrouterKey && message.data.openrouterKey) {
+            setOpenrouterKey(message.data.openrouterKey);
+          }
           break;
 
         case 'testResult':
@@ -181,6 +193,7 @@ export function RitemarkSettings() {
           if (message.key === 'openai') setTestingOpenai(false);
           if (message.key === 'google') setTestingGoogle(false);
           if (message.key === 'anthropic') setTestingAnthropic(false);
+          if (message.key === 'openrouter') setTestingOpenrouter(false);
           break;
 
         case 'codex:authStatus':
@@ -251,7 +264,13 @@ export function RitemarkSettings() {
   const handleSaveApiKey = (keyName: string, value: string) => {
     vscode.postMessage({ type: 'setApiKey', key: keyName, value });
     // Clear test result when key changes
-    const resultKey = keyName === 'openai-api-key' ? 'openai' : keyName === 'anthropic-api-key' ? 'anthropic' : 'google';
+    const resultKey = keyName === 'openai-api-key'
+      ? 'openai'
+      : keyName === 'anthropic-api-key'
+        ? 'anthropic'
+        : keyName === 'openrouter-api-key'
+          ? 'openrouter'
+          : 'google';
     setTestResults((prev) => {
       const next = { ...prev };
       delete next[resultKey];
@@ -264,6 +283,8 @@ export function RitemarkSettings() {
       setTestingOpenai(true);
     } else if (keyName === 'anthropic-api-key') {
       setTestingAnthropic(true);
+    } else if (keyName === 'openrouter-api-key') {
+      setTestingOpenrouter(true);
     } else {
       setTestingGoogle(true);
     }
@@ -754,6 +775,21 @@ export function RitemarkSettings() {
             )}
           </div>
 
+        {/* OpenCode runtime settings — only when the opencode-integration flag is on */}
+        {settings.opencodeEnabled && (
+          <div className="mb-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+            <label className="text-sm font-medium text-ink-strong block mb-2">
+              OpenCode
+            </label>
+            <ToggleRow
+              label="Auto-approve edits & tool calls"
+              description="Skip the approval card and let OpenCode edit files and run tools within the workspace automatically. Writes outside the workspace are still blocked. Use with caution."
+              checked={settings.opencodeAutoApprove ?? false}
+              onChange={(v) => handleToggle('opencode.autoApprove', v)}
+            />
+          </div>
+        )}
+
         {/* OpenAI */}
         <div className="mb-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -821,7 +857,7 @@ export function RitemarkSettings() {
           )}
 
           <p className="text-xs text-ink-muted mt-2">
-            Used for: AI Chat, Flows (LLM), Image Generation (GPT Image 1.5)
+            Used for: AI Chat, Flows (LLM), Image Generation (GPT Image 1.5){settings.opencodeEnabled ? ', OpenCode (GPT models)' : ''}
             <a
               href="https://platform.openai.com/api-keys"
               className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
@@ -899,7 +935,7 @@ export function RitemarkSettings() {
           )}
 
           <p className="text-xs text-ink-muted mt-2">
-            Used for: Gemini models, Imagen 3 (coming soon)
+            Used for: {settings.opencodeEnabled ? 'Gemini models in OpenCode, Flows' : 'Gemini models, Flows'}
             <a
               href="https://aistudio.google.com/apikey"
               className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
@@ -976,7 +1012,7 @@ export function RitemarkSettings() {
           )}
 
           <p className="text-xs text-ink-muted mt-2">
-            Used for: Claude in Ritemark (alternative to signing in with Claude.ai)
+            Used for: Claude in Ritemark (alternative to signing in with Claude.ai){settings.opencodeEnabled ? ', OpenCode (Claude models)' : ''}
             <a
               href="https://console.anthropic.com/settings/keys"
               className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
@@ -985,6 +1021,86 @@ export function RitemarkSettings() {
             </a>
           </p>
         </div>
+
+        {/* OpenRouter API Key — optional, flag-gated */}
+        {settings.openrouterEnabled && (
+          <div className="mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-ink-strong">
+                OpenRouter API Key
+                <span className="ml-2 text-xs text-ink-muted">(optional)</span>
+              </label>
+              {settings.openrouterKeyConfigured && (
+                <span className="flex items-center gap-1 text-xs text-ritemark-success">
+                  <Icon name="check" size={12} />
+                  Configured
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-2 mb-2">
+              <div className="flex-1 relative">
+                <input
+                  type={showOpenrouterKey ? 'text' : 'password'}
+                  value={openrouterKey}
+                  onChange={(e) => setOpenrouterKey(e.target.value)}
+                  placeholder="sk-or-..."
+                  className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
+                />
+                <button
+                  onClick={() => setShowOpenrouterKey(!showOpenrouterKey)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
+                >
+                  {showOpenrouterKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
+                </button>
+              </div>
+              <Button
+                onClick={() => handleSaveApiKey('openrouter-api-key', openrouterKey)}
+                size="lg"
+              >
+                Save
+              </Button>
+              <Button
+                onClick={() => handleTestApiKey('openrouter-api-key')}
+                disabled={!settings.openrouterKeyConfigured || testingOpenrouter}
+                variant="secondary"
+                size="lg"
+              >
+                {testingOpenrouter ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
+              </Button>
+            </div>
+
+            {testResults.openrouter && (
+              <div
+                className={`text-xs p-2 rounded ${
+                  testResults.openrouter.success
+                    ? 'bg-ritemark-success-soft text-ritemark-success'
+                    : 'bg-ritemark-error-soft text-ritemark-error'
+                }`}
+              >
+                {testResults.openrouter.success ? (
+                  <span className="flex items-center gap-1">
+                    <Icon name="check" size={12} /> {testResults.openrouter.message || 'API key is valid'}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <Icon name="x" size={12} /> {testResults.openrouter.error}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs text-ink-muted mt-2">
+              Used for: OpenCode — hundreds of models from multiple providers through a single key
+              <a
+                href="https://openrouter.ai/keys"
+                className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
+              >
+                Get an OpenRouter key <Icon name="arrow-square-out" size={12} />
+              </a>
+            </p>
+          </div>
+        )}
 
       </section>
 
@@ -1703,22 +1819,11 @@ function ToggleRow({ label, description, checked, onChange, badge }: ToggleRowPr
         </div>
         <div className="text-xs text-ink-muted">{description}</div>
       </div>
-      <button
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative w-10 h-6 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)] ${
-          checked
-            ? 'bg-primary shadow-ritemark-accent'
-            : 'bg-surface-soft border border-hairline-strong'
-        }`}
-      >
-        <span
-          className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-            checked ? 'translate-x-4' : 'translate-x-0'
-          }`}
-        />
-      </button>
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
+        className="mt-0.5 shrink-0"
+      />
     </div>
   );
 }

@@ -134,6 +134,75 @@
         "redistribution": "permitted-by-vendor-confirmation",
         "noticeUrl": "https://code.claude.com/docs/en/legal-and-compliance"
       }
+    },
+    {
+      "agent": "opencode",
+      "vendor": "sst",
+      "version": "1.15.13",
+      "platform": "darwin",
+      "arch": "arm64",
+      "sourceType": "npm-optional-package",
+      "npmPackage": "opencode-darwin-arm64",
+      "sourceUrl": "https://registry.npmjs.org/opencode-darwin-arm64/-/opencode-darwin-arm64-1.15.13.tgz",
+      "archiveFilename": "opencode-darwin-arm64-1.15.13.tgz",
+      "archiveFormat": "tar.gz",
+      "sha256": "e0546a2ce7fc64afaebd94cd07906587f66830e669ee0fa5eaf3e7492f92501b",
+      "archivePath": "package/bin/opencode",
+      "installName": "opencode",
+      "invocationMode": "acp",
+      "validationArgs": ["--version"],
+      "expectedFileArchPattern": "Mach-O 64-bit executable arm64",
+      "license": {
+        "spdx": "MIT",
+        "redistribution": "permitted",
+        "noticeUrl": "https://github.com/sst/opencode/blob/dev/LICENSE"
+      }
+    },
+    {
+      "agent": "opencode",
+      "vendor": "sst",
+      "version": "1.15.13",
+      "platform": "darwin",
+      "arch": "x64",
+      "sourceType": "npm-optional-package",
+      "npmPackage": "opencode-darwin-x64",
+      "sourceUrl": "https://registry.npmjs.org/opencode-darwin-x64/-/opencode-darwin-x64-1.15.13.tgz",
+      "archiveFilename": "opencode-darwin-x64-1.15.13.tgz",
+      "archiveFormat": "tar.gz",
+      "sha256": "69b08a76a80b1c218549998ceaca67ebab7e7b5ceb81e37d8248307a2082ca37",
+      "archivePath": "package/bin/opencode",
+      "installName": "opencode",
+      "invocationMode": "acp",
+      "validationArgs": ["--version"],
+      "expectedFileArchPattern": "Mach-O 64-bit executable x86_64",
+      "license": {
+        "spdx": "MIT",
+        "redistribution": "permitted",
+        "noticeUrl": "https://github.com/sst/opencode/blob/dev/LICENSE"
+      }
+    },
+    {
+      "agent": "opencode",
+      "vendor": "sst",
+      "version": "1.15.13",
+      "platform": "win32",
+      "arch": "x64",
+      "sourceType": "npm-optional-package",
+      "npmPackage": "opencode-windows-x64",
+      "sourceUrl": "https://registry.npmjs.org/opencode-windows-x64/-/opencode-windows-x64-1.15.13.tgz",
+      "archiveFilename": "opencode-windows-x64-1.15.13.tgz",
+      "archiveFormat": "tar.gz",
+      "sha256": "91b56b77f69089975d4d7bc674be54b523347de2251302d466cea1ef317913a5",
+      "archivePath": "package/bin/opencode.exe",
+      "installName": "opencode.exe",
+      "invocationMode": "acp",
+      "validationArgs": ["--version"],
+      "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows",
+      "license": {
+        "spdx": "MIT",
+        "redistribution": "permitted",
+        "noticeUrl": "https://github.com/sst/opencode/blob/dev/LICENSE"
+      }
     }
   ]
 }

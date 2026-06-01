@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'fs';
 import { basename, join, resolve, dirname } from 'path';
 
-export type AgentRuntimeKind = 'claude' | 'codex-cli' | 'codex-app-server';
+// Sprint 76 R2: 'opencode' — bundled ACP agent runtime
+export type AgentRuntimeKind = 'claude' | 'codex-cli' | 'codex-app-server' | 'opencode';
 
 export interface BundledAgentRuntime {
   kind: AgentRuntimeKind;
@@ -27,6 +28,11 @@ function executableNames(kind: AgentRuntimeKind, platform: NodeJS.Platform): str
 
   if (kind === 'codex-app-server') {
     return [`codex-app-server${extension}`];
+  }
+
+  // Sprint 76 R2: OpenCode ACP agent binary
+  if (kind === 'opencode') {
+    return [`opencode${extension}`];
   }
 
   return platform === 'win32'

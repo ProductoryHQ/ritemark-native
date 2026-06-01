@@ -9,6 +9,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore } from './store';
 import { Icon } from '../ui/Icon';
+import { Button } from '../ui/button';
 import { UserPromptBubble, AIResponseBubble } from './ChatBubbles';
 import { RunningIndicator } from './RunningIndicator';
 import { AgentQuestion } from './AgentQuestion';
@@ -89,6 +90,7 @@ export function CodexView() {
           turn={turn}
           isMixedRuntime={isMixedRuntime}
           onApprove={(requestId) => handleCodexApproval(requestId, true)}
+          onApproveAlways={(requestId) => handleCodexApproval(requestId, true, true)}
           onReject={(requestId) => handleCodexApproval(requestId, false)}
           onAnswerQuestion={answerCodexQuestion}
           onApprovePlan={approveCodexPlan}
@@ -136,6 +138,7 @@ export function CodexTurn({
   turn,
   isMixedRuntime,
   onApprove,
+  onApproveAlways,
   onReject,
   onAnswerQuestion,
   onApprovePlan,
@@ -144,6 +147,7 @@ export function CodexTurn({
   turn: CodexConversationTurn;
   isMixedRuntime: boolean;
   onApprove: (requestId: string | number) => void;
+  onApproveAlways: (requestId: string | number) => void;
   onReject: (requestId: string | number) => void;
   onAnswerQuestion: (turnId: string, question: NonNullable<CodexConversationTurn['pendingQuestion']>, answers: Record<string, string>) => void;
   onApprovePlan: (turnId: string) => void;
@@ -164,13 +168,16 @@ export function CodexTurn({
     && turn.streamingText.trim().length > 0
     && rawPlanText.trim() === turn.streamingText.trim();
 
+  // OpenCode reuses this Codex turn shape/rendering — label by provenance.
+  const runtimeLabel = turn.runtime === 'opencode' ? 'OpenCode' : 'Codex';
+
   return (
     <div className="space-y-2">
       {/* Runtime provenance — only in mixed-runtime conversations */}
       {isMixedRuntime && (
         <div className="flex items-center gap-1 text-[10px] text-[var(--r-ink-faint)] select-none">
           <Icon name="terminal" size={12} />
-          <span>Codex</span>
+          <span>{runtimeLabel}</span>
         </div>
       )}
 
@@ -193,6 +200,7 @@ export function CodexTurn({
         <ApprovalCard
           approval={turn.approval}
           onApprove={onApprove}
+          onApproveAlways={onApproveAlways}
           onReject={onReject}
         />
       )}
@@ -204,7 +212,7 @@ export function CodexTurn({
             toolUseId: String(turn.pendingQuestion.requestId),
             questions: turn.pendingQuestion.questions,
           }}
-          providerLabel="Codex"
+          providerLabel={runtimeLabel}
           onAnswer={(turnId, _question, answers) => onAnswerQuestion(turnId, turn.pendingQuestion!, answers)}
         />
       )}
@@ -378,13 +386,18 @@ function ActivityLine({ activity }: { activity: AgentProgress }) {
 function ApprovalCard({
   approval,
   onApprove,
+  onApproveAlways,
   onReject,
 }: {
   approval: NonNullable<CodexConversationTurn['approval']>;
   onApprove: (requestId: string | number) => void;
+  onApproveAlways: (requestId: string | number) => void;
   onReject: (requestId: string | number) => void;
 }) {
   const isCommand = approval.approvalType === 'command';
+  // "Always allow for this session" is wired for ACP/OpenCode approvals
+  // (requestId prefixed "acp-"); the host remembers the decision per session.
+  const supportsAlwaysAllow = String(approval.requestId).startsWith('acp-');
 
   return (
     <div className="mx-1 rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-input-background)]/80 p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
@@ -428,18 +441,22 @@ function ApprovalCard({
 
       {/* Buttons */}
       <div className="flex gap-2">
-        <button
-          onClick={() => onApprove(approval.requestId)}
-          className="flex items-center gap-1 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)]"
-        >
+        <Button variant="default" size="sm" onClick={() => onApprove(approval.requestId)}>
           <Icon name="check" size={12} /> Approve
-        </button>
-        <button
-          onClick={() => onReject(approval.requestId)}
-          className="flex items-center gap-1 rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-1 text-xs font-medium text-[var(--r-ink-body)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
-        >
+        </Button>
+        {supportsAlwaysAllow && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onApproveAlways(approval.requestId)}
+            title="Approve this and skip future approvals for the rest of this session"
+          >
+            <Icon name="check" size={12} /> Always allow
+          </Button>
+        )}
+        <Button variant="outline" size="sm" onClick={() => onReject(approval.requestId)}>
           <Icon name="x" size={12} /> Reject
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@
 
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
-export type AgentId = 'claude-code' | 'codex';
+export type AgentId = 'claude-code' | 'codex' | 'opencode';
 
 export interface AgentInfo {
   id: AgentId;
@@ -284,6 +284,12 @@ export interface CodexSidebarStatus {
 
 export interface CodexConversationTurn {
   id: string;
+  /**
+   * Which runtime produced this turn. OpenCode reuses the Codex turn shape +
+   * rendering path, so this marks provenance for the header label. Absent =
+   * Codex (backward compatible with saved conversations).
+   */
+  runtime?: 'codex' | 'opencode';
   userPrompt: string;
   requestedPlanMode?: boolean;
   /** Active file path that was included as context */
@@ -315,10 +321,26 @@ export interface CodexConversationTurn {
 
 // ── Messages from extension → webview ──
 
+/** BYOK provider availability flags — one boolean per provider. */
+export interface AcpProviderFlags {
+  google: boolean;
+  openai: boolean;
+  anthropic: boolean;
+  openrouter: boolean;
+}
+
+/** Curated model list for each BYOK provider. */
+export interface ByokModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
 export type ExtensionMessage =
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
-  | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null }
+  | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]> }
+  | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
   | { type: 'ai-streaming'; content: string }

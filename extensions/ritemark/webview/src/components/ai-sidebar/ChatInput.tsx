@@ -199,13 +199,24 @@ export function ChatInput() {
   const allCommands = useMemo(() => mergeCommands(discoveredCommands), [discoveredCommands]);
 
   const sendCodexMessage = useAISidebarStore((s) => s.sendCodexMessage);
+  const sendOpenCodeMessage = useAISidebarStore((s) => s.sendOpenCodeMessage);
   const codexConversation = useAISidebarStore((s) => s.codexConversation);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
+  const acpProviders = useAISidebarStore((s) => s.acpProviders);
+  const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
+  const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
+  const opencodeSelectedModel = useAISidebarStore((s) => s.opencodeSelectedModel);
+  const selectOpenCodeModel = useAISidebarStore((s) => s.selectOpenCodeModel);
+  const openAgentSettings = useAISidebarStore((s) => s.openAgentSettings);
 
   // Route by pendingRuntime so switching provider mid-session takes effect immediately
   const isClaudeCode = pendingRuntime.runtimeId === 'claude-code';
   const isCodex = pendingRuntime.runtimeId === 'codex';
-  const isAgentMode = isClaudeCode || isCodex;
+  const isOpenCode = (pendingRuntime.runtimeId as string) === 'opencode';
+  const isAgentMode = isClaudeCode || isCodex || isOpenCode;
+  // OpenCode zero-key check: all four provider booleans are false
+  const openCodeHasNoKeys = isOpenCode && acpProviders
+    && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
   const lastTurn = agentConversation[agentConversation.length - 1];
   const lastCodexTurn = codexConversation[codexConversation.length - 1];
   // Check both arrays — cancel routes by active turn, not by selected agent
@@ -219,7 +230,9 @@ export function ChatInput() {
       ? 'Ask Claude... (type @ to mention an agent, / for commands)'
       : isCodex
         ? 'Ask Codex... (type / for commands)'
-        : 'Ask anything... (type / for commands)';
+        : isOpenCode
+          ? 'Ask OpenCode... (type / for commands)'
+          : 'Ask anything... (type / for commands)';
   const hasSelectedContext = !selection.isEmpty && !!selection.text;
 
   // Build final message with path chips and pinned agent prepended
@@ -240,6 +253,8 @@ export function ChatInput() {
   const handleSend = useCallback((overridePrompt?: string) => {
     const prompt = overridePrompt ?? buildFinalPrompt();
     if (!prompt) return;
+    // Block send when OpenCode has no keys (#76)
+    if (isOpenCode && openCodeHasNoKeys) return;
 
     // Sprint 74 R2 (#82): while the agent runs, park the prompt in the queue
     // instead of dropping the send. Auto-sent when the run completes.
@@ -283,7 +298,9 @@ export function ChatInput() {
       .map((m) => discoveredAgents.find((a) => a.id === m.agentId)?.filePath)
       .filter((p): p is string => !!p);
 
-    if (isCodex) {
+    if (isOpenCode) {
+      sendOpenCodeMessage(prompt);
+    } else if (isCodex) {
       sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined, pendingRuntime.mode, hideBrowserContext);
     } else {
       sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext: hideBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
@@ -301,7 +318,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isAgentMode, isClaudeCode, isCodex, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on
@@ -755,12 +772,28 @@ export function ChatInput() {
   const canUseCodex = visibleAgents.some((a) => a.id === 'codex');
   const currentClaudeModel = models.find((m) => m.id === selectedModel) || models[0];
   const currentCodexModel = codexModels.find((m) => m.id === codexSelectedModel) || codexModels[0];
-  const runtimeSelectValue = pendingRuntime.runtimeId === 'codex'
-    ? `codex:${currentCodexModel?.id || codexSelectedModel}`
-    : `claude-code:${currentClaudeModel?.id || selectedModel}`;
-  const runtimeFooterLabel = pendingRuntime.runtimeId === 'codex'
-    ? `Codex · ${currentCodexModel?.label || codexSelectedModel || 'Model'}`
-    : `Claude · ${currentClaudeModel?.label || selectedModel || 'Model'}`;
+  // Sprint 76 R6: OpenCode model picker — only providers whose key is configured.
+  const openCodeModels: { compositeValue: string; label: string; description: string }[] = [];
+  if (opencodeEnabled && byokProviderModels) {
+    for (const provider of ['google', 'openai', 'anthropic', 'openrouter'] as const) {
+      if (acpProviders?.[provider]) {
+        for (const m of byokProviderModels[provider] || []) {
+          openCodeModels.push({ compositeValue: `opencode:${provider}/${m.id}`, label: m.label, description: m.description });
+        }
+      }
+    }
+  }
+  const currentOpenCodeEntry = openCodeModels.find((m) => m.compositeValue === opencodeSelectedModel);
+  const runtimeSelectValue = isOpenCode
+    ? (opencodeSelectedModel || 'opencode:')
+    : pendingRuntime.runtimeId === 'codex'
+      ? `codex:${currentCodexModel?.id || codexSelectedModel}`
+      : `claude-code:${currentClaudeModel?.id || selectedModel}`;
+  const runtimeFooterLabel = isOpenCode
+    ? `OpenCode · ${currentOpenCodeEntry?.label || 'Select a model…'}`
+    : pendingRuntime.runtimeId === 'codex'
+      ? `Codex · ${currentCodexModel?.label || codexSelectedModel || 'Model'}`
+      : `Claude · ${currentClaudeModel?.label || selectedModel || 'Model'}`;
   const contextCount = (showActiveFileChip ? 1 : 0) + (showBrowserContextChip ? 1 : 0) + pathChips.length;
   const contextSummary = [
     attachmentCount > 0 ? `${attachmentCount} attached` : null,
@@ -783,6 +816,14 @@ export function ChatInput() {
       }
       selectCodexModel(modelId);
       setPendingRuntime({ runtimeId: 'codex', modelId });
+    } else if (value.startsWith('opencode:')) {
+      // composite: opencode:<provider>/<model> — host expects bare provider/model
+      const providerModel = value.slice('opencode:'.length);
+      if (selectedAgent !== 'opencode') {
+        selectAgent('opencode' as AgentId);
+      }
+      selectOpenCodeModel(value);
+      setPendingRuntime({ runtimeId: 'opencode', modelId: providerModel });
     }
   }
 
@@ -1097,6 +1138,48 @@ export function ChatInput() {
                       </SelectItem>
                     );
                   })}
+                </SelectGroup>
+              )}
+              {/* Sprint 76 R6/R7: OpenCode — provider/model rows, flag-gated */}
+              {opencodeEnabled && ((canUseClaude && models.length > 0) || (canUseCodex && codexModels.length > 0)) && <SelectSeparator />}
+              {opencodeEnabled && (
+                <SelectGroup>
+                  <SelectLabel className="text-[10px]">OpenCode</SelectLabel>
+                  {openCodeModels.length > 0 ? (
+                    openCodeModels.map((entry) => (
+                      <SelectItem
+                        key={entry.compositeValue}
+                        value={entry.compositeValue}
+                        className="items-start py-1.5"
+                      >
+                        <div className="block w-full">
+                          <div className="text-[13px] font-medium text-[var(--r-ink-strong)] leading-tight">
+                            {entry.label}
+                          </div>
+                          {entry.description && (
+                            <div className="text-[11px] text-[var(--r-ink-muted)] leading-snug mt-0.5">
+                              {entry.description}
+                            </div>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    /* A2: no provider keys configured — non-selectable row */
+                    <div className="px-2 py-1.5 flex items-center gap-1.5">
+                      <span className="text-[11px] text-[var(--r-ink-muted)]">Add API keys to use OpenCode</span>
+                      <button
+                        className="text-[11px] text-[var(--r-accent-deep)] cursor-pointer hover:underline bg-transparent border-none p-0"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openAgentSettings();
+                        }}
+                      >
+                        Open Settings
+                      </button>
+                    </div>
+                  )}
                 </SelectGroup>
               )}
             </SelectContent>

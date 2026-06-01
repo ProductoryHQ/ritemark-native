@@ -23,9 +23,10 @@ function safeSerialize(value: unknown): string {
 
 function isTraceEnabled(): boolean {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const dynamicRequire = new Function('name', 'return require(name)') as (name: string) => { workspace?: { getConfiguration?: (section: string) => { get?: (key: string, defaultValue?: unknown) => unknown } } };
-    const vscode = dynamicRequire('vscode');
+    // Lazy direct require (module scope). A `new Function('return require(name)')`
+    // wrapper runs in global scope where `require` is undefined → the require
+    // throws and this whole check silently returned false, disabling all tracing.
+    const vscode = require('vscode') as { workspace?: { getConfiguration?: (section: string) => { get?: (key: string, defaultValue?: unknown) => unknown } } };
     return vscode?.workspace?.getConfiguration?.('ritemark.ai')?.get?.('debugTrace', false) === true;
   } catch {
     return false;
@@ -58,9 +59,9 @@ export function createRuntimeTrace(outputChannelName: string, logFileName: strin
 
   function tryCreateOutputChannel(): OutputChannelLike | null {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-implied-eval
-      const dynamicRequire = new Function('name', 'return require(name)') as (name: string) => { window?: { createOutputChannel?: (name: string) => OutputChannelLike } };
-      const vscode = dynamicRequire('vscode');
+      // Lazy direct require — see isTraceEnabled above for why the previous
+      // `new Function`-wrapped require silently failed in the extension host.
+      const vscode = require('vscode') as { window?: { createOutputChannel?: (name: string) => OutputChannelLike } };
       return vscode?.window?.createOutputChannel?.(outputChannelName) ?? null;
     } catch {
       return null;
