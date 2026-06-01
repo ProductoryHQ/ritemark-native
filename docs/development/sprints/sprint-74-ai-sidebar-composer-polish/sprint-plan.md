@@ -1,8 +1,8 @@
 # Sprint 74: AI Sidebar & Composer Polish
 
 Track: SDD
-Branch: sprint-74-ai-sidebar-composer-polish
-Status: Phase 2 (PLAN) — awaiting Jarmo approval
+Branch: claude/review-issues-sprint-2RKcJ (remote session branch — serves as the sprint branch; sprint code never lands on `main` directly)
+Status: Phase 4 (QA) — implementation complete, awaiting Jarmo's local testing
 
 ## SDD Artifacts
 
@@ -69,4 +69,21 @@ Phase 3 (DEVELOP) must not begin until:
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-06-01, after prototype review iterations)
+
+## Implementation Summary (Phase 3, 2026-06-01)
+
+| Workstream | Files changed | Status |
+|------------|---------------|--------|
+| W1 (R1, #86) | `planText.ts` (full text + `planTurnNeedsApproval` predicate), `AgentResponse.tsx` (corrected gate), `PlanReviewCard.tsx` (flat redesign) | ✅ Implemented + regression tests |
+| W2 (R2, #82) | `composerQueue.ts` (new, pure queue logic), `ChatInput.tsx` (unlock + queue notch + auto-send + no-border-top) | ✅ Implemented + regression tests |
+| W3 (R3, #84) | `Editor.tsx` (overflow visible on pre, scroll on code), `index.css` (fallback rule) | ✅ Implemented |
+| W4 (R4, #93) | `FormattingBubbleMenu.tsx` (Display text field + replace/insert logic) | ✅ Implemented |
+
+**Regression tests added** (wired into `npm test` in `extensions/ritemark/package.json`):
+- `webview/src/components/ai-sidebar/planText.test.ts` — full-plan-text preservation + approval-gate predicate (7 cases)
+- `webview/src/components/ai-sidebar/composerQueue.test.ts` — queue/send decisions + auto-send transition guards (8 cases)
+
+**Verification done in this environment:** webview typecheck (changed files clean), vite bundle build, extension `npm run compile`, all webview test suites, pre-commit validator hook.
+
+**Pending Jarmo (Phase 4/5):** manual QA scenarios in `tasks.md` Phase 6 (require running dev instance), then sprint closeout.

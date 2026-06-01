@@ -37,6 +37,8 @@ export function FormattingBubbleMenu({
   // Link dialog state management
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
+  // Sprint 74 R4 (#93): optional visible text for the link
+  const [linkDisplayText, setLinkDisplayText] = useState('')
   const [urlError, setUrlError] = useState('')
   const [fileSearchResults, setFileSearchResults] = useState<WorkspaceFileLinkResult[]>([])
   const [fileSearchReason, setFileSearchReason] = useState('')
@@ -49,11 +51,16 @@ export function FormattingBubbleMenu({
   useEffect(() => {
     if (externalLinkEdit) {
       setLinkUrl(externalLinkEdit.url)
+      // Pre-populate display text from current selection (Sprint 74 R4)
+      if (editor) {
+        const { from, to } = editor.state.selection
+        setLinkDisplayText(from !== to ? editor.state.doc.textBetween(from, to, ' ') : '')
+      }
       setUrlError('')
       setShowLinkDialog(true)
       onExternalLinkEditDone?.()
     }
-  }, [externalLinkEdit, onExternalLinkEditDone])
+  }, [externalLinkEdit, onExternalLinkEditDone, editor])
 
   // Auto-focus link input when dialog opens (with small delay for animation)
   useEffect(() => {
@@ -106,7 +113,9 @@ export function FormattingBubbleMenu({
         // Guard: Don't open dialog in code blocks (matches BubbleMenu shouldShow logic)
         if (!empty && !editor.isActive('codeBlock')) {
           const previousUrl = editor.getAttributes('link').href
+          const { from, to } = editor.state.selection
           setLinkUrl(previousUrl || '')
+          setLinkDisplayText(editor.state.doc.textBetween(from, to, ' '))
           setUrlError('')
           setShowLinkDialog(true)
         }
@@ -138,15 +147,42 @@ export function FormattingBubbleMenu({
       return
     }
 
-    const success = editor
-      .chain()
-      .focus()
-      .setLink({ href: target.href })
-      .run()
+    // Sprint 74 R4 (#93): if the user provided display text that differs from
+    // the current selection, replace the selection (or insert at the cursor)
+    // with that text carrying the link mark. Empty/unchanged display text
+    // preserves the original setLink behaviour.
+    const displayText = linkDisplayText.trim()
+    const { from, to } = editor.state.selection
+    const selectedText = from !== to ? editor.state.doc.textBetween(from, to, ' ') : ''
+
+    let success: boolean
+    if (displayText && displayText !== selectedText) {
+      success = editor
+        .chain()
+        .focus()
+        .command(({ tr, state }) => {
+          const linkMark = state.schema.marks.link.create({ href: target.href })
+          const textNode = state.schema.text(displayText, [linkMark])
+          if (from !== to) {
+            tr.replaceWith(from, to, textNode)
+          } else {
+            tr.insert(from, textNode)
+          }
+          return true
+        })
+        .run()
+    } else {
+      success = editor
+        .chain()
+        .focus()
+        .setLink({ href: target.href })
+        .run()
+    }
 
     if (success) {
       setShowLinkDialog(false)
       setLinkUrl('')
+      setLinkDisplayText('')
       setUrlError('')
     } else {
       setUrlError('Cannot add link here (links not allowed in this context)')
@@ -160,15 +196,19 @@ export function FormattingBubbleMenu({
     editor.chain().focus().unsetLink().run()
     setShowLinkDialog(false)
     setLinkUrl('')
+    setLinkDisplayText('')
     setUrlError('')
   }
 
   /**
    * Opens link dialog and pre-fills with existing URL if text is already linked.
+   * Display text pre-populates from the current selection (Sprint 74 R4).
    */
   const handleOpenLinkDialog = () => {
     const previousUrl = editor.getAttributes('link').href
+    const { from, to } = editor.state.selection
     setLinkUrl(previousUrl || '')
+    setLinkDisplayText(from !== to ? editor.state.doc.textBetween(from, to, ' ') : '')
     setUrlError('')
     setShowLinkDialog(true)
   }
@@ -374,7 +414,17 @@ export function FormattingBubbleMenu({
         Link Dialog - Separate modal for better UX and accessibility
         Uses Radix Dialog for proper focus trapping and keyboard navigation
       */}
-      <Dialog.Root open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+      <Dialog.Root
+        open={showLinkDialog}
+        onOpenChange={(open) => {
+          setShowLinkDialog(open)
+          if (!open) {
+            setLinkUrl('')
+            setLinkDisplayText('')
+            setUrlError('')
+          }
+        }}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
           <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl p-6 z-50 w-96">
@@ -437,6 +487,28 @@ export function FormattingBubbleMenu({
                 {/* Inline validation error message */}
                 {urlError && (
                   <p className="text-sm text-ritemark-error mt-1">{urlError}</p>
+                )}
+                {/* Sprint 74 R4 (#93): optional display text for the link.
+                    Hidden during @file search — that flow picks a path first. */}
+                {!isFileSearchMode && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium mb-1 text-ink-muted">
+                      Display text <span className="font-normal text-ink-faint">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={linkDisplayText}
+                      onChange={(e) => setLinkDisplayText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleSetLink()
+                        }
+                      }}
+                      placeholder="Visible text for the link"
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 )}
                 {isFileSearchMode && (
                   <div className="mt-2 rounded border border-hairline-strong bg-white shadow-sm max-h-56 overflow-y-auto">

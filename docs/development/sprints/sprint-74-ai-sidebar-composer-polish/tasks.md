@@ -3,62 +3,69 @@
 ## Phase 1: R1 — Plan Review Card Fix
 
 **Logic fix (AgentResponse.tsx):**
-- [ ] Change `needsApproval` condition: `!turn.pendingPlanApproval` → `!!turn.pendingPlanApproval`
-- [ ] Verify `approvePlan(turn.id)` and `rejectPlan(turn.id, feedback)` are still called correctly by the inline approval buttons in `AgentResponse`
-- [ ] (Optional, non-blocking) Evaluate whether the duplicate inline approval UI in `AgentResponse` (lines ~118-158) can be removed in favour of `AgentPlanApproval` — document decision in this file
+- [x] Change `needsApproval` condition: `!turn.pendingPlanApproval` → `!!turn.pendingPlanApproval`
+- [x] Verify `approvePlan(turn.id)` and `rejectPlan(turn.id, feedback)` are still called correctly by the inline approval buttons in `AgentResponse`
+- [x] (Optional, non-blocking) Evaluate whether the duplicate inline approval UI in `AgentResponse` (lines ~118-158) can be removed in favour of `AgentPlanApproval` — document decision in this file
+
+> **Decision (2026-06-01):** Kept the inline approval UI in `AgentResponse`, gated behind the corrected `planTurnNeedsApproval()` predicate (new export in `planText.ts`, regression-tested). Since `agent-result` always clears `pendingPlanApproval`, the inline UI can no longer falsely render dead buttons. Full removal deferred — the live approval path is `AgentView` → `AgentPlanApproval` → `PlanReviewCard`.
+
+> **Implementation note:** the `needsApproval` fix is `planTurnNeedsApproval(turn)` rather than an inline `!!` expression, so `planText.test.ts` covers the exact production logic.
 
 **Plan text fix (planText.ts):**
-- [ ] Simplify `extractPlanDisplayText` to return `planText.trim()` — remove the backward-scan logic that returns only the last list/heading block (see technical-plan.md § Plan Card Visual Redesign)
+- [x] Simplify `extractPlanDisplayText` to return `planText.trim()` — remove the backward-scan logic that returns only the last list/heading block (see technical-plan.md § Plan Card Visual Redesign)
 
 **Visual redesign (PlanReviewCard.tsx):**
 > Reference: `prototypes/plan-review-card.html` Column B. Plan card = Claude's chat artifact, not a composer element.
-- [ ] Remove the nested inner card (`max-h-[300px]` div with "Plan" eyebrow label and inner border) from `PlanReviewCard.tsx`
-- [ ] Add indigo-tinted header row: clipboard icon + "Claude is waiting for plan approval" + pulse dot; background `rgba(224,231,255,0.35)`; bottom border `rgba(67,56,202,0.10)`
-- [ ] Place `<RenderedMarkdown>` directly in the card body (no wrapper card): `px-2.5 py-2 max-h-[150px] overflow-y-auto`
-- [ ] Move action row (`Approve plan` + `Reject`) into a `border-top: rgba(67,56,202,0.08)` footer row; Approve = indigo filled (`bg-[var(--r-accent)] text-white`), Reject = ghost
-- [ ] Change outer card border from `var(--r-hairline)` to `rgba(67,56,202,0.18)` to give subtle indigo tint
+- [x] Remove the nested inner card (`max-h-[300px]` div with "Plan" eyebrow label and inner border) from `PlanReviewCard.tsx`
+- [x] Add indigo-tinted header row: clipboard icon + "Claude is waiting for plan approval" + pulse dot; background `rgba(224,231,255,0.35)`; bottom border `rgba(67,56,202,0.10)`
+- [x] Place `<RenderedMarkdown>` directly in the card body (no wrapper card): `px-2.5 py-2 max-h-[150px] overflow-y-auto`
+- [x] Move action row (`Approve plan` + `Reject`) into a `border-top: rgba(67,56,202,0.08)` footer row; Approve = indigo filled (`bg-[var(--r-accent)] text-white`), Reject = ghost
+- [x] Change outer card border from `var(--r-hairline)` to `rgba(67,56,202,0.18)` to give subtle indigo tint
 - [ ] Verify: card renders correctly in chat feed; Approve/Reject fire the same callbacks as before; reject feedback input still works
 
 ## Phase 2: R2 Level 1 — Unlock Textarea
 
-- [ ] In `ChatInput.tsx`, remove `disabled={isLoading}` from the `<textarea>` element
-- [ ] Add conditional placeholder: when `isLoading && isAgentMode`, show "Agent is running — type your next message…"; otherwise use existing placeholder logic
-- [ ] Keep `disabled={isLoading}` on the attach-file `<button>` element
+- [x] In `ChatInput.tsx`, remove `disabled={isLoading}` from the `<textarea>` element
+- [x] Add conditional placeholder: when `isLoading && isAgentMode`, show "Agent is running — type your next message…"; otherwise use existing placeholder logic
+- [x] Keep `disabled={isLoading}` on the attach-file `<button>` element
 - [ ] Verify: textarea accepts input while agent runs; Send button is still shown as Stop (not active Send); typed text is preserved when agent finishes
 
 ## Phase 3: R2 Level 2 — Queue Prompt
 
-- [ ] Add `const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null)` to `ChatInput`
-- [ ] Add `const prevAgentRunning = useRef(agentRunning)` for transition detection
-- [ ] Modify `handleSend` to accept an optional `overridePrompt?: string` parameter — use `overridePrompt ?? buildFinalPrompt()` as the prompt source
-- [ ] In `handleSend`, add queue branch: if `isLoading && isAgentMode && !overridePrompt`, queue the prompt via `setQueuedPrompt(buildFinalPrompt())`, clear `value`, and return early
-- [ ] Add `useEffect` that fires on `agentRunning` change: when transition from `true` → `false` and `queuedPrompt` is set, call `handleSend(queuedPrompt)` and clear queue
-- [ ] Add queue notch JSX **above** the input-box div (same location as `SelectedContextTab`, not inside the input card): pending circle + truncated prompt text + X discard button; use `mx-2.5 -mb-px rounded-t-lg border border-b-0` pattern matching `SelectedContextTab` (see technical-plan.md § Queue notch and `prototypes/composer-queue.html` Column B)
-- [ ] When both `queuedPrompt` and `selectedContext` are active, wrap both notch rows in a single `.notch-stack` container with `.ns-section` children so there is no visible seam between them (see `prototypes/composer-queue.html` Column C)
-- [ ] Ensure parent `input-wrap` has no `border-top` when any notch is present (prevents separator stripe between messages area and notch)
-- [ ] When `queuedPrompt` is set, change textarea `disabled` to `true` (prevents second queue entry)
-- [ ] When X on queue chip is clicked, clear `queuedPrompt` and re-enable textarea
+- [x] Add `const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null)` to `ChatInput`
+- [x] Add `const prevAgentRunning = useRef(agentRunning)` for transition detection
+- [x] Modify `handleSend` to accept an optional `overridePrompt?: string` parameter — use `overridePrompt ?? buildFinalPrompt()` as the prompt source
+- [x] In `handleSend`, add queue branch: if `isLoading && isAgentMode && !overridePrompt`, queue the prompt via `setQueuedPrompt(buildFinalPrompt())`, clear `value`, and return early
+- [x] Add `useEffect` that fires on `agentRunning` change: when transition from `true` → `false` and `queuedPrompt` is set, call `handleSend(queuedPrompt)` and clear queue
+- [x] Add queue notch JSX **above** the input-box div (same location as `SelectedContextTab`, not inside the input card): pending circle + truncated prompt text + X discard button; use `mx-2.5 -mb-px rounded-t-lg border border-b-0` pattern matching `SelectedContextTab` (see technical-plan.md § Queue notch and `prototypes/composer-queue.html` Column B)
+- [x] When both `queuedPrompt` and `selectedContext` are active, wrap both notch rows in a single `.notch-stack` container with `.ns-section` children so there is no visible seam between them (see `prototypes/composer-queue.html` Column C)
+
+> **Implementation note:** instead of a literal `.notch-stack` wrapper (which would require restructuring `SelectedContextTab`), the queue notch reads `selection` from the store and switches to a "stacked" variant when selected text is showing: top rounding and outer top border are dropped and replaced by a thin internal divider (`rgba(148,163,184,0.14)`). Visual result is identical to the prototype's notch-stack — one block, zero seams — with `SelectedContextTab` untouched.
+
+- [x] Ensure parent `input-wrap` has no `border-top` when any notch is present (prevents separator stripe between messages area and notch) — the ChatInput container drops `border-t` whenever `hasSelectedContext || queuedPrompt`
+- [x] When `queuedPrompt` is set, change textarea `disabled` to `true` (prevents second queue entry)
+- [x] When X on queue chip is clicked, clear `queuedPrompt` and re-enable textarea
 - [ ] Verify end-to-end: type → Enter queues → chip shows → agent finishes → prompt auto-sends → chip clears
 - [ ] Verify discard: queue → click X → textarea re-enabled → no auto-send
 
 ## Phase 4: R3 — Code Block Scrollbar Fix
 
-- [ ] In `Editor.tsx` inline `<style>`, change `overflow-x: auto !important` to `overflow: visible !important` on `.wysiwyg-editor .ProseMirror pre.tiptap-code-block`
-- [ ] In `Editor.tsx`, add `display: block !important; overflow-x: auto !important; min-width: 0 !important` to the existing `.wysiwyg-editor .ProseMirror pre.tiptap-code-block code` rule
-- [ ] In `index.css`, change `overflow-x: auto` to `overflow-x: hidden` on `.ProseMirror pre` (non-editor context fallback)
+- [x] In `Editor.tsx` inline `<style>`, change `overflow-x: auto !important` to `overflow: visible !important` on `.wysiwyg-editor .ProseMirror pre.tiptap-code-block`
+- [x] In `Editor.tsx`, add `display: block !important; overflow-x: auto !important; min-width: 0 !important` to the existing `.wysiwyg-editor .ProseMirror pre.tiptap-code-block code` rule
+- [x] In `index.css`, change `overflow-x: auto` to `overflow-x: hidden` on `.ProseMirror pre` (non-editor context fallback)
 - [ ] Verify: short code block → no scrollbar; long code block → scrollbar on `code` element; copy-button tooltip not clipped; mermaid blocks unaffected
 
 ## Phase 5: R4 — Edit Link Display Text Field
 
-- [ ] In `FormattingBubbleMenu.tsx`, add `const [linkDisplayText, setLinkDisplayText] = useState('')`
-- [ ] In `handleOpenLinkDialog`, after setting `linkUrl`, extract selected text from `editor.state.selection` and pre-populate `linkDisplayText`
-- [ ] In the `externalLinkEdit` `useEffect`, pre-populate `linkDisplayText` from selected text (same logic)
-- [ ] In `handleSetLink`, implement the conditional display-text save logic:
+- [x] In `FormattingBubbleMenu.tsx`, add `const [linkDisplayText, setLinkDisplayText] = useState('')`
+- [x] In `handleOpenLinkDialog`, after setting `linkUrl`, extract selected text from `editor.state.selection` and pre-populate `linkDisplayText`
+- [x] In the `externalLinkEdit` `useEffect`, pre-populate `linkDisplayText` from selected text (same logic)
+- [x] In `handleSetLink`, implement the conditional display-text save logic:
   - If `displayText` is non-empty: use ProseMirror `tr.replaceWith` (selection) or `tr.insert` (cursor) with the link mark
   - If `displayText` is empty: existing `setLink` chain only
-- [ ] In `handleRemoveLink`, also reset `linkDisplayText` to `''`
-- [ ] Add the "Display text (optional)" `<input>` field to the dialog JSX, hidden when `isFileSearchMode` is true
-- [ ] Add `linkDisplayText` reset to dialog close handler (`onOpenChange`)
+- [x] In `handleRemoveLink`, also reset `linkDisplayText` to `''`
+- [x] Add the "Display text (optional)" `<input>` field to the dialog JSX, hidden when `isFileSearchMode` is true
+- [x] Add `linkDisplayText` reset to dialog close handler (`onOpenChange`)
 - [ ] Verify tab order: URL field → Display text field → Cancel → Update/Add
 - [ ] Verify add-link no-selection case: no pre-population; typed display text is inserted at cursor with link
 - [ ] Verify edit-link case: pre-populated from selected text; clearing field and saving leaves link text unchanged
