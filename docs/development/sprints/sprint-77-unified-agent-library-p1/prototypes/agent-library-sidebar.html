@@ -633,6 +633,17 @@ body.dark .val-warn { color: #F87171; background: rgba(239,68,68,0.12); }
           <div class="anno-marker">3</div>
         </div>
 
+        <!-- Multi-agent attached flow ③ -->
+        <div class="item" title=".ritemark/flows/daily-brief.flow.json">
+          <div class="item-icon-chip chip-ind">🔄</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">daily-brief.flow.json</span></div>
+            <div class="flow-attach">↳ Agent A, Agent B</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">3</div>
+        </div>
+
         <!-- Standalone flow -->
         <div class="item" title=".ritemark/flows/standalone.flow.json">
           <div class="item-icon-chip chip-sla">🔄</div>
@@ -657,6 +668,7 @@ body.dark .val-warn { color: #F87171; background: rgba(239,68,68,0.12); }
         </div>
       </div>
       <div class="sec-body hidden">
+        <!-- schedule without runtime/routine -->
         <div class="item" title=".claude/agents/broken-agent.md">
           <div class="item-icon-chip chip-amb">💥</div>
           <div class="item-content">
@@ -666,6 +678,23 @@ body.dark .val-warn { color: #F87171; background: rgba(239,68,68,0.12); }
           </div>
           <button class="item-more-btn" title="More">···</button>
           <div class="anno-marker">5</div>
+        </div>
+
+        <!-- routine file missing from disk -->
+        <div class="item" title=".claude/agents/missing-routine-agent.md">
+          <div class="item-icon-chip chip-amb">🔄</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">missing-routine-agent</span></div>
+            <div class="item-description">Has runtime and schedule set correctly.</div>
+            <div class="val-warn">⚠ routine path does not exist: .ritemark/flows/missing.flow.json</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">5</div>
+        </div>
+
+        <!-- Empty state example (when section has no items) -->
+        <div style="padding:10px 12px;font-size:11px;color:var(--r-ink-faint);font-style:italic;border:1px dashed var(--r-hairline);border-radius:6px;margin:4px 8px;">
+          Empty state: "No agents configured yet. Create a .md file in .claude/agents/"
         </div>
       </div>
 

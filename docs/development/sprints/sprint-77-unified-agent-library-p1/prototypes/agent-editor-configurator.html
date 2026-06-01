@@ -868,9 +868,9 @@ html.dark .prov-shared { background: rgba(148,163,184,0.12); color: #94a3b8; bor
           </div>
           <select class="p-select">
             <option value="">Manual only</option>
-            <option value="on_open" selected>On file open</option>
-            <option value="on_save">On save</option>
-            <option value="on_commit">Pre-commit</option>
+            <option value="standup" selected>.ritemark/flows/standup.flow.json</option>
+            <option value="weekly">.ritemark/flows/weekly-digest.flow.json</option>
+            <option value="__new__">＋ Create new flow…</option>
           </select>
         </div>
 
@@ -1056,7 +1056,20 @@ function toggleSchedule(cb) {
 }
 
 function updateCron(val) {
-  document.getElementById('cron-preview').textContent = val || '—';
+  const preview = document.getElementById('cron-preview');
+  const human   = document.getElementById('cron-human');
+  const k6      = document.querySelector('.k6-banner');
+
+  if (!val) {
+    preview.textContent = '—';
+    human.textContent   = '';
+    human.style.color   = '';
+    if (k6) k6.style.display = 'none';
+    return;
+  }
+
+  preview.textContent = val;
+
   // Simplified human-readable mapping (real impl uses cron-parser package)
   const humanMap = {
     '0 */6 * * *':  'Every 6 hours',
@@ -1066,12 +1079,31 @@ function updateCron(val) {
     '*/30 * * * *': 'Every 30 minutes',
     '0 * * * *':    'Every hour',
   };
-  document.getElementById('cron-human').textContent = humanMap[val] || '(cron-parser preview)';
+
+  // Basic cron validity check: 5 whitespace-separated fields
+  const isValid = /^\S+(\s+\S+){4}$/.test(val.trim());
+  if (humanMap[val]) {
+    human.textContent = humanMap[val];
+    human.style.color = '';
+  } else if (isValid) {
+    human.textContent = '(cron-parser preview)';
+    human.style.color = '';
+  } else {
+    human.textContent = 'Invalid cron expression';
+    human.style.color = 'var(--r-error, #ef4444)';
+  }
+
+  // K6 banner: visible whenever schedule is non-empty (and not already dismissed)
+  if (k6 && k6.dataset.dismissed !== '1') {
+    k6.style.display = isValid ? '' : 'none';
+  }
 }
 
-// Dismiss K6 banner
+// Dismiss K6 banner (persists via data attribute for this session)
 document.querySelector('.k6-dismiss').addEventListener('click', function() {
-  this.closest('.k6-banner').style.display = 'none';
+  const banner = this.closest('.k6-banner');
+  banner.style.display = 'none';
+  banner.dataset.dismissed = '1';
 });
 
 // Color swatch selection

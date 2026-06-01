@@ -171,13 +171,13 @@ Then no yellow warning chip is shown
 
 ## Feature: agentEditor custom editor (R5)
 
-### Scenario: Opening an agent file launches the structured editor
+### Scenario: Opening an agent file activates agent mode in the editor
 
 Given a file at `.claude/agents/my-agent.md`
 When the user opens the file (double-click or via Explorer)
-Then the `ritemark.agentEditor` custom editor opens instead of the text editor
-And the left panel shows the body content below the frontmatter
-And the right panel shows the Configurator with the parsed frontmatter fields
+Then the standard `ritemark.editor` opens in agent mode
+And the LEFT panel (220px, same width as TOC/Properties panels) shows the Configurator with parsed frontmatter fields
+And the RIGHT area (flex-1) shows the TipTap body editor with content below the frontmatter
 
 ### Scenario: TipTap body initialised with content below frontmatter
 
@@ -193,11 +193,12 @@ When another process writes new content to `my-agent.md`
 Then the agent editor refreshes to show the updated body and frontmatter
 And the user is not shown a stale view
 
-### Scenario: Non-agent markdown files are not intercepted
+### Scenario: Non-agent markdown files open without agent mode panel
 
 Given a file at `docs/notes/meeting.md`
 When the user opens the file
-Then the standard Ritemark markdown editor opens (not the agent editor)
+Then the standard `ritemark.editor` opens without the 220px Configurator panel
+And no agent-mode UI is shown
 
 ## Feature: Configurator panel (R6)
 
