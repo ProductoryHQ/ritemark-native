@@ -129,40 +129,70 @@ All existing primitives. No new components required.
 
 ## Surface 2: Agent Selector + Model Picker with OpenCode
 
+> **Correction (2026-06-01, Jarmo's prototype review):** the original draft of this section placed
+> the selector at the top of the sidebar with a downward-opening dropdown. **The real Ritemark UI
+> places the agent·model trigger in the chat input footer at the BOTTOM of the panel** (next to the
+> context chip and send button), and **the dropdown opens UPWARD**, overlaying the chat transcript.
+> Group labels are sentence case ("Claude", "Codex"), and model rows are two-line (model name +
+> description below), with the selected row showing an indigo-soft background and a checkmark on
+> the right. The sections below and the prototypes have been corrected to match production.
+
 ### User story
 
 As a writer who has set up at least one provider key, I want to pick "OpenCode" and then choose which AI model to use from a simple grouped list, so that switching from Gemini to GPT-5 is a single click without leaving the sidebar.
 
 ### Layout and trigger
 
-The AgentSelector layout does not change structurally. The `<Select>` grows one more `<SelectGroup>` for OpenCode. Trigger label pattern: `OpenCode · Gemini 3 Pro`. The Codex mode rail (Edit / Plan) is **not** shown for OpenCode (no plan/edit modes this sprint).
+The selector layout does not change structurally. The trigger lives in the **chat input footer**
+(bottom-left of the input box, next to the "1 context" chip, paperclip, and send button) and reads
+`OpenCode · Gemini 3 Pro`. Clicking it opens the dropdown **upward**, anchored just above the input
+box and overlaying the chat transcript. The Codex mode rail (Edit / Plan) is **not** shown for
+OpenCode (no plan/edit modes this sprint).
 
-### SelectGroup structure
+### Group structure inside the dropdown (opens upward)
 
-OpenCode appended after Codex (see Q-UX3), with its own `<SelectSeparator>` and `<SelectGroup>`:
+OpenCode appended after Codex (see Q-UX3), as a third group with separator. Real production row
+format: model name on the first line (15px, ink-strong), description on the second line (13px,
+ink-muted). For OpenCode rows, **the description line carries the provider name**:
 
 ```
-────────────────────────────
-  CLAUDE
-  Sonnet 4.6         Best for everyday tasks
-  Opus 4             Most capable
-  Haiku 3.5          Fastest
-────────────────────────────
-  CODEX
-  codex-1            ...
-────────────────────────────
-  OPENCODE           ← new group
-  Gemini 3 Pro         Google
-  Gemini 3 Flash       Google · faster
-  GPT-5.2              OpenAI
-  GPT-4o               OpenAI · faster
-  Claude Sonnet 4.6    Anthropic
-  (OpenRouter models if key configured)
-────────────────────────────
+  ┌──────────────────────────────────────────────┐
+  │ Claude                                        │   ← group label, sentence case, muted
+  │   Opus 4.8 with 1M context                    │
+  │   Most capable for complex work               │
+  │   Sonnet 4.6                              ✓   │   ← selected: indigo-soft bg + check right
+  │   Best for everyday tasks                     │
+  │   …                                           │
+  ├──────────────────────────────────────────────┤
+  │ Codex                                         │
+  │   GPT-5.5                                     │
+  │   Frontier model for complex coding…          │
+  │   …                                           │
+  ├──────────────────────────────────────────────┤
+  │ OpenCode                                      │   ← new group
+  │   Gemini 3 Pro                                │
+  │   Google                                      │
+  │   Gemini 3 Flash                              │
+  │   Google · faster                             │
+  │   GPT-5.2                                     │
+  │   OpenAI                                      │
+  │   GPT-4o                                      │
+  │   OpenAI · faster                             │
+  │   Claude Sonnet 4.6                           │
+  │   Anthropic                                   │
+  └──────────────────────────────────────────────┘
+        ▲ dropdown opens upward from the trigger below
+  ┌──────────────────────────────────────────────┐
+  │  [input box]                                  │
+  │  OpenCode · Gemini 3 Pro ⌄   1 context   📎 ➤ │   ← trigger in input footer
+  └──────────────────────────────────────────────┘
 ```
 
-- **Group label:** `OPENCODE` — uppercase 10px `SelectLabel`, consistent with `CLAUDE` / `CODEX`.
-- **Provider sub-labels:** model name primary, provider name as secondary span (`text-[10px] opacity-60`): `Google`, `OpenAI`, `Anthropic`, `OpenRouter`. **Provider names as inline secondary text, not nested sub-group headers** — Radix Select doesn't support nested groups natively, and inline text is friendlier for non-technical users.
+- **Group label:** `OpenCode` — sentence case, muted, same style as `Claude` and `Codex` labels.
+- **Provider as description line:** model name primary, provider name (`Google`, `OpenAI`,
+  `Anthropic`, `OpenRouter`) on the description line — same two-line row format as existing
+  groups, so OpenCode rows look native. Not nested sub-group headers (Radix Select doesn't
+  support them, and inline description is friendlier for non-technical users).
 - **Composite value format:** `opencode:google/gemini-3-pro`, `opencode:openai/gpt-5.2`, etc.
 
 ### State A — Keys configured
@@ -210,12 +240,13 @@ The existing `pendingRuntime` pattern (AgentSelector.tsx:78-88) handles this: `s
 
 | Need | Reuse |
 | --- | --- |
-| Group wrapper | `<SelectGroup>` + `<SelectLabel className="text-[10px]">OpenCode</SelectLabel>` |
-| Model row | `<SelectItem value={'opencode:' + providerId + '/' + modelId} className="text-xs">` |
-| Provider sub-text | existing `<span className="ml-1.5 text-[10px] opacity-60">` pattern |
-| Zero-key row | non-interactive `<div>` inside `<SelectGroup>` — disabled text + accent link |
+| Group wrapper | existing `<SelectGroup>` + group label (sentence case, matches "Claude"/"Codex" rendering) |
+| Model row | existing two-line row (name + description); OpenCode rows put the provider name in the description line |
+| Selected row | existing indigo-soft background + right-side checkmark |
+| Zero-key row | non-interactive `<div>` inside the OpenCode group — muted text + accent "Open Settings" link |
 | Sidebar zero-key card | follows `CodexSetupView` layout exactly |
-| Trigger label | extend existing `triggerLabel` logic with `opencode:` prefix branch |
+| Trigger | existing input-footer trigger; extend `triggerLabel` logic with `opencode:` prefix branch |
+| Dropdown placement | existing upward-opening behavior (no change — Radix `Select` already handles side/position) |
 | `handleChange` | new `else if (value.startsWith('opencode:'))` branch mirroring the `codex:` branch |
 
 ### Edge cases (AgentSelector surface)

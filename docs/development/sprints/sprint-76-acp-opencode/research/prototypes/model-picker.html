@@ -21,8 +21,7 @@
     --r-accent-deep: #3730A3;
     --r-accent-soft: #E0E7FF;
     --r-ring-color: rgba(67, 56, 202, 0.10);
-    --r-shadow-indigo-sm: 0 4px 6px -1px rgba(67, 56, 202, 0.25);
-    --r-shadow-lg: 0 10px 15px -3px rgba(30,27,75,0.10), 0 4px 6px -4px rgba(30,27,75,0.08);
+    --r-shadow-lg: 0 10px 25px -3px rgba(30,27,75,0.14), 0 4px 10px -4px rgba(30,27,75,0.10);
     --r-font-ui: 'Sofia Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   body { font-family: var(--r-font-ui); background: var(--r-surface-muted); color: var(--r-ink-strong); -webkit-font-smoothing: antialiased; }
@@ -40,50 +39,77 @@
     border-radius: 8px; padding: 8px 11px; font-size: 11.5px; line-height: 1.45; max-width: 300px;
   }
 
-  /* Sidebar shell — VS Code-like right panel */
-  .sidebar {
-    width: 340px; background: var(--r-surface-muted); border: 1px solid var(--r-hairline);
-    border-radius: 8px; overflow: hidden; box-shadow: var(--r-shadow-lg);
-    display: flex; flex-direction: column; min-height: 460px;
+  /* ============ Chat panel shell (matches real Ritemark AI sidebar) ============ */
+  .panel {
+    width: 480px; height: 680px; background: var(--r-surface);
+    border: 1px solid var(--r-hairline); border-radius: 10px; overflow: hidden;
+    box-shadow: var(--r-shadow-lg); display: flex; flex-direction: column; position: relative;
   }
-  .sidebar-head {
-    padding: 8px 12px; border-bottom: 1px solid var(--r-hairline);
+  .panel-head {
+    padding: 9px 14px; border-bottom: 1px solid var(--r-hairline);
     font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
-    color: var(--r-ink-muted); background: var(--r-surface-muted);
+    color: var(--r-ink-muted); background: var(--r-surface-muted); flex-shrink: 0;
   }
+  /* chat transcript area (context only, sits BEHIND the upward-opening menu) */
+  .chat { flex: 1; overflow: hidden; padding: 16px 18px; font-size: 14.5px; line-height: 1.6; color: var(--r-ink-body); }
+  .chat .user-msg {
+    background: var(--r-surface-muted); border: 1px solid var(--r-hairline);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; color: var(--r-ink-strong);
+  }
+  .chat p { margin-bottom: 10px; }
+  .chat .meta { font-size: 12px; color: var(--r-ink-faint); }
 
-  /* Trigger (Select) */
+  /* ============ Input box pinned to the bottom (real layout) ============ */
+  .input-wrap { padding: 10px 12px 12px; flex-shrink: 0; }
+  .input-box {
+    border: 1px solid var(--r-hairline-strong); border-radius: 14px; background: var(--r-surface);
+    box-shadow: 0 1px 3px rgba(30,27,75,0.05);
+  }
+  .input-text { padding: 12px 14px 4px; min-height: 44px; font-size: 14px; color: var(--r-ink-faint); }
+  .input-footer {
+    display: flex; align-items: center; gap: 10px; padding: 6px 10px 8px;
+  }
+  /* the agent·model trigger lives in the input footer, bottom-left — plain text + chevron, no border */
   .trigger {
-    display: flex; align-items: center; justify-content: space-between; gap: 6px;
-    height: 28px; padding: 0 8px; font-size: 12px; border-radius: 6px;
-    border: 1px solid var(--r-hairline-strong); background: var(--r-surface);
-    color: var(--r-ink-strong); cursor: pointer; width: 100%;
+    display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500;
+    color: var(--r-ink-body); cursor: pointer; padding: 3px 6px; border-radius: 6px; max-width: 60%;
   }
-  .trigger.muted { color: var(--r-ink-muted); }
+  .trigger:hover { background: var(--r-surface-soft); }
+  .trigger.muted { color: var(--r-ink-faint); }
+  .ctx-chip { font-size: 12.5px; color: var(--r-ink-faint); }
+  .icon-btn {
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 9px; color: var(--r-ink-muted); cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--r-surface-soft); }
+  .send-btn {
+    width: 38px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 9px; background: var(--r-surface-soft); color: var(--r-ink-muted); cursor: pointer;
+  }
 
-  /* Dropdown panel */
+  /* ============ Dropdown panel — opens UPWARD from the trigger ============ */
   .menu {
-    margin-top: 4px; background: var(--r-surface); border: 1px solid var(--r-hairline);
-    border-radius: 8px; box-shadow: var(--r-shadow-lg); padding: 4px; max-width: 300px;
+    position: absolute; left: 14px; right: 56px; bottom: 86px; /* anchored just above the input box */
+    max-height: 540px; overflow-y: auto;
+    background: var(--r-surface); border: 1px solid var(--r-hairline);
+    border-radius: 14px; box-shadow: var(--r-shadow-lg); padding: 6px; z-index: 5;
   }
-  .menu-label {
-    padding: 8px 8px 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
-    text-transform: uppercase; color: var(--r-ink-strong);
-  }
-  .menu-sep { height: 1px; background: var(--r-hairline); margin: 4px -4px; }
+  .menu-label { padding: 10px 12px 4px; font-size: 13px; color: var(--r-ink-muted); }
+  .menu-sep { height: 1px; background: var(--r-hairline); margin: 6px 0; }
   .menu-item {
-    display: flex; align-items: center; padding: 6px 8px 6px 28px; font-size: 12px;
-    border-radius: 4px; color: var(--r-ink-strong); cursor: pointer; position: relative;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    padding: 9px 12px; border-radius: 9px; cursor: pointer; position: relative;
   }
   .menu-item:hover { background: var(--r-surface-soft); }
-  .menu-item.selected { background: var(--r-accent-soft); color: var(--r-ink-strong); font-weight: 500; }
-  .menu-item .check { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); }
-  .sub { margin-left: 6px; font-size: 10px; opacity: 0.6; }
-  .menu-info { padding: 8px; font-size: 12px; color: var(--r-ink-muted); }
-  .menu-link { font-size: 12px; color: var(--r-accent-deep); cursor: pointer; font-weight: 500; }
+  .menu-item.selected { background: var(--r-accent-soft); }
+  .menu-item .name { font-size: 15px; color: var(--r-ink-strong); line-height: 1.3; }
+  .menu-item .desc { font-size: 13px; color: var(--r-ink-muted); margin-top: 2px; line-height: 1.35; }
+  .menu-item .check { flex-shrink: 0; margin-top: 4px; }
+  .menu-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; font-size: 13.5px; color: var(--r-ink-muted); }
+  .menu-link { font-size: 13.5px; color: var(--r-accent-deep); cursor: pointer; font-weight: 500; white-space: nowrap; }
   .menu-link:hover { text-decoration: underline; }
 
-  /* Zero-key setup card (CodexSetupView pattern) */
+  /* ============ Zero-key setup card (CodexSetupView pattern) ============ */
   .setup-card {
     border-radius: 12px; border: 1px solid var(--r-hairline); background: var(--r-surface); padding: 16px;
   }
@@ -99,14 +125,14 @@
 
   <!-- Fixed state switcher bar -->
   <div class="sticky top-0 z-20 border-b" style="background:var(--r-surface);border-color:var(--r-hairline)">
-    <div class="max-w-4xl mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
+    <div class="max-w-5xl mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
       <a href="index.html" class="home-link text-xs font-medium" style="color:var(--r-accent-deep)">&larr; All states</a>
-      <span class="text-xs font-semibold" style="color:var(--r-ink-strong)">AI Sidebar · Agent Selector</span>
+      <span class="text-xs font-semibold" style="color:var(--r-ink-strong)">AI Sidebar · Agent Selector (trigger in chat input footer, dropdown opens upward)</span>
       <div class="flex items-center gap-1.5 ml-auto" id="switcher"></div>
     </div>
   </div>
 
-  <div class="max-w-4xl mx-auto px-6 py-10 relative">
+  <div class="max-w-5xl mx-auto px-6 py-10 relative">
     <div id="anno"></div>
     <div class="flex justify-center">
       <div id="stage"></div>
@@ -116,99 +142,102 @@
 <script>
 // ---------- icons ----------
 function checkIcon() {
-  return `<svg class="check" width="14" height="14" viewBox="0 0 256 256" fill="var(--r-accent)"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>`;
+  return `<svg class="check" width="18" height="18" viewBox="0 0 256 256" fill="var(--r-accent)"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>`;
 }
 function caret() {
-  return `<svg width="14" height="14" viewBox="0 0 256 256" fill="var(--r-ink-muted)"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>`;
+  return `<svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" style="opacity:.7"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>`;
 }
 function arrowRight() {
-  return `<svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" style="display:inline-block;vertical-align:-1px"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></svg>`;
+  return `<svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" style="display:inline-block;vertical-align:-1px"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></svg>`;
 }
 function plugsIcon() {
   return `<svg width="20" height="20" viewBox="0 0 256 256" fill="var(--r-accent)"><path d="M105.07,192.32,90.34,207.05,73,189.66,53.66,209,42.34,197.66,61.66,178.34,44.27,161,59,146.27a8,8,0,0,1,11.31,0L105.07,181A8,8,0,0,1,105.07,192.32Zm106.59-95.31L197,82.34,178.34,101,155,77.66,173.66,59,159,44.27a8,8,0,0,0-11.31,0l-34.75,34.74a8,8,0,0,0,0,11.32l46.07,46.07a8,8,0,0,0,11.32,0l45.05-45.06A8,8,0,0,0,211.66,97Z"/></svg>`;
 }
+function paperclipIcon() {
+  return `<svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34a8,8,0,0,1,0,11.32l-82.05,82a56,56,0,0,1-79.2-79.21L147.67,35.73a40,40,0,1,1,56.61,56.55L105,193A24,24,0,1,1,71,159L154.3,74.38A8,8,0,1,1,165.7,85.6L82.39,170.31a8,8,0,1,0,11.27,11.36L192.93,81A24,24,0,1,0,159,47L59.76,147.68a40,40,0,1,0,56.53,56.62l82.06-82A8,8,0,0,1,209.66,122.34Z"/></svg>`;
+}
+function sendIcon() {
+  return `<svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M231.4,44.34s0,.1,0,.15l-58.2,191.94a15.88,15.88,0,0,1-14,11.51q-.69.06-1.38.06a15.86,15.86,0,0,1-14.42-9.15l-35.71-75.39a4,4,0,0,1,.79-4.54l57.26-57.27a8,8,0,0,0-11.31-11.31L97.08,147.6a4,4,0,0,1-4.54.79l-75-35.53A16.37,16.37,0,0,1,8,97.36,15.89,15.89,0,0,1,19.57,82.84l191.94-58.2.15,0A16,16,0,0,1,231.4,44.34Z"/></svg>`;
+}
 
-// ---------- model data (exact from spec) ----------
+// ---------- model data ----------
+// Context groups use the REAL current Ritemark models (from production screenshot).
+const CLAUDE_MODELS = [
+  { name: 'Opus 4.8 with 1M context', desc: 'Most capable for complex work' },
+  { name: 'Sonnet 4.6', desc: 'Best for everyday tasks' },
+  { name: 'Sonnet 4.6 with 1M context', desc: 'Draws from usage credits · $3/$15 per Mtok' },
+  { name: 'Haiku 4.5', desc: 'Fastest for quick answers' },
+];
+const CODEX_MODELS = [
+  { name: 'GPT-5.5', desc: 'Frontier model for complex coding, research, and real-world work.' },
+  { name: 'GPT-5.4', desc: 'Strong model for everyday coding.' },
+  { name: 'GPT-5.4-Mini', desc: 'Small, fast, and cost-efficient model for simpler coding tasks.' },
+  { name: 'GPT-5.3-Codex', desc: 'Coding-optimized model.' },
+];
+// New OpenCode group — same two-line row format; description line = provider.
 const OPENCODE_MODELS = [
-  { label: 'Gemini 3 Pro',     sub: 'Google' },
-  { label: 'Gemini 3 Flash',   sub: 'Google · faster' },
-  { label: 'GPT-5.2',          sub: 'OpenAI' },
-  { label: 'GPT-4o',           sub: 'OpenAI · faster' },
-  { label: 'Claude Sonnet 4.6', sub: 'Anthropic' },
+  { name: 'Gemini 3 Pro',      desc: 'Google' },
+  { name: 'Gemini 3 Flash',    desc: 'Google · faster' },
+  { name: 'GPT-5.2',           desc: 'OpenAI' },
+  { name: 'GPT-4o',            desc: 'OpenAI · faster' },
+  { name: 'Claude Sonnet 4.6', desc: 'Anthropic' },
 ];
 const GEMINI_ONLY = OPENCODE_MODELS.slice(0, 2);
 
-// ---------- dropdown groups ----------
-function claudeGroup() {
-  return `
-    <div class="menu-label">Claude</div>
-    <div class="menu-item">Sonnet 4.6 <span class="sub">Best for everyday tasks</span></div>
-    <div class="menu-item">Opus 4 <span class="sub">Most capable</span></div>
-    <div class="menu-item">Haiku 3.5 <span class="sub">Fastest</span></div>`;
+// ---------- dropdown building blocks ----------
+function modelRow(m, selected) {
+  return `<div class="menu-item ${selected ? 'selected' : ''}">
+    <div class="min-w-0">
+      <div class="name">${m.name}</div>
+      <div class="desc">${m.desc}</div>
+    </div>
+    ${selected ? checkIcon() : ''}
+  </div>`;
 }
-function codexGroup() {
-  return `
-    <div class="menu-label">Codex</div>
-    <div class="menu-item">codex-1 <span class="sub">OpenAI agent</span></div>`;
-}
-function opencodeGroup(models, selectedLabel) {
-  const rows = models.map(m =>
-    `<div class="menu-item ${m.label===selectedLabel ? 'selected' : ''}">${m.label===selectedLabel ? checkIcon() : ''}${m.label} <span class="sub">${m.sub}</span></div>`
-  ).join('');
-  return `<div class="menu-label">OpenCode</div>${rows}`;
+function group(label, models, selectedName) {
+  return `<div class="menu-label">${label}</div>` +
+    models.map(m => modelRow(m, m.name === selectedName)).join('');
 }
 function opencodeZeroKeyGroup() {
   return `
     <div class="menu-label">OpenCode</div>
-    <div class="menu-info flex items-center justify-between gap-3">
+    <div class="menu-info">
       <span>Add API keys to use OpenCode</span>
       <span class="menu-link inline-flex items-center gap-1">${arrowRight()} Open Settings</span>
     </div>`;
 }
 
-// ---------- sidebar shells ----------
-function sidebarWithMenu({ triggerLabel, triggerMuted=false, menuHTML, showModeRail=false }) {
+// ---------- chat panel shell ----------
+// The trigger sits in the INPUT FOOTER at the bottom; the menu (when open) is
+// absolutely positioned ABOVE the input box, overlaying the chat transcript.
+function chatTranscript() {
   return `
-  <div class="sidebar">
-    <div class="sidebar-head">AI Assistant</div>
-    <div style="padding:8px 12px;border-bottom:1px solid var(--r-hairline)">
-      <div class="trigger ${triggerMuted ? 'muted' : ''}">
-        <span class="truncate">${triggerLabel}</span>
-        ${caret()}
-      </div>
-      ${menuHTML ? `<div class="menu">${menuHTML}</div>` : ''}
-      ${showModeRail ? modeRail() : ''}
-    </div>
-    <div style="flex:1"></div>
-  </div>`;
+    <div class="user-msg">Can you summarize the key points from my meeting notes?</div>
+    <p>Certainly. Your notes cover three main decision areas: the Q3 roadmap priorities, the hiring plan for the design team, and the budget reallocation for marketing.</p>
+    <p>The most important action item is the <strong>roadmap review scheduled for Friday</strong> — two stakeholders still need to confirm attendance.</p>
+    <p class="meta">10:42 · Read 2 files</p>`;
 }
 
-function modeRail() {
-  // Codex-only rail — shown ONLY for context comparison; never for OpenCode.
-  return `<div class="flex gap-1.5 mt-1.5">
-    <button style="padding:0 10px;height:24px;font-size:11px;font-weight:500;border-radius:4px;border:1px solid var(--r-accent);background:var(--r-accent-soft);color:var(--r-accent-deep)">Edit</button>
-    <button style="padding:0 10px;height:24px;font-size:11px;font-weight:500;border-radius:4px;border:1px solid var(--r-hairline);background:var(--r-surface);color:var(--r-ink-body)">Plan</button>
-  </div>`;
-}
-
-// full sidebar with zero-key setup card in the body
-function sidebarZeroKey(triggerLabel) {
+function chatPanel({ triggerLabel, triggerMuted = false, menuHTML = null, bodyHTML = null }) {
   return `
-  <div class="sidebar">
-    <div class="sidebar-head">AI Assistant</div>
-    <div style="padding:8px 12px;border-bottom:1px solid var(--r-hairline)">
-      <div class="trigger"><span class="truncate">${triggerLabel}</span>${caret()}</div>
-    </div>
-    <div style="flex:1;overflow-y:auto;padding:12px">
-      <div class="setup-card">
-        <div class="flex items-start gap-3">
-          <div class="shrink-0" style="margin-top:2px">${plugsIcon()}</div>
-          <div class="min-w-0 flex-1">
-            <div class="text-sm font-semibold" style="color:var(--r-ink-strong)">Set up your API keys</div>
-            <p class="mt-1 text-xs leading-5" style="color:var(--r-ink-muted)">OpenCode uses your own provider accounts for AI. Add at least one key (Gemini, OpenAI, Anthropic, or OpenRouter) to get started.</p>
-            <div class="mt-4">
-              <button class="setup-btn">Open Key Settings</button>
-            </div>
+  <div class="panel">
+    <div class="panel-head">AI Assistant</div>
+    <div class="chat">${bodyHTML !== null ? bodyHTML : chatTranscript()}</div>
+
+    ${menuHTML ? `<div class="menu">${menuHTML}</div>` : ''}
+
+    <div class="input-wrap">
+      <div class="input-box">
+        <div class="input-text">Ask anything about your documents…</div>
+        <div class="input-footer">
+          <div class="trigger ${triggerMuted ? 'muted' : ''}">
+            <span class="truncate">${triggerLabel}</span>
+            ${caret()}
+          </div>
+          <span class="ctx-chip">1 context</span>
+          <div class="ml-auto flex items-center gap-1">
+            <span class="icon-btn">${paperclipIcon()}</span>
+            <span class="send-btn">${sendIcon()}</span>
           </div>
         </div>
       </div>
@@ -216,47 +245,84 @@ function sidebarZeroKey(triggerLabel) {
   </div>`;
 }
 
+// zero-key setup card rendered in the chat body (input still visible below)
+function zeroKeyBody() {
+  return `
+    <div class="setup-card">
+      <div class="flex items-start gap-3">
+        <div class="shrink-0" style="margin-top:2px">${plugsIcon()}</div>
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-semibold" style="color:var(--r-ink-strong)">Set up your API keys</div>
+          <p class="mt-1 text-xs leading-5" style="color:var(--r-ink-muted)">OpenCode uses your own provider accounts for AI. Add at least one key (Gemini, OpenAI, Anthropic, or OpenRouter) to get started.</p>
+          <div class="mt-4">
+            <button class="setup-btn">Open Key Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---------- menus ----------
+function fullMenu(opencodeModels, selectedName) {
+  return group('Claude', CLAUDE_MODELS, null)
+    + `<div class="menu-sep"></div>`
+    + group('Codex', CODEX_MODELS, null)
+    + `<div class="menu-sep"></div>`
+    + group('OpenCode', opencodeModels, selectedName);
+}
+function zeroKeyMenu() {
+  return group('Claude', CLAUDE_MODELS, 'Sonnet 4.6')
+    + `<div class="menu-sep"></div>`
+    + group('Codex', CODEX_MODELS, null)
+    + `<div class="menu-sep"></div>`
+    + opencodeZeroKeyGroup();
+}
+
 // ---------- states ----------
 function buildState(id) {
   switch (id) {
     case 'A1':
       return {
-        anno: 'Dropdown OPEN, keys configured. OpenCode group appended after Codex with 5 models + inline provider sub-text. Claude/Codex groups shown for context.',
-        html: sidebarWithMenu({
+        anno: 'Dropdown OPEN (opens UPWARD over the chat), keys configured. OpenCode group appended after Codex with 5 models — provider shown on the description line. Selected model: indigo highlight + checkmark, same as Claude/Codex rows.',
+        html: chatPanel({
           triggerLabel: 'OpenCode · Gemini 3 Pro',
-          menuHTML: claudeGroup() + `<div class="menu-sep"></div>` + codexGroup() + `<div class="menu-sep"></div>` + opencodeGroup(OPENCODE_MODELS, 'Gemini 3 Pro')
+          menuHTML: fullMenu(OPENCODE_MODELS, 'Gemini 3 Pro')
         })
       };
     case 'A2':
       return {
-        anno: 'Dropdown OPEN, no keys. OPENCODE group still appears (discoverability) showing one non-selectable row: "Add API keys to use OpenCode" + Open Settings link.',
-        html: sidebarWithMenu({
-          triggerLabel: 'Claude · Sonnet 4.6',
-          menuHTML: claudeGroup() + `<div class="menu-sep"></div>` + codexGroup() + `<div class="menu-sep"></div>` + opencodeZeroKeyGroup()
+        anno: 'Dropdown OPEN, no BYOK keys. OpenCode group still appears (discoverability) showing one non-selectable row: "Add API keys to use OpenCode" + Open Settings link. Claude remains the selected agent.',
+        html: chatPanel({
+          triggerLabel: 'Claude · Sonnet',
+          menuHTML: zeroKeyMenu()
         })
       };
     case 'A3':
       return {
-        anno: 'Dropdown CLOSED, OpenCode · Gemini 3 Pro selected. No Edit/Plan mode rail (OpenCode has no modes this sprint).',
-        html: sidebarWithMenu({ triggerLabel: 'OpenCode · Gemini 3 Pro', menuHTML: null, showModeRail: false })
+        anno: 'Dropdown CLOSED. OpenCode · Gemini 3 Pro selected — trigger in the input footer (bottom-left), exactly where "Claude · Sonnet" sits today. No Edit/Plan mode rail (OpenCode has no modes this sprint).',
+        html: chatPanel({ triggerLabel: 'OpenCode · Gemini 3 Pro' })
       };
     case 'A4':
       return {
-        anno: 'Full sidebar — OpenCode selected, no keys. Zero-key inline card (CodexSetupView pattern): plugs icon, heading, copy, "Open Key Settings" primary button.',
-        html: sidebarZeroKey('OpenCode · Select a model…')
+        anno: 'OpenCode selected but no keys configured. Zero-key setup card replaces the chat content (CodexSetupView pattern): plugs icon, heading, copy, "Open Key Settings" primary button. Input footer trigger shows "Select a model…" muted.',
+        html: chatPanel({
+          triggerLabel: 'OpenCode · Select a model…',
+          triggerMuted: true,
+          bodyHTML: zeroKeyBody()
+        })
       };
     case 'A5':
       return {
-        anno: 'Dropdown OPEN, only Gemini key configured. OpenCode group filtered to the 2 Gemini models. Group label still shows. No "add a key" CTA inside the picker.',
-        html: sidebarWithMenu({
+        anno: 'Dropdown OPEN, only a Gemini key configured. OpenCode group filtered to the 2 Gemini models. Group label still shows. No "add a key" CTA inside the picker for other providers.',
+        html: chatPanel({
           triggerLabel: 'OpenCode · Gemini 3 Pro',
-          menuHTML: claudeGroup() + `<div class="menu-sep"></div>` + codexGroup() + `<div class="menu-sep"></div>` + opencodeGroup(GEMINI_ONLY, 'Gemini 3 Pro')
+          menuHTML: fullMenu(GEMINI_ONLY, 'Gemini 3 Pro')
         })
       };
     case 'A6':
       return {
         anno: 'Trigger stale state — selected model\'s provider key was removed. Trigger reads "OpenCode · Select a model…" in muted ink. User must re-pick before sending.',
-        html: sidebarWithMenu({ triggerLabel: 'OpenCode · Select a model…', triggerMuted: true, menuHTML: null })
+        html: chatPanel({ triggerLabel: 'OpenCode · Select a model…', triggerMuted: true })
       };
   }
 }
