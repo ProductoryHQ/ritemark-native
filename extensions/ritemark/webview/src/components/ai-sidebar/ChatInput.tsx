@@ -275,8 +275,11 @@ export function ChatInput() {
     const hiddenContext = hiddenParts.length > 0 ? hiddenParts.join('\n\n') : undefined;
 
     // Collect file paths for @mentioned agents so the extension can load their instructions
-    // Parsed inline to avoid referencing `mentions` which is defined later in this component
-    const mentionedAgentPaths = parseMentions(discoveredAgents, value)
+    // Parsed inline to avoid referencing `mentions` which is defined later in this component.
+    // Parse from the prompt actually being sent (#82): on the queued auto-send path
+    // `value` has already been cleared, so an @agent mention in the queued prompt would
+    // otherwise be dropped. `overridePrompt` carries the queued text in that case.
+    const mentionedAgentPaths = parseMentions(discoveredAgents, overridePrompt ?? value)
       .map((m) => discoveredAgents.find((a) => a.id === m.agentId)?.filePath)
       .filter((p): p is string => !!p);
 
@@ -397,6 +400,16 @@ export function ChatInput() {
           if (parsed.command.action === 'custom') {
             // Custom commands are sent as slash-command prompts to the agent
             const prompt = `/${parsed.command.id}${parsed.args ? ' ' + parsed.args : ''}`;
+            // Respect the running-agent queue (#82): a slash command typed while
+            // the agent is running must park in the queue like any other prompt,
+            // not bypass straight to send (which drops it for Claude / misroutes
+            // for Codex). Auto-send re-runs it through handleSend on completion.
+            if (shouldQueueInsteadOfSend({ isLoading, isAgentMode, hasOverridePrompt: false })) {
+              setQueuedPrompt(prompt);
+              setValue('');
+              setShowCommandPopup(false);
+              return;
+            }
             sendAgentMessage(prompt);
             setValue('');
             setShowCommandPopup(false);
@@ -414,7 +427,7 @@ export function ChatInput() {
         setShowCommandPopup(false);
       }
     },
-    [handleSend, showMentionPopup, showCommandPopup, value, executeCommandAction]
+    [handleSend, showMentionPopup, showCommandPopup, value, executeCommandAction, isLoading, isAgentMode]
   );
 
   // Handle text changes, @ mention detection, and / command detection
