@@ -165,7 +165,9 @@
       display: flex; align-items: center; gap: 6px;
       padding: 6px 10px;
       cursor: pointer; user-select: none;
+      transition: background 100ms;
     }
+    .notch-head:hover { background: rgba(241,245,249,0.6); }
     .notch-head-title {
       flex: 1;
       font-size: 11px; font-weight: 600; color: var(--r-ink-muted);
@@ -375,7 +377,7 @@
     </div>
 
     <!-- ── PLAN APPROVAL NOTCH — same pattern as SelectedContextTab ── -->
-    <div class="input-wrap" style="padding-bottom:0">
+    <div class="input-wrap" style="padding-bottom:0;border-top:none">
 
       <!-- The notch: rounded-t-lg border border-b-0 -mb-px  (matches SelectedContextTab) -->
       <div class="notch" id="plan-notch">
@@ -468,7 +470,7 @@
       </div>
     </div>
 
-    <div class="input-wrap" style="padding-bottom:0">
+    <div class="input-wrap" style="padding-bottom:0;border-top:none">
 
       <!-- UPPER notch: plan approval — rounded-t-lg, no border-bottom -->
       <div class="notch" id="plan-notch-c" style="margin-bottom:0">

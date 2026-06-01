@@ -202,7 +202,9 @@
       display: flex; align-items: center; gap: 6px;
       padding: 6px 10px;
       cursor: pointer; user-select: none;
+      transition: background 100ms;
     }
+    .notch-header-row:hover { background: rgba(241,245,249,0.6); }
     .q-count-pill {
       width: 16px; height: 16px;
       display: flex; align-items: center; justify-content: center;
@@ -243,7 +245,7 @@
 
     /* ── chat input bar ── */
     .input-wrap { flex-shrink:0;padding:8px 10px;border-top:1px solid var(--r-hairline); }
-    .input-wrap.no-top { padding-top:0; }
+    .input-wrap.no-top { padding-top:0; border-top:none; }
     .input-box {
       border:1px solid var(--r-hairline);border-radius:8px;
       background:var(--r-surface);box-shadow:var(--r-shadow-sm);overflow:hidden;
