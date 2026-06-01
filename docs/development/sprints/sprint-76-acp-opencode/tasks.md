@@ -31,16 +31,16 @@
 - [ ] Jarmo's Q1 decision (bundle vs download) based on audit data
 - [ ] **⛔ GATE: Jarmo approves spec + audits + prototypes before Phase 1 (CLAUDE.md Sprint Phase 2→3 gate).**
 
-## Phase 1: ACP client core (R1)
+## Phase 1: ACP client core (R1) — ✅ complete 2026-06-01
 
-- [ ] Add `@agentclientprotocol/sdk` to `extensions/ritemark/package.json` (exact version pin)
-- [ ] Write `src/acp/acpTrace.ts`
-- [ ] Write `src/acp/acpClient.ts` (spawn, stdio wiring, typed API: newSession/prompt/cancel/dispose)
-- [ ] Write `src/acp/acpFsProxy.ts` (fs/read_text_file, fs/write_text_file via vscode.workspace.fs)
-- [ ] Write `src/acp/acpManager.ts` (lifecycle, session/update → AgentProgress mapping, error handling)
-- [ ] Write `src/acp/index.ts` exports
-- [ ] Write `src/acp/acpClient.test.ts` (mock child process, scripted JSON-RPC)
-- [ ] `npm test` green for new tests
+- [x] Add `@agentclientprotocol/sdk` to `extensions/ritemark/package.json` (exact version pin: 0.22.1)
+- [x] Write `src/acp/acpTrace.ts` (7 lines)
+- [x] Write `src/acp/acpClient.ts` (spawn, stdio wiring, typed API: newSession/prompt/setModel/cancel/dispose) (288 lines)
+- [x] Write `src/acp/acpFsProxy.ts` (fs/read_text_file, fs/write_text_file via vscode.workspace.fs; mandatory approveWrite callback) (180 lines)
+- [x] Write `src/acp/acpManager.ts` (lifecycle, session/update → AgentProgress mapping, OPENCODE_PERMISSION env, 0-token soft error, cancel-as-kill) (266 lines)
+- [x] Write `src/acp/index.ts` exports (24 lines)
+- [x] Write `src/acp/acpClient.test.ts` + `acpManager.test.ts` (mock child process, scripted JSON-RPC)
+- [x] `npm test` green for new tests (all src/ tests pass; webview tests can't run in Linux remote env — EBADPLATFORM on darwin-pinned deps, pre-existing)
 
 ## Phase 2: Bundling & runtime discovery (R2)
 
