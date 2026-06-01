@@ -52,12 +52,14 @@
 - [ ] Add `'opencode'` to `AgentId` + `AGENTS` registry in `src/agent/types.ts`
       (incl. `requiresApiKey: 'byok'` type extension)
 
-## Phase 3: BYOK keys (R3)
+## Phase 3: Provider keys for OpenCode (R3a — revised 2026-06-01)
 
-- [ ] SecretStorage helpers for the four BYOK keys (gemini/openai/anthropic/openrouter)
-- [ ] Spawn-env injection in `acpManager.ts`
-- [ ] Settings page BYOK section (after ux-expert layout review)
-- [ ] AI sidebar empty-state "Set up your keys" card + `open-settings-byok` deep link
+- [ ] Locate existing provider-key SecretStorage helpers (OpenAI / Google AI / Anthropic cards);
+      add ONE new stored key for OpenRouter
+- [ ] Spawn-env injection in `acpManager.ts` reading existing key storage
+- [ ] Settings page: update "Used for:" copy on 3 existing cards; add OpenRouter card
+      (flag-gated, optional)
+- [ ] AI sidebar empty-state "Set up your API keys" card + `open-settings-api-keys` deep link
 - [ ] Verify keys never appear in webview messages (trace channel inspection — scenarios.md
       "Keys never leak")
 

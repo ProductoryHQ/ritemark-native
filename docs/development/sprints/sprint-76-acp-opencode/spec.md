@@ -62,19 +62,37 @@ Acceptance criteria:
 
 ### R3: BYOK key configuration through Ritemark Settings
 
-As a user, I want to enter my provider API keys (Google Gemini, OpenAI, Anthropic, OpenRouter)
-once in Ritemark Settings and have the OpenCode agent use them, so I never configure keys in two
-places.
+> **REVISED 2026-06-01 (Jarmo, prototype review):** the original criteria below called for a *new*
+> "Bring Your Own Keys" Settings section with its own four key fields. Jarmo rejected this — it
+> duplicates the OpenAI / Google AI / Anthropic key cards that already exist on the Settings page
+> (used by AI Chat, Flows, Image Generation, and the Claude OAuth alternative). **Revised
+> contract: OpenCode consumes the EXISTING provider keys.** See R3a below; the original text is
+> retained for the audit trail but is superseded.
+
+*Original (superseded):* ~~Settings page gains a "Bring Your Own Keys" section with fields for
+Google Gemini, OpenAI, Anthropic, OpenRouter…~~
+
+### R3a: OpenCode uses the existing provider keys + new OpenRouter card (revised R3)
+
+As a user, I want the API keys I have already saved in Ritemark Settings (OpenAI, Google AI,
+Anthropic) to automatically power the OpenCode agent, so I configure each provider exactly once
+on one page.
 
 Acceptance criteria:
-- Settings page gains a "Bring Your Own Keys" section with fields for at minimum: Google Gemini,
-  OpenAI, Anthropic, OpenRouter. Keys stored via VS Code SecretStorage (same mechanism as existing
-  API keys).
+- **No new "BYOK" section.** The existing **API Keys** section keeps its current cards; OpenCode
+  reads the same SecretStorage values those cards write.
+- The existing cards' "Used for:" lines are extended to mention OpenCode:
+  - OpenAI: "AI Chat, Flows (LLM), Image Generation (GPT Image 1.5), **OpenCode (GPT models)**"
+  - Google AI: "Gemini models in **OpenCode** and Flows, Imagen 3 (coming soon)"
+  - Anthropic: "Claude in Ritemark (alternative to signing in with Claude.ai), **OpenCode (Claude models)**"
+- **One new card only:** "OpenRouter API Key" *(optional)* — added to the API Keys section after
+  Anthropic. "Used for: OpenCode — hundreds of models from multiple providers through a single key."
+  Hidden when the `opencode-integration` flag is off.
 - At agent spawn, configured keys are injected as environment variables
   (`GEMINI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
   `OPENROUTER_API_KEY`) into the OpenCode process only — never written to disk, never sent to the webview.
-- If no keys are configured and the user selects OpenCode, the sidebar shows a setup prompt that
-  deep-links to the Settings BYOK section (no dead-end error).
+- If none of the four provider keys are configured and the user selects OpenCode, the sidebar
+  shows a setup prompt that deep-links to the Settings API Keys section (no dead-end error).
 - Keys configured in Ritemark are not required to also exist in `~/.config/opencode` — the env
   injection alone is sufficient for OpenCode to list and use those providers.
 
@@ -158,6 +176,8 @@ Acceptance criteria:
 | Q2 | UI label for the third runtime | **"OpenCode"** — honest about what it is, matches the open-source brand | Jarmo, 2026-06-01 |
 | Q3 | Feature flag status at launch | **`stable`** (not experimental) — still ON by default, still flag-gated for kill-switch capability | Jarmo, 2026-06-01 |
 | Q4 | Sequencing vs TO BE #2 (typed protocol) | **Proceed with Sprint 76 now.** Mitigation: normalize ACP + Codex approval payloads to one webview message shape, pre-aligning with the future typed protocol migration | Jarmo, 2026-06-01 |
+| Q-UX1 | Settings sub-section naming | **Moot** — no separate BYOK section exists after the R3 revision; OpenCode uses the existing API Keys section | Jarmo, 2026-06-01 |
+| Q-UX2 | Key duplication (separate OpenCode keys vs shared) | **Unified** — OpenCode consumes the existing provider keys; only OpenRouter is a new card. "Go back to the drawing board" review | Jarmo, 2026-06-01 |
 
 ## Open Questions
 

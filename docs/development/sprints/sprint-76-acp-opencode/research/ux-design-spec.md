@@ -28,7 +28,67 @@
 
 * * *
 
-## Surface 1: Settings — "Your API Keys" section (BYOK)
+## ⚠️ REVISION 2026-06-01 — Holistic Settings redesign (supersedes Surface 1 below)
+
+**Jarmo rejected the original Surface 1 design** ("go back to the drawing board"): it created a
+second set of OpenAI/Anthropic key cards next to the existing ones, ballooning the page to ~9
+credential cards. The revised design principle:
+
+> **A key is a key.** One card per provider on the whole page. Every feature that needs that
+> provider (AI Chat, Flows, Image Generation, Claude OAuth-alternative, OpenCode) consumes the
+> same stored key. The "Used for:" line tells the user everything that key powers.
+
+### The whole Settings page (real structure, with Sprint 76 changes marked)
+
+| Section | Contents | Sprint 76 change |
+| --- | --- | --- |
+| Appearance | Theme preview cards | — |
+| Agent Runtime | Runtime preference (bundled / system) | — |
+| **API Keys** | Claude Account (OAuth) · ChatGPT Account (OAuth) · OpenAI API Key · Google AI API Key · Anthropic API Key | **"Used for:" lines gain OpenCode mentions** on OpenAI / Google AI / Anthropic cards; **one new card: OpenRouter API Key** *(optional)* after Anthropic |
+| Agent Timeout | Timeout slider | — |
+| Chat Appearance | Font/density settings | — |
+| Updates | Update center | — |
+
+### Card-level changes (the only changes on the page)
+
+1. **OpenAI API Key** — "Used for:" becomes:
+   `AI Chat, Flows (LLM), Image Generation (GPT Image 1.5), OpenCode (GPT models)`
+2. **Google AI API Key** — "Used for:" becomes:
+   `Gemini models in OpenCode and Flows, Imagen 3 (coming soon)`
+3. **Anthropic API Key** — "Used for:" becomes:
+   `Claude in Ritemark (alternative to signing in with Claude.ai), OpenCode (Claude models)`
+4. **NEW: OpenRouter API Key** *(optional)* — identical card anatomy to the existing key cards:
+   - Placeholder: `sk-or-...`
+   - "Used for:" `OpenCode — hundreds of models from multiple providers through a single key`
+   - Get key link: `Get an OpenRouter key` → `https://openrouter.ai/keys`
+   - Hidden entirely when `opencode-integration` flag is off
+5. **No other card, section, heading, or copy changes anywhere on the page.**
+
+### Why this is better
+
+- Zero duplication: a user with an existing OpenAI key gets GPT models in OpenCode with **no
+  additional setup**.
+- The Settings page grows by exactly one card instead of a whole section.
+- Model-picker filtering (Surface 2) keys off the same booleans the page already manages:
+  Google AI key exists → Gemini models appear under OpenCode.
+- Implementation shrinks: no new SecretStorage keys, no new section component — just "Used for:"
+  copy updates, one new card, and the spawn-env injection reading existing storage.
+
+### Prototype states (settings.html — whole page)
+
+| ID | State to show |
+| --- | --- |
+| S1 | **Whole page**, default state: all 7 sections visible, OpenRouter card present (empty), updated "Used for:" lines highlighted with annotations |
+| S2 | Whole page, Google AI key configured: shows the one-key-unlocks-OpenCode story |
+| S3 | API Keys section close-up: all 6 cards (2 accounts + 4 keys) with updated copy |
+| S4 | OpenRouter card configured state |
+| S5 | Flag-off: page identical to today — no OpenRouter card, no OpenCode mentions in "Used for:" lines |
+
+*(Original S1–S7 states below are superseded.)*
+
+* * *
+
+## Surface 1 (SUPERSEDED — kept for audit trail): Settings — "Your API Keys" section (BYOK)
 
 ### User story
 

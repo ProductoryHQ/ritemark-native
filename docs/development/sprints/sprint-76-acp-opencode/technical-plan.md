@@ -101,10 +101,13 @@ version** (pre-1.0 SDK).
 ## Workstream 3: BYOK keys via Settings (R3)
 
 ### Extension Host
-- Key storage: VS Code SecretStorage keys `ritemark.byok.gemini`, `ritemark.byok.openai`,
-  `ritemark.byok.anthropic`, `ritemark.byok.openrouter` (reuse whatever helper Settings already
-  uses for the Anthropic/OpenAI keys — confirm exact module during Phase 1).
-- `acpManager.ts` builds the spawn env:
+
+> **Revised 2026-06-01 (R3 → R3a):** no new SecretStorage keys. OpenCode reads the **existing**
+> provider key storage that the OpenAI / Google AI / Anthropic Settings cards already write
+> (locate the exact storage helper + key names in `RitemarkSettings.tsx` message handlers /
+> UnifiedViewProvider during Phase 1). Only **one new stored key**: OpenRouter.
+
+- `acpManager.ts` builds the spawn env from existing storage:
 
 ```ts
 const env = {
@@ -120,11 +123,11 @@ const env = {
   providers are configured* (booleans), for the model dropdown (R6) and the setup prompt.
 
 ### Webview Side
-- Settings page: new "Bring Your Own Keys" section (4 password fields + save/clear), built with
-  the existing Settings components and `dialog.tsx` primitives — invoke `ux-expert` for layout
-  before implementation.
-- AI sidebar: "Set up your keys" empty-state card when OpenCode selected and no providers
-  configured; button posts `open-settings-byok` message.
+- Settings page (`RitemarkSettings.tsx`): update "Used for:" copy on the OpenAI / Google AI /
+  Anthropic cards; add ONE new card (OpenRouter, optional, flag-gated) after Anthropic — same
+  card anatomy as the existing key cards. No new section.
+- AI sidebar: "Set up your API keys" empty-state card when OpenCode selected and no provider keys
+  configured; button posts `open-settings-api-keys` message (deep-link to API Keys section).
 
 ## Workstream 4: Approval gating + progress streaming (R4, R5)
 
