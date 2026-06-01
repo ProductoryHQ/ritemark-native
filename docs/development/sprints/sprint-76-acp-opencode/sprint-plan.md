@@ -51,6 +51,7 @@ mode, custom agent binary picker, Linux packaging, ACP session resume.
 | 2026-06-01 | Protocol-first: integrate ACP, bundle OpenCode as default agent | Issue #52 research: immune to vendor CLI deprecation (Gemini CLI lesson); one client unlocks all current/future ACP agents |
 | 2026-06-01 | Single key UI in Ritemark Settings; env-injection to agent | TO BE architecture alignment — avoid key-management fragmentation |
 | 2026-06-01 | Sprint named by Jarmo: `sprint-76-acp-opencode`; SDD track | Multi-requirement, multi-component, security-sensitive (approval gating) |
+| 2026-06-01 | UI label = "OpenCode"; flag status = `stable`; proceed without waiting for typed-protocol refactor | Jarmo's answers to spec Q2/Q3/Q4 |
 
 ## Risks
 
@@ -74,4 +75,5 @@ mode, custom agent binary picker, Linux packaging, ACP session resume.
 
 | Date | Update |
 | --- | --- |
-| 2026-06-01 | Sprint created from issue #52 research. Branch renamed from `claude/serene-ride-STPCa` → `sprint-76-acp-opencode`. Five SDD artifacts drafted. **Awaiting: Jarmo's answers to spec.md Open Questions Q1–Q4 and Phase 2→3 approval.** |
+| 2026-06-01 | Sprint created from issue #52 research. Branch renamed from `claude/serene-ride-STPCa` → `sprint-76-acp-opencode`. Five SDD artifacts drafted. |
+| 2026-06-01 | Spec Q2/Q3/Q4 resolved by Jarmo. **Next: Phase 0 audits (ACP e2e + bundling/notarization), then Q1 decision and Phase 2→3 approval.** Note: both audits require darwin-arm64 — to run on Jarmo's Mac or a local session, not in the remote (Linux) environment. |

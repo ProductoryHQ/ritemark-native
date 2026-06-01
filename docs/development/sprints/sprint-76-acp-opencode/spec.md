@@ -54,8 +54,8 @@ Acceptance criteria:
   `win32-x64` with `sourceUrl`, `sha256`, version, and `license: { spdx: "MIT", redistribution: "permitted" }`.
 - `AgentRuntimeKind` (`src/utils/bundledAgentRuntime.ts:4`) gains `'opencode'`;
   `executableNames()` and `candidateRuntimePaths()` resolve it (bundled-first, system-PATH fallback).
-- `AgentId` (`src/agent/types.ts:11`) gains `'opencode'`; `AGENTS` registry gains an entry
-  (label/description per UX review).
+- `AgentId` (`src/agent/types.ts:11`) gains `'opencode'`; `AGENTS` registry gains an entry with
+  label **"OpenCode"** (resolved 2026-06-01 — Jarmo, see Resolved Questions Q2).
 - The fetch script downloads, sha256-verifies, and installs the OpenCode binary like it does for
   codex-app-server.
 - OpenCode appears in `AgentSelector.tsx` and is selectable.
@@ -131,8 +131,8 @@ can be disabled per-platform or per-user without code changes if something goes 
 Acceptance criteria:
 - New `FlagId` `'opencode-integration'` in `src/features/flags.ts`, following the
   `codex-integration` pattern.
-- Status `experimental` (matches Codex's introduction), platforms `['darwin', 'win32', 'linux']`,
-  enabled by default (HARD RULE #2 — features ON by default).
+- Status `stable` (resolved 2026-06-01 — Jarmo, see Resolved Questions Q3), platforms
+  `['darwin', 'win32', 'linux']`, enabled by default (HARD RULE #2 — features ON by default).
 - When the flag is off, OpenCode does not appear in the agent selector and the BYOK settings
   section is hidden.
 
@@ -153,13 +153,14 @@ Acceptance criteria:
 
 ## Resolved Questions
 
-*(none yet — populated as decisions are made during the sprint)*
+| # | Question | Decision | By / Date |
+| --- | --- | --- | --- |
+| Q2 | UI label for the third runtime | **"OpenCode"** — honest about what it is, matches the open-source brand | Jarmo, 2026-06-01 |
+| Q3 | Feature flag status at launch | **`stable`** (not experimental) — still ON by default, still flag-gated for kill-switch capability | Jarmo, 2026-06-01 |
+| Q4 | Sequencing vs TO BE #2 (typed protocol) | **Proceed with Sprint 76 now.** Mitigation: normalize ACP + Codex approval payloads to one webview message shape, pre-aligning with the future typed protocol migration | Jarmo, 2026-06-01 |
 
 ## Open Questions
 
 | # | Question | Owner | Blocking |
 | --- | --- | --- | --- |
 | Q1 | **Bundle OpenCode in the DMG or download on first use?** OpenCode ships as a Bun-compiled self-contained binary — size and macOS notarization behaviour inside our signed DMG are unverified. Phase 0 audit measures both. Codex precedent = bundle; if the binary is very large (>80 MB) or breaks notarization, first-use download is the fallback. | Jarmo (after audit data) | R2 |
-| Q2 | **UI label:** "OpenCode", "Open Agent (BYOK)", or "Bring Your Own Key"? Needs ux-expert input. | Jarmo | R2 (cosmetic) |
-| Q3 | **Flag status `experimental` vs `stable` at launch?** Spec assumes `experimental` (Codex precedent). | Jarmo | No |
-| Q4 | **Does TO BE #2 (typed webview↔host protocol) need to land first?** Research alignment said "ACP after typed protocol". Starting Sprint 76 now means the new `acp-execute` messages are added to the stringly-typed bridge and migrated later. Accept or re-sequence? | Jarmo | Sprint sequencing |

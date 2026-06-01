@@ -176,7 +176,7 @@ const env = {
 ## Workstream 6: Feature flag (R7)
 
 - `src/features/flags.ts`: add `'opencode-integration'` to `FlagId` (line 24) and `FLAGS`
-  registry — `status: 'experimental'`, `platforms: ['darwin', 'win32', 'linux']`.
+  registry — `status: 'stable'` (spec Q3 resolution), `platforms: ['darwin', 'win32', 'linux']`.
 - Gate points: agent registry exposure (host side), AgentSelector entry (webview), Settings BYOK
   section. Same gating call sites as `codex-integration` — grep for it and mirror.
 
