@@ -186,9 +186,11 @@ Acceptance criteria:
 | Q4 | Sequencing vs TO BE #2 (typed protocol) | **Proceed with Sprint 76 now.** Mitigation: normalize ACP + Codex approval payloads to one webview message shape, pre-aligning with the future typed protocol migration | Jarmo, 2026-06-01 |
 | Q-UX1 | Settings sub-section naming | **Moot** — no separate BYOK section exists after the R3 revision; OpenCode uses the existing API Keys section | Jarmo, 2026-06-01 |
 | Q-UX2 | Key duplication (separate OpenCode keys vs shared) | **Unified** — OpenCode consumes the existing provider keys; only OpenRouter is a new card. "Go back to the drawing board" review | Jarmo, 2026-06-01 |
+| Q1 | Bundle vs first-use download | **Bundle in DMG** — audit recommendation accepted via sprint approval (103.7 MB darwin-arm64; notarization re-verified at first production build) | Jarmo (sprint approval), 2026-06-01 |
+| Q-UX3 | OpenCode position in dropdown | **After Codex** — as prototyped/approved | Jarmo (sprint approval), 2026-06-01 |
+| Q-UX4 | Test button on OpenRouter card | **Include, following the existing card pattern** — as prototyped. If the validation endpoint proves disproportionate, defer with a note | Jarmo (sprint approval), 2026-06-01 |
+| Q-UX5 | OpenRouter scope | **Ship in Sprint 76** with curated model list — as prototyped | Jarmo (sprint approval), 2026-06-01 |
 
 ## Open Questions
 
-| # | Question | Owner | Blocking |
-| --- | --- | --- | --- |
-| Q1 | **Bundle OpenCode in the DMG or download on first use?** OpenCode ships as a Bun-compiled self-contained binary — size and macOS notarization behaviour inside our signed DMG are unverified. Phase 0 audit measures both. Codex precedent = bundle; if the binary is very large (>80 MB) or breaks notarization, first-use download is the fallback. | Jarmo (after audit data) | R2 |
+*(none — all resolved; sprint approved by Jarmo 2026-06-01)*

@@ -1,6 +1,6 @@
 # Sprint 76 — ACP Client + OpenCode BYOK Runtime
 
-**Track:** SDD | **Phase:** 2 (planning — awaiting approval) | **Branch:** `sprint-76-acp-opencode` | **Worktree:** main checkout
+**Track:** SDD | **Phase:** 3 (implementation — approved 2026-06-01) | **Branch:** `sprint-76-acp-opencode` | **Worktree:** main checkout
 
 ## What this sprint is about
 
@@ -82,4 +82,5 @@ mode, custom agent binary picker, Linux packaging, ACP session resume.
 | --- | --- |
 | 2026-06-01 | Sprint created from issue #52 research. Branch renamed from `claude/serene-ride-STPCa` → `sprint-76-acp-opencode`. Five SDD artifacts drafted. |
 | 2026-06-01 | Spec Q2/Q3/Q4 resolved by Jarmo. |
-| 2026-06-01 | **Phase 0 deliverables complete:** ACP e2e audit (DECISION: ship via ACP), bundling audit (RECOMMENDATION: bundle, 103.7 MB), UX design spec, 13-state HTML prototypes. **Awaiting Jarmo: prototype review, Q1 + Q-UX1..5 decisions, Phase 2→3 approval.** Residual risks: OpenCode 1.15.13 lacks session/cancel (process-kill fallback planned); Bun-binary notarization unverified until first production build. |
+| 2026-06-01 | **Phase 0 deliverables complete:** ACP e2e audit (DECISION: ship via ACP), bundling audit (RECOMMENDATION: bundle, 103.7 MB), UX design spec, HTML prototypes. Residual risks: OpenCode 1.15.13 lacks session/cancel (process-kill fallback planned); Bun-binary notarization unverified until first production build. |
+| 2026-06-01 | **SPRINT APPROVED by Jarmo (Phase 2→3 gate passed).** Model picker prototype explicitly approved; Settings prototype approved on prior review ("last time I checked it was all good"). Remaining questions resolved to recommended/prototyped defaults: bundle in DMG, OpenCode after Codex, Test button included, OpenRouter ships. **Phase 1 (ACP client core) implementation begins.** |
