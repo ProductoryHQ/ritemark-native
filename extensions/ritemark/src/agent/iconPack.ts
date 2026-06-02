@@ -130,13 +130,13 @@ export function autoSuggest(name: string, description: string): { icon: IconName
  * silently fall back to auto-suggest. CLAUDE.md gets a robot/indigo default.
  */
 export function resolveIconAndColor(
-  frontmatter: Record<string, string>,
+  frontmatter: Record<string, unknown>,
   name: string,
   description: string,
   isMainAgent = false,
 ): { icon: IconName; color: ColorName } {
-  const fmIcon = frontmatter.icon?.trim();
-  const fmColor = frontmatter.color?.trim();
+  const fmIcon = typeof frontmatter.icon === 'string' ? frontmatter.icon.trim() : undefined;
+  const fmColor = typeof frontmatter.color === 'string' ? frontmatter.color.trim() : undefined;
 
   let icon: IconName | undefined;
   let color: ColorName | undefined;

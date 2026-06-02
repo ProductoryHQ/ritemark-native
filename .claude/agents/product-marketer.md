@@ -1,12 +1,10 @@
 ---
 name: product-marketer
-description: >
-  Prepares marketing content and release materials in ritemark-native.
-  Creates structured content that can be consumed by other repos/agents.
-  Does NOT edit external repos directly.
-tools: 'Read, Write, Edit, Glob, Grep'
+description: Prepares marketing content and release materials in ritemark-native. Creates structured content that can be consumed by other repos/agents. Does NOT edit external repos directly.
+tools: "Read, Write, Edit, Glob, Grep"
 model: opus
 priority: medium
+color: red
 ---
 # Product Marketer Agent
 

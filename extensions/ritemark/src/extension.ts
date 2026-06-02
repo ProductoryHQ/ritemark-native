@@ -9,7 +9,6 @@ import { DocxEditorProvider } from './docxEditorProvider';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
-import { FlowsViewProvider } from './flows/FlowsViewProvider';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
 import { FlowStorage } from './flows/FlowStorage';
@@ -43,7 +42,6 @@ export let unifiedViewProvider: UnifiedViewProvider;
 let agentLibraryViewProvider: AgentLibraryViewProvider | null = null;
 
 // Flows view provider
-let flowsViewProvider: FlowsViewProvider | null = null;
 let flowScheduler: FlowScheduler | null = null;
 
 // Settings provider
@@ -119,7 +117,7 @@ async function createAndOpenWorkspaceFlow(workspacePath: string): Promise<void> 
   const flowPath = flowStorage.getFlowPath(newFlow.id);
   const uri = vscode.Uri.file(flowPath);
   await vscode.commands.executeCommand('vscode.openWith', uri, FlowEditorProvider.viewType);
-  await flowsViewProvider?.refresh();
+  await agentLibraryViewProvider?.refresh?.();
 }
 
 /**
@@ -317,22 +315,13 @@ export function activate(context: vscode.ExtensionContext) {
     // best-effort; failure here is non-fatal.
   }
 
-  // Register Flows View Provider (always register - visibility controlled by when clause in package.json)
+  // FlowsViewProvider sidebar panel removed (Sprint 77 R3): flows now appear
+  // as a section inside the Agent Library. FlowsViewProvider class is kept for
+  // use as the flow editor target.
   if (workspacePath) {
-    flowsViewProvider = new FlowsViewProvider(
-      context.extensionUri,
-      workspacePath,
-      context.workspaceState
-    );
-    context.subscriptions.push(
-      vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, flowsViewProvider, {
-        webviewOptions: { retainContextWhenHidden: true }
-      })
-    );
-
     flowScheduler = createFlowScheduler(context, workspacePath, {
       onRuntimeStateChanged: async () => {
-        await flowsViewProvider?.refresh();
+        await agentLibraryViewProvider?.refresh?.();
       },
     });
     flowScheduler.start();
@@ -486,7 +475,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.flows.refresh', async () => {
-      await flowsViewProvider?.refresh();
+      await agentLibraryViewProvider?.refresh?.();
     })
   );
 

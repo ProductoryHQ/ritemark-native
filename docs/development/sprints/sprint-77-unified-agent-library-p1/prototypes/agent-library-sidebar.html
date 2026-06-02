@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<!--
+  Sprint 77 Prototype — Agent Library Sidebar
+  HIGH-FIDELITY: CSS is taken verbatim from AgentLibraryViewProvider.ts
+  Light mode defaults match Ritemark Light theme.
+  Toggle dark mode with the button in the top-right corner.
+
+  New elements annotated ①–⑤:
+  ① Provenance badges [claude] / [codex] / [shared] on skills
+  ② Flows section (4th section — was a separate activity-bar entry)
+  ③ Attached-to-agent flow indicator
+  ④ Schedule metadata chip on agents with schedule: frontmatter
+  ⑤ Frontmatter validation warning chip
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Library Sidebar — Sprint 77 Prototype (Hi-Fi)</title>
+<style>
+/* ── Reset ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Light-mode Ritemark token defaults (VS Code vars resolved to Ritemark Light) ── */
+:root {
+  --r-accent: #4338CA;
+  --r-accent-hover: #3730A3;
+  --r-accent-soft: rgba(67, 56, 202, 0.10);
+  --r-accent-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.25);
+  --r-surface: #FFFFFF;
+  --r-surface-muted: rgba(241, 245, 249, 0.65);
+  --r-hairline: rgba(148, 163, 184, 0.25);
+  --r-hairline-strong: rgba(148, 163, 184, 0.45);
+  --r-ink-strong: #1E1B4B;
+  --r-ink-muted: #64748B;
+  --r-ink-faint: rgba(100, 116, 139, 0.65);
+  --r-radius-component: 10px;
+  --r-radius-input: 6px;
+  --r-danger: #B91C1C;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', sans-serif;
+}
+
+body.dark {
+  --r-surface: #1E293B;
+  --r-surface-muted: rgba(15, 23, 42, 0.6);
+  --r-hairline: rgba(148, 163, 184, 0.1);
+  --r-hairline-strong: rgba(148, 163, 184, 0.2);
+  --r-ink-strong: #F8FAFC;
+  --r-ink-muted: #94A3B8;
+  --r-ink-faint: rgba(148, 163, 184, 0.45);
+}
+
+/* ── Page shell ── */
+body {
+  background: #f0f0f0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+body.dark { background: #111827; }
+
+/* ── Proto banner ── */
+.proto-banner {
+  background: #4C1D95;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.proto-tag {
+  background: rgba(255,255,255,0.18);
+  border-radius: 3px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.proto-banner-actions { display: flex; gap: 8px; align-items: center; }
+.toggle-mode-btn {
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.toggle-mode-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* ── Two-column layout ── */
+.page-layout {
+  display: flex;
+  flex: 1;
+  padding: 20px;
+  gap: 20px;
+  overflow: auto;
+}
+
+/* ── Legend ── */
+.legend {
+  width: 200px;
+  flex-shrink: 0;
+  background: white;
+  border-radius: 8px;
+  padding: 14px;
+  height: fit-content;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+body.dark .legend { background: #1e293b; }
+
+.legend-heading {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #4338CA;
+  margin-bottom: 12px;
+}
+
+.anno-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+.anno-num {
+  min-width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #4C1D95; color: white;
+  font-size: 9px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.anno-text strong {
+  display: block; font-size: 11px; color: var(--r-ink-strong);
+  margin-bottom: 1px; line-height: 1.3; font-weight: 600;
+}
+.anno-text span { font-size: 10px; color: var(--r-ink-muted); line-height: 1.4; }
+.legend-sep { height: 1px; background: var(--r-hairline); margin: 10px 0; }
+.legend-existing { font-size: 10px; color: var(--r-ink-faint); }
+.legend-existing li { margin-bottom: 4px; list-style: none; padding-left: 10px; position: relative; }
+.legend-existing li::before { content: '–'; position: absolute; left: 0; color: var(--r-ink-faint); }
+
+/* ── VS Code sidebar frame ── */
+.sidebar-frame {
+  width: 300px;
+  min-width: 300px;
+  background: var(--r-surface);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  height: 720px;
+  /* Match VS Code sidebar border */
+  border: 1px solid var(--r-hairline);
+}
+
+/* ── Title row (verbatim from AgentLibraryViewProvider) ── */
+.header-counts {
+  padding: 0 14px 8px 20px;
+  font-size: 11px;
+  color: var(--r-ink-muted);
+}
+
+.search-container {
+  padding: 0 10px 8px 10px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--vscode-input-background, #f1f5f9);
+  border: 1px solid var(--vscode-input-border, var(--r-hairline));
+  border-radius: var(--r-radius-input);
+}
+body.dark .search-input-wrapper { background: rgba(255,255,255,0.07); }
+.search-input-wrapper:focus-within {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 3px var(--r-accent-soft);
+}
+.search-input {
+  flex: 1; padding: 0; font-size: 12px;
+  font-family: inherit;
+  color: var(--r-ink-strong);
+  background: transparent; border: none; outline: none;
+}
+.search-input::placeholder { color: var(--r-ink-faint); }
+.search-icon { flex-shrink: 0; width: 12px; height: 12px; color: var(--r-ink-muted); }
+
+.sort-btn {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-input);
+  color: var(--r-ink-muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+.sort-btn:hover { color: var(--r-accent); border-color: var(--r-accent); background: var(--r-accent-soft); }
+
+/* ── Scope tabs (verbatim) ── */
+.scope-tabs {
+  display: flex;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--r-hairline);
+}
+.scope-tab {
+  flex: 1; padding: 6px 4px;
+  font-size: 12px; font-weight: 500;
+  text-align: center; cursor: pointer;
+  color: var(--r-ink-muted);
+  border-bottom: 2px solid transparent;
+  transition: color 0.1s, border-color 0.1s;
+  user-select: none;
+}
+.scope-tab:hover { color: var(--r-ink-strong); }
+.scope-tab.active { color: var(--r-ink-strong); border-bottom-color: var(--r-accent); font-weight: 600; }
+
+/* ── Scrollable content ── */
+#content { flex: 1; overflow-y: auto; overflow-x: hidden; }
+#content::-webkit-scrollbar { width: 5px; }
+#content::-webkit-scrollbar-thumb { background: var(--r-hairline-strong); border-radius: 3px; }
+#content::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Section header (verbatim) ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px 4px 20px;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--r-ink-muted);
+  background: var(--r-surface-muted);
+  user-select: none;
+  cursor: pointer;
+}
+.section-header-meta { display: flex; align-items: center; gap: 8px; }
+.section-count { font-size: 11px; font-weight: 400; color: var(--r-ink-faint); }
+.section-add-btn {
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; cursor: pointer; padding: 0;
+  color: var(--r-ink-muted); background: transparent; border: none;
+  font-size: 16px; line-height: 1;
+}
+.section-add-btn:hover { background: var(--r-accent-soft); color: var(--r-accent); }
+
+.section-header-left { display: flex; align-items: center; gap: 6px; }
+
+/* ── Items (verbatim) ── */
+.item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 12px 8px 14px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background-color 0.1s;
+  position: relative;
+}
+.item:hover { background: var(--vscode-list-hoverBackground, rgba(0,0,0,0.04)); }
+body.dark .item:hover { background: rgba(255,255,255,0.04); }
+.item.selected { background: var(--r-accent-soft); border-left-color: var(--r-accent); }
+.item.selected .item-name { font-weight: 600; }
+
+.item-icon-chip {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  margin-top: 1px;
+  font-size: 16px;
+}
+.chip-red   { background: rgba(239,68,68,0.12); }
+.chip-ind   { background: rgba(67,56,202,0.12); }
+.chip-em    { background: rgba(16,185,129,0.12); }
+.chip-vio   { background: rgba(139,92,246,0.12); }
+.chip-amb   { background: rgba(245,158,11,0.12); }
+.chip-sla   { background: rgba(100,116,139,0.12); }
+.chip-tea   { background: rgba(20,184,166,0.12); }
+
+.item-content { flex: 1; min-width: 0; padding-top: 1px; }
+.item-name {
+  font-size: 13px; font-weight: 500; line-height: 1.35;
+  color: var(--r-ink-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+.item-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-description {
+  font-size: 11px; color: var(--r-ink-muted);
+  line-height: 1.4; margin-top: 2px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.item-description.placeholder { font-style: italic; opacity: 0.65; }
+
+.item-more-btn {
+  flex-shrink: 0;
+  width: 22px; height: 22px; margin-left: 4px; margin-top: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; background: transparent; border: none;
+  cursor: pointer; color: var(--r-ink-muted);
+  opacity: 0; transition: opacity 0.1s;
+  font-size: 16px;
+}
+.item:hover .item-more-btn,
+.item.selected .item-more-btn { opacity: 1; }
+.item-more-btn:hover { background: var(--r-accent-soft); color: var(--r-accent); }
+
+/* ═══════════════════════════════════════
+   NEW ELEMENTS (Sprint 77 additions)
+   ═══════════════════════════════════════ */
+
+/* ① Provenance badges */
+.prov-badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
+  flex-shrink: 0; white-space: nowrap;
+}
+.prov-claude {
+  background: rgba(67,56,202,0.1); color: #4338CA;
+  border: 1px solid rgba(67,56,202,0.2);
+}
+body.dark .prov-claude { color: #818CF8; background: rgba(67,56,202,0.2); }
+.prov-codex {
+  background: rgba(5,150,105,0.1); color: #059669;
+  border: 1px solid rgba(5,150,105,0.2);
+}
+body.dark .prov-codex { color: #34D399; background: rgba(16,185,129,0.15); }
+.prov-shared {
+  background: rgba(100,116,139,0.1); color: #475569;
+  border: 1px solid rgba(100,116,139,0.2);
+}
+body.dark .prov-shared { color: #94A3B8; background: rgba(100,116,139,0.14); }
+
+/* ④ Schedule chip */
+.sched-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-top: 4px; padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(245,158,11,0.1);
+  border: 1px solid rgba(245,158,11,0.2);
+  color: #92400E;
+  font-size: 10px; font-weight: 500;
+}
+body.dark .sched-chip { color: #FBBF24; }
+
+/* ③ Flow attachment indicator */
+.flow-attach {
+  font-size: 10px; color: #4338CA;
+  margin-top: 3px; display: flex; align-items: center; gap: 3px;
+}
+body.dark .flow-attach { color: #818CF8; }
+.flow-standalone { font-size: 10px; color: var(--r-ink-faint); margin-top: 3px; font-style: italic; }
+
+/* ⑤ Validation warning */
+.val-warn {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 4px; padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: #B91C1C;
+  font-size: 10px;
+}
+body.dark .val-warn { color: #F87171; background: rgba(239,68,68,0.12); }
+
+/* Annotation circles (prototype only) */
+.anno-marker {
+  position: absolute; top: 6px; right: 30px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #4C1D95; color: white;
+  font-size: 9px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; z-index: 5;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.sec-anno {
+  display: inline-flex; width: 16px; height: 16px; border-radius: 50%;
+  background: #4C1D95; color: white;
+  font-size: 9px; font-weight: 800;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+
+/* ── Header padding at top of content ── */
+.content-top-padding { padding: 6px 20px 2px; font-size: 10px; color: var(--r-ink-faint); }
+</style>
+</head>
+<body>
+
+<div class="proto-banner">
+  <span>Sprint 77 Hi-Fi Prototype · Agent Library Sidebar · CSS from AgentLibraryViewProvider.ts · Light-mode defaults applied</span>
+  <div class="proto-banner-actions">
+    <span class="proto-tag">NEW ①–⑤</span>
+    <button class="toggle-mode-btn" onclick="toggleMode()">☀ Light / ◑ Dark</button>
+  </div>
+</div>
+
+<div class="page-layout">
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-heading">New in Sprint 77</div>
+
+    <div class="anno-item">
+      <div class="anno-num">1</div>
+      <div class="anno-text">
+        <strong>Provenance badges</strong>
+        <span>Each skill shows which framework(s) own it:
+          <span style="display:inline-flex;gap:3px;margin-top:3px;flex-wrap:wrap">
+            <span class="prov-badge prov-claude">claude</span>
+            <span class="prov-badge prov-codex">codex</span>
+            <span class="prov-badge prov-shared">shared</span>
+          </span>
+        </span>
+      </div>
+    </div>
+
+    <div class="anno-item">
+      <div class="anno-num">2</div>
+      <div class="anno-text">
+        <strong>Flows section</strong>
+        <span>Merged from separate activity-bar entry. Lists all .ritemark/flows/ files.</span>
+      </div>
+    </div>
+
+    <div class="anno-item">
+      <div class="anno-num">3</div>
+      <div class="anno-text">
+        <strong>Attachment indicator</strong>
+        <span>Flow shows which agent references it via <code style="font-size:9px">routine:</code></span>
+      </div>
+    </div>
+
+    <div class="anno-item">
+      <div class="anno-num">4</div>
+      <div class="anno-text">
+        <strong>Schedule chip</strong>
+        <span>Amber chip for agents with <code style="font-size:9px">schedule:</code> set. Visible until Phase 2.</span>
+      </div>
+    </div>
+
+    <div class="anno-item">
+      <div class="anno-num">5</div>
+      <div class="anno-text">
+        <strong>Validation warning</strong>
+        <span>Malformed frontmatter (e.g. schedule without runtime) shows inline.</span>
+      </div>
+    </div>
+
+    <div class="legend-sep"></div>
+    <div style="font-size:9px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--r-ink-faint);margin-bottom:6px">Unchanged</div>
+    <ul class="legend-existing">
+      <li>Agents, Skills, Commands sections</li>
+      <li>Search, sort, Project/User tabs</li>
+      <li>Context menu, Launch Chat</li>
+      <li>Create / duplicate / move</li>
+      <li>Icon chips + color system</li>
+    </ul>
+  </div>
+
+  <!-- Sidebar frame -->
+  <div class="sidebar-frame">
+
+    <div class="content-top-padding" id="counts">2 agents · 3 skills · 1 command · 2 flows</div>
+
+    <div class="search-container">
+      <div class="search-input-wrapper">
+        <svg class="search-icon" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round">
+          <circle cx="116" cy="116" r="84"/><line x1="175" y1="175" x2="224" y2="224"/>
+        </svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search">
+      </div>
+      <button class="sort-btn" title="Sort">↕</button>
+    </div>
+
+    <div class="scope-tabs">
+      <div class="scope-tab active" onclick="setTab('project',this)">Project</div>
+      <div class="scope-tab" onclick="setTab('user',this)">User</div>
+    </div>
+
+    <div id="content">
+
+      <!-- ── Agents ── -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <div class="section-header-left">Agents</div>
+        <div class="section-header-meta">
+          <span class="section-count">2</span>
+          <button class="section-add-btn" onclick="event.stopPropagation()" title="New agent">+</button>
+        </div>
+      </div>
+      <div class="sec-body">
+
+        <!-- Bug Cruncher — scheduled agent -->
+        <div class="item selected" title=".claude/agents/bug-cruncher.md">
+          <div class="item-icon-chip chip-red">🐛</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">Bug Cruncher</span></div>
+            <div class="item-description">Triages new GitHub issues every 6 hours and writes a digest.</div>
+            <!-- ④ Schedule chip -->
+            <div class="sched-chip">⏱ every 6h · claude_local · runs while open</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">4</div>
+        </div>
+
+        <!-- PR Reviewer — normal -->
+        <div class="item" title=".claude/agents/pr-reviewer.md">
+          <div class="item-icon-chip chip-ind">🔍</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">PR Reviewer</span></div>
+            <div class="item-description">Reviews code changes, checks for issues, and manages the merge workflow.</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+        </div>
+
+      </div>
+
+      <!-- ── Skills ── -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <div class="section-header-left">
+          Skills
+          <span class="sec-anno">1</span>
+        </div>
+        <div class="section-header-meta">
+          <span class="section-count">3</span>
+          <button class="section-add-btn" onclick="event.stopPropagation()" title="New skill">+</button>
+        </div>
+      </div>
+      <div class="sec-body">
+
+        <!-- Claude-only skill -->
+        <div class="item" title=".claude/skills/gh-issue-reader/SKILL.md">
+          <div class="item-icon-chip chip-em">⚡</div>
+          <div class="item-content">
+            <div class="item-name">
+              <span class="item-name-text">gh-issue-reader</span>
+              <span class="prov-badge prov-claude">claude</span>
+            </div>
+            <div class="item-description">Fetches and formats GitHub issues for agent consumption.</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">1</div>
+        </div>
+
+        <!-- Shared skill (both locations) -->
+        <div class="item" title=".claude/skills/markdown-digest/SKILL.md · .agents/skills/markdown-digest/SKILL.md">
+          <div class="item-icon-chip chip-vio">📝</div>
+          <div class="item-content">
+            <div class="item-name">
+              <span class="item-name-text">markdown-digest-writer</span>
+              <span class="prov-badge prov-shared">shared</span>
+            </div>
+            <div class="item-description">Writes structured digest docs from issue data.</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">1</div>
+        </div>
+
+        <!-- Codex-only skill -->
+        <div class="item" title=".agents/skills/codex-summariser/SKILL.md">
+          <div class="item-icon-chip chip-tea">🤖</div>
+          <div class="item-content">
+            <div class="item-name">
+              <span class="item-name-text">codex-summariser</span>
+              <span class="prov-badge prov-codex">codex</span>
+            </div>
+            <div class="item-description">Summarises long documents using OpenAI Codex headless.</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">1</div>
+        </div>
+
+      </div>
+
+      <!-- ── Commands ── -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <div class="section-header-left">Commands</div>
+        <div class="section-header-meta">
+          <span class="section-count">1</span>
+        </div>
+      </div>
+      <div class="sec-body">
+
+        <div class="item" title=".claude/commands/triage-now.md">
+          <div class="item-icon-chip chip-amb">⚡</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">/triage-now</span></div>
+            <div class="item-description">Run the bug-cruncher triage immediately on demand.</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+        </div>
+
+      </div>
+
+      <!-- ── Flows (NEW ②) ── -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <div class="section-header-left">
+          Flows
+          <span class="sec-anno">2</span>
+        </div>
+        <div class="section-header-meta">
+          <span class="section-count">2</span>
+          <button class="section-add-btn" onclick="event.stopPropagation()" title="New flow">+</button>
+        </div>
+      </div>
+      <div class="sec-body">
+
+        <!-- Attached flow ③ -->
+        <div class="item" title=".ritemark/flows/bug-cruncher.flow.json">
+          <div class="item-icon-chip chip-red">🔄</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">bug-cruncher.flow.json</span></div>
+            <div class="flow-attach">↳ Bug Cruncher</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">3</div>
+        </div>
+
+        <!-- Multi-agent attached flow ③ -->
+        <div class="item" title=".ritemark/flows/daily-brief.flow.json">
+          <div class="item-icon-chip chip-ind">🔄</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">daily-brief.flow.json</span></div>
+            <div class="flow-attach">↳ Agent A, Agent B</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">3</div>
+        </div>
+
+        <!-- Standalone flow -->
+        <div class="item" title=".ritemark/flows/standalone.flow.json">
+          <div class="item-icon-chip chip-sla">🔄</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">standalone.flow.json</span></div>
+            <div class="flow-standalone">no agent attached</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">2</div>
+        </div>
+
+      </div>
+
+      <!-- ── Expand to see validation example ── -->
+      <div class="section-header" onclick="toggleSection(this)" style="border-top:1px solid var(--r-hairline);margin-top:4px">
+        <div class="section-header-left">
+          ⚠ Validation example
+          <span class="sec-anno">5</span>
+        </div>
+        <div class="section-header-meta">
+          <span class="section-count" style="color:var(--r-error,#ef4444)">1</span>
+        </div>
+      </div>
+      <div class="sec-body hidden">
+        <!-- schedule without runtime/routine -->
+        <div class="item" title=".claude/agents/broken-agent.md">
+          <div class="item-icon-chip chip-amb">💥</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">broken-agent</span></div>
+            <div class="item-description placeholder">No description in frontmatter</div>
+            <div class="val-warn">⚠ schedule: requires runtime: and routine:</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">5</div>
+        </div>
+
+        <!-- routine file missing from disk -->
+        <div class="item" title=".claude/agents/missing-routine-agent.md">
+          <div class="item-icon-chip chip-amb">🔄</div>
+          <div class="item-content">
+            <div class="item-name"><span class="item-name-text">missing-routine-agent</span></div>
+            <div class="item-description">Has runtime and schedule set correctly.</div>
+            <div class="val-warn">⚠ routine path does not exist: .ritemark/flows/missing.flow.json</div>
+          </div>
+          <button class="item-more-btn" title="More">···</button>
+          <div class="anno-marker">5</div>
+        </div>
+
+        <!-- Empty state example (when section has no items) -->
+        <div style="padding:10px 12px;font-size:11px;color:var(--r-ink-faint);font-style:italic;border:1px dashed var(--r-hairline);border-radius:6px;margin:4px 8px;">
+          Empty state: "No agents configured yet. Create a .md file in .claude/agents/"
+        </div>
+      </div>
+
+    </div><!-- /#content -->
+  </div><!-- /.sidebar-frame -->
+
+</div><!-- /.page-layout -->
+
+<script>
+function toggleMode() {
+  document.body.classList.toggle('dark');
+}
+
+function setTab(scope, el) {
+  document.querySelectorAll('.scope-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleSection(header) {
+  const body = header.nextElementSibling;
+  if (body) body.classList.toggle('hidden');
+}
+
+document.getElementById('searchInput').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.item').forEach(item => {
+    item.style.display = !q || item.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+  document.getElementById('counts').textContent = q ? 'Filtered results' : '2 agents · 3 skills · 1 command · 2 flows';
+});
+</script>
+</body>
+</html>
