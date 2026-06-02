@@ -1,11 +1,12 @@
 # RiteMark Patch: browser-action-bridge
 #
 # Purpose: Expose Playwright-driven browser action commands (navigate, click,
-#          fill, type, scroll) and a dedicated AI-control consent flag on
-#          BrowserViewModel, so the Ritemark extension host can drive the
-#          integrated browser through AI agents (Sprint 69). Also registers
+#          fill, type, scroll, snapshot) and a dedicated AI-control consent
+#          flag on BrowserViewModel, so the Ritemark extension host can drive
+#          the integrated browser through AI agents (Sprint 69). Also registers
 #          a workbench-level editor resolver for .html files so they open
 #          directly in BrowserEditor with zero text-tab flicker.
+#          Sprint 78: adds agentSnapshot (read-only ARIA outline, no consent).
 #
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
@@ -21,13 +22,14 @@ diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform
  	GetAnnotationMode = `${commandPrefix}.getAnnotationMode`,
  	EnsureActiveBrowserShared = `${commandPrefix}.ensureActiveBrowserShared`,
 +
-+	// Ritemark AI browser control bridge (Sprint 69)
++	// Ritemark AI browser control bridge (Sprint 69 + 78)
 +	EnsureActiveBrowserControlShared = `${commandPrefix}.ensureActiveBrowserControlShared`,
 +	BrowserNavigate = `${commandPrefix}.agentNavigate`,
 +	BrowserClick = `${commandPrefix}.agentClick`,
 +	BrowserFill = `${commandPrefix}.agentFill`,
 +	BrowserType = `${commandPrefix}.agentType`,
 +	BrowserScroll = `${commandPrefix}.agentScroll`,
++	BrowserSnapshot = `${commandPrefix}.agentSnapshot`,
  
  	// Storage
  	ClearGlobalStorage = `${commandPrefix}.clearGlobalStorage`,
@@ -646,9 +648,50 @@ new file mode 100644
 +	}
 +}
 +
++// Sprint 78: browser_snapshot — read-only ARIA outline, no Playwright consent required.
++// Mirrors the existing GetActiveSummary bridge but returns the same
++// IRitemarkBrowserActionResult shape as the other agent actions so it fits
++// cleanly into the MCP tool family.
++class BrowserSnapshotAction extends Action2 {
++	constructor() {
++		super({
++			id: BrowserViewCommandId.BrowserSnapshot,
++			title: localize2('ritemark.browser.agentSnapshot', 'Snapshot Active Browser (AI)'),
++			category: BrowserActionCategory,
++			f1: false,
++		});
++	}
++
++	async run(accessor: ServicesAccessor): Promise<IRitemarkBrowserActionResult> {
++		const editorService = accessor.get(IEditorService);
++		const playwrightService = accessor.get(IPlaywrightService);
++		try {
++			const model = activeBrowserModelFromEditorService(editorService);
++			if (!model) {
++				return { error: 'No active integrated browser tab.' };
++			}
++			// Snapshot is read-only — no control consent check needed. The model
++			// must already be tracked by Playwright (sharedWithAgent) for the
++			// summary to be available, but we surface a clear error if not.
++			try {
++				const summary = await playwrightService.getSummary(model.id);
++				return { ...modelMeta(model), summary };
++			} catch (err) {
++				return {
++					...modelMeta(model),
++					error: `Snapshot failed: ${err instanceof Error ? err.message : String(err)}. The browser tab may not be tracked yet — navigate to a page first.`,
++				};
++			}
++		} catch (err) {
++			return { error: err instanceof Error ? err.message : String(err) };
++		}
++	}
++}
++
 +registerAction2(EnsureActiveBrowserControlSharedAction);
 +registerAction2(BrowserNavigateAction);
 +registerAction2(BrowserClickAction);
 +registerAction2(BrowserFillAction);
 +registerAction2(BrowserTypeAction);
 +registerAction2(BrowserScrollAction);
++registerAction2(BrowserSnapshotAction);

@@ -940,20 +940,45 @@ export function ChatInput() {
               </div>
             )}
             {showBrowserContextChip && (
-              <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border ${currentBrowserContext?.annotationMode ? 'border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-indigo-50,#eef2ff)] text-[var(--r-indigo-700,#4338ca)]' : 'border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]'}`}>
-                <Icon name="globe" size={12} className="shrink-0" />
-                <span className="truncate max-w-[180px]" title={currentBrowserContext?.url}>
-                  Browser: {currentBrowserContext?.title || currentBrowserContext?.url}
-                  {currentBrowserContext?.annotationMode ? ' · Annotation' : ''}
-                </span>
-                <button
-                  onClick={() => setHideBrowserContext(true)}
-                  className="shrink-0 rounded hover:text-[var(--r-error)]"
-                  title="Remove browser context from this turn"
-                >
-                  <Icon name="x" size={12} />
-                </button>
-              </div>
+              currentBrowserContext?.annotationMode && currentBrowserContext.screenshotPreview
+                ? (
+                  /* Sprint 78 (#73): annotation mode active — show screenshot preview chip
+                     instead of the URL chip. Visual matches the image attachment strip. */
+                  <div className="relative group overflow-hidden rounded-md border border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-surface-muted)]/70">
+                    <div className="w-14 h-14">
+                      <img
+                        src={currentBrowserContext.screenshotPreview.dataUrl}
+                        alt={`Browser: ${currentBrowserContext.title || currentBrowserContext.url}`}
+                        className="w-full h-full object-cover"
+                        title={`Browser screenshot — ${currentBrowserContext.title || currentBrowserContext.url}`}
+                      />
+                    </div>
+                    <button
+                      onClick={() => setHideBrowserContext(true)}
+                      className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl border border-[var(--r-hairline)] bg-[var(--r-surface)] text-[var(--r-ink-body)] shadow-sm opacity-95 group-hover:text-[var(--r-error)] group-hover:opacity-100 transition-colors"
+                      title="Remove browser screenshot from this turn"
+                    >
+                      <Icon name="x" size={12} />
+                    </button>
+                  </div>
+                )
+                : (
+                  /* Normal mode or no screenshot yet — URL globe chip */
+                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border ${currentBrowserContext?.annotationMode ? 'border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-indigo-50,#eef2ff)] text-[var(--r-indigo-700,#4338ca)]' : 'border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]'}`}>
+                    <Icon name="globe" size={12} className="shrink-0" />
+                    <span className="truncate max-w-[180px]" title={currentBrowserContext?.url}>
+                      Browser: {currentBrowserContext?.title || currentBrowserContext?.url}
+                      {currentBrowserContext?.annotationMode ? ' · Annotation' : ''}
+                    </span>
+                    <button
+                      onClick={() => setHideBrowserContext(true)}
+                      className="shrink-0 rounded hover:text-[var(--r-error)]"
+                      title="Remove browser context from this turn"
+                    >
+                      <Icon name="x" size={12} />
+                    </button>
+                  </div>
+                )
             )}
             {pathChips.map((chip) => (
               <div

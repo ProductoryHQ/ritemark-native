@@ -11,6 +11,7 @@
  *   - mcp__ritemark_browser__browser_fill
  *   - mcp__ritemark_browser__browser_type
  *   - mcp__ritemark_browser__browser_scroll
+ *   - mcp__ritemark_browser__browser_snapshot  (Sprint 78 — read-only ARIA outline)
  *
  * Tool implementations always return text content — never throw — so the
  * agent runtime can surface workbench-side errors as a tool result instead
@@ -24,6 +25,7 @@ import {
   browserFill,
   browserType,
   browserScroll,
+  browserSnapshot,
   formatActionResultForAgent,
   type BrowserActionResult,
 } from './BrowserActionTools';
@@ -36,6 +38,7 @@ const BROWSER_TOOL_BARE_NAMES = [
   'browser_fill',
   'browser_type',
   'browser_scroll',
+  'browser_snapshot',
 ] as const;
 
 /**
@@ -119,6 +122,12 @@ export async function createBrowserMcpServer(): Promise<unknown> {
           selector: z.string().optional(),
         },
         async (args) => toTextContent(await browserScroll(args)),
+      ),
+      sdk.tool(
+        'browser_snapshot',
+        'Return the current ARIA outline of the active integrated browser tab — URL, title, and full accessibility tree snapshot. Use this to re-observe page state after an action without calling browser_navigate again. Read-only: does not require browser control consent.',
+        {},
+        async () => toTextContent(await browserSnapshot()),
       ),
     ],
   });

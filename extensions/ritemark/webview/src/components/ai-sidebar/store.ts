@@ -143,7 +143,7 @@ interface AISidebarState {
   // ── Selection ──
   selection: EditorSelection;
   activeFilePath: string | null;
-  currentBrowserContext: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null;
+  currentBrowserContext: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; screenshotPreview?: { dataUrl: string } | null; error?: string } | null;
 
   // ── Chat state (legacy read-only compat) ──
   chatMessages: ChatMessage[];

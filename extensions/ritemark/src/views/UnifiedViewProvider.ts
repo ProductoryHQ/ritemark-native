@@ -219,6 +219,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
   private _disposeClaudeStatusListener: (() => void) | null = null;
   private _browserContextPoll: ReturnType<typeof setInterval> | null = null;
+  /** Sprint 78 (#73): cached annotation-mode screenshot keyed by URL to avoid
+   *  re-capturing every 1500ms poll when the page hasn't changed. */
+  private _annotationScreenshotCache: { url: string; dataUrl: string } | null = null;
 
   // Sprint 76 R4/R5: ACP/OpenCode runtime state. One manager per live session;
   // model is applied per turn. Pending permission/write approvals are keyed by a
@@ -2314,6 +2317,42 @@ ${prompt}`;
       void BrowserContextStore.instance.ensureSharedForActiveTab();
     }
     const post = BrowserContextStore.instance.getLastSnapshot() ?? snapshot;
+
+    // Sprint 78 (#73): when annotation mode is active, capture a fresh
+    // viewport screenshot so the Composer can show a thumbnail chip instead
+    // of the plain URL chip. The screenshot is encoded as a data URL and
+    // sent only when annotation mode is on — normal-mode polls skip the
+    // (expensive) Playwright capture entirely.
+    //
+    // Cache: re-use the last captured screenshot as long as the URL hasn't
+    // changed. This avoids a Playwright screenshot on every 1500ms poll cycle
+    // when the user hasn't navigated away.
+    let screenshotPreview: { dataUrl: string } | null = null;
+    if (post?.annotationMode && post.sharedWithAgent && post.url) {
+      if (this._annotationScreenshotCache?.url === post.url) {
+        // URL unchanged — reuse cached screenshot.
+        screenshotPreview = { dataUrl: this._annotationScreenshotCache.dataUrl };
+      } else {
+        // URL changed or no cache — capture fresh screenshot.
+        try {
+          const result = await vscode.commands.executeCommand<unknown>('workbench.action.browser.captureActiveViewport');
+          if (result && typeof result === 'object' && 'screenshot' in result) {
+            const sr = (result as { screenshot?: { mimeType: string; base64: string } }).screenshot;
+            if (sr?.mimeType && sr?.base64) {
+              const dataUrl = `data:${sr.mimeType};base64,${sr.base64}`;
+              this._annotationScreenshotCache = { url: post.url, dataUrl };
+              screenshotPreview = { dataUrl };
+            }
+          }
+        } catch {
+          // Screenshot capture failed — fall back to URL chip (screenshotPreview stays null).
+        }
+      }
+    } else {
+      // Annotation mode off — clear cache so next activation gets a fresh shot.
+      this._annotationScreenshotCache = null;
+    }
+
     this._view?.webview.postMessage({
       type: 'active-browser-changed',
       context: post?.url ? {
@@ -2321,6 +2360,7 @@ ${prompt}`;
         title: post.title,
         sharedWithAgent: post.sharedWithAgent === true,
         annotationMode: post.annotationMode === true,
+        screenshotPreview,
         error: post.error,
       } : null,
     });
