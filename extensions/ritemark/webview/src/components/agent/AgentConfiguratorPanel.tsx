@@ -1,32 +1,35 @@
+/**
+ * Agent Configurator Panel — edits .claude/agents/*.md frontmatter.
+ *
+ * Built on the REAL Claude Code subagent schema. Reference:
+ * docs/development/sprints/sprint-77-unified-agent-library-p1/agent-protocols-reference.md
+ *
+ * Field semantics (per spec):
+ *  - description: REQUIRED — Claude uses it to decide when to delegate to this agent
+ *  - model:       alias (sonnet/opus/haiku), full model ID, or absent = inherit
+ *  - tools:       comma-separated string of canonical PascalCase names; absent = inherits ALL tools
+ *  - skills:      YAML list of skills preloaded into the agent's context
+ *  - effort/memory/color: optional behavior tuning
+ *  - routine:     RITEMARK EXTENSION (agent ↔ flow link) — not part of the Claude Code format
+ */
 import { useState, useCallback, useId } from 'react'
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
-import { FilterChip } from '../ui/filter-chip'
+import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Pill } from '../ui/pill'
 import { Badge } from '../ui/badge'
+import { Icon } from '../ui/Icon'
 import { ProvenanceBadge } from './ProvenanceBadge'
-import { ScheduleField } from './ScheduleField'
-
-// Runtime options
-const RUNTIME_OPTIONS = [
-  { value: 'claude', label: 'Claude', authKey: 'claude_local' },
-  { value: 'codex',  label: 'Codex',  authKey: 'codex_local'  },
-  { value: 'openai', label: 'OpenAI', authKey: 'openai_api'   },
-] as const
-
-// Allowed tools with descriptions
-const TOOL_OPTIONS: Array<{ id: string; label: string; description: string }> = [
-  { id: 'bash',        label: 'Bash',          description: 'Run shell commands' },
-  { id: 'read',        label: 'Read files',     description: 'Read file contents' },
-  { id: 'write',       label: 'Write files',    description: 'Create and edit files' },
-  { id: 'edit',        label: 'Edit files',     description: 'Make targeted edits' },
-  { id: 'glob',        label: 'Glob',           description: 'Find files by pattern' },
-  { id: 'grep',        label: 'Grep',           description: 'Search file contents' },
-  { id: 'web_fetch',   label: 'Web fetch',      description: 'Fetch URLs' },
-  { id: 'web_search',  label: 'Web search',     description: 'Search the web' },
-  { id: 'mcp',         label: 'MCP tools',      description: 'All MCP server tools' },
-]
+import {
+  CLAUDE_TOOLS,
+  MODEL_ALIASES,
+  EFFORT_OPTIONS,
+  MEMORY_OPTIONS,
+  COLOR_OPTIONS,
+  parseToolsField,
+  serializeToolsField,
+} from './agentSchema'
 
 export interface AgentSkill {
   id: string
@@ -42,10 +45,7 @@ interface AgentConfiguratorPanelProps {
   frontmatter: AgentFrontmatter
   flows: string[]
   skills: AgentSkill[]
-  authStatus: Record<string, boolean>
-  k6Dismissed: boolean
   onFrontmatterChange: (fm: AgentFrontmatter) => void
-  onDismissK6: () => void
   onCreateFlow: () => void
 }
 
@@ -68,38 +68,62 @@ function FieldRow({ label, htmlFor, children }: { label: string; htmlFor?: strin
   )
 }
 
+/** Select value used for the "custom model ID" mode. */
+const CUSTOM_MODEL = '__custom__'
+/** Select value meaning "field absent → inherit/none". */
+const UNSET = '__unset__'
+
 export function AgentConfiguratorPanel({
   frontmatter,
   flows,
   skills,
-  authStatus,
-  k6Dismissed,
   onFrontmatterChange,
-  onDismissK6,
   onCreateFlow,
 }: AgentConfiguratorPanelProps) {
+  const descriptionId = useId()
   const modelId = useId()
   const flowId = useId()
   const [skillInput, setSkillInput] = useState('')
+  const [customModelMode, setCustomModelMode] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   const fm = frontmatter
-  const runtime = typeof fm.agent === 'string' ? fm.agent : ''
-  const runtimeModel = typeof fm.model === 'string' ? fm.model : ''
-  const schedule = typeof fm.schedule === 'string' ? fm.schedule : ''
+  const description = typeof fm.description === 'string' ? fm.description : ''
+  const model = typeof fm.model === 'string' ? fm.model : ''
   const routine = typeof fm.routine === 'string' ? fm.routine : ''
+  const effort = typeof fm.effort === 'string' ? fm.effort : ''
+  const memory = typeof fm.memory === 'string' ? fm.memory : ''
+  const color = typeof fm.color === 'string' ? fm.color : ''
   const agentSkills: string[] = Array.isArray(fm.skills) ? (fm.skills as string[]) : []
-  const allowedTools: string[] = Array.isArray(fm.tools) ? (fm.tools as string[]) : []
 
+  // Tools: parse from comma-separated string OR array → canonical names.
+  // Empty = "inherits all tools" (per spec), NOT "no tools".
+  const grantedTools = parseToolsField(fm.tools)
+  const knownNames = CLAUDE_TOOLS.map(t => t.name)
+  const unknownTools = grantedTools.filter(t => !knownNames.includes(t))
+
+  /** Set a frontmatter key; empty/undefined values DELETE the key (= inherit/default per spec). */
   const set = useCallback((key: string, value: AgentFrontmatter[string]) => {
-    onFrontmatterChange({ ...fm, [key]: value })
+    const next = { ...fm }
+    const isEmpty =
+      value === undefined ||
+      value === '' ||
+      (Array.isArray(value) && value.length === 0)
+    if (isEmpty) {
+      delete next[key]
+    } else {
+      next[key] = value
+    }
+    onFrontmatterChange(next)
   }, [fm, onFrontmatterChange])
 
-  const toggleTool = useCallback((toolId: string) => {
-    const next = allowedTools.includes(toolId)
-      ? allowedTools.filter(t => t !== toolId)
-      : [...allowedTools, toolId]
-    set('tools', next)
-  }, [allowedTools, set])
+  const toggleTool = useCallback((toolName: string) => {
+    const next = grantedTools.includes(toolName)
+      ? grantedTools.filter(t => t !== toolName)
+      : [...grantedTools, toolName]
+    // Empty list = remove the field entirely → agent inherits all tools
+    set('tools', next.length > 0 ? serializeToolsField(next) : '')
+  }, [grantedTools, set])
 
   const addSkill = useCallback((skillId: string) => {
     if (!agentSkills.includes(skillId)) {
@@ -112,9 +136,20 @@ export function AgentConfiguratorPanel({
     set('skills', agentSkills.filter(s => s !== skillId))
   }, [agentSkills, set])
 
-  const selectedRuntime = RUNTIME_OPTIONS.find(r => r.value === runtime)
-  const authKey = selectedRuntime?.authKey
-  const isAuthenticated = authKey ? authStatus[authKey] : false
+  // Model select state: inherit | alias | custom ID
+  const isAlias = MODEL_ALIASES.includes(model)
+  const modelSelectValue = customModelMode
+    ? CUSTOM_MODEL
+    : model === '' ? UNSET : isAlias ? model : CUSTOM_MODEL
+
+  const handleModelSelect = useCallback((val: string) => {
+    if (val === CUSTOM_MODEL) {
+      setCustomModelMode(true)
+      return
+    }
+    setCustomModelMode(false)
+    set('model', val === UNSET ? '' : val)
+  }, [set])
 
   const filteredSkillSuggestions = skillInput.trim().length > 0
     ? skills.filter(s => s.name.toLowerCase().includes(skillInput.toLowerCase()) && !agentSkills.includes(s.id))
@@ -129,93 +164,102 @@ export function AgentConfiguratorPanel({
         {/* Header */}
         <h2 className="text-[15px] font-semibold text-ink-strong">Agent</h2>
 
-        {/* ── Runtime ── */}
-        <SectionLabel>Runtime</SectionLabel>
+        {/* ── Description (REQUIRED — routing text) ── */}
+        <SectionLabel>Description</SectionLabel>
 
-        {/* Runtime picker chips */}
-        <div className="flex flex-wrap gap-1.5">
-          {RUNTIME_OPTIONS.map(opt => (
-            <FilterChip
-              key={opt.value}
-              selected={runtime === opt.value}
-              onClick={() => set('agent', runtime === opt.value ? '' : opt.value)}
-            >
-              {opt.label}
-            </FilterChip>
-          ))}
+        <div className="flex flex-col gap-1">
+          <Textarea
+            id={descriptionId}
+            value={description}
+            onChange={e => set('description', e.target.value)}
+            placeholder="When should Claude use this agent?"
+            rows={4}
+            className="text-[12px] leading-snug"
+            aria-invalid={!description.trim()}
+          />
+          <p className="text-[10px] text-ink-muted leading-tight">
+            {description.trim()
+              ? 'Claude uses this to decide when to delegate to this agent.'
+              : 'Required — without a description Claude never delegates to this agent.'}
+          </p>
         </div>
 
-        {/* Auth status dot */}
-        {runtime && (
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-2 h-2 rounded-full"
-              style={{ background: isAuthenticated ? 'var(--ritemark-success, #22c55e)' : 'var(--ritemark-error, #ef4444)' }}
+        {/* ── Model ── */}
+        <SectionLabel>Model</SectionLabel>
+
+        <div className="flex flex-col gap-1.5">
+          <Select value={modelSelectValue} onValueChange={handleModelSelect}>
+            <SelectTrigger id={modelId} className="text-[12px] h-7" aria-label="Model">
+              <SelectValue placeholder="Inherit (default)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNSET}>Inherit (default)</SelectItem>
+              <SelectItem value="sonnet">Sonnet</SelectItem>
+              <SelectItem value="opus">Opus</SelectItem>
+              <SelectItem value="haiku">Haiku</SelectItem>
+              <SelectItem value={CUSTOM_MODEL}>Custom model ID…</SelectItem>
+            </SelectContent>
+          </Select>
+          {modelSelectValue === CUSTOM_MODEL && (
+            <Input
+              value={isAlias ? '' : model}
+              onChange={e => set('model', e.target.value)}
+              placeholder="e.g. claude-opus-4-8"
+              className="text-[12px] h-7"
             />
-            <span className="text-[11px] text-ink-muted">
-              {isAuthenticated ? 'Connected' : 'Not configured'}
-            </span>
+          )}
+        </div>
+
+        {/* ── Tools ── */}
+        <SectionLabel>Tools</SectionLabel>
+
+        {grantedTools.length === 0 && (
+          <p className="text-[11px] text-ink-muted leading-snug rounded px-2 py-1.5 bg-accent-soft">
+            Inherits <strong>all</strong> tools (no restriction). Check tools below to restrict
+            this agent to a specific set.
+          </p>
+        )}
+
+        <div className="flex flex-col gap-0.5">
+          {CLAUDE_TOOLS.map(tool => {
+            const checked = grantedTools.includes(tool.name)
+            return (
+              <label
+                key={tool.name}
+                className="flex items-start gap-2 px-1 py-1 rounded cursor-pointer hover:bg-surface-soft group"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleTool(tool.name)}
+                  className="mt-0.5 accent-[var(--r-accent)] flex-shrink-0"
+                />
+                <span className="flex flex-col min-w-0">
+                  <span className="text-[12px] text-ink-strong leading-tight font-mono">{tool.name}</span>
+                  <span className="text-[10px] text-ink-muted leading-tight">{tool.description}</span>
+                </span>
+              </label>
+            )
+          })}
+        </div>
+
+        {/* Unknown / MCP tool names present in the file — preserved, never dropped */}
+        {unknownTools.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <p className="text-[10px] text-ink-muted">Also granted (kept as-is):</p>
+            <div className="flex flex-wrap gap-1">
+              {unknownTools.map(t => (
+                <Pill key={t} variant="accent" className="font-mono text-[10px]" title="Tool name not in the standard list — preserved">
+                  {t}
+                </Pill>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Model */}
-        <FieldRow label="Model" htmlFor={modelId}>
-          <Input
-            id={modelId}
-            value={runtimeModel}
-            onChange={e => set('model', e.target.value)}
-            placeholder="e.g. claude-opus-4-8"
-            className="text-[12px] h-7"
-          />
-        </FieldRow>
-
-        {/* ── Schedule ── */}
-        <SectionLabel>Schedule</SectionLabel>
-
-        <ScheduleField
-          value={schedule}
-          onChange={val => set('schedule', val)}
-          k6Dismissed={k6Dismissed}
-          onDismissK6={onDismissK6}
-        />
-
-        {/* ── Linked flow ── */}
-        <SectionLabel>Linked flow</SectionLabel>
-
-        {flows.length > 0 ? (
-          <FieldRow label="Flow" htmlFor={flowId}>
-            <Select
-              value={routine || '__none__'}
-              onValueChange={val => set('routine', val === '__none__' ? '' : val)}
-            >
-              <SelectTrigger id={flowId} className="text-[12px] h-7">
-                <SelectValue placeholder="None" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {flows.map(stem => (
-                  <SelectItem key={stem} value={stem}>{stem}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FieldRow>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[11px] text-ink-muted">No flows yet.</p>
-            <button
-              type="button"
-              onClick={onCreateFlow}
-              className="self-start text-[11px] text-accent-deep hover:underline"
-            >
-              + Create flow
-            </button>
-          </div>
-        )}
-
-        {/* ── Skills ── */}
+        {/* ── Skills (preloaded into agent context) ── */}
         <SectionLabel>Skills</SectionLabel>
 
-        {/* Selected skill tags */}
         {agentSkills.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {agentSkills.map(sid => {
@@ -236,7 +280,6 @@ export function AgentConfiguratorPanel({
           </div>
         )}
 
-        {/* Autocomplete input */}
         <div className="relative">
           <Input
             value={skillInput}
@@ -264,31 +307,100 @@ export function AgentConfiguratorPanel({
           )}
         </div>
 
-        {/* ── Allowed tools ── */}
-        <SectionLabel>Allowed tools</SectionLabel>
+        {/* ── Advanced (collapsed) ── */}
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen(o => !o)}
+          className="flex items-center gap-1 mt-4 text-[10px] font-semibold uppercase tracking-widest text-ink-muted hover:text-ink-strong"
+          aria-expanded={advancedOpen}
+        >
+          <Icon
+            name="caret-right"
+            size={12}
+            className={advancedOpen ? 'rotate-90 transition-transform' : 'transition-transform'}
+          />
+          Advanced
+        </button>
 
-        <div className="flex flex-col gap-0.5">
-          {TOOL_OPTIONS.map(tool => {
-            const checked = allowedTools.includes(tool.id)
-            return (
-              <label
-                key={tool.id}
-                className="flex items-start gap-2 px-1 py-1 rounded cursor-pointer hover:bg-surface-soft group"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleTool(tool.id)}
-                  className="mt-0.5 accent-[var(--r-accent)] flex-shrink-0"
-                />
-                <span className="flex flex-col min-w-0">
-                  <span className="text-[12px] text-ink-strong leading-tight">{tool.label}</span>
-                  <span className="text-[10px] text-ink-muted leading-tight">{tool.description}</span>
-                </span>
-              </label>
-            )
-          })}
-        </div>
+        {advancedOpen && (
+          <div className="flex flex-col gap-3">
+            <FieldRow label="Effort">
+              <Select value={effort || UNSET} onValueChange={v => set('effort', v === UNSET ? '' : v)}>
+                <SelectTrigger className="text-[12px] h-7" aria-label="Effort">
+                  <SelectValue placeholder="Inherit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET}>Inherit</SelectItem>
+                  {EFFORT_OPTIONS.map(o => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldRow>
+
+            <FieldRow label="Memory">
+              <Select value={memory || UNSET} onValueChange={v => set('memory', v === UNSET ? '' : v)}>
+                <SelectTrigger className="text-[12px] h-7" aria-label="Memory">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET}>None</SelectItem>
+                  {MEMORY_OPTIONS.map(o => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldRow>
+
+            <FieldRow label="Color">
+              <Select value={color || UNSET} onValueChange={v => set('color', v === UNSET ? '' : v)}>
+                <SelectTrigger className="text-[12px] h-7" aria-label="Color">
+                  <SelectValue placeholder="Default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET}>Default</SelectItem>
+                  {COLOR_OPTIONS.map(o => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldRow>
+          </div>
+        )}
+
+        {/* ── Ritemark extension: linked flow ── */}
+        <SectionLabel>Linked flow</SectionLabel>
+        <p className="text-[10px] text-ink-muted -mt-1">Ritemark extension — not part of the Claude Code agent format.</p>
+
+        {flows.length > 0 ? (
+          <FieldRow label="Flow" htmlFor={flowId}>
+            <Select
+              value={routine || UNSET}
+              onValueChange={val => set('routine', val === UNSET ? '' : val)}
+            >
+              <SelectTrigger id={flowId} className="text-[12px] h-7">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNSET}>None</SelectItem>
+                {flows.map(stem => (
+                  <SelectItem key={stem} value={stem}>{stem}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] text-ink-muted">No flows yet.</p>
+            <button
+              type="button"
+              onClick={onCreateFlow}
+              className="self-start text-[11px] text-accent-deep hover:underline"
+            >
+              + Create flow
+            </button>
+          </div>
+        )}
 
       </div>
 

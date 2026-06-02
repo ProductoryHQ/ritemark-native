@@ -321,6 +321,7 @@ export type ExtensionMessage =
   | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
+  | { type: 'active-browser-changed'; context: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null }
   | { type: 'ai-streaming'; content: string }
   | { type: 'ai-result'; success: boolean; message?: string }
   | { type: 'ai-widget'; toolName: string; args: Record<string, unknown>; selection: EditorSelection }

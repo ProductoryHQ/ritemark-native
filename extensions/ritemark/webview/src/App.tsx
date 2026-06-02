@@ -120,8 +120,6 @@ function App() {
   const [agentFrontmatter, setAgentFrontmatter] = useState<AgentFrontmatter>({})
   const [agentFlows, setAgentFlows] = useState<string[]>([])
   const [agentSkills, setAgentSkills] = useState<AgentSkill[]>([])
-  const [agentAuthStatus, setAgentAuthStatus] = useState<Record<string, boolean>>({})
-  const [agentK6Dismissed, setAgentK6Dismissed] = useState(false)
 
   // Side panel state — TOC and Properties share the same slot
   const [activePanel, setActivePanel] = useState<SidePanel>(() => {
@@ -178,8 +176,6 @@ function App() {
             setAgentFrontmatter((message.agentFrontmatter as AgentFrontmatter) || {})
             setAgentFlows((message.agentFlows as string[]) || [])
             setAgentSkills((message.agentSkills as AgentSkill[]) || [])
-            setAgentAuthStatus((message.agentAuthStatus as Record<string, boolean>) || {})
-            setAgentK6Dismissed((message.agentK6Dismissed as boolean) || false)
             setActivePanel('agent')
           }
           setIsReady(true)
@@ -399,9 +395,10 @@ function App() {
     sendToExtension('contentChanged', { content: newContent })
   }, [])
 
-  // Side panel toggle helper — persists choice; agent panel is pinned and cannot be toggled off
+  // Side panel toggle helper — TOC / Properties / Agent share one slot, mutually exclusive.
+  // 'agent' is intentionally not restored from localStorage on init (it's auto-pinned on
+  // load only for agent files), so writing it here is harmless across sessions.
   const togglePanel = useCallback((panel: SidePanel) => {
-    if (isAgentMode) return
     setActivePanel(prev => {
       const next = prev === panel ? 'none' : panel
       try { localStorage.setItem('ritemark.activePanel', next) } catch { /* ignore */ }
@@ -409,16 +406,11 @@ function App() {
       try { localStorage.setItem('ritemark.inlineTocEnabled', String(next === 'toc')) } catch { /* ignore */ }
       return next
     })
-  }, [isAgentMode])
+  }, [])
 
   const handleAgentFrontmatterChange = useCallback((fm: AgentFrontmatter) => {
     setAgentFrontmatter(fm)
     sendToExtension('applyFrontmatter', { frontmatter: fm })
-  }, [])
-
-  const handleDismissK6 = useCallback(() => {
-    setAgentK6Dismissed(true)
-    sendToExtension('dismissK6Banner', {})
   }, [])
 
   const handleCreateFlow = useCallback(() => {
@@ -428,6 +420,10 @@ function App() {
   // Header button handlers
   const handlePropertiesClick = useCallback(() => {
     togglePanel('properties')
+  }, [togglePanel])
+
+  const handleAgentPanelClick = useCallback(() => {
+    togglePanel('agent')
   }, [togglePanel])
 
   const handleExportClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
@@ -607,6 +603,8 @@ function App() {
         contentsButtonRef={contentsButtonRef}
         contentsActive={inlineTocShown}
         propertiesActive={propertiesPanelShown}
+        agentActive={agentPanelShown}
+        onAgentClick={isAgentMode ? handleAgentPanelClick : undefined}
         hasFileChanged={showFileChangeNotification}
         onRefresh={() => {
           setShowFileChangeNotification(false)
@@ -640,10 +638,7 @@ function App() {
             frontmatter={agentFrontmatter}
             flows={agentFlows}
             skills={agentSkills}
-            authStatus={agentAuthStatus}
-            k6Dismissed={agentK6Dismissed}
             onFrontmatterChange={handleAgentFrontmatterChange}
-            onDismissK6={handleDismissK6}
             onCreateFlow={handleCreateFlow}
           />
         )}

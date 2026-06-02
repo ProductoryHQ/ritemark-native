@@ -39,7 +39,7 @@ export function SelectedContextTab() {
       aria-label="Selected editor context"
     >
       <div className="flex items-center gap-1.5">
-        <Icon name="selection" size={11} className="shrink-0 opacity-60" />
+        <Icon name="selection" size={12} className="shrink-0 opacity-60" />
         <span className="text-[11px] font-medium text-[var(--r-ink-muted)] flex-1 truncate">
           Working on selected text
         </span>
@@ -55,7 +55,7 @@ export function SelectedContextTab() {
           aria-label="Remove selected text from chat context"
           title="Remove selected text from chat context"
         >
-          <Icon name="x" size={10} />
+          <Icon name="x" size={12} />
         </button>
       </div>
       <div className="mt-0.5 text-[11px] leading-snug text-[var(--r-ink-body)] truncate">

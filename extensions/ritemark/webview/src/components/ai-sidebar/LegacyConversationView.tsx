@@ -32,7 +32,7 @@ export function LegacyConversationView() {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Read-only notice */}
       <div className="mx-3 mt-3 mb-1 flex items-start gap-2 px-2.5 py-2 rounded text-[11px] text-[var(--r-ink-muted)] bg-[var(--vscode-input-background)] border border-[var(--r-hairline)]">
-        <Icon name="clock-counter-clockwise" size={13} className="shrink-0 mt-0.5 opacity-70" />
+        <Icon name="clock-counter-clockwise" size={12} className="shrink-0 mt-0.5 opacity-70" />
         <span>
           This conversation was created with a legacy runtime that has been removed.
           It is shown read-only. To continue, start a new conversation.

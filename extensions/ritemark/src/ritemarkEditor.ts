@@ -192,23 +192,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
       const skills = discoverCommands(workspaceRoot).filter(c => c.source === 'skills');
 
-      const authStatus: Record<string, boolean> = {
-        claude_local: true, // Claude CLI is always available locally
-        codex_local: fs.existsSync(path.join(process.env.HOME || '', '.codex')) ||
-                     !!process.env.OPENAI_API_KEY,
-        openai_api: !!process.env.OPENAI_API_KEY,
-        anthropic_api: !!process.env.ANTHROPIC_API_KEY,
-      };
-
-      const k6Key = `agentEditor.k6Dismissed.${filePath}`;
-      const k6Dismissed = this.context.workspaceState.get<boolean>(k6Key, false);
-
       agentFields.isAgentMode = true;
       agentFields.agentFrontmatter = fm;
       agentFields.agentFlows = flowStems;
       agentFields.agentSkills = skills;
-      agentFields.agentAuthStatus = authStatus;
-      agentFields.agentK6Dismissed = k6Dismissed;
     }
 
     return {
@@ -792,12 +779,6 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             const newYaml = serializeFrontmatter(message.frontmatter);
             const newFull = newYaml + '\n' + currentParsed.content;
             this.updateDocument(document, newFull);
-            return;
-          }
-
-          case 'dismissK6Banner': {
-            const k6Key = `agentEditor.k6Dismissed.${message.filePath}`;
-            void this.context.workspaceState.update(k6Key, true);
             return;
           }
 

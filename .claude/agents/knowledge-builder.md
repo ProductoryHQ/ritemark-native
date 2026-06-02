@@ -1,7 +1,7 @@
 ---
 name: knowledge-builder
-description: Meta-agent for creating new Claude Code skills and agents. Use when you need to build reusable knowledge systems, create new specialized agents, or systematize learnings into skills. Can research topics and structure findings into proper skill/agent format.
-tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch
+description: "Meta-agent for creating new Claude Code skills and agents. Use when you need to build reusable knowledge systems, create new specialized agents, or systematize learnings into skills. Can research topics and structure findings into proper skill/agent format."
+tools: "Read, Write, Edit, Glob, Grep, WebFetch, WebSearch"
 model: opus
 priority: normal
 ---

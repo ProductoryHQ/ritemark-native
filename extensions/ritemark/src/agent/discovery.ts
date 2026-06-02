@@ -26,7 +26,6 @@ export interface DiscoveredAgent {
   // Extended frontmatter fields (Phase 1, R4)
   runtime?: string;
   runtimeModel?: string;
-  schedule?: string;
   routine?: string;
   skills?: string[];
   allowedTools?: string[];
@@ -210,7 +209,7 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
       const content = fs.readFileSync(mdPath, 'utf-8');
       const fm = parseFrontmatter(content);
       const id = fileName.replace('.md', '');
-      const description = fmStr(fm, 'description') || 'Main agent configuration';
+      const description = fmStr(fm, 'description') || 'Instructions loaded into every session';
       const { icon, color } = resolveIconAndColor(fm, fileName, description, true);
       agents.push({
         id,
@@ -260,7 +259,6 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
           color,
           runtime: fmStr(fm, 'runtime'),
           runtimeModel: fmStr(fm, 'model'),
-          schedule: fmStr(fm, 'schedule'),
           routine: fmStr(fm, 'routine'),
           skills: fmStrArr(fm, 'skills'),
           allowedTools: fmStrArr(fm, 'allowedTools'),
@@ -468,14 +466,6 @@ function extractFirstLine(content: string): string {
  */
 export function validateAgentFrontmatter(agent: DiscoveredAgent): string[] {
   const errors: string[] = [];
-  if (agent.schedule) {
-    if (!agent.runtime) {
-      errors.push('schedule requires runtime to be set');
-    }
-    if (!agent.routine) {
-      errors.push('schedule requires routine to be set');
-    }
-  }
   if (agent.routine) {
     const resolvedPath = path.resolve(path.dirname(agent.filePath), agent.routine);
     if (!fs.existsSync(resolvedPath)) {

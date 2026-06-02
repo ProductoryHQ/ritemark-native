@@ -15,6 +15,8 @@ interface DocumentHeaderProps {
   contentsButtonRef?: React.Ref<HTMLButtonElement>
   contentsActive?: boolean
   propertiesActive?: boolean
+  agentActive?: boolean
+  onAgentClick?: () => void
   hasFileChanged?: boolean
   onRefresh?: () => void
   features: Features
@@ -27,6 +29,8 @@ export function DocumentHeader({
   contentsButtonRef,
   contentsActive = false,
   propertiesActive = false,
+  agentActive = false,
+  onAgentClick,
   hasFileChanged = false,
   onRefresh,
   features
@@ -62,6 +66,20 @@ export function DocumentHeader({
           >
             <Icon name="info" size={14} tone={propertiesActive ? 'active' : 'muted'} />
           </Button>
+
+          {onAgentClick && (
+            <Button
+              variant="toolbar"
+              size="icon-sm"
+              data-state={agentActive ? 'active' : undefined}
+              aria-pressed={agentActive}
+              aria-label="Agent settings"
+              onClick={onAgentClick}
+              title={agentActive ? 'Hide agent settings' : 'Agent settings'}
+            >
+              <Icon name="robot" size={14} tone={agentActive ? 'active' : 'muted'} />
+            </Button>
+          )}
         </div>
 
         {/* Spacer */}

@@ -3,7 +3,7 @@ import { ReactRenderer } from '@tiptap/react'
 import { PluginKey } from '@tiptap/pm/state'
 import Suggestion from '@tiptap/suggestion'
 import tippy from 'tippy.js'
-import { FileLinkSuggestionList, type FileLinkSuggestionItem } from './FileLinkSuggestionList'
+import { FileLinkSuggestionList, type FileLinkSuggestionItem, type FileLinkSuggestionListHandle } from './FileLinkSuggestionList'
 import { requestWorkspaceFileSearch } from '../lib/workspaceFileSearch'
 
 const fileLinkSuggestionPluginKey = new PluginKey('fileLinkSuggestions')
@@ -103,7 +103,10 @@ export const FileLinkSuggestions = Extension.create({
                 return true
               }
 
-              return component?.ref?.onKeyDown?.(props) || false
+              // ReactRenderer's ref generic defaults to `unknown`; the actual handle contract
+              // is FileLinkSuggestionListHandle (typed forwardRef in FileLinkSuggestionList).
+              const handle = component?.ref as FileLinkSuggestionListHandle | null | undefined
+              return handle?.onKeyDown?.(props) || false
             },
             onExit() {
               if (popup[0]) {
