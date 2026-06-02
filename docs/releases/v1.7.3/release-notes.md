@@ -1,9 +1,12 @@
 ---
 date: 'TBD'
-title: 'Ritemark v1.7.3 — AI sidebar & composer polish'
+title: 'Ritemark v1.7.3 — Agent Library, Agent Configurator & AI sidebar polish'
 author: Jarmo Tuisk
 tags:
+  - sprint-77
   - sprint-74
+  - agent-library
+  - agent-configurator
   - ai-sidebar
   - composer
   - plan-approval
@@ -13,12 +16,14 @@ tags:
   - draft
 ---
 
-# Ritemark v1.7.3 — AI sidebar & composer polish
+# Ritemark v1.7.3 — Agent Library, Agent Configurator & AI sidebar polish
 
 **Status:** DRAFT / unreleased
-**Type:** Patch release (AI sidebar & composer polish)
+**Type:** Minor release (Agent Library + Agent Configurator, AI sidebar & composer polish)
 **Ships after:** v1.7.2 (this release is the next one in the train; v1.7.2 must ship first)
-**Focus:** Sprint 74 sharpens the AI sidebar's two most-used surfaces — the composer and the plan-approval flow — and fixes two smaller editor annoyances. You can now keep typing while an agent runs, plan approval buttons actually approve, the Edit Link dialog can change link text, and short code blocks stop showing a phantom scrollbar.
+**Focus:** Sprint 77 ships the unified Agent Library and a visual Agent Configurator built on the real Claude Code agent format — create, browse, and configure AI agents without touching YAML. Sprint 74 sharpens the AI sidebar's two most-used surfaces — the composer and the plan-approval flow — and fixes two smaller editor annoyances.
+
+**User guide:** [How to Configure and Use AI Agents in Ritemark](./agent-configurator-guide.md) — full how-to written for this release; source material for marketing and the user-docs refresh.
 
 * * *
 
@@ -45,13 +50,35 @@ Two of these are headline behaviour fixes; two are polish:
 - **Edit Link couldn't change link text.** The dialog only edited the URL; now it has an optional Display text field.
 - **Short code blocks showed a phantom horizontal scrollbar** caused by the copy-button tooltip overflowing the container.
 
-Sprint docs: `docs/development/sprints/sprint-74-ai-sidebar-composer-polish/`
+Sprint docs: `docs/development/sprints/sprint-74-ai-sidebar-composer-polish/` and `docs/development/sprints/sprint-77-unified-agent-library-p1/`
 
-Closes [#82](https://github.com/ProductoryHQ/ritemark-native/issues/82), [#84](https://github.com/ProductoryHQ/ritemark-native/issues/84), [#86](https://github.com/ProductoryHQ/ritemark-native/issues/86), and [#93](https://github.com/ProductoryHQ/ritemark-native/issues/93).
+Closes [#82](https://github.com/ProductoryHQ/ritemark-native/issues/82), [#84](https://github.com/ProductoryHQ/ritemark-native/issues/84), [#86](https://github.com/ProductoryHQ/ritemark-native/issues/86), and [#93](https://github.com/ProductoryHQ/ritemark-native/issues/93). Sprint 77 work delivered via [PR #99](https://github.com/ProductoryHQ/ritemark-native/pull/99).
 
 * * *
 
 ## What's New
+
+### Unified Agent Library & Agent Configurator (sprint-77)
+
+Ritemark now treats AI agents as first-class citizens you can see, organize, and configure — without writing a line of YAML.
+
+**Agent Library (left sidebar, robot icon):**
+
+- Everything AI-related in one place, in collapsible sections: **Instructions** (CLAUDE.md / AGENTS.md), **Agents**, **Skills**, **Commands**, and **Flows**
+- Section collapse state is remembered — keep only what you work with open
+- Project / User scope tabs, search, sort, create (+), and full row actions (Open, Duplicate, Launch Chat, Move scope, Delete)
+- Instructions files (CLAUDE.md / AGENTS.md) are now clearly separated from agents — they are project-wide rules loaded into every session, not configurable assistants
+
+**Agent Configurator (right panel when an agent file is open):**
+
+- Built on the **real Claude Code agent format** — what you configure is exactly what the AI runtime reads
+- **Description** editing with a required-field warning (this is how the AI decides when to delegate to the agent)
+- **Model** picker: Inherit / Sonnet / Opus / Haiku / custom model ID
+- **Tools** as an allow-list with correct semantics: nothing checked = agent inherits all tools; checked = agent gets only those (least privilege)
+- **Skills** preloading, and an **Advanced** section for Effort, Memory, and Color
+- Toolbar toggles to switch between Table of Contents, Properties, and the Agent panel
+
+**Read the full guide:** [How to Configure and Use AI Agents in Ritemark](./agent-configurator-guide.md)
 
 ### Keep typing while the agent runs — your next prompt queues (#82)
 
@@ -96,6 +123,9 @@ Short, single-line code blocks used to show a spurious horizontal scrollbar. The
 
 ## Under the Hood
 
+- **Agent schema module** (`agent/agentSchema.ts`, with tests): canonical Claude Code tool names, tools-field parsing (comma-separated string ↔ list), and self-healing of tool names written by older Ritemark versions. Reference document: `docs/development/sprints/sprint-77-unified-agent-library-p1/agent-protocols-reference.md`.
+- **Non-functional agent scheduling removed** (cron field, `cron-parser` dependency, "runs only while open" banner). Scheduling returns properly designed after the Flows → agent-runtime refactor ([#100](https://github.com/ProductoryHQ/ritemark-native/issues/100)).
+- **New quality gate:** webview TypeScript typecheck now runs in the pre-commit hook (vite builds do not type-check).
 - New webview modules: `ai-sidebar/composerQueue.ts` (queue state/transitions, with tests) and `ai-sidebar/planText.test.ts` (plan-text rendering coverage for the redesigned approval card). Both are wired into `npm test`.
 - The two chat agents remain Claude Code and Codex; the plan-approval and queue work applies to agent runs in the AI sidebar.
 - VS Code base: 1.117 (unchanged from v1.7.2). Primary target: macOS darwin-arm64.
