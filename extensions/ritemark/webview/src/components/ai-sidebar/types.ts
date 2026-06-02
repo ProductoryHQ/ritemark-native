@@ -343,6 +343,7 @@ export type ExtensionMessage =
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
+  | { type: 'active-browser-changed'; context: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null }
   | { type: 'ai-streaming'; content: string }
   | { type: 'ai-result'; success: boolean; message?: string }
   | { type: 'ai-widget'; toolName: string; args: Record<string, unknown>; selection: EditorSelection }

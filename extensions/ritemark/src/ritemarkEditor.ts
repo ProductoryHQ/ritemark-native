@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
+import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import matter from 'gray-matter';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
@@ -171,6 +173,31 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       document.uri,
       webview
     );
+
+    const isAgentMode = /[\/\\]\.claude[\/\\]agents[\/\\][^\/\\]+\.md$/.test(filePath);
+    const agentFields: Record<string, unknown> = {};
+
+    if (isAgentMode) {
+      const fm = parseFrontmatterFromText(document.getText());
+      const workspaceRoot = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath;
+      const flowsDir = workspaceRoot ? path.join(workspaceRoot, '.ritemark', 'flows') : null;
+
+      let flowStems: string[] = [];
+      if (flowsDir) {
+        try {
+          const files = fs.readdirSync(flowsDir).filter(f => f.endsWith('.flow.json'));
+          flowStems = files.map(f => path.basename(f, '.flow.json'));
+        } catch { /* no flows dir */ }
+      }
+
+      const skills = discoverCommands(workspaceRoot).filter(c => c.source === 'skills');
+
+      agentFields.isAgentMode = true;
+      agentFields.agentFrontmatter = fm;
+      agentFields.agentFlows = flowStems;
+      agentFields.agentSkills = skills;
+    }
+
     return {
       type: 'load',
       fileType: 'markdown',
@@ -183,7 +210,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         voiceDictation: isEnabled('voice-dictation'),
         markdownExport: isEnabled('markdown-export'),
         saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview')
-      }
+      },
+      ...agentFields,
     };
   }
 
@@ -744,6 +772,34 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
               void webview.postMessage({ type: 'clipboardText', text });
             });
             return;
+
+          case 'applyFrontmatter': {
+            // Agent mode: write updated frontmatter back to file, preserve body
+            const currentParsed = this.extractFrontMatter(document.getText());
+            const newYaml = serializeFrontmatter(message.frontmatter);
+            const newFull = newYaml + '\n' + currentParsed.content;
+            this.updateDocument(document, newFull);
+            return;
+          }
+
+          case 'createAgentFlow': {
+            void (async () => {
+              const workspaceRoot = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath;
+              if (!workspaceRoot || !message.name) return;
+              const flowsDir = path.join(workspaceRoot, '.ritemark', 'flows');
+              try {
+                await fsp.mkdir(flowsDir, { recursive: true });
+                const stem = String(message.name).replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+                const flowPath = path.join(flowsDir, `${stem}.flow.json`);
+                if (!fs.existsSync(flowPath)) {
+                  await fsp.writeFile(flowPath, JSON.stringify({ id: stem, name: message.name, nodes: [], edges: [] }, null, 2));
+                }
+                const files = fs.readdirSync(flowsDir).filter(f => f.endsWith('.flow.json'));
+                void webview.postMessage({ type: 'agentFlowsUpdated', flows: files.map(f => path.basename(f, '.flow.json')) });
+              } catch { /* ignore */ }
+            })();
+            return;
+          }
         }
       },
       undefined,

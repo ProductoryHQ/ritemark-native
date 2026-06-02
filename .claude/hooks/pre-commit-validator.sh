@@ -84,6 +84,22 @@ if ! cd extensions/ritemark && npm run compile --silent 2>/dev/null; then
 fi
 cd "$PROJECT_DIR"
 
+# Check 7b: Webview TypeScript typecheck
+# vite build does NOT type-check (it only transpiles) — tsc --noEmit is the only type gate.
+# Added 2026-06-02 after 6 type errors shipped invisibly in sprint-77 webview code.
+# Runs whenever any webview file is staged (src, tsconfig, package.json).
+STAGED_WEBVIEW_ANY=$(git diff --cached --name-only -- "extensions/ritemark/webview" 2>/dev/null || true)
+if [[ -n "$STAGED_WEBVIEW_ANY" ]]; then
+  WEBVIEW_TC_LOG=$(mktemp)
+  if ! (cd extensions/ritemark/webview && npx tsc --noEmit > "$WEBVIEW_TC_LOG" 2>&1); then
+    echo "ERROR: Webview TypeScript typecheck failed (vite build does not catch type errors)"
+    grep "error TS" "$WEBVIEW_TC_LOG" | head -10
+    echo "  Fix errors, verify with: cd extensions/ritemark/webview && npm run typecheck"
+    ERRORS=$((ERRORS + 1))
+  fi
+  rm -f "$WEBVIEW_TC_LOG"
+fi
+
 # Check 8: VS Code patches applied cleanly
 # All patches in patches/vscode/ must be applied (or already applied) — never partially.
 # Reverse-applies and re-applies as a dry-run; "Already applied" means OK.

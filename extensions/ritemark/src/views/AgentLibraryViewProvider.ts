@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { discoverAgents, discoverCommands } from '../agent/discovery';
+import * as fsp from 'fs/promises';
+import { discoverAgents, discoverCommands, validateAgentFrontmatter } from '../agent/discovery';
 import type { DiscoveredAgent, DiscoveredCommand, ItemScope } from '../agent/discovery';
 import { COLORS, ICONS } from '../agent/iconPack';
 
@@ -113,6 +114,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _agents: DiscoveredAgent[] = [];
   private _commands: DiscoveredCommand[] = [];
+  private _flows: Array<{ id: string; name: string; filePath: string }> = [];
   private _refreshTimer: NodeJS.Timeout | null = null;
 
   constructor(
@@ -182,16 +184,57 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   private _discover() {
     this._agents = discoverAgents(this._workspacePath);
     this._commands = discoverCommands(this._workspacePath);
+    this._discoverFlows(); // fire-and-forget; updates _flows then re-sends items
+  }
+
+  private _discoverFlows(): void {
+    if (!this._workspacePath) return;
+    const flowsDir = path.join(this._workspacePath, '.ritemark', 'flows');
+    fsp.readdir(flowsDir).then((files) => {
+      this._flows = files
+        .filter((f) => f.endsWith('.flow.json'))
+        .map((f) => {
+          const stem = path.basename(f, '.flow.json');
+          return { id: stem, name: stem, filePath: path.join(flowsDir, f) };
+        });
+      this._sendItems();
+    }).catch(() => {
+      this._flows = [];
+    });
   }
 
   private _sendItems() {
     const skills = this._commands.filter((c) => c.source === 'skills');
     const commands = this._commands.filter((c) => c.source === 'commands');
+
+    // Build attachment map: flow stem → agent display names
+    const attachmentMap: Record<string, string[]> = {};
+    for (const agent of this._agents) {
+      if (agent.routine) {
+        const stem = path.basename(agent.routine, '.flow.json');
+        if (!attachmentMap[stem]) attachmentMap[stem] = [];
+        attachmentMap[stem].push(agent.name);
+      }
+    }
+
+    const flows = this._flows.map((f) => ({
+      ...f,
+      attachedAgents: attachmentMap[f.id] || [],
+    }));
+
+    // Validation touches the filesystem (fs.existsSync on routine paths) and must
+    // run here on the extension host — the webview script has no fs access.
+    const agentsPayload = this._agents.map((a) => ({
+      ...a,
+      validationErrors: a.isMainAgent ? [] : validateAgentFrontmatter(a),
+    }));
+
     this._view?.webview.postMessage({
       type: 'items',
-      agents: this._agents,
+      agents: agentsPayload,
       skills,
       commands,
+      flows,
       workspacePath: this._workspacePath || '',
       userHomePath: os.homedir(),
     });
@@ -493,19 +536,28 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       font-weight: 600;
     }
 
-    /* === Section headers (with + affordance) === */
+    /* === Section headers (collapsible, with + affordance) === */
     .section-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 4px 10px 4px 20px;
+      padding: 10px 12px 10px 14px;
       font-size: 11px; font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.6px;
       color: var(--r-ink-muted);
       background: var(--r-surface-muted);
       user-select: none;
+      cursor: pointer;
+      transition: color 0.1s;
     }
+    .section-header:hover { color: var(--r-ink-strong); }
+    .section-title { display: inline-flex; align-items: center; gap: 6px; }
+    .section-caret {
+      width: 10px; height: 10px; flex-shrink: 0;
+      transition: transform 0.15s ease;
+    }
+    .section-caret.collapsed { transform: rotate(-90deg); }
     .section-header-meta { display: flex; align-items: center; gap: 8px; }
     .section-count { font-size: 11px; font-weight: 400; color: var(--r-ink-faint); }
     .section-add-btn {
@@ -564,6 +616,21 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }
     .item-icon.star { color: var(--r-accent); }
     .item-icon.warning { color: #F59E0B; cursor: help; }
+    .val-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 10px; font-weight: 500; padding: 1px 5px;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+      color: #B91C1C; border-radius: 3px; margin-top: 2px; cursor: help;
+    }
+    .prov-badge {
+      display: inline-flex; align-items: center;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+      padding: 1px 4px; border-radius: 3px; margin-left: 4px;
+    }
+    .prov-claude { background: rgba(67,56,202,0.10); color: #4338CA; border: 1px solid rgba(67,56,202,0.2); }
+    .prov-codex  { background: rgba(5,150,105,0.10);  color: #059669; border: 1px solid rgba(5,150,105,0.2); }
+    .prov-shared { background: rgba(100,116,139,0.10); color: #475569; border: 1px solid rgba(100,116,139,0.2); }
+    .flow-attach { font-size: 11px; color: var(--r-accent); margin-top: 2px; }
     .item-more-btn {
       flex-shrink: 0;
       width: 22px; height: 22px;
@@ -805,12 +872,32 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     let agents = [];
     let skills = [];
     let commands = [];
+    let flows = [];
     let workspacePath = '';
     let userHomePath = '';
     let selectedPath = null;
     let filter = '';
     let activeScope = 'project';
     let sortMode = 'name'; // 'name' | 'recent'
+
+    // Collapsed section titles — persisted in webview state so the user's focus
+    // (e.g. "only Skills expanded") survives panel reloads.
+    const persistedState = vscode.getState() || {};
+    let collapsedSections = new Set(Array.isArray(persistedState.collapsedSections) ? persistedState.collapsedSections : []);
+
+    function toggleSection(title) {
+      if (collapsedSections.has(title)) {
+        collapsedSections.delete(title);
+      } else {
+        collapsedSections.add(title);
+      }
+      vscode.setState({ ...(vscode.getState() || {}), collapsedSections: Array.from(collapsedSections) });
+      render();
+    }
+
+    function caretSvg(collapsed) {
+      return '<svg class="section-caret' + (collapsed ? ' collapsed' : '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+    }
 
     // Modal state
     let modalType = 'skill';
@@ -1003,6 +1090,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         agents = msg.agents || [];
         skills = msg.skills || [];
         commands = msg.commands || [];
+        flows = msg.flows || [];
         workspacePath = msg.workspacePath || '';
         userHomePath = msg.userHomePath || '';
         render();
@@ -1052,32 +1140,46 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       const scopedAgents = agents.filter(byScope);
       const scopedSkills = skills.filter(byScope);
       const scopedCommands = commands.filter(byScope);
+      // Flows are workspace-level only (no user-scope flows)
       const filteredAgents = applySort(scopedAgents.filter(matches));
       const filteredSkills = applySort(scopedSkills.filter(matches));
       const filteredCommands = applySort(scopedCommands.filter(matches));
+      const filteredFlows = flows.filter((f) => !filter || f.name.toLowerCase().includes(filter));
 
       const parts = [];
-      if (agents.length) parts.push(agents.length + ' agent' + (agents.length !== 1 ? 's' : ''));
+      const mainAgentCount = agents.filter((a) => a.isMainAgent).length;
+      const subAgentCount = agents.length - mainAgentCount;
+      if (subAgentCount) parts.push(subAgentCount + ' agent' + (subAgentCount !== 1 ? 's' : ''));
+      if (mainAgentCount) parts.push(mainAgentCount + ' instruction file' + (mainAgentCount !== 1 ? 's' : ''));
       if (skills.length) parts.push(skills.length + ' skill' + (skills.length !== 1 ? 's' : ''));
       if (commands.length) parts.push(commands.length + ' command' + (commands.length !== 1 ? 's' : ''));
+      if (flows.length) parts.push(flows.length + ' flow' + (flows.length !== 1 ? 's' : ''));
       countsEl.textContent = parts.join(' \\u00b7 ');
 
-      const scopeTotal = scopedAgents.length + scopedSkills.length + scopedCommands.length;
+      const scopeTotal = scopedAgents.length + scopedSkills.length + scopedCommands.length + flows.length;
       if (scopeTotal === 0) {
         renderEmptyState();
         return;
       }
 
       let html = '';
-      if (filteredAgents.length > 0) {
-        html += renderSection('Agents', 'agent', filteredAgents);
+      // CLAUDE.md / AGENTS.md are instruction files (no frontmatter, not agents) — own section.
+      const instructionDocs = filteredAgents.filter((a) => a.isMainAgent);
+      const subAgents = filteredAgents.filter((a) => !a.isMainAgent);
+      if (instructionDocs.length > 0) {
+        html += renderSection('Instructions', null, instructionDocs);
+      }
+      if (subAgents.length > 0) {
+        html += renderSection('Agents', 'agent', subAgents);
       }
       if (filteredSkills.length > 0) {
         html += renderSection('Skills', 'skill', filteredSkills);
       }
       if (filteredCommands.length > 0) {
-        // Commands: display only, no + affordance (decision: deprecated upstream)
         html += renderSection('Commands', null, filteredCommands);
+      }
+      if (filteredFlows.length > 0) {
+        html += renderFlowsSection(filteredFlows);
       }
 
       if (!html && filter) {
@@ -1087,6 +1189,41 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       contentEl.innerHTML = html;
       wireRowHandlers();
       wireSectionAddHandlers();
+      wireSectionToggleHandlers();
+    }
+
+    function wireSectionToggleHandlers() {
+      contentEl.querySelectorAll('.section-header[data-section]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          // The + (add) button has its own handler with stopPropagation; guard anyway.
+          if (e.target && e.target.closest && e.target.closest('.section-add-btn')) return;
+          toggleSection(el.dataset.section);
+        });
+      });
+    }
+
+    function renderFlowsSection(items) {
+      const collapsed = collapsedSections.has('Flows');
+      let html = '<div class="section-header" data-section="Flows" role="button" aria-expanded="' + String(!collapsed) + '">';
+      html += '<span class="section-title">' + caretSvg(collapsed) + 'Flows</span>';
+      html += '<div class="section-header-meta"><span class="section-count">' + items.length + '</span></div>';
+      html += '</div>';
+      if (collapsed) return html;
+      for (const flow of items) {
+        html += '<div class="item" data-filepath="' + escapeHtml(flow.filePath) + '" title="' + escapeHtml(flow.filePath) + '">';
+        html += '<div class="item-content">';
+        html += '<div class="item-name">' + escapeHtml(flow.name) + '</div>';
+        if (flow.attachedAgents && flow.attachedAgents.length > 0) {
+          html += '<div class="flow-attach">\\u2192 used by ' + escapeHtml(flow.attachedAgents.join(', ')) + '</div>';
+        }
+        html += '</div>';
+        html += '<button class="item-more-btn" data-more="1" title="More actions" aria-label="More actions">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />' +
+          '</svg></button>';
+        html += '</div>';
+      }
+      return html;
     }
 
     function renderEmptyState() {
@@ -1111,33 +1248,45 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }
 
     function renderSection(title, addType, items) {
-      let html = '<div class="section-header">';
-      html += '<span>' + escapeHtml(title) + '</span>';
+      const collapsed = collapsedSections.has(title);
+      let html = '<div class="section-header" data-section="' + escapeHtml(title) + '" role="button" aria-expanded="' + String(!collapsed) + '">';
+      html += '<span class="section-title">' + caretSvg(collapsed) + escapeHtml(title) + '</span>';
       html += '<div class="section-header-meta">';
       html += '<span class="section-count">' + items.length + '</span>';
       if (addType) {
         html += '<button class="section-add-btn" data-add-type="' + addType + '" title="New ' + addType + '" aria-label="New ' + addType + '">' + plusSvg() + '</button>';
       }
       html += '</div></div>';
+      if (collapsed) return html;
       for (const item of items) {
         const sel = item.filePath === selectedPath ? ' selected' : '';
         const main = !!item.isMainAgent;
         const warn = !main && !item.hasFrontmatter;
         const rel = displayPath(item);
         const desc = (item.description || '').trim();
-        const descText = desc || (main ? 'Main agent configuration' : 'No description in frontmatter');
+        const descText = desc || (main ? 'Instructions loaded into every session \\u2014 not an agent' : 'No description in frontmatter');
         const descClass = desc ? 'item-description' : 'item-description placeholder';
         html += '<div class="item' + sel + '" data-filepath="' + escapeHtml(item.filePath) + '" title="' + escapeHtml(rel) + '">';
         html += renderIconChip(item.icon, item.color);
+        // validateAgentFrontmatter only applies to agents (have isMainAgent property)
+        const isAgent = 'isMainAgent' in item;
+        const validationErrors = (isAgent && !main) ? (item.validationErrors || []) : [];
+        const provenance = !isAgent ? item.provenance : undefined;
         html += '<div class="item-content">';
-        html += '<div class="item-name">' + escapeHtml(item.name) + '</div>';
+        html += '<div class="item-name">' + escapeHtml(item.name) +
+          (provenance ? '<span class="prov-badge prov-' + provenance + '">' + provenance + '</span>' : '') +
+          '</div>';
         html += '<div class="' + descClass + '">' + escapeHtml(descText) + '</div>';
         if (warn) {
           html += '<div class="item-hint">Add a description in frontmatter — open file and click \\u24D8</div>';
         }
+        if (validationErrors.length > 0) {
+          html += '<div class="val-chip" title="' + escapeHtml(validationErrors[0]) + '">' +
+            '\\u26A0 ' + escapeHtml(validationErrors[0]) + '</div>';
+        }
         html += '</div>';
         if (main) {
-          html += '<span class="item-icon star" title="Main agent config">\\u2605</span>';
+          html += '<span class="item-icon star" title="Instructions file (CLAUDE.md / AGENTS.md) \\u2014 loaded into every session, not a configurable agent">\\u2605</span>';
         } else if (warn) {
           html += '<span class="item-icon warning" title="Missing or empty description field in frontmatter.">\\u26A0</span>';
         }

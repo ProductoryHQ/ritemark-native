@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Editor (agent mode) — Sprint 77 Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+/* ════════════════════════════════════════════════════════════
+   RITEMARK DESIGN TOKENS  (from webview/src/index.css)
+   ════════════════════════════════════════════════════════════ */
+:root {
+  --r-surface:         #ffffff;
+  --r-surface-muted:   #f8fafc;
+  --r-surface-soft:    #f1f5f9;
+  --r-hairline:        #e2e8f0;
+  --r-hairline-strong: #cbd5e1;
+  --r-ink-strong:      #1e1b4b;
+  --r-ink-body:        #475569;
+  --r-ink-muted:       #64748b;
+  --r-ink-faint:       #94a3b8;
+  --r-ink-disabled:    #cbd5e1;
+  --r-accent:          #4338ca;
+  --r-accent-deep:     #3730a3;
+  --r-accent-darker:   #312e81;
+  --r-accent-soft:     #e0e7ff;
+  --r-accent-fainter:  #c7d2fe;
+  --r-success:         #22c55e;
+  --r-success-soft:    #dcfce7;
+  --r-warning:         #f59e0b;
+  --r-warning-soft:    #fef3c7;
+  --r-error:           #ef4444;
+  --r-error-soft:      #fee2e2;
+  --r-radius-sm:       4px;
+  --r-radius-md:       6px;
+  --r-radius-lg:       10px;
+  --ui-font:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --editor-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+html.dark {
+  --r-surface:         #0F172A;
+  --r-surface-muted:   #020617;
+  --r-surface-soft:    #1E293B;
+  --r-hairline:        #1E293B;
+  --r-hairline-strong: #334155;
+  --r-ink-strong:      #f8fafc;
+  --r-ink-body:        #CBD5E1;
+  --r-ink-muted:       #94a3b8;
+  --r-ink-faint:       #64748b;
+  --r-ink-disabled:    #475569;
+  --r-accent:          #818cf8;
+  --r-accent-deep:     #6366f1;
+  --r-accent-darker:   #4f46e5;
+  --r-accent-soft:     rgba(129, 140, 248, 0.16);
+  --r-accent-fainter:  rgba(129, 140, 248, 0.28);
+  --r-success:         #4ade80;
+  --r-success-soft:    rgba(34, 197, 94, 0.18);
+  --r-warning:         #fbbf24;
+  --r-warning-soft:    rgba(245, 158, 11, 0.18);
+  --r-error:           #f87171;
+  --r-error-soft:      rgba(239, 68, 68, 0.18);
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESET + BASE
+   ════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--ui-font);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--r-surface);
+  color: var(--r-ink-strong);
+  overflow: hidden;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PROTO BANNER (not part of real UI)
+   ════════════════════════════════════════════════════════════ */
+.proto-banner {
+  background: var(--r-accent);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 5px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.proto-banner-left { display: flex; align-items: center; gap: 8px; }
+.proto-badge {
+  background: rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.proto-toggle {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--ui-font);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.proto-toggle:hover { background: rgba(255,255,255,0.25); }
+
+/* ════════════════════════════════════════════════════════════
+   APP SHELL  (mirrors App.tsx h-screen flex flex-col)
+   ════════════════════════════════════════════════════════════ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 32px); /* subtract proto banner */
+  background: var(--r-surface);
+  overflow: hidden;
+}
+
+/* ────────────────────────────────────────────────────────────
+   DOCUMENT HEADER  (mirrors DocumentHeader.tsx  h-10 = 40px)
+   ────────────────────────────────────────────────────────────
+   sticky top-0 left-0 right-0 h-10 bg-surface border-b border-hairline z-[60]
+   ─────────────────────────────────────────────────────────── */
+.doc-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: var(--r-surface);
+  border-bottom: 1px solid var(--r-hairline);
+  z-index: 60;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 6px;
+}
+.header-left  { display: flex; align-items: center; gap: 6px; }
+.header-mid   { flex: 1; }
+.header-right { display: flex; align-items: center; gap: 6px; }
+
+/* Toolbar buttons  (variant="toolbar" size="icon-sm") */
+.tbtn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--r-ink-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+  position: relative;
+}
+.tbtn:hover  { background: var(--r-surface-soft); color: var(--r-ink-body); }
+.tbtn.active { background: var(--r-accent-soft);  color: var(--r-accent); }
+.tbtn svg    { width: 14px; height: 14px; stroke-width: 2; fill: none; stroke: currentColor; }
+
+/* Filename breadcrumb chip */
+.filename-chip {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--r-ink-muted);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--r-radius-sm);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.filename-chip .path { color: var(--r-ink-faint); }
+
+/* ────────────────────────────────────────────────────────────
+   EDITOR ROW  (flex-1 flex overflow-hidden)
+   ─────────────────────────────────────────────────────────── */
+.editor-row {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ────────────────────────────────────────────────────────────
+   AGENT CONFIGURATOR PANEL  (220px, matches PropertiesSidePanel)
+   PropertiesSidePanel: w-[220px] flex-shrink-0 h-full overflow-y-auto
+                        border-r border-hairline
+   Inner: flex flex-col gap-3 px-4 py-4
+   ─────────────────────────────────────────────────────────── */
+.agent-panel {
+  width: 220px;
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  border-right: 1px solid var(--r-hairline);
+  background: var(--r-surface);
+}
+.agent-panel-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+/* Panel heading (text-[15px] font-semibold text-ink-strong) */
+.panel-heading {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--r-ink-strong);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.panel-heading svg {
+  width: 16px; height: 16px;
+  stroke: var(--r-accent); fill: none; stroke-width: 2;
+  flex-shrink: 0;
+}
+
+/* Section divider */
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--r-ink-faint);
+}
+.panel-divider {
+  border: none;
+  border-top: 1px solid var(--r-hairline);
+  margin: 4px 0;
+}
+
+/* Input field (compact, matching Ritemark inputs) */
+.p-input {
+  width: 100%;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--r-ink-strong);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-sm);
+  padding: 5px 8px;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.p-input:focus {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 2px var(--r-accent-soft);
+}
+.p-input::placeholder { color: var(--r-ink-faint); }
+
+/* Textarea variant */
+textarea.p-input {
+  resize: none;
+  min-height: 56px;
+  line-height: 1.4;
+}
+
+/* Select (dropdown) */
+.p-select {
+  width: 100%;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--r-ink-strong);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-sm);
+  padding: 5px 8px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 14px;
+  padding-right: 24px;
+  cursor: pointer;
+  outline: none;
+}
+.p-select:focus {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 2px var(--r-accent-soft);
+}
+
+/* Runtime picker — segmented control */
+.runtime-picker {
+  display: flex;
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-sm);
+  overflow: hidden;
+  gap: 0;
+}
+.runtime-btn {
+  flex: 1;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--r-ink-muted);
+  background: transparent;
+  border: none;
+  padding: 5px 0;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  text-align: center;
+}
+.runtime-btn:not(:last-child) { border-right: 1px solid var(--r-hairline); }
+.runtime-btn:hover  { background: var(--r-surface); }
+.runtime-btn.active { background: var(--r-accent-soft); color: var(--r-accent); font-weight: 600; }
+
+/* Auth status row */
+.auth-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--r-ink-muted);
+}
+.auth-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.auth-dot.ok      { background: var(--r-success); }
+.auth-dot.missing { background: var(--r-error); }
+.auth-link {
+  color: var(--r-accent);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: none;
+  margin-left: auto;
+}
+.auth-link:hover { text-decoration: underline; }
+
+/* Toggle row (checkbox-style) */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--r-ink-body);
+  cursor: pointer;
+}
+.toggle-row input[type=checkbox] { accent-color: var(--r-accent); cursor: pointer; }
+
+/* Cron preview pill */
+.cron-preview {
+  font-size: 11px;
+  color: var(--r-ink-muted);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--r-radius-sm);
+  padding: 3px 7px;
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+}
+.cron-human {
+  font-size: 11px;
+  color: var(--r-ink-muted);
+  margin-top: 2px;
+}
+
+/* K6 warning banner */
+.k6-banner {
+  background: var(--r-warning-soft);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--r-radius-sm);
+  padding: 7px 9px;
+  font-size: 11px;
+  color: #78350f;
+  line-height: 1.4;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  position: relative;
+}
+html.dark .k6-banner { color: #fef3c7; }
+.k6-banner svg {
+  width: 13px; height: 13px; flex-shrink: 0; margin-top: 1px;
+  stroke: #92400e; fill: none; stroke-width: 2;
+}
+html.dark .k6-banner svg { stroke: #fbbf24; }
+.k6-dismiss {
+  position: absolute; top: 5px; right: 6px;
+  background: none; border: none; cursor: pointer;
+  color: #92400e; font-size: 14px; line-height: 1;
+  padding: 0; opacity: 0.6;
+}
+html.dark .k6-dismiss { color: #fef3c7; }
+.k6-dismiss:hover { opacity: 1; }
+
+/* Skills tag autocomplete */
+.skills-tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-md);
+  background: var(--r-surface);
+  cursor: text;
+  min-height: 34px;
+}
+.skills-tag-input:focus-within {
+  outline: 2px solid rgba(67,56,202,0.25);
+  border-color: var(--r-accent);
+}
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--r-radius-pill, 999px);
+  background: var(--r-accent-soft);
+  color: var(--r-accent);
+  border: 1px solid var(--r-accent-fainter);
+  white-space: nowrap;
+}
+.skill-tag-remove {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--r-accent); font-size: 13px; line-height: 1;
+  opacity: 0.6; display: flex; align-items: center;
+}
+.skill-tag-remove:hover { opacity: 1; }
+.skill-tag-search {
+  border: none; outline: none; background: transparent;
+  font-size: 11px; color: var(--r-ink-strong);
+  min-width: 80px; flex: 1;
+}
+.skill-tag-search::placeholder { color: var(--r-ink-faint); }
+.skills-dropdown {
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-md);
+  background: var(--r-surface);
+  box-shadow: 0 4px 12px rgba(30,27,75,0.1);
+  max-height: 120px;
+  overflow-y: auto;
+  margin-top: 3px;
+}
+.skill-option {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 8px; font-size: 11px; color: var(--r-ink-body);
+  cursor: pointer;
+}
+.skill-option:hover { background: var(--r-accent-soft); }
+.skill-option-name { flex: 1; }
+
+/* Provenance badge */
+.prov {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.prov-claude { background: rgba(67,56,202,0.1);  color: #4338CA; border: 1px solid rgba(67,56,202,0.2); }
+.prov-codex  { background: rgba(5,150,105,0.1);  color: #059669; border: 1px solid rgba(5,150,105,0.2); }
+.prov-shared { background: rgba(100,116,139,0.1); color: #475569; border: 1px solid rgba(100,116,139,0.2); }
+
+html.dark .prov-claude { background: rgba(129,140,248,0.15); color: #a5b4fc; border-color: rgba(129,140,248,0.3); }
+html.dark .prov-codex  { background: rgba(52,211,153,0.15);  color: #6ee7b7; border-color: rgba(52,211,153,0.3); }
+html.dark .prov-shared { background: rgba(148,163,184,0.12); color: #94a3b8; border-color: rgba(148,163,184,0.25); }
+
+/* Tools checkboxes — single column with descriptions */
+.tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tool-item {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--r-hairline);
+}
+.tool-item:last-child { border-bottom: none; }
+.tool-item input { accent-color: var(--r-accent); flex-shrink: 0; margin-top: 2px; }
+.tool-label { font-size: 11px; font-weight: 500; color: var(--r-ink-strong); flex-shrink: 0; width: 56px; }
+.tool-desc  { font-size: 11px; color: var(--r-ink-faint); }
+
+/* Budget row */
+.budget-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.budget-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.budget-input {
+  width: 72px;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--r-ink-strong);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: var(--r-radius-sm);
+  padding: 5px 8px;
+  outline: none;
+}
+.budget-input:focus {
+  border-color: var(--r-accent);
+  box-shadow: 0 0 0 2px var(--r-accent-soft);
+}
+.budget-unit {
+  font-size: 12px;
+  color: var(--r-ink-muted);
+}
+.budget-estimate {
+  font-size: 11px;
+  color: var(--r-ink-muted);
+}
+.budget-estimate strong { color: var(--r-ink-body); font-weight: 600; }
+
+/* Identity icon+color picker row */
+.icon-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.icon-preview {
+  width: 30px; height: 30px;
+  border-radius: var(--r-radius-md);
+  background: var(--r-accent-soft);
+  border: 1px solid var(--r-accent-fainter);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.12s;
+}
+.icon-preview:hover { border-color: var(--r-accent); }
+.color-swatches {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.swatch {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.swatch:hover  { transform: scale(1.15); }
+.swatch.active { border-color: var(--r-ink-strong); }
+
+/* ────────────────────────────────────────────────────────────
+   EDITOR AREA  (flex-1 overflow-y-auto)
+   ─────────────────────────────────────────────────────────── */
+.editor-area {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--r-surface);
+  position: relative;
+}
+.editor-content {
+  font-family: var(--editor-font);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--r-ink-body);
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 40px 64px;
+}
+
+/* Fake TipTap ProseMirror styles */
+.editor-content h1 {
+  font-size: 1.75em; font-weight: 700; color: var(--r-ink-strong);
+  margin: 0 0 0.5em; line-height: 1.2;
+}
+.editor-content h2 {
+  font-size: 1.25em; font-weight: 600; color: var(--r-ink-strong);
+  margin: 1.4em 0 0.4em;
+}
+.editor-content h3 {
+  font-size: 1em; font-weight: 600; color: var(--r-ink-strong);
+  margin: 1.2em 0 0.3em;
+}
+.editor-content p  { margin: 0.6em 0; }
+.editor-content ul { margin: 0.5em 0; padding-left: 1.5em; }
+.editor-content li { margin: 0.25em 0; }
+.editor-content code {
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-size: 0.88em;
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--r-ink-strong);
+}
+.editor-content pre {
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--r-radius-md);
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.editor-content pre code {
+  background: none; border: none; padding: 0; font-size: 0.85em;
+}
+.editor-content blockquote {
+  border-left: 3px solid var(--r-accent);
+  margin: 0.8em 0;
+  padding-left: 1em;
+  color: var(--r-ink-muted);
+}
+
+/* Frontmatter badge (shown at top of editor in agent mode instead of raw YAML) */
+.fm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--ui-font);
+  font-weight: 500;
+  color: var(--r-ink-muted);
+  background: var(--r-surface-soft);
+  border: 1px solid var(--r-hairline);
+  border-radius: var(--r-radius-sm);
+  padding: 3px 9px;
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+.fm-badge:hover { border-color: var(--r-accent); color: var(--r-accent); }
+.fm-badge svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+/* TipTap cursor */
+.cursor {
+  display: inline-block;
+  width: 2px; height: 1.1em;
+  background: var(--r-accent);
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ════════════════════════════════════════════════════════════
+   ANNOTATION CALLOUTS
+   ════════════════════════════════════════════════════════════ */
+.anno {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  background: #f59e0b;
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: var(--ui-font);
+  border-radius: 50%;
+  flex-shrink: 0;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Annotation tooltips */
+.anno-wrap { position: relative; display: inline-flex; align-items: center; }
+.anno-tip {
+  display: none;
+  position: absolute;
+  left: 24px; top: 50%;
+  transform: translateY(-50%);
+  background: var(--r-ink-strong);
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 5px;
+  z-index: 200;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.anno-tip::before {
+  content: '';
+  position: absolute;
+  right: 100%; top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: var(--r-ink-strong);
+}
+.anno-wrap:hover .anno-tip { display: block; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--r-hairline-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--r-ink-faint); }
+
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     PROTO BANNER  (not part of real UI)
+     ══════════════════════════════════════════════════════════ -->
+<div class="proto-banner">
+  <div class="proto-banner-left">
+    <span class="proto-badge">Sprint 77</span>
+    <span>ritemark.editor — Agent Mode &middot; 220px left panel (same pattern as TOC / Properties)</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="proto-toggle" onclick="toggleDark()" id="dark-btn">Dark mode</button>
+    <button class="proto-toggle" onclick="togglePanel()" id="panel-btn">Hide panel</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     APP SHELL
+     ══════════════════════════════════════════════════════════ -->
+<div class="app" id="app">
+
+  <!-- ── DOCUMENT HEADER ── -->
+  <header class="doc-header">
+    <!-- Left: toggle buttons -->
+    <div class="header-left">
+      <!-- Contents (TOC) button — inactive, greyed out -->
+      <button class="tbtn" title="Contents">
+        <svg viewBox="0 0 16 16"><line x1="3" y1="4" x2="13" y2="4"/><line x1="3" y1="8" x2="10" y2="8"/><line x1="3" y1="12" x2="11" y2="12"/></svg>
+      </button>
+      <!-- Properties button — inactive -->
+      <button class="tbtn" title="Properties (frontmatter)">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.8" fill="currentColor"/></svg>
+      </button>
+      <!-- ① NEW: Agent Config toggle — ACTIVE (only for .claude/agents/*.md) -->
+      <div class="anno-wrap" style="display:inline-flex;align-items:center;gap:4px;">
+        <button class="tbtn active" title="Agent Configurator" id="agent-toggle-btn" onclick="togglePanel()">
+          <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><line x1="9" y1="7" x2="12" y2="7"/><line x1="9" y1="9.5" x2="11" y2="9.5"/><line x1="4" y1="11" x2="12" y2="11" stroke-dasharray="1.5 1.5"/></svg>
+        </button>
+        <span class="anno">①</span>
+        <span class="anno-tip">NEW: "Agent Config" toggle button — auto-activates for .claude/agents/*.md files. Same toolbar button pattern as Contents / Properties.</span>
+      </div>
+    </div>
+
+    <!-- Centre: filename breadcrumb -->
+    <div class="header-mid" style="display:flex;justify-content:center;">
+      <span class="filename-chip">
+        <span class="path">.claude/agents/</span>sprint-manager.md
+      </span>
+    </div>
+
+    <!-- Right: export -->
+    <div class="header-right">
+      <button class="tbtn" title="Export">
+        <svg viewBox="0 0 16 16"><path d="M8 3v7M5 7l3 3 3-3"/><path d="M3 12h10"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── EDITOR ROW ── -->
+  <div class="editor-row">
+
+    <!-- ════════════════════════════════════════════════
+         AGENT CONFIGURATOR PANEL  (220px)
+         Matches PropertiesSidePanel exactly:
+           w-[220px] flex-shrink-0 h-full overflow-y-auto
+           border-r border-hairline   bg: vscode-editor-background
+         Inner: flex flex-col gap-3 px-4 py-4
+         ════════════════════════════════════════════════ -->
+    <div class="agent-panel" id="agent-panel">
+      <div class="agent-panel-inner">
+
+        <!-- Panel heading -->
+        <div class="panel-heading">
+          <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><line x1="9" y1="7" x2="12" y2="7"/><line x1="9" y1="9.5" x2="11" y2="9.5"/></svg>
+          Agent
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── IDENTITY ── -->
+        <div class="panel-section">
+          <span class="section-label">Identity</span>
+
+          <!-- Icon + color row -->
+          <div class="icon-color-row">
+            <div class="icon-preview" title="Click to change icon">🤖</div>
+            <div class="color-swatches">
+              <div class="swatch active" style="background:#4338ca;" title="Indigo (default)"></div>
+              <div class="swatch" style="background:#0891b2;" title="Cyan"></div>
+              <div class="swatch" style="background:#059669;" title="Emerald"></div>
+              <div class="swatch" style="background:#dc2626;" title="Red"></div>
+              <div class="swatch" style="background:#d97706;" title="Amber"></div>
+              <div class="swatch" style="background:#7c3aed;" title="Violet"></div>
+              <div class="swatch" style="background:#64748b;" title="Slate"></div>
+            </div>
+          </div>
+
+          <!-- Name -->
+          <input class="p-input" type="text" value="sprint-manager" placeholder="agent-name">
+
+          <!-- Description -->
+          <textarea class="p-input" placeholder="Short description…" rows="3">Sprint manager agent for Ritemark Native. Enforces 6-phase workflow with hard approval gates.</textarea>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── RUNTIME ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Agent runtimes</span>
+            <div class="anno-wrap">
+              <span class="anno">②</span>
+              <span class="anno-tip">NEW: Runtime picker — segmented control. Defaults to claude. Auth status indicator shows API key health.</span>
+            </div>
+          </div>
+
+          <!-- Segmented runtime picker -->
+          <div class="runtime-picker">
+            <button class="runtime-btn active">Claude</button>
+            <button class="runtime-btn">Codex</button>
+            <button class="runtime-btn">OpenAI</button>
+          </div>
+
+          <!-- Auth status row -->
+          <div class="auth-row">
+            <div class="auth-dot ok"></div>
+            <span>API key configured</span>
+            <a class="auth-link" href="#">Settings</a>
+          </div>
+
+          <!-- Model dropdown -->
+          <select class="p-select" title="Model">
+            <option>claude-opus-4-8 (latest)</option>
+            <option selected>claude-sonnet-4-6</option>
+            <option>claude-haiku-4-5</option>
+          </select>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── SCHEDULE ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Schedule</span>
+            <div class="anno-wrap">
+              <span class="anno">③</span>
+              <span class="anno-tip">NEW: Schedule section with cron input and cron-parser preview. Shows K6 warning banner when enabled.</span>
+            </div>
+          </div>
+
+          <label class="toggle-row">
+            <input type="checkbox" id="sched-toggle" onchange="toggleSchedule(this)"> Enable schedule
+          </label>
+
+          <div id="sched-fields" style="display:none;flex-direction:column;gap:6px;">
+            <!-- Cron expression -->
+            <input class="p-input" type="text" id="cron-input" value="0 */6 * * *"
+              placeholder="0 9 * * 1-5" oninput="updateCron(this.value)">
+            <!-- Human-readable preview (cron-parser) -->
+            <div class="anno-wrap">
+              <div class="cron-preview" id="cron-preview">0 */6 * * *</div>
+              <div class="anno" style="margin-left:4px;">④</div>
+              <span class="anno-tip">NEW: cron-parser preview — "0 */6 * * *" → "Every 6 hours". Rendered by cron-parser npm package at runtime.</span>
+            </div>
+            <div class="cron-human" id="cron-human">Every 6 hours</div>
+
+            <!-- K6 Warning Banner -->
+            <div class="anno-wrap" style="width:100%;">
+              <div class="k6-banner">
+                <svg viewBox="0 0 16 16"><path d="M8 2L14 13H2L8 2z"/><line x1="8" y1="7" x2="8" y2="10"/><circle cx="8" cy="11.5" r="0.5" fill="currentColor"/></svg>
+                <span>Scheduled runs execute only while Ritemark is open. Reliable background execution ships in Phase 2.</span>
+                <button class="k6-dismiss" title="Dismiss">×</button>
+              </div>
+              <span class="anno" style="position:absolute;top:-6px;right:-6px;">⑤</span>
+            </div>
+          </div>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── LINKED FLOW ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Linked flow</span>
+            <div class="anno-wrap">
+              <span class="anno">⑥</span>
+              <span class="anno-tip">NEW: Which Ritemark flow runs when this agent's schedule fires. "Manual only" = agent never runs automatically.</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--r-ink-faint);margin-bottom:5px;line-height:1.4;">
+            Flow to execute on schedule. Leave empty for manual-only agents.
+          </div>
+          <select class="p-select">
+            <option value="">— Manual only —</option>
+            <option value="standup" selected>standup.flow.json</option>
+            <option value="weekly">weekly-digest.flow.json</option>
+            <option value="__new__">＋ Create new flow…</option>
+          </select>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── SKILLS ── -->
+        <div class="panel-section">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="section-label" style="flex:1">Skills</span>
+            <div class="anno-wrap">
+              <span class="anno">⑦</span>
+              <span class="anno-tip">NEW: Skills multiselect with provenance badges [claude] / [codex] / [shared]. Shared = present in both .claude/skills/ and .agents/skills/.</span>
+            </div>
+          </div>
+          <!-- Tag input: shows selected skills as removable tags, type to filter -->
+          <div class="skills-tag-input" onclick="document.getElementById('skill-search').focus()">
+            <span class="skill-tag">vscode-development <span class="prov prov-claude" style="margin:0 2px">claude</span><button class="skill-tag-remove" title="Remove">×</button></span>
+            <span class="skill-tag">feature-flags <span class="prov prov-shared" style="margin:0 2px">shared</span><button class="skill-tag-remove" title="Remove">×</button></span>
+            <input class="skill-tag-search" id="skill-search" type="text" placeholder="Add skill…" oninput="filterSkills(this.value)" onfocus="showSkillDrop()" onblur="setTimeout(hideSkillDrop,150)">
+          </div>
+          <!-- Dropdown (shown on focus / typing) -->
+          <div class="skills-dropdown" id="skill-drop" style="display:none">
+            <div class="skill-option"><span class="skill-option-name">release</span><span class="prov prov-claude">claude</span></div>
+            <div class="skill-option"><span class="skill-option-name">code-review</span><span class="prov prov-codex">codex</span></div>
+            <div class="skill-option"><span class="skill-option-name">ritemark-flows</span><span class="prov prov-shared">shared</span></div>
+            <div class="skill-option"><span class="skill-option-name">spec-driven-sprint</span><span class="prov prov-claude">claude</span></div>
+            <div class="skill-option"><span class="skill-option-name">deep-research</span><span class="prov prov-claude">claude</span></div>
+          </div>
+          <div style="font-size:10px;color:var(--r-ink-faint);margin-top:3px;">Type to search 30+ skills. Selected skills are injected into the agent's system prompt.</div>
+        </div>
+
+        <hr class="panel-divider">
+
+        <!-- ── ALLOWED TOOLS ── -->
+        <div class="panel-section">
+          <span class="section-label">Allowed Tools</span>
+          <div class="tools-list">
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Read</span><span class="tool-desc">Read files from disk</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Edit</span><span class="tool-desc">Make targeted file edits</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Write</span><span class="tool-desc">Create or overwrite files</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Bash</span><span class="tool-desc">Run terminal commands</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Glob</span><span class="tool-desc">Find files by pattern</span></label>
+            <label class="tool-item"><input type="checkbox" checked><span class="tool-label">Grep</span><span class="tool-desc">Search file contents</span></label>
+            <label class="tool-item"><input type="checkbox"><span class="tool-label">Agent</span><span class="tool-desc">Spawn sub-agents</span></label>
+            <label class="tool-item"><input type="checkbox"><span class="tool-label">WebFetch</span><span class="tool-desc">Fetch URLs from the web</span></label>
+            <label class="tool-item"><input type="checkbox"><span class="tool-label">WebSearch</span><span class="tool-desc">Search the web</span></label>
+          </div>
+        </div>
+
+
+      </div><!-- /agent-panel-inner -->
+    </div><!-- /agent-panel -->
+
+    <!-- ════════════════════════════════════════════════
+         EDITOR AREA  (flex-1)
+         Mirrors: <div class="flex-1 overflow-y-auto">
+                    <Editor … />
+                  </div>
+         ════════════════════════════════════════════════ -->
+    <div class="editor-area">
+      <div class="editor-content">
+
+        <!-- "Frontmatter managed by Agent Configurator" pill -->
+        <div class="fm-badge" title="Frontmatter fields are managed by the Agent Configurator panel">
+          <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><line x1="5" y1="7" x2="11" y2="7"/><line x1="5" y1="10" x2="9" y2="10"/></svg>
+          Frontmatter managed by Agent Configurator
+        </div>
+
+        <!-- Fake TipTap content — body of sprint-manager.md -->
+        <h1>Sprint Manager Agent</h1>
+
+        <p>Sprint manager agent for Ritemark Native. Enforces a strict 6-phase workflow with <strong>hard approval gates</strong>. REFUSES to write code without explicit approval from Jarmo.</p>
+
+        <h2>Instructions</h2>
+
+        <p>You are the sprint manager for Ritemark Native. Your job is to plan and manage development sprints following the SDD (Spec-Driven Development) process.</p>
+
+        <h3>Phase workflow</h3>
+
+        <ul>
+          <li><strong>Phase 1 — Investigate:</strong> Gather requirements, read relevant files, ask clarifying questions</li>
+          <li><strong>Phase 2 — Plan:</strong> Produce 5 SDD artifacts (spec, scenarios, technical-plan, tasks, sprint-plan)</li>
+          <li><strong>Phase 3 — Implement:</strong> Only after explicit approval. One workstream at a time.</li>
+          <li><strong>Phase 4 — QA:</strong> Run <code>qa-validator</code> before any commit</li>
+          <li><strong>Phase 5 — Release:</strong> Invoke <code>release-manager</code> with both gates satisfied</li>
+          <li><strong>Phase 6 — Retrospective:</strong> Document learnings, update skills</li>
+        </ul>
+
+        <h3>Hard rules</h3>
+
+        <blockquote>
+          Never write implementation code before Jarmo types "approved", "Jarmo approved", or "proceed". If you receive ambiguous approval, ask for confirmation.
+        </blockquote>
+
+        <p>Sprint branches follow the pattern <code>sprint-NN-short-name</code>. Create the branch immediately after approval, before touching any source file.</p>
+
+        <h2>When to invoke expert agents</h2>
+
+        <p>Subagent routing is mandatory — do not implement VS Code build changes, webview changes, or UX design without first invoking the relevant expert agent:</p>
+
+        <ul>
+          <li><code>vscode-expert</code> — builds, patches, extension errors</li>
+          <li><code>webview-expert</code> — TipTap, Vite, React webview</li>
+          <li><code>ux-expert</code> — all UI/UX design decisions</li>
+          <li><code>qa-validator</code> — before every commit</li>
+        </ul>
+
+        <p>Use <code>sprint-manager</code> (this agent) for all sprint planning and workflow enforcement.<span class="cursor"></span></p>
+
+      </div>
+    </div><!-- /editor-area -->
+
+  </div><!-- /editor-row -->
+</div><!-- /app -->
+
+<script>
+function toggleDark() {
+  const html = document.documentElement;
+  const btn  = document.getElementById('dark-btn');
+  html.classList.toggle('dark');
+  btn.textContent = html.classList.contains('dark') ? 'Light mode' : 'Dark mode';
+}
+
+function togglePanel() {
+  const panel = document.getElementById('agent-panel');
+  const btn   = document.getElementById('panel-btn');
+  const tbtn  = document.getElementById('agent-toggle-btn');
+  const hidden = panel.style.display === 'none';
+  panel.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? 'Hide panel' : 'Show panel';
+  tbtn.classList.toggle('active', hidden);
+}
+
+function toggleSchedule(cb) {
+  const fields = document.getElementById('sched-fields');
+  fields.style.display = cb.checked ? 'flex' : 'none';
+}
+
+function updateCron(val) {
+  const preview = document.getElementById('cron-preview');
+  const human   = document.getElementById('cron-human');
+  const k6      = document.querySelector('.k6-banner');
+
+  if (!val) {
+    preview.textContent = '—';
+    human.textContent   = '';
+    human.style.color   = '';
+    if (k6) k6.style.display = 'none';
+    return;
+  }
+
+  preview.textContent = val;
+
+  // Simplified human-readable mapping (real impl uses cron-parser package)
+  const humanMap = {
+    '0 */6 * * *':  'Every 6 hours',
+    '0 9 * * 1-5':  'Weekdays at 9:00 AM',
+    '0 9 * * *':    'Every day at 9:00 AM',
+    '0 0 * * *':    'Every day at midnight',
+    '*/30 * * * *': 'Every 30 minutes',
+    '0 * * * *':    'Every hour',
+  };
+
+  // Basic cron validity check: 5 whitespace-separated fields
+  const isValid = /^\S+(\s+\S+){4}$/.test(val.trim());
+  if (humanMap[val]) {
+    human.textContent = humanMap[val];
+    human.style.color = '';
+  } else if (isValid) {
+    human.textContent = '(cron-parser preview)';
+    human.style.color = '';
+  } else {
+    human.textContent = 'Invalid cron expression';
+    human.style.color = 'var(--r-error, #ef4444)';
+  }
+
+  // K6 banner: visible whenever schedule is non-empty (and not already dismissed)
+  if (k6 && k6.dataset.dismissed !== '1') {
+    k6.style.display = isValid ? '' : 'none';
+  }
+}
+
+// Skill tag autocomplete
+function showSkillDrop() { document.getElementById('skill-drop').style.display = ''; }
+function hideSkillDrop() { document.getElementById('skill-drop').style.display = 'none'; }
+function filterSkills(val) {
+  const drop = document.getElementById('skill-drop');
+  drop.style.display = '';
+  drop.querySelectorAll('.skill-option').forEach(opt => {
+    opt.style.display = opt.querySelector('.skill-option-name').textContent.includes(val) ? '' : 'none';
+  });
+}
+
+// Dismiss K6 banner (persists via data attribute for this session)
+document.querySelector('.k6-dismiss').addEventListener('click', function() {
+  const banner = this.closest('.k6-banner');
+  banner.style.display = 'none';
+  banner.dataset.dismissed = '1';
+});
+
+// Color swatch selection
+document.querySelectorAll('.swatch').forEach(s => {
+  s.addEventListener('click', function() {
+    document.querySelectorAll('.swatch').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// Runtime button selection
+document.querySelectorAll('.runtime-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.runtime-btn').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+    // Update auth status based on runtime
+    const dot  = document.querySelector('.auth-dot');
+    const text = dot.nextSibling;
+    const link = document.querySelector('.auth-link');
+    if (this.textContent === 'Codex') {
+      dot.className = 'auth-dot missing';
+      text.textContent = 'API key missing';
+      link.textContent = 'Configure';
+    } else {
+      dot.className = 'auth-dot ok';
+      text.textContent = 'API key configured';
+      link.textContent = 'Settings';
+    }
+  });
+});
+</script>
+</body>
+</html>

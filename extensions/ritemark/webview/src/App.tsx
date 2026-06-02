@@ -6,6 +6,8 @@ import { PDFViewer } from './components/viewers/PDFViewer'
 import { DOCXViewer } from './components/viewers/DOCXViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
 import { PropertiesSidePanel } from './components/properties'
+import { AgentConfiguratorPanel } from './components/agent'
+import type { AgentFrontmatter, AgentSkill } from './components/agent'
 import { FindBar } from './components/FindBar'
 import { InlineTableOfContents } from './components/InlineTableOfContents'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
@@ -18,7 +20,7 @@ import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { DocumentProperties } from './components/properties'
 
 type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf' | 'docx'
-type SidePanel = 'none' | 'toc' | 'properties'
+type SidePanel = 'none' | 'toc' | 'properties' | 'agent'
 
 // Minimum container width (px) at which the inline ToC panel is shown.
 // Tunable in T7 during live testing.
@@ -113,6 +115,12 @@ function App() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportButtonRef = useRef<HTMLElement | null>(null)
 
+  // Agent mode state
+  const [isAgentMode, setIsAgentMode] = useState(false)
+  const [agentFrontmatter, setAgentFrontmatter] = useState<AgentFrontmatter>({})
+  const [agentFlows, setAgentFlows] = useState<string[]>([])
+  const [agentSkills, setAgentSkills] = useState<AgentSkill[]>([])
+
   // Side panel state — TOC and Properties share the same slot
   const [activePanel, setActivePanel] = useState<SidePanel>(() => {
     try {
@@ -163,6 +171,13 @@ function App() {
             markdownExport: false,
             saveAsMarkdownFromPreview: false
           })
+          if (message.isAgentMode) {
+            setIsAgentMode(true)
+            setAgentFrontmatter((message.agentFrontmatter as AgentFrontmatter) || {})
+            setAgentFlows((message.agentFlows as string[]) || [])
+            setAgentSkills((message.agentSkills as AgentSkill[]) || [])
+            setActivePanel('agent')
+          }
           setIsReady(true)
           break
 
@@ -209,6 +224,10 @@ function App() {
           setImageMappings((message.imageMappings as Record<string, string>) || {})
           // Clear any stale refresh banner from a previous dirty-state event.
           setShowFileChangeNotification(false)
+          break
+
+        case 'agentFlowsUpdated':
+          setAgentFlows((message.flows as string[]) || [])
           break
       }
     })
@@ -376,7 +395,9 @@ function App() {
     sendToExtension('contentChanged', { content: newContent })
   }, [])
 
-  // Side panel toggle helper — persists choice
+  // Side panel toggle helper — TOC / Properties / Agent share one slot, mutually exclusive.
+  // 'agent' is intentionally not restored from localStorage on init (it's auto-pinned on
+  // load only for agent files), so writing it here is harmless across sessions.
   const togglePanel = useCallback((panel: SidePanel) => {
     setActivePanel(prev => {
       const next = prev === panel ? 'none' : panel
@@ -387,9 +408,22 @@ function App() {
     })
   }, [])
 
+  const handleAgentFrontmatterChange = useCallback((fm: AgentFrontmatter) => {
+    setAgentFrontmatter(fm)
+    sendToExtension('applyFrontmatter', { frontmatter: fm })
+  }, [])
+
+  const handleCreateFlow = useCallback(() => {
+    sendToExtension('createAgentFlow', {})
+  }, [])
+
   // Header button handlers
   const handlePropertiesClick = useCallback(() => {
     togglePanel('properties')
+  }, [togglePanel])
+
+  const handleAgentPanelClick = useCallback(() => {
+    togglePanel('agent')
   }, [togglePanel])
 
   const handleExportClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
@@ -554,6 +588,7 @@ function App() {
   // Side panel visibility derivation
   const inlineTocShown = activePanel === 'toc' && headings.length >= 2
   const propertiesPanelShown = activePanel === 'properties'
+  const agentPanelShown = activePanel === 'agent' && isAgentMode
 
   const contentsClick = headings.length >= 2 ? toggleInlineToc : undefined
 
@@ -568,6 +603,8 @@ function App() {
         contentsButtonRef={contentsButtonRef}
         contentsActive={inlineTocShown}
         propertiesActive={propertiesPanelShown}
+        agentActive={agentPanelShown}
+        onAgentClick={isAgentMode ? handleAgentPanelClick : undefined}
         hasFileChanged={showFileChangeNotification}
         onRefresh={() => {
           setShowFileChangeNotification(false)
@@ -592,6 +629,17 @@ function App() {
           <PropertiesSidePanel
             properties={properties}
             onChange={handlePropertiesChange}
+          />
+        )}
+
+        {/* Agent configurator panel — shown when editing a .claude/agents/*.md file */}
+        {agentPanelShown && (
+          <AgentConfiguratorPanel
+            frontmatter={agentFrontmatter}
+            flows={agentFlows}
+            skills={agentSkills}
+            onFrontmatterChange={handleAgentFrontmatterChange}
+            onCreateFlow={handleCreateFlow}
           />
         )}
 

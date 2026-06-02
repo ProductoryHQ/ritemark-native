@@ -12,6 +12,11 @@ interface FileLinkSuggestionListProps {
   command: (item: FileLinkSuggestionItem) => void
 }
 
+/** Imperative handle exposed via useImperativeHandle — the contract suggestion plugins rely on. */
+export interface FileLinkSuggestionListHandle {
+  onKeyDown: (props: { event: KeyboardEvent }) => boolean
+}
+
 function iconForKind(kind: WorkspaceFileLinkResult['kind'] | undefined) {
   if (kind === 'markdown' || kind === 'document') return 'file-text'
   if (kind === 'data') return 'table'
@@ -19,7 +24,7 @@ function iconForKind(kind: WorkspaceFileLinkResult['kind'] | undefined) {
   return 'file'
 }
 
-export const FileLinkSuggestionList = forwardRef((props: FileLinkSuggestionListProps, ref) => {
+export const FileLinkSuggestionList = forwardRef<FileLinkSuggestionListHandle, FileLinkSuggestionListProps>((props, ref) => {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const actionableItems = props.items.filter(item => !item.disabled)
 
