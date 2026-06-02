@@ -17,7 +17,7 @@
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 --- a/src/vs/platform/browserView/common/browserView.ts
 +++ b/src/vs/platform/browserView/common/browserView.ts
-@@ -42,6 +42,14 @@
+@@ -42,6 +42,15 @@
  	ToggleAnnotationMode = `${commandPrefix}.toggleAnnotationMode`,
  	GetAnnotationMode = `${commandPrefix}.getAnnotationMode`,
  	EnsureActiveBrowserShared = `${commandPrefix}.ensureActiveBrowserShared`,
@@ -208,7 +208,7 @@ diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/rite
 new file mode 100644
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
-@@ -0,0 +1,445 @@
+@@ -0,0 +1,486 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
