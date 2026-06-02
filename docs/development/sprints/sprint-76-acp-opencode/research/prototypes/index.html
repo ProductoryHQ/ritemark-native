@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sprint 76 — BYOK + OpenCode Model Selection · Prototypes</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --r-surface: #FFFFFF;
+    --r-surface-muted: #F8FAFC;
+    --r-surface-soft: #F1F5F9;
+    --r-hairline: #E2E8F0;
+    --r-hairline-strong: #CBD5E1;
+    --r-ink-strong: #1E1B4B;
+    --r-ink-body: #475569;
+    --r-ink-muted: #64748B;
+    --r-ink-faint: #94A3B8;
+    --r-accent: #4338CA;
+    --r-accent-deep: #3730A3;
+    --r-accent-soft: #E0E7FF;
+    --r-success: #22C55E;
+    --r-success-soft: #DCFCE7;
+    --r-error: #EF4444;
+    --r-error-soft: #FEE2E2;
+    --r-shadow-indigo-sm: 0 4px 6px -1px rgba(67, 56, 202, 0.25);
+    --r-font-ui: 'Sofia Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&display=swap');
+  body { font-family: var(--r-font-ui); background: var(--r-surface-muted); color: var(--r-ink-strong); }
+  a.state-link { transition: background 120ms ease, border-color 120ms ease; }
+  a.state-link:hover { background: var(--r-surface-soft); border-color: var(--r-hairline-strong); }
+  .chip { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="min-h-screen">
+  <div class="max-w-3xl mx-auto px-6 py-12">
+
+    <header class="mb-10">
+      <div class="inline-flex items-center gap-2 mb-3">
+        <span class="inline-flex items-center justify-center w-9 h-9 rounded-[10px]" style="background:var(--r-accent);box-shadow:var(--r-shadow-indigo-sm)">
+          <!-- key icon -->
+          <svg width="18" height="18" viewBox="0 0 256 256" fill="#fff"><path d="M160,16A80,80,0,0,0,84.4,121.18L26.34,179.27A20,20,0,0,0,20,193.93V224a8,8,0,0,0,8,8H64a8,8,0,0,0,8-8V208H88a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l11.51-11.51A80,80,0,1,0,160,16Zm12,72a16,16,0,1,1,16-16A16,16,0,0,1,172,88Z"/></svg>
+        </span>
+      </div>
+      <h1 class="text-2xl font-semibold tracking-tight" style="color:var(--r-ink-strong)">Sprint 76 — Design Prototypes</h1>
+      <p class="text-base mt-2" style="color:var(--r-ink-body)">BYOK Provider Keys + OpenCode Model Selection · Phase 0b</p>
+      <p class="text-sm mt-3 max-w-xl leading-relaxed" style="color:var(--r-ink-muted)">
+        Static, light-mode mockups of the 13 states defined in the UX design spec. Two surfaces:
+        the Settings &ldquo;API Keys&rdquo; section (BYOK provider cards) and the AI-sidebar Agent Selector
+        with the new OpenCode model group. Open each page, then use the state-switcher bar at the top.
+      </p>
+    </header>
+
+    <!-- Settings surface -->
+    <section class="mb-10">
+      <div class="flex items-center gap-2 mb-4">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="var(--r-ink-strong)"><path d="M160,16A80,80,0,0,0,84.4,121.18L26.34,179.27A20,20,0,0,0,20,193.93V224a8,8,0,0,0,8,8H64a8,8,0,0,0,8-8V208H88a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l11.51-11.51A80,80,0,1,0,160,16Zm12,72a16,16,0,1,1,16-16A16,16,0,0,1,172,88Z"/></svg>
+        <h2 class="text-lg font-semibold" style="color:var(--r-ink-strong)">Surface 1 — Settings, Whole Page (Unified Provider Keys · revised 2026-06-01)</h2>
+      </div>
+      <div class="rounded-[10px] border bg-white shadow-sm overflow-hidden" style="border-color:var(--r-hairline)">
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="settings.html#S1">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">S1</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">Whole page, default — all 7 sections; changes marked: 3 &ldquo;Used for:&rdquo; copy updates + 1 new card (OpenRouter). No separate BYOK section.</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="settings.html#S2">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">S2</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">One key unlocks OpenCode — Google AI key saved → confirmation that Gemini models are now in OpenCode</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="settings.html#S3">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">S3</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">API Keys section close-up — 2 account cards + 4 provider key cards; one card per provider on the entire page</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="settings.html#S4">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">S4</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">OpenRouter card configured — the only genuinely new card</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5" href="settings.html#S5">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">S5</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">Feature flag OFF — page identical to today&rsquo;s production page</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- AgentSelector surface -->
+    <section class="mb-6">
+      <div class="flex items-center gap-2 mb-4">
+        <!-- plugs icon -->
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="var(--r-ink-strong)"><path d="M105.07,192.32,90.34,207.05,73,189.66,53.66,209,42.34,197.66,61.66,178.34,44.27,161,59,146.27a8,8,0,0,1,11.31,0L105.07,181A8,8,0,0,1,105.07,192.32Zm106.59-95.31L197,82.34,178.34,101,155,77.66,173.66,59,159,44.27a8,8,0,0,0-11.31,0l-34.75,34.74a8,8,0,0,0,0,11.32l46.07,46.07a8,8,0,0,0,11.32,0l45.05-45.06A8,8,0,0,0,211.66,97Z"/></svg>
+        <h2 class="text-lg font-semibold" style="color:var(--r-ink-strong)">Surface 2 — AI Sidebar Agent Selector (OpenCode)</h2>
+      </div>
+      <div class="rounded-[10px] border bg-white shadow-sm overflow-hidden" style="border-color:var(--r-hairline)">
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="model-picker.html#A1">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">A1</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">Dropdown open, keys configured — OpenCode group (5 models + provider sub-text), Claude/Codex for context</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="model-picker.html#A2">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">A2</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">Dropdown open, no keys — &ldquo;Add API keys to use OpenCode&rdquo; row with Open Settings link</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="model-picker.html#A3">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">A3</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">Dropdown closed — OpenCode · Gemini 3 Pro selected; no mode rail</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="model-picker.html#A4">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">A4</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">Full sidebar — OpenCode selected, no keys → zero-key inline setup card</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5 border-b" style="border-color:var(--r-hairline)" href="model-picker.html#A5">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">A5</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">Dropdown open, only Gemini key configured — 2 Gemini models only</span>
+        </a>
+        <a class="state-link flex items-baseline gap-4 px-5 py-3.5" href="model-picker.html#A6">
+          <span class="chip shrink-0 w-8 text-sm font-semibold" style="color:var(--r-accent-deep)">A6</span>
+          <span class="text-sm" style="color:var(--r-ink-body)">Trigger stale state — &ldquo;OpenCode · Select a model…&rdquo; muted (provider key removed)</span>
+        </a>
+      </div>
+    </section>
+
+    <footer class="text-xs pt-6 mt-6 border-t" style="color:var(--r-ink-faint);border-color:var(--r-hairline)">
+      Phase 0b prototypes · 13 states across 2 surfaces · Light mode · Static HTML (Tailwind CDN). Reviewed by Jarmo before implementation.
+    </footer>
+
+  </div>
+</body>
+</html>

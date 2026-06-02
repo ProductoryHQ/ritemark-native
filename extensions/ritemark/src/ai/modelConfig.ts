@@ -287,6 +287,69 @@ export const GEMINI_IMAGE_MODELS: ImageModelConfig[] = [
 ];
 
 /**
+ * Sprint 76 R6: BYOK provider models for the OpenCode (ACP) runtime.
+ *
+ * OpenCode addresses a model by the composite `<provider>/<model>` value (audit
+ * observed e.g. `google/gemini-2.5-pro`). This registry is the single source of
+ * truth for the curated default model list per provider (CLAUDE.md hard rule —
+ * no model IDs hardcoded elsewhere). The `id` here is the BARE model id; the
+ * ACP layer joins it with the provider key (`google/`, `openai/`, …) and the
+ * ChatInput model-picker composite value is `opencode:<provider>/<model>`.
+ *
+ * Each entry follows the `ModelOption` convention from agent/types.ts
+ * (id + label + description) so the webview model picker renders BYOK models
+ * with the same two-line row shape as Claude/Codex models. The live list can
+ * also be cross-checked against the agent's `configOptions[id="model"]`.
+ *
+ * The webview receives this via the existing `flow:modelConfig` message channel
+ * (extended in FlowEditorProvider) and the AI sidebar `agent:config` message.
+ */
+export type ByokProvider = 'google' | 'openai' | 'anthropic' | 'openrouter';
+
+export interface ByokModelOption {
+  /** Bare model id (joined with the provider for the OpenCode value). */
+  id: string;
+  /** Display label for the model row. */
+  label: string;
+  /** Description line (provider context per the approved model-picker). */
+  description: string;
+}
+
+export const BYOK_PROVIDER_MODELS: Record<ByokProvider, ByokModelOption[]> = {
+  // Model IDs validated against OpenCode 1.15.13's registry (`opencode models google`)
+  // and Google's current developer lineup (gemini-3-pro-preview was retired and now
+  // aliases gemini-3.1-pro-preview; gemini-3.5-flash is the latest GA flash model).
+  google: [
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning (1M context)' },
+    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', description: 'Google — latest, fast & capable' },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Google — proven, large context' },
+  ],
+  openai: [
+    { id: 'gpt-5.2', label: 'GPT-5.2', description: 'OpenAI — latest flagship reasoning model' },
+    { id: 'gpt-4o', label: 'GPT-4o', description: 'OpenAI — fast multimodal generalist' },
+  ],
+  anthropic: [
+    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', description: 'Anthropic — fast & capable' },
+    { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', description: 'Anthropic — most powerful' },
+  ],
+  openrouter: [
+    { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', description: 'OpenRouter — Anthropic via OpenRouter' },
+    { id: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', description: 'OpenRouter — Google via OpenRouter' },
+    { id: 'openai/gpt-5.2', label: 'GPT-5.2', description: 'OpenRouter — OpenAI via OpenRouter' },
+    { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', description: 'OpenRouter — open-weight, low cost' },
+  ],
+};
+
+/**
+ * Sprint 76 R6: build the `<provider>/<model>` value OpenCode expects from a
+ * provider + bare model id. For OpenRouter the bare id already carries its own
+ * upstream `vendor/model` path, so it is namespaced as `openrouter/<id>`.
+ */
+export function toOpenCodeModelValue(provider: ByokProvider, modelId: string): string {
+  return `${provider}/${modelId}`;
+}
+
+/**
  * Default models for different use cases
  */
 export const DEFAULT_MODELS = {

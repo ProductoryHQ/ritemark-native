@@ -23,7 +23,8 @@ import {
   OPENAI_IMAGE_MODELS,
   GEMINI_LLM_MODELS,
   GEMINI_IMAGE_MODELS,
-  DEFAULT_MODELS
+  DEFAULT_MODELS,
+  BYOK_PROVIDER_MODELS
 } from '../ai/modelConfig';
 
 /**
@@ -250,6 +251,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         geminiLLM: GEMINI_LLM_MODELS.map(m => ({ id: m.id, name: m.name })),
         geminiImage: GEMINI_IMAGE_MODELS.map(m => ({ id: m.id, name: m.name })),
         defaults: DEFAULT_MODELS,
+        // Sprint 76 R6: curated BYOK provider models for the OpenCode runtime.
+        // Single source of truth (modelConfig.ts); webview filters by which
+        // providers the user has keys for (booleans from R3a).
+        byokProviderModels: BYOK_PROVIDER_MODELS,
       },
     });
   }

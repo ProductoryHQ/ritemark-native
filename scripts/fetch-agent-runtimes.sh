@@ -9,7 +9,7 @@
 # Options:
 #   --platform <darwin|win32>   Target platform (default: host)
 #   --arch <arm64|x64>          Target arch     (default: host)
-#   --agent <codex|claude>      Filter to one agent (default: all)
+#   --agent <codex|claude|opencode>  Filter to one agent (default: all)
 #   --verify-only               Re-verify sha256 sidecars without re-downloading
 #   --all-platforms             Iterate every manifest entry regardless of host
 #   --help                      Show this usage message
@@ -92,7 +92,7 @@ Usage:
 Options:
   --platform <darwin|win32>   Target platform (default: auto-detect from host)
   --arch <arm64|x64>          Target arch    (default: auto-detect from host)
-  --agent <codex|claude>      Fetch only the named agent (default: all)
+  --agent <codex|claude|opencode>  Fetch only the named agent (default: all)
   --verify-only               Re-verify sha256 sidecars; fail if mismatched
   --all-platforms             Iterate every manifest entry (ignores platform/arch filter)
   --help                      Show this message

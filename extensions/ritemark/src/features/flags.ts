@@ -31,7 +31,9 @@ export type FlagId =
   | 'codex-integration'
   | 'scheduled-flow-runs'
   | 'analytics'
-  | 'browser-agent-control';
+  | 'browser-agent-control'
+  // Sprint 76 R7: ACP + OpenCode BYOK runtime
+  | 'opencode-integration';
 
 /**
  * Feature flag registry
@@ -106,6 +108,15 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     description: 'Let the AI agent navigate, click, and fill forms in the integrated browser',
     status: 'stable',
     platforms: ['darwin'],
+  },
+  // Sprint 76 R7: ACP + OpenCode BYOK runtime. Status 'stable' (spec Q3 —
+  // still ON by default per HARD RULE #2, flag exists as a kill-switch).
+  'opencode-integration': {
+    id: 'opencode-integration',
+    label: 'OpenCode Runtime',
+    description: 'Open-source ACP agent that uses your own API keys (Gemini, GPT, Claude, OpenRouter)',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
   },
 };
 

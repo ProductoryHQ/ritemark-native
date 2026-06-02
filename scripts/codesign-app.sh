@@ -364,6 +364,33 @@ while IFS= read -r -d '' whisperfile; do
     fi
 done < <(find "$APP_PATH" -name "whisper-cli" -type f -print0 2>/dev/null)
 
+# 5c-agents. Sign bundled AI agent binaries (claude, codex-app-server, opencode, ...)
+# These ship pre-signed by their vendors (Anthropic/OpenAI) or adhoc (opencode),
+# under extensions/ritemark/binaries/agents/. They match NONE of the name-based
+# signers above, so without this block they keep their foreign/adhoc signature:
+#   - foreign Team ID passes local `codesign --verify` but FAILS notarization
+#   - adhoc (opencode) FAILS the step-7b unsigned scan and blocks the build
+# Re-sign with OUR Developer ID + hardened runtime + entitlements (--force overrides).
+echo "  [5c-agents] Signing bundled AI agent binaries..."
+AGENTS_FOUND=0
+while IFS= read -r -d '' agentbin; do
+    if file "$agentbin" 2>/dev/null | grep -q "Mach-O"; then
+        AGENTS_FOUND=1
+        basename_agent=$(basename "$agentbin")
+        if sign_item "$agentbin" "true" > /dev/null 2>&1; then
+            echo "    ✓ Signed agent: $basename_agent"
+            increment_signed
+        else
+            echo -e "    ${RED}FAILED: $basename_agent${NC}"
+            increment_failed
+        fi
+    fi
+done < <(find "$APP_PATH/Contents/Resources/app/extensions/ritemark/binaries/agents" -type f -perm +111 -print0 2>/dev/null)
+if [ "$AGENTS_FOUND" -eq 0 ]; then
+    echo -e "    ${YELLOW}⚠ No agent binaries found under binaries/agents (skipped)${NC}"
+fi
+
+
 # ShipIt (in Squirrel.framework)
 SHIPIT="$APP_PATH/Contents/Frameworks/Squirrel.framework/Versions/A/Resources/ShipIt"
 if [ -f "$SHIPIT" ]; then

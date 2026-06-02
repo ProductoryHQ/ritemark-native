@@ -2,7 +2,7 @@
   "name": "ritemark",
   "displayName": "Ritemark Editor",
   "description": "WYSIWYG Markdown Editor",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "publisher": "ritemark",
   "license": "MIT",
   "engines": {
@@ -279,6 +279,12 @@
               "Full system access including network — use with extreme caution"
             ],
             "description": "What Codex is allowed to do on your filesystem.",
+            "scope": "application"
+          },
+          "ritemark.opencode.autoApprove": {
+            "type": "boolean",
+            "default": false,
+            "description": "Auto-approve OpenCode file edits and tool calls within the workspace without showing the approval card. Writes outside the workspace are still blocked. Use with caution.",
             "scope": "application"
           }
         }
@@ -619,13 +625,14 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/utils/imageWriter.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/ai-sidebar/planText.test.ts && npx tsx webview/src/components/ai-sidebar/composerQueue.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts && npx tsx webview/src/components/agent/agentSchema.test.ts",
+    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/utils/imageWriter.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/acp/acpClient.test.ts && npx tsx src/acp/acpManager.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/ai-sidebar/planText.test.ts && npx tsx webview/src/components/ai-sidebar/composerQueue.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts && npx tsx webview/src/components/agent/agentSchema.test.ts",
     "test:integration": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/LLMNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration:free": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts",
     "test:all": "npm run test && npm run test:integration",
     "test:update": "npx tsx src/update/updateResolver.test.ts"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "0.22.1",
     "@anthropic-ai/claude-agent-sdk": "^0.3.156",
     "@anthropic-ai/sdk": "file:./npm-stubs/anthropic-ai-sdk",
     "@modelcontextprotocol/sdk": "file:./npm-stubs/modelcontextprotocol-sdk",
