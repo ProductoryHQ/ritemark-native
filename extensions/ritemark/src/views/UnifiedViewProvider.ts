@@ -220,8 +220,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _disposeClaudeStatusListener: (() => void) | null = null;
   private _browserContextPoll: ReturnType<typeof setInterval> | null = null;
   /** Sprint 78 (#73): cached annotation-mode screenshot keyed by URL to avoid
-   *  re-capturing every 1500ms poll when the page hasn't changed. */
-  private _annotationScreenshotCache: { url: string; dataUrl: string } | null = null;
+   *  re-capturing every 1500ms poll when the page hasn't changed. The TTL keeps
+   *  the thumbnail fresh when the user scrolls or interacts without navigating. */
+  private static readonly ANNOTATION_SCREENSHOT_TTL_MS = 5000;
+  private _annotationScreenshotCache: { url: string; dataUrl: string; capturedAt: number } | null = null;
 
   // Sprint 76 R4/R5: ACP/OpenCode runtime state. One manager per live session;
   // model is applied per turn. Pending permission/write approvals are keyed by a
@@ -2337,27 +2339,37 @@ ${prompt}`;
     // (expensive) Playwright capture entirely.
     //
     // Cache: re-use the last captured screenshot as long as the URL hasn't
-    // changed. This avoids a Playwright screenshot on every 1500ms poll cycle
-    // when the user hasn't navigated away.
+    // changed AND the capture is recent (ANNOTATION_SCREENSHOT_TTL_MS). The TTL
+    // re-captures same-URL viewport changes (scroll, modals) within a few
+    // seconds while still avoiding a Playwright screenshot on every 1500ms
+    // poll cycle.
     let screenshotPreview: { dataUrl: string } | null = null;
     if (post?.annotationMode && post.sharedWithAgent && post.url) {
-      if (this._annotationScreenshotCache?.url === post.url) {
-        // URL unchanged — reuse cached screenshot.
-        screenshotPreview = { dataUrl: this._annotationScreenshotCache.dataUrl };
+      const cache = this._annotationScreenshotCache?.url === post.url ? this._annotationScreenshotCache : null;
+      const cacheIsFresh = cache !== null
+        && Date.now() - cache.capturedAt < UnifiedViewProvider.ANNOTATION_SCREENSHOT_TTL_MS;
+      if (cache && cacheIsFresh) {
+        // URL unchanged and capture is recent — reuse cached screenshot.
+        screenshotPreview = { dataUrl: cache.dataUrl };
       } else {
-        // URL changed or no cache — capture fresh screenshot.
+        // URL changed, cache expired, or no cache — capture fresh screenshot.
         try {
           const result = await vscode.commands.executeCommand<unknown>('workbench.action.browser.captureActiveViewport');
           if (result && typeof result === 'object' && 'screenshot' in result) {
             const sr = (result as { screenshot?: { mimeType: string; base64: string } }).screenshot;
             if (sr?.mimeType && sr?.base64) {
               const dataUrl = `data:${sr.mimeType};base64,${sr.base64}`;
-              this._annotationScreenshotCache = { url: post.url, dataUrl };
+              this._annotationScreenshotCache = { url: post.url, dataUrl, capturedAt: Date.now() };
               screenshotPreview = { dataUrl };
             }
           }
         } catch {
-          // Screenshot capture failed — fall back to URL chip (screenshotPreview stays null).
+          // Screenshot capture failed — handled by the stale-cache fallback below.
+        }
+        if (!screenshotPreview && cache) {
+          // Capture failed or returned nothing — keep showing the stale
+          // thumbnail for the same URL instead of flickering back to the URL chip.
+          screenshotPreview = { dataUrl: cache.dataUrl };
         }
       }
     } else {
