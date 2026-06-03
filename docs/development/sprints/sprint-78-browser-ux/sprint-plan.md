@@ -87,6 +87,36 @@ model picker updates immediately — same pattern as the existing `apiKeyChanged
 - [ ] Saving a Google AI key in Settings makes Gemini models appear in the OpenCode picker section without reloading the window
 - [ ] Removing the last BYOK key makes the picker fall back to the "Add API keys to use OpenCode" prompt without reloading
 
+## Scope addition: Plan approval card shows empty plan body
+
+**Issue (reported by Jarmo, 2026-06-03):** When Claude requests plan approval in the AI
+sidebar, the card shows only "Claude is waiting for plan approval" + Approve/Reject
+buttons — the plan content itself is missing.
+
+**Root cause:** The Claude Code SDK delivers the plan markdown inside the `ExitPlanMode`
+tool call (`input.plan`). `AgentRunner._handleCanUseTool` had this in hand but emitted
+the approval request with only `{ toolUseId }`, dropping the plan. The UI's
+`turn.planText` relied on a fragile side-channel: streamed `plan_text` progress events,
+which require Claude to (a) call the `EnterPlanMode` tool and (b) write the plan as a
+plain text block before calling `ExitPlanMode` — usually neither happens, so the card
+body (`{displayText && ...}`) rendered nothing.
+
+**Fix:** Pass `input.plan` through the approval request as the canonical plan source;
+keep streamed `plan_text` as fallback.
+
+### Plan approval checklist
+
+- [x] `AgentPlanApprovalRequest` (extension `src/agent/types.ts` + webview `types.ts`): add `plan?: string`
+- [x] `AgentRunner._handleCanUseTool` (ExitPlanMode): emit `{ toolUseId, plan: input.plan }`
+- [x] Webview store `agent-plan-approval` case: set `turn.planText` from `request.plan` (fallback to streamed `plan_text`)
+- [x] `AgentRunner.test.ts`: assert approval request carries `input.plan`
+- [x] Extension compiles + webview bundle rebuilt
+
+### Plan approval success criteria
+
+- [ ] Asking Claude to plan (plan mode) shows the full plan markdown inside the approval card before Approve/Reject
+
 ## Approval
 
 - [x] Jarmo pre-approved this sprint (solo-build authorization granted)
+- [x] Plan approval card fix approved by Jarmo ("tee", 2026-06-03)

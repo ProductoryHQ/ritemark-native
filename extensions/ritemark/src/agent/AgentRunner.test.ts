@@ -11,20 +11,27 @@ async function testSynchronousPlanApprovalAnswer() {
     workspacePath: process.cwd(),
   }) as AgentSession & Record<string, unknown>;
 
-  session._emitPlanApproval = (request: { toolUseId: string }) => {
+  const planMarkdown = '## Plan\n\n1. First step\n2. Second step';
+
+  session._emitPlanApproval = (request: { toolUseId: string; plan?: string }) => {
+    assert.equal(
+      request.plan,
+      planMarkdown,
+      'approval request should carry the plan markdown from ExitPlanMode input.plan'
+    );
     const answered = session.answerPlanApproval(request.toolUseId, true);
     assert.equal(answered, true, 'synchronous plan approval answer should be accepted');
   };
 
   const result = await session._handleCanUseTool(
     'ExitPlanMode',
-    { allowedPrompts: [] },
+    { allowedPrompts: [], plan: planMarkdown },
     { signal: new AbortController().signal, toolUseID: 'plan-tool-1' }
   );
 
   assert.equal(result.behavior, 'allow');
   if (result.behavior === 'allow') {
-    assert.deepEqual(result.updatedInput, { allowedPrompts: [] });
+    assert.deepEqual(result.updatedInput, { allowedPrompts: [], plan: planMarkdown });
   }
 }
 

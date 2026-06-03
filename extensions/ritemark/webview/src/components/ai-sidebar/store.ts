@@ -1467,6 +1467,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
             planHandled: false,
             planDecision: undefined,
             pendingPlanApproval,
+            // ExitPlanMode's input.plan is the canonical plan text; streamed
+            // plan_text events (lastTurn.planText) are only a fallback.
+            planText: pendingPlanApproval.plan?.trim()
+              ? pendingPlanApproval.plan
+              : lastTurn.planText,
           };
           set({ agentConversation: conv });
         }
