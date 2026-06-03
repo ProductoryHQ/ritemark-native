@@ -2,7 +2,7 @@
 
 Track: Plain full track
 Branch: claude/github-issues-sprint-78-EDKa4
-Status: Phase 6 (REVIEW — PR #101 open, Codex findings fixed, awaiting Jarmo QA + merge)
+Status: Phase 6 (REVIEW — Jarmo QA passed 2026-06-03, awaiting qa-validator + merge)
 
 ## Goal
 
@@ -19,12 +19,12 @@ No new feature flags needed. Both changes extend existing flagged subsystems (`b
 
 ## Success Criteria
 
-- [ ] `mcp__ritemark_browser__browser_snapshot` is callable and returns the same ARIA outline as `browser_navigate` (URL + title + page summary)
-- [ ] Agents declaring `allowed-tools: mcp__ritemark_browser__*` can call `browser_snapshot` without playwright fallback
-- [ ] When annotation mode is active, the Composer shows a screenshot preview chip (thumbnail + dismiss) instead of the URL chip
-- [ ] Screenshot preview chip is visually identical to a pasted image chip (same 56x56 thumbnail + x button)
-- [ ] When annotation mode is NOT active, the existing URL chip behaviour is unchanged
-- [ ] Pre-commit hook passes
+- [x] `mcp__ritemark_browser__browser_snapshot` is callable and returns the same ARIA outline as `browser_navigate` (URL + title + page summary) — Jarmo QA 2026-06-03
+- [x] Agents declaring `allowed-tools: mcp__ritemark_browser__*` can call `browser_snapshot` without playwright fallback — Jarmo QA 2026-06-03
+- [x] When annotation mode is active, the Composer shows a screenshot preview chip (thumbnail + dismiss) instead of the URL chip — Jarmo QA 2026-06-03
+- [x] Screenshot preview chip is visually identical to a pasted image chip (same 56x56 thumbnail + x button) — Jarmo QA 2026-06-03
+- [x] When annotation mode is NOT active, the existing URL chip behaviour is unchanged
+- [x] Pre-commit hook passes
 
 ## Implementation Checklist
 
@@ -84,8 +84,8 @@ model picker updates immediately — same pattern as the existing `apiKeyChanged
 
 ### Stretch success criteria
 
-- [ ] Saving a Google AI key in Settings makes Gemini models appear in the OpenCode picker section without reloading the window
-- [ ] Removing the last BYOK key makes the picker fall back to the "Add API keys to use OpenCode" prompt without reloading
+- [ ] ~~Saving a Google AI key in Settings makes Gemini models appear in the OpenCode picker section without reloading the window~~ — **intentionally untested**: Jarmo already has all BYOK keys configured, no clean fixture available (2026-06-03). Accepted as-is; wait for real user reports.
+- [ ] ~~Removing the last BYOK key makes the picker fall back to the "Add API keys to use OpenCode" prompt without reloading~~ — **intentionally untested** (same reason)
 
 ## Scope addition: Plan approval card shows empty plan body
 
@@ -114,7 +114,7 @@ keep streamed `plan_text` as fallback.
 
 ### Plan approval success criteria
 
-- [ ] Asking Claude to plan (plan mode) shows the full plan markdown inside the approval card before Approve/Reject
+- [x] Asking Claude to plan (plan mode) shows the full plan markdown inside the approval card before Approve/Reject — Jarmo QA 2026-06-03
 
 ## Approval
 
