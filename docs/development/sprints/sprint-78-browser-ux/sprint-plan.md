@@ -2,7 +2,7 @@
 
 Track: Plain full track
 Branch: claude/github-issues-sprint-78-EDKa4
-Status: Phase 5 (CLEANUP — awaiting webview bundle rebuild on build machine)
+Status: Phase 6 (REVIEW — PR #101 open, Codex findings fixed, awaiting Jarmo QA + merge)
 
 ## Goal
 
@@ -49,8 +49,13 @@ No new feature flags needed. Both changes extend existing flagged subsystems (`b
 
 ### Pending on build machine
 
-- [ ] `cd extensions/ritemark/webview && npm run build` — rebuild webview bundle to include ChatInput.tsx changes
-- [ ] Verify pre-commit hook passes (`npm run compile` in extensions/ritemark)
+- [x] `cd extensions/ritemark/webview && npm run build` — rebuild webview bundle to include ChatInput.tsx changes (commit 9242f28)
+- [x] Verify pre-commit hook passes (`npm run compile` in extensions/ritemark)
+
+### Codex review fixes (PR #101)
+
+- [x] P1 — `browser_snapshot` now gated on `sharedWithAgent` read consent; error response excludes URL/title; tool descriptions updated (commit 6809186)
+- [x] P2 — annotation screenshot cache: 5s TTL added so same-URL viewport changes refresh the chip; stale-cache fallback on capture failure (commit 3df9d6c)
 
 ## Stretch: OpenCode model picker ignores already-configured BYOK keys
 
