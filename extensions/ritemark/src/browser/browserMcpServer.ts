@@ -125,7 +125,7 @@ export async function createBrowserMcpServer(): Promise<unknown> {
       ),
       sdk.tool(
         'browser_snapshot',
-        'Return the current ARIA outline of the active integrated browser tab — URL, title, and full accessibility tree snapshot. Use this to re-observe page state after an action without calling browser_navigate again. Read-only: does not require browser control consent.',
+        'Return the current ARIA outline of the active integrated browser tab — URL, title, and full accessibility tree snapshot. Use this to re-observe page state after an action without calling browser_navigate again. Read-only: does not require browser control consent, but the tab must be shared with Ritemark AI by the user.',
         {},
         async () => toTextContent(await browserSnapshot()),
       ),

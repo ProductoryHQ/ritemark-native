@@ -120,7 +120,7 @@ export function buildCodexBrowserDynamicTools(): DynamicToolDefinition[] {
     {
       name: 'ritemark_browser_snapshot',
       description:
-        'Return the current ARIA outline of the active integrated Ritemark browser tab — URL, title, and full accessibility tree snapshot. Use this to re-observe page state after an action without calling ritemark_browser_navigate again. Read-only: does not require browser control consent.',
+        'Return the current ARIA outline of the active integrated Ritemark browser tab — URL, title, and full accessibility tree snapshot. Use this to re-observe page state after an action without calling ritemark_browser_navigate again. Read-only: does not require browser control consent, but the tab must be shared with Ritemark AI by the user.',
       inputSchema: {
         type: 'object',
         properties: {},
