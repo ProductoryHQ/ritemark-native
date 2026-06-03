@@ -17,6 +17,18 @@
  *   openrouter → OPENROUTER_API_KEY
  */
 
+/**
+ * SecretStorage names that hold the BYOK provider keys — the SAME names the
+ * Settings cards write. Sprint 78 (stretch): used to detect which secret
+ * changes should refresh the OpenCode provider flags in the AI sidebar.
+ */
+export const BYOK_SECRET_KEYS: readonly string[] = [
+  'openai-api-key',
+  'google-ai-key',
+  'anthropic-api-key',
+  'openrouter-api-key',
+];
+
 /** Provider keys read from SecretStorage. Any field may be undefined/empty. */
 export interface ByokKeys {
   /** SecretStorage 'google-ai-key'. */

@@ -74,7 +74,7 @@ import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
-import { AcpManager, buildByokEnv, byokProviderFlags, traceAcp, type ByokKeys, type ByokProviderFlags } from '../acp';
+import { AcpManager, buildByokEnv, byokProviderFlags, BYOK_SECRET_KEYS, traceAcp, type ByokKeys, type ByokProviderFlags } from '../acp';
 import { findBundledAgentRuntime } from '../utils/bundledAgentRuntime';
 import { BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
 import type {
@@ -235,6 +235,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _acpApprovalSeq = 0;
   /** Provider/model pairs the user "always allowed" for the current session. */
   private _acpSessionAlwaysAllow = new Set<string>();
+  /** Sprint 78 (stretch): BYOK secret-change subscription (see constructor). */
+  private _secretsChangeListener?: vscode.Disposable;
   // Files whose `edit` was just approved via session/request_permission. The
   // follow-up fs/write_text_file for the same file is auto-allowed so the user
   // is not prompted twice for one edit (the permission is the real gate).
@@ -250,6 +252,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
     this._disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
       void this._handleExternalClaudeStatusInvalidation(event.reason);
+    });
+    // Sprint 78 (stretch): the Settings webview writes BYOK keys to the SAME
+    // SecretStorage; refresh the OpenCode provider flags in the AI sidebar as
+    // soon as one is saved or removed so the model picker updates without a
+    // window reload.
+    this._secretsChangeListener = this._secrets?.onDidChange((e) => {
+      if (BYOK_SECRET_KEYS.includes(e.key)) {
+        void this._sendAcpProviders();
+      }
     });
   }
 
@@ -647,6 +658,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._stopClaudeLoginPolling();
     this._disposeCodexStatusListener?.();
     this._disposeClaudeStatusListener?.();
+    this._secretsChangeListener?.dispose();
     if (this._browserContextPoll) {
       clearInterval(this._browserContextPoll);
       this._browserContextPoll = null;

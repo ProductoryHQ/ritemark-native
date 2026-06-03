@@ -52,6 +52,36 @@ No new feature flags needed. Both changes extend existing flagged subsystems (`b
 - [ ] `cd extensions/ritemark/webview && npm run build` — rebuild webview bundle to include ChatInput.tsx changes
 - [ ] Verify pre-commit hook passes (`npm run compile` in extensions/ritemark)
 
+## Stretch: OpenCode model picker ignores already-configured BYOK keys
+
+**Issue (reported by Jarmo, 2026-06-03):** The agent picker's OpenCode section shows
+"Add API keys to use OpenCode" even when a Gemini (Google AI) key is already saved and
+showing "Configured" in Settings. Expected: when a provider key exists, the picker shows
+that provider's models (e.g. Gemini models for a Google key).
+
+**Root cause:** The AI sidebar receives BYOK provider flags (`acpProviders`) only once,
+in the `agent:config` message at webview load (`UnifiedViewProvider.ts`). Saving a key in
+Settings happens in a *different* webview (`RitemarkSettingsProvider.ts` → `secrets.store()`)
+and nothing notifies the AI sidebar — the `acp-providers` refresh message exists but is
+never triggered by key changes. The picker stays stale until a full window reload.
+
+**Fix:** `UnifiedViewProvider` subscribes to `SecretStorage.onDidChange`. When one of the
+four BYOK secret names (`openai-api-key`, `google-ai-key`, `anthropic-api-key`,
+`openrouter-api-key`) is stored or deleted, it calls `_sendAcpProviders()` so the sidebar's
+model picker updates immediately — same pattern as the existing `apiKeyChanged` listener.
+
+### Stretch checklist
+
+- [x] Add `BYOK_SECRET_KEYS` constant to `src/acp/acpKeyEnv.ts` (single source for the four SecretStorage names) + export via `src/acp/index.ts`
+- [x] Subscribe to `secrets.onDidChange` in `UnifiedViewProvider` constructor → `_sendAcpProviders()` on BYOK key change; dispose listener in `dispose()`
+- [x] Test coverage in `acpKeyEnv.test.ts` for `BYOK_SECRET_KEYS`
+- [x] Extension compiles; no webview change needed (webview already handles the `acp-providers` message)
+
+### Stretch success criteria
+
+- [ ] Saving a Google AI key in Settings makes Gemini models appear in the OpenCode picker section without reloading the window
+- [ ] Removing the last BYOK key makes the picker fall back to the "Add API keys to use OpenCode" prompt without reloading
+
 ## Approval
 
 - [x] Jarmo pre-approved this sprint (solo-build authorization granted)
