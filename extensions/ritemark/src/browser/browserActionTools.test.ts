@@ -56,6 +56,7 @@ const {
   browserFill,
   browserType,
   browserScroll,
+  browserSnapshot,
   ensureBrowserControlConsent,
   formatActionResultForAgent,
 } = actions;
@@ -101,6 +102,11 @@ async function runTests() {
   assert.deepEqual(calls[0].args[0], { direction: 'down', amount: 400 });
 
   resetCalls();
+  await browserSnapshot();
+  assert.equal(calls[0].command, 'workbench.action.browser.agentSnapshot');
+  assert.equal(calls[0].args.length, 0);
+
+  resetCalls();
   await ensureBrowserControlConsent();
   assert.equal(calls[0].command, 'workbench.action.browser.ensureActiveBrowserControlShared');
   assert.equal(calls[0].args.length, 0);
@@ -134,7 +140,7 @@ async function runTests() {
 
   // 5. Codex dynamicTools list shape.
   const dynamicTools = buildCodexBrowserDynamicTools();
-  assert.equal(dynamicTools.length, 5);
+  assert.equal(dynamicTools.length, 6);
   for (const tool of dynamicTools) {
     assert.match(tool.name, /^[a-zA-Z0-9_-]+$/, `tool name ${tool.name} must match Codex naming rule`);
     assert.ok(tool.name.startsWith('ritemark_browser_'), `tool name ${tool.name} must use ritemark_browser_ prefix`);
@@ -161,6 +167,14 @@ async function runTests() {
   const failed = await dispatchCodexBrowserToolCall('ritemark_browser_navigate', { url: 'x' });
   assert.equal(failed.success, false);
   assert.ok(failed.text.includes('no consent'));
+
+  // 8b. ritemark_browser_snapshot dispatches to agentSnapshot (no args needed).
+  resetCalls();
+  nextReturn = { pageId: 'p1', url: 'https://example.com', title: 'Example', summary: 'snapshot-tree' };
+  const snapshotResult = await dispatchCodexBrowserToolCall('ritemark_browser_snapshot', {});
+  assert.equal(snapshotResult.success, true);
+  assert.ok(snapshotResult.text.includes('snapshot-tree'));
+  assert.equal(calls[0].command, 'workbench.action.browser.agentSnapshot');
 
   // 9. CODEX_BROWSER_TOOL_NAMES is the same set surfaced by buildCodexBrowserDynamicTools().
   const namesFromTools = dynamicTools.map((t) => t.name);

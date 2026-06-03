@@ -9,7 +9,7 @@
  */
 
 import assert from 'assert';
-import { buildByokEnv, byokProviderFlags } from './acpKeyEnv';
+import { buildByokEnv, byokProviderFlags, BYOK_SECRET_KEYS } from './acpKeyEnv';
 
 function run(): void {
   // ── full mapping ──
@@ -64,6 +64,17 @@ function run(): void {
     const serialized = JSON.stringify(flags);
     assert.ok(!serialized.includes('super-secret'), 'flags must not contain key values');
     assert.strictEqual(flags.openrouter, true);
+  }
+
+  // ── SecretStorage names match the Settings cards (Sprint 78 stretch) ──
+  // UnifiedViewProvider uses this list to refresh provider flags on key
+  // changes; a rename here or in RitemarkSettings must stay in sync.
+  {
+    assert.deepStrictEqual(
+      [...BYOK_SECRET_KEYS].sort(),
+      ['anthropic-api-key', 'google-ai-key', 'openai-api-key', 'openrouter-api-key'],
+      'BYOK secret names must cover exactly the four provider cards'
+    );
   }
 
   console.log('acpKeyEnv.test.ts: all tests passed');

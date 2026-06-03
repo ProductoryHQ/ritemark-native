@@ -57,6 +57,11 @@ export interface AgentQuestion {
 
 export interface AgentPlanApprovalRequest {
   toolUseId: string;
+  /**
+   * Full plan markdown from ExitPlanMode's `input.plan` — the canonical
+   * source of the plan text shown in the approval card.
+   */
+  plan?: string;
 }
 
 /**

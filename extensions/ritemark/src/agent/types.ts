@@ -119,6 +119,13 @@ export interface AgentQuestion {
 
 export interface AgentPlanApprovalRequest {
   toolUseId: string;
+  /**
+   * Full plan markdown from ExitPlanMode's `input.plan` — the canonical
+   * source of the plan text. Streamed `plan_text` progress events are only
+   * a fallback (they require EnterPlanMode + plain-text plan blocks, which
+   * Claude usually skips).
+   */
+  plan?: string;
 }
 
 /**

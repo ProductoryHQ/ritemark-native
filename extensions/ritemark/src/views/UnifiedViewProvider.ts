@@ -74,7 +74,7 @@ import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
-import { AcpManager, buildByokEnv, byokProviderFlags, traceAcp, type ByokKeys, type ByokProviderFlags } from '../acp';
+import { AcpManager, buildByokEnv, byokProviderFlags, BYOK_SECRET_KEYS, traceAcp, type ByokKeys, type ByokProviderFlags } from '../acp';
 import { findBundledAgentRuntime } from '../utils/bundledAgentRuntime';
 import { BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
 import type {
@@ -219,6 +219,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
   private _disposeClaudeStatusListener: (() => void) | null = null;
   private _browserContextPoll: ReturnType<typeof setInterval> | null = null;
+  /** Sprint 78 (#73): cached annotation-mode screenshot keyed by URL to avoid
+   *  re-capturing every 1500ms poll when the page hasn't changed. The TTL keeps
+   *  the thumbnail fresh when the user scrolls or interacts without navigating. */
+  private static readonly ANNOTATION_SCREENSHOT_TTL_MS = 5000;
+  private _annotationScreenshotCache: { url: string; dataUrl: string; capturedAt: number } | null = null;
 
   // Sprint 76 R4/R5: ACP/OpenCode runtime state. One manager per live session;
   // model is applied per turn. Pending permission/write approvals are keyed by a
@@ -232,6 +237,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _acpApprovalSeq = 0;
   /** Provider/model pairs the user "always allowed" for the current session. */
   private _acpSessionAlwaysAllow = new Set<string>();
+  /** Sprint 78 (stretch): BYOK secret-change subscription (see constructor). */
+  private _secretsChangeListener?: vscode.Disposable;
   // Files whose `edit` was just approved via session/request_permission. The
   // follow-up fs/write_text_file for the same file is auto-allowed so the user
   // is not prompted twice for one edit (the permission is the real gate).
@@ -247,6 +254,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
     this._disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
       void this._handleExternalClaudeStatusInvalidation(event.reason);
+    });
+    // Sprint 78 (stretch): the Settings webview writes BYOK keys to the SAME
+    // SecretStorage; refresh the OpenCode provider flags in the AI sidebar as
+    // soon as one is saved or removed so the model picker updates without a
+    // window reload.
+    this._secretsChangeListener = this._secrets?.onDidChange((e) => {
+      if (BYOK_SECRET_KEYS.includes(e.key)) {
+        void this._sendAcpProviders();
+      }
     });
   }
 
@@ -644,6 +660,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._stopClaudeLoginPolling();
     this._disposeCodexStatusListener?.();
     this._disposeClaudeStatusListener?.();
+    this._secretsChangeListener?.dispose();
     if (this._browserContextPoll) {
       clearInterval(this._browserContextPoll);
       this._browserContextPoll = null;
@@ -2314,6 +2331,52 @@ ${prompt}`;
       void BrowserContextStore.instance.ensureSharedForActiveTab();
     }
     const post = BrowserContextStore.instance.getLastSnapshot() ?? snapshot;
+
+    // Sprint 78 (#73): when annotation mode is active, capture a fresh
+    // viewport screenshot so the Composer can show a thumbnail chip instead
+    // of the plain URL chip. The screenshot is encoded as a data URL and
+    // sent only when annotation mode is on — normal-mode polls skip the
+    // (expensive) Playwright capture entirely.
+    //
+    // Cache: re-use the last captured screenshot as long as the URL hasn't
+    // changed AND the capture is recent (ANNOTATION_SCREENSHOT_TTL_MS). The TTL
+    // re-captures same-URL viewport changes (scroll, modals) within a few
+    // seconds while still avoiding a Playwright screenshot on every 1500ms
+    // poll cycle.
+    let screenshotPreview: { dataUrl: string } | null = null;
+    if (post?.annotationMode && post.sharedWithAgent && post.url) {
+      const cache = this._annotationScreenshotCache?.url === post.url ? this._annotationScreenshotCache : null;
+      const cacheIsFresh = cache !== null
+        && Date.now() - cache.capturedAt < UnifiedViewProvider.ANNOTATION_SCREENSHOT_TTL_MS;
+      if (cache && cacheIsFresh) {
+        // URL unchanged and capture is recent — reuse cached screenshot.
+        screenshotPreview = { dataUrl: cache.dataUrl };
+      } else {
+        // URL changed, cache expired, or no cache — capture fresh screenshot.
+        try {
+          const result = await vscode.commands.executeCommand<unknown>('workbench.action.browser.captureActiveViewport');
+          if (result && typeof result === 'object' && 'screenshot' in result) {
+            const sr = (result as { screenshot?: { mimeType: string; base64: string } }).screenshot;
+            if (sr?.mimeType && sr?.base64) {
+              const dataUrl = `data:${sr.mimeType};base64,${sr.base64}`;
+              this._annotationScreenshotCache = { url: post.url, dataUrl, capturedAt: Date.now() };
+              screenshotPreview = { dataUrl };
+            }
+          }
+        } catch {
+          // Screenshot capture failed — handled by the stale-cache fallback below.
+        }
+        if (!screenshotPreview && cache) {
+          // Capture failed or returned nothing — keep showing the stale
+          // thumbnail for the same URL instead of flickering back to the URL chip.
+          screenshotPreview = { dataUrl: cache.dataUrl };
+        }
+      }
+    } else {
+      // Annotation mode off — clear cache so next activation gets a fresh shot.
+      this._annotationScreenshotCache = null;
+    }
+
     this._view?.webview.postMessage({
       type: 'active-browser-changed',
       context: post?.url ? {
@@ -2321,6 +2384,7 @@ ${prompt}`;
         title: post.title,
         sharedWithAgent: post.sharedWithAgent === true,
         annotationMode: post.annotationMode === true,
+        screenshotPreview,
         error: post.error,
       } : null,
     });

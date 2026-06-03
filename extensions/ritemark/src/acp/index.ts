@@ -23,5 +23,5 @@ export { AcpFsProxy, resolveWithinWorkspace } from './acpFsProxy';
 export type { AcpFsBackend, AcpFsProxyConfig, AcpWriteApproval } from './acpFsProxy';
 export { traceAcp, showAcpTrace, getAcpTraceLogPath } from './acpTrace';
 // Sprint 76 R3a: BYOK key → spawn-env mapping (vscode-free, testable).
-export { buildByokEnv, byokProviderFlags } from './acpKeyEnv';
+export { buildByokEnv, byokProviderFlags, BYOK_SECRET_KEYS } from './acpKeyEnv';
 export type { ByokKeys, ByokProviderFlags } from './acpKeyEnv';

@@ -21,6 +21,7 @@ const BROWSER_CLICK_COMMAND = 'workbench.action.browser.agentClick';
 const BROWSER_FILL_COMMAND = 'workbench.action.browser.agentFill';
 const BROWSER_TYPE_COMMAND = 'workbench.action.browser.agentType';
 const BROWSER_SCROLL_COMMAND = 'workbench.action.browser.agentScroll';
+const BROWSER_SNAPSHOT_COMMAND = 'workbench.action.browser.agentSnapshot';
 
 export interface BrowserActionResult {
   pageId?: string;
@@ -96,6 +97,10 @@ export function browserType(args: BrowserTypeArgs): Promise<BrowserActionResult>
 
 export function browserScroll(args: BrowserScrollArgs): Promise<BrowserActionResult> {
   return callBrowserAction(BROWSER_SCROLL_COMMAND, args as unknown as Record<string, unknown>);
+}
+
+export function browserSnapshot(): Promise<BrowserActionResult> {
+  return callBrowserAction(BROWSER_SNAPSHOT_COMMAND);
 }
 
 export function ensureBrowserControlConsent(): Promise<BrowserActionResult> {

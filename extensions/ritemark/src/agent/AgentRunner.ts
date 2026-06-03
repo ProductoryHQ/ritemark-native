@@ -942,9 +942,13 @@ export class AgentSession {
             reject,
           };
 
-          this._emitPlanApproval?.({ toolUseId: options.toolUseID });
+          this._emitPlanApproval?.({
+            toolUseId: options.toolUseID,
+            plan: typeof input.plan === 'string' ? input.plan : '',
+          });
           traceClaude('tool', 'ExitPlanMode emitted approval request', {
             toolUseId: options.toolUseID,
+            planLength: typeof input.plan === 'string' ? input.plan.length : 0,
           });
 
           options.signal.addEventListener('abort', () => {

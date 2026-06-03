@@ -17,6 +17,7 @@ import {
   browserFill,
   browserType,
   browserScroll,
+  browserSnapshot,
   formatActionResultForAgent,
 } from './BrowserActionTools';
 import type { DynamicToolDefinition } from '../codex/codexProtocol';
@@ -27,6 +28,7 @@ export const CODEX_BROWSER_TOOL_NAMES = [
   'ritemark_browser_fill',
   'ritemark_browser_type',
   'ritemark_browser_scroll',
+  'ritemark_browser_snapshot',
 ] as const;
 
 export type CodexBrowserToolName = typeof CODEX_BROWSER_TOOL_NAMES[number];
@@ -115,6 +117,16 @@ export function buildCodexBrowserDynamicTools(): DynamicToolDefinition[] {
         additionalProperties: false,
       },
     },
+    {
+      name: 'ritemark_browser_snapshot',
+      description:
+        'Return the current ARIA outline of the active integrated Ritemark browser tab — URL, title, and full accessibility tree snapshot. Use this to re-observe page state after an action without calling ritemark_browser_navigate again. Read-only: does not require browser control consent, but the tab must be shared with Ritemark AI by the user.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
   ];
 }
 
@@ -148,6 +160,9 @@ export async function dispatchCodexBrowserToolCall(
         break;
       case 'ritemark_browser_scroll':
         result = await browserScroll(args as Parameters<typeof browserScroll>[0]);
+        break;
+      case 'ritemark_browser_snapshot':
+        result = await browserSnapshot();
         break;
       default: {
         const _exhaustive: never = toolName;
