@@ -1,8 +1,12 @@
 # v1.7.3 Test Checklist
 
-**Release:** Ritemark v1.7.3 — OpenCode BYOK runtime + AI sidebar polish
-**Date:** 2026-06-02 (arm64 build)
-**Scope:** Sprint 76 (ACP client + bundled OpenCode BYOK runtime, #52) + Sprint 74 (AI sidebar & composer polish — composer queue #82, link display text #93, plan approval #86, code-block scrollbar #84)
+**Release:** Ritemark v1.7.3 — Agent Library + Configurator, OpenCode BYOK runtime, Browser UX & AI sidebar polish
+**Date:** 2026-06-03 (arm64 build)
+**Scope:**
+- **Sprint 77** (Unified Agent Library + Agent Configurator — discovery, provenance, sidebar merge, configurator panel; PR #99)
+- **Sprint 78** (Browser UX — `browser_snapshot` MCP tool #88, annotation screenshot chip #73, OpenCode BYOK picker refresh, plan-approval card content; PR #101)
+- **Sprint 76** (ACP client + bundled OpenCode BYOK runtime, #52)
+- **Sprint 74** (AI sidebar & composer polish — composer queue #82, link display text #93, plan approval #86, code-block scrollbar #84)
 
 > Before opening the new DMG: **quit any running Ritemark.app** (Cmd+Q). Two instances share the user-data dir and cause a blank webview / SW `InvalidStateError`.
 
@@ -28,6 +32,63 @@
 - [ ] **Codex** — select it, send a prompt → responds (no crash / "killed" / signature error)
 - [ ] **OpenCode** — select it, send a prompt → responds (see Sprint 76 below)
 - [ ] No macOS "cannot be opened / damaged" or code-signature dialogs for any agent
+
+---
+
+## Sprint 77 — Unified Agent Library + Agent Configurator (headline)
+
+> Full how-to: `docs/releases/v1.7.3/agent-configurator-guide.md`. Test with both Project and User scope if you have agents in both.
+
+### Agent Library sidebar (R1–R3, R8)
+
+- [ ] Left activity bar shows the **Agent Library** (robot) icon; the old separate **Flows** activity-bar container is **gone**
+- [ ] Library lists collapsible sections: **Instructions** (CLAUDE.md / AGENTS.md), **Agents**, **Skills**, **Commands**, **Flows**
+- [ ] **Discovery is correct** — agents/skills/commands that exist on disk all appear (no missing entries); Instructions files are listed separately from Agents
+- [ ] **Provenance badges** distinguish Project vs User scope; **Project / User scope tabs** filter the list
+- [ ] Search filters; sort works; **+** creates a new item in the active section
+- [ ] Row actions work: **Open, Duplicate, Launch Chat, Move scope, Delete**
+- [ ] Section collapse state **persists** across reloads
+- [ ] **Flows section**: clicking a flow opens it for editing; attachment indicator shows when a flow is attached
+
+### Agent Configurator panel (R5, R6)
+
+- [ ] Opening an agent `.md` file opens it in the editor with the **Agent panel** available (toolbar toggles: Table of Contents / Properties / Agent)
+- [ ] **Description** field edits; empty description shows the required-field warning
+- [ ] **Model** picker: Inherit / Sonnet / Opus / Haiku / custom model ID — selection saves to frontmatter
+- [ ] **Tools** allow-list: nothing checked = inherits all; checking some = least-privilege subset (saved correctly to the `tools` field)
+- [ ] **Skills** preloading + **Advanced** section (Effort, Memory, Color) save and reload correctly
+- [ ] Reopening the file shows the saved values (frontmatter round-trips — no corruption of an existing agent file)
+
+### Schedule UI / K6 banner (R7)
+
+- [ ] No non-functional cron/schedule field is shown (scheduling was removed); if a "runs only while open" style banner appears, it is accurate
+
+---
+
+## Sprint 78 — Browser UX
+
+> Requires the integrated browser. Open a page in a Ritemark browser tab and **share it with AI** for the snapshot/annotation tests.
+
+### `browser_snapshot` MCP tool (#88)
+
+- [ ] With a browser tab **shared with AI**: ask Claude Code (or Codex) to snapshot the page → returns the ARIA outline (URL + title + accessibility tree) **without re-navigating**
+- [ ] On a tab **NOT shared with AI**: the snapshot tool returns an error and does **not** leak URL, title, or page content (consent gate)
+
+### Annotation-mode screenshot chip (#73)
+
+- [ ] Turn on **annotation mode** (camera toggle in the browser toolbar) → the composer shows a **56×56 screenshot thumbnail chip** (not the URL globe chip)
+- [ ] Scroll / open a modal without navigating → the thumbnail **refreshes** within ~5 s to match the current view
+- [ ] **×** on the chip dismisses it (browser context excluded from the next prompt), same as dismissing the URL chip
+- [ ] Annotation mode **off** → the existing URL chip behaviour is unchanged
+
+### Plan-approval card content (Sprint 78 fix)
+
+- [ ] Ask Claude Code to **plan** (plan mode) → the approval card shows the **full plan markdown** in the body before Approve/Reject (not an empty body)
+
+### OpenCode BYOK picker refresh (Sprint 78 stretch)
+
+- [ ] In Settings, **save** a provider key (e.g. Google AI) → the agent picker's OpenCode section updates to show that provider's models **without a window reload**
+> Note: intentionally untested by Jarmo (all BYOK keys already configured, no clean fixture). Spot-check only if convenient.
 
 ---
 
@@ -99,6 +160,6 @@
 ## Gate 1 sign-off
 
 - [ ] **All critical items pass** → reply "**Gate 1 passed**" / "tested locally"
-- [ ] Notarization happens only after Gate 1 **and** ≥ 60 min since DMG build (≥ **09:09:51 EEST**, hardening window)
+- [ ] Notarization happens only after Gate 1 **and** ≥ 60 min since DMG build (DMG built **12:52 EEST** → hardening window ends **≥ 13:52 EEST**)
 
 > x64 macOS + Windows builds (Gate 2) come from CI after the tag is pushed — not part of this local Gate 1.

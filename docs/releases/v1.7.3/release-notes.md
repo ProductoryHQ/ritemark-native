@@ -5,7 +5,11 @@ author: Jarmo Tuisk
 tags:
   - sprint-78
   - sprint-77
+  - sprint-76
   - sprint-74
+  - opencode
+  - acp
+  - byok
   - agent-library
   - agent-configurator
   - browser
@@ -20,12 +24,12 @@ tags:
   - draft
 ---
 
-# Ritemark v1.7.3 — Agent Library, Agent Configurator, Browser UX & AI sidebar polish
+# Ritemark v1.7.3 — Agent Library, Agent Configurator, OpenCode runtime, Browser UX & AI sidebar polish
 
 **Status:** DRAFT / unreleased
-**Type:** Minor release (Agent Library + Agent Configurator, Browser UX, AI sidebar & composer polish)
+**Type:** Minor release (Agent Library + Agent Configurator, OpenCode BYOK runtime, Browser UX, AI sidebar & composer polish)
 **Ships after:** v1.7.2 (this release is the next one in the train; v1.7.2 must ship first)
-**Focus:** Sprint 77 ships the unified Agent Library and a visual Agent Configurator built on the real Claude Code agent format — create, browse, and configure AI agents without touching YAML. Sprint 78 makes the integrated browser a better partner for AI agents — a `browser_snapshot` tool for re-observing page state and a live screenshot chip in the composer when annotation mode is on. Sprint 74 sharpens the AI sidebar's two most-used surfaces — the composer and the plan-approval flow — and fixes two smaller editor annoyances.
+**Focus:** Sprint 77 ships the unified Agent Library and a visual Agent Configurator built on the real Claude Code agent format — create, browse, and configure AI agents without touching YAML. Sprint 76 adds **OpenCode** as a third, bring-your-own-key AI runtime (alongside Claude Code and Codex) via the Agent Client Protocol. Sprint 78 makes the integrated browser a better partner for AI agents — a `browser_snapshot` tool for re-observing page state and a live screenshot chip in the composer when annotation mode is on. Sprint 74 sharpens the AI sidebar's two most-used surfaces — the composer and the plan-approval flow — and fixes two smaller editor annoyances.
 
 **User guide:** [How to Configure and Use AI Agents in Ritemark](./agent-configurator-guide.md) — full how-to written for this release; source material for marketing and the user-docs refresh.
 
@@ -45,18 +49,24 @@ tags:
 
 ## Why This Release
 
-v1.7.2 was a Markdown-navigation release. v1.7.3 turns back to the AI sidebar and fixes the friction that showed up once people actually used the chat composer and the plan-approval flow day to day.
+v1.7.2 was a Markdown-navigation release. v1.7.3 is an **AI release**: it turns AI agents into something you can see, organize, and choose between — and it sharpens the day-to-day friction in the chat sidebar.
 
-Two of these are headline behaviour fixes; two are polish:
+The headline additions:
+
+- **The Agent Library + Configurator** make agents first-class — browse, create, and configure them without writing YAML.
+- **OpenCode** joins Claude Code and Codex as a third, bring-your-own-key runtime.
+- **The integrated browser** gains a `browser_snapshot` tool and a live screenshot chip so AI agents can actually see what you see.
+
+And the smaller fixes that came out of daily use:
 
 - **The composer used to lock while an agent was running.** If a follow-up thought occurred mid-run, you had to wait for the run to finish before typing it. Now the composer stays unlocked — type the next prompt and it queues.
-- **The plan-approval card looked clickable but did nothing.** The Approve/Reject buttons rendered after the approval window had already closed, so clicking them was a silent no-op. That is fixed, and the card is redesigned.
+- **The plan-approval card looked clickable but did nothing.** The Approve/Reject buttons rendered after the approval window had already closed, so clicking them was a silent no-op. That is fixed, the card is redesigned, and it now reliably shows the full plan.
 - **Edit Link couldn't change link text.** The dialog only edited the URL; now it has an optional Display text field.
 - **Short code blocks showed a phantom horizontal scrollbar** caused by the copy-button tooltip overflowing the container.
 
-Sprint docs: `docs/development/sprints/sprint-74-ai-sidebar-composer-polish/`, `docs/development/sprints/sprint-77-unified-agent-library-p1/`, and `docs/development/sprints/sprint-78-browser-ux/`
+Sprint docs: `docs/development/sprints/sprint-74-ai-sidebar-composer-polish/`, `docs/development/sprints/sprint-76-acp-opencode/`, `docs/development/sprints/sprint-77-unified-agent-library-p1/`, and `docs/development/sprints/sprint-78-browser-ux/`
 
-Closes [#73](https://github.com/ProductoryHQ/ritemark-native/issues/73), [#82](https://github.com/ProductoryHQ/ritemark-native/issues/82), [#84](https://github.com/ProductoryHQ/ritemark-native/issues/84), [#86](https://github.com/ProductoryHQ/ritemark-native/issues/86), [#88](https://github.com/ProductoryHQ/ritemark-native/issues/88), and [#93](https://github.com/ProductoryHQ/ritemark-native/issues/93). Sprint 77 work delivered via [PR #99](https://github.com/ProductoryHQ/ritemark-native/pull/99), Sprint 78 via [PR #101](https://github.com/ProductoryHQ/ritemark-native/pull/101).
+Closes [#52](https://github.com/ProductoryHQ/ritemark-native/issues/52), [#73](https://github.com/ProductoryHQ/ritemark-native/issues/73), [#82](https://github.com/ProductoryHQ/ritemark-native/issues/82), [#84](https://github.com/ProductoryHQ/ritemark-native/issues/84), [#86](https://github.com/ProductoryHQ/ritemark-native/issues/86), [#88](https://github.com/ProductoryHQ/ritemark-native/issues/88), and [#93](https://github.com/ProductoryHQ/ritemark-native/issues/93). Sprint 77 work delivered via [PR #99](https://github.com/ProductoryHQ/ritemark-native/pull/99), Sprint 78 via [PR #101](https://github.com/ProductoryHQ/ritemark-native/pull/101).
 
 * * *
 
@@ -83,6 +93,17 @@ Ritemark now treats AI agents as first-class citizens you can see, organize, and
 - Toolbar toggles to switch between Table of Contents, Properties, and the Agent panel
 
 **Read the full guide:** [How to Configure and Use AI Agents in Ritemark](./agent-configurator-guide.md)
+
+### A third AI runtime — OpenCode, bring-your-own-key (#52) (sprint-76)
+
+Ritemark now bundles **OpenCode** as a third chat runtime alongside Claude Code and Codex, integrated over the **Agent Client Protocol (ACP)**. Where Claude Code and Codex use their own sign-in, OpenCode is **bring-your-own-key**: point it at any provider you already have a key for and pick from that provider's models.
+
+- **Model picker** shows an **OpenCode** group (after Codex). Only providers with a configured key appear — add a Google AI key and Gemini models show up; add OpenAI and you get GPT models, and so on. With no keys, the group prompts you to open Settings.
+- **Streaming + reasoning**: responses stream in, reasoning is summarized as a few "Thinking" entries (not hundreds of one-word activities), and tool calls appear as activities.
+- **File-edit approval**: when OpenCode wants to edit an open file, you get a single **File Change Approval** card with the target path — the file on disk is untouched until you Approve. Writes outside the workspace are rejected automatically. An **Auto-approve edits & tool calls** toggle lives in Settings → OpenCode for when you want it to run hands-free (out-of-workspace writes stay blocked even then).
+- **New provider support**: an **OpenRouter** API-key field joins OpenAI / Google AI / Anthropic in Settings.
+
+The bundled OpenCode binary is re-signed under Ritemark's Developer ID with hardened runtime, so it launches cleanly on macOS without Gatekeeper warnings.
 
 ### Agents can re-observe the browser — `browser_snapshot` tool (#88) (sprint-78)
 
@@ -148,6 +169,7 @@ Saving a provider key (Google AI, OpenAI, Anthropic, OpenRouter) in Settings use
 
 ## Under the Hood
 
+- **OpenCode over ACP** (sprint-76): OpenCode runs as a bundled binary driven through the Agent Client Protocol. The binary (and the other bundled agent runtimes) is re-signed under Ritemark's Developer ID with hardened runtime at build time so notarization and Gatekeeper accept it — foreign Team IDs would otherwise be rejected.
 - **`browser_snapshot` bridge action** (sprint-78): new `BrowserSnapshotAction` in VS Code patch 010 with a read-share consent gate — snapshots never expose URL, title, or page content of a tab that isn't shared with Ritemark AI. Codex automated review (P1) verified and addressed in [PR #101](https://github.com/ProductoryHQ/ritemark-native/pull/101).
 - **Annotation screenshot cache** (sprint-78): viewport screenshots for the composer chip are cached per URL with a 5-second TTL, so the chip stays fresh without running a Playwright capture on every 1.5 s context poll.
 - **Agent schema module** (`agent/agentSchema.ts`, with tests): canonical Claude Code tool names, tools-field parsing (comma-separated string ↔ list), and self-healing of tool names written by older Ritemark versions. Reference document: `docs/development/sprints/sprint-77-unified-agent-library-p1/agent-protocols-reference.md`.
