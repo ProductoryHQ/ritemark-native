@@ -25,7 +25,7 @@ Write and edit markdown with a visual editor.
 | [Core Editor](editor.md) | WYSIWYG markdown editing with auto-save |
 | [Text Formatting](formatting.md) | Bold, italic, links, and inline styles |
 | [Block Types](blocks.md) | Headings, lists, tables, code blocks |
-| [AI Agents](ai-agents.md) | Built-in Claude and Codex agents in the sidebar |
+| [AI Agents](ai-agents.md) | Built-in Claude, Codex, and OpenCode agents in the sidebar |
 | [Keyboard Shortcuts](keyboard-shortcuts.md) | Complete shortcut reference |
 
 ---
@@ -55,7 +55,7 @@ Build and run AI workflows.
 
 | Feature | Description |
 |---------|-------------|
-| [AI Agents](ai-agents.md) | Two built-in agents: Claude and Codex |
+| [AI Agents](ai-agents.md) | Three built-in agents: Claude, Codex, and OpenCode |
 | [Agent Library](agent-library.md) | Create, launch, and manage custom agents and skills |
 | [Browser](browser.md) | In-app browser with AI context — open `.html` files and localhost next to your markdown |
 | [Ritemark Flows](flows.md) | Visual AI workflow automation |
@@ -96,8 +96,8 @@ These work across all modes.
 
 ### AI Tools
 
-Ritemark's AI lives in the sidebar as two agents — **Claude** and **Codex** — that can read and
-edit your files in a multi-turn conversation.
+Ritemark's AI lives in the sidebar as three agents — **Claude**, **Codex**, and **OpenCode** — that
+can read and edit your files in a multi-turn conversation.
 
 [AI Agents guide →](ai-agents.md)
 
@@ -106,5 +106,5 @@ edit your files in a multi-turn conversation.
 ## Guides
 
 - [Getting Started](../guides/getting-started.md) - First-run walkthrough
-- [Set Up AI](../setup-ai.md) - Set up Claude and Codex (and OpenAI keys for Flows)
+- [Set Up AI](../setup-ai.md) - Set up Claude, Codex, and OpenCode (and OpenAI keys for Flows)
 - [Troubleshooting](../troubleshooting/common-issues.md) - Common issues and solutions

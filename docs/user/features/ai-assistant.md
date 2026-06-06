@@ -4,7 +4,7 @@
 > OpenAI chat runtime with rephrase, find-and-replace, and insert tools, plus document search (RAG) —
 > was removed in v1.7.2 (Sprint 74).
 
-The AI sidebar now offers two agents only: **Claude Code** and **Codex**.
+The AI sidebar now offers three agents: **Claude Code**, **Codex**, and **OpenCode** (added in v1.7.3).
 
 - For the current AI sidebar, see **[AI Agents](ai-agents.md)**.
 - To configure AI, see **[Set Up AI](../setup-ai.md)**.

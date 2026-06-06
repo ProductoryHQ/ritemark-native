@@ -58,10 +58,20 @@ Check **Don't ask again** to skip the prompt for future tabs in the same session
 
 When a browser tab is sharing context with the AI, a chip appears in the chat composer:
 
-- **Gray chip** — the AI receives the page's text summary (ARIA outline, ~12k characters).
-- **Indigo chip** — annotation mode is on; the AI additionally receives a viewport screenshot.
+- **Gray URL chip** — the AI receives the page's text summary (ARIA outline, ~12k characters).
+- **Screenshot thumbnail chip** *(v1.7.3)* — when annotation mode is on, the composer shows a live screenshot thumbnail of the page (the same 56×56 format as a pasted image) in place of the URL chip. It previews exactly the screenshot the AI will receive and refreshes automatically as you scroll or interact with the page (≈5 s).
 
 Click the **×** on the chip to drop browser context for the next message only. The chip reappears on the following turn.
+
+### Re-observing a page — `browser_snapshot`
+
+> Added in v1.7.3.
+
+The AI can re-check a shared page **without re-navigating to it**. The `browser_snapshot` tool returns the active tab's current ARIA outline (URL, title, and full accessibility tree) — useful after the page changes from a click or a form fill, where re-navigating would lose page state.
+
+- Available to both runtimes: `mcp__ritemark_browser__browser_snapshot` (Claude Code) and `ritemark_browser_snapshot` (Codex).
+- **Read-only and consent-aware:** it only works on tabs you've shared via "Share with Agent?". An unshared tab returns an error — no URL, title, or page content leaks.
+- It does not require AI Browser Control (below); reading a shared page is always available, acting on it is the opt-in feature.
 
 ### Annotation mode
 
@@ -71,7 +81,7 @@ Toggle the **camera icon** in the browser toolbar to include a viewport screensh
 - "What does the schematic show at these slider values?"
 - "Is the contrast on this badge sufficient?"
 
-Annotation resets after each turn — you toggle it on for the questions that need it.
+While annotation mode is on, the composer shows a **live screenshot thumbnail chip** (v1.7.3) so you can see exactly what the AI will receive — see [The browser chip](#the-browser-chip) above.
 
 ### What the AI does not do (by default)
 
@@ -176,5 +186,5 @@ These are tracked as candidates for future sprints.
 
 ## Related
 
-- [AI Agents](ai-agents.md) — Claude, Codex, and how to switch between them
+- [AI Agents](ai-agents.md) — Claude, Codex, OpenCode, and how to switch between them
 - [Set Up AI](../setup-ai.md) — configure AI and agent runtimes

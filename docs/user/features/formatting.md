@@ -67,6 +67,9 @@ To strike through text:
 1. Click on the linked text
 2. Press Cmd+K
 3. Edit or remove the URL
+4. *(v1.7.3)* Use the optional **Display text** field to change the link's visible text. It pre-fills
+   with the link's current text; clicking **Update** replaces both the text and the target in one step.
+   Leave it unchanged to keep the existing text.
 
 ---
 

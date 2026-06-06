@@ -4,8 +4,13 @@
 
 Ritemark works great without any AI features. But if you want AI-powered editing, here's how to set everything up.
 
-Ritemark's AI sidebar runs two agents — **Claude Code** and **Codex**. Set up whichever one you want
-to use below. If you use **Flows**, you'll also need an OpenAI API key (see [OpenAI API Key for Flows](#openai-api-key-for-flows)).
+Ritemark's AI sidebar runs three agents — **Claude Code**, **Codex**, and **OpenCode**. Set up
+whichever one you want to use below. If you use **Flows**, you'll also need an OpenAI API key (see
+[OpenAI API Key for Flows](#openai-api-key-for-flows)).
+
+> **New in v1.7.3:** **OpenCode** joins Claude Code and Codex as a third, bring-your-own-key chat
+> runtime. Where Claude and Codex use their own sign-in, OpenCode points at any provider you already
+> have an API key for. See [OpenCode (bring your own key)](#opencode-bring-your-own-key) below.
 
 > **Changed in v1.7.2:** The earlier built-in "Ritemark Agent" — a direct OpenAI chat assistant with
 > rephrase / find-and-replace / insert tools and document search — has been removed. The OpenAI API
@@ -99,6 +104,61 @@ export OPENAI_API_KEY='your-key-here'
 
 ---
 
+## OpenCode (bring your own key)
+
+> Added in v1.7.3.
+
+OpenCode is a third AI chat runtime, alongside Claude Code and Codex, integrated over the **Agent
+Client Protocol (ACP)**. Unlike Claude and Codex, OpenCode has no sign-in of its own — it is
+**bring-your-own-key**. You point it at any provider you already have an API key for and pick from
+that provider's models.
+
+The OpenCode runtime ships bundled with Ritemark; there is nothing to install.
+
+### Step 1: Add a provider API key
+
+1. Open **Settings** (gear icon).
+2. Find the API-key fields and paste a key for any provider you want OpenCode to use:
+   - **OpenAI** — GPT models
+   - **Google AI** — Gemini models
+   - **Anthropic** — Claude models
+   - **OpenRouter** — a wide range of models from many providers (new in v1.7.3)
+3. Keys are stored securely in your system's credential store.
+
+![Settings showing the bring-your-own-key provider fields used by OpenCode](../releases/v1.7.3/screenshots/1.7.3-full-screen-BYOK-settings-open-code.png)
+
+You can configure more than one provider. Only providers with a saved key become available in
+OpenCode.
+
+### Step 2: Pick an OpenCode model
+
+1. Open the **AI sidebar** and open the model picker.
+2. Scroll to the **OpenCode** group (it appears after Codex).
+3. The group lists models only from providers whose key you've configured — add a Google AI key and
+   Gemini models appear, add OpenAI and GPT models appear, and so on. With no keys configured, the
+   group prompts you to open Settings.
+
+![OpenCode running a Gemini model in the AI sidebar](../releases/v1.7.3/screenshots/1-7-3-full-screen-open-code-gemini.png)
+
+> The OpenCode group refreshes the moment you save or remove a provider key — no window reload
+> needed (fixed in v1.7.3).
+
+### File edits and approval
+
+When OpenCode wants to edit a file you have open, Ritemark shows a single **File Change Approval**
+card with the target path. The file on disk is **untouched until you Approve**. Writes outside your
+workspace are rejected automatically.
+
+For hands-free runs, Settings → OpenCode has an **Auto-approve edits & tool calls** toggle. Even
+with auto-approve on, out-of-workspace writes stay blocked.
+
+### Learn more
+
+For OpenCode usage and provider details, see the project's documentation:
+**[OpenCode](https://opencode.ai)**
+
+---
+
 ## OpenAI API Key for Flows
 
 [Flows](features/flows.md) use an OpenAI API key for their **LLM Prompt** and **Image Generation**
@@ -176,6 +236,6 @@ You can always add AI later.
 
 ## Related
 
-- [AI Agents](features/ai-agents.md) - Built-in Claude and Codex agents
+- [AI Agents](features/ai-agents.md) - Built-in Claude, Codex, and OpenCode agents
 - [Flows](features/flows.md) - Visual AI workflows (use the OpenAI key)
 - [Getting Started](getting-started.md) - Basic setup

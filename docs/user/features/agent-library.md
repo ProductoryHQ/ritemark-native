@@ -59,6 +59,8 @@ Open any agent from the library and Ritemark switches to **agent editing mode**:
 
 The top toolbar has three panel toggles: **Contents** (☰), **Properties** (ⓘ), and **Agent** (🤖). Click to switch between them.
 
+![An agent file open with the Agent Configurator panel on the right](../../releases/v1.7.3/screenshots/1-7-3-agent-library-agent-editor-open.png)
+
 ### Configurator fields
 
 | Field | What it does |
@@ -147,6 +149,6 @@ The starter pack gives you a few working examples you can read, edit, duplicate,
 ## Related
 
 - [How to Configure and Use AI Agents (v1.7.3 guide)](../../releases/v1.7.3/agent-configurator-guide.md) - Full configurator walkthrough with recipes
-- [AI Agents](ai-agents.md) - Built-in Claude and Codex runtimes, sign-in and setup
+- [AI Agents](ai-agents.md) - Built-in Claude, Codex, and OpenCode runtimes, sign-in and setup
 - [Set Up AI](../setup-ai.md) - Sign in and configure the built-in runtimes
 - [Getting Started](../getting-started.md) - First-run walkthrough
