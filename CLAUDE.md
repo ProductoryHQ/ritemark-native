@@ -96,6 +96,7 @@ Skills (knowledge injection, not agents):
 | `flow-testing` | Testing Ritemark Flows |
 | `ritemark-flows` | Building / editing flow JSON |
 | `ritemark-design` | Visual design decisions |
+| `architectural-design` | Deciding if a change is architectural, evaluating proposals against locked decisions, choosing between structural approaches |
 
 **Routing rule:** when user input contains a trigger keyword, invoke the agent BEFORE responding. Subagents cannot invoke other subagents — when one needs another's domain, it surfaces a routing recommendation to the user.
 
@@ -166,7 +167,7 @@ ritemark-native/
 │   │   └── [editors]            # ritemarkEditor, docxEditorProvider, pdfEditorProvider, excelEditorProvider
 │   ├── out/                     # Compiled JS
 │   ├── webview/                 # React webview (TipTap editor + AI sidebar)
-│   ├── media/                   # webview.js bundle (~900KB)
+│   ├── media/                   # webview.js bundle (~7.6 MB IIFE — see GH #107)
 │   └── binaries/agents/         # Bundled agent binaries (gitignored) + manifest.json
 ├── patches/vscode/              # Numbered patch files (001-*.patch … 010-*.patch)
 ├── branding/                    # Icons, logos, product.json overrides
