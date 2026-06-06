@@ -14,9 +14,16 @@ Ritemark Native is a VS Code OSS fork with Ritemark built-in as the native markd
 | --- | --- | --- |
 | VS Code OSS | Git submodule | NOT a fork — easy upstream sync |
 | Integration | Custom Editor Provider | .md files open in Ritemark webview |
-| Build target | darwin-arm64 | Apple Silicon |
+| Build targets | darwin-arm64 (primary), win32-x64 (supported) | macOS Apple Silicon is primary; Windows is fully supported |
 | Marketplace | Hidden | Prevent extension conflicts |
 | Telemetry | Minimal, opt-out | Privacy first |
+| Agent runtimes | Claude Code (SDK), Codex (stdio), ACP/OpenCode (stdio) + `AgentRuntime` interface | All runtimes implement the same interface — see `docs/development/architecture.md` |
+| Agent approval | Unified approval gate — one webview message type for all runtimes | No runtime-specific approval message types after Sprint 79 |
+| Browser tools | `BrowserMcpServer` injected into all runtimes via `BrowserToolsInjector` | No runtime-specific browser tool implementations |
+| Model IDs | `src/ai/modelConfig.ts` is the authoritative registry | Never hardcode model IDs elsewhere; never split into runtime-specific files |
+
+**Full extension architecture (subsystems, TO BE items, open debt):** `docs/development/architecture.md`
+This document is updated at the end of every sprint that changes extension structure. Read it before planning any sprint that touches `extensions/ritemark/src/`.
 
 * * *
 
@@ -70,7 +77,7 @@ Branch name matches the sprint directory under `docs/development/sprints/`. Veri
 
 | Domain | Agent | Trigger keywords |
 | --- | --- | --- |
-| Builds, Extensions, Errors, Patches | `vscode-expert` | build, compile, error, fail, not working, extension, patch, update vscode, prod, production, gulp, run dev, start dev, launch, npm run, yarn |
+| Builds, Extensions, Errors, Patches | `vscode-expert` | build, compile, error, fail, not working, extension, patch, update vscode, prod, production, gulp, run dev, start dev, launch, open, start, scripts/code.sh, npm run, yarn |
 | PR Reviews & Merging | `pr-reviewer` | review PR, merge PR, check PR, approve PR |
 | Sprint Workflow | `sprint-manager` | sprint, phase, plan, implement, feature |
 | Quality Gates | `qa-validator` | commit, push, done, merge, PR |
@@ -116,7 +123,7 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (6)
+### Current patches (10)
 
 | Patch | Purpose |
 | --- | --- |
@@ -126,6 +133,10 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows builds, OSS compatibility, account service |
 | `006-ritemark-dev-launch-fallback.patch` | Dev mode scripts, product.json dev launch fallback |
+| `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 API compatibility fixes |
+| `008-ritemark-windows-binary-strip.patch` | Strip debug symbols from Windows agent binaries |
+| `009-ritemark-browser-context-bridge.patch` | Bridges VS Code webview context to the integrated browser panel |
+| `010-ritemark-browser-action-bridge.patch` | Enables AI agent actions (click, navigate, fill) in the integrated browser |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 
@@ -138,19 +149,37 @@ ritemark-native/
 ├── vscode/                      # VS Code OSS submodule (patches applied here)
 │   └── extensions/ritemark/     # SYMLINK → ../../extensions/ritemark
 ├── extensions/ritemark/         # Ritemark extension SOURCE (edit here!)
-│   ├── src/                     # TypeScript source
+│   ├── src/
+│   │   ├── agent/               # Claude Code runtime (SDK + bundled binary)
+│   │   ├── codex/               # Codex runtime (stdio JSON-RPC)
+│   │   ├── acp/                 # ACP/OpenCode runtime (@agentclientprotocol/sdk)
+│   │   ├── runtime/             # Shared AgentRuntime interface + registry (Sprint 79+)
+│   │   ├── browser/             # Integrated browser — CDP panel, MCP server, action tools
+│   │   ├── flows/               # Flow engine — scheduler, executor, storage
+│   │   ├── features/            # Feature flags (flags.ts registry)
+│   │   ├── ai/                  # Shared AI — modelConfig.ts, connectivity, analytics
+│   │   ├── views/               # UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
+│   │   ├── settings/            # Settings page bridge
+│   │   ├── utils/               # Binary resolution, platform utils, bundledAgentRuntime
+│   │   ├── voiceDictation/      # Whisper STT (macOS only)
+│   │   ├── export/              # PDF/DOCX export
+│   │   └── [editors]            # ritemarkEditor, docxEditorProvider, pdfEditorProvider, excelEditorProvider
 │   ├── out/                     # Compiled JS
-│   ├── webview/                 # React webview (TipTap editor)
-│   └── media/                   # webview.js bundle (~900KB)
-├── patches/vscode/              # Numbered patch files (001-*.patch …)
+│   ├── webview/                 # React webview (TipTap editor + AI sidebar)
+│   ├── media/                   # webview.js bundle (~900KB)
+│   └── binaries/agents/         # Bundled agent binaries (gitignored) + manifest.json
+├── patches/vscode/              # Numbered patch files (001-*.patch … 010-*.patch)
 ├── branding/                    # Icons, logos, product.json overrides
 ├── scripts/                     # Development and release scripts
-├── VSCode-darwin-arm64/         # Production build output
+├── VSCode-darwin-arm64/         # Production build output (macOS)
 ├── docs/
 │   ├── WISHLIST.md              # DEPRECATED — historical reference only (see below)
 │   ├── user/                    # User-facing docs
 │   ├── releases/                # Release notes per version
-│   └── development/             # Developer docs (analysis, sprints, release-process)
+│   └── development/
+│       ├── architecture.md      # Extension architecture — AS IS + TO BE (update each sprint)
+│       ├── analysis/            # Research docs (dated)
+│       └── sprints/             # Sprint docs (spec, tech-plan, tasks, sprint-plan)
 └── docs-internal/               # Gitignored: marketing, product strategy
 ```
 
@@ -162,10 +191,14 @@ Feature ideas/requests → **GitHub Issues** on `ProductoryHQ/ritemark-native` w
 
 ## AI Model Configuration
 
-All AI model identifiers live in **one** file: `extensions/ritemark/src/ai/modelConfig.ts`. Never hardcode model names elsewhere.
+All AI model identifiers must live in `extensions/ritemark/src/ai/modelConfig.ts`. Never hardcode model IDs anywhere else.
+
+**Current state (pre-Sprint 79):** Three locations exist — `modelConfig.ts` (OpenAI/BYOK models), `src/agent/types.ts` (`CLAUDE_MODELS`), `src/codex/codexModels.ts` (Codex dynamic list). Sprint 79 consolidates all into `modelConfig.ts`.
+
+**After Sprint 79:** The single-source rule is strictly true. Import from:
 
 ```typescript
-import { DEFAULT_MODELS, OPENAI_LLM_MODELS } from '../ai/modelConfig';
+import { CLAUDE_MODELS, OPENAI_LLM_MODELS, BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
 ```
 
 For webview code, the extension sends model config via the `flow:modelConfig` message into `webview/src/config/modelConfig.ts`.
@@ -181,6 +214,8 @@ Webview uses **Tailwind CSS** + **shadcn/ui** (Radix primitives, copy-paste patt
 ## Feature Flags
 
 Project uses feature flags for platform-specific, experimental, and premium features. Implementation: `.claude/skills/feature-flags/SKILL.md`. Sprint-manager prompts when a sprint touches a feature that may need gating.
+
+**Rule:** When a feature is deleted, its flag must also be deleted (or set to `status: 'disabled'`). Zombie flags that gate deleted code are tracked in `docs/development/architecture.md` under ARCH-3.
 
 * * *
 
