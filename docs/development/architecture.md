@@ -287,9 +287,9 @@ update-feed.json        Sparkle update feed → jarmo-productory/ritemark-public
 
 Build prerequisites (not enforceable at commit time): Node v20.x arm64 for prod, Node v22.21.1 arm64 for dev, `arch -arm64` shell wrapper. Full commands and gotchas in `.claude/skills/vscode-development/SKILL.md`.
 
-**Known architectural issue — extension host (ARCH-8):** The host ships as 105 loose `.js` files plus the entire `node_modules` tree (~180 packages). Most packages are transitive dependencies of `@anthropic-ai/claude-agent-sdk` + `@modelcontextprotocol/sdk` and are not loaded at runtime. This is the root cause of three documented incidents: Windows EMFILE, the 0-byte tsc trap (v1.7.1), and DMG bloat. Fix: esbuild bundle with tree-shaking; target is a handful of self-contained files.
+**Known architectural issue ([#105](https://github.com/ProductoryHQ/ritemark-native/issues/105)):** The host ships as 105 loose `.js` files plus the entire `node_modules` tree (~180 packages). Most packages are transitive dependencies not loaded at runtime. Root cause of three documented incidents: Windows EMFILE, the 0-byte tsc trap (v1.7.1), and DMG bloat.
 
-**Known architectural issue — webview bundle (ARCH-10):** The webview bundle is documented in several places as "~900 KB" but is actually **~7.6 MB** (~8× undocumented growth). All surfaces — TipTap editor, PDF/Excel/DOCX viewers, Flows canvas, AI sidebar — are in one IIFE loaded on every `.md` open. No CI bundle-size budget exists.
+**Known architectural issue ([#107](https://github.com/ProductoryHQ/ritemark-native/issues/107)):** The webview bundle is documented in several places as "~900 KB" but is actually **~7.6 MB** (~8× undocumented growth). All surfaces in one IIFE loaded on every `.md` open. No CI bundle-size budget exists.
 
 ---
 
@@ -319,7 +319,7 @@ src/daemon/                          ← NEW in Sprint 79
 
 4. **Background execution (Phase 2).** Phase 1 (Sprint 80) runs while Ritemark is open. True background execution (process keeps running after app close) requires OS-level service integration — out of scope until there is user demand.
 
-5. **Cross-runtime context (Sprint 80 pre-flight):** The daemon fires a runtime and receives results. When the daemon result is surfaced in the Agent Library alongside interactive history, what context (if any) carries between them? See ARCH-13.
+5. **Cross-runtime context (Sprint 80 pre-flight):** The daemon fires a runtime and receives results. When the daemon result is surfaced in the Agent Library alongside interactive history, what context (if any) carries between them? Design decision required before Sprint 80 — see [#97](https://github.com/ProductoryHQ/ritemark-native/issues/97).
 
 ---
 
@@ -339,52 +339,30 @@ All model identifiers in `src/ai/modelConfig.ts`. The CLAUDE.md rule "all model 
 
 ---
 
-## Broader Architectural Roadmap (Post-Sprint 79)
-
-These improvements are not in Sprint 79 scope. Each is independently shippable. Tracked as ARCH items below.
-
-**Sequencing (from docs-internal/architecture/to-be-proposal.md):**
-
-1. ~~Dead-code removal (#4)~~ ✅ Sprint 74 | Patch manifest (#7) — low priority
-2. **Esbuild host bundle (#1) + build integrity gate (#6)** — ARCH-8, ARCH-11. The keystone structural win; they reinforce each other. Sprint 79 runtime unification makes the host cleaner and esbuild more tractable.
-3. **Shared model config (#3) + typed webview protocol (#2)** — ARCH-9. Sprint 79 does the model-ID half; the full shared-module approach pairs with the typed protocol.
-4. **Webview lazy-load + size budget (#5)** — ARCH-10. Last; highest constraint (CSP-compatible chunk loading, not just a Vite flag).
-
-**Item summaries:**
-
-**#1 Bundle the extension host (esbuild) — ARCH-8 — the keystone win.** Bundle the host into a small set of files using esbuild (same tool VS Code extensions use), tree-shaking out everything not reachable from `extension.ts`. `node_modules` stops shipping. Payoff: dissolves EMFILE structurally, eliminates the 0-byte tsc trap (a broken bundle fails loudly, not silently), shrinks the DMG, speeds extension activation. Watch-out: native modules and bundled agent binaries stay external (mark `external` in esbuild, copy explicitly).
-
-**#2 Typed webview ↔ host protocol — ARCH-9.** Define the protocol as a discriminated union in a shared module (`shared/protocol.ts`) imported by both sides. Adding or changing a message type becomes a compile error on both ends until both are updated. Sprint 79 reduces message types from 9+ to 3 (agent-execute/cancel/approve), making the typed protocol tractable.
-
-**#3 Single model-config source — partial in Sprint 79 (R6).** Sprint 79 consolidates model IDs into `modelConfig.ts`. Full solution: promote to a `@shared` module that both host (esbuild) and webview (Vite `@shared` alias) import directly, eliminating the runtime `flow:modelConfig` mirror message for static config.
-
-**#5 Webview lazy-load + size budget — ARCH-10.** Split viewers (PDF/Excel/DOCX) and Flows canvas out of the editor critical path. Requires CSP-compatible chunk loading (nonce'd script injection or small loader) — not just flipping `inlineDynamicImports`. Add a CI bundle-size budget so the ~7.6 MB figure is tracked, not invisible.
-
-**#6 Build-integrity gate — ARCH-11.** Before signing: (a) clean build from empty `out/`/`dist/` (no incremental tsc state); (b) assert every emitted artifact is non-zero; (c) smoke-launch the built app headless and confirm the `ai-sidebar` sentinel. Win #8 (esbuild bundling) makes (a) and (b) near-automatic — a broken bundle fails at build time, not as a 0-byte file.
-
-**Model gateway — ARCH-12.** Currently the three agent runtimes and flow nodes each carry their own auth, model-resolution, retry, and telemetry paths. A thin gateway interface would unify these without merging execution shapes. Separate from R6 (which consolidates model IDs, not call paths).
-
-**Cross-runtime conversation context — ARCH-13 (GH#97).** When switching agents mid-conversation, what context (if any) carries to the new runtime? Today each runtime has its own backend session; the sidebar renders a single combined transcript — so switching drops prior context from the new agent's view. Three design options: replay-on-switch, unified transcript + per-turn runtime marker, explicit "carry context to <agent>" handoff. **Must be decided before any Sprint 80+ daemon wiring or multi-agent orchestration.** Tracking: [ProductoryHQ/ritemark-native#97](https://github.com/ProductoryHQ/ritemark-native/issues/97).
-
----
-
 ## Open Architectural Debt
 
-| ID | Item | Blocking? | Target sprint |
-|---|---|---|---|
-| **ARCH-1** | `@agentclientprotocol/sdk` esbuild compatibility — verify no dynamic `require()` in prod build. Sprint 76 shipped without verification. | Not blocking, but prerequisite for ARCH-8. | Sprint 79 Phase 0 audit |
-| **ARCH-2** | Unified approval gate — three incompatible approval message types. | No, but each sprint without it adds drift. | Sprint 79 (R3) |
-| **ARCH-3** | `document-search` zombie flag gates deleted RAG code (`src/rag/` removed Sprint 74). | No effect; flag is a tombstone. | Sprint 79 cleanup (R7) |
-| **ARCH-4** | `CODEX_MODELS` in `types.ts` is `@deprecated` but not removed. | No. | Sprint 79 (R6) |
-| **ARCH-5** | Codex browser tools use dynamic injection (`codexBrowserTools.ts`); Claude Code uses MCP server. Two patterns for same capability. | No, but blocks ACP browser parity. | Sprint 79 (R4) — Path A if audit confirms, Path B if blocked |
-| **ARCH-6** | File attachments broken for Codex (partial) and ACP (missing). | Yes — user-visible bug. | Sprint 79 (R5) |
-| **ARCH-7** | `UnifiedViewProvider` at 2480 LOC; grows linearly with each new runtime. | No, but maintainability cost compounds. | Sprint 79 (R2) |
-| **ARCH-8** | Extension host ships as 105 loose `.js` files + ~180 `node_modules` packages. Root cause of Windows EMFILE, 0-byte tsc trap, DMG bloat. Fix: esbuild bundle. | No — three documented incidents but not hard-blocking. | Sprint 80 or 81 |
-| **ARCH-9** | Webview ↔ host protocol is stringly-typed (`bridge.ts`). Message renames fail silently at runtime. | No. | After Sprint 79 (sprint count TBD; Sprint 79 reduces message types from 9+ → 3 first) |
-| **ARCH-10** | Webview bundle is ~7.6 MB IIFE (documented as ~900 KB; 8× undocumented growth). All surfaces loaded on every `.md` open; no CI size budget. | No — UX impact on cold start but not broken. | After ARCH-8 (esbuild first) |
-| **ARCH-11** | Build-integrity gate: Gate 1 has passed a build with 0-byte `.js` files (v1.7.1 incident). Gate checks file existence, not integrity. | Yes — can ship broken DMGs that pass Gate 1. | Sprint 80 (with ARCH-8) |
-| **ARCH-12** | Model gateway: agent runtimes and flow nodes have separate auth / model-resolution / retry / telemetry paths. | No. | After Sprint 79; sequence TBD |
-| **ARCH-13** | Cross-runtime conversation context (GH#97). Switching agents mid-conversation silently drops prior context from the new runtime. Open design decision. | Decision required before Sprint 80 daemon wiring. | Sprint 80 pre-flight |
+Items being resolved in Sprint 79:
+
+| Item | Sprint 79 requirement |
+|---|---|
+| `@agentclientprotocol/sdk` esbuild compatibility audit | Phase 0 audit → `research/arch-1-esbuild-audit.md` |
+| Unified approval gate (3 incompatible message types) | R3 |
+| `document-search` zombie flag (RAG removed Sprint 74) | R7 cleanup |
+| `CODEX_MODELS` deprecated constant | R6 |
+| Codex browser tools: dynamic injection vs MCP server (two patterns) | R4 |
+| File attachments broken for Codex (partial) and ACP (missing) | R5 |
+| `UnifiedViewProvider` at 2480 LOC | R2 — target ≤ 1100 |
+
+Post-Sprint 79 items tracked as GitHub Issues:
+
+| Issue | Item | Prerequisite |
+|---|---|---|
+| [#105](https://github.com/ProductoryHQ/ritemark-native/issues/105) | Extension host esbuild bundling — 105 loose files + ~180 packages; root cause of EMFILE, 0-byte tsc trap, DMG bloat | Sprint 79 |
+| [#106](https://github.com/ProductoryHQ/ritemark-native/issues/106) | Typed webview ↔ host protocol — `bridge.ts` is stringly-typed; renames fail silently at runtime | Sprint 79 (reduces message count 9→3 first) |
+| [#107](https://github.com/ProductoryHQ/ritemark-native/issues/107) | Webview bundle ~7.6 MB IIFE (documented as ~900 KB); no CI size budget; all surfaces loaded on every `.md` open | #105 esbuild first |
+| [#108](https://github.com/ProductoryHQ/ritemark-native/issues/108) | Build-integrity gate — Gate 1 has passed 0-byte builds (v1.7.1); checks presence not integrity | #105 esbuild first |
+| [#109](https://github.com/ProductoryHQ/ritemark-native/issues/109) | Model gateway — agent runtimes and flow nodes have separate auth/model-resolution/retry/telemetry paths | Sprint 79 R6 |
+| [#97](https://github.com/ProductoryHQ/ritemark-native/issues/97) | Cross-runtime conversation context — switching agents drops prior context; open design decision | **Decide before Sprint 80 daemon wiring** |
 
 ---
 
