@@ -42,6 +42,7 @@ Webview (AI sidebar)                Extension Host                    External p
 - Run a production build with `@agentclientprotocol/sdk` included.
 - Check for `dynamic require` warnings in the Gulp/esbuild output.
 - Decision: **no issue** / **needs bundler config fix** / **needs SDK version pin change**.
+- If work is needed: record the required fix as **ARCH-8** in `docs/development/architecture.md` (extension host esbuild bundling) and add to Sprint 80 planning. The full esbuild bundling win (ARCH-8) is out of Sprint 79 scope regardless of this audit outcome — the audit only validates that `@agentclientprotocol/sdk` will not block the future bundling sprint.
 
 ## Workstream 1: `src/runtime/` — Interface + Registry (R1)
 

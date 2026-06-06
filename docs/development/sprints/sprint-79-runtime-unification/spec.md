@@ -131,6 +131,7 @@ Acceptance criteria:
 - No background daemon execution (OS service, launchd, systemd) — Phase 2, post-Sprint 80.
 - No changes to the webview bundle architecture or Vite config.
 - No VS Code patches added or removed.
+- **No cross-runtime conversation context sharing (GH#97).** When a user switches agents mid-conversation, context is not carried between runtimes. This is a pre-existing behavior; the unified message protocol introduced in R2 does not require solving it. The decision on how to handle context across runtimes must happen before Sprint 80 daemon wiring — see ARCH-13 in `docs/development/architecture.md`.
 
 ## Open Questions
 
@@ -140,3 +141,4 @@ Acceptance criteria:
 | Q2 | Does Codex JSON-RPC protocol support MCP server injection at session start (to replace `codexBrowserTools.ts`)? Or is it a different mechanism? | Audit `codexAppServer.ts` + Codex protocol docs |
 | Q3 | Does `node-cron` or `cron-parser` (already installed via Sprint 77) expose a scheduler we can use for R8, or do we need an additional dep? | Check Sprint 77 dep in package.json |
 | Q4 | Should `agent-execute` replace the webview messages immediately (breaking) or should we keep old messages and add new ones with a migration period? | Jarmo decision — clean break preferred; migration window only if webview regression risk is high |
+| Q5 | **Cross-runtime conversation context (GH#97, ARCH-13).** The `AgentRuntime` interface as designed is compatible with future context-sharing (each runtime receives `start()` which could accept replay context). But the Sprint 80 daemon wiring needs a decision: when daemon results appear alongside interactive history in the Agent Library, what constitutes "context"? This does not block Sprint 79 implementation — record the design decision as an explicit prerequisite for Sprint 80 planning. | Jarmo decision before Sprint 80 kickoff |
