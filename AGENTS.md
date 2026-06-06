@@ -7,6 +7,18 @@ This file configures Codex behavior for `ritemark-native`. It is additive to the
 - Leave `.claude/**` unchanged unless the user explicitly asks to modify Claude Code assets.
 - Prefer Codex-specific instructions in this file and Codex skills in `.agents/skills/`.
 
+### Architecture Awareness
+
+The Ritemark extension architecture is documented in `docs/development/architecture.md`. Read it before starting any sprint that touches `extensions/ritemark/src/`. Key invariants:
+
+- **Three agent runtimes** (`src/agent/`, `src/codex/`, `src/acp/`) share the `AgentRuntime` interface (defined in Sprint 79). Do not add a fourth runtime without implementing this interface.
+- **All model identifiers** live in `src/ai/modelConfig.ts`. Never hardcode model IDs elsewhere.
+- **Approval gating** is handled through `UnifiedApprovalGate` (post Sprint 79). Never add a new runtime-specific approval message type.
+- **Browser tools** are injected via `BrowserToolsInjector` → MCP server path. Do not add new runtime-specific browser tool implementations.
+- **Feature flags** are defined in `src/features/flags.ts`. New features require a flag entry. Deleted features require the flag to be removed or set `disabled`.
+
+**Sprint Architecture Gate:** If a sprint changes module structure, webview message contracts, feature flags, or the binary manifest, update `docs/development/architecture.md` as part of the sprint close. The `Last updated` date in that document must be ≥ the sprint branch creation date.
+
 ### Default Workflow
 
 - Prefer existing project scripts in `scripts/` over ad hoc shell sequences.
@@ -14,6 +26,7 @@ This file configures Codex behavior for `ritemark-native`. It is additive to the
 - For release work, also use the `release-process` skill and run `./scripts/release-preflight.sh` before version bumps, tags, or build/distribution steps.
 - Keep sprint documentation under `docs/development/sprints/` aligned with implementation when the task is part of an explicit sprint.
 - Before closing a sprint or handing work off as ready, check whether user-facing behavior changed. If it did, update `docs/CHANGELOG.md` and the relevant `docs/releases/<version>/release-notes.md`; if no release note is appropriate, record why in the sprint plan.
+- If the sprint changes extension architecture (see Architecture Gate above), update `docs/development/architecture.md` before marking the sprint done.
 
 ### Hard Gates
 
