@@ -1,5 +1,5 @@
 ---
-date: 'TBD'
+date: '2026-06-06'
 title: 'Ritemark v1.7.3 — Agent Library, Agent Configurator, Browser UX & AI sidebar polish'
 author: Jarmo Tuisk
 tags:
@@ -21,14 +21,12 @@ tags:
   - queue
   - edit-link
   - code-blocks
-  - draft
 ---
 
 # Ritemark v1.7.3 — Agent Library, Agent Configurator, OpenCode runtime, Browser UX & AI sidebar polish
 
-**Status:** DRAFT / unreleased
+**Status:** Released 2026-06-06
 **Type:** Minor release (Agent Library + Agent Configurator, OpenCode BYOK runtime, Browser UX, AI sidebar & composer polish)
-**Ships after:** v1.7.2 (this release is the next one in the train; v1.7.2 must ship first)
 **Focus:** Sprint 77 ships the unified Agent Library and a visual Agent Configurator built on the real Claude Code agent format — create, browse, and configure AI agents without touching YAML. Sprint 76 adds **OpenCode** as a third, bring-your-own-key AI runtime (alongside Claude Code and Codex) via the Agent Client Protocol. Sprint 78 makes the integrated browser a better partner for AI agents — a `browser_snapshot` tool for re-observing page state and a live screenshot chip in the composer when annotation mode is on. Sprint 74 sharpens the AI sidebar's two most-used surfaces — the composer and the plan-approval flow — and fixes two smaller editor annoyances.
 
 **User guide:** [How to Configure and Use AI Agents in Ritemark](./agent-configurator-guide.md) — full how-to written for this release; source material for marketing and the user-docs refresh.
@@ -37,13 +35,11 @@ tags:
 
 ## Downloads
 
-> _v1.7.3 is a DRAFT and has not been built. Download links and the build date are filled in at release-cut time._
-
 | Asset | Platform | URL |
 |-------|----------|-----|
-| Ritemark.dmg | macOS (Apple Silicon, arm64) | TBD on release |
-| Ritemark x64 DMG | macOS (Intel, x64) | TBD on release |
-| Windows installer | Windows x64 | TBD on release |
+| Ritemark-arm64.dmg | macOS (Apple Silicon, arm64) — notarized | [Download](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.3/Ritemark-arm64.dmg) |
+| Ritemark-x64.dmg | macOS (Intel, x64) — notarized | [Download](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.3/Ritemark-x64.dmg) |
+| Ritemark-Setup.exe | Windows x64 | [Download](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.3/Ritemark-Setup.exe) |
 
 * * *
 
@@ -184,4 +180,4 @@ Saving a provider key (Google AI, OpenAI, Anthropic, OpenRouter) in Settings use
 ## Tests and Validation
 
 - Regression coverage for the composer queue (#82) and plan-approval text (#86) lands as `ai-sidebar/composerQueue.ts` tests and `ai-sidebar/planText.test.ts`, run via `npm test`.
-- Gate 2 (manual install + test of the cut build) is pending — this is a draft and no DMG has been built.
+- Gate 1/2: Jarmo tested the signed macOS arm64 build before notarization. The x64 macOS DMG and Windows installer ship the same app code (x64 Gate-2 test waived by Jarmo as the app code is identical to the tested arm64 build). All three platform artifacts are notarized (macOS) / signed and published with a verified update-feed.json.
