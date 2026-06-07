@@ -116,9 +116,9 @@ Each scenario maps to one or more spec requirements (R1, R2, R3, R4).
 
 **Expected:**
 - Missed run is NOT executed retroactively (no catch-up)
-- No error or notification about the missed run
+- No toast or notification about the missed run
 - Scheduler registers the next upcoming trigger from the cron expression
-- Run history shows no entry for the missed 09:00 slot
+- Run history shows an entry for the missed 09:00 slot with outcome `missed` — no output, no action buttons available
 
 ---
 
@@ -136,7 +136,7 @@ Each scenario maps to one or more spec requirements (R1, R2, R3, R4).
 - Each entry shows: task label, file path, start time, duration, outcome (completed / blocked / errored)
 - Completed entries show first lines of agent output
 - Blocked entries show which operation was blocked and the target path
-- Entries are ordered most-recent first
+- Entries are ordered most-recent first; only the 10 most recent runs are shown
 - History persists across app restarts (stored in workspaceState)
 
 ---
