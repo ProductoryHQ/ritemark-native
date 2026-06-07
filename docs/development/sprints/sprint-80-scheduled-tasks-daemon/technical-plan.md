@@ -163,15 +163,21 @@ Persists run history to `workspaceState`. API:
 ```typescript
 class DaemonResultStore {
   record(taskId: string, result: TaskResult): void;
-  getHistory(taskId: string): TaskResult[];   // most-recent first, max 50
+  getHistory(taskId: string): TaskResult[];      // most-recent first, max 50
   getAllHistory(): Map<string, TaskResult[]>;
-  clearHistory(taskId?: string): void;        // undefined = clear all
+  getBlockedResult(taskId: string, runId: string): TaskResult | undefined;
+  supersede(taskId: string, runId: string, replacement: TaskResult): void;
+  clearHistory(taskId?: string): void;           // undefined = clear all
 }
 ```
 
 Storage key pattern: `ritemark.daemon.results.${taskId}` in `vscode.ExtensionContext.workspaceState`.
 
 Max 50 entries per task — on `record()`, trim oldest if over limit.
+
+Each `TaskResult` carries a `runId: string` (generated at run start via `crypto.randomUUID()` or equivalent). This is required for `ritemark.approveScheduledAction(taskId, runId)` to look up the specific blocked result and supersede it after a successful re-run.
+
+`blockedActions` on `TaskResult` must persist the full detail needed to construct a re-run allow-list entry — `kind` and `detail` (file path or command string) are already in `BlockedAction`; this is sufficient.
 
 **Independent of Sprint 79.** Can be built and merged first.
 
@@ -192,9 +198,12 @@ Status bar:
 
 Toasts (`vscode.window.showInformationMessage` / `showWarningMessage`):
 - Completion: `"${label} finished"` + first line of output. Button: "Show history".
-- Blocked: `"${label} paused — approval needed"` + blocked action detail. Button: "Show history".
+- Blocked: `"${label} paused — approval needed"` + blocked action detail. Buttons: **"Review & approve"**, **"Dismiss"**.
 
-"Show history" button triggers `vscode.commands.executeCommand('ritemark.showDaemonHistory')`.
+"Review & approve" button triggers `vscode.commands.executeCommand('ritemark.approveScheduledAction', taskId, runId)`.
+"Show history" button (on completion toast) triggers `vscode.commands.executeCommand('ritemark.showDaemonHistory')`.
+
+**Agent Library SCHEDULED row:** when a run result is `blocked`, the row renders an amber `.item-hint` line: "Approval needed — click to review". This is already shown in the design mockup and is treated as committed UX. Clicking the row (or a dedicated action icon on it) executes `ritemark.approveScheduledAction(taskId, runId)` for the most recent blocked run for that task. After a successful re-run the hint disappears and the outcome pill flips to `Completed`.
 
 **Independent of Sprint 79.** Can be built and merged first.
 
@@ -247,6 +256,56 @@ Register command: `ritemark.showDaemonHistory` — opens a simple output channel
 
 ---
 
+---
+
+## Inline Approval Mechanism
+
+### Chosen approach: re-run with a one-time allow-list
+
+When the user approves a blocked action, the agent is re-run from the start with that specific blocked action added to a **one-time allow-list** passed into `AgentTaskHandler.run()`.
+
+**Why re-run rather than replay just the blocked action:**
+
+Replaying a single tool call in isolation would require reconstructing the agent's prior message state and injecting the result mid-session — this is brittle and non-portable across runtime backends. Re-running from scratch with the allow-list is simpler, uses the same code path as a normal scheduled run, and produces a coherent session transcript. The trade-off is that the agent redoes prior work (e.g. re-reads files it already read), but for the size of tasks these agents typically perform this is acceptable. The allow-list is applied only for this re-run and does not mutate the standing `AutoApprovalPolicy`.
+
+**Allow-list shape** (extends `AutoApprovalPolicy` at the call site):
+
+```typescript
+export interface RunAllowListEntry {
+  kind: 'file-write' | 'shell-command';
+  detail: string;   // must match exactly: file path or command string
+}
+
+// Passed as an optional param to AgentTaskHandler.run():
+export interface TaskRunOptions {
+  allowList?: RunAllowListEntry[];
+}
+```
+
+Inside `AgentTaskHandler.onApprovalRequest`: if the incoming action matches an entry in `allowList` (by `kind` + exact `detail`), respond `approved: true` — overriding the standing `block` policy for that action. All other policy rules remain unchanged.
+
+### Command: `ritemark.approveScheduledAction`
+
+```typescript
+vscode.commands.registerCommand(
+  'ritemark.approveScheduledAction',
+  async (taskId: string, runId: string) => {
+    // 1. [S79] guard — check AgentRuntime availability; warn + bail if absent
+    // 2. Look up the blocked TaskResult from DaemonResultStore
+    // 3. Build allowList from result.blockedActions
+    // 4. Re-invoke AgentTaskHandler.run(ctx, { allowList })
+    // 5. On completion: DaemonResultStore.supersede(taskId, runId, newResult)
+    // 6. DaemonStatusEvents.emitRunComplete / emitRunBlocked for the re-run outcome
+  }
+);
+```
+
+**Sprint 79 dependency:** step 1 applies the same dynamic import guard as `Scheduler.ts`. If `RuntimeRegistry` is unavailable, the command shows a warning toast: "Cannot retry — AgentRuntime unavailable." and exits without modifying `DaemonResultStore`.
+
+**Sprint 79 unified approval gate dependency:** The `onApprovalRequest` callback signature in `AgentTaskHandler` must be compatible with whatever unified approval gate Sprint 79 establishes. If Sprint 79 changes the `ApprovalRequest` shape, `AgentTaskHandler` will need a corresponding update. Treat this as a known [S79] integration point and document any mismatch found during Phase 3 in `notes/`.
+
+---
+
 ## Workstream Independence Summary
 
 | Component | Sprint 79 dependency | Can ship without Sprint 79? |
@@ -259,6 +318,7 @@ Register command: `ritemark.showDaemonHistory` — opens a simple output channel
 | `GitSyncHandler.ts` (stub) | None | Yes |
 | `ScriptHandler.ts` (stub) | None | Yes |
 | `AgentTaskHandler.ts` | Imports `RuntimeRegistry` | Compiles if Sprint 79 types present; runtime-guarded |
+| `ritemark.approveScheduledAction` command | Imports `RuntimeRegistry` via same guard | Registered at startup; runtime-guarded at execution time |
 | Feature flag entry | None | Yes |
 | `extension.ts` wiring | None | Yes |
 
@@ -280,6 +340,7 @@ If a new dependency is unavoidable, raise it with Jarmo before adding it (sprint
 - Unit tests for `DaemonResultStore.ts` — record, retrieve, 50-entry cap, clear.
 - Integration test for `Scheduler.ts` — mock `ScheduledTask.run()`, advance fake timer, verify task fires.
 - Manual QA matrix: scenarios S1–S10 from `scenarios.md`.
+- Manual QA for inline approval: scenarios S11–S15 from `scenarios.md`. S14 (Sprint 79 guard) can be verified regardless of Sprint 79 state by temporarily removing the dynamic import target.
 
 ---
 
