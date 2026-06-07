@@ -63,20 +63,6 @@ export interface ModelOption {
   description: string;
 }
 
-export const CLAUDE_MODELS: ModelOption[] = [
-  { id: 'claude-sonnet-4-5', label: 'Sonnet', description: 'Fast & capable' },
-  { id: 'claude-opus-4-6', label: 'Opus', description: 'Most powerful' },
-  { id: 'claude-haiku-4-5', label: 'Haiku', description: 'Quick & light' },
-];
-
-export const DEFAULT_MODEL = 'claude-sonnet-4-5';
-
-/** @deprecated Use getCodexModels() from codex/codexModels for dynamic model list */
-export const CODEX_MODELS: ModelOption[] = [
-  { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', description: 'Most capable' },
-  { id: 'codex-spark', label: 'Codex Spark', description: 'Fast & light' },
-  { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex', description: 'Balanced' },
-];
 
 /**
  * Progress event types from agent execution

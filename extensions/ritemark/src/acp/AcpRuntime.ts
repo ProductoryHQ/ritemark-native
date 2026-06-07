@@ -121,7 +121,17 @@ export class AcpRuntime implements AgentRuntime {
       await this._manager.setModel(providerModel);
     }
 
-    await this._manager.prompt(turn.prompt);
+    let promptText = turn.prompt;
+    if (turn.attachments && turn.attachments.length > 0) {
+      const blocks = turn.attachments.map(a => `**Attachment: ${a.name}**\n\`\`\`\n${a.data}\n\`\`\``);
+      promptText = `${blocks.join('\n\n')}\n\n${promptText}`;
+      const imageCount = turn.attachments.filter(a => a.kind === 'image').length;
+      if (imageCount > 0) {
+        config.onProgress({ type: 'text', message: `Note: ${imageCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
+      }
+    }
+
+    await this._manager.prompt(promptText);
   }
 
   async cancel(): Promise<void> {

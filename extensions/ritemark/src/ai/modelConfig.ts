@@ -428,3 +428,19 @@ export function getFlowLLMModels(): ModelConfig[] {
 export function getFlowImageModels(): ImageModelConfig[] {
   return OPENAI_IMAGE_MODELS.filter((m) => !m.deprecated);
 }
+
+// ── Claude Code runtime models ────────────────────────────────────────────────
+
+export interface ClaudeModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export const CLAUDE_MODELS: ClaudeModelOption[] = [
+  { id: 'claude-sonnet-4-5', label: 'Sonnet', description: 'Fast & capable' },
+  { id: 'claude-opus-4-6', label: 'Opus', description: 'Most powerful' },
+  { id: 'claude-haiku-4-5', label: 'Haiku', description: 'Quick & light' },
+];
+
+export const DEFAULT_MODEL = 'claude-sonnet-4-5';

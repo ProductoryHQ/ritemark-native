@@ -63,8 +63,8 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   'document-search': {
     id: 'document-search',
     label: 'Document Search (RAG)',
-    description: 'Search your markdown documents with AI-powered semantic search',
-    status: 'stable',
+    description: 'Removed in Sprint 74. Flag retained as a kill-switch tombstone.',
+    status: 'disabled',
     platforms: ['darwin', 'win32', 'linux'],
   },
   'ritemark-flows': {
