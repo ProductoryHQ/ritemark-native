@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 80 — Scheduled Tasks Daemon · UX Touchpoints</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --surface:#FFFFFF; --surface-muted:#F8FAFC; --surface-soft:#F1F5F9;
+  --hairline:#E2E8F0; --hairline-strong:#CBD5E1;
+  --ink-strong:#1E1B4B; --ink-body:#475569; --ink-muted:#64748B; --ink-faint:#94A3B8; --ink-disabled:#CBD5E1;
+  --indigo:#4338CA; --indigo-deep:#3730A3; --indigo-soft:#E0E7FF; --indigo-fainter:#C7D2FE;
+  --success:#22C55E; --success-soft:#DCFCE7; --warning:#F59E0B; --warning-soft:#FEF3C7;
+  --error:#EF4444; --error-soft:#FEE2E2;
+  --font-ui:'Sofia Sans',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --font-display:'Space Grotesk','Sofia Sans',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --radius-sm:4px; --radius-md:6px; --radius-lg:10px;
+  --shadow-md:0 4px 6px -1px rgba(30,27,75,.08),0 2px 4px -2px rgba(30,27,75,.06);
+  --shadow-lg:0 10px 15px -3px rgba(30,27,75,.10),0 4px 6px -4px rgba(30,27,75,.08);
+  --shadow-indigo:0 4px 6px -1px rgba(67,56,202,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-ui);background:#EEF1F6;color:var(--ink-strong);
+  padding:48px 32px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+.page{max-width:1080px;margin:0 auto}
+.page-head{margin-bottom:8px}
+.eyebrow{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--indigo);font-weight:600}
+h1{font-family:var(--font-display);font-size:34px;letter-spacing:-.5px;font-weight:600;margin:6px 0 4px}
+.sub{color:var(--ink-muted);font-size:14px;max-width:640px}
+.meta{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--indigo-soft);color:var(--indigo-deep)}
+.tag.ghost{background:var(--surface);border:1px solid var(--hairline);color:var(--ink-muted)}
+
+.section{margin-top:44px}
+.section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+.section-num{font-family:var(--font-mono);font-size:12px;color:var(--indigo);font-weight:500}
+.section h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+.section-desc{color:var(--ink-muted);font-size:13px;margin-bottom:18px;max-width:680px}
+
+.stage{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius-lg);
+  padding:28px;box-shadow:var(--shadow-md);
+}
+.stage.dim{background:#FAFBFD}
+.stage-label{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink-faint);font-weight:600;margin-bottom:14px}
+.row{display:flex;gap:24px;flex-wrap:wrap}
+.row>.col{flex:1;min-width:300px}
+
+/* ---- VS Code window chrome (mini) ---- */
+.win{border:1px solid var(--hairline-strong);border-radius:8px;overflow:hidden;box-shadow:var(--shadow-lg);background:var(--surface)}
+.win-title{height:34px;background:var(--surface-muted);border-bottom:1px solid var(--hairline);display:flex;align-items:center;padding:0 12px;gap:8px}
+.dot{width:11px;height:11px;border-radius:50%}
+.dot.r{background:#FF5F57}.dot.y{background:#FEBC2E}.dot.g{background:#28C840}
+.win-title .tt{margin-left:10px;font-size:12px;color:var(--ink-muted);font-weight:500}
+.win-body{display:flex;min-height:220px}
+.editor{flex:1;padding:20px 26px;background:var(--surface)}
+.tab{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-strong);font-weight:500;
+  padding:7px 14px;background:var(--surface);border-top:2px solid var(--indigo);
+  border-right:1px solid var(--hairline);margin:-20px -26px 18px -26px;width:fit-content}
+.tab svg{width:13px;height:13px;color:var(--indigo)}
+
+/* ---- status bar ---- */
+.statusbar{height:24px;background:var(--surface-muted);border-top:1px solid var(--hairline);
+  display:flex;align-items:center;padding:0 4px;font-size:11.5px;color:var(--ink-muted);gap:2px;font-weight:500}
+.sb-item{display:flex;align-items:center;gap:6px;padding:0 9px;height:100%;cursor:default}
+.sb-item.brand{color:var(--indigo);font-weight:600}
+.sb-item.running{color:var(--indigo);font-weight:600}
+.sb-item.alert{color:var(--warning)}
+.sb-item:hover{background:var(--surface-soft)}
+.sb-spacer{flex:1}
+.sb-item svg{width:13px;height:13px}
+.spin{animation:spin 1.1s linear infinite;transform-origin:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--indigo);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+
+/* ---- toast ---- */
+.toast-field{position:relative;min-height:150px;background:
+  repeating-linear-gradient(45deg,#F4F6FA,#F4F6FA 10px,#F0F3F8 10px,#F0F3F8 20px);
+  border-radius:var(--radius-md);padding:18px;display:flex;justify-content:flex-end;align-items:flex-end}
+.toast{
+  width:380px;background:var(--surface);border:1px solid var(--hairline);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);overflow:hidden;
+}
+.toast-accent{border-left:3px solid var(--indigo)}
+.toast-accent.warn{border-left-color:var(--warning)}
+.toast-accent.ok{border-left-color:var(--success)}
+.toast-in{padding:14px 16px}
+.toast-head{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.toast-icon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.toast-icon svg{width:15px;height:15px}
+.ic-ok{background:var(--success-soft);color:#15803D}
+.ic-warn{background:var(--warning-soft);color:#B45309}
+.ic-run{background:var(--indigo-soft);color:var(--indigo)}
+.toast-title{font-size:13px;font-weight:600;color:var(--ink-strong);flex:1}
+.toast-close{color:var(--ink-faint);font-size:16px;line-height:1;cursor:pointer}
+.toast-body{font-size:12.5px;color:var(--ink-body);line-height:1.5;padding-left:35px}
+.toast-body .quote{color:var(--ink-muted);font-style:italic}
+.toast-body code{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-soft);
+  padding:1px 5px;border-radius:3px;color:var(--ink-strong);font-style:normal}
+.toast-actions{display:flex;gap:8px;padding:10px 16px 14px 51px}
+.btn{font-family:var(--font-ui);font-size:12px;font-weight:600;padding:6px 13px;border-radius:var(--radius-md);
+  border:1px solid var(--hairline);background:var(--surface);color:var(--ink-body);cursor:pointer}
+.btn:hover{background:var(--surface-soft)}
+.btn.primary{background:var(--indigo);color:#fff;border-color:var(--indigo);box-shadow:var(--shadow-indigo)}
+.btn.primary:hover{background:var(--indigo-deep)}
+
+/* ---- frontmatter code ---- */
+.code{font-family:var(--font-mono);font-size:13px;line-height:1.7;background:var(--surface-muted);
+  border:1px solid var(--hairline);border-radius:var(--radius-md);padding:16px 18px;overflow-x:auto}
+.code .k{color:var(--indigo-deep)}
+.code .s{color:#0F766E}
+.code .b{color:#9333EA}
+.code .c{color:var(--ink-faint)}
+.code .dim{color:var(--ink-faint)}
+.fm-rail{border-left:3px solid var(--indigo);padding-left:14px}
+.hint{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:12px;color:var(--ink-muted)}
+.hint svg{width:14px;height:14px;color:var(--indigo);flex-shrink:0;margin-top:2px}
+
+/* ---- run history panel ---- */
+.panel{width:380px;background:var(--surface-muted);border:1px solid var(--hairline);border-radius:var(--radius-lg);overflow:hidden}
+.panel-head{padding:13px 16px;border-bottom:1px solid var(--hairline);display:flex;align-items:center;gap:8px;background:var(--surface)}
+.panel-head h3{font-size:13px;font-weight:600;flex:1;letter-spacing:.2px}
+.panel-head svg{width:15px;height:15px;color:var(--indigo)}
+.count-pill{font-size:10.5px;font-weight:600;background:var(--indigo-soft);color:var(--indigo-deep);padding:2px 8px;border-radius:999px}
+.run{display:flex;gap:11px;padding:13px 16px;border-bottom:1px solid var(--hairline);background:var(--surface)}
+.run:hover{background:var(--surface-soft)}
+.run-stat{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.st-ok{background:var(--success)}.st-warn{background:var(--warning)}.st-err{background:var(--error)}.st-run{background:var(--indigo)}
+.run-main{flex:1;min-width:0}
+.run-top{display:flex;align-items:baseline;gap:8px}
+.run-label{font-size:12.5px;font-weight:600;color:var(--ink-strong)}
+.run-time{font-size:11px;color:var(--ink-faint);margin-left:auto;white-space:nowrap}
+.run-meta{font-size:11px;color:var(--ink-muted);margin-top:1px;display:flex;gap:6px;align-items:center}
+.run-meta .file{font-family:var(--font-mono);font-size:10.5px}
+.run-out{font-size:11.5px;color:var(--ink-body);margin-top:5px;line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.outcome{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:1px 6px;border-radius:3px}
+.oc-ok{background:var(--success-soft);color:#15803D}
+.oc-warn{background:var(--warning-soft);color:#B45309}
+.oc-err{background:var(--error-soft);color:#B91C1C}
+.oc-run{background:var(--indigo-soft);color:var(--indigo)}
+
+.note{margin-top:14px;font-size:12px;color:var(--ink-muted);display:flex;gap:8px;align-items:flex-start}
+.note b{color:var(--ink-body);font-weight:600}
+.footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--hairline-strong);font-size:12px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-head">
+    <div class="eyebrow">Sprint 80 · UX Touchpoints</div>
+    <h1>Scheduled Tasks Daemon</h1>
+    <p class="sub">Every surface a user actually sees when an agent runs on a schedule. Static mockup in the Indigo-Editorial system — for design review before implementation.</p>
+    <div class="meta">
+      <span class="tag">5 touchpoints</span>
+      <span class="tag ghost">Light theme</span>
+      <span class="tag ghost">Ritemark chrome, not VS Code default</span>
+    </div>
+  </div>
+
+  <!-- 1. FRONTMATTER AUTHORING -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">01</span><h2>Authoring a schedule</h2></div>
+    <p class="section-desc">The only setup interface is the agent file's frontmatter. The user writes a <code style="font-family:var(--font-mono);font-size:12px">schedule</code> block; Ritemark picks it up live, no restart.</p>
+    <div class="stage">
+      <div class="win">
+        <div class="win-title">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="tt">daily-brief.md — my-notes</span>
+        </div>
+        <div class="win-body">
+          <div class="editor">
+            <div class="tab">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              daily-brief.md
+            </div>
+            <div class="code fm-rail">
+<span class="c">---</span>
+<span class="k">title</span><span class="dim">:</span> <span class="s">Daily Brief</span>
+<span class="k">agent</span><span class="dim">:</span> <span class="s">claude-sonnet-4-6</span>
+<span class="k">schedule</span><span class="dim">:</span>
+  <span class="k">cron</span><span class="dim">:</span> <span class="s">"0 9 * * 1-5"</span>   <span class="c"># weekdays at 09:00</span>
+  <span class="k">label</span><span class="dim">:</span> <span class="s">"Daily brief"</span>
+  <span class="k">enabled</span><span class="dim">:</span> <span class="b">true</span>
+<span class="c">---</span>
+
+Summarise my open tasks, unread items, and
+calendar for today into a short morning brief.
+            </div>
+            <div class="hint">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              <span><b style="color:var(--ink-body);font-weight:600">enabled: false</b> pauses the schedule without deleting it. Editing the cron line takes effect the moment you save.</span>
+            </div>
+          </div>
+        </div>
+        <div class="statusbar">
+          <span class="sb-item brand">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            1 scheduled task
+          </span>
+          <span class="sb-spacer"></span>
+          <span class="sb-item">Markdown</span>
+          <span class="sb-item">UTF-8</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. STATUS BAR STATES -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">02</span><h2>Status bar — the live signal</h2></div>
+    <p class="section-desc">Scheduled runs happen in the background. The status bar is the always-visible signal that one is registered, running, or needs attention. One status item, three states.</p>
+    <div class="stage">
+      <div class="row">
+        <div class="col">
+          <div class="stage-label">Idle — task registered</div>
+          <div class="statusbar" style="border:1px solid var(--hairline);border-radius:var(--radius-md)">
+            <span class="sb-item brand">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              1 scheduled task
+            </span>
+            <span class="sb-spacer"></span>
+            <span class="sb-item">Ln 12, Col 4</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="stage-label">Running — pulsing</div>
+          <div class="statusbar" style="border:1px solid var(--hairline);border-radius:var(--radius-md)">
+            <span class="sb-item running">
+              <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke-linecap="round"/></svg>
+              Daily brief…
+            </span>
+            <span class="sb-spacer"></span>
+            <span class="sb-item">Ln 12, Col 4</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="stage-label">Needs attention — blocked run</div>
+          <div class="statusbar" style="border:1px solid var(--hairline);border-radius:var(--radius-md)">
+            <span class="sb-item alert">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+              1 needs review
+            </span>
+            <span class="sb-spacer"></span>
+            <span class="sb-item">Ln 12, Col 4</span>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--indigo)" stroke-width="2" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>Clicking the status item opens <b>Run history</b> (touchpoint 05). The pulse uses the indigo accent only — no green/red traffic-lighting per the design rules.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. COMPLETION TOAST -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">03</span><h2>Completion toast</h2></div>
+    <p class="section-desc">When a read-only run finishes, a dismissible toast surfaces the result without interrupting editing. Shows the label and the first line of the agent's output.</p>
+    <div class="stage dim">
+      <div class="toast-field">
+        <div class="toast toast-accent ok">
+          <div class="toast-in">
+            <div class="toast-head">
+              <span class="toast-icon ic-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span class="toast-title">Daily brief finished</span>
+              <span class="toast-close">×</span>
+            </div>
+          </div>
+          <div class="toast-body">
+            <span class="quote">"Here's your Monday 9 June brief: three meetings, two open PRs awaiting your review, and one overdue task…"</span>
+          </div>
+          <div class="toast-actions">
+            <button class="btn primary">Open result</button>
+            <button class="btn">Show history</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. BLOCKED TOAST -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">04</span><h2>Blocked toast — approval needed</h2></div>
+    <p class="section-desc">Unattended runs auto-approve reads but block writes and shell commands. The toast names exactly what was blocked so the user can decide. Amber, the earned warning tone — not red (nothing is broken).</p>
+    <div class="stage dim">
+      <div class="toast-field">
+        <div class="toast toast-accent warn">
+          <div class="toast-in">
+            <div class="toast-head">
+              <span class="toast-icon ic-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+              <span class="toast-title">Daily brief paused — approval needed</span>
+              <span class="toast-close">×</span>
+            </div>
+          </div>
+          <div class="toast-body">
+            Agent wants to write to <code>notes/2026-06-09.md</code>. Scheduled runs can't write unattended.
+          </div>
+          <div class="toast-actions">
+            <button class="btn primary">Review &amp; approve</button>
+            <button class="btn">Dismiss</button>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--indigo)" stroke-width="2" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span><b>Sprint 80 scope note:</b> the spec defers inline approve-from-history. The "Review &amp; approve" button is shown here as the <i>intended</i> path; if it doesn't land this sprint, the toast degrades to "Show history" only. Decision flagged for the plan.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. RUN HISTORY -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">05</span><h2>Run history</h2></div>
+    <p class="section-desc">Lives in the AI sidebar / Agent Library. Every scheduled run — completed, blocked, errored, in-progress — is recorded here. This is the durable record; toasts are ephemeral.</p>
+    <div class="stage dim">
+      <div class="panel">
+        <div class="panel-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <h3>Scheduled runs</h3>
+          <span class="count-pill">Today · 4</span>
+        </div>
+
+        <div class="run">
+          <span class="run-stat st-run"></span>
+          <div class="run-main">
+            <div class="run-top"><span class="run-label">Daily brief</span><span class="run-time">running…</span></div>
+            <div class="run-meta"><span class="file">daily-brief.md</span>·<span class="outcome oc-run">In progress</span></div>
+            <div class="run-out">Reading calendar and open tasks…</div>
+          </div>
+        </div>
+
+        <div class="run">
+          <span class="run-stat st-warn"></span>
+          <div class="run-main">
+            <div class="run-top"><span class="run-label">Weekly digest</span><span class="run-time">2 min ago</span></div>
+            <div class="run-meta"><span class="file">weekly-digest.md</span>·<span>0.8s</span>·<span class="outcome oc-warn">Blocked</span></div>
+            <div class="run-out">Wanted to write notes/2026-06-09.md — blocked, awaiting approval.</div>
+          </div>
+        </div>
+
+        <div class="run">
+          <span class="run-stat st-ok"></span>
+          <div class="run-main">
+            <div class="run-top"><span class="run-label">Daily brief</span><span class="run-time">yest. 09:00</span></div>
+            <div class="run-meta"><span class="file">daily-brief.md</span>·<span>3.1s</span>·<span class="outcome oc-ok">Completed</span></div>
+            <div class="run-out">Friday brief: two meetings, one PR merged, inbox at zero. Nothing overdue.</div>
+          </div>
+        </div>
+
+        <div class="run">
+          <span class="run-stat st-err"></span>
+          <div class="run-main">
+            <div class="run-top"><span class="run-label">Standup notes</span><span class="run-time">yest. 08:45</span></div>
+            <div class="run-meta"><span class="file">standup.md</span>·<span>0.2s</span>·<span class="outcome oc-err">Errored</span></div>
+            <div class="run-out">Model unavailable — no API key configured. Run skipped.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--indigo)" stroke-width="2" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>Each row: status dot · label · file · duration · outcome · first lines of output. Stored in <b>workspaceState</b> (DaemonResultStore). Isolated — none of this enters interactive chat history.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Static mockup · Ritemark Indigo-Editorial · for Sprint 80 design review. Not production code. Generated as a planning artifact under <code style="font-family:var(--font-mono)">docs/development/sprints/sprint-80-scheduled-tasks-daemon/mocks/</code>.
+  </div>
+
+</div>
+</body>
+</html>
