@@ -33,7 +33,9 @@ export type FlagId =
   | 'analytics'
   | 'browser-agent-control'
   // Sprint 76 R7: ACP + OpenCode BYOK runtime
-  | 'opencode-integration';
+  | 'opencode-integration'
+  // Sprint 80: scheduled agent tasks daemon
+  | 'scheduled-tasks-daemon';
 
 /**
  * Feature flag registry
@@ -116,6 +118,14 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     label: 'OpenCode Runtime',
     description: 'Open-source ACP agent that uses your own API keys (Gemini, GPT, Claude, OpenRouter)',
     status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  // Sprint 80: scheduled agent tasks. Disabled until Sprint 79 AgentRuntime is merged.
+  'scheduled-tasks-daemon': {
+    id: 'scheduled-tasks-daemon',
+    label: 'Scheduled Tasks Daemon',
+    description: 'Run AI agents on a schedule while Ritemark is open',
+    status: 'disabled',
     platforms: ['darwin', 'win32', 'linux'],
   },
 };

@@ -111,6 +111,21 @@
         "icon": "$(globe)"
       },
       {
+        "command": "ritemark.daemon.showScheduledRuns",
+        "title": "Show Scheduled Runs",
+        "category": "Ritemark"
+      },
+      {
+        "command": "ritemark.daemon.approveScheduledAction",
+        "title": "Approve Scheduled Action",
+        "category": "Ritemark"
+      },
+      {
+        "command": "ritemark.daemon.openResult",
+        "title": "Open Scheduled Run Result",
+        "category": "Ritemark"
+      },
+      {
         "command": "ritemark.browser.back",
         "title": "Back",
         "category": "Ritemark Browser",
