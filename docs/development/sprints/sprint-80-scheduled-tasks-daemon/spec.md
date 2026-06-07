@@ -14,31 +14,28 @@ This is for recurring tasks: daily briefings, weekly summaries, morning to-do ge
 
 ---
 
-## R1 — Scheduling an agent task via frontmatter
+## R1 — Scheduling an agent task in the Agent editor
 
-A Ritemark agent file (`.md`) can be scheduled by adding a `schedule` block to its frontmatter:
+The schedule is authored in the **Agent editor pane** (the structured left panel in `AgentConfiguratorPanel.tsx`), as a **Schedule** field group alongside Description / Model / Tools — not as hand-typed frontmatter. It follows the existing `SectionLabel` + `FieldRow` pattern. The fields serialize to a `schedule:` frontmatter block underneath:
 
 ```yaml
----
-title: Daily Brief
 schedule:
   cron: "0 9 * * 1-5"
   label: "Daily brief"
   enabled: true
----
 ```
 
-**Fields:**
+**Fields (as rendered in the editor):**
 
-| Field | Type | Required | Description |
+| Field | Control | Required | Description |
 |---|---|---|---|
-| `cron` | string | Yes | Standard 5-field cron expression (minute hour dom month dow) |
-| `label` | string | No | Human-readable name shown in status bar and run history. Falls back to file name. |
-| `enabled` | boolean | Yes | `true` to activate scheduling. Set to `false` to pause without deleting the schedule. |
+| Cron | mono `Input` + inline "Cron help" link | Yes | Standard 5-field cron expression (minute hour dom month dow) |
+| Label | text `Input` | No | Human-readable name shown in status bar and run history. Falls back to file name. |
+| Enabled | toggle `switch` | Yes | On to activate. Off pauses without deleting the schedule. |
 
 The schedule is per-file. One file = one schedule. A file with no `schedule` block is not scheduled.
 
-Ritemark watches the workspace for frontmatter changes. Editing a cron expression or toggling `enabled` takes effect without restarting the app.
+Ritemark watches the workspace for frontmatter changes. Editing the cron or toggling Enabled takes effect without restarting the app. (Raw frontmatter editing still works for power users — the editor is the primary path, not the only one.)
 
 ---
 
@@ -60,43 +57,26 @@ This means scheduled agents are safe to run unattended for read-only tasks (summ
 
 ---
 
-## R3 — Status bar and notifications
+## R3 — Status bar and notifications (VS Code native)
 
-Ritemark shows a live indicator during scheduled runs.
+Both surfaces use VS Code native primitives — no custom webview chrome. See `mocks/touchpoints.html` for the rendered states.
 
-**While a task is running:**
+**Status bar** — a native `StatusBarItem` (right-aligned, same idiom as `connectivity.ts` and the word-count item), with three states driven by codicon + text + `backgroundColor`:
 
-The status bar shows a pulsing indicator with the task label:
+| State | Render | Notes |
+|---|---|---|
+| Idle (task registered) | `$(clock) 1 scheduled` | accent foreground |
+| Running | `$(sync~spin) Daily brief…` | spinner codicon during the run |
+| Needs review (blocked run) | `$(warning) 1 needs review` | uses built-in `statusBarItem.warningBackground` (amber) |
 
-```
-⟳ Daily brief...
-```
+Clicking the item runs `ritemark.showScheduledRuns` → reveals the Library's Scheduled section.
 
-The indicator is visible in the bottom status bar for the duration of the run.
+**Notifications** — native VS Code toasts via `showInformationMessage` / `showWarningMessage`, with action buttons mapped to the return value:
 
-**When a task completes:**
+- *Completed:* info toast — label + first line of output. Buttons: **Open result**, **Show runs**.
+- *Blocked:* warning toast — names the blocked action (`notes/2026-06-09.md`). Buttons: **Review & approve** (depends on inline approval — see scope note), **Dismiss**.
 
-A toast notification appears with the task label and the first line of the agent's output:
-
-```
-Daily brief finished
-"Here's your summary for Monday 9 June: three meetings, two open PRs..."
-```
-
-The toast is dismissible. It does not interrupt editing.
-
-**When a task is blocked (file write or shell command):**
-
-A toast notification appears explaining what was blocked:
-
-```
-Daily brief paused — approval needed
-Agent wants to write to "notes/2026-06-09.md". Open run history to review.
-```
-
-**Run history:**
-
-All completed and blocked runs are stored and viewable. Each entry shows: task label, file path, start time, duration, outcome (completed / blocked / errored), and the first lines of output.
+**Run history** — surfaced as a new collapsible **SCHEDULED** section in the Agent Library (between COMMANDS and FLOWS), reusing the existing `.section-header` + `.item` markup in `AgentLibraryViewProvider.ts`. Each row: status-tinted 32×32 icon chip · label · relative time · description (first lines of output) · outcome pill (Completed / Blocked / Errored / In progress), with the amber `.item-hint` style when an action is needed. Stored in `workspaceState` (DaemonResultStore), isolated from interactive chat history.
 
 ---
 
