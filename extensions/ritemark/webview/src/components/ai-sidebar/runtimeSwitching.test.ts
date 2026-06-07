@@ -87,6 +87,7 @@ function testCancelRequestRoutesToCodexWhenCodexIsRunning() {
   try {
     useAISidebarStore.setState({
       ...useAISidebarStore.getState(),
+      selectedAgent: 'codex',
       codexConversation: [makeCodexTurn({ isRunning: true })],
       agentConversation: [],
     });
@@ -94,12 +95,12 @@ function testCancelRequestRoutesToCodexWhenCodexIsRunning() {
     useAISidebarStore.getState().cancelRequest();
 
     assert.ok(
-      posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'codex-cancel'),
-      'cancelRequest must send codex-cancel when Codex has a running turn'
+      posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'codex'),
+      'cancelRequest must send agent-cancel with agentId=codex when Codex has a running turn'
     );
     assert.ok(
-      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'ai-cancel-agent'),
-      'cancelRequest must not send ai-cancel-agent when only Codex is running'
+      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'claude-code'),
+      'cancelRequest must not send agent-cancel with agentId=claude-code when only Codex is running'
     );
     const { codexConversation } = useAISidebarStore.getState();
     assert.equal(codexConversation[0].isRunning, false, 'cancelled Codex turn must be marked not running');
@@ -125,12 +126,12 @@ function testCancelRequestRoutesToClaudeWhenClaudeIsRunning() {
     useAISidebarStore.getState().cancelRequest();
 
     assert.ok(
-      posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'ai-cancel-agent'),
-      'cancelRequest must send ai-cancel-agent when Claude has a running turn'
+      posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'claude-code'),
+      'cancelRequest must send agent-cancel with agentId=claude-code when Claude has a running turn'
     );
     assert.ok(
-      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'codex-cancel'),
-      'cancelRequest must not send codex-cancel when only Claude is running'
+      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'codex'),
+      'cancelRequest must not send agent-cancel with agentId=codex when only Claude is running'
     );
     const { agentConversation } = useAISidebarStore.getState();
     assert.equal(agentConversation[0].isRunning, false, 'cancelled Claude turn must be marked not running');
@@ -149,6 +150,7 @@ function testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns() {
   try {
     useAISidebarStore.setState({
       ...useAISidebarStore.getState(),
+      selectedAgent: 'codex',
       codexConversation: [makeCodexTurn({ isRunning: true })],
       agentConversation: [makeAgentTurn({ isRunning: true })],
     });
@@ -156,11 +158,11 @@ function testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns() {
     useAISidebarStore.getState().cancelRequest();
 
     assert.ok(
-      posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'codex-cancel'),
+      posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'codex'),
       'cancelRequest must target Codex first when both runtimes have running turns'
     );
     assert.ok(
-      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'ai-cancel-agent'),
+      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'claude-code'),
       'cancelRequest must not double-cancel Claude when Codex is already targeted'
     );
   } finally {
@@ -184,12 +186,8 @@ function testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning() {
     useAISidebarStore.getState().cancelRequest();
 
     assert.ok(
-      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'codex-cancel'),
-      'cancelRequest must not send codex-cancel when Codex is not running'
-    );
-    assert.ok(
-      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'ai-cancel-agent'),
-      'cancelRequest must not send ai-cancel-agent when Claude is not running'
+      !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'agent-cancel'),
+      'cancelRequest must not send agent-cancel when neither runtime is running'
     );
     assert.equal(posted.length, 0, 'cancelRequest must post no messages when neither runtime is running');
   } finally {

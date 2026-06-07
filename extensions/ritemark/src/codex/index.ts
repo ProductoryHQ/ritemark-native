@@ -29,3 +29,4 @@ export {
 } from './codexStatusEvents';
 export * from './codexProtocol';
 export { routeApprovalRequest } from './codexApproval';
+export { CodexRuntime, type CodexSidebarStatus } from './CodexRuntime';

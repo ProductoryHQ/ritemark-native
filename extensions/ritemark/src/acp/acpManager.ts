@@ -41,6 +41,11 @@ export interface AcpManagerConfig {
   args?: string[];
   /** Provider/BYOK env vars injected at spawn (merged over process.env). */
   byokEnv?: Record<string, string>;
+  /**
+   * MCP stdio server descriptors to pass to session/new. Populated by
+   * BrowserToolsInjector when the browser-agent-control feature flag is on.
+   */
+  mcpServers?: unknown[];
   /** Permission handler — Phase 4 renders the approval UI. */
   requestPermission: (params: RequestPermissionRequest) => Promise<RequestPermissionResponse>;
   /** Write approval gate for the fs proxy (R4 — no silent writes). */
@@ -105,7 +110,7 @@ export class AcpManager {
 
     this.emit('init', 'Starting OpenCode session…');
     await this.client.initialize();
-    const session = await this.client.newSession(this.config.workspaceRoot);
+    const session = await this.client.newSession(this.config.workspaceRoot, this.config.mcpServers);
     this.sessionId = session.sessionId;
     traceAcp('manager', 'started', { sessionId: this.sessionId });
     return this.sessionId;

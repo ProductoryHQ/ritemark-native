@@ -57,7 +57,9 @@ These are locked for this sprint. Changes require Jarmo sign-off:
 
 | Q | Question | Default if Jarmo unavailable |
 |---|---|---|
+| Q3 | Daemon cron dependency | **RESOLVED: add `cron-parser`** — FlowScheduler going deprecated, cron-parser is the canonical path |
 | Q4 | Clean break on message rename (`agent-execute` replaces `ai-execute-agent` etc.) vs migration period? | Clean break (no migration window) — conversation history is reset on upgrade anyway |
+| Q_browser | ACP browser control approach | **OPEN — pending web research** — Phase 0 audit found stdio adapter needed; researching alternatives |
 
 ## Definition of Done
 

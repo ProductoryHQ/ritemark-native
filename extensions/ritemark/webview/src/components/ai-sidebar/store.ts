@@ -448,7 +448,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       data: att.data,
       mediaType: att.mediaType,
     }));
-    vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile, skipBrowserContext: options?.skipBrowserContext, mentionedAgentPaths: options?.mentionedAgentPaths });
+    vscode.postMessage({ type: 'agent-execute', agentId: 'claude-code', prompt: fullPrompt, attachments: attachmentPayload, skipActiveFile: options?.skipActiveFile, skipBrowserContext: options?.skipBrowserContext, mentionedAgentPaths: options?.mentionedAgentPaths });
   },
 
   dismissSelectedContext: () => {
@@ -555,12 +555,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const hasRunningClaude = state.agentConversation.some((t) => t.isRunning);
 
     if (hasRunningCodex) {
-      // OpenCode uses acp-cancel; Codex uses codex-cancel
-      if (state.selectedAgent === 'opencode') {
-        vscode.postMessage({ type: 'acp-cancel' });
-      } else {
-        vscode.postMessage({ type: 'codex-cancel' });
-      }
+      const agentId = state.selectedAgent;
+      vscode.postMessage({ type: 'agent-cancel', agentId });
       const conv = [...state.codexConversation];
       const last = conv[conv.length - 1];
       if (last?.isRunning) {
@@ -568,7 +564,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       }
       set({ codexConversation: conv });
     } else if (hasRunningClaude) {
-      vscode.postMessage({ type: 'ai-cancel-agent' });
+      vscode.postMessage({ type: 'agent-cancel', agentId: 'claude-code' });
       const conv = [...state.agentConversation];
       const last = conv[conv.length - 1];
       if (last?.isRunning) {
@@ -658,9 +654,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     );
     set({ agentConversation: conv });
     vscode.postMessage({
-      type: 'agent-answer-plan',
-      toolUseId: targetTurn.pendingPlanApproval.toolUseId,
+      type: 'agent-approve',
+      agentId: 'claude-code',
+      requestId: targetTurn.pendingPlanApproval.toolUseId,
       approved: true,
+      alwaysAllow: false,
     });
   },
 
@@ -683,10 +681,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     );
     set({ agentConversation: conv });
     vscode.postMessage({
-      type: 'agent-answer-plan',
-      toolUseId: targetTurn.pendingPlanApproval.toolUseId,
+      type: 'agent-approve',
+      agentId: 'claude-code',
+      requestId: targetTurn.pendingPlanApproval.toolUseId,
       approved: false,
-      feedback,
+      alwaysAllow: false,
     });
   },
 
@@ -758,15 +757,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
     set({ codexConversation: [...state.codexConversation, turn] });
     vscode.postMessage({
-      type: 'codex-execute',
+      type: 'agent-execute',
+      agentId: 'codex',
       prompt: fullPrompt,
       model: state.codexSelectedModel,
-      // The Edit/Plan toggle in ChatInput sets pendingRuntime.mode; until
-      // 51095ad this never reached the extension because mode wasn't on
-      // the wire. Now it is — Codex collaboration mode actually responds
-      // to the toggle.
-      mode: requestedMode,
-      skipBrowserContext,
       attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
     });
   },
@@ -811,7 +805,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     };
 
     set({ codexConversation: [...state.codexConversation, turn] });
-    vscode.postMessage({ type: 'acp-execute', prompt, model });
+    vscode.postMessage({ type: 'agent-execute', agentId: 'opencode', prompt, model });
   },
 
   handleCodexApproval: (requestId, approved, alwaysAllow?) => {
@@ -823,9 +817,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     set({ codexConversation: conv });
     // ACP approvals (requestId starts with "acp-") use a different message type
     if (typeof requestId === 'string' && requestId.startsWith('acp-')) {
-      vscode.postMessage({ type: 'acp-approval-response', requestId, approved, alwaysAllow });
+      vscode.postMessage({ type: 'agent-approve', agentId: 'opencode', requestId, approved, alwaysAllow });
     } else {
-      vscode.postMessage({ type: 'codex-approve', requestId, approved });
+      vscode.postMessage({ type: 'agent-approve', agentId: 'codex', requestId, approved, alwaysAllow: false });
     }
   },
 
@@ -858,10 +852,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     }
     set({ codexConversation: conversation });
     vscode.postMessage({
-      type: 'codex-execute',
+      type: 'agent-execute',
+      agentId: 'codex',
       prompt,
       model: state.codexSelectedModel,
-      mode: 'execute',
     });
   },
 

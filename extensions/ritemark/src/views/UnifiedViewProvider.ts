@@ -32,7 +32,6 @@ const CLAUDE_AGENT_SDK_VERSION: string | null = (() => {
 let cachedDiscoveredClaudeModels: ModelOption[] | null = null;
 let claudeModelDiscoveryInFlight = false;
 import {
-  AgentSession,
   AGENTS,
   CLAUDE_FALLBACK_MODELS,
   DEFAULT_MODEL,
@@ -56,10 +55,6 @@ import {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
   type AgentId,
-  type AgentPlanApprovalRequest,
-  type AgentProgress,
-  type AgentQuestion,
-  type FileAttachment,
   type ModelOption,
   type SetupStatus,
   type AgentEnvironmentStatus,
@@ -68,152 +63,30 @@ import {
 } from '../agent';
 import { BrowserContextStore } from '../browser/BrowserContextStore';
 import { createBrowserMcpServer, BROWSER_MCP_SERVER_NAME, BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
-import { buildCodexBrowserDynamicTools, isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
-import { browserNavigate, formatActionResultForAgent } from '../browser/BrowserActionTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
-import { CodexAppServer, CodexAuth, CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, routeApprovalRequest, traceCodex, type CodexCompatibilityStatus } from '../codex';
+import { CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
-import { AcpManager, buildByokEnv, byokProviderFlags, BYOK_SECRET_KEYS, traceAcp, type ByokKeys, type ByokProviderFlags } from '../acp';
-import { findBundledAgentRuntime } from '../utils/bundledAgentRuntime';
+import { byokProviderFlags, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
+// Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
+import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
+import { ClaudeCodeRuntime } from '../agent/ClaudeCodeRuntime';
+import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
+import { AcpRuntime } from '../acp/AcpRuntime';
 import { BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
-import type {
-  RequestPermissionRequest,
-  RequestPermissionResponse,
-  WriteTextFileRequest,
-} from '@agentclientprotocol/sdk';
+import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
+import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 
-type CodexSidebarStatus = {
-  enabled: boolean;
-  state: 'disabled' | 'checking' | 'broken-install' | 'needs-auth' | 'auth-in-progress' | 'ready';
-  version: string | null;
-  authMethod: 'apiKey' | 'chatgpt' | null;
-  email: string | null;
-  plan: string | null;
-  error: string | null;
-  diagnostics: string[];
-  repairCommand: string | null;
-  binaryPath: string | null;
-  compatibility: CodexCompatibilityStatus | null;
-};
-
-const CODEX_BASE_INSTRUCTIONS = [
-  'You are running inside Ritemark — a markdown editor, not a code IDE.',
-  'When the user asks you to modify, edit, simplify, rewrite, translate, or change text in the active file, use your file editing tools (apply_patch) to make the change directly in the file.',
-  'Do NOT paraphrase the modification in chat when the user clearly wants a file edit — actually apply it.',
-  'Reply text after a file edit should briefly confirm what changed, not restate the new text.',
-  'Prefer structured protocol features over free-form text when the protocol supports them.',
-].join(' ');
-
-const CODEX_PLAN_DEVELOPER_INSTRUCTIONS = [
-  'When you need the user to choose between options or provide required clarifications before continuing, you must use the request_user_input tool instead of asking in plain assistant text.',
-  'Do not present a question as normal chat text if request_user_input can express it.',
-  'When you produce a plan, prefer structured plan updates over embedding the whole plan only in prose.',
-  'If you already asked for user input via request_user_input, wait for the answer instead of ending the turn with the question rendered as plain text.',
-].join(' ');
-
-const CODEX_PLAN_TURN_REMINDER = [
-  'Ritemark runtime reminder:',
-  '- If you need the user to answer a question or choose from options, you must call request_user_input.',
-  '- Do not ask the question in normal assistant text when request_user_input can represent it.',
-  '- If the user explicitly asked for multiple-choice questions, use request_user_input for them.',
-  '- After calling request_user_input, wait for the answer instead of finishing the turn with the question in prose.',
-].join('\n');
-
-const CODEX_BROWSER_REMINDER = [
-  'Browser instructions:',
-  '- When the user asks to open a URL, navigate, browse, or interact with a web page, you MUST use the `ritemark_browser_navigate` tool (and other `ritemark_browser_*` tools).',
-  '- NEVER open URLs through shell commands like `open`, `xdg-open`, or any system-browser path — those launch the user\'s default external browser (Chrome / Edge / Safari), which is the wrong surface.',
-  '- The user\'s expectation is that the page opens inside the integrated Ritemark browser tab so they can see what you see and you can act on it.',
-  '- If the URL is ambiguous (e.g. user says "go to my company website" without an exact URL), use web search to resolve the exact URL first, then call `ritemark_browser_navigate` with that URL.',
-  '- Use `ritemark_browser_fill` for form fields when a ref/selector is available. Use `ritemark_browser_type` only for keyboard shortcuts or after an editable field is focused.',
-].join('\n');
-
-const CLAUDE_BROWSER_APPEND = [
-  'Browser routing (Ritemark-specific):',
-  '- For any request to open, navigate, browse, click, fill, type, or scroll a web page, use the `mcp__ritemark_browser__*` tools (browser_navigate, browser_click, browser_fill, browser_type, browser_scroll).',
-  '- NEVER use Bash to run `open <url>`, `xdg-open <url>`, or otherwise launch the system default browser — that opens Chrome/Edge/Safari, which is the wrong surface. The user expects the page to load inside the integrated Ritemark browser.',
-  '- If the URL is ambiguous (e.g. "my company website"), use WebFetch or WebSearch to resolve the exact URL first, THEN call `browser_navigate` with the resolved URL.',
-  '- `browser_navigate` will create a new tab if none exists and reuse the first existing tab otherwise — call it directly when the user says "open browser and go to X".',
-].join('\n');
-
-function shouldStartCodexInPlanMode(prompt: string): boolean {
-  return /\bplan mode\b/i.test(prompt)
-    || /\bwork in plan\b/i.test(prompt)
-    || /\benter plan mode\b/i.test(prompt);
-}
-
-function extractRequestedBrowserUrl(prompt: string): string | null {
-  const hasNavigationIntent = /\b(open|go to|navigate|browse|load|visit|ava|mine|liigu|navigeeri)\b/i.test(prompt);
-  if (!hasNavigationIntent) {
-    return null;
-  }
-
-  const explicitUrl = prompt.match(/\bhttps?:\/\/[^\s<>"')]+/i)?.[0];
-  if (explicitUrl) {
-    return explicitUrl.replace(/[.,;:!?]+$/, '');
-  }
-
-  const domain = prompt.match(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<>"')]+)?/i)?.[0];
-  if (!domain) {
-    return null;
-  }
-  return `https://${domain.replace(/[.,;:!?]+$/, '')}`;
-}
-
-/**
- * Render a Codex turn error into a user-readable string.
- *
- * The Codex app-server delivers turn errors as opaque JSON objects shaped
- * `{ type, message, ... }`. Calling `String(error)` on such an object yields
- * the literal "[object Object]", which surfaced in the AI sidebar after a
- * stale-auth turn (the user signed out elsewhere and the next turn returned
- * an unauthenticated error). This formatter prefers `.message`, falls back to
- * the JSON shape so we still see what came over the wire, and returns
- * undefined when there is no error to propagate.
- */
-function formatCodexTurnError(error: unknown): string | undefined {
-  if (error == null) {
-    return undefined;
-  }
-  if (typeof error === 'string') {
-    return error.trim() || undefined;
-  }
-  if (error instanceof Error) {
-    return error.message || error.name;
-  }
-  if (typeof error === 'object') {
-    const maybeMessage = (error as { message?: unknown }).message;
-    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
-      return maybeMessage;
-    }
-    try {
-      return JSON.stringify(error);
-    } catch {
-      return undefined;
-    }
-  }
-  return String(error);
-}
+const BROWSER_ROUTING_HINT = 'Ritemark has an integrated browser. When opening URLs or browsing the web, prefer the mcp__ritemark_browser__* tools over Bash open/xdg-open commands.';
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
 
   private _view?: vscode.WebviewView;
   private _activeAbortController: AbortController | null = null;
-  private _agentSession: AgentSession | null = null;
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
 
-  // Codex state
-  private _codexAppServer: CodexAppServer | null = null;
-  private _codexAuth: CodexAuth | null = null;
-  private _codexThreadId: string | null = null;
-  private _codexTurnId: string | null = null;
-  private _codexBrowserToolsEnabledForThread = false;
-  private _codexBrowserToolQueue: Promise<void> = Promise.resolve();
-  private _codexLoginInProgress = false;
-  private _codexLoginPoll: ReturnType<typeof setInterval> | null = null;
   private _disposeCodexStatusListener: (() => void) | null = null;
   private _claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
   private _claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
@@ -225,24 +98,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private static readonly ANNOTATION_SCREENSHOT_TTL_MS = 5000;
   private _annotationScreenshotCache: { url: string; dataUrl: string; capturedAt: number } | null = null;
 
-  // Sprint 76 R4/R5: ACP/OpenCode runtime state. One manager per live session;
-  // model is applied per turn. Pending permission/write approvals are keyed by a
-  // request id and resolved when the webview posts 'acp-approval-response'.
-  private _acpManager: AcpManager | null = null;
-  private _acpModel: string | null = null;
-  private _acpPendingApprovals = new Map<
-    string,
-    (decision: { approved: boolean; alwaysAllow: boolean }) => void
-  >();
-  private _acpApprovalSeq = 0;
-  /** Provider/model pairs the user "always allowed" for the current session. */
-  private _acpSessionAlwaysAllow = new Set<string>();
   /** Sprint 78 (stretch): BYOK secret-change subscription (see constructor). */
   private _secretsChangeListener?: vscode.Disposable;
-  // Files whose `edit` was just approved via session/request_permission. The
-  // follow-up fs/write_text_file for the same file is auto-allowed so the user
-  // is not prompted twice for one edit (the permission is the real gate).
-  private _acpRecentlyPermissionedWrites = new Set<string>();
+
+  private _runtimeRegistry: RuntimeRegistry;
+  private _approvalGate: UnifiedApprovalGate;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -255,14 +115,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
       void this._handleExternalClaudeStatusInvalidation(event.reason);
     });
-    // Sprint 78 (stretch): the Settings webview writes BYOK keys to the SAME
-    // SecretStorage; refresh the OpenCode provider flags in the AI sidebar as
-    // soon as one is saved or removed so the model picker updates without a
-    // window reload.
     this._secretsChangeListener = this._secrets?.onDidChange((e) => {
       if (BYOK_SECRET_KEYS.includes(e.key)) {
         void this._sendAcpProviders();
       }
+    });
+
+    this._runtimeRegistry = new RuntimeRegistry(new Map<AgentId, AgentRuntime>([
+      ['claude-code', new ClaudeCodeRuntime()],
+      ['codex', new CodexRuntime()],
+      ['opencode', new AcpRuntime()],
+    ]));
+    this._approvalGate = new UnifiedApprovalGate((req) => {
+      this._view?.webview.postMessage({ type: 'agent-approval-request', ...req });
     });
   }
 
@@ -348,54 +213,43 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'ai-select-model':
-          // Persist model selection and recreate session with new model
-          await vscode.workspace.getConfiguration('ritemark.ai').update(
-            'selectedModel',
-            message.modelId,
-            vscode.ConfigurationTarget.Global
-          );
-          // Close existing session so next message uses the new model
-          if (this._agentSession) {
-            this._agentSession.close();
-            this._agentSession = null;
-          }
+          await vscode.workspace.getConfiguration('ritemark.ai').update('selectedModel', message.modelId, vscode.ConfigurationTarget.Global);
+          this._runtimeRegistry.get('claude-code')?.dispose();
           break;
 
         case 'pin-agent-request':
           this.pinAgent(message.agentId, message.filePath);
           break;
 
-        case 'ai-execute-agent':
-          traceClaude('webview->extension', 'ai-execute-agent', {
-            promptPreview: message.prompt?.slice(0, 200),
-            imageCount: Array.isArray(message.images) ? message.images.length : 0,
-            skipActiveFile: message.skipActiveFile === true,
-          });
-          await this._handleAgentExecution(message.prompt, message.images, message.skipActiveFile, message.mentionedAgentPaths, message.skipBrowserContext === true);
+        case 'agent-execute': {
+          const { agentId, prompt, model, attachments } = message;
+          const runtime = this._runtimeRegistry.get(agentId as import('../agent/types').AgentId);
+          const sessionConfig: RuntimeSessionConfig = {
+            workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
+            model,
+            extraSystemPrompt: BROWSER_ROUTING_HINT,
+            onProgress: (progress) => this._view?.webview.postMessage({ type: 'agent-progress', agentId, progress }),
+            onApprovalRequest: (req) => this._approvalGate.request(req),
+          };
+          await runtime.start(sessionConfig);
+          await runtime.prompt({ prompt, attachments });
           break;
+        }
 
-        case 'ai-cancel-agent':
-          traceClaude('webview->extension', 'ai-cancel-agent');
-          if (this._agentSession?.isActive) {
-            this._agentSession.interrupt();
-          }
+        case 'agent-cancel': {
+          const runtime = this._runtimeRegistry.get(message.agentId as import('../agent/types').AgentId);
+          await runtime.cancel();
           break;
+        }
 
         case 'agent-answer-question':
-          traceClaude('webview->extension', 'agent-answer-question', {
-            toolUseId: message.toolUseId,
-            answerKeys: Object.keys(message.answers || {}),
-          });
-          this._handleAgentQuestionAnswer(message.toolUseId, message.answers || {});
+          traceClaude('webview->extension', 'agent-answer-question', { toolUseId: message.toolUseId });
+          (this._runtimeRegistry.get('claude-code') as import('../agent/ClaudeCodeRuntime').ClaudeCodeRuntime)
+            .answerQuestion(message.toolUseId, message.answers || {});
           break;
 
-        case 'agent-answer-plan':
-          traceClaude('webview->extension', 'agent-answer-plan', {
-            toolUseId: message.toolUseId,
-            approved: message.approved === true,
-            hasFeedback: Boolean(message.feedback?.trim()),
-          });
-          this._handleAgentPlanAnswer(message.toolUseId, message.approved === true, message.feedback);
+        case 'agent-approve':
+          this._approvalGate.respond(message.requestId, message.approved === true, message.alwaysAllow === true);
           break;
 
         case 'agent-setup:install':
@@ -457,16 +311,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         // Codex messages
-        case 'codex-execute':
-          traceCodex('webview->extension', 'codex-execute', {
-            promptPreview: typeof message.prompt === 'string' ? message.prompt.slice(0, 200) : '',
-            model: message.model,
-            mode: message.mode,
-            attachmentCount: Array.isArray(message.attachments) ? message.attachments.length : 0,
-          });
-          await this._handleCodexExecution(message.prompt, message.model, message.attachments, message.mode, message.skipBrowserContext === true);
-          break;
-
         case 'codex:login':
           await this._handleCodexLogin();
           break;
@@ -493,51 +337,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           await vscode.commands.executeCommand('ritemark.aiSettings');
           break;
 
-        case 'codex-cancel':
-          traceCodex('webview->extension', 'codex-cancel');
-          this._handleCodexCancel();
-          break;
-
-        case 'codex-approve':
-          traceCodex('webview->extension', 'codex-approve', {
-            requestId: message.requestId,
-            approved: message.approved,
-          });
-          this._handleCodexApproval(message.requestId, message.approved);
-          break;
-
         case 'codex-answer-question':
-          traceCodex('webview->extension', 'codex-answer-question', {
-            requestId: message.requestId,
-            answers: message.answers,
-          });
-          this._handleCodexQuestionAnswer(
-            message.requestId,
-            message.answers && typeof message.answers === 'object' ? message.answers : {}
-          );
+          traceCodex('webview->extension', 'codex-answer-question', { requestId: message.requestId });
+          (this._runtimeRegistry.get('codex') as CodexRuntime).answerQuestion(message.requestId, message.answers || {});
           break;
 
         case 'conversation:reset':
           traceCodex('webview->extension', 'conversation:reset');
           this._resetProviderSessions();
-          break;
-
-        // ── ACP / OpenCode (Sprint 76 R4/R5/R6) ──
-        // Mirrors the codex-execute / codex-cancel / codex-approve trio.
-        case 'acp-execute':
-          await this._handleAcpExecution(message.prompt, message.model);
-          break;
-
-        case 'acp-cancel':
-          await this._handleAcpCancel();
-          break;
-
-        case 'acp-approval-response':
-          this._handleAcpApprovalResponse(
-            message.requestId,
-            message.approved === true,
-            message.alwaysAllow === true,
-          );
           break;
 
         // Sprint 76 R3a: return provider-configured booleans (never key values)
@@ -562,10 +369,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('ritemark.chat.fontSize')) {
         this._sendChatFontSize();
-      }
-      // Reset Codex thread when approval/sandbox settings change so new values take effect
-      if (e.affectsConfiguration('ritemark.codex.approvalPolicy') || e.affectsConfiguration('ritemark.codex.sandboxMode')) {
-        this._codexThreadId = null;
       }
     });
 
@@ -653,14 +456,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   public dispose() {
-    this._agentSession?.close();
-    this._codexAppServer?.dispose();
-    this._disposeAcpRuntime(); // Sprint 76 R5
-    this._stopCodexLoginPolling();
+    this._runtimeRegistry.get('opencode')?.dispose();
+    (this._runtimeRegistry.get('codex') as CodexRuntime).stopLoginPolling();
     this._stopClaudeLoginPolling();
     this._disposeCodexStatusListener?.();
     this._disposeClaudeStatusListener?.();
     this._secretsChangeListener?.dispose();
+    this._runtimeRegistry.dispose(); // Sprint 79
     if (this._browserContextPoll) {
       clearInterval(this._browserContextPoll);
       this._browserContextPoll = null;
@@ -693,18 +495,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Get unified onboarding status, including Codex CLI state.
    */
   private async _getOnboardingStatus(): Promise<OnboardingStatus> {
-    const codexManager = new CodexManager();
-    const codexBinary = await codexManager.getBinaryStatus();
-    // Use live auth state if Codex runtime is booted, otherwise false.
-    // The onboarding status is re-sent on every auth change, so the first
-    // render being conservative (false) is self-correcting.
-    const codexAuthenticated = this._codexAuth?.isAuthenticated() ?? false;
+    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
+    const codexStatus = await rt.getCodexSidebarStatus();
+    const codexAuthenticated = codexStatus.state === 'ready';
+    const codexCliInstalled = codexStatus.state !== 'disabled' && codexStatus.state !== 'broken-install';
     const keyManager = getAPIKeyManager();
     const hasOpenAiKey = keyManager ? await keyManager.hasAPIKey() : false;
 
     return getOnboardingStatus({
       hasOpenAiKey,
-      codexCliInstalled: codexBinary.runnable,
+      codexCliInstalled,
       codexCliAuthenticated: codexAuthenticated,
     });
   }
@@ -759,7 +559,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const discoveredAgents = workspacePath ? discoverAgents(workspacePath) : [];
     const discoveredCommands = workspacePath ? discoverCommands(workspacePath) : [];
-    const codexStatus = await this._getCodexSidebarStatus();
+    const codexStatus = await (this._runtimeRegistry.get('codex') as CodexRuntime).getCodexSidebarStatus();
 
     // Filter agents based on feature flags; exclude deprecated agents from the selector
     const opencodeEnabled = isEnabled('opencode-integration');
@@ -850,27 +650,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     if (!isEnabled('codex-integration')) {
       return;
     }
-
+    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
     if (reason === 'login-started') {
-      this._codexLoginInProgress = true;
-      this._startCodexLoginPolling();
-    } else if (reason === 'logout') {
-      this._codexLoginInProgress = false;
-      this._stopCodexLoginPolling();
-      // Dispose the AI sidebar's Codex app-server so the next getStatus call
-      // spawns a fresh subprocess that re-reads ~/.codex/auth.json (now empty
-      // after logout in another surface). Without this, the cached app-server
-      // keeps reporting the previous authenticated account, leaving the AI
-      // sidebar showing chat instead of the SetupWizard.
-      this._disposeCodexRuntime();
-    } else if (reason === 'login-finished') {
-      this._codexLoginInProgress = false;
-      this._stopCodexLoginPolling();
-      // Same reasoning as logout — the auth file changed under us. Dispose
-      // the local app-server so the next status read picks up the new token.
-      this._disposeCodexRuntime();
+      rt.setLoginInProgress(true);
+      rt.startLoginPolling((s) => this._postCodexSidebarStatus(s));
+    } else if (reason === 'logout' || reason === 'login-finished') {
+      rt.stopLoginPolling();
+      rt.dispose();
     }
-
     await this._sendCodexSidebarStatus();
     this._sendOnboardingStatus();
   }
@@ -935,113 +722,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }, 2000);
   }
 
-  private _ensureCodexRuntime(): CodexAppServer {
-    if (this._codexAppServer) {
-      return this._codexAppServer;
-    }
-
-    this._codexAppServer = new CodexAppServer({ trace: traceCodex });
-    this._codexAuth = new CodexAuth(this._codexAppServer);
-    traceCodex('runtime', 'created codex app-server runtime');
-
-    this._codexAuth.on('statusChanged', (status) => {
-      if (!status.authenticated) {
-        this._resetCodexSessionState();
-      }
-      void this._sendCodexSidebarStatus();
-    });
-
-    this._codexAuth.on('loginComplete', (event: { success: boolean }) => {
-      this._codexLoginInProgress = false;
-      this._stopCodexLoginPolling();
-      if (event.success) {
-        emitCodexStatusInvalidated('login-finished');
-      }
-      void this._sendCodexSidebarStatus();
-    });
-
-    // Phase F: forward in-flight progress notifications (e.g. slow
-    // thread/start) to the AI sidebar so the user sees that the runtime is
-    // still working rather than a frozen UI. Distinct from 'codex-progress'
-    // which carries AgentProgress events for turn execution.
-    this._codexAppServer.on('progress', (event: { method: string; message: string }) => {
-      this._view?.webview.postMessage({
-        type: 'codex-rpc-progress',
-        method: event.method,
-        message: event.message,
-      });
-    });
-
-    this._setupCodexEventListeners();
-    return this._codexAppServer;
-  }
-
-  private _disposeCodexRuntime(): void {
-    traceCodex('runtime', 'disposing codex runtime', {
-      hadThreadId: this._codexThreadId,
-      hadTurnId: this._codexTurnId,
-    });
-    this._codexAppServer?.dispose();
-    this._codexAppServer = null;
-    this._codexAuth = null;
-    this._codexLoginInProgress = false;
-    this._stopCodexLoginPolling();
-    this._resetCodexSessionState();
-  }
-
   private _resetProviderSessions(): void {
     traceCodex('runtime', 'reset provider sessions');
-    this._agentSession?.close();
-    this._agentSession = null;
-    this._disposeCodexRuntime();
-    // Sprint 76 R5: tear down the OpenCode session too.
-    this._disposeAcpRuntime();
-    this._acpModel = null;
-  }
-
-  private _resetCodexSessionState(): void {
-    traceCodex('runtime', 'reset session state', {
-      threadId: this._codexThreadId,
-      turnId: this._codexTurnId,
-      browserToolsEnabledForThread: this._codexBrowserToolsEnabledForThread,
-    });
-    this._codexThreadId = null;
-    this._codexTurnId = null;
-    this._codexBrowserToolsEnabledForThread = false;
-    this._codexBrowserToolQueue = Promise.resolve();
-  }
-
-  private _stopCodexLoginPolling(): void {
-    if (this._codexLoginPoll) {
-      clearInterval(this._codexLoginPoll);
-      this._codexLoginPoll = null;
-    }
-  }
-
-  private _startCodexLoginPolling(): void {
-    this._stopCodexLoginPolling();
-
-    let attempts = 0;
-    this._codexLoginPoll = setInterval(() => {
-      attempts += 1;
-
-      void (async () => {
-        const status = await this._getCodexSidebarStatus();
-        this._postCodexSidebarStatus(status);
-
-        if (status.state === 'ready') {
-          this._codexLoginInProgress = false;
-          this._stopCodexLoginPolling();
-          return;
-        }
-
-        if (attempts >= 60) {
-          this._codexLoginInProgress = false;
-          this._stopCodexLoginPolling();
-          await this._sendCodexSidebarStatus();
-        }
-      })();
-    }, 2000);
+    this._runtimeRegistry.getAll().forEach(r => r.dispose());
   }
 
   private _postCodexSidebarStatus(status: CodexSidebarStatus): void {
@@ -1052,144 +735,38 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _sendCodexSidebarStatus(): Promise<void> {
-    this._postCodexSidebarStatus(await this._getCodexSidebarStatus());
-  }
-
-  private async _getCodexSidebarStatus(): Promise<CodexSidebarStatus> {
-    if (!isEnabled('codex-integration')) {
-      return {
-        enabled: false,
-        state: 'disabled',
-        version: null,
-        authMethod: null,
-        email: null,
-        plan: null,
-        error: null,
-        diagnostics: [],
-        repairCommand: null,
-        binaryPath: null,
-        compatibility: null,
-      };
-    }
-
-    const codexManager = new CodexManager();
-    const binaryStatus = await codexManager.getBinaryStatus();
-
-    if (!binaryStatus.available || !binaryStatus.runnable) {
-      return {
-        enabled: true,
-        state: 'broken-install',
-        version: binaryStatus.version,
-        authMethod: null,
-        email: null,
-        plan: null,
-        error: binaryStatus.error ?? 'Codex CLI is not available.',
-        diagnostics: binaryStatus.diagnostics,
-        repairCommand: binaryStatus.repairCommand,
-        binaryPath: binaryStatus.binaryPath,
-        compatibility: binaryStatus.compatibility,
-      };
-    }
-
-    try {
-      this._ensureCodexRuntime();
-      const authStatus = await this._codexAuth!.getStatus();
-      const authenticated = authStatus.authenticated;
-
-      return {
-        enabled: true,
-        state: authenticated
-          ? 'ready'
-          : this._codexLoginInProgress
-            ? 'auth-in-progress'
-            : 'needs-auth',
-        version: binaryStatus.version,
-        authMethod: authStatus.authMethod,
-        email: authStatus.email,
-        plan: authStatus.plan,
-        error: null,
-        diagnostics: binaryStatus.diagnostics,
-        repairCommand: binaryStatus.repairCommand,
-        binaryPath: binaryStatus.binaryPath,
-        compatibility: binaryStatus.compatibility,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        enabled: true,
-        state: 'broken-install',
-        version: binaryStatus.version,
-        authMethod: null,
-        email: null,
-        plan: null,
-        error: message,
-        diagnostics: binaryStatus.diagnostics,
-        repairCommand: binaryStatus.repairCommand,
-        binaryPath: binaryStatus.binaryPath,
-        compatibility: binaryStatus.compatibility,
-      };
-    }
+    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
+    this._postCodexSidebarStatus(await rt.getCodexSidebarStatus());
   }
 
   private async _handleCodexLogin(): Promise<void> {
+    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
     try {
-      const status = await this._getCodexSidebarStatus();
-      if (status.state === 'broken-install') {
-        this._postCodexSidebarStatus(status);
-        return;
-      }
-
-      this._ensureCodexRuntime();
-      this._codexLoginInProgress = true;
-      this._postCodexSidebarStatus({
-        ...status,
-        state: 'auth-in-progress',
-        error: null,
-      });
-      this._startCodexLoginPolling();
-
-      const login = await this._codexAuth!.startLogin();
-      await vscode.env.openExternal(vscode.Uri.parse(login.authUrl));
+      const status = await rt.getCodexSidebarStatus();
+      if (status.state === 'broken-install') { this._postCodexSidebarStatus(status); return; }
+      rt.setLoginInProgress(true);
+      this._postCodexSidebarStatus({ ...status, state: 'auth-in-progress', error: null });
+      rt.startLoginPolling((s) => this._postCodexSidebarStatus(s));
+      const authUrl = await rt.beginLogin();
+      await vscode.env.openExternal(vscode.Uri.parse(authUrl));
       emitCodexStatusInvalidated('login-started');
     } catch (error) {
-      this._codexLoginInProgress = false;
-      this._stopCodexLoginPolling();
+      rt.stopLoginPolling();
       const message = error instanceof Error ? error.message : String(error);
-      this._postCodexSidebarStatus({
-        enabled: true,
-        state: 'needs-auth',
-        version: null,
-        authMethod: null,
-        email: null,
-        plan: null,
-        error: message,
-        diagnostics: [],
-        repairCommand: null,
-        binaryPath: null,
-        compatibility: null,
-      });
+      this._postCodexSidebarStatus({ enabled: true, state: 'needs-auth', version: null, authMethod: null, email: null, plan: null, error: message, diagnostics: [], repairCommand: null, binaryPath: null, compatibility: null });
     }
   }
 
   private async _handleCodexLogout(): Promise<void> {
+    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
     try {
-      const status = await this._getCodexSidebarStatus();
-      if (status.state === 'broken-install') {
-        this._postCodexSidebarStatus(status);
-        return;
-      }
-
-      this._ensureCodexRuntime();
-      await this._codexAuth!.logout();
-      this._codexLoginInProgress = false;
-      this._stopCodexLoginPolling();
-      this._resetCodexSessionState();
+      const status = await rt.getCodexSidebarStatus();
+      if (status.state === 'broken-install') { this._postCodexSidebarStatus(status); return; }
+      await rt.logout();
       emitCodexStatusInvalidated('logout');
     } catch (error) {
-      vscode.window.showErrorMessage(
-        `Codex sign-out failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-      await this._sendCodexSidebarStatus();
+      vscode.window.showErrorMessage(`Codex sign-out failed: ${error instanceof Error ? error.message : String(error)}`);
+      this._postCodexSidebarStatus(await rt.getCodexSidebarStatus());
     }
   }
 
@@ -1210,446 +787,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       'Opened Codex repair in terminal. After it finishes, reload the window.'
     );
   }
-
-  /**
-   * Execute a prompt using the Claude Code agent (persistent session).
-   * Reuses the same process across turns so the agent retains context.
-   */
-  private async _handleAgentExecution(prompt: string, images?: FileAttachment[], skipActiveFile?: boolean, mentionedAgentPaths?: string[], skipBrowserContext?: boolean) {
-    // Prepend @mentioned agent instructions as hidden context
-    if (mentionedAgentPaths && mentionedAgentPaths.length > 0) {
-      const fs = require('fs') as typeof import('fs');
-      const sections = mentionedAgentPaths.map((p) => {
-        try { return fs.readFileSync(p, 'utf-8'); } catch { return null; }
-      }).filter(Boolean);
-      if (sections.length > 0) {
-        prompt = `[Agent instructions — respond as this agent for this conversation]\n\n${sections.join('\n\n---\n\n')}\n\n---\n\n${prompt}`;
-      }
-    }
-    if (!isEnabled('agentic-assistant')) {
-      this._view?.webview.postMessage({
-        type: 'agent-result',
-        error: 'Agentic assistant is not enabled. Enable it in Settings > Ritemark Features.',
-      });
-      return;
-    }
-
-    // Guard: check if Claude Code is set up
-    const status = await getSetupStatus({ refresh: true });
-    if (status.state !== 'ready') {
-      this._view?.webview.postMessage({
-        type: 'agent-result',
-        error: status.error
-          ?? (status.state === 'broken-install'
-            ? 'Claude is installed but not ready. Repair it first.'
-            : status.state === 'needs-auth' || status.state === 'auth-in-progress'
-              ? 'Claude is not signed in yet. Finish Claude.ai sign-in first.'
-              : 'Claude is not installed yet. Complete setup first.'),
-      });
-      await this._sendAgentConfig();
-      return;
-    }
-
-    if (!this._workspacePath) {
-      traceClaude('execution', 'blocked: no workspace');
-      this._view?.webview.postMessage({
-        type: 'agent-result',
-        error: 'No workspace folder open. Please open a folder first.',
-      });
-      return;
-    }
-
-    // Create or reuse persistent session
-    if (!this._agentSession) {
-      const config = vscode.workspace.getConfiguration('ritemark.ai');
-      const excludedFolders = config.get<string[]>('excludedFolders');
-      const model = config.get<string>('selectedModel', DEFAULT_MODEL);
-
-      let anthropicApiKey: string | undefined;
-      if (status.authMethod === 'api-key' && this._secrets) {
-        anthropicApiKey = await this._secrets.get('anthropic-api-key');
-      }
-
-      // Sprint 69: when browser-control feature flag is on, expose the
-      // browser-action MCP server to the agent. Tool execution still
-      // requires per-tab control consent enforced by the workbench Action2.
-      const browserMcp = isEnabled('browser-agent-control')
-        ? await this._buildBrowserMcpConfig()
-        : null;
-
-      this._agentSession = new AgentSession({
-        workspacePath: this._workspacePath,
-        model,
-        pathToClaudeCodeExecutable: status.binaryPath,
-        ...(excludedFolders ? { excludedFolders } : {}),
-        ...(anthropicApiKey ? { anthropicApiKey } : {}),
-        ...(browserMcp ? {
-          mcpServers: browserMcp.servers,
-          allowedTools: browserMcp.allowedTools,
-          extraSystemPromptAppend: CLAUDE_BROWSER_APPEND,
-        } : {}),
-      });
-      traceClaude('execution', 'created AgentSession', {
-        model,
-        workspacePath: this._workspacePath,
-        browserMcpEnabled: Boolean(browserMcp),
-      });
-
-      // When SDK reports available models, update the webview dropdown
-      this._agentSession.onModelsDiscovered = (models) => {
-        this._view?.webview.postMessage({
-          type: 'agent:models-update',
-          models,
-        });
-      };
-    }
-
-    const browserContext = skipBrowserContext ? null : await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
-    if (browserContext) {
-      prompt = `${browserContext.promptBlock}
-
----
-
-${prompt}`;
-      if (browserContext.claudeAttachments.length > 0) {
-        images = [...(images ?? []), ...browserContext.claudeAttachments];
-      }
-    }
-
-    // Get active file context — works for both TextEditor and custom editors (Ritemark)
-    // Skip if user explicitly dismissed the context chip in the UI
-    const activeFile = skipActiveFile ? undefined : this._getActiveFileContext();
-
-    // Read agent timeout from settings (default 15 min)
-    const agentTimeout = vscode.workspace.getConfiguration('ritemark.ai').get<number>('agentTimeout', 15);
-
-    try {
-      const result = await this._agentSession.sendMessage({
-        prompt,
-        attachments: images as FileAttachment[] | undefined,
-        activeFile,
-        timeoutMinutes: agentTimeout,
-        onProgress: (progress: AgentProgress) => {
-          traceClaude('bridge', 'agent-progress', {
-            type: progress.type,
-            message: progress.message,
-            tool: progress.tool ?? null,
-          });
-          this._view?.webview.postMessage({
-            type: 'agent-progress',
-            progress,
-          });
-        },
-        onQuestion: (question: AgentQuestion) => {
-          traceClaude('bridge', 'agent-question', {
-            toolUseId: question.toolUseId,
-            questionHeaders: question.questions.map((item) => item.header),
-          });
-          this._view?.webview.postMessage({
-            type: 'agent-question',
-            question,
-          });
-        },
-        onPlanApproval: (request: AgentPlanApprovalRequest) => {
-          traceClaude('bridge', 'agent-plan-approval', request);
-          this._view?.webview.postMessage({
-            type: 'agent-plan-approval',
-            request,
-          });
-        },
-      });
-
-      traceClaude('bridge', 'agent-result', {
-        hasText: Boolean(result.text),
-        filesModified: result.filesModified,
-        error: result.error ?? null,
-      });
-      this._view?.webview.postMessage({
-        type: 'agent-result',
-        text: result.text,
-        filesModified: result.filesModified,
-        metrics: result.metrics,
-        error: result.error,
-      });
-      // Bug #33: Claude Code subprocess writes files outside VS Code's
-      // filesystem provider, so the explorer model is unaware of new files
-      // until the user manually refreshes. Nudge the explorer here.
-      this._refreshExplorerForAgentWrites(result.filesModified);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      traceClaude('bridge', 'agent-result error', { error: errorMessage });
-      this._view?.webview.postMessage({
-        type: 'agent-result',
-        error: errorMessage,
-      });
-    }
-  }
-
-  /**
-   * Bug #33: After an agent (Claude Code subprocess OR Codex) finishes a turn
-   * that wrote or edited files, the file explorer is often stale because the
-   * OS file watcher missed (or hasn't yet propagated) the writes.
-   *
-   * Nudge the explorer in two ways:
-   *   1. If we know the modified paths, stat each file's parent directory via
-   *      vscode.workspace.fs. Routing through VS Code's filesystem provider
-   *      forces the explorer to re-enumerate that directory.
-   *   2. Always run the global "refresh files explorer" command as a safety
-   *      net — covers cases where we don't know which files changed (Codex
-   *      doesn't expose a filesModified list on turn/completed).
-   *
-   * Fire-and-forget; never block the agent-result postMessage on this.
-   */
-  private _refreshExplorerForAgentWrites(filesModified: string[] | undefined): void {
-    const parentDirs = new Set<string>();
-    if (filesModified) {
-      for (const file of filesModified) {
-        const parent = file.replace(/[/\\][^/\\]+$/, '');
-        if (parent && parent !== file) parentDirs.add(parent);
-      }
-    }
-
-    void Promise.all(
-      Array.from(parentDirs).map((dir) =>
-        vscode.workspace.fs
-          .stat(vscode.Uri.file(dir))
-          .then(undefined, () => undefined)
-      )
-    ).then(() =>
-      vscode.commands
-        .executeCommand('workbench.files.action.refreshFilesExplorer')
-        .then(undefined, () => undefined)
-    );
-  }
-
-  private _handleAgentQuestionAnswer(toolUseId: string, answers: Record<string, string>) {
-    if (!this._agentSession) {
-      traceClaude('bridge', 'agent-answer-question without session', { toolUseId });
-      return;
-    }
-
-    const answered = this._agentSession.answerQuestion(toolUseId, answers);
-    if (!answered) {
-      traceClaude('bridge', 'agent-answer-question lost state', { toolUseId });
-      this._view?.webview.postMessage({
-        type: 'agent-result',
-        error: 'Claude question state was lost. Please retry your last message.',
-      });
-    }
-  }
-
-  private _handleAgentPlanAnswer(toolUseId: string, approved: boolean, feedback?: string) {
-    if (!this._agentSession) {
-      traceClaude('bridge', 'agent-answer-plan without session', { toolUseId });
-      return;
-    }
-
-    const answered = this._agentSession.answerPlanApproval(toolUseId, approved, feedback);
-    if (!answered) {
-      traceClaude('bridge', 'agent-answer-plan lost state', { toolUseId, approved });
-      this._view?.webview.postMessage({
-        type: 'agent-result',
-        error: 'Claude plan approval state was lost. Please retry your last message.',
-      });
-    }
-  }
-
-  /**
-   * Execute a prompt using the Codex agent (persistent thread).
-   */
-  private async _handleCodexExecution(
-    prompt: string,
-    model?: string,
-    attachments?: Array<{ kind: string; data: string; mediaType: string }>,
-    mode?: 'plan' | 'execute',
-    skipBrowserContext?: boolean
-  ) {
-    if (!isEnabled('codex-integration')) {
-      this._view?.webview.postMessage({
-        type: 'codex-result',
-        error: 'Codex integration is not enabled.',
-      });
-      return;
-    }
-
-    try {
-      const status = await this._getCodexSidebarStatus();
-      traceCodex('execution', 'status before execute', status);
-      this._postCodexSidebarStatus(status);
-      if (status.state === 'broken-install') {
-        this._view?.webview.postMessage({
-          type: 'codex-result',
-          error: status.error ?? 'Codex CLI is not ready.',
-        });
-        return;
-      }
-      if (status.state === 'needs-auth' || status.state === 'auth-in-progress') {
-        this._view?.webview.postMessage({
-          type: 'codex-result',
-          error: status.state === 'auth-in-progress'
-            ? 'Finish ChatGPT sign-in first.'
-            : 'Sign in with ChatGPT before using Codex.',
-        });
-        return;
-      }
-
-      const appServer = this._ensureCodexRuntime();
-      await appServer.ensureInitialized();
-
-      const browserControlEnabled = isEnabled('browser-agent-control');
-      const resolvedModel = model || getCodexModels()[0]?.id || 'gpt-5.3-codex';
-      const shouldUsePlanMode = mode === 'plan' || (mode !== 'execute' && shouldStartCodexInPlanMode(prompt));
-
-      if (browserControlEnabled && this._codexThreadId && !this._codexBrowserToolsEnabledForThread) {
-        this._codexThreadId = null;
-        this._codexTurnId = null;
-      }
-
-      // Create thread if needed
-      if (!this._codexThreadId) {
-        const codexConfig = vscode.workspace.getConfiguration('ritemark.codex');
-        const approvalPolicy = codexConfig.get<string>('approvalPolicy', 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
-        const sandbox = codexConfig.get<string>('sandboxMode', 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
-        const dynamicTools = browserControlEnabled ? buildCodexBrowserDynamicTools() : undefined;
-        const result = await appServer.threadStart({
-          cwd: this._workspacePath || null,
-          model: model || null,
-          approvalPolicy,
-          sandbox,
-          baseInstructions: CODEX_BASE_INSTRUCTIONS,
-          developerInstructions: shouldUsePlanMode ? CODEX_PLAN_DEVELOPER_INSTRUCTIONS : null,
-          ...(dynamicTools ? { dynamicTools } : {}),
-        });
-        this._codexThreadId = result.thread.id;
-        this._codexBrowserToolsEnabledForThread = Boolean(dynamicTools?.length);
-        traceCodex('execution', 'thread started', {
-          threadId: result.thread.id,
-          model: result.model,
-          approvalPolicy,
-          sandbox,
-          browserToolCount: dynamicTools?.length ?? 0,
-        });
-      }
-
-      // Convert image attachments to data URLs for Codex
-      const imageDataUrls = attachments
-        ?.filter(a => a.kind === 'image')
-        .map(a => `data:${a.mediaType};base64,${a.data}`) ?? [];
-
-      let browserPreActionBlock = '';
-      const requestedBrowserUrl = browserControlEnabled && !skipBrowserContext && !this._codexBrowserToolsEnabledForThread
-        ? extractRequestedBrowserUrl(prompt)
-        : null;
-      if (requestedBrowserUrl) {
-        const navigationResult = await browserNavigate({ type: 'url', url: requestedBrowserUrl });
-        browserPreActionBlock = [
-          '[Ritemark browser action already executed before this Codex turn]',
-          formatActionResultForAgent(navigationResult),
-          navigationResult.error
-            ? 'Instruction: tell the user the browser navigation failed and do not claim it succeeded.'
-            : 'Instruction: use this resulting page state; do not claim you opened a different page.',
-        ].join('\n');
-      }
-
-      const browserContext = skipBrowserContext ? null : await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
-      if (browserContext?.codexImageDataUrls.length) {
-        imageDataUrls.push(...browserContext.codexImageDataUrls);
-      }
-
-      const collaborationMode = shouldUsePlanMode
-        ? {
-            mode: 'plan' as const,
-            settings: {
-              model: resolvedModel,
-              reasoning_effort: null,
-              developer_instructions: CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
-            },
-          }
-        : null;
-      traceCodex('execution', 'prepared turn start', {
-        threadId: this._codexThreadId,
-        model: resolvedModel,
-        mode: mode ?? (shouldUsePlanMode ? 'plan' : 'execute'),
-        collaborationMode,
-        hasImages: Boolean(imageDataUrls && imageDataUrls.length > 0),
-      });
-
-      // Prepend active file and browser context to prompt (same pattern as Claude Code agent)
-      const activeFile = this._getActiveFileContext();
-      const promptWithBrowserContext = browserContext
-        ? `${browserContext.promptBlock}\n\n---\n\n${browserPreActionBlock ? `${browserPreActionBlock}\n\n---\n\n` : ''}${prompt}`
-        : browserPreActionBlock
-          ? `${browserPreActionBlock}\n\n---\n\n${prompt}`
-        : prompt;
-      const promptBody = activeFile
-        ? `[Currently editing: ${activeFile.path}]\n\n${promptWithBrowserContext}`
-        : promptWithBrowserContext;
-      const browserReminder = isEnabled('browser-agent-control') ? `\n\n${CODEX_BROWSER_REMINDER}` : '';
-      const planReminder = shouldUsePlanMode ? CODEX_PLAN_TURN_REMINDER : '';
-      const enrichedPrompt = planReminder
-        ? `${planReminder}${browserReminder}\n\n${promptBody}`
-        : `${browserReminder ? `${browserReminder.trim()}\n\n` : ''}${promptBody}`;
-
-      // Start turn (send user message)
-      const turnResult = await appServer.turnStart(
-        this._codexThreadId,
-        enrichedPrompt,
-        resolvedModel,
-        imageDataUrls.length > 0 ? imageDataUrls : undefined,
-        collaborationMode,
-      );
-      this._codexTurnId = turnResult.turn.id;
-      traceCodex('execution', 'turn start acknowledged', {
-        threadId: this._codexThreadId,
-        turnId: turnResult.turn.id,
-        status: turnResult.turn.status,
-      });
-
-      this._view?.webview.postMessage({
-        type: 'codex-progress',
-        progress: { type: 'init', message: 'Starting...', timestamp: Date.now() },
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      traceCodex('execution', 'turn start failed', { error: errorMessage });
-      this._view?.webview.postMessage({
-        type: 'codex-result',
-        error: errorMessage,
-      });
-    }
-  }
-
-  /**
-   * Cancel current Codex turn.
-   */
-  private _handleCodexCancel() {
-    if (this._codexAppServer && this._codexThreadId && this._codexTurnId) {
-      this._codexAppServer.turnInterrupt(this._codexThreadId, this._codexTurnId).catch(() => {});
-    }
-  }
-
-  /**
-   * Handle approval/rejection from webview for Codex tool execution.
-   * Approvals are bidirectional: the server sends a JSON-RPC request with an id,
-   * and we respond using that same id.
-   */
-  private _handleCodexApproval(requestId: string | number, approved: boolean) {
-    if (!this._codexAppServer) return;
-    this._codexAppServer.sendApprovalResponse(requestId, approved ? 'accept' : 'decline');
-  }
-
-  private _handleCodexQuestionAnswer(requestId: string | number, answers: Record<string, { answers: string[] }>) {
-    if (!this._codexAppServer) return;
-    this._codexAppServer.sendToolRequestUserInputResponse(requestId, answers);
-  }
-
-  // ── ACP / OpenCode runtime (Sprint 76 R3a/R4/R5/R6) ──────────────────────
-  //
-  // Structural mirror of the Codex execution path. Progress, approvals and
-  // results are deliberately posted using the SAME webview message types Codex
-  // uses ('codex-progress', 'codex-streaming', 'codex-approval', 'codex-result')
-  // so the existing AI-sidebar rendering works without any webview change
-  // (spec Q4: normalize ACP + Codex approvals to one webview payload shape).
 
   /**
    * Read the BYOK provider keys from SecretStorage. These are the SAME values
@@ -1681,517 +818,6 @@ ${prompt}`;
       type: 'acp-providers',
       enabled,
       providers,
-    });
-  }
-
-  /**
-   * Sprint 76 R4/R5/R6: run an OpenCode turn. `model` is the
-   * `<provider>/<model>` value (the 'opencode:' composite prefix is stripped by
-   * the webview before this call). Resolves the bundled binary, injects the
-   * BYOK keys, sets the model, and sends the prompt — forwarding progress via
-   * the shared Codex webview message shapes.
-   */
-  private async _handleAcpExecution(prompt: string, model?: string): Promise<void> {
-    // R7: flag gate — inert when off.
-    if (!isEnabled('opencode-integration')) {
-      this._view?.webview.postMessage({
-        type: 'codex-result',
-        error: 'OpenCode integration is not enabled.',
-      });
-      return;
-    }
-
-    if (typeof prompt !== 'string' || !prompt.trim()) {
-      return;
-    }
-
-    try {
-      // R3a: a turn requires at least one configured provider key.
-      const keys = await this._readByokKeys();
-      const flags = byokProviderFlags(keys);
-      if (!flags.google && !flags.openai && !flags.anthropic && !flags.openrouter) {
-        this._view?.webview.postMessage({
-          type: 'codex-result',
-          error: 'No API keys configured. Add a provider key in Settings → API Keys to use OpenCode.',
-        });
-        return;
-      }
-
-      const workspaceRoot = this._workspacePath
-        ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!workspaceRoot) {
-        this._view?.webview.postMessage({
-          type: 'codex-result',
-          error: 'Open a folder before using OpenCode.',
-        });
-        return;
-      }
-
-      // R2: resolve the bundled OpenCode binary (system-PATH fallback inside
-      // findBundledAgentRuntime). 'opencode' kind.
-      const runtime = findBundledAgentRuntime('opencode');
-      if (!runtime) {
-        this._view?.webview.postMessage({
-          type: 'codex-result',
-          error: 'OpenCode runtime not found. Reinstall Ritemark to restore the bundled agent.',
-        });
-        return;
-      }
-
-      // Start (or reuse) the session. cancel() abandons the session, so a null
-      // manager means a fresh start is needed.
-      if (!this._acpManager || !this._acpManager.isRunning()) {
-        this._disposeAcpRuntime();
-        // R3a: workspace-root is wired into the fs proxy via the manager config.
-        this._acpManager = new AcpManager({
-          binaryPath: runtime.path,
-          workspaceRoot,
-          byokEnv: buildByokEnv(keys),
-          requestPermission: (params) => this._handleAcpPermission(params),
-          approveWrite: (request) => this._handleAcpWriteApproval(request),
-          onProgress: (progress) => this._postAcpProgress(progress),
-        });
-        await this._acpManager.start();
-        this._acpSessionAlwaysAllow.clear();
-      }
-
-      // R6: apply model selection for this turn.
-      if (model && model !== this._acpModel) {
-        await this._acpManager.setModel(model);
-        this._acpModel = model;
-      } else if (this._acpModel) {
-        await this._acpManager.setModel(this._acpModel);
-      }
-
-      this._view?.webview.postMessage({
-        type: 'codex-progress',
-        progress: { type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() },
-      });
-
-      const activeFile = this._getActiveFileContext();
-      const promptBody = activeFile
-        ? `[Currently editing: ${activeFile.path}]\n\n${prompt}`
-        : prompt;
-
-      const result = await this._acpManager.prompt(promptBody);
-
-      // R4: the agent writes through the approval-gated fs proxy, so the
-      // explorer can be stale after a turn — blanket refresh like Codex.
-      this._refreshExplorerForAgentWrites(undefined);
-
-      this._view?.webview.postMessage({
-        type: 'codex-result',
-        status: result.stopReason === 'end_turn' ? 'completed' : result.stopReason,
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      this._view?.webview.postMessage({
-        type: 'codex-result',
-        error: errorMessage,
-      });
-    }
-  }
-
-  /**
-   * Sprint 76 R5: cancel the in-flight OpenCode turn. OpenCode 1.15.13 has no
-   * native session/cancel, so AcpManager.cancel kills the process (audit). The
-   * session is abandoned; the next execute starts a fresh one. UI returns to
-   * idle within 2s.
-   */
-  private async _handleAcpCancel(): Promise<void> {
-    const manager = this._acpManager;
-    this._acpManager = null;
-    this._rejectPendingAcpApprovals();
-    try {
-      await manager?.cancel();
-    } catch {
-      // Process may already be gone.
-    }
-    this._view?.webview.postMessage({
-      type: 'codex-result',
-      status: 'cancelled',
-    });
-  }
-
-  /**
-   * Sprint 76 R4: a session/request_permission from the agent. Normalize to the
-   * shared Codex approval webview shape and await the user's decision. "Always
-   * allow for this session" mirrors the Codex allow_always semantics.
-   */
-  private async _handleAcpPermission(
-    params: RequestPermissionRequest,
-  ): Promise<RequestPermissionResponse> {
-    const tool = params.toolCall?.title ?? 'tool call';
-    const file = params.toolCall?.locations?.[0]?.path;
-    const isFileEdit = params.toolCall?.kind === 'edit' && !!file;
-    const sessionKey = `${tool}:${file ?? ''}`;
-    traceAcp('approval', 'permission-requested', { tool, file, kind: params.toolCall?.kind });
-
-    // A file `edit` is the user-facing gate; its follow-up fs/write_text_file is
-    // auto-allowed (no duplicate prompt), so remember the file whenever we let
-    // an edit through.
-    const rememberEdit = () => {
-      if (isFileEdit && file) this._acpRecentlyPermissionedWrites.add(file);
-    };
-
-    // Settings auto-approve mode — skip the card entirely (off by default).
-    if (this._isAcpAutoApprove()) {
-      rememberEdit();
-      return this._acpSelectOutcome(params, true);
-    }
-
-    // Session "always allow" short-circuit (R4 parity with Codex).
-    if (this._acpSessionAlwaysAllow.has(sessionKey)) {
-      rememberEdit();
-      return this._acpSelectOutcome(params, true);
-    }
-
-    // Label an edit as a file change (with the target path) rather than a shell
-    // command — it is not a shell command, and this is the single card the user
-    // sees for the edit.
-    const payload = isFileEdit && file
-      ? { approvalType: 'fileChange' as const, fileChanges: { [file]: { type: 'edit' } } }
-      : { approvalType: 'command' as const, command: tool, workingDir: file ?? '' };
-    const { approved, alwaysAllow } = await this._postAcpApproval(payload);
-    if (approved && alwaysAllow) {
-      this._acpSessionAlwaysAllow.add(sessionKey);
-    }
-    if (approved) {
-      rememberEdit();
-    }
-    return this._acpSelectOutcome(params, approved);
-  }
-
-  /**
-   * Sprint 76 R4: a fs/write_text_file approval (gated by AcpFsProxy). Writes
-   * outside the workspace root are already auto-rejected in the proxy before
-   * this runs. Normalize to the shared Codex 'fileChange' approval shape.
-   */
-  private async _handleAcpWriteApproval(request: WriteTextFileRequest): Promise<boolean> {
-    const sessionKey = `write:${request.path}`;
-    traceAcp('approval', 'write-requested', { path: request.path });
-    // This write is the execution of an `edit` the user just approved via
-    // session/request_permission — don't prompt a second time for the same file.
-    if (this._acpRecentlyPermissionedWrites.has(request.path)) {
-      this._acpRecentlyPermissionedWrites.delete(request.path);
-      return true;
-    }
-    // Settings auto-approve mode (off by default). Out-of-workspace writes are
-    // already rejected by AcpFsProxy before this runs, so this only auto-approves
-    // in-workspace edits.
-    if (this._isAcpAutoApprove()) {
-      return true;
-    }
-    if (this._acpSessionAlwaysAllow.has(sessionKey)) {
-      return true;
-    }
-    const { approved, alwaysAllow } = await this._postAcpApproval({
-      approvalType: 'fileChange',
-      fileChanges: { [request.path]: { newContent: request.content } },
-    });
-    if (approved && alwaysAllow) {
-      this._acpSessionAlwaysAllow.add(sessionKey);
-    }
-    return approved;
-  }
-
-  /** Settings toggle: auto-approve OpenCode tool calls / edits (off by default). */
-  private _isAcpAutoApprove(): boolean {
-    return vscode.workspace
-      .getConfiguration('ritemark')
-      .get<boolean>('opencode.autoApprove', false) === true;
-  }
-
-  /**
-   * Map an approval decision onto the ACP RequestPermissionResponse outcome,
-   * choosing the matching option id from the agent's offered options.
-   */
-  private _acpSelectOutcome(
-    params: RequestPermissionRequest,
-    approved: boolean,
-  ): RequestPermissionResponse {
-    const wantKinds = approved
-      ? ['allow_once', 'allow_always']
-      : ['reject_once', 'reject_always'];
-    const option = params.options.find((o) => wantKinds.includes(o.kind));
-    if (option) {
-      return { outcome: { outcome: 'selected', optionId: option.optionId } };
-    }
-    // No matching option offered — cancel is the safe ACP fallback.
-    return { outcome: { outcome: 'cancelled' } };
-  }
-
-  /**
-   * Post an approval request to the webview using the SAME 'codex-approval'
-   * message shape Codex uses, and return a promise that resolves when the
-   * webview posts 'acp-approval-response'.
-   */
-  private _postAcpApproval(
-    payload:
-      | { approvalType: 'command'; command: string; workingDir: string }
-      | { approvalType: 'fileChange'; fileChanges: Record<string, unknown> },
-  ): Promise<{ approved: boolean; alwaysAllow: boolean }> {
-    const requestId = `acp-${++this._acpApprovalSeq}`;
-    return new Promise<{ approved: boolean; alwaysAllow: boolean }>((resolve) => {
-      this._acpPendingApprovals.set(requestId, resolve);
-      this._view?.webview.postMessage({
-        type: 'codex-approval',
-        requestId,
-        ...payload,
-      });
-    });
-  }
-
-  /**
-   * Sprint 76 R4: resolve a pending ACP approval from the webview response. The
-   * webview reuses the Codex approval card, posting back via 'acp-approval-
-   * response' with the requestId we issued (and an optional alwaysAllow flag).
-   */
-  private _handleAcpApprovalResponse(
-    requestId: string,
-    approved: boolean,
-    alwaysAllow: boolean,
-  ): void {
-    const resolve = this._acpPendingApprovals.get(requestId);
-    if (!resolve) return;
-    this._acpPendingApprovals.delete(requestId);
-    resolve({ approved, alwaysAllow });
-  }
-
-  /** Forward an AgentProgress event to the webview via the shared Codex shape. */
-  private _postAcpProgress(progress: AgentProgress): void {
-    if (progress.type === 'text') {
-      // Stream assistant text the same way Codex deltas render.
-      this._view?.webview.postMessage({ type: 'codex-streaming', delta: progress.message });
-      return;
-    }
-    this._view?.webview.postMessage({ type: 'codex-progress', progress });
-  }
-
-  private _rejectPendingAcpApprovals(): void {
-    for (const resolve of this._acpPendingApprovals.values()) {
-      resolve({ approved: false, alwaysAllow: false });
-    }
-    this._acpPendingApprovals.clear();
-  }
-
-  private _disposeAcpRuntime(): void {
-    this._rejectPendingAcpApprovals();
-    this._acpSessionAlwaysAllow.clear();
-    this._acpRecentlyPermissionedWrites.clear();
-    try {
-      this._acpManager?.dispose();
-    } catch {
-      // best effort
-    }
-    this._acpManager = null;
-  }
-
-  /**
-   * Set up event listeners on CodexAppServer to forward events to webview.
-   */
-  private _setupCodexEventListeners() {
-    if (!this._codexAppServer) return;
-
-    // V2 notifications
-    this._codexAppServer.on('turn/started', (params: { threadId: string; turn: { id: string }; collaborationModeKind?: 'plan' | 'default' }) => {
-      traceCodex('event', 'turn/started', params);
-    });
-
-    this._codexAppServer.on('item/started', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
-      traceCodex('event', 'item/started', params);
-      // Only show activity for actual tool use, not userMessage/reasoning
-      const itemType = params.item?.type;
-      if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning') {
-        const label = itemType === 'agentMessage' ? 'Thinking...' : `Running: ${itemType}`;
-        this._view?.webview.postMessage({
-          type: 'codex-progress',
-          progress: { type: 'tool_use', message: label, tool: itemType, timestamp: Date.now() },
-        });
-      }
-    });
-
-    this._codexAppServer.on('item/agentMessage/delta', (params: { delta: string }) => {
-      traceCodex('event', 'item/agentMessage/delta', {
-        preview: params.delta.slice(0, 200),
-      });
-      this._view?.webview.postMessage({
-        type: 'codex-streaming',
-        delta: params.delta,
-      });
-    });
-
-    this._codexAppServer.on('turn/plan/updated', (params: {
-      threadId: string;
-      turnId: string;
-      explanation: string | null;
-      plan: Array<{ step: string; status: 'pending' | 'inProgress' | 'completed' }>;
-    }) => {
-      traceCodex('event', 'turn/plan/updated', params);
-      this._view?.webview.postMessage({
-        type: 'codex-plan-update',
-        explanation: params.explanation,
-        plan: params.plan,
-      });
-    });
-
-    this._codexAppServer.on('item/plan/delta', (params: { delta: string }) => {
-      traceCodex('event', 'item/plan/delta', {
-        preview: params.delta.slice(0, 200),
-      });
-      this._view?.webview.postMessage({
-        type: 'codex-plan-text-delta',
-        delta: params.delta,
-      });
-    });
-
-    this._codexAppServer.on('item/completed', (params: { item: { type: string; id: string; text?: string }; threadId: string; turnId: string }) => {
-      traceCodex('event', 'item/completed', params);
-      const itemType = params.item?.type;
-      // Only show completion for tool items, not userMessage/reasoning/agentMessage
-      if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage') {
-        this._view?.webview.postMessage({
-          type: 'codex-progress',
-          progress: { type: 'done', message: `Done: ${itemType}`, tool: itemType, timestamp: Date.now() },
-        });
-      }
-    });
-
-    this._codexAppServer.on('turn/completed', (params: { threadId: string; turn: { id: string; status: string; error: unknown } }) => {
-      traceCodex('event', 'turn/completed', params);
-      this._codexTurnId = null;
-      this._view?.webview.postMessage({
-        type: 'codex-result',
-        status: params.turn.status,
-        error: formatCodexTurnError(params.turn.error),
-      });
-      // Bug #33: Codex apply_patch / shell tools write files outside VS Code's
-      // filesystem provider, so the explorer is often stale. The protocol
-      // doesn't expose a filesModified list on turn/completed, so issue a
-      // blanket refresh.
-      this._refreshExplorerForAgentWrites(undefined);
-    });
-
-    // Server-initiated requests (approvals are bidirectional RPC)
-    this._codexAppServer.on('server-request', (request: { id: string | number; method: string; params: Record<string, unknown> }) => {
-      traceCodex('event', 'server-request', {
-        requestId: request.id,
-        method: request.method,
-        params: request.params,
-      });
-      // Sprint 69: handle dynamic browser tool calls before the legacy
-      // approval/userInput routing — these are server-initiated calls into
-      // our `dynamicTools` registered at thread/start.
-      if (request.method === 'item/tool/call') {
-        const params = request.params as Record<string, unknown>;
-        const toolName = typeof params.tool === 'string' ? params.tool : '';
-        let toolArgs: Record<string, unknown> = {};
-        if (params.arguments && typeof params.arguments === 'object') {
-          toolArgs = params.arguments as Record<string, unknown>;
-        } else if (typeof params.arguments === 'string') {
-          try {
-            const parsed = JSON.parse(params.arguments);
-            if (parsed && typeof parsed === 'object') {
-              toolArgs = parsed as Record<string, unknown>;
-            }
-          } catch {
-            toolArgs = {};
-          }
-        }
-        if (isCodexBrowserToolCall(toolName)) {
-          const runBrowserTool = async () => {
-            const reply = await dispatchCodexBrowserToolCall(toolName, toolArgs);
-            this._codexAppServer?.sendToolCallResponse(request.id, reply.text, reply.success);
-          };
-          const queuedBrowserTool = this._codexBrowserToolQueue
-            .catch(() => undefined)
-            .then(runBrowserTool);
-          this._codexBrowserToolQueue = queuedBrowserTool.then(
-            () => undefined,
-            () => undefined,
-          );
-          return;
-        }
-        // Unknown dynamic tool — reply with an error so the model can recover.
-        this._codexAppServer?.sendToolCallResponse(request.id, `Unknown dynamic tool: ${toolName}`, false);
-        return;
-      }
-      const routed = routeApprovalRequest(request);
-      if (request.method === 'item/tool/requestUserInput') {
-        const params = request.params;
-        const questions = Array.isArray(params.questions)
-          ? params.questions
-              .filter((question): question is {
-                id?: unknown;
-                header?: unknown;
-                question?: unknown;
-                options?: unknown;
-              } => Boolean(question) && typeof question === 'object')
-              .map((question) => ({
-                id: typeof question.id === 'string' && question.id.trim()
-                  ? question.id.trim()
-                  : crypto.randomUUID(),
-                header: typeof question.header === 'string' && question.header.trim()
-                  ? question.header.trim()
-                  : 'Input',
-                question: typeof question.question === 'string' ? question.question : '',
-                options: Array.isArray(question.options)
-                  ? question.options.flatMap((option: unknown) => {
-                      if (!option || typeof option !== 'object') {
-                        return [];
-                      }
-                      const normalizedOption = option as { label?: unknown; description?: unknown };
-                      const label = typeof normalizedOption.label === 'string' ? normalizedOption.label.trim() : '';
-                      if (!label) {
-                        return [];
-                      }
-                      return [{
-                        label,
-                        description: typeof normalizedOption.description === 'string' ? normalizedOption.description.trim() : '',
-                      }];
-                    })
-                  : [],
-                multiSelect: false,
-              }))
-              .filter((question) => question.question.trim().length > 0)
-          : [];
-
-        this._view?.webview.postMessage({
-          type: 'codex-question',
-          requestId: request.id,
-          questions,
-        });
-      } else if (routed.type === 'command') {
-        this._view?.webview.postMessage({
-          type: 'codex-approval',
-          approvalType: 'command',
-          requestId: routed.requestId,
-          command: routed.command,
-          workingDir: routed.workingDir,
-        });
-      } else if (routed.type === 'fileChange') {
-        this._view?.webview.postMessage({
-          type: 'codex-approval',
-          approvalType: 'fileChange',
-          requestId: routed.requestId,
-          fileChanges: routed.fileChanges,
-        });
-      } else {
-        // Unknown server request — decline to be safe (log for debugging)
-        console.warn(`[codex] → UNKNOWN method "${routed.method}" — declining request ${routed.requestId}`);
-        this._codexAppServer?.sendApprovalResponse(routed.requestId, 'decline');
-      }
-    });
-
-    this._codexAppServer.on('exit', () => {
-      traceCodex('event', 'app-server exit');
-      this._codexAppServer = null;
-      this._codexAuth = null;
-      this._codexThreadId = null;
-      this._codexTurnId = null;
-      this._codexLoginInProgress = false;
-      this._stopCodexLoginPolling();
-      void this._sendCodexSidebarStatus();
     });
   }
 
@@ -2299,15 +925,6 @@ ${prompt}`;
     const pendingStatus = await getSetupStatus({ refresh: true });
     const pendingEnvironmentStatus = await getAgentEnvironmentStatus({ setupStatus: pendingStatus });
     this._view?.webview.postMessage({ type: 'agent-setup:complete', status: pendingStatus, environmentStatus: pendingEnvironmentStatus });
-  }
-
-  private _cancelClaudeLogin(): void {
-    if (this._claudeLoginSubprocess) {
-      this._claudeLoginSubprocess.kill();
-      this._claudeLoginSubprocess = null;
-    }
-    setClaudeLoginInProgress(false);
-    emitClaudeStatusInvalidated('settings-updated');
   }
 
   private _sendChatFontSize() {
