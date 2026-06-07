@@ -74,16 +74,43 @@ Clicking the item runs `ritemark.showScheduledRuns` → reveals the Library's Sc
 **Notifications** — native VS Code toasts via `showInformationMessage` / `showWarningMessage`, with action buttons mapped to the return value:
 
 - *Completed:* info toast — label + first line of output. Buttons: **Open result**, **Show runs**.
-- *Blocked:* warning toast — names the blocked action (`notes/2026-06-09.md`). Buttons: **Review & approve** (depends on inline approval — see scope note), **Dismiss**.
+- *Blocked:* warning toast — names the blocked action (`notes/2026-06-09.md`). Buttons: **Review & approve**, **Dismiss**.
 
 **Run history** — surfaced as a new collapsible **SCHEDULED** section in the Agent Library (between COMMANDS and FLOWS), reusing the existing `.section-header` + `.item` markup in `AgentLibraryViewProvider.ts`. Each row: status-tinted 32×32 icon chip · label · relative time · description (first lines of output) · outcome pill (Completed / Blocked / Errored / In progress), with the amber `.item-hint` style when an action is needed. Stored in `workspaceState` (DaemonResultStore), isolated from interactive chat history.
+
+---
+
+## R4 — Inline approval of blocked actions
+
+When a scheduled run is paused because a file-write or shell command was blocked, the user can approve that specific action directly from the notification toast or from the Agent Library's SCHEDULED section — without opening a full agent session.
+
+**Entry points** (both are committed UX from the design mockup):
+
+- The blocked warning toast shows a **Review & approve** button alongside Dismiss.
+- The SCHEDULED section row shows an amber hint line: "Approval needed — click to review". Clicking it (or a dedicated row action) opens the same approval review.
+
+**What "approve" does:**
+
+Approving re-runs the scheduled agent from the start with the previously-blocked action added to a one-time allow-list for that run. The allow-list is scoped to the single re-run — it does not change the standing `AutoApprovalPolicy` or persist to future scheduled runs. The previous blocked result is superseded in `DaemonResultStore`; the run outcome flips from `blocked` to `success` (or `blocked` again if a different action is blocked in the re-run).
+
+**What is not in scope within this flow:**
+
+- Editing the action before approving (e.g. changing the target path). Approve = approve as-is.
+- Bulk-approving multiple blocked runs at once.
+- Changing the standing policy for future runs (that is a separate settings concern).
+
+**Command:** `ritemark.approveScheduledAction(taskId, runId)` — resolves the pending blocked result from `DaemonResultStore`, constructs an allow-list entry for the blocked action, and re-invokes `AgentTaskHandler.run()` with that allow-list applied.
+
+**Sprint 79 dependency:** Re-running via `AgentTaskHandler` requires the `AgentRuntime` interface. The approval command must apply the same `[S79]` guard — if `AgentRuntime` is absent, the command logs a warning and shows a toast explaining the action cannot be retried yet.
 
 ---
 
 ## Out of scope (this sprint)
 
 - Running tasks when Ritemark is closed (background daemon). Scheduled tasks only fire while the app is open.
-- Editing schedules through a UI. The frontmatter is the only interface.
+- A standalone schedule-management UI (calendar view, cross-file schedule list). Schedules are authored per-file in the Agent editor (R1); there is no aggregate scheduling dashboard this sprint.
 - Chaining tasks or dependencies between agent files.
 - Per-task model selection. Scheduled agents use the workspace default model.
-- Approval UI within the run history for blocked writes — blocked actions are notified but not actionable inline yet.
+- Editing the blocked action before approving (e.g. changing the target path). Approve means approve as-is.
+- Bulk-approving multiple blocked runs at once.
+- Changing the standing `AutoApprovalPolicy` for future runs (separate settings concern).

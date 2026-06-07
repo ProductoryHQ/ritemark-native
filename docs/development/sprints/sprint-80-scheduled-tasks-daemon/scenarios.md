@@ -3,7 +3,7 @@
 **Track:** SDD
 **Linked spec:** [spec.md](spec.md)
 
-Each scenario maps to one or more spec requirements (R1, R2, R3).
+Each scenario maps to one or more spec requirements (R1, R2, R3, R4).
 
 ---
 
@@ -172,6 +172,103 @@ Each scenario maps to one or more spec requirements (R1, R2, R3).
 **Expected:**
 - File is ignored by the scheduler entirely
 - No error
+
+---
+
+## S11 — User approves blocked file-write from toast
+
+**Covers:** R4
+
+**Setup:**
+- Agent file is scheduled and enabled
+- Agent's task instructs it to write `notes/2026-06-09.md`
+- Run fires headlessly; file-write is blocked (S3 precondition)
+- Warning toast is showing: "Daily brief paused — approval needed" with **Review & approve** and **Dismiss** buttons
+
+**Steps:**
+1. User clicks **Review & approve** in the toast
+
+**Expected:**
+- `ritemark.approveScheduledAction(taskId, runId)` is invoked
+- Agent re-runs from the start with `notes/2026-06-09.md` write on the one-time allow-list
+- File is written during the re-run
+- `DaemonResultStore` records a new result entry with outcome `completed`; the previous `blocked` entry is superseded (or clearly marked as superseded)
+- Status bar returns to idle state: `$(clock) 1 scheduled`
+- Completion toast appears: "Daily brief finished" + first line of output
+- The standing `AutoApprovalPolicy` is unchanged — future runs still block file-writes unless approved again
+
+---
+
+## S12 — User approves blocked action from Agent Library SCHEDULED row
+
+**Covers:** R4, R3
+
+**Setup:**
+- Same post-block state as S11, but user dismisses the toast without clicking Review & approve
+
+**Steps:**
+1. User opens Agent Library and navigates to the SCHEDULED section
+2. The blocked run row shows an amber hint: "Approval needed — click to review"
+3. User clicks the hint or a row action button to approve
+
+**Expected:**
+- Same re-run and result-flip behaviour as S11
+- Amber hint disappears from the row after the re-run completes
+- Row outcome pill updates from `Blocked` to `Completed`
+
+---
+
+## S13 — Approved action re-runs but a different action is blocked
+
+**Covers:** R4
+
+**Setup:**
+- Agent's first blocked action (file-write to `notes/2026-06-09.md`) is approved
+- During the re-run, the agent also attempts to execute a shell command
+
+**Expected:**
+- First file-write proceeds (it was approved)
+- Shell command is blocked (it was not approved; policy still blocks shell commands)
+- Re-run outcome is `blocked` (not `completed`)
+- New `DaemonResultStore` entry reflects the new blocked action (shell command detail)
+- Toast shows the shell command as the new blocker
+
+---
+
+## S14 — Approval attempted when Sprint 79 is absent
+
+**Covers:** R4 (Sprint 79 guard)
+
+**Setup:**
+- A run result with outcome `blocked` exists in `DaemonResultStore`
+- User clicks **Review & approve**
+- Sprint 79 `AgentRuntime` is NOT present in the codebase
+
+**Expected:**
+- `ritemark.approveScheduledAction` fires the `[S79]` guard check
+- No re-run is attempted
+- A warning toast explains: "Cannot retry — AgentRuntime unavailable. Ensure Sprint 79 is merged."
+- `DaemonResultStore` entry remains unchanged (still `blocked`)
+- No crash
+
+---
+
+## S15 — Workspace changed since block (staleness)
+
+**Covers:** R4
+
+**Setup:**
+- A run was blocked because the agent tried to write `notes/2026-06-09.md`
+- The user manually creates `notes/2026-06-09.md` (or deletes it) after the block, before clicking **Review & approve**
+
+**Steps:**
+1. User clicks **Review & approve** after the workspace state has changed
+
+**Expected:**
+- The re-run proceeds from the start regardless — the allow-list still permits the write to `notes/2026-06-09.md`
+- If the file now exists, the agent may overwrite it (standard file-write semantics; no staleness abort)
+- No special warning is shown about the changed workspace state — the approval is unconditional (approve-as-is per R4)
+- The re-run outcome reflects what actually happened (completed or blocked again if a different action is hit)
 
 ---
 
