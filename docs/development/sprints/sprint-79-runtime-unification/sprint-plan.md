@@ -7,11 +7,11 @@
 
 ## What This Sprint Does
 
-Structural refactor of the Ritemark extension's agent runtime layer. Introduces an `AgentRuntime` interface and `RuntimeRegistry` so all three runtimes (Claude Code, Codex, ACP/OpenCode) are interchangeable plugins. Collapses `UnifiedViewProvider` from 2480 to ≤1100 LOC. Fixes broken file attachments for Codex and ACP. Unifies the approval system to one message type and one UI card. Standardizes browser tool injection. Consolidates model config. Cleans up five architectural debt items. Lays the daemon scheduling foundation (inactive — Sprint 80 activates it).
+Structural refactor of the Ritemark extension's agent runtime layer. Introduces an `AgentRuntime` interface and `RuntimeRegistry` so all three runtimes (Claude Code, Codex, ACP/OpenCode) are interchangeable plugins. Collapses `UnifiedViewProvider` from 2480 to ≤1100 LOC. **Enforces runtime parity: every capability (prompt, file attachment, approval, browser control, cancel) must work identically across all three runtimes.** Fixes broken file attachments (images, PDFs, text files) for Codex and ACP. Unifies the approval system to one message type and one UI card. Standardizes browser tool injection. Adds base system prompt hint to prefer the integrated browser over external Chrome. Consolidates model config. Cleans up five architectural debt items. Lays the daemon scheduling foundation (inactive — Sprint 80 activates it).
 
 ## What This Sprint Does NOT Do
 
-- No new user-visible features (except fixing file attachment support for Codex/ACP).
+- No new user-visible features beyond: (1) file attachments working for all runtimes, (2) integrated browser preference hint.
 - No fourth runtime bundled.
 - No background/OS-level daemon execution.
 - No VS Code patches.

@@ -12,6 +12,7 @@ This sprint is a **structural refactor** — no user-visible behavior changes ex
 
 ## Principles
 
+- **Runtime parity.** Every capability (prompt, file attachment, approval, browser control, cancel) must work identically across all three runtimes from the user's perspective. Where native support is unavailable, the adapter uses a fallback (e.g. PDF → inline text), but the user-visible outcome is identical. A feature that works only for Claude Code is not done.
 - **Zero user-visible regression.** All three runtimes must work correctly after the refactor. Full integration test for each runtime before merge.
 - **Adapt, don't rewrite.** Existing `CodexManager`, `AcpManager`, and `AgentRunner` are wrapped by adapters, not replaced. Their internal logic stays intact.
 - **Architecture doc as deliverable.** `docs/development/architecture.md` `Last updated` date must equal the sprint close date. This is a required output, not optional.
@@ -63,14 +64,15 @@ Acceptance criteria:
 
 ### R4: Browser tool injection unification
 
-As a developer, I want browser tools to be injected into all three runtimes through a single `BrowserToolsInjector`, so adding a fourth runtime automatically gets browser capabilities.
+As a developer, I want browser tools to be injected into all runtimes through a single `BrowserToolsInjector`, so adding a fourth runtime automatically gets browser capabilities.
 
 Acceptance criteria:
 - New `src/runtime/BrowserToolsInjector.ts` — returns `{ enabled: boolean, mcpServers: Record<string, unknown> }` based on `browser-agent-control` flag and current browser state.
 - `ClaudeCodeRuntime` calls `BrowserToolsInjector.get()` and passes `mcpServers` into `AgentSessionConfig` (existing behavior, just relocated).
-- `CodexRuntime` calls `BrowserToolsInjector.get()` and uses `codexBrowserTools.ts`'s MCP injection path (or equivalent). `codexBrowserTools.ts` is **deleted**; Codex receives browser as MCP, not as dynamic tools. This is the primary behavioral change — verify with an integration test (Codex + browser action).
-- `AcpRuntime` calls `BrowserToolsInjector.get()` and passes MCP servers into the ACP `initialize` request (OpenCode supports `mcpServers` in ACP init — verify in research/acp-browser-audit.md).
+- `CodexRuntime` calls `BrowserToolsInjector.get()` and uses `codexBrowserTools.ts`'s MCP injection path (or equivalent). `codexBrowserTools.ts` is **deleted**; Codex receives browser as MCP, not as dynamic tools. Verify with an integration test (Codex + browser action).
+- `AcpRuntime`: attempt MCP injection via Phase 0 audit. If supported: pass MCP servers into ACP `initialize`. If not supported this sprint: `AcpRuntime` returns `"browser control not supported for OpenCode"` as a progress message — never silently ignores the request. Record as ARCH-8 for a future sprint.
 - `UnifiedViewProvider` no longer holds `_codexBrowserToolsEnabledForThread` state; this is internalized in `CodexRuntime`.
+- Base system prompt (always present, not flag-gated): one-line hint that Ritemark has an integrated browser and agents should prefer `mcp__ritemark_browser__*` tools over Bash `open`/`xdg-open` for URLs. This prevents Claude from launching an external Chrome window in normal chat mode.
 
 ### R5: File attachment unification
 

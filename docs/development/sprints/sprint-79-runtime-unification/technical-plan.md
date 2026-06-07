@@ -288,8 +288,16 @@ W7: Cleanup + architecture doc update
 
 - **Unit:** `RuntimeRegistry.test.ts`, `UnifiedApprovalGate.test.ts`, `AgentDaemon.test.ts`, `BrowserToolsInjector.test.ts`
 - **Adapter unit:** `ClaudeCodeRuntime.test.ts`, `CodexRuntime.test.ts`, `AcpRuntime.test.ts` — mock the underlying manager, verify `AgentRuntime` contract
-- **Integration (manual):** Run all three runtimes in dev mode, send a prompt, attach a file, trigger an approval, cancel mid-run. Verify no regression from v1.7.3 behavior.
-- **Browser integration:** Claude Code + browser action; Codex + browser action (regression test post-`codexBrowserTools.ts` removal or migration)
+- **Integration (manual, parity matrix):** For each of the three runtimes, verify every capability:
+  - Basic prompt → response
+  - Image attachment (Ctrl+V paste or file picker)
+  - PDF attachment
+  - Text file attachment
+  - File-write approval flow (approve + reject)
+  - Cancel mid-run
+  - No regression from v1.7.3 behavior
+- **Browser integration:** Claude Code + browser action; Codex + browser action (regression test post-`codexBrowserTools.ts` removal or migration); OpenCode → verify "browser control not supported" message appears instead of silent failure
+- **Browser routing (S8):** With `browser-agent-control` off, ask Claude to open a URL — verify no external Chrome opens
 
 ## Risk Register
 

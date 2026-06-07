@@ -64,6 +64,7 @@
 
 ### W7: Cleanup + docs
 
+- [ ] Base system prompt in `UnifiedViewProvider` — add integrated browser routing hint (one line; always present, not flag-gated): prefer `mcp__ritemark_browser__*` tools over Bash `open`/`xdg-open` for URLs
 - [ ] `flags.ts`: `document-search` → `status: 'disabled'`
 - [ ] Delete `CODEX_MODELS` from `agent/types.ts`
 - [ ] Move `CLAUDE_MODELS` + `DEFAULT_MODEL` to `modelConfig.ts`; update all import sites
@@ -77,17 +78,18 @@
 
 ## Phase 4 — Integration Testing
 
-- [ ] S1: Claude Code prompt, no regression
-- [ ] S2: Codex prompt, no regression
-- [ ] S3: ACP/OpenCode prompt, no regression
-- [ ] S4: Unified file-write approval (Codex)
-- [ ] S5: Unified plan approval (Claude Code)
-- [ ] S6: Image attachment, Claude Code
-- [ ] S7: PDF attachment, Codex (new behavior)
-- [ ] S8: Browser action, Claude Code
-- [ ] S9: Browser action, Codex
-- [ ] S10: Cancel mid-run (all 3 runtimes)
-- [ ] S11: Daemon registration (unit test)
+Each scenario marked "all runtimes" must pass for Claude Code, Codex, and OpenCode separately.
+
+- [ ] S1: Basic prompt — all runtimes
+- [ ] S2: File-write approval — all runtimes
+- [ ] S3: Plan approval — Claude Code only
+- [ ] S4: Image attachment — all runtimes
+- [ ] S5: PDF attachment — all runtimes
+- [ ] S6: Text file attachment — all runtimes
+- [ ] S7: Browser action — Claude Code + Codex (OpenCode stubbed)
+- [ ] S8: Integrated browser preferred over external Chrome — Claude Code
+- [ ] S9: Cancel mid-run — all runtimes
+- [ ] S10: Daemon registration — unit test
 
 ## Phase 5 — QA Gate
 
