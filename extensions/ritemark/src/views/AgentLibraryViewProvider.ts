@@ -6,6 +6,7 @@ import * as fsp from 'fs/promises';
 import { discoverAgents, discoverCommands, validateAgentFrontmatter } from '../agent/discovery';
 import type { DiscoveredAgent, DiscoveredCommand, ItemScope } from '../agent/discovery';
 import { COLORS, ICONS } from '../agent/iconPack';
+import type { DaemonResultStore } from '../daemon/DaemonResultStore';
 
 type HelperType = 'skill' | 'agent';
 
@@ -119,7 +120,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _workspacePath: string | undefined
+    private readonly _workspacePath: string | undefined,
+    private readonly _resultStore?: DaemonResultStore
   ) {}
 
   public resolveWebviewView(
@@ -166,6 +168,13 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
           break;
         case 'launchChat':
           void this._launchChat(message.agentId, message.filePath);
+          break;
+        case 'approveScheduledRun':
+          void vscode.commands.executeCommand(
+            'ritemark.daemon.approveScheduledAction',
+            message.taskId,
+            message.runId
+          );
           break;
       }
     });
@@ -229,12 +238,15 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       validationErrors: a.isMainAgent ? [] : validateAgentFrontmatter(a),
     }));
 
+    const scheduledRuns = this._resultStore ? this._resultStore.getAllRuns(10) : [];
+
     this._view?.webview.postMessage({
       type: 'items',
       agents: agentsPayload,
       skills,
       commands,
       flows,
+      scheduledRuns,
       workspacePath: this._workspacePath || '',
       userHomePath: os.homedir(),
     });
@@ -659,6 +671,33 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       color: #F59E0B; padding: 2px 0 0; opacity: 0.85;
     }
 
+    /* === Scheduled runs section === */
+    .run-time {
+      font-size: 10px; font-weight: 400;
+      color: var(--r-ink-faint); margin-left: auto;
+      white-space: nowrap; padding-left: 8px;
+    }
+    .item-name { display: flex; align-items: center; gap: 6px; }
+    .sched-chip svg { width: 16px; height: 16px; }
+    .sched-chip.sched-ok   { background: #DCFCE7; color: #15803D; }
+    .sched-chip.sched-warn { background: #FEF3C7; color: #B45309; }
+    .sched-chip.sched-err  { background: #FEE2E2; color: #B91C1C; }
+    .sched-chip.sched-muted{ background: var(--r-surface-soft); color: var(--r-ink-muted); }
+    .sched-chip.sched-run  { background: var(--r-accent-soft); color: var(--r-accent); }
+    .sched-pill {
+      display: inline-block; margin-top: 4px;
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.4px; padding: 1px 6px; border-radius: 3px;
+    }
+    .sched-pill.sched-ok   { background: #DCFCE7; color: #15803D; }
+    .sched-pill.sched-err  { background: #FEE2E2; color: #B91C1C; }
+    .sched-pill.sched-muted{ background: var(--r-surface-soft); color: var(--r-ink-muted); }
+    .sched-pill.sched-run  { background: var(--r-accent-soft); color: var(--r-accent); }
+    .sched-approve { cursor: pointer; font-weight: 500; }
+    .sched-approve:hover { text-decoration: underline; }
+    .run-spin { animation: sched-spin 1.1s linear infinite; transform-origin: center; }
+    @keyframes sched-spin { to { transform: rotate(360deg); } }
+
     /* === Empty state === */
     .empty-state {
       padding: 32px 16px 24px;
@@ -873,6 +912,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     let skills = [];
     let commands = [];
     let flows = [];
+    let scheduledRuns = [];
     let workspacePath = '';
     let userHomePath = '';
     let selectedPath = null;
@@ -1091,6 +1131,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         skills = msg.skills || [];
         commands = msg.commands || [];
         flows = msg.flows || [];
+        scheduledRuns = msg.scheduledRuns || [];
         workspacePath = msg.workspacePath || '';
         userHomePath = msg.userHomePath || '';
         render();
@@ -1156,7 +1197,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       if (flows.length) parts.push(flows.length + ' flow' + (flows.length !== 1 ? 's' : ''));
       countsEl.textContent = parts.join(' \\u00b7 ');
 
-      const scopeTotal = scopedAgents.length + scopedSkills.length + scopedCommands.length + flows.length;
+      const scopeTotal = scopedAgents.length + scopedSkills.length + scopedCommands.length + flows.length + scheduledRuns.length;
       if (scopeTotal === 0) {
         renderEmptyState();
         return;
@@ -1178,6 +1219,10 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       if (filteredCommands.length > 0) {
         html += renderSection('Commands', null, filteredCommands);
       }
+      const filteredRuns = scheduledRuns.filter((r) => !filter || (r.taskId || '').toLowerCase().includes(filter));
+      if (filteredRuns.length > 0) {
+        html += renderScheduledSection(filteredRuns);
+      }
       if (filteredFlows.length > 0) {
         html += renderFlowsSection(filteredFlows);
       }
@@ -1190,6 +1235,19 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       wireRowHandlers();
       wireSectionAddHandlers();
       wireSectionToggleHandlers();
+      wireScheduledHandlers();
+    }
+
+    function wireScheduledHandlers() {
+      contentEl.querySelectorAll('.sched-approve').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const taskId = el.dataset.task;
+          const runId = el.dataset.run;
+          if (!taskId || !runId) return;
+          vscode.postMessage({ type: 'approveScheduledRun', taskId, runId });
+        });
+      });
     }
 
     function wireSectionToggleHandlers() {
@@ -1222,6 +1280,71 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
           '<circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />' +
           '</svg></button>';
         html += '</div>';
+      }
+      return html;
+    }
+
+    function relativeTime(iso) {
+      if (!iso) return '';
+      const then = new Date(iso).getTime();
+      if (isNaN(then)) return '';
+      const diff = Date.now() - then;
+      const min = Math.floor(diff / 60000);
+      if (min < 1) return 'just now';
+      if (min < 60) return min + ' min ago';
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return hr + 'h ago';
+      const day = Math.floor(hr / 24);
+      return day === 1 ? 'yesterday' : day + 'd ago';
+    }
+
+    // Outcome → { chip background token, chip text, foreground colour, icon SVG }
+    function scheduledOutcomeMeta(outcome) {
+      switch (outcome) {
+        case 'completed':
+          return { cls: 'ok', label: 'Completed', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>' };
+        case 'blocked':
+          return { cls: 'warn', label: 'Blocked', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' };
+        case 'errored':
+          return { cls: 'err', label: 'Errored', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 9v4M12 17h.01"/></svg>' };
+        case 'missed':
+          return { cls: 'muted', label: 'Missed', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>' };
+        case 'skipped':
+          return { cls: 'muted', label: 'Skipped', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>' };
+        default:
+          return { cls: 'run', label: 'In progress', icon: '<svg class="run-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke-linecap="round"/></svg>' };
+      }
+    }
+
+    function renderScheduledSection(items) {
+      const collapsed = collapsedSections.has('Scheduled');
+      let html = '<div class="section-header" data-section="Scheduled" role="button" aria-expanded="' + String(!collapsed) + '">';
+      html += '<span class="section-title">' + caretSvg(collapsed) + 'Scheduled</span>';
+      html += '<div class="section-header-meta"><span class="section-count">' + items.length + '</span></div>';
+      html += '</div>';
+      if (collapsed) return html;
+      for (const run of items) {
+        if (run.supersededBy) continue;
+        const meta = scheduledOutcomeMeta(run.outcome);
+        const label = run.taskId || 'Scheduled run';
+        const desc = run.outcome === 'blocked' && run.blockedAction
+          ? 'Wanted to ' + (run.blockedAction.kind === 'file-write' ? 'write ' : 'run ') + escapeHtml(run.blockedAction.target)
+          : (run.outputFirstLine || run.errorMessage || run.skipReason || '');
+        const dur = run.durationMs ? ' \\u00b7 ' + (run.durationMs / 1000).toFixed(1) + 's' : '';
+        html += '<div class="item sched-item" data-task="' + escapeHtml(label) + '" data-run="' + escapeHtml(run.runId || '') + '">';
+        html += '<span class="item-icon-chip sched-chip sched-' + meta.cls + '">' + meta.icon + '</span>';
+        html += '<div class="item-content">';
+        html += '<div class="item-name">' + escapeHtml(label) +
+          '<span class="run-time">' + escapeHtml(relativeTime(run.startedAt)) + '</span></div>';
+        if (desc) {
+          html += '<div class="item-description">' + escapeHtml(desc) + '</div>';
+        }
+        if (run.outcome === 'blocked') {
+          html += '<div class="item-hint sched-approve" data-task="' + escapeHtml(label) + '" data-run="' + escapeHtml(run.runId || '') + '">Approval needed \\u2014 click to review</div>';
+        } else {
+          html += '<span class="sched-pill sched-' + meta.cls + '">' + escapeHtml(meta.label) + dur + '</span>';
+        }
+        html += '</div></div>';
       }
       return html;
     }

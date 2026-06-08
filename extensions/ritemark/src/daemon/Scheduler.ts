@@ -26,7 +26,8 @@ export class Scheduler {
     private readonly context: vscode.ExtensionContext,
     private readonly store: DaemonResultStore,
     private readonly status: DaemonStatusEvents,
-    private readonly workspacePath: string
+    private readonly workspacePath: string,
+    private readonly onRunsChanged?: () => void
   ) {}
 
   start(): void {
@@ -98,6 +99,7 @@ export class Scheduler {
 
     const result = await entry.task.run(ctx);
     await this.store.append(result);
+    this.onRunsChanged?.();
 
     switch (result.outcome) {
       case 'completed':

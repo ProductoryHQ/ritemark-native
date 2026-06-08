@@ -254,7 +254,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerReactionCommand(context);
 
   // Initialize scheduled tasks daemon (Sprint 80)
-  initDaemon(context);
+  const daemon = initDaemon(context);
 
   // Initialize update service
   const updateStorage = new UpdateStorage(context.globalState);
@@ -277,12 +277,14 @@ export function activate(context: vscode.ExtensionContext) {
   seedStarterPackOnFirstRun(context.extensionPath);
 
   // Register Agent Library View Provider
-  agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath);
+  agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath, daemon.store);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(AgentLibraryViewProvider.viewType, agentLibraryViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );
+  // Live-refresh the Agent Library SCHEDULED section when daemon runs change
+  daemon.onRunsChanged(() => agentLibraryViewProvider?.refresh());
 
   // === File watchers for Agent Library auto-refresh ===
   // Workspace-side: VS Code's watcher catches .claude/ changes inside the workspace.

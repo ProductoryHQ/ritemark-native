@@ -12,6 +12,14 @@ export class DaemonResultStore {
     return all[taskId] ?? [];
   }
 
+  /** All runs across every task, most-recent first, capped for display. */
+  getAllRuns(limit = 10): TaskResult[] {
+    const all = this.state.get<Record<string, TaskResult[]>>(STORE_KEY, {});
+    const flat = Object.values(all).flat();
+    flat.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    return flat.slice(0, limit);
+  }
+
   async getBlockedResult(taskId: string, runId: string): Promise<TaskResult | undefined> {
     const results = await this.getAll(taskId);
     return results.find(r => r.runId === runId && r.outcome === 'blocked');
