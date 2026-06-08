@@ -31,27 +31,34 @@ export function initDaemon(context: vscode.ExtensionContext): DaemonController {
       vscode.commands.executeCommand('ritemark.agentLibraryView.focus');
     }),
     vscode.commands.registerCommand('ritemark.daemon.openResult', (_taskId: string, _runId: string) => {
-      // [S79] Open the run result detail — implemented after Sprint 79
       vscode.commands.executeCommand('ritemark.daemon.showScheduledRuns');
     }),
     vscode.commands.registerCommand('ritemark.daemon.approveScheduledAction', async (taskId: string, runId: string) => {
-      // [S79] Inline approval — requires AgentRuntime (Sprint 79)
-      try {
-        require('../runtime/RuntimeRegistry');
-      } catch {
-        vscode.window.showWarningMessage(
-          'Cannot retry — AgentRuntime unavailable. Ensure Sprint 79 is merged.',
-          'Dismiss'
-        );
+      const blockedResult = await store.getBlockedResult(taskId, runId);
+      if (!blockedResult?.blockedAction) {
+        vscode.window.showWarningMessage('Blocked run not found — it may have already been superseded.');
         return;
       }
-      // [S79] TODO: implement allow-list re-run
-      // 1. store.getBlockedResult(taskId, runId)
-      // 2. Build oneTimeAllowList from blockedAction
-      // 3. Re-run via scheduler entry's task.run(ctx, { oneTimeAllowList })
-      // 4. store.append(newResult); store.supersede(taskId, runId, newResult.runId)
-      // 5. runsChanged.fire()
-      void taskId; void runId;
+
+      const entry = scheduler?.getEntry(taskId);
+      if (!entry) {
+        vscode.window.showWarningMessage('Scheduled task not found — the agent file may have been removed or disabled.');
+        return;
+      }
+
+      const { blockedAction } = blockedResult;
+      const oneTimeAllowList = [{ kind: blockedAction.kind, target: blockedAction.target }];
+
+      const ctx = {
+        workspacePath: workspacePath ?? '',
+        extensionContext: context,
+        runtimeRegistry: scheduler?.getRuntimeRegistry(),
+      };
+
+      const newResult = await entry.task.run(ctx, { oneTimeAllowList });
+      await store.append(newResult);
+      await store.supersede(taskId, runId, newResult.runId);
+      runsChanged.fire();
     }),
     { dispose: () => scheduler?.stop() }
   );

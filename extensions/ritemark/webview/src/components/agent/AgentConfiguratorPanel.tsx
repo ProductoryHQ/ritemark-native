@@ -37,8 +37,14 @@ export interface AgentSkill {
   provenance?: 'claude' | 'codex' | 'shared'
 }
 
+export interface ScheduleFrontmatter {
+  cron?: string
+  label?: string
+  enabled?: boolean
+}
+
 export interface AgentFrontmatter {
-  [key: string]: string | string[] | number | boolean | undefined
+  [key: string]: string | string[] | number | boolean | ScheduleFrontmatter | undefined
 }
 
 interface AgentConfiguratorPanelProps {
@@ -73,6 +79,34 @@ const CUSTOM_MODEL = '__custom__'
 /** Select value meaning "field absent → inherit/none". */
 const UNSET = '__unset__'
 
+function humanizeCron(expr: string): string {
+  const parts = expr.trim().split(/\s+/)
+  if (parts.length !== 5) return 'Invalid cron (need 5 fields)'
+  const [min, hour, dom, mon, dow] = parts
+  if (dom === '*' && mon === '*' && dow === '*') {
+    if (hour === '*') return `Every minute${min === '*' ? '' : ` at :${min.padStart(2, '0')}`}`
+    if (min === '0') return `Daily at ${hour}:00`
+    return `Daily at ${hour}:${min.padStart(2, '0')}`
+  }
+  if (dom === '*' && mon === '*' && dow === '1-5') {
+    if (min === '0') return `Weekdays at ${hour}:00`
+    return `Weekdays at ${hour}:${min.padStart(2, '0')}`
+  }
+  if (dom === '*' && mon === '*') {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const idx = parseInt(dow, 10)
+    const dayName = !isNaN(idx) && idx >= 0 && idx <= 6 ? days[idx] : dow
+    if (min === '0') return `${dayName}s at ${hour}:00`
+    return `${dayName}s at ${hour}:${min.padStart(2, '0')}`
+  }
+  return expr
+}
+
+function isValidCron(expr: string): boolean {
+  const parts = expr.trim().split(/\s+/)
+  return parts.length === 5 && parts.every(p => /^[\d*/,\-]+$/.test(p))
+}
+
 export function AgentConfiguratorPanel({
   frontmatter,
   flows,
@@ -95,6 +129,20 @@ export function AgentConfiguratorPanel({
   const memory = typeof fm.memory === 'string' ? fm.memory : ''
   const color = typeof fm.color === 'string' ? fm.color : ''
   const agentSkills: string[] = Array.isArray(fm.skills) ? (fm.skills as string[]) : []
+
+  const rawSchedule = fm.schedule && typeof fm.schedule === 'object' && !Array.isArray(fm.schedule)
+    ? fm.schedule as ScheduleFrontmatter
+    : undefined
+  const schedCron = rawSchedule?.cron ?? ''
+  const schedLabel = rawSchedule?.label ?? ''
+  const schedEnabled = rawSchedule?.enabled ?? false
+
+  const setSchedule = useCallback((patch: Partial<ScheduleFrontmatter>) => {
+    const current: ScheduleFrontmatter = rawSchedule ?? {}
+    const next = { ...current, ...patch }
+    const isEmpty = !next.cron && !next.label && !next.enabled
+    set('schedule', isEmpty ? undefined : next)
+  }, [rawSchedule, set])
 
   // Tools: parse from comma-separated string OR array → canonical names.
   // Empty = "inherits all tools" (per spec), NOT "no tools".
@@ -367,6 +415,46 @@ export function AgentConfiguratorPanel({
             </FieldRow>
           </div>
         )}
+
+        {/* ── Schedule ── */}
+        <SectionLabel>Schedule</SectionLabel>
+        <p className="text-[10px] text-ink-muted -mt-1">Run this agent automatically on a cron schedule.</p>
+
+        <div className="flex flex-col gap-2">
+          <FieldRow label="Cron expression">
+            <Input
+              value={schedCron}
+              onChange={e => setSchedule({ cron: e.target.value })}
+              placeholder="e.g. 0 9 * * 1-5"
+              className={`text-[12px] h-7 font-mono ${schedCron && !isValidCron(schedCron) ? 'border-destructive' : ''}`}
+            />
+            {schedCron && isValidCron(schedCron) && (
+              <p className="text-[10px] text-ink-muted">{humanizeCron(schedCron)}</p>
+            )}
+            {schedCron && !isValidCron(schedCron) && (
+              <p className="text-[10px] text-destructive">Invalid — use 5 fields: min hour dom month dow</p>
+            )}
+          </FieldRow>
+
+          <FieldRow label="Label">
+            <Input
+              value={schedLabel}
+              onChange={e => setSchedule({ label: e.target.value })}
+              placeholder="e.g. Daily standup"
+              className="text-[12px] h-7"
+            />
+          </FieldRow>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={schedEnabled}
+              onChange={e => setSchedule({ enabled: e.target.checked })}
+              className="accent-[var(--r-accent)]"
+            />
+            <span className="text-[12px] text-ink-strong">Enable schedule</span>
+          </label>
+        </div>
 
         {/* ── Ritemark extension: linked flow ── */}
         <SectionLabel>Linked flow</SectionLabel>

@@ -1,13 +1,14 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
 import type { ScheduledTask, TaskContext, TaskResult, ScheduleConfig } from './ScheduledTask';
+import type { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { DaemonResultStore } from './DaemonResultStore';
 import { DaemonStatusEvents } from './DaemonStatusEvents';
 import { parseScheduleFromFrontmatter } from './scheduleParser';
+import { AgentTaskHandler } from './handlers/AgentTaskHandler';
 
-interface RegisteredEntry {
+export interface RegisteredEntry {
   task: ScheduledTask;
   config: ScheduleConfig;
   filePath: string;
@@ -22,6 +23,9 @@ export class Scheduler {
   private tickTimer: ReturnType<typeof setInterval> | undefined;
   private watcher: vscode.FileSystemWatcher | undefined;
 
+  /** Lazy provider — set after UnifiedViewProvider is created in extension.ts. */
+  private registryProvider?: () => RuntimeRegistry | undefined;
+
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly store: DaemonResultStore,
@@ -29,6 +33,11 @@ export class Scheduler {
     private readonly workspacePath: string,
     private readonly onRunsChanged?: () => void
   ) {}
+
+  /** Wire the runtime registry after it becomes available (post-activation). */
+  setRuntimeRegistryProvider(provider: () => RuntimeRegistry | undefined): void {
+    this.registryProvider = provider;
+  }
 
   start(): void {
     this.scanWorkspace();
@@ -46,6 +55,19 @@ export class Scheduler {
     this.entries.clear();
     this.watcher?.dispose();
     this.status.setScheduledCount(0);
+  }
+
+  /** Look up a registered entry by agent id (basename without .md). */
+  getEntry(taskId: string): RegisteredEntry | undefined {
+    for (const entry of this.entries.values()) {
+      if (entry.task.id === taskId) return entry;
+    }
+    return undefined;
+  }
+
+  /** Expose current runtime registry for inline approval re-runs. */
+  getRuntimeRegistry(): import('../runtime/RuntimeRegistry').RuntimeRegistry | undefined {
+    return this.registryProvider?.();
   }
 
   /** Register a task for a specific agent file path. */
@@ -92,6 +114,7 @@ export class Scheduler {
     const ctx: TaskContext = {
       workspacePath: this.workspacePath,
       extensionContext: this.context,
+      runtimeRegistry: this.registryProvider?.(),
     };
 
     const label = entry.config.label || path.basename(filePath, '.md');
@@ -165,31 +188,12 @@ export class Scheduler {
   }
 
   // ---------------------------------------------------------------------------
-  // Task factory — builds a minimal ScheduledTask for an agent file.
-  // The AgentTaskHandler (Sprint 79-gated) will replace this with a real impl.
+  // Task factory — builds an AgentTaskHandler for an agent file.
   // ---------------------------------------------------------------------------
 
   private buildTaskForFile(filePath: string, config: ScheduleConfig): ScheduledTask {
     const id = path.basename(filePath, '.md');
-    const schedule = config;
-    // [S79] AgentTaskHandler wired here after Sprint 79 merges.
-    // Until then, produce a skipped result.
-    return {
-      id,
-      schedule,
-      async run(_ctx): Promise<TaskResult> {
-        const now = new Date().toISOString();
-        return {
-          taskId: id,
-          runId: crypto.randomUUID(),
-          outcome: 'skipped',
-          startedAt: now,
-          finishedAt: now,
-          durationMs: 0,
-          skipReason: 'agent-runtime-unavailable',
-        };
-      },
-    };
+    return new AgentTaskHandler(id, config, filePath);
   }
 
   // ---------------------------------------------------------------------------

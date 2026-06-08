@@ -285,6 +285,8 @@ export function activate(context: vscode.ExtensionContext) {
   );
   // Live-refresh the Agent Library SCHEDULED section when daemon runs change
   daemon.onRunsChanged(() => agentLibraryViewProvider?.refresh());
+  // Wire runtime registry into the scheduler now that UnifiedViewProvider is ready
+  daemon.scheduler?.setRuntimeRegistryProvider(() => unifiedViewProvider?.getRuntimeRegistry());
 
   // === File watchers for Agent Library auto-refresh ===
   // Workspace-side: VS Code's watcher catches .claude/ changes inside the workspace.
