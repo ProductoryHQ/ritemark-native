@@ -125,7 +125,7 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'scheduled-tasks-daemon',
     label: 'Scheduled Tasks Daemon',
     description: 'Run AI agents on a schedule while Ritemark is open',
-    status: 'disabled',
+    status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
 };
