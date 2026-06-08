@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ScheduledTask, TaskContext, ScheduleConfig } from './ScheduledTask';
+import * as crypto from 'crypto';
+import type { ScheduledTask, TaskContext, TaskResult, ScheduleConfig } from './ScheduledTask';
 import { DaemonResultStore } from './DaemonResultStore';
 import { DaemonStatusEvents } from './DaemonStatusEvents';
 import { parseScheduleFromFrontmatter } from './scheduleParser';
@@ -20,6 +21,7 @@ const TICK_INTERVAL_MS = 30_000; // re-evaluate every 30 s
 
 export class Scheduler {
   private readonly entries = new Map<string, RegisteredEntry>();
+  private readonly running = new Set<string>(); // filePaths currently executing
   private tickTimer: ReturnType<typeof setInterval> | undefined;
   private watcher: vscode.FileSystemWatcher | undefined;
 
@@ -93,6 +95,23 @@ export class Scheduler {
       this.stop();
       return;
     }
+    // Skip if this task is already running to prevent overlapping executions.
+    if (this.running.has(filePath)) {
+      const runId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const skipped: TaskResult = {
+        taskId: entry.task.id,
+        runId,
+        outcome: 'skipped',
+        startedAt: now,
+        finishedAt: now,
+        durationMs: 0,
+        skipReason: 'concurrent-run',
+      };
+      await this.store.append(skipped);
+      this.onRunsChanged?.();
+      return;
+    }
     // Re-arm next fire before running so a long run doesn't shift the schedule
     const nextFire = this.computeNext(entry.config.cron);
     if (nextFire) {
@@ -112,7 +131,13 @@ export class Scheduler {
     const label = entry.config.label || path.basename(filePath, '.md');
     this.status.emitRunStarted(label);
 
-    const result = await entry.task.run(ctx);
+    this.running.add(filePath);
+    let result: TaskResult;
+    try {
+      result = await entry.task.run(ctx);
+    } finally {
+      this.running.delete(filePath);
+    }
     await this.store.append(result);
     this.onRunsChanged?.();
 

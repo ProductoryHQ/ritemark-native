@@ -493,6 +493,19 @@ export function serializeFrontmatter(fm: FrontmatterRecord): string {
     if (Array.isArray(v)) {
       lines.push(`${k}:`);
       (v as string[]).forEach(item => lines.push(`  - ${item}`));
+    } else if (v !== null && typeof v === 'object') {
+      lines.push(`${k}:`);
+      for (const [sk, sv] of Object.entries(v as Record<string, unknown>)) {
+        if (typeof sv === 'boolean' || typeof sv === 'number') {
+          lines.push(`  ${sk}: ${sv}`);
+        } else if (sv === undefined || sv === null) {
+          // omit
+        } else {
+          const s = String(sv);
+          const safe = /[:#\[\]{}&*!|>'",%@`]/.test(s) || s.includes('\n') ? JSON.stringify(s) : s;
+          lines.push(`  ${sk}: ${safe}`);
+        }
+      }
     } else if (typeof v === 'boolean' || typeof v === 'number') {
       lines.push(`${k}: ${v}`);
     } else {

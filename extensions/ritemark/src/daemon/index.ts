@@ -25,7 +25,7 @@ export function initDaemon(context: vscode.ExtensionContext): DaemonController {
   // When the flag is off the scheduler is never created: no workspace scan, no
   // cron timers, no runs. The store + commands remain so the UI degrades cleanly.
   if (workspacePath && isEnabled('scheduled-tasks-daemon')) {
-    const status = new DaemonStatusEvents(context);
+    const status = new DaemonStatusEvents(context, store);
     scheduler = new Scheduler(context, store, status, workspacePath, () => runsChanged.fire());
     scheduler.start();
   }
