@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ScheduledTask, TaskContext, TaskResult, ScheduleConfig } from './ScheduledTask';
-import type { RuntimeRegistry } from '../runtime/RuntimeRegistry';
+import type { ScheduledTask, TaskContext, ScheduleConfig } from './ScheduledTask';
 import { DaemonResultStore } from './DaemonResultStore';
 import { DaemonStatusEvents } from './DaemonStatusEvents';
 import { parseScheduleFromFrontmatter } from './scheduleParser';
 import { AgentTaskHandler } from './handlers/AgentTaskHandler';
+import { isEnabled } from '../features/featureGate';
 
 export interface RegisteredEntry {
   task: ScheduledTask;
@@ -23,9 +23,6 @@ export class Scheduler {
   private tickTimer: ReturnType<typeof setInterval> | undefined;
   private watcher: vscode.FileSystemWatcher | undefined;
 
-  /** Lazy provider — set after UnifiedViewProvider is created in extension.ts. */
-  private registryProvider?: () => RuntimeRegistry | undefined;
-
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly store: DaemonResultStore,
@@ -33,11 +30,6 @@ export class Scheduler {
     private readonly workspacePath: string,
     private readonly onRunsChanged?: () => void
   ) {}
-
-  /** Wire the runtime registry after it becomes available (post-activation). */
-  setRuntimeRegistryProvider(provider: () => RuntimeRegistry | undefined): void {
-    this.registryProvider = provider;
-  }
 
   start(): void {
     this.scanWorkspace();
@@ -63,11 +55,6 @@ export class Scheduler {
       if (entry.task.id === taskId) return entry;
     }
     return undefined;
-  }
-
-  /** Expose current runtime registry for inline approval re-runs. */
-  getRuntimeRegistry(): import('../runtime/RuntimeRegistry').RuntimeRegistry | undefined {
-    return this.registryProvider?.();
   }
 
   /** Register a task for a specific agent file path. */
@@ -100,6 +87,12 @@ export class Scheduler {
     if (!entry) {
       return;
     }
+    // Defense in depth: if the flag was toggled off after start(), stop firing
+    // and tear down so no scheduled run executes while the feature is disabled.
+    if (!isEnabled('scheduled-tasks-daemon')) {
+      this.stop();
+      return;
+    }
     // Re-arm next fire before running so a long run doesn't shift the schedule
     const nextFire = this.computeNext(entry.config.cron);
     if (nextFire) {
@@ -114,7 +107,6 @@ export class Scheduler {
     const ctx: TaskContext = {
       workspacePath: this.workspacePath,
       extensionContext: this.context,
-      runtimeRegistry: this.registryProvider?.(),
     };
 
     const label = entry.config.label || path.basename(filePath, '.md');

@@ -137,13 +137,6 @@ export function AgentConfiguratorPanel({
   const schedLabel = rawSchedule?.label ?? ''
   const schedEnabled = rawSchedule?.enabled ?? false
 
-  const setSchedule = useCallback((patch: Partial<ScheduleFrontmatter>) => {
-    const current: ScheduleFrontmatter = rawSchedule ?? {}
-    const next = { ...current, ...patch }
-    const isEmpty = !next.cron && !next.label && !next.enabled
-    set('schedule', isEmpty ? undefined : next)
-  }, [rawSchedule, set])
-
   // Tools: parse from comma-separated string OR array → canonical names.
   // Empty = "inherits all tools" (per spec), NOT "no tools".
   const grantedTools = parseToolsField(fm.tools)
@@ -164,6 +157,13 @@ export function AgentConfiguratorPanel({
     }
     onFrontmatterChange(next)
   }, [fm, onFrontmatterChange])
+
+  const setSchedule = useCallback((patch: Partial<ScheduleFrontmatter>) => {
+    const current: ScheduleFrontmatter = rawSchedule ?? {}
+    const next = { ...current, ...patch }
+    const isEmpty = !next.cron && !next.label && !next.enabled
+    set('schedule', isEmpty ? undefined : next)
+  }, [rawSchedule, set])
 
   const toggleTool = useCallback((toolName: string) => {
     const next = grantedTools.includes(toolName)

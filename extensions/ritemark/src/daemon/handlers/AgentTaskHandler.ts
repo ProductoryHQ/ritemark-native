@@ -2,9 +2,23 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { ScheduledTask, TaskContext, TaskResult, TaskRunOptions, ScheduleConfig, BlockedActionDetail } from '../ScheduledTask';
 import { DEFAULT_HEADLESS_POLICY } from '../ScheduledTask';
-import type { RuntimeRegistry } from '../../runtime/RuntimeRegistry';
 import type { UnifiedApprovalRequest, RuntimeTurnResult } from '../../runtime/AgentRuntime';
 
+/**
+ * AgentTaskHandler — runs an agent .md file headlessly via a fresh AgentRuntime.
+ *
+ * Headless session contract (Sprint 80, technical-plan.md, Jarmo decision #2):
+ * each run creates its OWN ClaudeCodeRuntime instance with a NEW session. It
+ * never borrows the shared RuntimeRegistry the interactive sidebar uses — a
+ * background run must not clobber the user's live conversation or its approval
+ * mode. The runtime is disposed when the run ends.
+ *
+ * Approval policy: the runtime is started in 'ask' mode so the SDK surfaces an
+ * approval callback for every Write/Edit/Bash. Reads proceed automatically. The
+ * handler auto-rejects file-writes and shell-commands (recording the first as a
+ * blocked action) unless they appear in the per-run one-time allow-list passed
+ * from an inline approval re-run.
+ */
 export class AgentTaskHandler implements ScheduledTask {
   readonly id: string;
   readonly schedule: ScheduleConfig;
@@ -22,92 +36,79 @@ export class AgentTaskHandler implements ScheduledTask {
     const startedAt = new Date().toISOString();
     const runId = crypto.randomUUID();
 
-    const registry = ctx.runtimeRegistry;
-    if (!registry) {
-      return this.skipped(runId, startedAt, 'agent-runtime-unavailable');
-    }
-
-    let runtime: Awaited<ReturnType<RuntimeRegistry['get']>> | undefined;
-    try {
-      runtime = registry.get('claude-code');
-    } catch {
-      return this.skipped(runId, startedAt, 'agent-runtime-unavailable');
-    }
-
     const prompt = this.readPrompt();
     if (!prompt) {
       return this.skipped(runId, startedAt, 'empty-agent-file');
     }
 
-    // Build one-time allow list from options + base policy
-    const oneTimeAllowList = options?.oneTimeAllowList ?? [];
+    // Fresh, isolated runtime per run — never the shared interactive instance.
+    let ClaudeCodeRuntime: typeof import('../../agent/ClaudeCodeRuntime').ClaudeCodeRuntime;
+    try {
+      ({ ClaudeCodeRuntime } = await import('../../agent/ClaudeCodeRuntime'));
+    } catch {
+      return this.skipped(runId, startedAt, 'agent-runtime-unavailable');
+    }
+    const runtime = new ClaudeCodeRuntime();
 
+    const oneTimeAllowList = options?.oneTimeAllowList ?? [];
     let blockedAction: BlockedActionDetail | undefined;
     let turnResult: RuntimeTurnResult | undefined;
-    let turnError: string | undefined;
 
     try {
-      await runtime.start({
-        workspacePath: ctx.workspacePath,
-        onProgress: () => { /* headless — discard progress */ },
-        onApprovalRequest: (req: UnifiedApprovalRequest) => {
-          if (this.isAllowed(req, oneTimeAllowList)) {
-            runtime!.respondToApproval(req.requestId, true, false);
-            return;
-          }
-          // First blocked action wins — record it and reject
-          if (!blockedAction) {
-            blockedAction = this.toBlockedDetail(req);
-          }
-          runtime!.respondToApproval(req.requestId, false, false);
-        },
-        onComplete: (result: RuntimeTurnResult) => {
-          turnResult = result;
-        },
-      });
+      try {
+        await runtime.start({
+          workspacePath: ctx.workspacePath,
+          // 'ask' is required: 'auto' uses bypassPermissions and the SDK would
+          // silently auto-approve writes/shell, defeating the headless policy.
+          approvalMode: 'ask',
+          onProgress: () => { /* headless — discard progress */ },
+          onApprovalRequest: (req: UnifiedApprovalRequest) => {
+            if (this.isAllowed(req, oneTimeAllowList)) {
+              runtime.respondToApproval(req.requestId, true, false);
+              return;
+            }
+            if (!blockedAction) {
+              blockedAction = this.toBlockedDetail(req);
+            }
+            runtime.respondToApproval(req.requestId, false, false);
+          },
+          // prompt() never throws — turn errors arrive here with an `error` field.
+          onComplete: (result: RuntimeTurnResult) => {
+            turnResult = result;
+          },
+        });
+      } catch (err) {
+        // start() throws only when Claude Code isn't installed / signed in.
+        return this.skipped(runId, startedAt, 'agent-runtime-unavailable',
+          err instanceof Error ? err.message : String(err));
+      }
 
       await runtime.prompt({ prompt, timeoutMinutes: 10 });
-    } catch (err) {
-      turnError = err instanceof Error ? err.message : String(err);
     } finally {
       runtime.dispose();
     }
 
     const finishedAt = new Date().toISOString();
     const durationMs = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
+    const base = { taskId: this.id, runId, startedAt, finishedAt, durationMs };
 
-    if (turnError) {
-      return {
-        taskId: this.id,
-        runId,
-        outcome: 'errored',
-        startedAt,
-        finishedAt,
-        durationMs,
-        errorMessage: turnError,
-      };
+    // prompt() surfaces turn failures through onComplete({ error }), not by throwing.
+    if (turnResult?.error) {
+      return { ...base, outcome: 'errored', errorMessage: turnResult.error };
     }
 
     if (blockedAction) {
       return {
-        taskId: this.id,
-        runId,
+        ...base,
         outcome: 'blocked',
-        startedAt,
-        finishedAt,
-        durationMs,
         blockedAction,
         outputFirstLine: this.firstLine(turnResult?.text),
       };
     }
 
     return {
-      taskId: this.id,
-      runId,
+      ...base,
       outcome: 'completed',
-      startedAt,
-      finishedAt,
-      durationMs,
       outputFirstLine: this.firstLine(turnResult?.text),
     };
   }
@@ -117,8 +118,8 @@ export class AgentTaskHandler implements ScheduledTask {
   private readPrompt(): string | undefined {
     try {
       const raw = fs.readFileSync(this.filePath, 'utf-8');
-      // Strip YAML frontmatter (--- ... ---)
-      const stripped = raw.replace(/^---[\s\S]*?---\n?/, '').trim();
+      // Strip leading YAML frontmatter (--- ... ---); the body is the prompt.
+      const stripped = raw.replace(/^---[\s\S]*?\n---\n?/, '').trim();
       return stripped || undefined;
     } catch {
       return undefined;
@@ -154,7 +155,7 @@ export class AgentTaskHandler implements ScheduledTask {
     return line || undefined;
   }
 
-  private skipped(runId: string, startedAt: string, reason: string): TaskResult {
+  private skipped(runId: string, startedAt: string, reason: string, detail?: string): TaskResult {
     return {
       taskId: this.id,
       runId,
@@ -163,6 +164,7 @@ export class AgentTaskHandler implements ScheduledTask {
       finishedAt: new Date().toISOString(),
       durationMs: 0,
       skipReason: reason,
+      ...(detail ? { errorMessage: detail } : {}),
     };
   }
 }

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { Scheduler } from './Scheduler';
 import { DaemonResultStore } from './DaemonResultStore';
 import { DaemonStatusEvents } from './DaemonStatusEvents';
+import { isEnabled } from '../features/featureGate';
 
 export interface DaemonController {
   store: DaemonResultStore;
@@ -20,7 +21,10 @@ export function initDaemon(context: vscode.ExtensionContext): DaemonController {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   const workspacePath = workspaceFolders?.length ? workspaceFolders[0].uri.fsPath : undefined;
 
-  if (workspacePath) {
+  // Gated on the 'scheduled-tasks-daemon' flag (currently 'disabled' → ships inert).
+  // When the flag is off the scheduler is never created: no workspace scan, no
+  // cron timers, no runs. The store + commands remain so the UI degrades cleanly.
+  if (workspacePath && isEnabled('scheduled-tasks-daemon')) {
     const status = new DaemonStatusEvents(context);
     scheduler = new Scheduler(context, store, status, workspacePath, () => runsChanged.fire());
     scheduler.start();
@@ -52,7 +56,6 @@ export function initDaemon(context: vscode.ExtensionContext): DaemonController {
       const ctx = {
         workspacePath: workspacePath ?? '',
         extensionContext: context,
-        runtimeRegistry: scheduler?.getRuntimeRegistry(),
       };
 
       const newResult = await entry.task.run(ctx, { oneTimeAllowList });

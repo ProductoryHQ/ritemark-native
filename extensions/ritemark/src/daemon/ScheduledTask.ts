@@ -1,5 +1,4 @@
 import type * as vscode from 'vscode';
-import type { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 
 // ---------------------------------------------------------------------------
 // Core types
@@ -8,8 +7,6 @@ import type { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 export interface TaskContext {
   workspacePath: string;
   extensionContext: vscode.ExtensionContext;
-  /** Live registry provided by the extension host (undefined until wired). */
-  runtimeRegistry?: RuntimeRegistry;
 }
 
 export type TaskOutcome = 'completed' | 'blocked' | 'errored' | 'skipped' | 'missed';

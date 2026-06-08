@@ -105,8 +105,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _runtimeRegistry: RuntimeRegistry;
   private _approvalGate: UnifiedApprovalGate;
 
-  getRuntimeRegistry(): RuntimeRegistry { return this._runtimeRegistry; }
-
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _workspacePath: string | undefined,
