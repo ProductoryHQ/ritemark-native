@@ -104,6 +104,13 @@ export class CodexRuntime implements AgentRuntime {
   private _browserToolsEnabledForThread = false;
 
   /**
+   * Approval policy + sandbox the current thread was started with
+   * ("<policy>:<sandbox>"). A change (e.g. Auto↔Ask) forces a thread reset
+   * since both are fixed at threadStart.
+   */
+  private _threadApprovalKey = '';
+
+  /**
    * Maps the string requestId we expose externally (e.g. "codex-42") back to
    * the original server request id for response routing via sendApprovalResponse().
    */
@@ -114,7 +121,7 @@ export class CodexRuntime implements AgentRuntime {
   /** Expose the auth object for login/logout/status in UnifiedViewProvider. */
   getAuth(): CodexAuth | null { return this._auth; }
   /** Reset the codex thread (e.g. after logout or conversation reset). */
-  resetSession(): void { this._threadId = null; this._turnId = null; this._requestIdMap.clear(); }
+  resetSession(): void { this._threadId = null; this._turnId = null; this._threadApprovalKey = ''; this._requestIdMap.clear(); }
 
   async start(config: RuntimeSessionConfig): Promise<void> {
     this._sessionConfig = config;
@@ -219,7 +226,13 @@ export class CodexRuntime implements AgentRuntime {
     const shouldUsePlanMode = turn.mode === 'plan'
       || (turn.mode !== 'execute' && shouldStartCodexInPlanMode(turn.prompt));
 
-    // Reset thread when browser-tools state would change (to apply the tool list)
+    const approvalPolicy = (config.codexApprovalPolicy ?? 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
+    const sandbox = (config.codexSandboxMode ?? 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
+    const approvalKey = `${approvalPolicy}:${sandbox}`;
+
+    // Reset thread when browser-tools state OR the approval policy/sandbox would
+    // change — both are fixed at threadStart, so a live thread must be recreated
+    // for a new unified approval mode (Auto↔Ask) to take effect.
     const browserToolsNeeded = Boolean(config.onBrowserToolCall);
     if (this._threadId && browserToolsNeeded !== this._browserToolsEnabledForThread) {
       traceCodex('execution', 'resetting thread: browser-tools state changed', {
@@ -229,11 +242,17 @@ export class CodexRuntime implements AgentRuntime {
       this._threadId = null;
       this._turnId = null;
     }
+    if (this._threadId && approvalKey !== this._threadApprovalKey) {
+      traceCodex('execution', 'resetting thread: approval config changed', {
+        was: this._threadApprovalKey,
+        now: approvalKey,
+      });
+      this._threadId = null;
+      this._turnId = null;
+    }
 
     // Create thread on first turn or after reset
     if (!this._threadId) {
-      const approvalPolicy = (config.codexApprovalPolicy ?? 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
-      const sandbox = (config.codexSandboxMode ?? 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
       const dynamicTools = browserToolsNeeded ? buildCodexBrowserDynamicTools() : undefined;
       const planDevInstructions = config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS;
 
@@ -248,6 +267,7 @@ export class CodexRuntime implements AgentRuntime {
       });
       this._threadId = result.thread.id;
       this._browserToolsEnabledForThread = Boolean(dynamicTools?.length);
+      this._threadApprovalKey = approvalKey;
       traceCodex('execution', 'thread started', {
         threadId: result.thread.id,
         approvalPolicy,

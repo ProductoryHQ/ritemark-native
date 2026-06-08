@@ -21,11 +21,25 @@ import type {
   UnifiedApprovalRequest,
 } from '../runtime/AgentRuntime';
 
+/**
+ * Per-turn reminder injected in 'plan' mode so Claude proposes a reviewable
+ * plan (via ExitPlanMode → plan-approval card) before mutating the workspace.
+ */
+const CLAUDE_PLAN_TURN_REMINDER = [
+  'Ritemark plan-mode reminder:',
+  '- Produce a short, reviewable plan and call ExitPlanMode to request approval.',
+  '- Do NOT edit files or run commands until the plan is approved.',
+].join('\n');
+
 export class ClaudeCodeRuntime implements AgentRuntime {
   readonly id: AgentId = 'claude-code';
 
   private _session: AgentSession | null = null;
   private _sessionConfig: RuntimeSessionConfig | null = null;
+  /** Model of the live session — used to decide reuse vs recreate. */
+  private _activeModel: string | undefined;
+  /** Whether the live session was started in Ask permission mode (SDK 'default'). */
+  private _activeAskMode = false;
 
   /**
    * Pending question requests — stored so respondToApproval() can look them up.
@@ -52,10 +66,24 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       );
     }
 
-    // Close any existing session before creating a new one
+    this._sessionConfig = config;
+    const approvalMode = config.approvalMode ?? 'auto';
+    const needsAsk = approvalMode === 'ask';
+
+    // Reuse the warm session across turns to preserve conversation context
+    // (start() is called every turn). Recreate when there's no live session,
+    // the model changed, or we cross the Ask boundary (Ask uses a different SDK
+    // permission mode fixed at session start). Mirrors Codex/ACP session reuse.
+    if (this._session?.isActive && this._activeModel === config.model && this._activeAskMode === needsAsk) {
+      this._session.setApprovalMode(approvalMode);
+      return;
+    }
+
+    // Close any stale session before creating a new one
     this._session?.close();
     this._pendingQuestions.clear();
-    this._sessionConfig = config;
+    this._activeModel = config.model;
+    this._activeAskMode = needsAsk;
     this._session = new AgentSession({
       workspacePath: config.workspacePath,
       model: config.model,
@@ -64,6 +92,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       extraSystemPromptAppend: config.extraSystemPrompt,
       mcpServers: config.mcpServers,
       allowedTools: config.allowedTools,
+      approvalMode,
       ...(config.anthropicApiKey ? { anthropicApiKey: config.anthropicApiKey } : {}),
     });
   }
@@ -77,9 +106,14 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     // UnifiedAttachment is structurally identical to FileAttachment — safe cast
     const attachments = turn.attachments as FileAttachment[] | undefined;
 
+    // In 'plan' mode, nudge Claude to propose a plan (ExitPlanMode) first.
+    const promptText = config.approvalMode === 'plan'
+      ? `${CLAUDE_PLAN_TURN_REMINDER}\n\n${turn.prompt}`
+      : turn.prompt;
+
     try {
       const result = await this._session.sendMessage({
-        prompt: turn.prompt,
+        prompt: promptText,
         attachments,
         activeFile: turn.activeFile,
         timeoutMinutes: turn.timeoutMinutes,
@@ -90,6 +124,17 @@ export class ClaudeCodeRuntime implements AgentRuntime {
             agentId: 'claude-code',
             kind: 'plan',
             planText: request.plan,
+          };
+          config.onApprovalRequest(req);
+        },
+        onToolApproval: (request) => {
+          // 'ask' mode — surface a unified file-write/shell-command approval card.
+          const req: UnifiedApprovalRequest = {
+            requestId: request.toolUseId,
+            agentId: 'claude-code',
+            kind: request.kind,
+            filePath: request.filePath,
+            command: request.command,
           };
           config.onApprovalRequest(req);
         },
@@ -127,7 +172,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
 
   respondToApproval(requestId: string, approved: boolean, _alwaysAllow: boolean, feedback?: string): void {
     if (!this._session) return;
-    // Plan approval path — AgentSession.answerPlanApproval uses toolUseId as the key
+    // Both tool ('ask') and plan approvals key on toolUseId. Try the tool gate
+    // first; if it didn't match, route to plan approval.
+    if (this._session.answerToolApproval(requestId, approved)) return;
     this._session.answerPlanApproval(requestId, approved, feedback);
   }
 
@@ -158,6 +205,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     this._session?.close();
     this._session = null;
     this._sessionConfig = null;
+    this._activeModel = undefined;
     this._pendingQuestions.clear();
   }
 }

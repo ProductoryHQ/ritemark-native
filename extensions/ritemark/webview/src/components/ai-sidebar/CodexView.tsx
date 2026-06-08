@@ -90,7 +90,6 @@ export function CodexView() {
           turn={turn}
           isMixedRuntime={isMixedRuntime}
           onApprove={(requestId) => handleCodexApproval(requestId, true)}
-          onApproveAlways={(requestId) => handleCodexApproval(requestId, true, true)}
           onReject={(requestId) => handleCodexApproval(requestId, false)}
           onAnswerQuestion={answerCodexQuestion}
           onApprovePlan={approveCodexPlan}
@@ -138,7 +137,6 @@ export function CodexTurn({
   turn,
   isMixedRuntime,
   onApprove,
-  onApproveAlways,
   onReject,
   onAnswerQuestion,
   onApprovePlan,
@@ -147,7 +145,6 @@ export function CodexTurn({
   turn: CodexConversationTurn;
   isMixedRuntime: boolean;
   onApprove: (requestId: string | number) => void;
-  onApproveAlways: (requestId: string | number) => void;
   onReject: (requestId: string | number) => void;
   onAnswerQuestion: (turnId: string, question: NonNullable<CodexConversationTurn['pendingQuestion']>, answers: Record<string, string>) => void;
   onApprovePlan: (turnId: string) => void;
@@ -200,7 +197,6 @@ export function CodexTurn({
         <ApprovalCard
           approval={turn.approval}
           onApprove={onApprove}
-          onApproveAlways={onApproveAlways}
           onReject={onReject}
         />
       )}
@@ -383,21 +379,16 @@ function ActivityLine({ activity }: { activity: AgentProgress }) {
   );
 }
 
-function ApprovalCard({
+export function ApprovalCard({
   approval,
   onApprove,
-  onApproveAlways,
   onReject,
 }: {
   approval: NonNullable<CodexConversationTurn['approval']>;
   onApprove: (requestId: string | number) => void;
-  onApproveAlways: (requestId: string | number) => void;
   onReject: (requestId: string | number) => void;
 }) {
   const isCommand = approval.approvalType === 'command';
-  // "Always allow for this session" is wired for ACP/OpenCode approvals
-  // (requestId prefixed "acp-"); the host remembers the decision per session.
-  const supportsAlwaysAllow = String(approval.requestId).startsWith('acp-');
 
   return (
     <div className="mx-1 rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-input-background)]/80 p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
@@ -444,16 +435,6 @@ function ApprovalCard({
         <Button variant="default" size="sm" onClick={() => onApprove(approval.requestId)}>
           <Icon name="check" size={12} /> Approve
         </Button>
-        {supportsAlwaysAllow && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onApproveAlways(approval.requestId)}
-            title="Approve this and skip future approvals for the rest of this session"
-          >
-            <Icon name="check" size={12} /> Always allow
-          </Button>
-        )}
         <Button variant="outline" size="sm" onClick={() => onReject(approval.requestId)}>
           <Icon name="x" size={12} /> Reject
         </Button>

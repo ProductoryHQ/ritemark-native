@@ -790,7 +790,7 @@ export function ChatInput() {
       ? `codex:${currentCodexModel?.id || codexSelectedModel}`
       : `claude-code:${currentClaudeModel?.id || selectedModel}`;
   const runtimeFooterLabel = isOpenCode
-    ? `OpenCode · ${currentOpenCodeEntry?.label || 'Select a model…'}`
+    ? `OpenCode · ${(currentOpenCodeEntry || openCodeModels[0])?.label || 'Select a model…'}`
     : pendingRuntime.runtimeId === 'codex'
       ? `Codex · ${currentCodexModel?.label || codexSelectedModel || 'Model'}`
       : `Claude · ${currentClaudeModel?.label || selectedModel || 'Model'}`;
@@ -1210,24 +1210,28 @@ export function ChatInput() {
             </SelectContent>
           </Select>
 
-          {pendingRuntime.runtimeId === 'codex' && (
-            <div className="inline-flex shrink-0 overflow-hidden rounded border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/60">
-              {(['edit', 'plan'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setPendingRuntime({ mode })}
-                  className={[
-                    'h-5 px-2 text-[10px] font-medium transition-colors',
-                    pendingRuntime.mode === mode
-                      ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)] shadow-[inset_0_0_0_1px_var(--r-accent-fainter)]'
-                      : 'text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]',
-                  ].join(' ')}
-                >
-                  {mode === 'edit' ? 'Edit' : 'Plan'}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Unified approval policy — applies to all runtimes. */}
+          <div className="inline-flex shrink-0 overflow-hidden rounded border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/60">
+            {(['auto', 'ask', 'plan'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setPendingRuntime({ mode })}
+                title={
+                  mode === 'auto' ? 'Auto — agent acts without asking'
+                  : mode === 'ask' ? 'Ask — approve file writes & shell commands'
+                  : 'Plan — propose a plan, then execute after approval'
+                }
+                className={[
+                  'h-5 px-2 text-[10px] font-medium transition-colors capitalize',
+                  pendingRuntime.mode === mode
+                    ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)] shadow-[inset_0_0_0_1px_var(--r-accent-fainter)]'
+                    : 'text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]',
+                ].join(' ')}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
 
           {contextSummary && (
             <span className="min-w-0 truncate text-[10px] text-[var(--r-ink-faint)]">

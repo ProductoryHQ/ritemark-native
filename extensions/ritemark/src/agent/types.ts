@@ -115,6 +115,20 @@ export interface AgentPlanApprovalRequest {
 }
 
 /**
+ * A mutating-tool approval request emitted in 'ask' mode (unified approval
+ * policy). The toolUseId is the request key answered via answerToolApproval().
+ */
+export interface AgentToolApprovalRequest {
+  toolUseId: string;
+  /** 'file-write' for Write/Edit, 'shell-command' for Bash. */
+  kind: 'file-write' | 'shell-command';
+  /** Target file path (Write/Edit). */
+  filePath?: string;
+  /** Shell command text (Bash). */
+  command?: string;
+}
+
+/**
  * Subagent progress tracking for nested agent execution
  */
 export interface SubagentProgress {
@@ -280,6 +294,8 @@ export interface AgentSessionConfig {
    * push browser-tool routing instructions when browser control is on.
    */
   extraSystemPromptAppend?: string;
+  /** Unified approval mode: 'auto' (default), 'ask', or 'plan'. */
+  approvalMode?: 'auto' | 'ask' | 'plan';
 }
 
 /**
@@ -301,6 +317,8 @@ export interface AgentTurnOptions {
   onProgress?: (progress: AgentProgress) => void;
   onQuestion?: (question: AgentQuestion) => void;
   onPlanApproval?: (request: AgentPlanApprovalRequest) => void;
+  /** Emitted in 'ask' mode before a Write/Edit/Bash tool executes. */
+  onToolApproval?: (request: AgentToolApprovalRequest) => void;
 }
 
 /**
@@ -310,6 +328,8 @@ export interface AgentTurnOptions {
 export interface QueryHandle extends AsyncIterable<unknown> {
   interrupt(): Promise<void>;
   close(): void;
+  /** Change the permission mode of a live session (used by unified approval). */
+  setPermissionMode?(mode: string): Promise<void>;
 }
 
 /**

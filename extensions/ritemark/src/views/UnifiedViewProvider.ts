@@ -68,7 +68,7 @@ import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
-import { byokProviderFlags, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
+import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { ClaudeCodeRuntime } from '../agent/ClaudeCodeRuntime';
@@ -130,28 +130,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._approvalGate = new UnifiedApprovalGate((req) => {
       this._view?.webview.postMessage({ type: 'agent-approval-request', ...req });
     });
-  }
-
-  /**
-   * Sprint 69: build the browser-action MCP server config for a new
-   * AgentSession. Returns null if the SDK cannot create the MCP server
-   * (e.g. import failure) — callers should fall back to no browser tools.
-   *
-   * Workbench-side `EnsureActiveBrowserControlShared` is the consent gate;
-   * we wire the tools unconditionally when the feature flag is on, and the
-   * first browser-tool call from the model triggers the consent prompt.
-   */
-  private async _buildBrowserMcpConfig(): Promise<{ servers: Record<string, unknown>; allowedTools: string[] } | null> {
-    try {
-      const mcpServer = await createBrowserMcpServer();
-      return {
-        servers: { [BROWSER_MCP_SERVER_NAME]: mcpServer },
-        allowedTools: [...DEFAULT_TOOLS, ...BROWSER_TOOL_ALLOW_NAMES],
-      };
-    } catch (err) {
-      console.warn('[UnifiedViewProvider] Failed to build browser MCP config:', err);
-      return null;
-    }
   }
 
   public resolveWebviewView(
@@ -223,10 +201,50 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'agent-execute': {
-          const { agentId, prompt, model, attachments } = message;
+          const { agentId, model, attachments } = message;
+          const skipActiveFile = message.skipActiveFile === true;
+          const skipBrowserContext = message.skipBrowserContext === true;
+          const mentionedAgentPaths: string[] | undefined = message.mentionedAgentPaths;
+          // Unified approval policy (Auto/Ask/Plan) — applies to all runtimes.
+          const approvalMode: 'auto' | 'ask' | 'plan' =
+            message.approvalMode === 'ask' || message.approvalMode === 'plan' ? message.approvalMode : 'auto';
+          const codexTurnMode: 'plan' | 'execute' = approvalMode === 'plan' ? 'plan' : 'execute';
           const runtime = this._runtimeRegistry.get(agentId as import('../agent/types').AgentId);
           const isClaudeCode = agentId === 'claude-code';
+          const isCodex = agentId === 'codex';
           const browserEnabled = isEnabled('browser-agent-control');
+
+          // ── Per-turn context injection (parity with the pre-Sprint-79 handlers;
+          //    Sprint 79 unifies the plumbing, NOT the behavior — see architecture.md) ──
+          let prompt: string = message.prompt;
+          let turnAttachments = attachments;
+
+          // @mentioned agent definitions prepended as hidden context (Claude Code).
+          if (isClaudeCode && Array.isArray(mentionedAgentPaths) && mentionedAgentPaths.length > 0) {
+            const fs = require('fs') as typeof import('fs');
+            const sections = mentionedAgentPaths
+              .map((p) => { try { return fs.readFileSync(p, 'utf-8'); } catch { return null; } })
+              .filter((s): s is string => Boolean(s));
+            if (sections.length > 0) {
+              prompt = `[Agent instructions — respond as this agent for this conversation]\n\n${sections.join('\n\n---\n\n')}\n\n---\n\n${prompt}`;
+            }
+          }
+
+          // Browser context (page summary + screenshot). Consent-gated inside
+          // buildTurnContext() — returns null unless the user shared a tab. Only
+          // Claude Code + Codex received this pre-Sprint-79 (ACP did not).
+          if (browserEnabled && !skipBrowserContext && (isClaudeCode || isCodex)) {
+            const browserContext = await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
+            if (browserContext) {
+              prompt = `${browserContext.promptBlock}\n\n---\n\n${prompt}`;
+              if (browserContext.claudeAttachments.length > 0) {
+                turnAttachments = [...(turnAttachments ?? []), ...browserContext.claudeAttachments];
+              }
+            }
+          }
+
+          // Active file context — works for TextEditor and custom (Ritemark) editors.
+          const activeFile = skipActiveFile ? undefined : this._getActiveFileContext();
 
           // Browser MCP server for Claude Code (in-process server)
           let mcpServers: Record<string, unknown> | undefined;
@@ -235,10 +253,50 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             mcpServers = { [BROWSER_MCP_SERVER_NAME]: server };
           }
 
+          const byokKeys = await this._readByokKeys();
+
+          // ── Per-runtime settings (dropped during the migration — restored) ──
+          const aiConfig = vscode.workspace.getConfiguration('ritemark.ai');
+          const agentTimeout = aiConfig.get<number>('agentTimeout', 15);
+          let excludedFolders: string[] | undefined;
+          let anthropicApiKey: string | undefined;
+          if (isClaudeCode) {
+            excludedFolders = aiConfig.get<string[]>('excludedFolders');
+            const claudeStatus = await getSetupStatus();
+            // API-key auth reuses the same secret the BYOK Settings card writes.
+            if (claudeStatus.authMethod === 'api-key') {
+              anthropicApiKey = byokKeys.anthropic;
+            }
+          }
+          // Codex approval is sandbox-gated: 'workspace-write' pre-approves in-workspace
+          // edits regardless of policy. So Ask must use a read-only sandbox + 'untrusted'
+          // to force an approval before each write/command. Auto/Plan run freely
+          // (Plan gates via plan-mode approval).
+          const codexConfig = vscode.workspace.getConfiguration('ritemark.codex');
+          let codexApprovalPolicy: string | undefined;
+          let codexSandboxMode: string | undefined;
+          if (isCodex) {
+            if (approvalMode === 'ask') {
+              codexApprovalPolicy = 'untrusted';
+              codexSandboxMode = 'read-only';
+            } else {
+              codexApprovalPolicy = 'never';
+              codexSandboxMode = codexConfig.get<string>('sandboxMode', 'workspace-write');
+            }
+          }
+
           const sessionConfig: RuntimeSessionConfig = {
             workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
             model,
-            extraSystemPrompt: BROWSER_ROUTING_HINT,
+            byokEnv: buildByokEnv(byokKeys),
+            excludedFolders,
+            anthropicApiKey,
+            approvalMode,
+            codexApprovalPolicy,
+            codexSandboxMode,
+            // extraSystemPrompt is APPENDED by Claude Code but REPLACES Codex's
+            // base instructions — so only set it for Claude Code's browser hint.
+            extraSystemPrompt: isClaudeCode && browserEnabled ? BROWSER_ROUTING_HINT : undefined,
             mcpServers,
             allowedTools: isClaudeCode && browserEnabled
               ? [...DEFAULT_TOOLS, ...BROWSER_TOOL_ALLOW_NAMES]
@@ -249,8 +307,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               } else {
                 if (progress.type === 'text') {
                   this._view?.webview.postMessage({ type: 'codex-streaming', delta: progress.message });
+                } else {
+                  this._view?.webview.postMessage({ type: 'codex-progress', progress });
                 }
-                this._view?.webview.postMessage({ type: 'codex-progress', progress });
               }
             },
             onApprovalRequest: (req) => this._approvalGate.request(req),
@@ -277,6 +336,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               });
               this._refreshExplorerForAgentWrites(undefined);
             },
+            onExit: () => {
+              // Codex app-server died mid-turn — finalize the turn so the webview
+              // isn't stuck on "running" forever.
+              this._view?.webview.postMessage({
+                type: 'codex-result',
+                agentId,
+                status: 'error',
+                error: 'Codex exited unexpectedly. Please try again.',
+              });
+            },
             onCodexPlanDelta: (delta) => {
               this._view?.webview.postMessage({ type: 'codex-plan-text-delta', delta });
             },
@@ -299,8 +368,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               }
               : undefined,
           };
-          await runtime.start(sessionConfig);
-          await runtime.prompt({ prompt, attachments });
+          try {
+            await runtime.start(sessionConfig);
+            await runtime.prompt({ prompt, attachments: turnAttachments, activeFile, mode: codexTurnMode, model, timeoutMinutes: agentTimeout });
+          } catch (err) {
+            // Unhandled runtime error — surface it to the webview so the turn finishes
+            const errMsg = err instanceof Error ? err.message : String(err);
+            if (isClaudeCode) {
+              sessionConfig.onComplete?.({ text: '', filesModified: [], metrics: { durationMs: 0, costUsd: null, model: null }, error: errMsg });
+            } else {
+              sessionConfig.onCodexComplete?.({ status: 'error', error: errMsg });
+            }
+          }
           break;
         }
 

@@ -187,6 +187,22 @@ One webview message contract, one approval card component, all runtimes:
 
 Each runtime adapter translates its native approval format (Codex JSON-RPC, ACP `session/request_permission`, Claude plan approval) into this shape before forwarding to the webview.
 
+### Unified approval policy (Sprint 79)
+
+A single per-conversation **mode** (`approvalMode`) governs *when* the gate fires, applied uniformly across all three runtimes. Selected in the composer (Auto · Ask · Plan), default **Auto**; sent as `approvalMode` on `agent-execute`.
+
+| Mode | Claude Code | Codex | OpenCode (ACP) |
+|---|---|---|---|
+| **Auto** | SDK `bypassPermissions` — no prompts | `approvalPolicy: never`, `workspace-write` | auto-allow `request_permission` |
+| **Ask** | SDK `default` mode + mutating tools (Write/Edit/Bash) removed from `allowedTools` → routed through `canUseTool` → gate | `approvalPolicy: untrusted` + `sandbox: read-only` (workspace-write pre-approves edits, so read-only is required to force a prompt) | native `request_permission` prompt |
+| **Plan** | plan reminder → `ExitPlanMode` → plan card | plan collaboration mode | falls back to Ask |
+
+Mechanics & constraints:
+- `allowedTools` in the Claude SDK means *auto-allowed without prompting* — mutating tools must be excluded from it for Ask to reach `canUseTool`. `ExitPlanMode`/`AskUserQuestion` are control tools that always reach the client regardless of mode.
+- Claude's SDK permission mode and Codex's `approvalPolicy`/`sandbox` are fixed at session/thread start, so crossing the Ask boundary **recreates** the Claude session / resets the Codex thread (loses that conversation's in-runtime context). Same-mode turns reuse the warm session.
+- Claude sessions are reused across turns (model + Ask-class match) to preserve conversation memory — recreating per turn was a Sprint-79 regression, now fixed.
+- "Always allow" was removed from the approval card (it was OpenCode-only and did not actually persist); cards offer Approve / Reject only.
+
 ---
 
 ## Browser Tool Injection
@@ -377,3 +393,4 @@ The decisions that define the system. Changing any of these is an architecture-l
 | 2026-06-06 | Baseline | Initial document (agent runtime scope). Captures AS IS post-Sprint 78: 3 runtimes, 2 browser integration patterns, 3 model config locations. Defines TO BE for Sprint 79 (runtime adapter unification). |
 | 2026-06-06 | Pre-Sprint 79 | Expanded to full system scope. Added: system layers overview, webview↔host protocol, flows architecture, build pipeline (with ARCH-8 and ARCH-10 observations), broader TO BE roadmap (ARCH-8 through ARCH-13), locked decisions. Reconciled with `docs-internal/architecture/` (high-level-architecture.md + to-be-proposal.md). |
 | 2026-06-08 | Sprint 79 | Runtime unification: `src/runtime/` added (AgentRuntime, RuntimeRegistry, UnifiedApprovalGate, BrowserToolsInjector); ClaudeCodeRuntime/CodexRuntime/AcpRuntime adapters; `UnifiedViewProvider` 2480→1097 LOC; unified `agent-execute`/`agent-cancel`/`agent-approve` webview messages; browser IPC server + `browserMcpAdapter.ts` for ACP browser injection via Unix socket; `AgentDaemon` foundation (inactive); `CLAUDE_MODELS`/`DEFAULT_MODEL` moved to `modelConfig.ts`; `CODEX_MODELS` deleted; `document-search` flag disabled; ARCH-2/3/4/5 resolved. |
+| 2026-06-08 | Sprint 79 (close) | Integration-test hardening: unified approval **policy** (Auto/Ask/Plan `approvalMode`) across all 3 runtimes; restored per-turn context dropped in the dispatch migration (active file, browser context, @mentions, Codex approval-policy/sandbox + plan toggle, Claude api-key/excludedFolders/timeout, `onExit`, Codex base-instruction clobber); fixed Claude warm-session reuse (was recreated every turn → lost memory); "Always allow" removed from the approval card; OpenCode model picker auto-default + BYOK env wiring. |

@@ -45,7 +45,7 @@ function testSetPendingRuntimeMergesPartialUpdate() {
   try {
     useAISidebarStore.setState({
       ...useAISidebarStore.getState(),
-      pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'edit' },
+      pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'ask' },
     });
 
     useAISidebarStore.getState().setPendingRuntime({ runtimeId: 'codex' });
@@ -53,7 +53,7 @@ function testSetPendingRuntimeMergesPartialUpdate() {
     const { pendingRuntime } = useAISidebarStore.getState();
     assert.equal(pendingRuntime.runtimeId, 'codex', 'runtimeId should update');
     assert.equal(pendingRuntime.modelId, 'claude-sonnet-4-5', 'modelId should be preserved');
-    assert.equal(pendingRuntime.mode, 'edit', 'mode should be preserved');
+    assert.equal(pendingRuntime.mode, 'ask', 'mode should be preserved');
   } finally {
     resetStore();
   }
@@ -63,7 +63,7 @@ function testSetPendingRuntimeModeOnly() {
   try {
     useAISidebarStore.setState({
       ...useAISidebarStore.getState(),
-      pendingRuntime: { runtimeId: 'codex', modelId: 'o4-mini', mode: 'edit' },
+      pendingRuntime: { runtimeId: 'codex', modelId: 'o4-mini', mode: 'auto' },
     });
 
     useAISidebarStore.getState().setPendingRuntime({ mode: 'plan' });

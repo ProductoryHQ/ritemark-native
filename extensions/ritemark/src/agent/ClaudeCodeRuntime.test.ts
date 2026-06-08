@@ -32,7 +32,9 @@ const mockSession = {
   },
   interrupt: () => { calls.push('interrupt'); },
   close: () => { calls.push('close'); },
+  setApprovalMode: (_mode: string) => {},
   answerPlanApproval: (_toolUseId: string, _approved: boolean): boolean => false,
+  answerToolApproval: (_toolUseId: string, _approved: boolean): boolean => false,
   answerQuestion: (_toolUseId: string, _answers: Record<string, string>): boolean => false,
 };
 

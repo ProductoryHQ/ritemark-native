@@ -4,10 +4,9 @@
  * Wraps AcpManager and maps its requestPermission + approveWrite callbacks to
  * the unified AgentRuntime interface. Does NOT rewrite AcpManager internals.
  *
- * Note (W2): RuntimeSessionConfig does not yet carry BYOK keys; AcpRuntime
- * launches OpenCode with an empty byokEnv. Extend RuntimeSessionConfig with a
- * `byokEnv?: Record<string, string>` field when W2 wires dispatch through the
- * registry so the runtime can receive injected provider API keys.
+ * BYOK provider keys arrive via `RuntimeSessionConfig.byokEnv` (built from
+ * SecretStorage in UnifiedViewProvider) and are forwarded to the OpenCode
+ * subprocess in start().
  */
 
 import * as crypto from 'crypto';
@@ -113,15 +112,12 @@ export class AcpRuntime implements AgentRuntime {
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
-    // Apply model for this turn (strip 'opencode:' composite prefix if present)
-    if (config.model) {
-      const providerModel = config.model.startsWith('opencode:')
-        ? config.model.slice('opencode:'.length)
-        : config.model;
-      await this._manager.setModel(providerModel);
-    }
-
     let promptText = turn.prompt;
+    // Active file context — same `[Currently editing: …]` preamble Claude Code
+    // and Codex inject, so "edit this file" prompts know the target.
+    if (turn.activeFile) {
+      promptText = `[Currently editing: ${turn.activeFile.path}]\n\n${promptText}`;
+    }
     if (turn.attachments && turn.attachments.length > 0) {
       const blocks = turn.attachments.map(a => `**Attachment: ${a.name}**\n\`\`\`\n${a.data}\n\`\`\``);
       promptText = `${blocks.join('\n\n')}\n\n${promptText}`;
@@ -132,6 +128,14 @@ export class AcpRuntime implements AgentRuntime {
     }
 
     try {
+      // Apply model for this turn (strip 'opencode:' composite prefix if present).
+      // Must be inside try/catch — setModel throws if the model ID is invalid.
+      if (config.model) {
+        const providerModel = config.model.startsWith('opencode:')
+          ? config.model.slice('opencode:'.length)
+          : config.model;
+        await this._manager.setModel(providerModel);
+      }
       const result = await this._manager.prompt(promptText);
       config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
     } catch (err) {
@@ -231,6 +235,11 @@ export class AcpRuntime implements AgentRuntime {
     const config = this._sessionConfig;
     if (!config) return { outcome: { outcome: 'cancelled' } };
 
+    // Unified 'auto' approval mode — allow without prompting the user.
+    if (config.approvalMode === 'auto') {
+      return this._selectOutcome(params, true);
+    }
+
     const tool = params.toolCall?.title ?? 'tool call';
     const file = params.toolCall?.locations?.[0]?.path;
     const isFileEdit = params.toolCall?.kind === 'edit' && !!file;
@@ -264,6 +273,9 @@ export class AcpRuntime implements AgentRuntime {
 
     const config = this._sessionConfig;
     if (!config) return false;
+
+    // Unified 'auto' approval mode — allow writes without prompting.
+    if (config.approvalMode === 'auto') return true;
 
     const requestId = `acp-write-${++this._approvalSeq}`;
     traceAcp('approval', 'write-requested', { path: request.path });

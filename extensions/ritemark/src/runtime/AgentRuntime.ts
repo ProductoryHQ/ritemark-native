@@ -36,6 +36,13 @@ export interface RuntimeSessionConfig {
   anthropicApiKey?: string;
   /** BYOK provider env vars for AcpRuntime */
   byokEnv?: Record<string, string>;
+  /**
+   * Unified approval mode applied across all runtimes:
+   * - 'auto'  — agents act without asking (no approval prompts)
+   * - 'ask'   — file writes + shell commands require approval
+   * - 'plan'  — agent proposes a plan, executes after plan approval
+   */
+  approvalMode?: 'auto' | 'ask' | 'plan';
   onProgress: (p: AgentProgress) => void;
   onApprovalRequest: (req: UnifiedApprovalRequest) => void;
   /** Called when a turn completes with its final result (Claude Code) */

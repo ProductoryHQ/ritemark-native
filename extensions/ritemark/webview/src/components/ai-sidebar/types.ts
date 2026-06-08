@@ -212,6 +212,8 @@ export interface AgentConversationTurn {
   planText?: string;
   pendingQuestion?: AgentQuestion;
   pendingPlanApproval?: AgentPlanApprovalRequest;
+  /** Pending file-write / shell-command approval (Ask mode, unified gate). */
+  approval?: CodexApprovalRequest;
   timestamp: number;
 }
 
