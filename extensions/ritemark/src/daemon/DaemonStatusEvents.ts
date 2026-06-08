@@ -78,11 +78,7 @@ export class DaemonStatusEvents {
   }
 
   private async refreshAsync(): Promise<void> {
-    const needsReview = await this.store.countUnresolvedBlocked();
-    this.renderStatus(needsReview);
-  }
-
-  private renderStatus(needsReviewCount: number): void {
+    const needsReviewCount = await this.store.countUnresolvedBlocked();
     if (needsReviewCount > 0) {
       this.statusBar.text = `$(warning) ${needsReviewCount} needs review`;
       this.statusBar.tooltip = 'Scheduled run needs your approval — click to review';

@@ -95,19 +95,26 @@ export class Scheduler {
       this.stop();
       return;
     }
-    // Skip if this task is already running to prevent overlapping executions.
+    // Skip if this task is already running — prevents a second headless runtime
+    // for the same agent when a run outlasts its cron interval.
     if (this.running.has(filePath)) {
-      const runId = crypto.randomUUID();
       const now = new Date().toISOString();
       const skipped: TaskResult = {
         taskId: entry.task.id,
-        runId,
+        runId: crypto.randomUUID(),
         outcome: 'skipped',
         startedAt: now,
         finishedAt: now,
         durationMs: 0,
         skipReason: 'concurrent-run',
       };
+      // Still re-arm the next fire so the schedule keeps ticking.
+      const reNext = this.computeNext(entry.config.cron);
+      if (reNext) {
+        const reDelay = Math.max(0, reNext.getTime() - Date.now());
+        const reTimer = setTimeout(() => this.fire(filePath), reDelay);
+        this.entries.set(filePath, { ...entry, nextFire: reNext, timerId: reTimer });
+      }
       await this.store.append(skipped);
       this.onRunsChanged?.();
       return;

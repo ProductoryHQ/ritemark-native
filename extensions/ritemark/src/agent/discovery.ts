@@ -54,7 +54,8 @@ function safeMtime(filePath: string): number {
   }
 }
 
-export type FrontmatterValue = string | string[] | number | boolean;
+export type FrontmatterScalar = string | number | boolean;
+export type FrontmatterValue = string | string[] | number | boolean | Record<string, FrontmatterScalar>;
 export type FrontmatterRecord = Record<string, FrontmatterValue>;
 
 /**
@@ -70,17 +71,21 @@ function parseFrontmatter(content: string): FrontmatterRecord {
   const lines = match[1].split('\n').map(l => l.replace(/\r$/, ''));
   let currentKey = '';
   let currentListItems: string[] | null = null;
+  let currentMap: Record<string, FrontmatterScalar> | null = null;
   let currentValue = '';
 
   const commitCurrent = () => {
     if (!currentKey) return;
-    if (currentListItems !== null) {
+    if (currentMap !== null) {
+      result[currentKey] = currentMap;
+    } else if (currentListItems !== null) {
       result[currentKey] = currentListItems;
     } else {
       result[currentKey] = coerceValue(currentValue.trim());
     }
     currentKey = '';
     currentListItems = null;
+    currentMap = null;
     currentValue = '';
   };
 
@@ -105,7 +110,14 @@ function parseFrontmatter(content: string): FrontmatterRecord {
       // Multi-line list item
       if (currentListItems === null) currentListItems = [];
       currentListItems.push(line.replace(/^\s+-\s+/, '').trim());
-    } else if (currentKey && /^\s+/.test(line)) {
+    } else if (currentKey && currentListItems === null && /^\s+\w[\w-]*\s*:/.test(line)) {
+      // Nested map entry (one level): "  key: value" under a parent with empty value
+      const nested = line.match(/^\s+(\w[\w-]*)\s*:\s*(.*)$/);
+      if (nested) {
+        if (currentMap === null) currentMap = {};
+        currentMap[nested[1]] = coerceValue(nested[2].trim()) as FrontmatterScalar;
+      }
+    } else if (currentKey && currentMap === null && /^\s+/.test(line)) {
       // Continuation of scalar value
       currentValue += (currentValue ? ' ' : '') + line.trim();
     }
@@ -489,29 +501,26 @@ export function parseFrontmatterFromText(text: string): FrontmatterRecord {
  */
 export function serializeFrontmatter(fm: FrontmatterRecord): string {
   const lines = ['---'];
+  const serializeScalar = (val: unknown): string => {
+    if (typeof val === 'boolean' || typeof val === 'number') return String(val);
+    const s = String(val);
+    return /[:#\[\]{}&*!|>'",%@`]/.test(s) || s.includes('\n') ? JSON.stringify(s) : s;
+  };
   for (const [k, v] of Object.entries(fm)) {
     if (Array.isArray(v)) {
       lines.push(`${k}:`);
       (v as string[]).forEach(item => lines.push(`  - ${item}`));
     } else if (v !== null && typeof v === 'object') {
+      // Nested map (one level) — e.g. schedule: { cron, label, enabled }
       lines.push(`${k}:`);
       for (const [sk, sv] of Object.entries(v as Record<string, unknown>)) {
-        if (typeof sv === 'boolean' || typeof sv === 'number') {
-          lines.push(`  ${sk}: ${sv}`);
-        } else if (sv === undefined || sv === null) {
-          // omit
-        } else {
-          const s = String(sv);
-          const safe = /[:#\[\]{}&*!|>'",%@`]/.test(s) || s.includes('\n') ? JSON.stringify(s) : s;
-          lines.push(`  ${sk}: ${safe}`);
-        }
+        if (sv === undefined || sv === null) continue;
+        lines.push(`  ${sk}: ${serializeScalar(sv)}`);
       }
     } else if (typeof v === 'boolean' || typeof v === 'number') {
       lines.push(`${k}: ${v}`);
     } else {
-      const s = String(v);
-      const safe = /[:#\[\]{}&*!|>'",%@`]/.test(s) || s.includes('\n') ? JSON.stringify(s) : s;
-      lines.push(`${k}: ${safe}`);
+      lines.push(`${k}: ${serializeScalar(v)}`);
     }
   }
   lines.push('---');

@@ -42,7 +42,7 @@ export class DaemonResultStore {
     await this.state.update(STORE_KEY, { ...all, [taskId]: updated });
   }
 
-  /** Count blocked runs that have not been superseded — for status-bar accuracy. */
+  /** Count blocked runs not yet superseded — drives the status-bar review count. */
   async countUnresolvedBlocked(): Promise<number> {
     const all = this.state.get<Record<string, TaskResult[]>>(STORE_KEY, {});
     return Object.values(all).flat().filter(
