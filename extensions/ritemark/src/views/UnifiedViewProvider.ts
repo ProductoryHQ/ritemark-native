@@ -224,12 +224,57 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'agent-execute': {
           const { agentId, prompt, model, attachments } = message;
           const runtime = this._runtimeRegistry.get(agentId as import('../agent/types').AgentId);
+          const isClaudeCode = agentId === 'claude-code';
           const sessionConfig: RuntimeSessionConfig = {
             workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
             model,
             extraSystemPrompt: BROWSER_ROUTING_HINT,
-            onProgress: (progress) => this._view?.webview.postMessage({ type: 'agent-progress', agentId, progress }),
+            onProgress: (progress) => {
+              if (isClaudeCode) {
+                this._view?.webview.postMessage({ type: 'agent-progress', agentId, progress });
+              } else {
+                if (progress.type === 'text') {
+                  this._view?.webview.postMessage({ type: 'codex-streaming', delta: progress.message });
+                }
+                this._view?.webview.postMessage({ type: 'codex-progress', progress });
+              }
+            },
             onApprovalRequest: (req) => this._approvalGate.request(req),
+            onComplete: (result) => {
+              this._view?.webview.postMessage({
+                type: 'agent-result',
+                agentId,
+                text: result.text ?? '',
+                filesModified: result.filesModified ?? [],
+                metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
+                error: result.error,
+              });
+              this._refreshExplorerForAgentWrites(result.filesModified);
+            },
+            onQuestion: (question) => {
+              this._view?.webview.postMessage({ type: 'agent-question', agentId, question });
+            },
+            onCodexComplete: (result) => {
+              this._view?.webview.postMessage({
+                type: 'codex-result',
+                agentId,
+                status: result.status,
+                error: result.error,
+              });
+              this._refreshExplorerForAgentWrites(undefined);
+            },
+            onCodexPlanDelta: (delta) => {
+              this._view?.webview.postMessage({ type: 'codex-plan-text-delta', delta });
+            },
+            onCodexPlanUpdate: (explanation, plan) => {
+              this._view?.webview.postMessage({ type: 'codex-plan-update', explanation, plan });
+            },
+            onCodexQuestion: (requestId, questions) => {
+              this._view?.webview.postMessage({ type: 'codex-question', requestId, questions });
+            },
+            onRpcProgress: (_method, msg) => {
+              this._view?.webview.postMessage({ type: 'codex-rpc-progress', method: _method, message: msg });
+            },
           };
           await runtime.start(sessionConfig);
           await runtime.prompt({ prompt, attachments });
@@ -248,9 +293,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             .answerQuestion(message.toolUseId, message.answers || {});
           break;
 
-        case 'agent-approve':
-          this._approvalGate.respond(message.requestId, message.approved === true, message.alwaysAllow === true);
+        case 'agent-approve': {
+          const { requestId, approved, alwaysAllow, agentId: approveAgentId } = message;
+          this._approvalGate.respond(requestId, approved === true, alwaysAllow === true);
+          if (approveAgentId) {
+            const rt = this._runtimeRegistry.get(approveAgentId as import('../agent/types').AgentId);
+            rt?.respondToApproval(requestId, approved === true, alwaysAllow === true);
+          }
           break;
+        }
 
         case 'agent-setup:install':
           this._handleClaudeInstall();
@@ -1093,5 +1144,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
+  }
+
+  /** Bug #33: After an agent finishes writing files, nudge the explorer so it doesn't show stale state. */
+  private _refreshExplorerForAgentWrites(filesModified: string[] | undefined): void {
+    const parentDirs = new Set<string>();
+    if (filesModified) {
+      for (const file of filesModified) {
+        const parent = file.replace(/[/\\][^/\\]+$/, '');
+        if (parent && parent !== file) parentDirs.add(parent);
+      }
+    }
+    void Promise.all(
+      Array.from(parentDirs).map((dir) =>
+        vscode.workspace.fs.stat(vscode.Uri.file(dir)).then(undefined, () => undefined)
+      )
+    ).then(() =>
+      vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer')
+    );
   }
 }

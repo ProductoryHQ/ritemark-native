@@ -359,6 +359,7 @@ export type ExtensionMessage =
   | { type: 'agent-question'; question: AgentQuestion }
   | { type: 'agent-plan-approval'; request: AgentPlanApprovalRequest }
   | { type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string }
+  | { type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string }
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus }
   | { type: 'agent-setup:error'; error: string }

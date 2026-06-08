@@ -131,7 +131,12 @@ export class AcpRuntime implements AgentRuntime {
       }
     }
 
-    await this._manager.prompt(promptText);
+    try {
+      const result = await this._manager.prompt(promptText);
+      config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
+    } catch (err) {
+      config.onCodexComplete?.({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+    }
   }
 
   async cancel(): Promise<void> {

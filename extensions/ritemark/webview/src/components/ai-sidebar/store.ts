@@ -662,7 +662,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     });
   },
 
-  rejectPlan: (turnId, feedback?) => {
+  rejectPlan: (turnId, _feedback?) => {
     const state = get();
     const targetTurn = state.agentConversation.find((t) => t.id === turnId);
     if (!targetTurn?.pendingPlanApproval) {
@@ -709,7 +709,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
   },
 
-  sendCodexMessage: (prompt, attachments?, requestedMode?, skipBrowserContext?) => {
+  sendCodexMessage: (prompt, attachments?, requestedMode?, _skipBrowserContext?) => {
     const state = get();
     const lastTurn = state.codexConversation[state.codexConversation.length - 1];
     if (lastTurn?.isRunning) return;
@@ -1615,6 +1615,48 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         if (lastTurn?.isRunning) {
           conv[conv.length - 1] = { ...lastTurn, rpcProgressMessage: message.message };
           set({ codexConversation: conv });
+        }
+        break;
+      }
+
+      case 'agent-approval-request': {
+        if (message.kind === 'plan' && message.agentId === 'claude-code') {
+          // Plan approval for Claude Code — route to agentConversation
+          const conv = [...state.agentConversation];
+          const lastTurn = conv[conv.length - 1];
+          if (lastTurn?.isRunning) {
+            const pendingPlanApproval: AgentPlanApprovalRequest = {
+              toolUseId: message.requestId,
+              plan: message.planText,
+            };
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              isPlan: true,
+              planHandled: false,
+              planDecision: undefined,
+              pendingPlanApproval,
+              planText: message.planText?.trim() ? message.planText : lastTurn.planText,
+            };
+            set({ agentConversation: conv });
+          }
+        } else {
+          // File-write / shell-command / permission approval for Codex + ACP
+          const conv = [...state.codexConversation];
+          const lastTurn = conv[conv.length - 1];
+          if (lastTurn?.isRunning) {
+            const approvalType: 'command' | 'fileChange' = message.kind === 'file-write' ? 'fileChange' : 'command';
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              approval: {
+                approvalType,
+                requestId: message.requestId,
+                command: message.command,
+                workingDir: message.workingDir,
+                fileChanges: undefined,
+              },
+            };
+            set({ codexConversation: conv });
+          }
         }
         break;
       }
