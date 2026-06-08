@@ -63,6 +63,7 @@ import {
 } from '../agent';
 import { BrowserContextStore } from '../browser/BrowserContextStore';
 import { createBrowserMcpServer, BROWSER_MCP_SERVER_NAME, BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
+import { isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
@@ -225,10 +226,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const { agentId, prompt, model, attachments } = message;
           const runtime = this._runtimeRegistry.get(agentId as import('../agent/types').AgentId);
           const isClaudeCode = agentId === 'claude-code';
+          const browserEnabled = isEnabled('browser-agent-control');
+
+          // Browser MCP server for Claude Code (in-process server)
+          let mcpServers: Record<string, unknown> | undefined;
+          if (isClaudeCode && browserEnabled) {
+            const server = await createBrowserMcpServer();
+            mcpServers = { [BROWSER_MCP_SERVER_NAME]: server };
+          }
+
           const sessionConfig: RuntimeSessionConfig = {
             workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
             model,
             extraSystemPrompt: BROWSER_ROUTING_HINT,
+            mcpServers,
+            allowedTools: isClaudeCode && browserEnabled
+              ? [...DEFAULT_TOOLS, ...BROWSER_TOOL_ALLOW_NAMES]
+              : undefined,
             onProgress: (progress) => {
               if (isClaudeCode) {
                 this._view?.webview.postMessage({ type: 'agent-progress', agentId, progress });
@@ -275,6 +289,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             onRpcProgress: (_method, msg) => {
               this._view?.webview.postMessage({ type: 'codex-rpc-progress', method: _method, message: msg });
             },
+            // Codex dynamic browser tools (dispatched in extension host, results sent back to Codex)
+            onBrowserToolCall: (agentId === 'codex' && browserEnabled)
+              ? async (toolName, args, _requestId) => {
+                if (isCodexBrowserToolCall(toolName)) {
+                  return dispatchCodexBrowserToolCall(toolName, args);
+                }
+                return { text: `Unknown browser tool: ${toolName}`, success: false };
+              }
+              : undefined,
           };
           await runtime.start(sessionConfig);
           await runtime.prompt({ prompt, attachments });
