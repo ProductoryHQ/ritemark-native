@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-06-06 (pre-Sprint 79 baseline; expanded to full system scope)
+**Last updated:** 2026-06-08 (Sprint 79 close — runtime unification)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -110,22 +110,20 @@ Each runtime was integrated independently. The result is three structurally simi
 | **Webview execute message** | `ai-execute-agent` | `codex-execute` | `acp-execute` |
 | **Webview cancel message** | `ai-cancel-agent` | `codex-cancel` | `acp-cancel` |
 
-**Dispatch:** `UnifiedViewProvider.ts` (2480 LOC) contains three parallel switch-case trees — one per runtime — plus runtime-specific private methods. Adding a fourth runtime requires ~200 LOC of new switch cases and private methods.
+**Dispatch (post-Sprint 79 AS IS):** `UnifiedViewProvider.ts` is 1097 LOC. Three unified switch cases replace the previous 9 runtime-specific variants. Adding a fourth runtime requires only a new adapter class + a registry entry.
 
-### TO BE (Sprint 79+) — Runtime Adapter Pattern
-
-A thin abstraction layer makes `UnifiedViewProvider` runtime-agnostic. Each runtime becomes a pluggable adapter. New runtimes (e.g. Goose, Cursor via ACP) require only a new adapter class + registry entry.
+### AS IS (Sprint 79) — Runtime Adapter Pattern
 
 ```
-src/runtime/                          ← NEW in Sprint 79
+src/runtime/                          ← added Sprint 79
 ├── AgentRuntime.ts                   interface + shared types
 ├── RuntimeRegistry.ts                factory, lookup, lifecycle management
 ├── UnifiedApprovalGate.ts            single approval path for all runtimes
-└── BrowserToolsInjector.ts           single browser MCP injection for all runtimes
+└── BrowserToolsInjector.ts           browser MCP injection config
 
-src/agent/   → ClaudeCodeRuntime implements AgentRuntime
-src/codex/   → CodexRuntime implements AgentRuntime
-src/acp/     → AcpRuntime implements AgentRuntime
+src/agent/ClaudeCodeRuntime.ts   → implements AgentRuntime, wraps AgentRunner/AgentSession
+src/codex/CodexRuntime.ts        → implements AgentRuntime, wraps CodexAppServer+CodexAuth
+src/acp/AcpRuntime.ts            → implements AgentRuntime, wraps AcpManager
 ```
 
 **`AgentRuntime` interface:**
@@ -139,49 +137,27 @@ interface AgentRuntime {
   cancel(): Promise<void>;
   dispose(): void;
 
-  // Unified approval — all runtimes respond through one path
   respondToApproval(requestId: string, approved: boolean, alwaysAllow: boolean): void;
-
   getStatus(): Promise<RuntimeStatus>;
 }
 ```
 
-**`RuntimeSessionConfig`** — shared session config that each adapter translates to its native form:
+**Unified dispatch in `UnifiedViewProvider`:**
 
 ```typescript
-interface RuntimeSessionConfig {
-  workspacePath: string;
-  model?: string;
-  attachments?: UnifiedAttachment[];
-  mcpServers?: Record<string, unknown>;  // browser tools + future MCP
-  excludedFolders?: string[];
-  extraSystemPrompt?: string;
-  onProgress: (p: AgentProgress) => void;
-  onApprovalRequest: (req: UnifiedApprovalRequest) => void;
-}
-```
-
-**Unified dispatch in `UnifiedViewProvider` (post-Sprint 79):**
-
-```typescript
-// Before: 3 × execute + 3 × cancel + 3 × approve = 9 cases
-// After: 3 cases total
+// 3 cases total (was 9 runtime-specific)
 case 'agent-execute': {
   const runtime = this._runtimeRegistry.get(message.agentId);
-  await runtime.prompt({ prompt: message.prompt, model: message.model, attachments: message.attachments });
+  await runtime.start(sessionConfig);
+  await runtime.prompt({ prompt, attachments });
   break;
 }
 case 'agent-cancel': {
   this._runtimeRegistry.get(message.agentId)?.cancel();
   break;
 }
-case 'agent-approve': {
-  this._runtimeRegistry.get(message.agentId)?.respondToApproval(message.requestId, message.approved, message.alwaysAllow);
-  break;
-}
+// agent-approve → _approvalGate.respond(requestId, approved, alwaysAllow)
 ```
-
-**Target size:** `UnifiedViewProvider` ≤ 1100 LOC (from 2480).
 
 ---
 
@@ -210,6 +186,22 @@ One webview message contract, one approval card component, all runtimes:
 ```
 
 Each runtime adapter translates its native approval format (Codex JSON-RPC, ACP `session/request_permission`, Claude plan approval) into this shape before forwarding to the webview.
+
+### Unified approval policy (Sprint 79)
+
+A single per-conversation **mode** (`approvalMode`) governs *when* the gate fires, applied uniformly across all three runtimes. Selected in the composer (Auto · Ask · Plan), default **Auto**; sent as `approvalMode` on `agent-execute`.
+
+| Mode | Claude Code | Codex | OpenCode (ACP) |
+|---|---|---|---|
+| **Auto** | SDK `bypassPermissions` — no prompts | `approvalPolicy: never`, `workspace-write` | auto-allow `request_permission` |
+| **Ask** | SDK `default` mode + mutating tools (Write/Edit/Bash) removed from `allowedTools` → routed through `canUseTool` → gate | `approvalPolicy: untrusted` + `sandbox: read-only` (workspace-write pre-approves edits, so read-only is required to force a prompt) | native `request_permission` prompt |
+| **Plan** | plan reminder → `ExitPlanMode` → plan card | plan collaboration mode | falls back to Ask |
+
+Mechanics & constraints:
+- `allowedTools` in the Claude SDK means *auto-allowed without prompting* — mutating tools must be excluded from it for Ask to reach `canUseTool`. `ExitPlanMode`/`AskUserQuestion` are control tools that always reach the client regardless of mode.
+- Claude's SDK permission mode and Codex's `approvalPolicy`/`sandbox` are fixed at session/thread start, so crossing the Ask boundary **recreates** the Claude session / resets the Codex thread (loses that conversation's in-runtime context). Same-mode turns reuse the warm session.
+- Claude sessions are reused across turns (model + Ask-class match) to preserve conversation memory — recreating per turn was a Sprint-79 regression, now fixed.
+- "Always allow" was removed from the approval card (it was OpenCode-only and did not actually persist); cards offer Approve / Reject only.
 
 ---
 
@@ -325,33 +317,30 @@ src/daemon/                          ← NEW in Sprint 79
 
 ## Model Configuration (Single Source of Truth)
 
-### AS IS — Three locations (pre-Sprint 79)
+### AS IS — One location (post-Sprint 79)
 
 | Location | Models |
 |---|---|
-| `src/agent/types.ts:52` | `CLAUDE_MODELS` (Sonnet/Opus/Haiku) |
-| `src/codex/codexModels.ts` | `getCodexModels()` dynamic |
-| `src/ai/modelConfig.ts` | `OPENAI_LLM_MODELS` + `BYOK_PROVIDER_MODELS` |
+| `src/ai/modelConfig.ts` | `CLAUDE_MODELS`, `DEFAULT_MODEL`, `OPENAI_LLM_MODELS`, `BYOK_PROVIDER_MODELS` |
+| `src/codex/codexModels.ts` | `getCodexModels()` dynamic (Codex list fetched at runtime, not static) |
 
-### TO BE — One location (post-Sprint 79)
-
-All model identifiers in `src/ai/modelConfig.ts`. The CLAUDE.md rule "all model identifiers in one file" becomes literally true. `agent/types.ts` retains only type definitions; `CODEX_MODELS` (`@deprecated`) is deleted in Sprint 79. Full elimination of the runtime `flow:modelConfig` mirror message (for static config) requires the shared module approach — see ARCH-9 + to-be-proposal.md #3.
+`CODEX_MODELS` deleted (deprecated static list). `agent/types.ts` retains only type definitions. `CLAUDE_MODELS` / `DEFAULT_MODEL` re-exported from `src/agent/index.ts` for backward compatibility (callers that import from `../agent`). Full elimination of the runtime `flow:modelConfig` mirror message (for static config) requires the shared module approach — see ARCH-9.
 
 ---
 
 ## Open Architectural Debt
 
-Items being resolved in Sprint 79:
+**Resolved in Sprint 79:**
 
-| Item | Sprint 79 requirement |
+| Item | Resolution |
 |---|---|
-| `@agentclientprotocol/sdk` esbuild compatibility audit | Phase 0 audit → `research/arch-1-esbuild-audit.md` |
-| Unified approval gate (3 incompatible message types) | R3 |
-| `document-search` zombie flag (RAG removed Sprint 74) | R7 cleanup |
-| `CODEX_MODELS` deprecated constant | R6 |
-| Codex browser tools: dynamic injection vs MCP server (two patterns) | R4 |
-| File attachments broken for Codex (partial) and ACP (missing) | R5 |
-| `UnifiedViewProvider` at 2480 LOC | R2 — target ≤ 1100 |
+| `@agentclientprotocol/sdk` esbuild compatibility audit | Phase 0 audit complete → `research/arch-1-esbuild-audit.md`; no bundler blocker found |
+| Unified approval gate (3 incompatible message types) | Done — `UnifiedApprovalGate` + `agent-approve` unified message type |
+| `document-search` zombie flag (RAG removed Sprint 74) | Done — flag status set to `'disabled'` with tombstone description |
+| `CODEX_MODELS` deprecated constant | Done — deleted; `CLAUDE_MODELS` + `DEFAULT_MODEL` moved to `modelConfig.ts` |
+| Codex browser tools: dynamic injection vs MCP server (two patterns) | Done — Phase B: dynamic injection moved inside `CodexRuntime`; `_codexBrowserToolsEnabledForThread` now internal |
+| File attachments broken for Codex (partial) and ACP (missing) | Done — `UnifiedAttachment` type; ACP fenced-block fallback with notice |
+| `UnifiedViewProvider` at 2480 LOC | Done — 2480 → 1097 LOC (target was ≤ 1100) |
 
 Post-Sprint 79 items tracked as GitHub Issues:
 
@@ -403,3 +392,5 @@ The decisions that define the system. Changing any of these is an architecture-l
 |---|---|---|
 | 2026-06-06 | Baseline | Initial document (agent runtime scope). Captures AS IS post-Sprint 78: 3 runtimes, 2 browser integration patterns, 3 model config locations. Defines TO BE for Sprint 79 (runtime adapter unification). |
 | 2026-06-06 | Pre-Sprint 79 | Expanded to full system scope. Added: system layers overview, webview↔host protocol, flows architecture, build pipeline (with ARCH-8 and ARCH-10 observations), broader TO BE roadmap (ARCH-8 through ARCH-13), locked decisions. Reconciled with `docs-internal/architecture/` (high-level-architecture.md + to-be-proposal.md). |
+| 2026-06-08 | Sprint 79 | Runtime unification: `src/runtime/` added (AgentRuntime, RuntimeRegistry, UnifiedApprovalGate, BrowserToolsInjector); ClaudeCodeRuntime/CodexRuntime/AcpRuntime adapters; `UnifiedViewProvider` 2480→1097 LOC; unified `agent-execute`/`agent-cancel`/`agent-approve` webview messages; browser IPC server + `browserMcpAdapter.ts` for ACP browser injection via Unix socket; `AgentDaemon` foundation (inactive); `CLAUDE_MODELS`/`DEFAULT_MODEL` moved to `modelConfig.ts`; `CODEX_MODELS` deleted; `document-search` flag disabled; ARCH-2/3/4/5 resolved. |
+| 2026-06-08 | Sprint 79 (close) | Integration-test hardening: unified approval **policy** (Auto/Ask/Plan `approvalMode`) across all 3 runtimes; restored per-turn context dropped in the dispatch migration (active file, browser context, @mentions, Codex approval-policy/sandbox + plan toggle, Claude api-key/excludedFolders/timeout, `onExit`, Codex base-instruction clobber); fixed Claude warm-session reuse (was recreated every turn → lost memory); "Always allow" removed from the approval card; OpenCode model picker auto-default + BYOK env wiring. |

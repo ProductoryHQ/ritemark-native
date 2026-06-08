@@ -142,11 +142,11 @@ export class AcpClient {
   }
 
   /** session/new — create a conversation session for the given cwd. */
-  async newSession(cwd: string): Promise<NewSessionResponse> {
+  async newSession(cwd: string, mcpServers?: unknown[]): Promise<NewSessionResponse> {
     const connection = this.requireConnection();
     // OpenCode requires an absolute cwd and an mcpServers array (may be empty).
-    const result = await connection.newSession({ cwd, mcpServers: [] });
-    this.trace?.('client', 'newSession', { cwd, sessionId: result.sessionId });
+    const result = await connection.newSession({ cwd, mcpServers: (mcpServers ?? []) as never });
+    this.trace?.('client', 'newSession', { cwd, mcpServerCount: (mcpServers ?? []).length, sessionId: result.sessionId });
     return result;
   }
 

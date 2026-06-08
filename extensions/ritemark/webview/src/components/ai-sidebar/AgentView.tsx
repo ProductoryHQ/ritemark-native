@@ -10,6 +10,7 @@ import { RunningIndicator } from './RunningIndicator';
 import { AgentResponse } from './AgentResponse';
 import { AgentQuestion } from './AgentQuestion';
 import { AgentPlanApproval } from './AgentPlanApproval';
+import { ApprovalCard } from './CodexView';
 import { SubagentCard } from './SubagentCard';
 import { UserPromptBubble } from './ChatBubbles';
 import type { AgentConversationTurn, AgentProgress } from './types';
@@ -22,12 +23,14 @@ export function AgentTurnBlock({
   answerAgentQuestion,
   approvePlan,
   rejectPlan,
+  handleToolApproval,
 }: {
   turn: AgentConversationTurn;
   isMixedRuntime: boolean;
   answerAgentQuestion: (turnId: string, question: NonNullable<AgentConversationTurn['pendingQuestion']>, answers: Record<string, string>) => void;
   approvePlan: (turnId: string) => void;
   rejectPlan: (turnId: string) => void;
+  handleToolApproval: (requestId: string, approved: boolean) => void;
 }) {
   const compactedEvent = turn.activities.find((a: AgentProgress) => a.type === 'compacted');
 
@@ -79,7 +82,16 @@ export function AgentTurnBlock({
         />
       )}
 
-      {turn.isRunning && !turn.pendingQuestion && !turn.pendingPlanApproval && (
+      {/* Ask-mode file-write / shell-command approval (unified gate) */}
+      {turn.approval && (
+        <ApprovalCard
+          approval={turn.approval}
+          onApprove={(id) => handleToolApproval(String(id), true)}
+          onReject={(id) => handleToolApproval(String(id), false)}
+        />
+      )}
+
+      {turn.isRunning && !turn.pendingQuestion && !turn.pendingPlanApproval && !turn.approval && (
         <RunningIndicator activities={turn.activities} subagents={turn.subagents} />
       )}
 
@@ -99,6 +111,7 @@ export function AgentView() {
   const answerAgentQuestion = useAISidebarStore((s) => s.answerAgentQuestion);
   const approvePlan = useAISidebarStore((s) => s.approvePlan);
   const rejectPlan = useAISidebarStore((s) => s.rejectPlan);
+  const handleToolApproval = useAISidebarStore((s) => s.handleAgentToolApproval);
 
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -141,6 +154,7 @@ export function AgentView() {
             answerAgentQuestion={answerAgentQuestion}
             approvePlan={approvePlan}
             rejectPlan={rejectPlan}
+            handleToolApproval={handleToolApproval}
           />
         ))}
         <div ref={endRef} />

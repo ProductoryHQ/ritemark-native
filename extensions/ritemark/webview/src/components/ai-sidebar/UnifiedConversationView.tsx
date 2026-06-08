@@ -28,6 +28,7 @@ export function UnifiedConversationView() {
   const answerAgentQuestion = useAISidebarStore((s) => s.answerAgentQuestion);
   const approvePlan = useAISidebarStore((s) => s.approvePlan);
   const rejectPlan = useAISidebarStore((s) => s.rejectPlan);
+  const handleToolApproval = useAISidebarStore((s) => s.handleAgentToolApproval);
 
   // Codex actions
   const handleCodexApproval = useAISidebarStore((s) => s.handleCodexApproval);
@@ -108,6 +109,7 @@ export function UnifiedConversationView() {
               answerAgentQuestion={answerAgentQuestion}
               approvePlan={approvePlan}
               rejectPlan={rejectPlan}
+              handleToolApproval={handleToolApproval}
             />
           ) : (
             <CodexTurn
@@ -115,7 +117,6 @@ export function UnifiedConversationView() {
               turn={item.turn}
               isMixedRuntime={isMixedRuntime}
               onApprove={(requestId) => handleCodexApproval(requestId, true)}
-              onApproveAlways={(requestId) => handleCodexApproval(requestId, true, true)}
               onReject={(requestId) => handleCodexApproval(requestId, false)}
               onAnswerQuestion={answerCodexQuestion}
               onApprovePlan={approveCodexPlan}

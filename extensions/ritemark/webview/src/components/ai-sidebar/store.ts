@@ -111,6 +111,27 @@ function computeContextState(_turns: AgentConversationTurn[]) {
   return { estimatedTokens: 0, contextUsagePercent: 0, showContextWarning: false };
 }
 
+/**
+ * First available OpenCode model as a composite "opencode:<provider>/<id>" value,
+ * picking the first configured provider's first model. Used to give the OpenCode
+ * picker a sensible default (Claude/Codex already default to their first model) so
+ * the composer never shows "Select a model…" with a valid, key-backed provider.
+ */
+function firstAvailableOpenCodeModel(
+  enabled: boolean,
+  providers: AcpProviderFlags | undefined,
+  models: Record<string, ByokModelOption[]> | undefined,
+): string {
+  if (!enabled || !providers || !models) return '';
+  for (const provider of ['google', 'openai', 'anthropic', 'openrouter'] as const) {
+    if (providers[provider]) {
+      const first = models[provider]?.[0];
+      if (first) return `opencode:${provider}/${first.id}`;
+    }
+  }
+  return '';
+}
+
 function getCodexCompatibilityNoticeKey(status: CodexSidebarStatus): string | null {
   const compatibility = status.compatibility;
   if (status.state !== 'ready' || !compatibility || compatibility.state === 'compatible') {
@@ -166,7 +187,8 @@ interface AISidebarState {
   dismissedCurrentPlanKey: string | null;
 
   // ── Pending runtime (per-run draft selection) ──
-  pendingRuntime: { runtimeId: 'claude-code' | 'codex' | 'opencode'; modelId: string; mode: 'plan' | 'edit' };
+  // mode = unified approval policy: 'auto' (no prompts) | 'ask' (approve writes/commands) | 'plan'
+  pendingRuntime: { runtimeId: 'claude-code' | 'codex' | 'opencode'; modelId: string; mode: 'auto' | 'ask' | 'plan' };
 
   // ── OpenCode / ACP state ──
   opencodeEnabled: boolean;
@@ -217,7 +239,7 @@ interface AISidebarState {
   // ── Actions ──
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
-  setPendingRuntime: (partial: Partial<{ runtimeId: 'claude-code' | 'codex' | 'opencode'; modelId: string; mode: 'plan' | 'edit' }>) => void;
+  setPendingRuntime: (partial: Partial<{ runtimeId: 'claude-code' | 'codex' | 'opencode'; modelId: string; mode: 'auto' | 'ask' | 'plan' }>) => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
   /**
@@ -247,13 +269,15 @@ interface AISidebarState {
   rejectPlan: (turnId: string, feedback?: string) => void;
   answerAgentQuestion: (turnId: string, question: AgentQuestion, answers: Record<string, string>) => void;
   dismissWelcome: () => void;
-  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'plan' | 'edit', skipBrowserContext?: boolean) => void;
+  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'auto' | 'ask' | 'plan', skipBrowserContext?: boolean) => void;
   selectCodexModel: (modelId: string) => void;
   /** Select an OpenCode model. compositeValue is the full "opencode:<provider>/<model>" string. */
   selectOpenCodeModel: (compositeValue: string) => void;
   /** Send a message to the OpenCode (ACP) runtime. */
   sendOpenCodeMessage: (prompt: string) => void;
   handleCodexApproval: (requestId: string | number, approved: boolean, alwaysAllow?: boolean) => void;
+  /** Respond to a Claude Ask-mode file-write/shell-command approval card. */
+  handleAgentToolApproval: (requestId: string, approved: boolean) => void;
   answerCodexQuestion: (turnId: string, question: CodexQuestion, answers: Record<string, string>) => void;
   approveCodexPlan: (turnId: string) => void;
   discardCodexPlan: (turnId: string) => void;
@@ -315,7 +339,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   dismissedCodexNoticeKey: null,
   dismissedCurrentPlanKey: null,
 
-  pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'edit' },
+  pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'auto' },
 
   opencodeEnabled: false,
   acpProviders: { google: false, openai: false, anthropic: false, openrouter: false },
@@ -448,7 +472,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       data: att.data,
       mediaType: att.mediaType,
     }));
-    vscode.postMessage({ type: 'ai-execute-agent', prompt: fullPrompt, images: attachmentPayload, skipActiveFile: options?.skipActiveFile, skipBrowserContext: options?.skipBrowserContext, mentionedAgentPaths: options?.mentionedAgentPaths });
+    vscode.postMessage({ type: 'agent-execute', agentId: 'claude-code', prompt: fullPrompt, attachments: attachmentPayload, approvalMode: get().pendingRuntime.mode, skipActiveFile: options?.skipActiveFile, skipBrowserContext: options?.skipBrowserContext, mentionedAgentPaths: options?.mentionedAgentPaths });
   },
 
   dismissSelectedContext: () => {
@@ -498,7 +522,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     // chat suggestions instead of apply_patch calls; strong directive
     // language fixes the mode but earlier line-number disambiguation
     // pointed at the wrong occurrence — replaced with a context window.
-    const isEditMode = pendingRuntime.mode === 'edit';
+    const isEditMode = pendingRuntime.mode !== 'plan';
     const header = isEditMode
       ? '[Selection context — Edit mode]'
       : '[Selection context — Plan mode]';
@@ -555,12 +579,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const hasRunningClaude = state.agentConversation.some((t) => t.isRunning);
 
     if (hasRunningCodex) {
-      // OpenCode uses acp-cancel; Codex uses codex-cancel
-      if (state.selectedAgent === 'opencode') {
-        vscode.postMessage({ type: 'acp-cancel' });
-      } else {
-        vscode.postMessage({ type: 'codex-cancel' });
-      }
+      // Cancel the runtime that owns the running turn, not the (possibly switched)
+      // picker selection — Codex and OpenCode both live in codexConversation.
+      const runningTurn = [...state.codexConversation].reverse().find((t) => t.isRunning);
+      const agentId = runningTurn?.runtime ?? 'codex';
+      vscode.postMessage({ type: 'agent-cancel', agentId });
       const conv = [...state.codexConversation];
       const last = conv[conv.length - 1];
       if (last?.isRunning) {
@@ -568,7 +591,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       }
       set({ codexConversation: conv });
     } else if (hasRunningClaude) {
-      vscode.postMessage({ type: 'ai-cancel-agent' });
+      vscode.postMessage({ type: 'agent-cancel', agentId: 'claude-code' });
       const conv = [...state.agentConversation];
       const last = conv[conv.length - 1];
       if (last?.isRunning) {
@@ -658,13 +681,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     );
     set({ agentConversation: conv });
     vscode.postMessage({
-      type: 'agent-answer-plan',
-      toolUseId: targetTurn.pendingPlanApproval.toolUseId,
+      type: 'agent-approve',
+      agentId: 'claude-code',
+      requestId: targetTurn.pendingPlanApproval.toolUseId,
       approved: true,
+      alwaysAllow: false,
     });
   },
 
-  rejectPlan: (turnId, feedback?) => {
+  rejectPlan: (turnId, _feedback?) => {
     const state = get();
     const targetTurn = state.agentConversation.find((t) => t.id === turnId);
     if (!targetTurn?.pendingPlanApproval) {
@@ -683,10 +708,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     );
     set({ agentConversation: conv });
     vscode.postMessage({
-      type: 'agent-answer-plan',
-      toolUseId: targetTurn.pendingPlanApproval.toolUseId,
+      type: 'agent-approve',
+      agentId: 'claude-code',
+      requestId: targetTurn.pendingPlanApproval.toolUseId,
       approved: false,
-      feedback,
+      alwaysAllow: false,
     });
   },
 
@@ -758,14 +784,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
     set({ codexConversation: [...state.codexConversation, turn] });
     vscode.postMessage({
-      type: 'codex-execute',
+      type: 'agent-execute',
+      agentId: 'codex',
       prompt: fullPrompt,
       model: state.codexSelectedModel,
-      // The Edit/Plan toggle in ChatInput sets pendingRuntime.mode; until
-      // 51095ad this never reached the extension because mode wasn't on
-      // the wire. Now it is — Codex collaboration mode actually responds
-      // to the toggle.
-      mode: requestedMode,
+      // Unified approval policy (Auto/Ask/Plan) — the host maps it to the Codex
+      // approval policy + plan collaboration mode.
+      approvalMode: requestedMode ?? 'auto',
       skipBrowserContext,
       attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
     });
@@ -811,7 +836,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     };
 
     set({ codexConversation: [...state.codexConversation, turn] });
-    vscode.postMessage({ type: 'acp-execute', prompt, model });
+    vscode.postMessage({ type: 'agent-execute', agentId: 'opencode', prompt, model, approvalMode: get().pendingRuntime.mode });
   },
 
   handleCodexApproval: (requestId, approved, alwaysAllow?) => {
@@ -823,10 +848,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     set({ codexConversation: conv });
     // ACP approvals (requestId starts with "acp-") use a different message type
     if (typeof requestId === 'string' && requestId.startsWith('acp-')) {
-      vscode.postMessage({ type: 'acp-approval-response', requestId, approved, alwaysAllow });
+      vscode.postMessage({ type: 'agent-approve', agentId: 'opencode', requestId, approved, alwaysAllow });
     } else {
-      vscode.postMessage({ type: 'codex-approve', requestId, approved });
+      vscode.postMessage({ type: 'agent-approve', agentId: 'codex', requestId, approved, alwaysAllow: false });
     }
+  },
+
+  handleAgentToolApproval: (requestId, approved) => {
+    // Clear the Ask-mode approval card from the Claude turn, then respond.
+    const conv = get().agentConversation.map((t) =>
+      t.approval?.requestId === requestId ? { ...t, approval: undefined } : t
+    );
+    set({ agentConversation: conv });
+    vscode.postMessage({ type: 'agent-approve', agentId: 'claude-code', requestId, approved, alwaysAllow: false });
   },
 
   answerCodexQuestion: (turnId, question, answers) => {
@@ -858,10 +892,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     }
     set({ codexConversation: conversation });
     vscode.postMessage({
-      type: 'codex-execute',
+      type: 'agent-execute',
+      agentId: 'codex',
       prompt,
       model: state.codexSelectedModel,
-      mode: 'execute',
     });
   },
 
@@ -1193,6 +1227,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
           opencodeEnabled: message.opencodeEnabled ?? get().opencodeEnabled,
           acpProviders: message.acpProviders ?? get().acpProviders,
           byokProviderModels: message.byokProviderModels ?? get().byokProviderModels,
+          // Default the OpenCode picker to the first configured model (state isn't
+          // persisted across window reloads, so it resets to '' otherwise).
+          opencodeSelectedModel: get().opencodeSelectedModel || firstAvailableOpenCodeModel(
+            message.opencodeEnabled ?? get().opencodeEnabled,
+            message.acpProviders ?? get().acpProviders,
+            message.byokProviderModels ?? get().byokProviderModels,
+          ),
         });
         break;
       }
@@ -1201,6 +1242,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         set({
           opencodeEnabled: message.enabled,
           acpProviders: message.providers,
+          opencodeSelectedModel: get().opencodeSelectedModel || firstAvailableOpenCodeModel(
+            message.enabled,
+            message.providers,
+            get().byokProviderModels,
+          ),
         });
         break;
       }
@@ -1490,6 +1536,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
             isPlan: hasPlanActivity,
             pendingQuestion: undefined,
             pendingPlanApproval: undefined,
+            approval: undefined,
             result: {
               text: message.text || '',
               filesModified: message.filesModified || [],
@@ -1621,6 +1668,65 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         if (lastTurn?.isRunning) {
           conv[conv.length - 1] = { ...lastTurn, rpcProgressMessage: message.message };
           set({ codexConversation: conv });
+        }
+        break;
+      }
+
+      case 'agent-approval-request': {
+        // Reconstruct a fileChanges map so the card shows what's being changed.
+        // ACP/Claude send a single `filePath`; Codex sends a JSON `diff` map.
+        const buildFileChanges = (): Record<string, unknown> | undefined => {
+          if (message.filePath) return { [message.filePath]: { type: 'edit' } };
+          if (message.diff) { try { return JSON.parse(message.diff); } catch { return undefined; } }
+          return undefined;
+        };
+
+        if (message.agentId === 'claude-code') {
+          // Claude approvals render on the agent (Claude) conversation turn.
+          const conv = [...state.agentConversation];
+          const lastTurn = conv[conv.length - 1];
+          if (lastTurn?.isRunning) {
+            if (message.kind === 'plan') {
+              conv[conv.length - 1] = {
+                ...lastTurn,
+                isPlan: true,
+                planHandled: false,
+                planDecision: undefined,
+                pendingPlanApproval: { toolUseId: message.requestId, plan: message.planText },
+                planText: message.planText?.trim() ? message.planText : lastTurn.planText,
+              };
+            } else {
+              // Ask-mode file-write / shell-command approval.
+              conv[conv.length - 1] = {
+                ...lastTurn,
+                approval: {
+                  approvalType: message.kind === 'file-write' ? 'fileChange' : 'command',
+                  requestId: message.requestId,
+                  command: message.command,
+                  workingDir: message.workingDir,
+                  fileChanges: buildFileChanges(),
+                },
+              };
+            }
+            set({ agentConversation: conv });
+          }
+        } else {
+          // File-write / shell-command / permission approval for Codex + ACP
+          const conv = [...state.codexConversation];
+          const lastTurn = conv[conv.length - 1];
+          if (lastTurn?.isRunning) {
+            conv[conv.length - 1] = {
+              ...lastTurn,
+              approval: {
+                approvalType: message.kind === 'file-write' ? 'fileChange' : 'command',
+                requestId: message.requestId,
+                command: message.command,
+                workingDir: message.workingDir,
+                fileChanges: buildFileChanges(),
+              },
+            };
+            set({ codexConversation: conv });
+          }
         }
         break;
       }

@@ -14,6 +14,7 @@
 import type {
   AgentExecutionOptions,
   AgentPlanApprovalRequest,
+  AgentToolApprovalRequest,
   AgentQuestion,
   AgentSettingSource,
   AgentSessionConfig,
@@ -122,6 +123,9 @@ function isContextOverflowError(str: string): boolean {
 
 export const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'AskUserQuestion', 'ExitPlanMode'];
 export const DEFAULT_SETTING_SOURCES: AgentSettingSource[] = ['user', 'project', 'local'];
+
+/** Tools that mutate the workspace — gated behind approval in 'ask' mode. */
+const MUTATING_TOOLS = new Set(['Bash', 'Write', 'Edit', 'NotebookEdit']);
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const CLAUDE_LIFECYCLE_APPEND = [
   'LIFECYCLE RULES:',
@@ -422,6 +426,7 @@ export class AgentSession {
   private _emitProgress: ExtendedProgressEmitter | null = null;
   private _emitQuestion: ((question: AgentQuestion) => void) | null = null;
   private _emitPlanApproval: ((request: AgentPlanApprovalRequest) => void) | null = null;
+  private _emitToolApproval: ((request: AgentToolApprovalRequest) => void) | null = null;
   private _turnTimeout: ReturnType<typeof setTimeout> | null = null;
   private _turnTimeoutMs = 0;  // Stored so we can reset on activity
   private _planModeActive = false;
@@ -435,6 +440,11 @@ export class AgentSession {
     resolve: (decision: { approved: boolean; feedback?: string }) => void;
     reject: (error: Error) => void;
   } | null = null;
+  private _pendingToolApproval: {
+    toolUseId: string;
+    resolve: (approved: boolean) => void;
+    reject: (error: Error) => void;
+  } | null = null;
 
   // Config
   private readonly _workspacePath: string;
@@ -446,6 +456,8 @@ export class AgentSession {
   private readonly _pathToClaudeCodeExecutable: string | undefined;
   private _mcpServers: Record<string, unknown> | undefined;
   private _extraSystemPromptAppend: string | undefined;
+  /** Unified approval mode (mutable per turn via setApprovalMode). */
+  private _approvalMode: 'auto' | 'ask' | 'plan' = 'auto';
 
   /** Called when SDK reports its available models (after session init) */
   onModelsDiscovered: ((models: Array<{ id: string; label: string; description: string }>) => void) | null = null;
@@ -460,6 +472,31 @@ export class AgentSession {
     this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
     this._mcpServers = config.mcpServers;
     this._extraSystemPromptAppend = config.extraSystemPromptAppend;
+    this._approvalMode = config.approvalMode ?? 'auto';
+  }
+
+  /**
+   * Update the unified approval mode. Safe to call between turns within the same
+   * permission class (auto↔plan): `_handleCanUseTool` reads `_approvalMode` live
+   * and the plan reminder reads it per turn. Crossing the Ask boundary requires a
+   * fresh session (different SDK permission mode) — ClaudeCodeRuntime handles that.
+   */
+  setApprovalMode(mode: 'auto' | 'ask' | 'plan'): void {
+    this._approvalMode = mode;
+  }
+
+  /** True when this session must run in SDK 'default' permission mode (Ask). */
+  get needsAskPermissions(): boolean {
+    return this._approvalMode === 'ask';
+  }
+
+  /**
+   * Map the unified approval mode to an SDK permission mode.
+   * - 'auto'/'plan' → bypassPermissions (known-working config; Plan gates via ExitPlanMode)
+   * - 'ask'         → default (mutating tools aren't in allowedTools, so they hit canUseTool)
+   */
+  private _permissionModeForApproval(): string {
+    return this._approvalMode === 'ask' ? 'default' : 'bypassPermissions';
   }
 
   /**
@@ -489,7 +526,7 @@ export class AgentSession {
    * subsequent calls feed into the existing warm process (~2-3s).
    */
   async sendMessage(options: AgentTurnOptions): Promise<AgentResult> {
-    const { prompt, attachments, activeFile, timeoutMinutes = DEFAULT_TIMEOUT_MINUTES, onProgress, onQuestion, onPlanApproval } = options;
+    const { prompt, attachments, activeFile, timeoutMinutes = DEFAULT_TIMEOUT_MINUTES, onProgress, onQuestion, onPlanApproval, onToolApproval } = options;
 
     if (!prompt || prompt.trim() === '') {
       throw new Error('Agent prompt is empty');
@@ -533,6 +570,7 @@ export class AgentSession {
     this._planModeActive = false;
     this._clearPendingQuestion();
     this._clearPendingPlanApproval();
+    this._clearPendingToolApproval();
     this._emitProgress = (type, message, tool?, file?, subagentInfo?) => {
       onProgress?.({
         type,
@@ -547,6 +585,7 @@ export class AgentSession {
     };
     this._emitQuestion = onQuestion || null;
     this._emitPlanApproval = onPlanApproval || null;
+    this._emitToolApproval = onToolApproval || null;
 
     const resultPromise = new Promise<AgentResult>((resolve) => {
       this._turnResolve = resolve;
@@ -579,6 +618,7 @@ export class AgentSession {
     this._queryStream?.interrupt().catch(() => {});
     this._clearPendingQuestion('Execution cancelled');
     this._clearPendingPlanApproval('Execution cancelled');
+    this._clearPendingToolApproval('Execution cancelled');
     this._forceResolveTurn(turnId, {
       text: '',
       filesModified: [],
@@ -601,6 +641,7 @@ export class AgentSession {
     this._model = null;
     this._clearPendingQuestion('Session closed');
     this._clearPendingPlanApproval('Session closed');
+    this._clearPendingToolApproval('Session closed');
     this._forceResolveTurn(this._turnId, {
       text: '',
       filesModified: [],
@@ -672,6 +713,7 @@ export class AgentSession {
       this._emitProgress = null;
       this._emitQuestion = null;
       this._emitPlanApproval = null;
+      this._emitToolApproval = null;
       this._turnFilesModified = [];
       this._planModeActive = false;
       if (this._turnTimeout) {
@@ -712,6 +754,19 @@ export class AgentSession {
     const { resolve } = this._pendingPlanApproval;
     this._pendingPlanApproval = null;
     resolve({ approved, feedback });
+    return true;
+  }
+
+  /** Answer a mutating-tool approval (Write/Edit/Bash) emitted in 'ask' mode. */
+  answerToolApproval(toolUseId: string, approved: boolean): boolean {
+    traceClaude('lifecycle', 'answerToolApproval', { toolUseId, approved });
+    if (!this._pendingToolApproval || this._pendingToolApproval.toolUseId !== toolUseId) {
+      traceClaude('lifecycle', 'answerToolApproval missed pending state', { toolUseId });
+      return false;
+    }
+    const { resolve } = this._pendingToolApproval;
+    this._pendingToolApproval = null;
+    resolve(approved);
     return true;
   }
 
@@ -763,6 +818,15 @@ export class AgentSession {
       ? `${safetyAppend}\n\n${this._extraSystemPromptAppend}`
       : safetyAppend;
 
+    // Mutating tools must NOT be auto-allowed, or the SDK skips canUseTool for
+    // them (allowedTools = "auto-allowed without prompting"). Excluding them
+    // lets 'default' mode (Ask) route them through canUseTool. In 'bypassPermissions'
+    // (Auto/Plan) the SDK runs them regardless, so excluding them is harmless.
+    const sdkAllowedTools = this._allowedTools.filter((t) => !MUTATING_TOOLS.has(t));
+
+    const permissionMode = this._permissionModeForApproval();
+    const isBypass = permissionMode === 'bypassPermissions';
+
     const queryOptions: Record<string, unknown> = {
       cwd: this._workspacePath,
       ...(this._pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable: this._pathToClaudeCodeExecutable } : {}),
@@ -772,9 +836,11 @@ export class AgentSession {
         append: fullAppend,
       },
       settingSources: this._settingSources,
-      permissionMode: 'bypassPermissions',
-      allowDangerouslySkipPermissions: true,
-      allowedTools: this._allowedTools,
+      permissionMode,
+      // Only the bypass path skips permissions; 'default' (Ask) must route
+      // mutating tools through canUseTool, so the dangerous flag stays off.
+      ...(isBypass ? { allowDangerouslySkipPermissions: true } : {}),
+      allowedTools: sdkAllowedTools,
       canUseTool: this._handleCanUseTool.bind(this),
       ...(this._mcpServers ? { mcpServers: this._mcpServers } : {}),
     };
@@ -985,6 +1051,37 @@ export class AgentSession {
       }
     }
 
+    // Unified 'ask' approval: gate mutating tools before they run. Read/Glob/Grep
+    // and everything else stay auto-allowed. 'auto'/'plan' modes skip this gate.
+    if (this._approvalMode === 'ask' && MUTATING_TOOLS.has(toolName)) {
+      if (!this._emitToolApproval) {
+        return { behavior: 'allow' }; // No approval UI wired — fail open, don't freeze the turn.
+      }
+      const kind: AgentToolApprovalRequest['kind'] = toolName === 'Bash' ? 'shell-command' : 'file-write';
+      const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
+      const command = typeof input.command === 'string' ? input.command : undefined;
+      try {
+        const approved = await new Promise<boolean>((resolve, reject) => {
+          this._pendingToolApproval = { toolUseId: options.toolUseID, resolve, reject };
+          this._emitToolApproval?.({ toolUseId: options.toolUseID, kind, filePath, command });
+          options.signal.addEventListener('abort', () => {
+            if (this._pendingToolApproval?.toolUseId === options.toolUseID) {
+              this._pendingToolApproval = null;
+            }
+            reject(new Error('Tool approval cancelled'));
+          }, { once: true });
+        });
+        return approved
+          ? { behavior: 'allow', updatedInput: input }
+          : { behavior: 'deny', message: 'User rejected this action.' };
+      } catch (error) {
+        return {
+          behavior: 'deny',
+          message: error instanceof Error ? error.message : 'Tool approval failed',
+        };
+      }
+    }
+
     if (toolName !== 'AskUserQuestion') {
       return { behavior: 'allow' };
     }
@@ -1068,6 +1165,15 @@ export class AgentSession {
 
     const { reject } = this._pendingPlanApproval;
     this._pendingPlanApproval = null;
+    reject(new Error(message));
+  }
+
+  private _clearPendingToolApproval(message = 'Tool approval cancelled') {
+    if (!this._pendingToolApproval) {
+      return;
+    }
+    const { reject } = this._pendingToolApproval;
+    this._pendingToolApproval = null;
     reject(new Error(message));
   }
 }

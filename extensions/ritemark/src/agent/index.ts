@@ -28,7 +28,8 @@ export {
   type ClaudeStatusInvalidationReason,
   type ClaudeStatusInvalidationEvent,
 } from './claudeStatusEvents';
-export { AGENTS, CLAUDE_MODELS, CODEX_MODELS, DEFAULT_MODEL } from './types';
+export { AGENTS } from './types';
+export { CLAUDE_MODELS, DEFAULT_MODEL } from '../ai/modelConfig';
 export { CLAUDE_FALLBACK_MODELS } from './claudeModels';
 export { discoverClaudeModels } from './discoverModels';
 export type {
