@@ -579,7 +579,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     const hasRunningClaude = state.agentConversation.some((t) => t.isRunning);
 
     if (hasRunningCodex) {
-      const agentId = state.selectedAgent;
+      // Cancel the runtime that owns the running turn, not the (possibly switched)
+      // picker selection — Codex and OpenCode both live in codexConversation.
+      const runningTurn = [...state.codexConversation].reverse().find((t) => t.isRunning);
+      const agentId = runningTurn?.runtime ?? 'codex';
       vscode.postMessage({ type: 'agent-cancel', agentId });
       const conv = [...state.codexConversation];
       const last = conv[conv.length - 1];
@@ -733,7 +736,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
     vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
   },
 
-  sendCodexMessage: (prompt, attachments?, requestedMode?, _skipBrowserContext?) => {
+  sendCodexMessage: (prompt, attachments?, requestedMode?, skipBrowserContext?) => {
     const state = get();
     const lastTurn = state.codexConversation[state.codexConversation.length - 1];
     if (lastTurn?.isRunning) return;
@@ -788,6 +791,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       // Unified approval policy (Auto/Ask/Plan) — the host maps it to the Codex
       // approval policy + plan collaboration mode.
       approvalMode: requestedMode ?? 'auto',
+      skipBrowserContext,
       attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
     });
   },
