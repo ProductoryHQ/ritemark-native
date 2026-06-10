@@ -44,11 +44,11 @@ Out of scope this sprint: `.drawio` (raw XML) and `.drawio.png` formats; export 
 
 ## Feature Flag Check
 
-This sprint introduces a new user-visible feature backed by a ~10 MB vendored binary bundle. A feature flag is required as a kill-switch and to allow experimental rollout.
+This sprint introduces a new user-visible feature backed by a ~10 MB vendored binary bundle. A feature flag is required as a kill-switch.
 
 - Flag ID: `drawio-diagrams`
 - Default: ON (HARD RULE #2 — features are ON by default)
-- Proposed status: `experimental` — surfaces in Settings so users can disable it (open for Jarmo confirmation at approval gate, Q3)
+- Status: `stable` — kill-switch only, not surfaced in Settings (Jarmo decision, 2026-06-10, Q3)
 - Platforms: darwin, win32, linux
 - The `DrawioEditorProvider` is only registered when `isEnabled('drawio-diagrams')` is true.
 
@@ -87,12 +87,12 @@ If the audit finds blockers, implementation scope is adjusted before any code is
 
 ---
 
-## Open Decisions (require Jarmo confirmation at this approval gate)
+## Open Decisions — RESOLVED (Jarmo, 2026-06-10)
 
-| Q | Question | Default |
+| Q | Question | Decision |
 |---|---|---|
-| Q2 | Gitignore the ~10 MB bundle (like `binaries/agents/`) vs commit it to git? | Gitignore — add to `.gitignore`, require `scripts/vendor-drawio.sh` for dev setup |
-| Q3 | Feature flag status: `experimental` (surfaces in Settings) vs `stable` (kill-switch only)? | `experimental` |
+| Q2 | Gitignore the ~10 MB bundle vs commit it to git? | **Commit to git** — simpler onboarding; `vendor-drawio.sh` used only for version updates |
+| Q3 | Feature flag status: `experimental` vs `stable`? | **`stable`** — kill-switch only, not surfaced in Settings |
 
 ---
 

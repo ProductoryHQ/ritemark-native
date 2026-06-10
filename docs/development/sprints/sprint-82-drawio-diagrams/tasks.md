@@ -25,8 +25,7 @@
 - [ ] Write `scripts/vendor-drawio.sh` with the exact download + placement steps from W0 audit
 - [ ] Run the vendor script; verify `draw.io.html` is present and loads in a browser
 - [ ] Create `extensions/ritemark/media/drawio/VERSION` with the pinned version string
-- [ ] Add `extensions/ritemark/media/drawio/draw.io.html` to `.gitignore` (if gitignore approach confirmed by Jarmo — Q2)
-- [ ] Verify pre-commit hook check: if bundle is gitignored, add a check that fails with a clear message if `media/drawio/draw.io.html` is missing
+- [ ] Commit the bundle to git (Q2 resolved: commit, no `.gitignore` entry)
 
 ### W1: `DrawioEditorProvider` (R1, R3)
 
@@ -71,7 +70,7 @@
 
 - [ ] `extensions/ritemark/src/features/flags.ts`:
   - [ ] Add `'drawio-diagrams'` to `FlagId` union type
-  - [ ] Add flag entry with `status: 'experimental'` (or `'stable'` — confirmed by Jarmo Q3), platforms all three
+  - [ ] Add flag entry with `status: 'stable'` (Q3 resolved — kill-switch only, not in Settings), platforms all three
 - [ ] Confirm `docs/development/architecture.md` update is queued for sprint close (do NOT update until all code is done — sprint architecture gate runs at close)
 
 ---
@@ -107,5 +106,5 @@ Manual test matrix — each row maps to a scenario in `scenarios.md`.
 - [ ] `media/webview.js` size check: confirm bundle size has NOT increased by draw.io bundle size
 - [ ] `docs/development/architecture.md` updated — `Last updated` = 2026-06-10 or sprint close date, Sprint 82 entry in Version History, `[editors]` line updated to include `drawioEditorProvider.ts`
 - [ ] `research/drawio-bundle-audit.md` complete and decision recorded
-- [ ] Q2 (gitignore vs commit) resolved and implemented
-- [ ] Q3 (flag status) resolved and implemented
+- [ ] Q2 resolved (commit to git) — implemented
+- [ ] Q3 resolved (`stable` flag) — implemented

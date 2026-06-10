@@ -47,21 +47,17 @@ Advantages over vendoring the full `src/main/webapp/` directory:
 
 **If the audit finds the single-file approach is CSP-incompatible in the VS Code webview context**, fall back to vendoring a subset of `src/main/webapp/` with only the required JS entry points. The audit must decide before implementation begins (R2 is a Phase 0 audit gate for W1).
 
-### Q2: Bundle gitignore vs commit
+### Q2: Bundle gitignore vs commit — RESOLVED
 
-**Recommendation: Gitignore it.**
+**Decision (Jarmo, 2026-06-10): commit the bundle to git.**
 
-The draw.io single-file bundle is ~10 MB. Committing it would bloat git history permanently. The pattern used for `binaries/agents/` (gitignored, downloaded at dev setup time) applies here. A `scripts/vendor-drawio.sh` script handles the download step. The pre-commit hook should verify the bundle is present; if not, emit a clear error pointing to the script.
+The ~10 MB single-file bundle is committed for simpler onboarding — no `.gitignore` entry, no pre-commit presence check needed. `scripts/vendor-drawio.sh` still exists, but only as the documented path for bumping the pinned draw.io version.
 
-**Jarmo must confirm this at approval gate** (Q2 in spec.md). If Jarmo prefers to commit it for simpler onboarding, the `.gitignore` entry is omitted and the 10 MB is accepted.
+### Q3: Feature flag status — RESOLVED
 
-### Q3: Feature flag status
+**Decision (Jarmo, 2026-06-10): `status: 'stable'`.**
 
-**Recommendation: `status: 'experimental'`.**
-
-This is a large new feature with a vendored 10 MB binary bundle. Marking it `experimental` means it appears in the Settings feature-toggle list. Users who do not want the draw.io editor can disable it. This is consistent with how `scheduled-flow-runs` is treated.
-
-**Jarmo must confirm at approval gate** (Q3 in spec.md). If `stable`, the flag exists only as a kill-switch and is not surfaced in Settings.
+The `drawio-diagrams` flag exists as a kill-switch only and is not surfaced in the Settings feature-toggle list. Feature is ON by default (HARD RULE #2).
 
 ---
 
@@ -206,7 +202,7 @@ if (isEnabled('drawio-diagrams')) {
 
 ```
 media/drawio/
-├── draw.io.html     ← vendored single-file bundle (gitignored if > 5 MB)
+├── draw.io.html     ← vendored single-file bundle (committed to git — Q2)
 └── VERSION          ← e.g. "v24.7.17"
 ```
 
@@ -229,13 +225,9 @@ echo "Vendored draw.io $VERSION to $DEST/"
 
 Exact version and filename format to be confirmed by W0 audit; the script is updated accordingly.
 
-### `.gitignore` entry (if bundle is gitignored)
+### Git handling
 
-```
-extensions/ritemark/media/drawio/draw.io.html
-```
-
-The `VERSION` file is always committed so the expected version is tracked.
+Q2 resolved: the bundle is committed to git — no `.gitignore` entry. Both `draw.io.html` and `VERSION` are tracked.
 
 ---
 
@@ -377,7 +369,7 @@ export type FlagId =
   id: 'drawio-diagrams',
   label: 'Draw.io Diagram Editing',
   description: 'Create and edit draw.io diagrams (.drawio.svg) embedded in markdown files. Requires vendored draw.io bundle (~10 MB).',
-  status: 'experimental',  // confirmed by Jarmo at approval gate (Q3)
+  status: 'stable',  // Q3 resolved (Jarmo, 2026-06-10) — kill-switch only
   platforms: ['darwin', 'win32', 'linux'],
 },
 ```
@@ -416,7 +408,7 @@ W1 and W3 can be developed in parallel once W2 is done (they don't depend on eac
 |---|---|---|---|
 | draw.io single-file HTML has inline scripts incompatible with VS Code webview CSP | Medium | Medium — would require vendoring webapp/ directory instead | W0 audit tests this directly before any code; fallback path is defined |
 | `window.postMessage` embed API behavior differs between draw.io versions | Low | Medium — could break save/load silently | Pin to a specific draw.io version in VERSION file; test the API in W0 audit before committing to a version |
-| draw.io bundle size exceeds 10 MB causing build / CI issues | Low | Low — gitignore pattern handles this | W0 audit measures size; gitignore entry prevents accidental commit |
+| draw.io bundle size exceeds 10 MB causing build / CI issues | Low | Low — bundle is committed (Q2), size lands in repo + DMG | W0 audit measures size; if materially larger than ~10 MB, surface to Jarmo before committing |
 | `insertImageAtPos` reuse is blocked — existing flow doesn't support positional insert | Low | Low — add a new message handler; small addition | Read the image insertion flow during W4 to confirm before planning |
 | `vscode.openWith` for `.drawio.svg` opens in wrong editor (e.g. Ritemark text editor picks it up before drawioEditor) | Low | Medium — `customEditors` priority ordering must be correct | Test `priority: "default"` for `*.drawio.svg`; VS Code resolves by file pattern specificity, and `*.drawio.svg` is more specific than `*.md` |
 | Windows path handling: `path.resolve` with mixed separators for `relativePath` in `openDrawioDiagram` | Low | Low — win32-x64 build target | Use `path.resolve` (handles mixed separators); add a Windows path scenario to integration test |

@@ -46,7 +46,7 @@ As a developer building Ritemark, I want a documented, reproducible way to vendo
 Acceptance criteria:
 - A pinned draw.io release artifact is downloaded and placed at `extensions/ritemark/media/drawio/` (the exact file — see Technical Plan for the recommended artifact).
 - The vendored bundle version is recorded in `extensions/ritemark/media/drawio/VERSION` (single line, e.g. `v24.7.17`).
-- The draw.io bundle files are added to `.gitignore` if > 5 MB (consistent with the `binaries/agents/` pattern) — or committed if small enough. Decision and rationale recorded in Technical Plan.
+- The draw.io bundle files are **committed to git** (Jarmo decision, 2026-06-10 — Q2). No `.gitignore` entry; `scripts/vendor-drawio.sh` exists for version updates only.
 - The draw.io editor webview CSP allows `script-src` for the bundle served from `webview.cspSource` only — no `unsafe-inline` script, no `cdnjs.cloudflare.com`, no remote origin.
 - A `scripts/vendor-drawio.sh` script (or inline instructions in `docs/development/sprints/sprint-82-drawio-diagrams/research/drawio-bundle-audit.md`) documents the exact download + placement steps so any developer can re-vendor.
 
@@ -115,6 +115,6 @@ Acceptance criteria:
 | # | Question | Owner | Default if unresolved |
 |---|---|---|---|
 | Q1 | Which specific draw.io artifact to vendor: single-file `draw.io.html` from release page, or `webapp/` directory from source? Size, CSP compatibility, and iframe embed API support differ. | Audit in `research/drawio-bundle-audit.md` before Phase 3 | Use `draw.io.html` single-file approach — simpler CSP, one file |
-| Q2 | Should the `media/drawio/` bundle be gitignored (like `binaries/agents/`) or committed? If gitignored, the CI/build process must vendor it. If committed, git history grows ~10 MB. | Jarmo decision at approval gate | Gitignore it; add vendoring step to dev setup docs |
-| Q3 | The `drawio-diagrams` feature flag: `status: 'experimental'` (shows in settings toggle) or `status: 'stable'` (ON, no toggle needed)? Given this is a new feature with a 10 MB vendored bundle, `experimental` seems appropriate for the first sprint. | Jarmo decision at approval gate | `experimental` |
+| Q2 | ~~Gitignore vs commit the `media/drawio/` bundle?~~ **RESOLVED (Jarmo, 2026-06-10): commit to git.** Simpler onboarding; ~10 MB in git history accepted. | — | — |
+| Q3 | ~~Feature flag `experimental` or `stable`?~~ **RESOLVED (Jarmo, 2026-06-10): `stable`.** Flag exists as kill-switch only, not surfaced in Settings. | — | — |
 | Q4 | Should `.drawio.svg` files appear in the Ritemark file explorer sidebar, or only be accessible from the markdown preview? | Jarmo decision | Appear in explorer (no special hiding needed — VS Code shows all files by default) |
