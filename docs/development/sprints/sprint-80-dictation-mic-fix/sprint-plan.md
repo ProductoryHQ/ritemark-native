@@ -11,14 +11,15 @@ Status: Phase 2 (PLAN) — awaiting Jarmo approval
 **Q1 — Reproduction machine:** Can you test on macOS Tahoe 26.6 (or any Tahoe build)? If yes,
 we can run `plutil -p Ritemark.app/Contents/Info.plist | grep -i micro` and reproduce H1 directly.
 
-**Q2 — User follow-up:** Should we reply to the user asking:
+**Q2 — User follow-up:** PARTIALLY ANSWERED 2026-06-10 — reporter's screenshot shows Ritemark
+  listed in Privacy → Microphone with toggle ON (answers b/c/d: prompt fired, granted, still
+  fails). Remaining asks for the user:
   (a) What version of Ritemark are they running? (Help → About)
-  (b) Does "Ritemark" appear at all in System Settings → Privacy & Security → Microphone?
-  (c) If it appears, is the toggle on or off?
-  (d) Did a permission prompt ever appear when they first launched dictation?
-  This narrows H1 (TCC attribution — Ritemark not listed) vs H2 (NSMicrophoneUsageDescription
-  dropped — prompt never appeared) vs H3 (Electron Tahoe regression — prompt appeared, toggle
-  is on, still fails).
+  (e) Which Mac model? (Mac mini / Mac Studio have no built-in microphone)
+  (f) Does System Settings → Sound → Input list any input device?
+  (g) Does voice input work in another Chromium/Electron app on the same machine
+      (e.g. the Claude desktop app visible in their permission list, or Chrome on a mic-test
+      page)? This is the H3-vs-H4 discriminator.
 
 **Q3 — Sprint number:** Sprint 80 appears to be the next free number based on the sprint directory.
 Please confirm.
@@ -45,9 +46,29 @@ than permissions.
 
 | ID | Hypothesis | Likelihood |
 |----|------------|------------|
-| H1 | macOS Tahoe 26.6 TCC regression: Electron signature attribution broken, OS hides devices, Chromium reports NotFoundError | Most likely |
-| H2 | `NSMicrophoneUsageDescription` missing/dropped from Info.plist in recent prod packaging; TCC silently denies without showing a prompt | Medium — **not verified in CI** |
-| H3 | Tahoe 26.6 point-release regression with our Electron version's device enumeration | Less likely — would affect all Tahoe users |
+| H1 | macOS Tahoe 26.6 TCC regression: Electron signature attribution broken, OS hides devices, Chromium reports NotFoundError | ~~Most likely~~ **Ruled out 2026-06-10** (see Evidence update) |
+| H2 | `NSMicrophoneUsageDescription` missing/dropped from Info.plist in recent prod packaging; TCC silently denies without showing a prompt | ~~Medium~~ **Ruled out 2026-06-10** (see Evidence update) |
+| H3 | Tahoe 26.6 point-release regression with our Electron version's device enumeration / Chromium audio-service TCC attribution in utility process | **Now most likely** |
+| H4 | No OS-level input device present at capture time (e.g. Mac mini/Studio with no built-in mic, headset disconnected) — the "no microphone found" message is literally true | **New — cannot be excluded yet** |
+
+### Evidence update (2026-06-10, reporter screenshot)
+
+The reporter (Margus Vaino) sent a screenshot of System Settings → Privacy & Security →
+Microphone on the affected machine: **Ritemark IS listed and its toggle is ON** (alongside
+the Claude desktop app). Implications:
+
+- The TCC prompt fired and was granted → `NSMicrophoneUsageDescription` must be present in
+  the shipped Info.plist → **H2 dead** (the S2 build preflight check stays as cheap hardening).
+- TCC attribution works at the main-app level → the "prompt never appears / app not listed"
+  variant of **H1 is dead**.
+- Remaining puzzle: permission granted, yet Chromium reports zero input devices
+  (`NotFoundError`). That is either H3 (Chromium audio service in our Electron version cannot
+  enumerate/open devices on Tahoe 26.6 despite the grant — cf. microsoft/vscode#307364
+  child-process TCC family, electron-builder#9529 symptom family) or H4 (no device exists).
+- Sharp discriminator: the same machine has the Claude desktop app (also Electron, much newer)
+  granted mic access. If voice input works in Claude/Chrome on that machine → mic exists and
+  Tahoe is fine → the fault is our Electron/VS Code version (H3) → escalate to `vscode-expert`
+  for an upstream bump evaluation. If System Settings → Sound → Input shows no devices → H4.
 
 Note: Sprint 23 notes record that `NSMicrophoneUsageDescription` was "already present" in
 Info.plist at the time, but this was never enforced in the build pipeline and was never

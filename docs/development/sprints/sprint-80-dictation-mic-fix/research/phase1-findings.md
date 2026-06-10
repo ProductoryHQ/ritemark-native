@@ -143,6 +143,25 @@ needs `import { systemPreferences } from 'electron'` in extension context).
 | H2 | NSMicrophoneUsageDescription missing from Info.plist → TCC silent deny | Medium | **Elevated** — key is not enforced anywhere in the build pipeline; cannot be ruled out without a `plutil` check on a built bundle |
 | H3 | Electron version device-enumeration regression on Tahoe 26.6 | Less likely | Unchanged |
 
+## 8a. Hypothesis Confidence After Reporter Screenshot (2026-06-10, later same day)
+
+Reporter screenshot shows System Settings → Privacy & Security → Microphone on the affected
+machine with **Ritemark present and toggle ON**. This supersedes the table above:
+
+| ID | Hypothesis | Status |
+|----|------------|--------|
+| H1 | TCC attribution broken / prompt never fires | **Ruled out** — prompt fired and was granted |
+| H2 | NSMicrophoneUsageDescription missing | **Ruled out** — the key must exist for the prompt to fire and the app to be listed. Keep the build preflight (S2) as cheap regression hardening only |
+| H3 | Our Electron's Chromium audio service cannot enumerate/open devices on Tahoe 26.6 despite granted TCC (utility-process attribution; cf. microsoft/vscode#307364, electron-builder#9529 symptom family) | **Now primary** |
+| H4 (new) | No OS-level input device at capture time (Mac mini/Studio without built-in mic, headset disconnected) — error message literally true | Cannot be excluded; discriminate via Sound → Input and a mic test in another Electron/Chromium app on the same machine |
+
+Design consequence for R2: the diagnostic bridge should return BOTH
+`systemPreferences.getMediaAccessStatus('microphone')` AND the webview-side
+`navigator.mediaDevices.enumerateDevices()` audio-input count, so the error UI can say
+precisely: "permission granted, but macOS reports 0 input devices" (H3/H4) vs "permission
+blocked" (classic TCC). For this reporter, the first message would have been correct and
+would have saved the entire hardware-debugging detour.
+
 ---
 
 ## 9. Scope Confirmation
