@@ -117,7 +117,8 @@ Each runtime was integrated independently. The result is three structurally simi
 ```
 src/runtime/                          ← added Sprint 79
 ├── AgentRuntime.ts                   interface + shared types
-├── RuntimeRegistry.ts                factory, lookup, lifecycle management
+├── RuntimeRegistry.ts                holds the shared interactive instances (lookup, lifecycle)
+├── runtimeFactory.ts                 createRuntime(id) — single runtime construction source (Sprint 80)
 ├── UnifiedApprovalGate.ts            single approval path for all runtimes
 └── BrowserToolsInjector.ts           browser MCP injection config
 
@@ -299,13 +300,17 @@ This generality is a structural decision, not speculative scope. Coupling the sc
 src/daemon/                          ← NEW in Sprint 80
 ├── Scheduler.ts                     cron watcher, registration, lifecycle (handler-agnostic)
 ├── ScheduledTask.ts                 ScheduledTask interface + shared types
+├── cron.ts                          minimal pure 5-field cron engine (unit-tested)
+├── scheduleParser.ts                schedule frontmatter parser + cron validation
 ├── handlers/
 │   ├── AgentTaskHandler.ts          runs a headless AgentRuntime session (Sprint 80)
-│   ├── GitSyncHandler.ts            git pull/commit/push        (future — interface only in Sprint 80)
-│   └── ScriptHandler.ts             arbitrary deterministic Node job (future)
-├── DaemonResultStore.ts             persists run history (workspaceState)
+│   ├── GitSyncHandler.ts            git pull/commit/push        (stub — interface only)
+│   └── ScriptHandler.ts             arbitrary deterministic Node job (stub — interface only)
+├── DaemonResultStore.ts             persists run history (workspaceState, 10/run cap per task)
 └── DaemonStatusEvents.ts            VS Code status bar + Agent Library notifications
 ```
+
+The scheduler scans and watches agent files under **both** `.claude/agents/` and `.agents/` in the workspace; a frontmatter `schedule:` block makes a file eligible.
 
 **`ScheduledTask` interface (the load-bearing abstraction):**
 
@@ -318,7 +323,7 @@ interface ScheduledTask {
 }
 ```
 
-`Scheduler` depends only on `ScheduledTask`. It never imports `AgentRuntime`. `AgentTaskHandler` is the adapter that bridges the two: it implements `ScheduledTask.run()` by calling `runtime.prompt()` on a headless session. A future `GitSyncHandler` implements the same interface by calling `simpleGit` — the scheduler is unchanged.
+`Scheduler` depends only on `ScheduledTask`. It never imports `AgentRuntime`. `AgentTaskHandler` is the adapter that bridges the two: it implements `ScheduledTask.run()` by calling `runtime.prompt()` on a headless session. Each run constructs its **own fresh** runtime via the `createRuntime()` factory (`src/runtime/runtimeFactory.ts`) — the single construction source that `UnifiedViewProvider` also uses for the shared interactive registry — so a headless run is fully isolated from the user's live conversation (Jarmo decision #2) and is runtime-agnostic *by construction* (claude-code is the verified default; pointing a task at another runtime is a constructor argument, not a rewrite). A future `GitSyncHandler` implements the same interface by calling `simpleGit` — the scheduler is unchanged.
 
 **Key design decisions:**
 
@@ -326,7 +331,7 @@ interface ScheduledTask {
 
 2. **Agent runs go through the same `AgentRuntime` interface.** `AgentTaskHandler` calls `runtime.prompt()` like an interactive session, but with a headless session that routes approvals to auto-block-or-skip logic instead of the UI. This is why the `AgentRuntime` abstraction must exist first (Sprint 79 is a hard prerequisite for the agent handler specifically).
 
-3. **No daemon-specific runtime.** The agent handler is a client of the existing runtime layer, not a fourth runtime.
+3. **No daemon-specific runtime.** The agent handler is a client of the existing runtime layer, not a fourth runtime. It builds its instance through the shared `createRuntime()` factory rather than constructing a concrete runtime class directly — keeping runtime construction in one place.
 
 4. **Auto-approval policy for headless runs:** carried by `autoApprovalPolicy` on the task. For agent tasks: file-reads auto-approved; file-writes blocked and surfaced as a notification; shell commands blocked. The agent's `allowedTools` frontmatter narrows this further. Deterministic handlers (git sync) define their own policy — they are not bound to the agent policy.
 
@@ -334,7 +339,7 @@ interface ScheduledTask {
 
 6. **Cross-runtime context (Sprint 80 pre-flight, agent handler only):** When an agent-task result is surfaced in the Agent Library alongside interactive history, what context (if any) carries between them? Design decision required before wiring `AgentTaskHandler` — see [#97](https://github.com/ProductoryHQ/ritemark-native/issues/97). Does not block the scheduler or non-agent handlers.
 
-**Sprint 80 scope:** ship `Scheduler`, `ScheduledTask`, `DaemonResultStore`, `DaemonStatusEvents`, and exactly one concrete handler (`AgentTaskHandler`). `GitSyncHandler` / `ScriptHandler` are named here to prove the interface generalizes; they are not implemented in Sprint 80.
+**Sprint 80 scope:** ship `Scheduler`, `ScheduledTask`, `DaemonResultStore`, `DaemonStatusEvents`, and exactly one concrete handler (`AgentTaskHandler`). `GitSyncHandler` / `ScriptHandler` ship as interface-only stubs (`run()` throws `not implemented`) to prove the interface generalizes without committing to their behaviour.
 
 ---
 
