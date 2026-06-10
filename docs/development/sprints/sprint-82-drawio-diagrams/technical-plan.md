@@ -253,11 +253,12 @@ case 'openDrawioDiagram': {
 
 ```typescript
 case 'insertDiagram': {
-  // Sprint 82 R5: create new .drawio.svg and insert reference
+  // Sprint 82 R5: create new .drawio.svg in images/ (existing image attachment folder) and insert reference
   const { insertPos } = message as { insertPos: number };
-  const docDir = path.dirname(document.uri.fsPath);
-  const diagramPath = getUniqueDrawioPath(docDir);
-  const relativePath = './' + path.basename(diagramPath);
+  const imagesDir = path.join(path.dirname(document.uri.fsPath), 'images');
+  await fsp.mkdir(imagesDir, { recursive: true });
+  const diagramPath = getUniqueDrawioPath(imagesDir);
+  const relativePath = './images/' + path.basename(diagramPath);
 
   // Write empty diagram template
   await fsp.writeFile(diagramPath, EMPTY_DRAWIO_SVG_TEMPLATE, 'utf-8');

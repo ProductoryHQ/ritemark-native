@@ -90,9 +90,9 @@ And `openDrawioDiagram` is NOT sent to the extension host
 ### Scenario: Draw.io diagram image in a subdirectory
 
 Given a markdown file at `/workspace/docs/readme.md`
-And it references `![](./assets/flow.drawio.svg)`
+And it references `![](./images/flow.drawio.svg)`
 When the user clicks the diagram
-Then `openDrawioDiagram` sends `relativePath: './assets/flow.drawio.svg'`
+Then `openDrawioDiagram` sends `relativePath: './images/flow.drawio.svg'`
 And the extension host resolves the absolute path correctly relative to the markdown file's directory
 And the draw.io editor opens `flow.drawio.svg`
 
@@ -106,23 +106,23 @@ Given a markdown file is open in Ritemark
 And the cursor is on an empty line
 When the user types `/diagram` and selects "Diagram" from the slash command popup
 Then the webview sends `insertDiagram` to the extension host
-And the extension host creates `diagram.drawio.svg` in the same directory as the markdown file
+And the extension host creates `images/diagram.drawio.svg` relative to the markdown file (creating the `images/` folder if it does not exist — same folder the existing image attachment flow uses)
 And the file is initialized with a valid empty draw.io SVG template
-And the editor inserts `![](./diagram.drawio.svg)` at the cursor position
+And the editor inserts `![](./images/diagram.drawio.svg)` at the cursor position
 And the draw.io editor opens automatically for the new file
 
 ### Scenario: Auto-incrementing filename to avoid collision
 
-Given `diagram.drawio.svg` already exists in the current directory
+Given `images/diagram.drawio.svg` already exists relative to the markdown file
 When the user inserts a new diagram via `/diagram`
-Then the new file is named `diagram-2.drawio.svg`
-And the markdown reference inserted is `![](./diagram-2.drawio.svg)`
+Then the new file is named `images/diagram-2.drawio.svg`
+And the markdown reference inserted is `![](./images/diagram-2.drawio.svg)`
 
 ### Scenario: Second auto-increment
 
-Given `diagram.drawio.svg` and `diagram-2.drawio.svg` both exist
+Given `images/diagram.drawio.svg` and `images/diagram-2.drawio.svg` both exist
 When the user inserts a new diagram via `/diagram`
-Then the new file is named `diagram-3.drawio.svg`
+Then the new file is named `images/diagram-3.drawio.svg`
 
 ### Scenario: Insert Diagram when no markdown file is active
 

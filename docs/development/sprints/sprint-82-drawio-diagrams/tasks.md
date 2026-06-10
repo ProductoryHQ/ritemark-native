@@ -89,9 +89,9 @@ Manual test matrix — each row maps to a scenario in `scenarios.md`.
 - [ ] S8: Click `.drawio.svg` in preview — draw.io editor panel opens for that file
 - [ ] S9: Click regular PNG — resize handles appear, `openDrawioDiagram` NOT sent
 - [ ] S10: Click `.drawio.svg` in subdirectory path — editor opens the correct file
-- [ ] S11: `/diagram` slash command — creates `diagram.drawio.svg`, inserts `![](./diagram.drawio.svg)`, editor opens
-- [ ] S12: Auto-increment — `diagram.drawio.svg` exists, `/diagram` creates `diagram-2.drawio.svg`
-- [ ] S13: Second auto-increment — `diagram.drawio.svg` and `diagram-2.drawio.svg` exist, result is `diagram-3.drawio.svg`
+- [ ] S11: `/diagram` slash command — creates `images/diagram.drawio.svg` (folder created if missing), inserts `![](./images/diagram.drawio.svg)`, editor opens
+- [ ] S12: Auto-increment — `images/diagram.drawio.svg` exists, `/diagram` creates `images/diagram-2.drawio.svg`
+- [ ] S13: Second auto-increment — `images/diagram.drawio.svg` and `images/diagram-2.drawio.svg` exist, result is `images/diagram-3.drawio.svg`
 - [ ] S14: Feature flag — `isEnabled('drawio-diagrams')` returns true by default
 - [ ] S15: No drawio code in `media/webview.js` — grep `mxGraph` returns no match
 - [ ] S16: Windows path test — open `.drawio.svg` referenced from subdirectory on win32 (if win32-x64 build is available for testing; else document as deferred)

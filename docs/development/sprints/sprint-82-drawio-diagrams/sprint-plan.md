@@ -18,7 +18,7 @@ Status: Phase 2 — awaiting Jarmo approval
 
 ## Goal
 
-Users can insert and edit draw.io diagrams embedded in markdown files, with diagrams stored as `.drawio.svg` files beside the `.md`, rendered inline in the Ritemark preview, and editable via a native `DrawioEditorProvider` backed by the Apache 2.0 draw.io JS library.
+Users can insert and edit draw.io diagrams embedded in markdown files, with diagrams stored as `.drawio.svg` files in the `images/` folder beside the `.md` (existing image attachment pattern), rendered inline in the Ritemark preview, and editable via a native `DrawioEditorProvider` backed by the Apache 2.0 draw.io JS library.
 
 ## Linked Issues
 

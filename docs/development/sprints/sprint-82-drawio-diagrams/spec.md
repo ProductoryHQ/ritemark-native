@@ -8,14 +8,14 @@
 
 ## Purpose
 
-Users can create and embed draw.io diagrams directly in `.md` files. The workflow is: type `/diagram` in the editor to create a new `.drawio.svg` file beside the markdown file and insert an image reference; click the diagram in the preview to open the draw.io editor; save to update the file and re-render the preview inline. The implementation uses the Apache 2.0 draw.io JS library directly — no GPL-3.0 code is copied or bundled.
+Users can create and embed draw.io diagrams directly in `.md` files. The workflow is: type `/diagram` in the editor to create a new `.drawio.svg` file in the `images/` folder beside the markdown file and insert an image reference; click the diagram in the preview to open the draw.io editor; save to update the file and re-render the preview inline. The implementation uses the Apache 2.0 draw.io JS library directly — no GPL-3.0 code is copied or bundled.
 
 ---
 
 ## Principles
 
 - **Clean-room implementation.** The hediet/vscode-drawio extension (GPL-3.0) may be read for approach and inspiration only. No code is copied. All implementation is original.
-- **Portable markdown.** Diagrams live as `.drawio.svg` files beside the `.md`. The markdown image reference `![](diagram.drawio.svg)` is standard and renders anywhere SVG is supported — GitHub, Obsidian, VS Code preview, etc.
+- **Portable markdown.** Diagrams live as `.drawio.svg` files in the `images/` folder beside the `.md` (the existing image attachment pattern). The markdown image reference `![](./images/diagram.drawio.svg)` is standard and renders anywhere SVG is supported — GitHub, Obsidian, VS Code preview, etc.
 - **Separate bundle.** The draw.io JS bundle (~10 MB) is loaded only by the draw.io editor webview. It must never enter `media/webview.js`. This is a hard constraint from GH#107.
 - **Offline-first.** The draw.io bundle is vendored locally — no CDN, no network required at runtime.
 - **Feature is ON by default** per CLAUDE.md HARD RULE #2. A feature flag exists as a kill-switch only.
@@ -81,10 +81,10 @@ As a user, I want to type `/diagram` in the editor or click an Insert Diagram bu
 Acceptance criteria:
 - `blockItems.ts` gains a new item: `{ title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio' }`.
 - When the user triggers the slash command, the webview sends `sendToExtension('insertDiagram', { insertPos: number })` to the extension host.
-- The extension host (`ritemarkEditor.ts` handler for `insertDiagram`) creates a new `.drawio.svg` file beside the current markdown file, named `diagram.drawio.svg` (or `diagram-2.drawio.svg`, etc., auto-incrementing to avoid collisions).
+- The extension host (`ritemarkEditor.ts` handler for `insertDiagram`) creates a new `.drawio.svg` file in the `images/` folder beside the current markdown file (creating the folder if needed — the same folder the existing image attachment flow uses), named `diagram.drawio.svg` (or `diagram-2.drawio.svg`, etc., auto-incrementing to avoid collisions).
 - The new file is initialised with a minimal empty draw.io SVG template (see Technical Plan for the template content).
 - The extension host sends `{ type: 'insertImageAtPos', relativePath: string, pos: number }` back to the webview (reusing the existing image insertion flow, or a close equivalent).
-- The TipTap editor inserts `![](./diagram.drawio.svg)` (the relative path) at the cursor position.
+- The TipTap editor inserts `![](./images/diagram.drawio.svg)` (the relative path) at the cursor position.
 - After insertion, the extension host opens the new `.drawio.svg` file in the draw.io editor panel automatically (`vscode.openWith`).
 
 ---
@@ -93,7 +93,7 @@ Acceptance criteria:
 
 - No `.drawio` (raw XML) or `.drawio.png` file format support in this sprint. `.drawio.svg` only.
 - No export of diagrams to PNG/PDF from within Ritemark.
-- No inline base64 embedding of diagram content in markdown (file-beside-md is the only mode).
+- No inline base64 embedding of diagram content in markdown (file in `images/` beside the md is the only mode).
 - No multi-page diagram support (draw.io supports pages; the editor may show them but Ritemark renders only the first page via `<img>`).
 - No diagram toolbar or property panel beyond what draw.io's own UI provides.
 - No collaboration or co-editing.
@@ -105,7 +105,7 @@ Acceptance criteria:
 
 ## Resolved Questions
 
-- **File placement:** `.drawio.svg` beside the `.md` file (not inline base64). Rationale: self-contained, portable, same pattern as image attachments, standard markdown image syntax. Decision: binding (Jarmo comment on GH#111).
+- **File placement:** `.drawio.svg` as a file (not inline base64), stored in the `images/` folder beside the `.md` — the folder the existing image attachment flow already uses (Jarmo, 2026-06-10). Rationale: self-contained, portable, one consistent asset folder, standard markdown image syntax. Decision: binding (Jarmo comment on GH#111 + review feedback).
 - **Library choice:** Apache 2.0 draw.io JS library (jgraph/drawio), not hediet/vscode-drawio (GPL-3.0). Decision: binding (Jarmo comment on GH#111).
 - **TipTap SVG rendering:** The existing `ImageExtension` uses `<img src=...>` which renders SVG files correctly as long as the source URI is a valid `webviewUri`. The `ResizableImage` component does not special-case SVG. A `.drawio.svg` image reference resolves to a `webviewUri` during document load (the same mechanism as other local images), so it renders inline without changes to the TipTap image node. Confirmed by reading `imageExtensions.ts` and `ResizableImage.tsx` — no TipTap extension changes are needed for rendering. Click-to-edit requires a small addition to `ResizableImage` (detect `.drawio.svg` in `src` and send `openDrawioDiagram` instead of resize handles).
 - **Offline bundle artifact:** The draw.io project ships a self-contained `drawio-desktop` release bundle. The recommended vendoring target is the `draw.io-x.y.z.html` file from the GitHub release of jgraph/drawio — a single self-contained HTML file that can be loaded in an iframe. Alternatively, `src/main/webapp/` (the web app directory from the draw.io repo) can be used; the audit in `research/drawio-bundle-audit.md` will determine which artifact is smaller and simpler to vendor.
