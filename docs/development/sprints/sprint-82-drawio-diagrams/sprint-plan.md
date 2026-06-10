@@ -1,8 +1,8 @@
 # Sprint 82: Draw.io Diagram Embedding
 
 Track: SDD (auto-detected: 5 user-facing requirements + multi-component flow: webview ↔ bridge ↔ extension host ↔ filesystem + vendored binary bundle)
-Branch: `sprint-82-drawio-diagrams` (create after approval)
-Status: Phase 2 — awaiting Jarmo approval
+Branch: `claude/sprint-82-issue-review-x99it0` (remote session branch — serves as the sprint branch; approved by Jarmo 2026-06-10)
+Status: Phase 5 — implementation complete, QA gate passed (2026-06-10). Remaining: Jarmo's local test pass (scenarios S1–S13) before release.
 
 ---
 

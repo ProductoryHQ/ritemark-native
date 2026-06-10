@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-06-11 (Sprint 80 close — scheduled-tasks daemon; Sprint 81 close — Excel editing + #110 multi-sheet fix)
+**Last updated:** 2026-06-11 (Sprint 80 — scheduled-tasks daemon; Sprint 81 — Excel editing + #110; Sprint 82 — draw.io diagram embedding)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -85,7 +85,7 @@ extensions/ritemark/src/
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime
 ├── voiceDictation/  Whisper-based STT (macOS only)
 ├── export/          PDF/DOCX export
-└── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts
+└── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts, drawioEditorProvider.ts
 ```
 
 Editor provider contracts: `ritemarkEditor.ts` is a `CustomTextEditorProvider` (markdown + CSV, editable). `excelEditorProvider.ts` is a full `CustomEditorProvider<ExcelDocument>` since Sprint 81 — .xlsx is editable (dirty tracking via `CustomDocumentContentChangeEvent`, save/save-as/revert/hot-exit backup; no undo-redo stack), .xls stays read-only. `docxEditorProvider.ts` and `pdfEditorProvider.ts` are read-only (`CustomReadonlyEditorProvider`).
@@ -425,3 +425,4 @@ The decisions that define the system. Changing any of these is an architecture-l
 | 2026-06-08 | Sprint 79 | Runtime unification: `src/runtime/` added (AgentRuntime, RuntimeRegistry, UnifiedApprovalGate, BrowserToolsInjector); ClaudeCodeRuntime/CodexRuntime/AcpRuntime adapters; `UnifiedViewProvider` 2480→1097 LOC; unified `agent-execute`/`agent-cancel`/`agent-approve` webview messages; browser IPC server + `browserMcpAdapter.ts` for ACP browser injection via Unix socket; `AgentDaemon` foundation (inactive); `CLAUDE_MODELS`/`DEFAULT_MODEL` moved to `modelConfig.ts`; `CODEX_MODELS` deleted; `document-search` flag disabled; ARCH-2/3/4/5 resolved. |
 | 2026-06-08 | Sprint 79 (close) | Integration-test hardening: unified approval **policy** (Auto/Ask/Plan `approvalMode`) across all 3 runtimes; restored per-turn context dropped in the dispatch migration (active file, browser context, @mentions, Codex approval-policy/sandbox + plan toggle, Claude api-key/excludedFolders/timeout, `onExit`, Codex base-instruction clobber); fixed Claude warm-session reuse (was recreated every turn → lost memory); "Always allow" removed from the approval card; OpenCode model picker auto-default + BYOK env wiring. |
 | 2026-06-08 | Pre-Sprint 80 | Generalized the daemon from agent-specific (`AgentDaemon`/`DaemonSession`) to a handler-agnostic `Scheduler` + `ScheduledTask` interface with pluggable handlers (`AgentTaskHandler` in Sprint 80; `GitSyncHandler`/`ScriptHandler` interface-only). Scheduler no longer depends on `AgentRuntime`; the agent handler is the adapter that bridges them. |
+| 2026-06-10 | Sprint 82 | Draw.io diagram embedding (GH#111): `drawioEditorProvider.ts` added to [editors] — `CustomTextEditorProvider` for `*.drawio.svg` hosting the vendored draw.io v30.0.4 webapp subset (`media/drawio/`, 36 MB, Apache 2.0, committed to git) in an iframe; clean-room bridge over the draw.io embed JSON protocol. `/diagram` slash command creates `images/diagram[-N].drawio.svg` and reuses the `imageSaved` insertion flow; `.drawio.svg` images in TipTap are click-to-edit. New `drawio-diagrams` flag (stable, kill-switch). `scripts/vendor-drawio.sh` re-vendors the bundle. The drawio bundle is NOT part of `media/webview.js` (no impact on GH#107). |
