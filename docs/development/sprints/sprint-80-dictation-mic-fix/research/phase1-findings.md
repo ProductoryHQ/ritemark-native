@@ -155,6 +155,39 @@ machine with **Ritemark present and toggle ON**. This supersedes the table above
 | H3 | Our Electron's Chromium audio service cannot enumerate/open devices on Tahoe 26.6 despite granted TCC (utility-process attribution; cf. microsoft/vscode#307364, electron-builder#9529 symptom family) | **Now primary** |
 | H4 (new) | No OS-level input device at capture time (Mac mini/Studio without built-in mic, headset disconnected) — error message literally true | Cannot be excluded; discriminate via Sound → Input and a mic test in another Electron/Chromium app on the same machine |
 
+## 8b. ROOT CAUSE CONFIRMED (2026-06-10, evening — Jarmo's machine, prod build, Tahoe 26.2)
+
+Webview DevTools (vscode-webview:// frame context):
+
+```
+[Violation] Permissions policy violation: microphone is not allowed in this document.
+FAIL: NotAllowedError — Permission denied
+audioinput: 1
+```
+
+And in the live dictation flow (clicking the mic button):
+
+```
+[Violation] Permissions policy violation: microphone is not allowed in this document.  (webview.js:1791)
+[Dictation] Failed to start mic capture: NotAllowedError: Permission denied
+```
+
+Confirmed chain: mic hardware present (1 audioinput), TCC granted, but Chromium's
+**Permissions Policy** blocks `microphone` in the webview iframe. The iframe `allow`
+attribute set in `src/vs/workbench/contrib/webview/browser/webviewElement.ts` is
+`cross-origin-isolated; autoplay; local-network-access; clipboard-read; clipboard-write`
+(verified identical in upstream 1.109 and 1.117) — `microphone` is never delegated to the
+cross-origin `vscode-webview://` frame, so the Electron permission handler in patch 004 is
+never consulted. The pre-Sprint-55 Electron did not enforce iframe media policy; Electron
+39.x (VS Code 1.109/1.117 bumps) does — hence the silent regression with no change in our code.
+
+Also confirmed live: the current "Microphone Access Required" modal sends the user to
+System Settings → Privacy → Microphone, which is WRONG advice for this failure (TCC already
+granted) — validating the R3 error-semantics work.
+
+THE FIX: add `'microphone'` to the iframe allow-list in `webviewElement.ts` (one line,
+via patch 004 which owns mic permission plumbing). H1–H4 superseded.
+
 Design consequence for R2: the diagnostic bridge should return BOTH
 `systemPreferences.getMediaAccessStatus('microphone')` AND the webview-side
 `navigator.mediaDevices.enumerateDevices()` audio-input count, so the error UI can say

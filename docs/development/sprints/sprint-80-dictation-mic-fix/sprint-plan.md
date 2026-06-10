@@ -28,6 +28,39 @@ Please confirm.
 
 ## Background
 
+### ROOT CAUSE CONFIRMED (2026-06-10, Jarmo's machine, production v1.8.x, macOS Tahoe 26.2)
+
+Webview DevTools console output (vscode-webview:// frame context):
+
+```
+[Violation] Permissions policy violation: microphone is not allowed in this document.
+FAIL: NotAllowedError — Permission denied
+audioinput: 1
+```
+
+The microphone EXISTS (1 audioinput device enumerated) and TCC permission IS granted.
+**Chromium's Permissions Policy blocks `microphone` in the webview iframe** because the
+iframe's `allow` attribute — set upstream in
+`src/vs/workbench/contrib/webview/browser/webviewElement.ts` — is
+`cross-origin-isolated; autoplay; local-network-access; clipboard-read; clipboard-write`
+and does NOT delegate `microphone` to the cross-origin `vscode-webview://` frame.
+The Electron permission-request handler patched in 004 is never consulted; the request
+dies at the policy layer.
+
+Verified identical allow-list in upstream 1.109 and 1.117 → the VS Code source did not
+change; what changed is enforcement: the feature worked when built on the pre-Sprint-55
+Electron (Sprint 23 era) and stopped once the Electron 39.x line (VS Code 1.109/1.117
+bumps) began enforcing iframe Permissions Policy for media devices. Hypotheses H1–H4 are
+all superseded by this confirmed root cause.
+
+**The fix:** add `'microphone'` to the webview iframe `allow` list (one-line change in
+`webviewElement.ts`, shipped via our VS Code patch system — extends patch 004, which
+already owns microphone permission plumbing). Patch 004's Electron handler remains
+necessary: once the policy delegates the feature, Chromium then consults the Electron
+permission handler, which triggers the macOS TCC flow.
+
+### Original report (for context)
+
 A production user on macOS Tahoe 26.6 reports voice dictation fails immediately with the message
 "cannot find the microphone and cannot start recording". They reset TCC mic permissions via
 `tccutil reset Microphone` and checked System Settings — no change.
@@ -92,8 +125,13 @@ pipeline so the root cause cannot silently regress.
 
 ## Success Criteria
 
+- [ ] **S0 (THE FIX)** — Webview iframe `allow` list includes `microphone` (patch 004
+  update to `webviewElement.ts`). In a production build on macOS Tahoe, clicking the mic
+  button triggers recording and transcription end-to-end; webview console shows NO
+  "Permissions policy violation: microphone" line. Verified on Jarmo's machine.
 - [ ] **S1** — `plutil` check on a production build confirms `NSMicrophoneUsageDescription`
-  is present in `Ritemark.app/Contents/Info.plist`.
+  is present in `Ritemark.app/Contents/Info.plist`. (Downgraded to hardening — root cause
+  is confirmed elsewhere.)
 - [ ] **S2** — Build pipeline enforces the key: missing `NSMicrophoneUsageDescription` causes
   `codesign-app.sh` (or a pre-flight script) to fail with a clear error before signing.
 - [ ] **S3** — When `getUserMedia` throws `NotFoundError`, the extension is queried for the
@@ -126,6 +164,19 @@ pipeline so the root cause cannot silently regress.
 ---
 
 ## Implementation Checklist
+
+### Phase 0: THE FIX — webview iframe microphone delegation (R0)
+- [ ] Update patch 004 (owns mic permission plumbing): in
+  `src/vs/workbench/contrib/webview/browser/webviewElement.ts` `_createElement`, add
+  `'microphone'` to the iframe `allow` feature list (alongside `cross-origin-isolated`,
+  `autoplay`, `local-network-access`, `clipboard-read`, `clipboard-write`).
+- [ ] Regenerate the patch via `./scripts/create-patch.sh` workflow; verify
+  `./scripts/apply-patches.sh --dry-run` is clean.
+- [ ] Verify in dev mode: webview console shows no permissions-policy violation; dictation
+  records and transcribes.
+- [ ] Verify in production build on Tahoe (S0).
+- [ ] NOTE: scope is microphone only — do NOT add `camera` or other features without a
+  separate decision (security surface).
 
 ### Phase 1: Verify & Diagnose (R1)
 - [ ] Run `plutil -p VSCode-darwin-arm64/Ritemark.app/Contents/Info.plist | grep -i micro`
