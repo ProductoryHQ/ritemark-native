@@ -1,0 +1,196 @@
+# Sprint 80: Voice Dictation — Microphone Access Fix (macOS Tahoe)
+
+Track: Plain full track
+Branch: sprint-80-dictation-mic-fix
+Status: Phase 2 (PLAN) — awaiting Jarmo approval
+
+---
+
+## Open Questions for Jarmo (answer before Phase 3)
+
+**Q1 — Reproduction machine:** Can you test on macOS Tahoe 26.6 (or any Tahoe build)? If yes,
+we can run `plutil -p Ritemark.app/Contents/Info.plist | grep -i micro` and reproduce H1 directly.
+
+**Q2 — User follow-up:** Should we reply to the user asking:
+  (a) What version of Ritemark are they running? (Help → About)
+  (b) Does "Ritemark" appear at all in System Settings → Privacy & Security → Microphone?
+  (c) If it appears, is the toggle on or off?
+  (d) Did a permission prompt ever appear when they first launched dictation?
+  This narrows H1 (TCC attribution — Ritemark not listed) vs H2 (NSMicrophoneUsageDescription
+  dropped — prompt never appeared) vs H3 (Electron Tahoe regression — prompt appeared, toggle
+  is on, still fails).
+
+**Q3 — Sprint number:** Sprint 80 appears to be the next free number based on the sprint directory.
+Please confirm.
+
+---
+
+## Background
+
+A production user on macOS Tahoe 26.6 reports voice dictation fails immediately with the message
+"cannot find the microphone and cannot start recording". They reset TCC mic permissions via
+`tccutil reset Microphone` and checked System Settings — no change.
+
+This symptom maps to the `NotFoundError` branch in `useVoiceDictation.ts:258`:
+```
+} else if (err.name === 'NotFoundError') {
+  setError('No microphone found. Please connect a microphone.')
+```
+On macOS, Chromium hides all input devices from enumeration (causing `NotFoundError`, not
+`NotAllowedError`) when OS-level TCC access is denied or unattributable. The error message
+"no microphone found" is therefore misleading — it directs the user to check hardware rather
+than permissions.
+
+### Root-cause hypotheses (ranked)
+
+| ID | Hypothesis | Likelihood |
+|----|------------|------------|
+| H1 | macOS Tahoe 26.6 TCC regression: Electron signature attribution broken, OS hides devices, Chromium reports NotFoundError | Most likely |
+| H2 | `NSMicrophoneUsageDescription` missing/dropped from Info.plist in recent prod packaging; TCC silently denies without showing a prompt | Medium — **not verified in CI** |
+| H3 | Tahoe 26.6 point-release regression with our Electron version's device enumeration | Less likely — would affect all Tahoe users |
+
+Note: Sprint 23 notes record that `NSMicrophoneUsageDescription` was "already present" in
+Info.plist at the time, but this was never enforced in the build pipeline and was never
+re-verified after the VS Code 1.117 upstream bump (Sprint 55) or subsequent packaging changes.
+
+### Feature flag check
+
+No new feature flag required. Voice dictation is an existing, on-by-default feature
+(`extensions/ritemark/src/voiceDictation/`). Fixes to error semantics and build verification
+do not add a new capability that needs gating.
+
+---
+
+## Goal
+
+Fix the misleading "no microphone found" error for macOS users affected by TCC/permission
+issues, add correct actionable guidance, and verify/enforce the Info.plist key in the build
+pipeline so the root cause cannot silently regress.
+
+---
+
+## Success Criteria
+
+- [ ] **S1** — `plutil` check on a production build confirms `NSMicrophoneUsageDescription`
+  is present in `Ritemark.app/Contents/Info.plist`.
+- [ ] **S2** — Build pipeline enforces the key: missing `NSMicrophoneUsageDescription` causes
+  `codesign-app.sh` (or a pre-flight script) to fail with a clear error before signing.
+- [ ] **S3** — When `getUserMedia` throws `NotFoundError`, the extension is queried for the
+  actual OS-level permission status (`systemPreferences.getMediaAccessStatus('microphone')`)
+  before the error message is chosen.
+- [ ] **S4** — If the real status is `denied` or `restricted`, the user sees: "Microphone access
+  is blocked in System Settings — Ritemark cannot record audio." with an "Open Privacy Settings"
+  button that deep-links to the Microphone pane.
+- [ ] **S5** — If the real status is `not-determined`, the user sees: "Microphone permission has
+  not been granted. Click Open System Settings to enable it, then restart dictation."
+- [ ] **S6** — If the real status is `granted` (hardware genuinely absent or Tahoe H3), the
+  existing "No microphone found" message is preserved — no regression.
+- [ ] **S7 (conditional, H2/H3 confirmed)** — If `NSMicrophoneUsageDescription` is confirmed
+  missing or Electron version proves to be the cause, a packaging fix or Electron bump is
+  implemented and verified.
+
+---
+
+## Deliverables
+
+| Deliverable | Description |
+|-------------|-------------|
+| Build-time check | `codesign-app.sh` preflight: assert `NSMicrophoneUsageDescription` in Info.plist, fail loudly if absent |
+| Extension bridge message | New `dictation:queryMicPermission` → `dictation:micPermissionStatus` message pair; extension calls `systemPreferences.getMediaAccessStatus` and returns result to webview |
+| Error semantics fix | `useVoiceDictation.ts` catches `NotFoundError`, sends bridge query, awaits status, then emits the correct error string |
+| UX modal extension | `VoiceDictationButton.tsx` mic-permission modal covers the `NotFoundError`-caused-by-TCC case (currently only fires on `error.includes('Microphone access denied')`) |
+| Deep link | "Open Privacy Settings" button sends `system:openMicSettings` with `x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone` URL (message already exists in the codebase) |
+| Conditional packaging fix | If H2 confirmed: enforce `NSMicrophoneUsageDescription` injection via PlistBuddy in build script |
+
+---
+
+## Implementation Checklist
+
+### Phase 1: Verify & Diagnose (R1)
+- [ ] Run `plutil -p VSCode-darwin-arm64/Ritemark.app/Contents/Info.plist | grep -i micro`
+  on latest production build to confirm/deny H2.
+- [ ] If key is absent: trace where it gets dropped (electron packaging step vs. VS Code
+  gulp step vs. branding override step).
+- [ ] Document finding in `research/infoplist-audit.md`.
+- [ ] Add preflight assertion to `scripts/codesign-app.sh`: before signing, check that
+  `NSMicrophoneUsageDescription` exists in `$APP_PATH/Contents/Info.plist`; abort with
+  actionable error if missing.
+
+### Phase 2: Extension bridge — permission status query (R2)
+- [ ] In `extensions/ritemark/src/voiceDictation/controller.ts` or a new
+  `voiceDictation/permissionHelper.ts`, expose a method that calls
+  `systemPreferences.getMediaAccessStatus('microphone')` and returns the status string.
+- [ ] Register a new incoming message handler `dictation:queryMicPermission` in the
+  extension message router (wherever `dictation:prepare`, `dictation:start`, etc. are
+  handled).
+- [ ] Post back `dictation:micPermissionStatus` with `{ status: 'granted' | 'denied' |
+  'restricted' | 'not-determined' }` to the webview.
+
+### Phase 3: Webview error semantics (R2 + R3)
+- [ ] In `useVoiceDictation.ts` `startMicCapture` catch block, when `err.name === 'NotFoundError'`:
+  - Send `dictation:queryMicPermission` to extension.
+  - Wait for `dictation:micPermissionStatus` response (with a short timeout — fall back to
+    current message if no response within 1 s).
+  - Choose error message based on returned status (see S3–S6).
+- [ ] In `VoiceDictationButton.tsx`, extend the `showMicPermission` trigger condition to
+  fire on any error that references "blocked", "not granted", or "no microphone" with a
+  non-granted permission status (not just the existing `'Microphone access denied'` string
+  check).
+- [ ] Update the modal body copy to cover the TCC-hidden-devices scenario explicitly:
+  "macOS is blocking microphone access for Ritemark. This can happen after a system update
+  even if the toggle was previously enabled."
+
+### Phase 4: Conditional packaging fix (R4 — if H2 confirmed)
+- [ ] If `NSMicrophoneUsageDescription` is absent from Info.plist in production: add
+  PlistBuddy injection step to the build script that sets the key immediately after
+  electron-builder/gulp-atom-electron unpacks the app bundle, before signing.
+- [ ] Verify with `plutil` after the step and assert the key is present.
+- [ ] Note: if H3 (Electron regression on Tahoe) is confirmed, surface `vscode-expert` to
+  evaluate an Electron/VS Code upstream bump — that is a Phase 3 DEVELOP extension
+  decision, not decided here.
+
+---
+
+## Affected Files (anticipated)
+
+- `extensions/ritemark/src/voiceDictation/controller.ts` — new bridge message handler
+- `extensions/ritemark/src/voiceDictation/permissionHelper.ts` — (new, if split out)
+- `extensions/ritemark/webview/src/hooks/useVoiceDictation.ts` — NotFoundError semantics
+- `extensions/ritemark/webview/src/components/VoiceDictationButton.tsx` — modal trigger
+- `scripts/codesign-app.sh` — Info.plist preflight assertion
+- (Conditional) build script for PlistBuddy injection
+
+---
+
+## Risks
+
+| Risk | Mitigation |
+|------|------------|
+| `dictation:micPermissionStatus` response race: webview sends query, extension responds after error state already set | Use a short-lived one-shot listener with 1 s timeout; fall back to current message |
+| `getMediaAccessStatus` returns `granted` even when Tahoe TCC is broken (H1 Tahoe regression) | S6 preserves "No microphone found" — user is not made worse off; we document the Tahoe caveat |
+| `NSMicrophoneUsageDescription` is present but TCC still attributes to wrong bundle ID (Tahoe H1) | Out of scope for this sprint unless reproduced; document as known Tahoe limitation |
+| R4 packaging fix touches the build pipeline — risk of breaking signing | Preflight check (S2) exists precisely to catch this before signing; test in CI against a local build |
+
+---
+
+## Status
+
+**Track:** Full 6-phase
+**Current Phase:** 2 (PLAN)
+**Next Phase:** 3 (DEVELOP) — BLOCKED on Jarmo approval and sprint branch creation
+
+---
+
+## Approval
+
+- [ ] Jarmo approved this sprint plan
+
+**GATE: Phase 2 → 3 requires Jarmo's explicit approval.**
+Upon approval, the FIRST action is:
+
+```bash
+git checkout -b sprint-80-dictation-mic-fix
+git branch --show-current   # must print: sprint-80-dictation-mic-fix
+```
+
+No implementation code may be written until that branch is checked out.
