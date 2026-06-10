@@ -1,5 +1,7 @@
 Ritemark Build System: making the VS Code fork build and run correctly
 Consolidates old patches: 008 (jschardet), 009 (microphone), 013 (integrity check)
+Also delegates the microphone Permissions-Policy feature to webview iframes
+(required since Electron 39 enforces iframe media policy; fixes voice dictation, GH #116)
 ---
 diff --git a/build/.moduleignore b/build/.moduleignore
 index ed36151130c..48344ab7aa4 100644
@@ -129,3 +131,16 @@ index a2466a691d2..31aacbfa9eb 100644
  	}
 
  	private _showNotification(): void {
+diff --git a/src/vs/workbench/contrib/webview/browser/webviewElement.ts b/src/vs/workbench/contrib/webview/browser/webviewElement.ts
+index 5d0d61f8a2c..280e0628f1b 100644
+--- a/src/vs/workbench/contrib/webview/browser/webviewElement.ts
++++ b/src/vs/workbench/contrib/webview/browser/webviewElement.ts
+@@ -404,7 +404,7 @@ export class WebviewElement extends Disposable implements IWebviewElement, Webvi
+ 		element.className = `webview ${options.customClasses || ''}`;
+ 		element.sandbox.add('allow-scripts', 'allow-same-origin', 'allow-forms', 'allow-pointer-lock', 'allow-downloads');
+ 
+-		const allowRules = ['cross-origin-isolated', 'autoplay', 'local-network-access'];
++		const allowRules = ['cross-origin-isolated', 'autoplay', 'local-network-access', 'microphone'];
+ 		if (!isFirefox) {
+ 			allowRules.push('clipboard-read', 'clipboard-write');
+ 		}

@@ -115,6 +115,36 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 /**
+ * Check whether the microphone feature is delegated to this webview iframe
+ * via Permissions Policy. When the iframe's allow attribute lacks 'microphone',
+ * getUserMedia fails with NotAllowedError before any OS permission is consulted
+ * (GH #116) — a Ritemark packaging bug, not something the user can fix.
+ */
+function isMicrophoneDelegated(): boolean {
+  try {
+    const fp = (document as Document & {
+      featurePolicy?: { allowsFeature(feature: string): boolean }
+    }).featurePolicy
+    return fp ? fp.allowsFeature('microphone') : true
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Count audio input devices visible to this context.
+ * Returns -1 if enumeration itself fails.
+ */
+async function countAudioInputs(): Promise<number> {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    return devices.filter(d => d.kind === 'audioinput').length
+  } catch {
+    return -1
+  }
+}
+
+/**
  * Hook for voice dictation using Web Audio API
  *
  * Captures microphone audio as raw PCM and converts to WAV format
@@ -254,9 +284,23 @@ export function useVoiceDictation(): VoiceDictationHook {
       console.error('[Dictation] Failed to start mic capture:', err)
       if (err instanceof Error) {
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          setError('Microphone access denied. Please enable microphone permissions.')
+          if (!isMicrophoneDelegated()) {
+            // Permissions-Policy block inside the webview iframe (GH #116):
+            // System Settings advice would be wrong here — nothing the user can fix.
+            console.error('[Dictation] Microphone is not delegated to the webview iframe (Permissions Policy). This is a Ritemark packaging bug — see GH #116.')
+            setError('Dictation is blocked by an internal configuration error in this build. Please update Ritemark or report this issue.')
+          } else {
+            setError('Microphone access denied. Please enable microphone permissions.')
+          }
         } else if (err.name === 'NotFoundError') {
-          setError('No microphone found. Please connect a microphone.')
+          const inputs = await countAudioInputs()
+          if (inputs === 0) {
+            setError('No microphone found. Please connect a microphone.')
+          } else {
+            // Devices exist (or enumeration failed) yet none could be opened —
+            // on macOS this means the OS is blocking access, not missing hardware.
+            setError('Microphone access denied. A microphone exists but macOS blocked access to it.')
+          }
         } else {
           setError(`Failed to start dictation: ${err.message}`)
         }
