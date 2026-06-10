@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { DataTable } from './DataTable'
 import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
 import { ConflictDialog } from './dialogs/ConflictDialog'
+import { Button } from './ui/button'
 import { sendToExtension, onMessage } from '../bridge'
 
 export interface SpreadsheetViewerProps {
@@ -502,12 +503,9 @@ export function SpreadsheetViewer({
             {filename} is {sizeMB}MB. Parsing large files may take a moment.
           </div>
         </div>
-        <button
-          onClick={() => setProceedWithLargeFile(true)}
-          className="px-4 py-2 bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)]"
-        >
+        <Button onClick={() => setProceedWithLargeFile(true)}>
           Continue Anyway
-        </button>
+        </Button>
       </div>
     )
   }
@@ -590,17 +588,19 @@ export function SpreadsheetViewer({
       {fileType === 'xlsx' && cachedWorkbook && cachedWorkbook.SheetNames.length > 1 && (
         <div className="flex gap-1 px-2 py-1 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] overflow-x-auto">
           {cachedWorkbook.SheetNames.map(sheetName => (
-            <button
+            <Button
               key={sheetName}
+              variant="ghost"
+              size="sm"
               onClick={() => handleSheetChange(sheetName)}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
+              className={`h-auto px-3 py-1 text-xs rounded ${
                 sheetName === selectedSheet
-                  ? 'bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] font-medium'
-                  : 'bg-transparent text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]'
+                  ? 'bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] font-medium hover:bg-[var(--r-accent)] hover:text-[var(--vscode-button-foreground)]'
+                  : 'text-[var(--r-ink-strong)]'
               }`}
             >
               {sheetName}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -614,12 +614,9 @@ export function SpreadsheetViewer({
             {fileType === 'xlsx' && selectedSheet ? `${selectedSheet} is empty` : `${filename} is empty`}
           </div>
           {isEditable && fileType === 'xlsx' && (
-            <button
-              onClick={handleExcelAddRow}
-              className="px-4 py-2 bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)]"
-            >
+            <Button onClick={handleExcelAddRow}>
               Add a row to start editing
-            </button>
+            </Button>
           )}
         </div>
       ) : (

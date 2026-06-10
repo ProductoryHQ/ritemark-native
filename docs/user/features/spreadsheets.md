@@ -1,6 +1,6 @@
 # Spreadsheets
 
-> View and edit CSV files. Preview Excel spreadsheets without leaving Ritemark.
+> View and edit CSV and Excel files without leaving Ritemark.
 
 Ritemark handles spreadsheet files directly - edit CSV files inline or preview Excel files with multi-sheet support.
 
@@ -14,7 +14,7 @@ Ritemark handles spreadsheet files directly - edit CSV files inline or preview E
 - **Handle large files** - Virtual scrolling for up to 10,000 rows
 
 ### Excel Files
-- **Preview spreadsheets** - View .xlsx and .xls files
+- **Edit Excel files** - Basic cell editing for .xlsx (preview for .xls)
 - **Switch sheets** - Tab-based sheet navigation
 - **Open in external app** - One-click open in Excel or Numbers
 
@@ -64,11 +64,18 @@ If your file exceeds limits:
 
 ---
 
-## Excel Preview
+## Excel Editor
 
 ### Opening Excel Files
 
-Double-click any `.xlsx` or `.xls` file. It opens in read-only preview mode.
+Double-click any `.xlsx` or `.xls` file. `.xlsx` files open in an editable grid; `.xls` files open in read-only preview mode.
+
+### Editing .xlsx Files
+
+- Click a cell to edit its value; press Enter or click away to commit
+- Edits mark the document dirty — save with Cmd+S / Ctrl+S
+- An empty sheet shows an "Add a row to start editing" button
+- If the file changes on disk while you have unsaved edits, a confirmation protects your changes before refreshing
 
 ### Multi-Sheet Support
 
@@ -79,9 +86,9 @@ Excel workbooks with multiple sheets show tabs at the top:
 
 ### Limitations
 
-Excel files are **read-only** in Ritemark:
-- You can view but not edit
-- Use the toolbar to open in Excel or Numbers for editing
+- Basic cell editing only: formulas, cell styles, and merged-cell layouts are not edited (untouched cells and sheets are preserved on save)
+- `.xls` (legacy format) stays read-only — use the toolbar to open in Excel or Numbers
+- Clearing cells does not shrink the sheet's used range (phantom empty rows/columns may remain)
 
 ---
 
@@ -109,7 +116,7 @@ This opens the actual file in the external app, not a copy.
 | Extension | Mode | Features |
 |-----------|------|----------|
 | `.csv` | Edit | Full editing, auto-save |
-| `.xlsx` | Preview | Read-only, multi-sheet |
+| `.xlsx` | Edit | Basic cell editing, multi-sheet, save with Cmd+S |
 | `.xls` | Preview | Read-only, multi-sheet |
 
 ### CSV Format Notes
