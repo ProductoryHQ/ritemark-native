@@ -62,6 +62,13 @@ Upgrade the Excel editor from read-only to basic editing for .xlsx files, and fi
       empty state seeds the sheet's `!ref` (1×1 grid), after which the normal
       add-row/add-column controls render
 
+### Follow-up (Jarmo request)
+
+- [x] Grid anchored at A1: leading blank rows/columns are visible and grid row
+      numbers / column letters match Excel's actual cell addresses (e.g. data
+      starting at B3 displays at row 3, not row 1); edits in leading blank
+      rows expand the sheet's `!ref` so they survive saving
+
 ## Status
 
 **Track:** Lightweight

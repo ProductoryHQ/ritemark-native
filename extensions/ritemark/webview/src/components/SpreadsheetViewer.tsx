@@ -31,6 +31,11 @@ const SIZE_WARNING_BYTES = 5 * 1024 * 1024 // 5MB
  * Uses spreadsheet-letter columns (A, B, C…) and a full 1:1 grid
  * (blank rows included, first row NOT swallowed as a header) so that
  * row/column indexes map exactly to worksheet cell addresses for editing.
+ *
+ * The grid is always anchored at A1 — even when the sheet's used range
+ * starts later (e.g. data begins at B3) — so the grid's row numbers and
+ * column letters match Excel's actual addresses and leading blank
+ * rows/columns are visible.
  */
 function extractSheet(workbook: XLSX.WorkBook, sheetName: string): ParsedData {
   const worksheet = workbook.Sheets[sheetName]
@@ -45,7 +50,7 @@ function extractSheet(workbook: XLSX.WorkBook, sheetName: string): ParsedData {
 
   const range = XLSX.utils.decode_range(ref)
   const columns: string[] = []
-  for (let c = range.s.c; c <= range.e.c; c++) {
+  for (let c = 0; c <= range.e.c; c++) {
     columns.push(XLSX.utils.encode_col(c))
   }
 
@@ -54,6 +59,7 @@ function extractSheet(workbook: XLSX.WorkBook, sheetName: string): ParsedData {
     defval: '',
     blankrows: true,
     raw: false,
+    range: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: range.e }),
   })
 
   let rows = aoa.map(cells => {
@@ -374,14 +380,10 @@ export function SpreadsheetViewer({
     const worksheet = cachedWorkbook.Sheets[selectedSheet]
     if (!worksheet) return
 
-    const colIndex = parsedData.columns.indexOf(columnId)
-    if (colIndex === -1) return
-
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
-    const addr = XLSX.utils.encode_cell({
-      r: range.s.r + rowIndex,
-      c: range.s.c + colIndex,
-    })
+    // The grid is anchored at A1, so display indexes ARE the cell address
+    const r = rowIndex
+    const c = XLSX.utils.decode_col(columnId)
+    const addr = XLSX.utils.encode_cell({ r, c })
 
     if (value === '') {
       delete worksheet[addr]
@@ -390,6 +392,15 @@ export function SpreadsheetViewer({
       // basic editing stores plain values only
       const numeric = value.trim() !== '' && !Number.isNaN(Number(value))
       worksheet[addr] = numeric ? { t: 'n', v: Number(value) } : { t: 's', v: value }
+
+      // Expand the used range when the edit lands outside it (e.g. in a
+      // leading blank row above the data) so the cell survives saving
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || addr)
+      range.s.r = Math.min(range.s.r, r)
+      range.s.c = Math.min(range.s.c, c)
+      range.e.r = Math.max(range.e.r, r)
+      range.e.c = Math.max(range.e.c, c)
+      worksheet['!ref'] = XLSX.utils.encode_range(range)
     }
 
     const newRows = [...parsedData.rows]
