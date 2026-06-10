@@ -26,6 +26,7 @@ export const blockItems: BlockItemDef[] = [
   { title: 'Code Block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock' },
   { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table' },
   { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid' },
+  { title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio' },
   { title: 'Image', description: 'Insert an image from file', icon: 'image', nodeType: 'image' },
   { title: 'Divider', description: 'Horizontal rule', icon: 'minus', nodeType: 'horizontalRule' },
 ]
@@ -39,6 +40,16 @@ export function executeSlashCommand(editor: any, range: any, item: BlockItemDef)
     editor.chain().focus().deleteRange(range).run()
     emitInternalEvent('image:pending-position', insertPos)
     sendToExtension('selectImageFile')
+    return
+  }
+
+  // Sprint 82 R5: create a .drawio.svg and insert its reference via the
+  // same pending-position + imageSaved flow as file images.
+  if (item.nodeType === 'drawio') {
+    const insertPos = range.from
+    editor.chain().focus().deleteRange(range).run()
+    emitInternalEvent('image:pending-position', insertPos)
+    sendToExtension('insertDiagram')
     return
   }
 
@@ -85,6 +96,13 @@ export function executeBlockInsert(editor: any, pos: number, item: BlockItemDef)
   if (item.nodeType === 'image') {
     emitInternalEvent('image:pending-position', pos)
     sendToExtension('selectImageFile')
+    return
+  }
+
+  // Sprint 82 R5: same flow as the slash command variant above.
+  if (item.nodeType === 'drawio') {
+    emitInternalEvent('image:pending-position', pos)
+    sendToExtension('insertDiagram')
     return
   }
 

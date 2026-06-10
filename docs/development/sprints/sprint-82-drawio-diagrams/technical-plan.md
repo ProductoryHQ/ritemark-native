@@ -32,20 +32,15 @@ No changes to:
 
 ## Open Questions Resolution (from spec.md)
 
-### Q1: Which draw.io artifact to vendor?
+### Q1: Which draw.io artifact to vendor? — RESOLVED BY AUDIT
 
-**Recommendation: `draw.io.html` single-file release artifact.**
+**Audit outcome (2026-06-10, see `research/drawio-bundle-audit.md`): the single-file `draw.io-x.y.z.html` artifact DOES NOT EXIST on jgraph/drawio releases.** The only release artifact is `draw.war` (the deployable webapp as a zip).
 
-The draw.io project publishes a self-contained `draw.io-x.y.z.html` file on each GitHub release (https://github.com/jgraph/drawio/releases). This file embeds all required JS and CSS inline and supports the iframe embed API (`window.postMessage` with `load`, `export`, `save` actions) documented at https://www.drawio.com/doc/faq/embed-mode.
+**Decision: vendor a verified 36 MB subset of the webapp** extracted from `draw.war` v30.0.4 into `media/drawio/` (Jarmo approved size deviation 2026-06-10). The subset passes the full embed protocol (`init`/`load`/`export`/`save`) offline with zero 404s — verified in headless Chromium. Iframe embed URL: `drawioUri('index.html') + '?embed=1&proto=json&offline=1&lang=en&spin=1'`.
 
-Advantages over vendoring the full `src/main/webapp/` directory:
-- Single file (~10 MB vs ~30 MB for the full webapp directory).
-- No separate asset dependencies — no broken relative paths to manage under VS Code's webviewUri rewriting.
-- The iframe embed URL for the single file is `drawioUri + '?embed=1&proto=json'`.
+`index.html` has NO inline scripts, so the iframe document needs no CSP concessions; the outer page CSP only needs `frame-src` for the webview resource origin.
 
-**Confirmed by audit:** see `research/drawio-bundle-audit.md`. The audit must verify: (a) the single-file approach works with VS Code's `webview.asWebviewUri`; (b) the `proto=json` embed mode supports `load`, `export`, and `save` messages as needed; (c) the CSP for the editor webview can accommodate the inline scripts in the bundled file (the single-file HTML uses inline `<script>` tags — this requires `'unsafe-inline'` in `script-src` for the editor webview only, or a nonce-based approach if feasible).
-
-**If the audit finds the single-file approach is CSP-incompatible in the VS Code webview context**, fall back to vendoring a subset of `src/main/webapp/` with only the required JS entry points. The audit must decide before implementation begins (R2 is a Phase 0 audit gate for W1).
+**R3 simplification from audit:** `{ action: 'export', format: 'xmlsvg' }` returns the complete `.drawio.svg` file content (base64 SVG with embedded XML). The bridge saves the export output directly — no manual XML-into-SVG writing. The save flow is: drawio `save` event → bridge sends `export xmlsvg` → `export` event → post SVG to extension host → workspace edit.
 
 ### Q2: Bundle gitignore vs commit — RESOLVED
 
@@ -198,32 +193,24 @@ if (isEnabled('drawio-diagrams')) {
 
 ## Workstream 2: Bundle vendoring (R2)
 
-### `extensions/ritemark/media/drawio/` layout (after vendoring)
+### `extensions/ritemark/media/drawio/` layout (after vendoring — per audit)
 
 ```
 media/drawio/
-├── draw.io.html     ← vendored single-file bundle (committed to git — Q2)
-└── VERSION          ← e.g. "v24.7.17"
+├── index.html       ← drawio webapp entry (no inline scripts)
+├── favicon.ico
+├── VERSION          ← "v30.0.4"
+├── js/              ← bootstrap, main, PreConfig, PostConfig, app.min,
+│                      stencils.min, shapes-14-6-5.min, extensions.min
+├── styles/  mxgraph/  images/  math4/
+└── resources/dia.txt
 ```
+
+Total 36 MB uncompressed / ~17.6 MB gzip. Committed to git (Q2, size deviation approved 2026-06-10).
 
 ### `scripts/vendor-drawio.sh`
 
-```bash
-#!/usr/bin/env bash
-# Sprint 82 R2: Download and vendor the draw.io bundle
-# Usage: ./scripts/vendor-drawio.sh [version]
-# Default version: v24.7.17
-
-VERSION=${1:-v24.7.17}
-DEST="extensions/ritemark/media/drawio"
-mkdir -p "$DEST"
-curl -L "https://github.com/jgraph/drawio/releases/download/${VERSION}/draw.io-${VERSION#v}.html" \
-  -o "$DEST/draw.io.html"
-echo "$VERSION" > "$DEST/VERSION"
-echo "Vendored draw.io $VERSION to $DEST/"
-```
-
-Exact version and filename format to be confirmed by W0 audit; the script is updated accordingly.
+Downloads `draw.war` for the pinned version, unzips to a temp dir, copies exactly the subset list above into `media/drawio/`, writes `VERSION`. Used only when bumping the drawio version — the bundle itself is committed.
 
 ### Git handling
 

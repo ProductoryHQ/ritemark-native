@@ -186,23 +186,37 @@ export function ResizableImage({ node, selected }: ResizableImageProps) {
   // Check if this is a local image (has relative path in title)
   const isLocalImage = title && (title.startsWith('./') || title.startsWith('../'))
 
+  // Sprint 82 R4: draw.io diagrams open their editor on click instead of
+  // showing resize handles (diagram size is set inside draw.io itself)
+  const isDrawioDiagram = Boolean(
+    title?.endsWith('.drawio.svg') || src.split('?')[0].endsWith('.drawio.svg')
+  )
+
+  const handleDiagramClick = useCallback(() => {
+    if (isDrawioDiagram && title) {
+      sendToExtension('openDrawioDiagram', { relativePath: title })
+    }
+  }, [isDrawioDiagram, title])
+
   return (
     <NodeViewWrapper className="resizable-image-wrapper" data-drag-handle>
       <div
-        className={`resizable-image-container ${selected ? 'selected' : ''} ${resizeState?.isResizing ? 'resizing' : ''}`}
+        className={`resizable-image-container ${selected ? 'selected' : ''} ${resizeState?.isResizing ? 'resizing' : ''} ${isDrawioDiagram ? 'drawio-diagram' : ''}`}
         style={previewSize ? { width: previewSize.width } : undefined}
       >
         <img
           ref={imgRef}
           src={src}
           alt={alt || ''}
+          title={isDrawioDiagram ? 'Click to edit diagram' : undefined}
           onLoad={handleImageLoad}
+          onClick={isDrawioDiagram ? handleDiagramClick : undefined}
           draggable={false}
           style={previewSize ? { width: previewSize.width, height: previewSize.height } : undefined}
         />
 
-        {/* Resize handles - only show for local images when selected */}
-        {isLocalImage && selected && (
+        {/* Resize handles - only show for local images when selected (not for draw.io diagrams) */}
+        {isLocalImage && !isDrawioDiagram && selected && (
           <>
             <div
               className="resize-handle resize-handle-se"
@@ -282,6 +296,16 @@ export function ResizableImage({ node, selected }: ResizableImageProps) {
 
         .resizable-image-container.resizing img {
           opacity: 0.8;
+        }
+
+        /* Sprint 82 R4: draw.io diagrams are click-to-edit */
+        .resizable-image-container.drawio-diagram img {
+          cursor: pointer;
+        }
+
+        .resizable-image-container.drawio-diagram img:hover {
+          outline: 2px solid var(--vscode-focusBorder, #007acc);
+          outline-offset: 2px;
         }
 
         /* Resize handles */

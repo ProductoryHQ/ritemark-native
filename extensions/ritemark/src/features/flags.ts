@@ -35,7 +35,9 @@ export type FlagId =
   // Sprint 76 R7: ACP + OpenCode BYOK runtime
   | 'opencode-integration'
   // Sprint 80: scheduled agent tasks daemon
-  | 'scheduled-tasks-daemon';
+  | 'scheduled-tasks-daemon'
+  // Sprint 82: draw.io diagram embedding
+  | 'drawio-diagrams';
 
 /**
  * Feature flag registry
@@ -126,6 +128,15 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'scheduled-tasks-daemon',
     label: 'Scheduled Tasks Daemon',
     description: 'Run AI agents on a schedule while Ritemark is open',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  // Sprint 82: status 'stable' per Q3 (Jarmo, 2026-06-10) — ON by default,
+  // flag exists as a kill-switch only and is not surfaced in Settings.
+  'drawio-diagrams': {
+    id: 'drawio-diagrams',
+    label: 'Draw.io Diagram Editing',
+    description: 'Create and edit draw.io diagrams (.drawio.svg) embedded in markdown files',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
