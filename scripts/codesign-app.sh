@@ -168,6 +168,19 @@ fi
 echo "  ✓ Entitlements file found: $ENTITLEMENTS_PATH"
 echo "  Entitlements:"
 grep "<key>" "$ENTITLEMENTS_PATH" | sed 's/.*<key>/    - /; s/<\/key>//'
+
+# Voice dictation requires the microphone usage description in Info.plist.
+# The key comes from Electron's stock Info.plist and is not set anywhere in our
+# pipeline, so assert it survived packaging (GH #116 hardening).
+INFO_PLIST="$APP_PATH/Contents/Info.plist"
+if ! /usr/libexec/PlistBuddy -c "Print :NSMicrophoneUsageDescription" "$INFO_PLIST" > /dev/null 2>&1; then
+    echo -e "${RED}ERROR: NSMicrophoneUsageDescription missing from $INFO_PLIST${NC}"
+    echo "  Voice dictation will be silently denied by macOS TCC without this key."
+    echo "  Check the electron packaging step (gulp-atom-electron) — the key should"
+    echo "  come from Electron's stock Info.plist."
+    exit 1
+fi
+echo "  ✓ NSMicrophoneUsageDescription present in Info.plist"
 # =============================================================================
 # Step 3: Clean up unnecessary files (webview node_modules, etc.)
 # =============================================================================
