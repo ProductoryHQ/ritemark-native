@@ -16,6 +16,8 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   private fileChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
   // Webview panels per document (for revert/refresh pushes)
   private webviewPanels = new Map<string, vscode.WebviewPanel>();
+  // Documents with unsaved webview edits (uri.toString())
+  private dirtyDocuments = new Set<string>();
   // Files currently being saved by us — suppresses our own watcher events
   private savingFiles = new Set<string>();
   // One-time-per-session caveat about basic editing fidelity
@@ -118,8 +120,23 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
             break;
 
           case 'refresh':
-            // Refresh: re-read file and send fresh content
-            await this.handleRefresh(webviewPanel.webview, document);
+            // Refresh: unsaved edits require an explicit discard confirmation
+            // (the webview shows a ConflictDialog and answers with
+            // confirmRefresh / cancelRefresh)
+            if (this.dirtyDocuments.has(document.uri.toString())) {
+              webviewPanel.webview.postMessage({ type: 'confirmDiscard' });
+            } else {
+              await this.handleRefresh(webviewPanel.webview, document);
+            }
+            break;
+
+          case 'confirmRefresh':
+            // User confirmed discarding local edits in favor of disk state
+            await this.discardEditsAndRefresh(document, webviewPanel.webview);
+            break;
+
+          case 'cancelRefresh':
+            // User kept their local edits — nothing to do
             break;
 
           case 'checkExcel':
@@ -153,6 +170,7 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
       if (this.webviewPanels.get(document.uri.toString()) === webviewPanel) {
         this.webviewPanels.delete(document.uri.toString());
       }
+      this.dirtyDocuments.delete(document.uri.toString());
     });
   }
 
@@ -165,6 +183,7 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
     }
 
     document.update(Buffer.from(base64Content, 'base64'));
+    this.dirtyDocuments.add(document.uri.toString());
     this._onDidChangeCustomDocument.fire({ document });
 
     if (!this.editCaveatShown) {
@@ -180,6 +199,7 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
 
   async saveCustomDocument(document: ExcelDocument, _token: vscode.CancellationToken): Promise<void> {
     await this.writeFileSuppressingWatcher(document.uri.fsPath, document.buffer, document.uri.fsPath);
+    this.dirtyDocuments.delete(document.uri.toString());
   }
 
   async saveCustomDocumentAs(
@@ -193,10 +213,26 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   async revertCustomDocument(document: ExcelDocument, _token: vscode.CancellationToken): Promise<void> {
     const buffer = await fs.readFile(document.uri.fsPath);
     document.update(buffer);
+    this.dirtyDocuments.delete(document.uri.toString());
     // Push fresh content so the webview re-renders the reverted workbook
     const panel = this.webviewPanels.get(document.uri.toString());
     if (panel) {
       this.sendExcelData(panel.webview, document);
+    }
+  }
+
+  /**
+   * Confirmed refresh of a dirty document: discard local edits and reload
+   * from disk. Goes through VS Code's revert so the dirty indicator clears
+   * (the webview that sent the request is the active editor); falls back to
+   * a manual reload if the command fails.
+   */
+  private async discardEditsAndRefresh(document: ExcelDocument, webview: vscode.Webview): Promise<void> {
+    this.dirtyDocuments.delete(document.uri.toString());
+    try {
+      await vscode.commands.executeCommand('workbench.action.files.revert', document.uri);
+    } catch {
+      await this.handleRefresh(webview, document);
     }
   }
 

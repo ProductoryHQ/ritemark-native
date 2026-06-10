@@ -400,41 +400,42 @@ export function SpreadsheetViewer({
   }, [cachedWorkbook, selectedSheet, parsedData, onChange, serializeWorkbook])
 
   const handleExcelAddRow = useCallback(() => {
-    if (!cachedWorkbook || !selectedSheet || !parsedData || !onChange) return
+    if (!cachedWorkbook || !selectedSheet || !onChange) return
     const worksheet = cachedWorkbook.Sheets[selectedSheet]
     if (!worksheet) return
 
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
-    range.e.r += 1
-    worksheet['!ref'] = XLSX.utils.encode_range(range)
-
-    const emptyRow: Record<string, unknown> = {}
-    for (const col of parsedData.columns) {
-      emptyRow[col] = ''
+    const ref = worksheet['!ref']
+    if (!ref) {
+      // Empty sheet: seed a 1×1 grid so editing can start
+      worksheet['!ref'] = 'A1'
+    } else {
+      const range = XLSX.utils.decode_range(ref)
+      range.e.r += 1
+      worksheet['!ref'] = XLSX.utils.encode_range(range)
     }
-    setParsedData({ ...parsedData, rows: [...parsedData.rows, emptyRow] })
 
+    setParsedData(extractSheet(cachedWorkbook, selectedSheet))
     serializeWorkbook(cachedWorkbook)
-  }, [cachedWorkbook, selectedSheet, parsedData, onChange, serializeWorkbook])
+  }, [cachedWorkbook, selectedSheet, onChange, serializeWorkbook])
 
   const handleExcelAddColumn = useCallback(() => {
-    if (!cachedWorkbook || !selectedSheet || !parsedData || !onChange) return
+    if (!cachedWorkbook || !selectedSheet || !onChange) return
     const worksheet = cachedWorkbook.Sheets[selectedSheet]
     if (!worksheet) return
 
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
-    range.e.c += 1
-    worksheet['!ref'] = XLSX.utils.encode_range(range)
+    const ref = worksheet['!ref']
+    if (!ref) {
+      // Empty sheet: seed a 1×1 grid so editing can start
+      worksheet['!ref'] = 'A1'
+    } else {
+      const range = XLSX.utils.decode_range(ref)
+      range.e.c += 1
+      worksheet['!ref'] = XLSX.utils.encode_range(range)
+    }
 
-    const newCol = XLSX.utils.encode_col(range.e.c)
-    setParsedData({
-      ...parsedData,
-      columns: [...parsedData.columns, newCol],
-      rows: parsedData.rows.map(row => ({ ...row, [newCol]: '' })),
-    })
-
+    setParsedData(extractSheet(cachedWorkbook, selectedSheet))
     serializeWorkbook(cachedWorkbook)
-  }, [cachedWorkbook, selectedSheet, parsedData, onChange, serializeWorkbook])
+  }, [cachedWorkbook, selectedSheet, onChange, serializeWorkbook])
 
   // Handle conflict dialog actions
   const handleConfirmDiscard = useCallback(() => {
@@ -597,10 +598,18 @@ export function SpreadsheetViewer({
           selector stay accessible (an empty first sheet must not hide
           the other sheets in a multi-sheet workbook) */}
       {isEmpty ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
           <div className="text-[var(--r-ink-muted)]">
             {fileType === 'xlsx' && selectedSheet ? `${selectedSheet} is empty` : `${filename} is empty`}
           </div>
+          {isEditable && fileType === 'xlsx' && (
+            <button
+              onClick={handleExcelAddRow}
+              className="px-4 py-2 bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)]"
+            >
+              Add a row to start editing
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">

@@ -52,6 +52,16 @@ Upgrade the Excel editor from read-only to basic editing for .xlsx files, and fi
 - [x] SheetJS round-trip verification test (run ad hoc, not committed)
 - [x] Architecture doc updated (provider contract change)
 
+### PR #115 review fixes (Codex)
+
+- [x] P1: Refresh on a dirty .xlsx now routes through the existing ConflictDialog
+      (`confirmDiscard` → `confirmRefresh`/`cancelRefresh`) instead of silently
+      discarding unsaved edits; confirmed discard reverts via VS Code so the
+      dirty indicator clears
+- [x] P2: Empty sheets are editable — "Add a row to start editing" action in the
+      empty state seeds the sheet's `!ref` (1×1 grid), after which the normal
+      add-row/add-column controls render
+
 ## Status
 
 **Track:** Lightweight
