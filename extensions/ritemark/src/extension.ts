@@ -33,8 +33,7 @@ import {
 } from './browser/IntegratedBrowser';
 import { BrowserHistoryStore } from './browser/BrowserHistoryStore';
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
-import { AgentDaemon } from './daemon/AgentDaemon';
-import { RuntimeRegistry } from './runtime/RuntimeRegistry';
+import { initDaemon } from './daemon/index';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
@@ -254,6 +253,9 @@ export function activate(context: vscode.ExtensionContext) {
   initAnalytics(context);
   registerReactionCommand(context);
 
+  // Initialize scheduled tasks daemon (Sprint 80)
+  const daemon = initDaemon(context, () => agentLibraryViewProvider);
+
   // Initialize update service
   const updateStorage = new UpdateStorage(context.globalState);
   const updateService = new UpdateService(updateStorage);
@@ -275,12 +277,14 @@ export function activate(context: vscode.ExtensionContext) {
   seedStarterPackOnFirstRun(context.extensionPath);
 
   // Register Agent Library View Provider
-  agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath);
+  agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath, daemon.store);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(AgentLibraryViewProvider.viewType, agentLibraryViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );
+  // Live-refresh the Agent Library SCHEDULED section when daemon runs change
+  daemon.onRunsChanged(() => agentLibraryViewProvider?.refresh());
 
   // === File watchers for Agent Library auto-refresh ===
   // Workspace-side: VS Code's watcher catches .claude/ changes inside the workspace.
@@ -344,14 +348,6 @@ export function activate(context: vscode.ExtensionContext) {
       console.log('Failed to auto-open terminal:', e);
     }
   }, 2500);
-
-  // AgentDaemon — instantiated but NOT activated in Sprint 79.
-  // Sprint 80 wires register() calls and the UI.  Registered as a disposable
-  // so its timer is cleaned up on extension deactivation.
-  // RuntimeRegistry is not yet exposed from UnifiedViewProvider; pass an empty
-  // registry until Sprint 80 wires the full registry through.
-  const agentDaemon = new AgentDaemon(new RuntimeRegistry(new Map()));
-  context.subscriptions.push(agentDaemon);
 
   // Register commands
   context.subscriptions.push(

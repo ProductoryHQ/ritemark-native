@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 80 — Scheduled Tasks Daemon · UX Touchpoints (v2)</title>
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --r-surface:#FFFFFF; --r-surface-muted:#F8FAFC; --r-surface-soft:#F1F5F9;
+  --r-hairline:#E2E8F0; --r-hairline-strong:#CBD5E1;
+  --r-ink-strong:#1E1B4B; --r-ink-body:#475569; --r-ink-muted:#64748B; --r-ink-faint:#94A3B8;
+  --r-accent:#4338CA; --r-accent-deep:#3730A3; --r-accent-soft:#E0E7FF; --r-accent-fainter:#C7D2FE;
+  --r-success:#22C55E; --r-success-soft:#DCFCE7; --r-warning:#F59E0B; --r-warning-soft:#FEF3C7;
+  --r-error:#EF4444; --r-error-soft:#FEE2E2;
+  --font-ui:'Sofia Sans',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --font-display:'Space Grotesk','Sofia Sans',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --shadow-md:0 4px 6px -1px rgba(30,27,75,.08),0 2px 4px -2px rgba(30,27,75,.06);
+  --shadow-lg:0 10px 15px -3px rgba(30,27,75,.10),0 4px 6px -4px rgba(30,27,75,.08);
+  --shadow-indigo:0 4px 6px -1px rgba(67,56,202,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-ui);background:#EEF1F6;color:var(--r-ink-strong);padding:48px 32px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.page{max-width:1080px;margin:0 auto}
+.eyebrow{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--r-accent);font-weight:600}
+h1{font-family:var(--font-display);font-size:34px;letter-spacing:-.5px;font-weight:600;margin:6px 0 4px}
+.sub{color:var(--r-ink-muted);font-size:14px;max-width:680px}
+.meta{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--r-accent-soft);color:var(--r-accent-deep)}
+.tag.ghost{background:var(--r-surface);border:1px solid var(--r-hairline);color:var(--r-ink-muted)}
+.tag.fix{background:var(--r-success-soft);color:#15803D}
+
+.section{margin-top:44px}
+.section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+.section-num{font-family:var(--font-mono);font-size:12px;color:var(--r-accent);font-weight:500}
+.section h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+.section-desc{color:var(--r-ink-muted);font-size:13px;margin-bottom:18px;max-width:700px}
+.native-badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:#15803D;background:var(--r-success-soft);padding:2px 8px;border-radius:999px;vertical-align:middle;margin-left:8px}
+
+.stage{background:#EDF0F5;border:1px solid var(--r-hairline);border-radius:12px;padding:26px;display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.caption{flex:1;min-width:220px}
+.caption .t{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--r-ink-faint);font-weight:600;margin-bottom:10px}
+.caption p{font-size:12.5px;color:var(--r-ink-body);line-height:1.5;margin-bottom:10px}
+.caption code{font-family:var(--font-mono);font-size:11.5px;background:var(--r-surface);border:1px solid var(--r-hairline);padding:1px 5px;border-radius:3px;color:var(--r-ink-strong)}
+
+/* ============ AGENT LIBRARY (real .section-header + .item) ============ */
+.lib{width:360px;background:var(--r-surface-muted);border:1px solid var(--r-hairline);border-radius:8px;overflow:hidden;box-shadow:var(--shadow-md);flex-shrink:0}
+.lib-top{padding:12px 14px 6px}
+.lib-title{font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--r-ink-muted);text-transform:uppercase}
+.lib-meta{font-size:11.5px;color:var(--r-ink-muted);margin-top:4px}
+.section-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 10px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--r-ink-muted);background:var(--r-surface-muted);cursor:pointer;border-top:1px solid var(--r-hairline)}
+.section-title{display:inline-flex;align-items:center;gap:6px}
+.section-caret{width:10px;height:10px;transition:transform .15s}
+.section-caret.collapsed{transform:rotate(-90deg)}
+.section-header-meta{display:inline-flex;align-items:center;gap:8px}
+.section-count{font-size:11px;font-weight:400;color:var(--r-ink-faint)}
+.section-add-btn{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;color:var(--r-ink-muted);background:transparent;border:none;cursor:pointer}
+.section-add-btn:hover{background:var(--r-accent-soft);color:var(--r-accent)}
+.item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px 8px 14px;cursor:pointer;border-left:2px solid transparent;background:var(--r-surface)}
+.item:hover{background:var(--r-surface-soft)}
+.item-icon-chip{flex-shrink:0;width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;margin-top:1px}
+.item-icon-chip svg{width:16px;height:16px}
+.item-content{flex:1;min-width:0;padding-top:1px}
+.item-name{font-size:13px;font-weight:500;line-height:1.35;color:var(--r-ink-strong);display:flex;align-items:center;gap:6px}
+.item-description{font-size:11px;color:var(--r-ink-muted);line-height:1.4;margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item-hint{font-size:10px;line-height:1.3;color:#F59E0B;padding-top:2px;opacity:.9}
+.run-time{font-size:10px;color:var(--r-ink-faint);margin-left:auto;white-space:nowrap;font-weight:400}
+.oc{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 5px;border-radius:3px}
+.oc-ok{background:var(--r-success-soft);color:#15803D}
+.oc-warn{background:var(--r-warning-soft);color:#B45309}
+.oc-err{background:var(--r-error-soft);color:#B91C1C}
+.oc-run{background:var(--r-accent-soft);color:var(--r-accent)}
+.spin{animation:spin 1.1s linear infinite;transform-origin:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============ AGENT EDITOR LEFT PANE (real SectionLabel/FieldRow) ============ */
+.agent-pane{width:248px;background:var(--r-surface);border:1px solid var(--r-hairline);border-radius:8px;padding:16px;box-shadow:var(--shadow-md);flex-shrink:0}
+.pane-h{font-size:15px;font-weight:600;color:var(--r-ink-strong);margin-bottom:4px}
+.sl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:var(--r-ink-muted);margin:16px 0 6px}
+.fieldrow{display:flex;flex-direction:column;gap:5px;margin-bottom:4px}
+.flabel{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.5px;color:var(--r-ink-muted)}
+.inp{height:28px;border:1px solid var(--r-hairline-strong);border-radius:6px;background:var(--r-surface);font-size:12px;color:var(--r-ink-strong);padding:0 9px;font-family:var(--font-mono);display:flex;align-items:center}
+.inp.ui{font-family:var(--font-ui)}
+.inp.sel{justify-content:space-between;cursor:pointer}
+.inp.sel svg{width:13px;height:13px;color:var(--r-ink-faint)}
+.help{font-size:10px;color:var(--r-ink-muted);line-height:1.4}
+.toggle-row{display:flex;align-items:center;gap:9px;padding:6px 2px}
+.switch{width:32px;height:18px;border-radius:999px;background:var(--r-accent);position:relative;flex-shrink:0}
+.switch::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;right:2px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.off{background:var(--r-hairline-strong)}
+.switch.off::after{right:auto;left:2px}
+.toggle-label{font-size:12px;color:var(--r-ink-strong);font-weight:500}
+.toggle-sub{font-size:10px;color:var(--r-ink-muted)}
+.pane-divider{height:1px;background:var(--r-hairline);margin:14px -16px}
+
+/* ============ VS CODE NATIVE NOTIFICATION TOAST ============ */
+.vsfield{flex:1;min-width:300px;background:#E2E5EB;border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:14px;align-items:flex-end}
+.vsnote{width:100%;max-width:420px;background:var(--r-surface);border:1px solid var(--r-hairline-strong);border-radius:5px;box-shadow:var(--shadow-lg);overflow:hidden;font-size:13px}
+.vsnote-main{display:flex;gap:9px;padding:12px 12px 8px}
+.vsnote-sev{width:16px;height:16px;flex-shrink:0;margin-top:1px}
+.vsnote-sev.info{color:var(--r-accent)}
+.vsnote-sev.warn{color:var(--r-warning)}
+.vsnote-sev.ok{color:var(--r-success)}
+.vsnote-msg{flex:1;color:var(--r-ink-strong);line-height:1.45;font-size:13px}
+.vsnote-msg .q{color:var(--r-ink-muted);font-style:italic}
+.vsnote-msg code{font-family:var(--font-mono);font-size:11.5px;background:var(--r-surface-soft);padding:1px 5px;border-radius:3px;font-style:normal}
+.vsnote-x{display:flex;gap:2px;flex-shrink:0;color:var(--r-ink-faint)}
+.vsnote-x svg{width:15px;height:15px}
+.vsnote-src{font-size:11px;color:var(--r-ink-faint);padding:0 12px 8px 37px}
+.vsnote-btns{display:flex;justify-content:flex-end;gap:8px;padding:0 12px 12px}
+.vsbtn{font-family:var(--font-ui);font-size:12px;font-weight:500;padding:5px 14px;border-radius:2px;border:1px solid var(--r-accent);background:var(--r-accent);color:#fff;cursor:pointer}
+.vsbtn:hover{background:var(--r-accent-deep)}
+.vsbtn.sec{background:var(--r-surface-soft);color:var(--r-ink-body);border-color:var(--r-hairline-strong)}
+.vsbtn.sec:hover{background:var(--r-hairline)}
+
+/* ============ VS CODE NATIVE STATUS BAR ============ */
+.vsstatus{display:inline-flex;align-items:stretch;height:22px;background:var(--r-surface-muted);border:1px solid var(--r-hairline);border-radius:4px;overflow:hidden;font-size:12px;font-family:var(--font-ui)}
+.sbi{display:inline-flex;align-items:center;gap:5px;padding:0 8px;color:var(--r-ink-muted);border-right:1px solid var(--r-hairline)}
+.sbi:last-child{border-right:none}
+.sbi.accent{color:var(--r-accent);font-weight:500}
+.sbi.warnbg{background:var(--r-warning);color:#3B2A00;font-weight:500}
+.sbi svg{width:13px;height:13px}
+.codicon{font-family:var(--font-mono);font-weight:700;font-size:12px}
+.sb-stack{display:flex;flex-direction:column;gap:16px}
+.sb-line .lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--r-ink-faint);font-weight:600;margin-bottom:7px}
+
+.note{margin-top:16px;font-size:12px;color:var(--r-ink-muted);display:flex;gap:8px;align-items:flex-start}
+.note svg{width:14px;height:14px;color:var(--r-accent);flex-shrink:0;margin-top:2px}
+.note b{color:var(--r-ink-body);font-weight:600}
+.footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--r-hairline-strong);font-size:12px;color:var(--r-ink-faint)}
+.footer code{font-family:var(--font-mono)}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div>
+    <div class="eyebrow">Sprint 80 · UX Touchpoints · v2</div>
+    <h1>Scheduled Tasks Daemon</h1>
+    <p class="sub">Revised to use Ritemark's existing components and VS Code native primitives — no invented surfaces. Schedule is authored in the Agent editor; runs live in the Agent Library; toasts and the status bar are VS Code native.</p>
+    <div class="meta">
+      <span class="tag">4 touchpoints</span>
+      <span class="tag fix">Agent Library section</span>
+      <span class="tag fix">Agent editor field</span>
+      <span class="tag fix">Native VS Code toast</span>
+      <span class="tag fix">Native status bar</span>
+    </div>
+  </div>
+
+  <!-- 1. AGENT EDITOR SCHEDULE FIELD -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">01</span><h2>Authoring — in the Agent editor</h2></div>
+    <p class="section-desc">No raw frontmatter. The schedule is a field group in the agent pane, alongside Description / Model / Tools — same <code style="font-family:var(--font-mono);font-size:12px">SectionLabel</code> + <code style="font-family:var(--font-mono);font-size:12px">FieldRow</code> pattern as <code style="font-family:var(--font-mono);font-size:12px">AgentConfiguratorPanel.tsx</code>. It serializes to <code style="font-family:var(--font-mono);font-size:12px">schedule:</code> frontmatter underneath.</p>
+    <div class="stage">
+      <div class="agent-pane">
+        <div class="pane-h">Agent</div>
+        <div class="sl">Model</div>
+        <div class="inp sel ui">Opus <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>
+
+        <div class="pane-divider"></div>
+
+        <div class="sl" style="color:var(--r-accent)">Schedule</div>
+        <div class="fieldrow">
+          <span class="flabel">Cron</span>
+          <div class="inp">0 9 * * 1-5</div>
+          <span class="help">Weekdays at 09:00. <a href="#" style="color:var(--r-accent)">Cron help</a></span>
+        </div>
+        <div class="fieldrow" style="margin-top:10px">
+          <span class="flabel">Label</span>
+          <div class="inp ui">Daily brief</div>
+          <span class="help">Shown in the status bar and run history.</span>
+        </div>
+        <div class="toggle-row">
+          <span class="switch"></span>
+          <span><span class="toggle-label">Enabled</span><br><span class="toggle-sub">Pause without deleting the schedule</span></span>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="t">Why this changed</div>
+        <p>v1 showed a raw YAML block in the editor. Real Ritemark agents are configured through the structured agent pane — the schedule belongs there as a first-class field group, not as hand-typed frontmatter.</p>
+        <p>The <b style="color:var(--r-ink-body)">Enabled</b> switch reuses the toggle pattern; <b style="color:var(--r-ink-body)">Cron</b> is a mono input with an inline help link; <b style="color:var(--r-ink-body)">Label</b> feeds every other surface.</p>
+        <p style="color:var(--r-ink-muted)">Implementation: add one <code>SectionLabel</code> + <code>FieldRow</code> group; write-through to <code>fm.schedule</code>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. STATUS BAR (native) -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">02</span><h2>Status bar<span class="native-badge">VS Code native · createStatusBarItem</span></h2></div>
+    <p class="section-desc">A native status bar item (right-aligned), same idiom as <code style="font-family:var(--font-mono);font-size:12px">connectivity.ts</code> and the word-count item. Codicon + label text; the warning state uses the built-in <code style="font-family:var(--font-mono);font-size:12px">statusBarItem.warningBackground</code>. Click runs <code style="font-family:var(--font-mono);font-size:12px">ritemark.daemon.showScheduledRuns</code>.</p>
+    <div class="stage">
+      <div class="sb-stack">
+        <div class="sb-line">
+          <div class="lbl">Idle — task registered</div>
+          <div class="vsstatus">
+            <span class="sbi accent"><span class="codicon">⟲</span> 1 scheduled</span>
+          </div>
+        </div>
+        <div class="sb-line">
+          <div class="lbl">Running — $(sync~spin)</div>
+          <div class="vsstatus">
+            <span class="sbi accent"><svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke-linecap="round"/></svg> Daily brief…</span>
+          </div>
+        </div>
+        <div class="sb-line">
+          <div class="lbl">Needs review — warningBackground</div>
+          <div class="vsstatus">
+            <span class="sbi warnbg"><span class="codicon">⚠</span> 1 needs review</span>
+          </div>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="t">Native, not custom</div>
+        <p>v1 drew a bespoke pill. This is the real VS Code status bar item: <code>$(clock)</code> idle, <code>$(sync~spin)</code> running, <code>$(warning)</code> + amber <code>warningBackground</code> for blocked runs.</p>
+        <p style="color:var(--r-ink-muted)">No webview involved. One <code>StatusBarItem</code>, text + <code>backgroundColor</code> swapped by state.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. TOASTS (native VS Code notifications) -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">03</span><h2>Notifications<span class="native-badge">VS Code native · showInformation / showWarning</span></h2></div>
+    <p class="section-desc">Native VS Code notification toasts (bottom-right), not custom HTML. Action buttons map to the return value of <code style="font-family:var(--font-mono);font-size:12px">showInformationMessage</code> / <code style="font-family:var(--font-mono);font-size:12px">showWarningMessage</code>.</p>
+    <div class="stage">
+      <div class="vsfield">
+        <div class="vsnote">
+          <div class="vsnote-main">
+            <svg class="vsnote-sev ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <div class="vsnote-msg">Daily brief finished — <span class="q">"Monday 9 June: three meetings, two open PRs awaiting review, one overdue task…"</span></div>
+            <div class="vsnote-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
+          </div>
+          <div class="vsnote-src">Source: Ritemark</div>
+          <div class="vsnote-btns">
+            <button class="vsbtn">Open result</button>
+            <button class="vsbtn sec">Show runs</button>
+          </div>
+        </div>
+
+        <div class="vsnote">
+          <div class="vsnote-main">
+            <svg class="vsnote-sev warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+            <div class="vsnote-msg">Daily brief paused — agent wants to write <code>notes/2026-06-09.md</code>. Scheduled runs can't write unattended.</div>
+            <div class="vsnote-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
+          </div>
+          <div class="vsnote-src">Source: Ritemark</div>
+          <div class="vsnote-btns">
+            <button class="vsbtn">Review &amp; approve</button>
+            <button class="vsbtn sec">Dismiss</button>
+          </div>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="t">Anatomy</div>
+        <p>Severity icon · message · <code>Source: Ritemark</code> · action buttons. The buttons are VS Code's own (indigo via our theme keys <code>notifications.*</code>).</p>
+        <p style="color:var(--r-ink-muted)"><b style="color:var(--r-ink-body)">Open scope question:</b> "Review &amp; approve" depends on inline approval — currently deferred. If it slips, the blocked toast shows only "Show runs".</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. AGENT LIBRARY SCHEDULED SECTION -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">04</span><h2>Run history — a Library section</h2></div>
+    <p class="section-desc">Not a bespoke panel. A new collapsible <b>SCHEDULED</b> section in the Agent Library, between COMMANDS and FLOWS — same <code style="font-family:var(--font-mono);font-size:12px">.section-header</code> and <code style="font-family:var(--font-mono);font-size:12px">.item</code> markup as every other section (icon chip 32×32, name 13px, description 11px, amber <code style="font-family:var(--font-mono);font-size:12px">.item-hint</code>).</p>
+    <div class="stage">
+      <div class="lib">
+        <div class="lib-top">
+          <div class="lib-title">Agent Library</div>
+          <div class="lib-meta">6 agents · 21 skills · 5 commands · 1 flow</div>
+        </div>
+
+        <div class="section-header">
+          <span class="section-title"><svg class="section-caret collapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 18 6-6-6-6"/></svg> COMMANDS</span>
+          <span class="section-header-meta"><span class="section-count">5</span></span>
+        </div>
+
+        <div class="section-header" style="background:var(--r-surface-muted)">
+          <span class="section-title"><svg class="section-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 18 6-6-6-6"/></svg> SCHEDULED</span>
+          <span class="section-header-meta"><span class="section-count">4 today</span><button class="section-add-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button></span>
+        </div>
+
+        <div class="item">
+          <span class="item-icon-chip" style="background:var(--r-accent-soft);color:var(--r-accent)">
+            <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke-linecap="round"/></svg>
+          </span>
+          <div class="item-content">
+            <div class="item-name">Daily brief <span class="run-time">running…</span></div>
+            <div class="item-description">Reading calendar and open tasks…</div>
+            <span class="oc oc-run">In progress</span>
+          </div>
+        </div>
+
+        <div class="item">
+          <span class="item-icon-chip" style="background:var(--r-warning-soft);color:#B45309">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          </span>
+          <div class="item-content">
+            <div class="item-name">Weekly digest <span class="run-time">2 min ago</span></div>
+            <div class="item-description">Wanted to write notes/2026-06-09.md — blocked.</div>
+            <div class="item-hint">Approval needed — click to review</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <span class="item-icon-chip" style="background:var(--r-success-soft);color:#15803D">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+          </span>
+          <div class="item-content">
+            <div class="item-name">Daily brief <span class="run-time">yest. 09:00</span></div>
+            <div class="item-description">Friday brief: two meetings, one PR merged, inbox at zero.</div>
+            <span class="oc oc-ok">Completed · 3.1s</span>
+          </div>
+        </div>
+
+        <div class="item">
+          <span class="item-icon-chip" style="background:var(--r-error-soft);color:#B91C1C">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+          </span>
+          <div class="item-content">
+            <div class="item-name">Standup notes <span class="run-time">yest. 08:45</span></div>
+            <div class="item-description">Model unavailable — no API key configured. Run skipped.</div>
+            <span class="oc oc-err">Errored</span>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <span class="section-title"><svg class="section-caret collapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 18 6-6-6-6"/></svg> FLOWS</span>
+          <span class="section-header-meta"><span class="section-count">1</span></span>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="t">Reuses the section engine</div>
+        <p>v1 was a standalone panel. This is one more entry in the hardcoded section list in <code>AgentLibraryViewProvider.ts</code> — same caret, count, item chip, 2-line clamp, amber hint.</p>
+        <p>Each row: status-tinted chip · label · relative time · description · outcome pill (or amber hint when action is needed).</p>
+        <p style="color:var(--r-ink-muted)">Stored in <code>workspaceState</code> (DaemonResultStore). Isolated from interactive chat history.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Static mockup v2 · Ritemark Indigo-Editorial + VS Code native primitives · Sprint 80 design review. Not production code. <code>docs/development/sprints/sprint-80-scheduled-tasks-daemon/mocks/</code>
+  </div>
+
+</div>
+</body>
+</html>

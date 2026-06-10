@@ -71,9 +71,8 @@ import { CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatus
 import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
-import { ClaudeCodeRuntime } from '../agent/ClaudeCodeRuntime';
+import { createRuntime } from '../runtime/runtimeFactory';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
-import { AcpRuntime } from '../acp/AcpRuntime';
 import { BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -123,9 +122,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
 
     this._runtimeRegistry = new RuntimeRegistry(new Map<AgentId, AgentRuntime>([
-      ['claude-code', new ClaudeCodeRuntime()],
-      ['codex', new CodexRuntime()],
-      ['opencode', new AcpRuntime()],
+      ['claude-code', createRuntime('claude-code')],
+      ['codex', createRuntime('codex')],
+      ['opencode', createRuntime('opencode')],
     ]));
     this._approvalGate = new UnifiedApprovalGate((req) => {
       this._view?.webview.postMessage({ type: 'agent-approval-request', ...req });

@@ -17,10 +17,12 @@ import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Switch } from '../ui/switch'
 import { Pill } from '../ui/pill'
 import { Badge } from '../ui/badge'
 import { Icon } from '../ui/Icon'
 import { ProvenanceBadge } from './ProvenanceBadge'
+import { ScheduleEditor } from './ScheduleEditor'
 import {
   CLAUDE_TOOLS,
   MODEL_ALIASES,
@@ -37,8 +39,14 @@ export interface AgentSkill {
   provenance?: 'claude' | 'codex' | 'shared'
 }
 
+export interface ScheduleFrontmatter {
+  cron?: string
+  label?: string
+  enabled?: boolean
+}
+
 export interface AgentFrontmatter {
-  [key: string]: string | string[] | number | boolean | undefined
+  [key: string]: string | string[] | number | boolean | ScheduleFrontmatter | undefined
 }
 
 interface AgentConfiguratorPanelProps {
@@ -73,6 +81,7 @@ const CUSTOM_MODEL = '__custom__'
 /** Select value meaning "field absent → inherit/none". */
 const UNSET = '__unset__'
 
+
 export function AgentConfiguratorPanel({
   frontmatter,
   flows,
@@ -96,6 +105,13 @@ export function AgentConfiguratorPanel({
   const color = typeof fm.color === 'string' ? fm.color : ''
   const agentSkills: string[] = Array.isArray(fm.skills) ? (fm.skills as string[]) : []
 
+  const rawSchedule = fm.schedule && typeof fm.schedule === 'object' && !Array.isArray(fm.schedule)
+    ? fm.schedule as ScheduleFrontmatter
+    : undefined
+  const schedCron = rawSchedule?.cron ?? ''
+  const schedLabel = rawSchedule?.label ?? ''
+  const schedEnabled = rawSchedule?.enabled ?? false
+
   // Tools: parse from comma-separated string OR array → canonical names.
   // Empty = "inherits all tools" (per spec), NOT "no tools".
   const grantedTools = parseToolsField(fm.tools)
@@ -116,6 +132,13 @@ export function AgentConfiguratorPanel({
     }
     onFrontmatterChange(next)
   }, [fm, onFrontmatterChange])
+
+  const setSchedule = useCallback((patch: Partial<ScheduleFrontmatter>) => {
+    const current: ScheduleFrontmatter = rawSchedule ?? {}
+    const next = { ...current, ...patch }
+    const isEmpty = !next.cron && !next.label && !next.enabled
+    set('schedule', isEmpty ? undefined : next)
+  }, [rawSchedule, set])
 
   const toggleTool = useCallback((toolName: string) => {
     const next = grantedTools.includes(toolName)
@@ -367,6 +390,35 @@ export function AgentConfiguratorPanel({
             </FieldRow>
           </div>
         )}
+
+        {/* ── Schedule ── */}
+        <SectionLabel>Schedule</SectionLabel>
+        <p className="text-[10px] text-ink-muted -mt-1">Run this agent automatically on a cron schedule.</p>
+
+        <div className="flex flex-col gap-2">
+          <ScheduleEditor
+            cron={schedCron}
+            onCronChange={cron => setSchedule({ cron })}
+          />
+
+          <FieldRow label="Label">
+            <Input
+              value={schedLabel}
+              onChange={e => setSchedule({ label: e.target.value })}
+              placeholder="e.g. Daily standup"
+              className="text-[12px] h-7"
+            />
+          </FieldRow>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <Switch
+              checked={schedEnabled}
+              onCheckedChange={enabled => setSchedule({ enabled })}
+              aria-label="Enable schedule"
+            />
+            <span className="text-[12px] text-ink-strong">Enable schedule</span>
+          </label>
+        </div>
 
         {/* ── Ritemark extension: linked flow ── */}
         <SectionLabel>Linked flow</SectionLabel>

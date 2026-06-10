@@ -1,43 +1,56 @@
-/**
- * DaemonResultStore — persists the most recent run result for each scheduled
- * agent.  Results are stored in workspaceState so they survive extension
- * host restarts but are scoped to the open workspace.
- *
- * Sprint 79: populated by AgentDaemon but not yet consumed by any UI.
- * Sprint 80 wires the results into the Agent Library sidebar.
- */
+import type { Memento } from 'vscode';
+import type { TaskResult } from './ScheduledTask';
 
-import type { AgentId } from '../agent/types';
-
-export interface DaemonRunResult {
-  agentId: AgentId;
-  /** Unix timestamp (milliseconds) when the run was triggered. */
-  timestamp: number;
-  /** One-line summary produced by the run (or error message). */
-  summary: string;
-  success: boolean;
-}
-
-const KEY_PREFIX = 'daemon.lastRun.';
-
-/** Structural subset of vscode.ExtensionContext required by this store. */
-interface ExtensionContextLike {
-  workspaceState: {
-    get<T>(key: string): T | undefined;
-    update(key: string, value: unknown): Thenable<void>;
-  };
-}
+const STORE_KEY = 'daemon:runHistory';
+const MAX_RESULTS_PER_TASK = 10;
 
 export class DaemonResultStore {
-  constructor(private readonly context: ExtensionContextLike) {}
+  constructor(private readonly state: Memento) {}
 
-  record(agentId: AgentId, result: DaemonRunResult): void {
-    void this.context.workspaceState.update(`${KEY_PREFIX}${agentId}`, result);
+  async getAll(taskId: string): Promise<TaskResult[]> {
+    const all = this.state.get<Record<string, TaskResult[]>>(STORE_KEY, {});
+    return all[taskId] ?? [];
   }
 
-  getLastRun(agentId: AgentId): DaemonRunResult | undefined {
-    return this.context.workspaceState.get<DaemonRunResult>(
-      `${KEY_PREFIX}${agentId}`
+  /** All runs across every task, most-recent first, capped for display. */
+  getAllRuns(limit = 10): TaskResult[] {
+    const all = this.state.get<Record<string, TaskResult[]>>(STORE_KEY, {});
+    const flat = Object.values(all).flat();
+    flat.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    return flat.slice(0, limit);
+  }
+
+  async getBlockedResult(taskId: string, runId: string): Promise<TaskResult | undefined> {
+    const results = await this.getAll(taskId);
+    return results.find(r => r.runId === runId && r.outcome === 'blocked');
+  }
+
+  async append(result: TaskResult): Promise<void> {
+    const all = this.state.get<Record<string, TaskResult[]>>(STORE_KEY, {});
+    const existing = all[result.taskId] ?? [];
+    const trimmed = [result, ...existing].slice(0, MAX_RESULTS_PER_TASK);
+    await this.state.update(STORE_KEY, { ...all, [result.taskId]: trimmed });
+  }
+
+  /** Mark an existing result as superseded by a newer run. */
+  async supersede(taskId: string, runId: string, supersededBy: string): Promise<void> {
+    const all = this.state.get<Record<string, TaskResult[]>>(STORE_KEY, {});
+    const existing = all[taskId] ?? [];
+    const updated = existing.map(r =>
+      r.runId === runId ? { ...r, supersededBy } : r
     );
+    await this.state.update(STORE_KEY, { ...all, [taskId]: updated });
+  }
+
+  /** Count blocked runs not yet superseded — drives the status-bar review count. */
+  async countUnresolvedBlocked(): Promise<number> {
+    const all = this.state.get<Record<string, TaskResult[]>>(STORE_KEY, {});
+    return Object.values(all).flat().filter(
+      r => r.outcome === 'blocked' && !r.supersededBy
+    ).length;
+  }
+
+  async clearAll(): Promise<void> {
+    await this.state.update(STORE_KEY, {});
   }
 }
