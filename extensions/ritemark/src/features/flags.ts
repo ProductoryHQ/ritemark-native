@@ -120,7 +120,8 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
-  // Sprint 80: scheduled agent tasks. Disabled until Sprint 79 AgentRuntime is merged.
+  // Sprint 80: scheduled agent tasks. Shipped ENABLED ('stable') — daemon is on
+  // by default (Jarmo's decision, 2026-06-08).
   'scheduled-tasks-daemon': {
     id: 'scheduled-tasks-daemon',
     label: 'Scheduled Tasks Daemon',

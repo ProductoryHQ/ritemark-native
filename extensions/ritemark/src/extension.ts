@@ -254,7 +254,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerReactionCommand(context);
 
   // Initialize scheduled tasks daemon (Sprint 80)
-  const daemon = initDaemon(context);
+  const daemon = initDaemon(context, () => agentLibraryViewProvider);
 
   // Initialize update service
   const updateStorage = new UpdateStorage(context.globalState);

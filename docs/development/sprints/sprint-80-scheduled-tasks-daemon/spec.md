@@ -25,13 +25,19 @@ schedule:
   enabled: true
 ```
 
-**Fields (as rendered in the editor):**
+**Fields (as rendered in the editor — `ScheduleEditor.tsx`, Jarmo decision #7):**
 
-| Field | Control | Required | Description |
-|---|---|---|---|
-| Cron | mono `Input` + inline "Cron help" link | Yes | Standard 5-field cron expression (minute hour dom month dow) |
-| Label | text `Input` | No | Human-readable name shown in status bar and run history. Falls back to file name. |
-| Enabled | toggle `switch` | Yes | On to activate. Off pauses without deleting the schedule. |
+The cron expression is authored through a structured **picker**, not a raw text field:
+
+| Control | Description |
+|---|---|
+| Mode segmented control | **Interval** (every N minutes/hours from presets) or **Days** (weekday chips Mon–Sun + recurrence presets Every day / Weekdays / Weekends / Custom + time `HH:MM`) |
+| Summary banner | Live human-readable readout, e.g. "Runs daily at 09:00" |
+| Advanced (cron) | Collapsible escape hatch: editable 5-field cron expression + copy button. If a file's cron cannot be represented by the two picker modes, the editor opens directly in Advanced mode. |
+| Label | text `Input` — human-readable name shown in status bar and run history. Falls back to file name. |
+| Enabled | shadcn `Switch` — on to activate. Off pauses without deleting the schedule. |
+
+The picker serializes to the same `schedule.cron` string (`webview/src/components/agent/cronSchedule.ts` owns the cron ↔ UI mapping; round-trip unit-tested).
 
 The schedule is per-file. One file = one schedule. A file with no `schedule` block is not scheduled.
 
@@ -69,7 +75,7 @@ Both surfaces use VS Code native primitives — no custom webview chrome. See `m
 | Running | `$(sync~spin) Daily brief…` | spinner codicon during the run |
 | Needs review (blocked run) | `$(warning) 1 needs review` | uses built-in `statusBarItem.warningBackground` (amber) |
 
-Clicking the item runs `ritemark.showScheduledRuns` → reveals the Library's Scheduled section.
+Clicking the item runs `ritemark.daemon.showScheduledRuns` → reveals the Library's Scheduled section.
 
 **Notifications** — native VS Code toasts via `showInformationMessage` / `showWarningMessage`, with action buttons mapped to the return value:
 
@@ -91,7 +97,7 @@ When a scheduled run is paused because a file-write or shell command was blocked
 
 **What "approve" does:**
 
-Approving re-runs the scheduled agent from the start with the previously-blocked action added to a one-time allow-list for that run. The allow-list is scoped to the single re-run — it does not change the standing `AutoApprovalPolicy` or persist to future scheduled runs. The previous blocked result is superseded in `DaemonResultStore`; the run outcome flips from `blocked` to `success` (or `blocked` again if a different action is blocked in the re-run).
+Approving re-runs the scheduled agent from the start with the previously-blocked action added to a one-time allow-list for that run. The allow-list is scoped to the single re-run — it does not change the standing `AutoApprovalPolicy` or persist to future scheduled runs. The previous blocked result is superseded in `DaemonResultStore`; the run outcome flips from `blocked` to `completed` (or `blocked` again if a different action is blocked in the re-run).
 
 **What is not in scope within this flow:**
 
@@ -99,7 +105,7 @@ Approving re-runs the scheduled agent from the start with the previously-blocked
 - Bulk-approving multiple blocked runs at once.
 - Changing the standing policy for future runs (that is a separate settings concern).
 
-**Command:** `ritemark.approveScheduledAction(taskId, runId)` — resolves the pending blocked result from `DaemonResultStore`, constructs an allow-list entry for the blocked action, and re-invokes `AgentTaskHandler.run()` with that allow-list applied.
+**Command:** `ritemark.daemon.approveScheduledAction(taskId, runId)` — resolves the pending blocked result from `DaemonResultStore`, constructs an allow-list entry for the blocked action, and re-invokes `AgentTaskHandler.run()` with that allow-list applied.
 
 **Sprint 79 dependency:** Re-running via `AgentTaskHandler` requires the `AgentRuntime` interface. The approval command must apply the same `[S79]` guard — if `AgentRuntime` is absent, the command logs a warning and shows a toast explaining the action cannot be retried yet.
 

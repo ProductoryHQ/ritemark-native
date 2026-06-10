@@ -190,6 +190,22 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }, 200);
   }
 
+  /**
+   * Reveal the Agent Library, expand the SCHEDULED section and — when a run is
+   * given — scroll to and briefly highlight that run. Invoked from the daemon's
+   * completion/blocked toast buttons and the status-bar item (via
+   * ritemark.daemon.showScheduledRuns / openResult).
+   */
+  public revealScheduled(taskId?: string, runId?: string): void {
+    // Reveals the view (creates it if the library has never been opened).
+    void vscode.commands.executeCommand('ritemark.agentLibraryView.focus');
+    this._view?.webview.postMessage({
+      type: 'revealScheduled',
+      taskId: taskId ?? null,
+      runId: runId ?? null,
+    });
+  }
+
   private _discover() {
     this._agents = discoverAgents(this._workspacePath);
     this._commands = discoverCommands(this._workspacePath);
@@ -1135,6 +1151,23 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         workspacePath = msg.workspacePath || '';
         userHomePath = msg.userHomePath || '';
         render();
+      } else if (msg.type === 'revealScheduled') {
+        // Triggered by the daemon's toast buttons / status-bar item.
+        collapsedSections.delete('Scheduled');
+        render();
+        requestAnimationFrame(() => {
+          const row = msg.runId
+            ? contentEl.querySelector('.sched-item[data-run="' + msg.runId + '"]')
+            : null;
+          const target = row || contentEl.querySelector('[data-section="Scheduled"]');
+          if (target) target.scrollIntoView({ block: 'center' });
+          if (row) {
+            row.style.outline = '2px solid var(--vscode-focusBorder)';
+            row.style.outlineOffset = '1px';
+            row.style.borderRadius = '6px';
+            setTimeout(() => { row.style.outline = ''; row.style.outlineOffset = ''; }, 1600);
+          }
+        });
       }
     });
 

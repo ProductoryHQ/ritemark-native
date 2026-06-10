@@ -189,7 +189,7 @@ Each scenario maps to one or more spec requirements (R1, R2, R3, R4).
 1. User clicks **Review & approve** in the toast
 
 **Expected:**
-- `ritemark.approveScheduledAction(taskId, runId)` is invoked
+- `ritemark.daemon.approveScheduledAction(taskId, runId)` is invoked
 - Agent re-runs from the start with `notes/2026-06-09.md` write on the one-time allow-list
 - File is written during the re-run
 - `DaemonResultStore` records a new result entry with outcome `completed`; the previous `blocked` entry is superseded (or clearly marked as superseded)
@@ -245,7 +245,7 @@ Each scenario maps to one or more spec requirements (R1, R2, R3, R4).
 - Sprint 79 `AgentRuntime` is NOT present in the codebase
 
 **Expected:**
-- `ritemark.approveScheduledAction` fires the `[S79]` guard check
+- `ritemark.daemon.approveScheduledAction` fires the `[S79]` guard check
 - No re-run is attempted
 - A warning toast explains: "Cannot retry — AgentRuntime unavailable. Ensure Sprint 79 is merged."
 - `DaemonResultStore` entry remains unchanged (still `blocked`)

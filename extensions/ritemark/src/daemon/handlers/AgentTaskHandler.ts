@@ -2,16 +2,23 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { ScheduledTask, TaskContext, TaskResult, TaskRunOptions, ScheduleConfig, BlockedActionDetail } from '../ScheduledTask';
 import { DEFAULT_HEADLESS_POLICY } from '../ScheduledTask';
+import type { AgentId } from '../../agent/types';
+import { createRuntime } from '../../runtime/runtimeFactory';
 import type { UnifiedApprovalRequest, RuntimeTurnResult } from '../../runtime/AgentRuntime';
 
 /**
  * AgentTaskHandler — runs an agent .md file headlessly via a fresh AgentRuntime.
  *
  * Headless session contract (Sprint 80, technical-plan.md, Jarmo decision #2):
- * each run creates its OWN ClaudeCodeRuntime instance with a NEW session. It
- * never borrows the shared RuntimeRegistry the interactive sidebar uses — a
- * background run must not clobber the user's live conversation or its approval
- * mode. The runtime is disposed when the run ends.
+ * each run creates its OWN runtime instance (via createRuntime) with a NEW
+ * session. It never borrows the shared RuntimeRegistry the interactive sidebar
+ * uses — a background run must not clobber the user's live conversation or its
+ * approval mode. The runtime is disposed when the run ends.
+ *
+ * The instance is built through the runtime factory against the AgentRuntime
+ * interface, so headless execution is runtime-agnostic by construction.
+ * `runtimeId` defaults to 'claude-code' (the verified headless path); pointing
+ * a scheduled task at another runtime is a constructor argument, not a rewrite.
  *
  * Approval policy: the runtime is started in 'ask' mode so the SDK surfaces an
  * approval callback for every Write/Edit/Bash. Reads proceed automatically. The
@@ -25,11 +32,13 @@ export class AgentTaskHandler implements ScheduledTask {
   readonly autoApprovalPolicy = DEFAULT_HEADLESS_POLICY;
 
   private readonly filePath: string;
+  private readonly runtimeId: AgentId;
 
-  constructor(id: string, schedule: ScheduleConfig, filePath: string) {
+  constructor(id: string, schedule: ScheduleConfig, filePath: string, runtimeId: AgentId = 'claude-code') {
     this.id = id;
     this.schedule = schedule;
     this.filePath = filePath;
+    this.runtimeId = runtimeId;
   }
 
   async run(ctx: TaskContext, options?: TaskRunOptions): Promise<TaskResult> {
@@ -42,13 +51,10 @@ export class AgentTaskHandler implements ScheduledTask {
     }
 
     // Fresh, isolated runtime per run — never the shared interactive instance.
-    let ClaudeCodeRuntime: typeof import('../../agent/ClaudeCodeRuntime').ClaudeCodeRuntime;
-    try {
-      ({ ClaudeCodeRuntime } = await import('../../agent/ClaudeCodeRuntime'));
-    } catch {
-      return this.skipped(runId, startedAt, 'agent-runtime-unavailable');
-    }
-    const runtime = new ClaudeCodeRuntime();
+    // Built through the factory against the AgentRuntime interface; whether the
+    // runtime is actually usable (installed / signed in) is checked by start()
+    // below, which returns an 'agent-runtime-unavailable' skip on failure.
+    const runtime = createRuntime(this.runtimeId);
 
     const oneTimeAllowList = options?.oneTimeAllowList ?? [];
     let blockedAction: BlockedActionDetail | undefined;

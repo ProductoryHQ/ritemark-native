@@ -6,6 +6,8 @@
 
 Sprint-79-dependent tasks are marked `[S79]`. All others are independent and can be implemented and reviewed before Sprint 79 merges.
 
+> **Implementation status (2026-06-10):** Phases 1–4 and 6 are implemented (Sprint 79 merged, so `[S79]` tasks are active, built via the `createRuntime()` factory). Unit tests shipped: `scheduleParser.test.ts`, `cron.test.ts`, `DaemonResultStore.test.ts`, `cronSchedule.test.ts` (webview picker round-trip). Added beyond this plan: structured schedule picker (`ScheduleEditor.tsx`), toast→Library reveal (`revealScheduled`), `.agents/` scan scope, flag ships enabled. Phase 5 manual QA (Jarmo, dev mode, 2026-06-10): S1 ✅ (happy path, toast, history); S3 ✅ (file-write blocked, warning toast, no file written); S11/R4 ✅ (modal confirm → approve → re-run with one-time allow-list → file written, outcome flips Completed); S2 ✅ implicitly (s1 fixture disabled via picker, never fired). Remaining scenarios unexercised: S4–S10, S13–S15. QA fixtures kept (disabled): `.claude/agents/s1-daily-brief.md`, `s3-write-test.md`.
+
 ---
 
 ## Phase 1: Foundation (Sprint-79-independent)
@@ -17,7 +19,7 @@ Sprint-79-dependent tasks are marked `[S79]`. All others are independent and can
 
 ### 1.2 Types — `src/daemon/ScheduledTask.ts`
 
-- [ ] Define `TaskOutcome` union type (`success | blocked | error | skipped`)
+- [ ] Define `TaskOutcome` union type (`completed | blocked | errored | skipped | missed`)
 - [ ] Define `TaskContext` interface
 - [ ] Define `BlockedAction` interface
 - [ ] Define `TaskResult` interface
@@ -36,7 +38,7 @@ Sprint-79-dependent tasks are marked `[S79]`. All others are independent and can
 
 ### 1.4 Result store — `src/daemon/DaemonResultStore.ts`
 
-- [ ] Implement `record(taskId, result)` with 50-entry cap per task
+- [ ] Implement `record(taskId, result)` with 10-entry cap per task
 - [ ] Implement `getHistory(taskId)` returning most-recent-first array
 - [ ] Implement `getAllHistory()` returning full map
 - [ ] Implement `getBlockedResult(taskId, runId)` returning a single blocked result by run ID
@@ -44,7 +46,7 @@ Sprint-79-dependent tasks are marked `[S79]`. All others are independent and can
 - [ ] Implement `clearHistory(taskId?)` — clear one task or all
 - [ ] Ensure each `TaskResult` includes a `runId: string` (generated at run start) for lookup by `approveScheduledAction`
 - [ ] Use `vscode.ExtensionContext.workspaceState` for persistence
-- [ ] Write unit tests: record, cap at 50, clear, persist across simulated restarts, supersede replaces correct entry
+- [ ] Write unit tests: record, cap at 10, clear, persist across simulated restarts, supersede replaces correct entry
 - [ ] All unit tests pass
 
 ### 1.5 Status events — `src/daemon/DaemonStatusEvents.ts`
@@ -52,7 +54,7 @@ Sprint-79-dependent tasks are marked `[S79]`. All others are independent and can
 - [ ] Create status bar item (left-aligned, priority 100); hidden initially
 - [ ] Implement `emitRunStart(label)` — show spinner + label
 - [ ] Implement `emitRunComplete(result)` — update icon + tooltip; show completion toast with "Show history" button
-- [ ] Implement `emitRunBlocked(taskId, runId, result)` — show warning icon; show blocked toast with **"Review & approve"** and **"Dismiss"** buttons; "Review & approve" executes `ritemark.approveScheduledAction(taskId, runId)`
+- [ ] Implement `emitRunBlocked(taskId, runId, result)` — show warning icon; show blocked toast with **"Review & approve"** and **"Dismiss"** buttons; "Review & approve" executes `ritemark.daemon.approveScheduledAction(taskId, runId)`
 - [ ] Implement `emitRunError(result)` — show error icon
 - [ ] Implement `emitWarning(message)` — status bar warning without toast (used for skipped runs)
 - [ ] Implement `updateIdleState(scheduledCount)` — static icon + count when no run active; hide if count = 0
@@ -90,12 +92,12 @@ These tasks require Sprint 79's `AgentRuntime` interface (`src/runtime/AgentRunt
 - [ ] `[S79]` In `run(ctx)`: call `RuntimeRegistry.getInstance().get(defaultAgentId).start(config)` with a daemon-local `onProgress` and `onApprovalRequest` — no interaction with `UnifiedViewProvider`
 - [ ] `[S79]` Implement `AutoApprovalPolicy` enforcement in `onApprovalRequest`: auto-approve file reads (`approved: true`); auto-block file writes and shell commands (`approved: false`); record each blocked action in `blockedActions` array
 - [ ] `[S79]` Collect agent output stream; build `outputSummary` (first 500 chars) and `outputFirstLine`
-- [ ] `[S79]` Return `TaskResult` with correct `outcome`: `success` if run completes without blocks; `blocked` if any action was blocked; `error` if runtime throws
+- [ ] `[S79]` Return `TaskResult` with correct `outcome`: `completed` if run completes without blocks; `blocked` if any action was blocked; `errored` if runtime throws
 - [ ] `[S79]` Wire `AgentTaskHandler` into `Scheduler.ts` as the default handler for `.md` agent files (replacing the runtime-unavailability skip path when Sprint 79 is present)
 - [ ] `[S79]` Add `TaskRunOptions` interface to `ScheduledTask.ts`: `{ allowList?: RunAllowListEntry[] }` where `RunAllowListEntry` has `kind` and `detail` fields
 - [ ] `[S79]` Extend `AgentTaskHandler.run(ctx, options?)` to accept `TaskRunOptions`; in `onApprovalRequest`, if the incoming action matches an allow-list entry (by `kind` + exact `detail`), respond `approved: true` — overriding the standing block policy for that action only
 - [ ] `[S79]` Integration test: mock `AgentRuntime.prompt()` to emit a file-write approval request; verify it is blocked and recorded
-- [ ] `[S79]` Integration test: re-run with allow-list containing the blocked action; verify the action is approved and `TaskResult.outcome` is `success`
+- [ ] `[S79]` Integration test: re-run with allow-list containing the blocked action; verify the action is approved and `TaskResult.outcome` is `completed`
 - [ ] `[S79]` All tests pass
 
 ---
@@ -104,15 +106,15 @@ These tasks require Sprint 79's `AgentRuntime` interface (`src/runtime/AgentRunt
 
 - [ ] Import `Scheduler` and instantiate on extension activation
 - [ ] Pass `extensionContext` to `Scheduler` (for `workspaceState` and disposable registration)
-- [ ] Register command `ritemark.showDaemonHistory`: open a VS Code output channel or simple webview listing `DaemonResultStore.getAllHistory()` entries
-- [ ] Register "Show history" button handler (from toast) to execute `ritemark.showDaemonHistory`
-- [ ] `[S79]` Register command `ritemark.approveScheduledAction(taskId, runId)`:
+- [ ] Register command `ritemark.daemon.showScheduledRuns` (reveals the Agent Library SCHEDULED section) + `ritemark.daemon.openResult`, backed by `DaemonResultStore.getAllRuns()`
+- [ ] Register "Show runs" button handler (from toast) to execute `ritemark.daemon.showScheduledRuns`
+- [ ] `[S79]` Register command `ritemark.daemon.approveScheduledAction(taskId, runId)`:
   - Apply `[S79]` dynamic import guard for `RuntimeRegistry`; if absent, show warning toast and exit
   - Look up blocked `TaskResult` via `DaemonResultStore.getBlockedResult(taskId, runId)`; if not found, log and exit
   - Build `allowList` from `result.blockedActions`
   - Re-invoke `AgentTaskHandler.run(ctx, { allowList })`
   - On completion: `DaemonResultStore.supersede(taskId, runId, newResult)`; emit run-complete or run-blocked via `DaemonStatusEvents`
-- [ ] `[S79]` Register `ritemark.approveScheduledAction` in `package.json` command contributions (no keybinding needed; invoked programmatically from toast and Library row)
+- [ ] `[S79]` Register `ritemark.daemon.approveScheduledAction` in `package.json` command contributions (no keybinding needed; invoked programmatically from toast and Library row)
 - [ ] Add `Scheduler` to `context.subscriptions` for automatic disposal
 - [ ] TypeScript compiles without errors
 - [ ] Extension activates without errors in dev mode
@@ -150,7 +152,7 @@ These tasks require Sprint 79's `AgentRuntime` interface (`src/runtime/AgentRunt
 
 ## Definition of Done
 
-- [ ] All Phase 1–4 tasks complete (Phase 3 `[S79]` tasks and `ritemark.approveScheduledAction` complete only if Sprint 79 is merged before Sprint 80 closes; otherwise deferred)
+- [ ] All Phase 1–4 tasks complete (Phase 3 `[S79]` tasks and `ritemark.daemon.approveScheduledAction` complete only if Sprint 79 is merged before Sprint 80 closes; otherwise deferred)
 - [ ] All unit + integration tests pass
 - [ ] Manual QA: S1–S10 pass (S8 passes regardless of Sprint 79 state)
 - [ ] `[S79]` Manual QA: S11–S15 pass (inline approval scenarios)

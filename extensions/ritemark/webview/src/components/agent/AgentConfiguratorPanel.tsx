@@ -17,10 +17,12 @@ import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Switch } from '../ui/switch'
 import { Pill } from '../ui/pill'
 import { Badge } from '../ui/badge'
 import { Icon } from '../ui/Icon'
 import { ProvenanceBadge } from './ProvenanceBadge'
+import { ScheduleEditor } from './ScheduleEditor'
 import {
   CLAUDE_TOOLS,
   MODEL_ALIASES,
@@ -79,33 +81,6 @@ const CUSTOM_MODEL = '__custom__'
 /** Select value meaning "field absent → inherit/none". */
 const UNSET = '__unset__'
 
-function humanizeCron(expr: string): string {
-  const parts = expr.trim().split(/\s+/)
-  if (parts.length !== 5) return 'Invalid cron (need 5 fields)'
-  const [min, hour, dom, mon, dow] = parts
-  if (dom === '*' && mon === '*' && dow === '*') {
-    if (hour === '*') return `Every minute${min === '*' ? '' : ` at :${min.padStart(2, '0')}`}`
-    if (min === '0') return `Daily at ${hour}:00`
-    return `Daily at ${hour}:${min.padStart(2, '0')}`
-  }
-  if (dom === '*' && mon === '*' && dow === '1-5') {
-    if (min === '0') return `Weekdays at ${hour}:00`
-    return `Weekdays at ${hour}:${min.padStart(2, '0')}`
-  }
-  if (dom === '*' && mon === '*') {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const idx = parseInt(dow, 10)
-    const dayName = !isNaN(idx) && idx >= 0 && idx <= 6 ? days[idx] : dow
-    if (min === '0') return `${dayName}s at ${hour}:00`
-    return `${dayName}s at ${hour}:${min.padStart(2, '0')}`
-  }
-  return expr
-}
-
-function isValidCron(expr: string): boolean {
-  const parts = expr.trim().split(/\s+/)
-  return parts.length === 5 && parts.every(p => /^[\d*/,\-]+$/.test(p))
-}
 
 export function AgentConfiguratorPanel({
   frontmatter,
@@ -421,20 +396,10 @@ export function AgentConfiguratorPanel({
         <p className="text-[10px] text-ink-muted -mt-1">Run this agent automatically on a cron schedule.</p>
 
         <div className="flex flex-col gap-2">
-          <FieldRow label="Cron expression">
-            <Input
-              value={schedCron}
-              onChange={e => setSchedule({ cron: e.target.value })}
-              placeholder="e.g. 0 9 * * 1-5"
-              className={`text-[12px] h-7 font-mono ${schedCron && !isValidCron(schedCron) ? 'border-destructive' : ''}`}
-            />
-            {schedCron && isValidCron(schedCron) && (
-              <p className="text-[10px] text-ink-muted">{humanizeCron(schedCron)}</p>
-            )}
-            {schedCron && !isValidCron(schedCron) && (
-              <p className="text-[10px] text-destructive">Invalid — use 5 fields: min hour dom month dow</p>
-            )}
-          </FieldRow>
+          <ScheduleEditor
+            cron={schedCron}
+            onCronChange={cron => setSchedule({ cron })}
+          />
 
           <FieldRow label="Label">
             <Input
@@ -446,11 +411,10 @@ export function AgentConfiguratorPanel({
           </FieldRow>
 
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
+            <Switch
               checked={schedEnabled}
-              onChange={e => setSchedule({ enabled: e.target.checked })}
-              className="accent-[var(--r-accent)]"
+              onCheckedChange={enabled => setSchedule({ enabled })}
+              aria-label="Enable schedule"
             />
             <span className="text-[12px] text-ink-strong">Enable schedule</span>
           </label>

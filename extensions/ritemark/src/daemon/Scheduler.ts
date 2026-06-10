@@ -7,6 +7,7 @@ import { DaemonResultStore } from './DaemonResultStore';
 import { DaemonStatusEvents } from './DaemonStatusEvents';
 import { parseScheduleFromFrontmatter } from './scheduleParser';
 import { AgentTaskHandler } from './handlers/AgentTaskHandler';
+import { computeNextFire } from './cron';
 import { isEnabled } from '../features/featureGate';
 
 export interface RegisteredEntry {
@@ -18,6 +19,11 @@ export interface RegisteredEntry {
 }
 
 const TICK_INTERVAL_MS = 30_000; // re-evaluate every 30 s
+
+// Agent files may live under either convention. Both are scanned at startup and
+// watched for live changes.
+const AGENT_DIRS = ['.claude/agents', '.agents'];
+const AGENT_WATCH_GLOB = `{${AGENT_DIRS.join(',')}}/**/*.md`;
 
 export class Scheduler {
   private readonly entries = new Map<string, RegisteredEntry>();
@@ -65,7 +71,7 @@ export class Scheduler {
     if (!task.schedule.enabled) {
       return;
     }
-    const nextFire = this.computeNext(task.schedule.cron);
+    const nextFire = computeNextFire(task.schedule.cron, new Date());
     if (!nextFire) {
       return;
     }
@@ -109,7 +115,7 @@ export class Scheduler {
         skipReason: 'concurrent-run',
       };
       // Still re-arm the next fire so the schedule keeps ticking.
-      const reNext = this.computeNext(entry.config.cron);
+      const reNext = computeNextFire(entry.config.cron, new Date());
       if (reNext) {
         const reDelay = Math.max(0, reNext.getTime() - Date.now());
         const reTimer = setTimeout(() => this.fire(filePath), reDelay);
@@ -120,7 +126,7 @@ export class Scheduler {
       return;
     }
     // Re-arm next fire before running so a long run doesn't shift the schedule
-    const nextFire = this.computeNext(entry.config.cron);
+    const nextFire = computeNextFire(entry.config.cron, new Date());
     if (nextFire) {
       const delay = Math.max(0, nextFire.getTime() - Date.now());
       const timerId = setTimeout(() => this.fire(filePath), delay);
@@ -172,13 +178,15 @@ export class Scheduler {
     if (!this.workspacePath) {
       return;
     }
-    const agentsDir = path.join(this.workspacePath, '.claude', 'agents');
-    if (!fs.existsSync(agentsDir)) {
-      return;
-    }
-    const files = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'));
-    for (const file of files) {
-      this.reloadFile(path.join(agentsDir, file));
+    for (const rel of AGENT_DIRS) {
+      const agentsDir = path.join(this.workspacePath, ...rel.split('/'));
+      if (!fs.existsSync(agentsDir)) {
+        continue;
+      }
+      const files = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'));
+      for (const file of files) {
+        this.reloadFile(path.join(agentsDir, file));
+      }
     }
   }
 
@@ -200,7 +208,7 @@ export class Scheduler {
   private watchAgentFiles(): void {
     const agentsPattern = new vscode.RelativePattern(
       this.workspacePath,
-      '.claude/agents/**/*.md'
+      AGENT_WATCH_GLOB
     );
     this.watcher = vscode.workspace.createFileSystemWatcher(agentsPattern);
     const reload = (uri: vscode.Uri) => this.reloadFile(uri.fsPath);
@@ -233,66 +241,4 @@ export class Scheduler {
       }
     }
   }
-
-  /**
-   * Compute the next fire time for a 5-field cron expression.
-   * Minimal implementation: scans forward minute-by-minute up to 1 year.
-   */
-  private computeNext(expr: string): Date | undefined {
-    const parts = expr.trim().split(/\s+/);
-    if (parts.length !== 5) {
-      return undefined;
-    }
-    const [minPart, hourPart, domPart, monPart, dowPart] = parts;
-
-    const now = new Date();
-    const candidate = new Date(now);
-    candidate.setSeconds(0, 0);
-    candidate.setMinutes(candidate.getMinutes() + 1); // start from next minute
-
-    const limit = new Date(now);
-    limit.setFullYear(limit.getFullYear() + 1);
-
-    while (candidate < limit) {
-      if (
-        matchField(candidate.getMinutes(), minPart, 0, 59) &&
-        matchField(candidate.getHours(), hourPart, 0, 23) &&
-        matchField(candidate.getDate(), domPart, 1, 31) &&
-        matchField(candidate.getMonth() + 1, monPart, 1, 12) &&
-        matchField(candidate.getDay(), dowPart, 0, 6)
-      ) {
-        return candidate;
-      }
-      candidate.setMinutes(candidate.getMinutes() + 1);
-    }
-    return undefined;
-  }
-}
-
-function matchField(value: number, expr: string, min: number, max: number): boolean {
-  if (expr === '*') {
-    return true;
-  }
-  for (const part of expr.split(',')) {
-    if (part.includes('/')) {
-      const [range, stepStr] = part.split('/');
-      const step = parseInt(stepStr, 10);
-      const [lo, hi] = range === '*'
-        ? [min, max]
-        : range.split('-').map(Number);
-      if (value >= lo && value <= hi && (value - lo) % step === 0) {
-        return true;
-      }
-    } else if (part.includes('-')) {
-      const [lo, hi] = part.split('-').map(Number);
-      if (value >= lo && value <= hi) {
-        return true;
-      }
-    } else {
-      if (parseInt(part, 10) === value) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
