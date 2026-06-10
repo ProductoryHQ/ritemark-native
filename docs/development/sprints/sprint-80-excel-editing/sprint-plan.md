@@ -65,7 +65,7 @@ Upgrade the Excel editor from read-only to basic editing for .xlsx files, and fi
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
-  (approval was given implicitly via the direct feature request; explicit confirmation requested)
-- [ ] qa-validator pass before merge
+- [x] Jarmo approved this sprint plan ("plan approved", 2026-06-10)
+- [x] qa-validator pass before merge (2026-06-10 — PASS; one pre-existing warning:
+      debug console.log at excelEditorProvider.ts:87-89, pre-dates Sprint 80, cleanup deferred)
 - [ ] Gate 2: Jarmo tested locally before release
