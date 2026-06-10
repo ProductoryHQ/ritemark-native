@@ -12,8 +12,9 @@ export interface SpreadsheetViewerProps {
   fileType: 'csv' | 'xlsx'
   encoding?: string
   sizeBytes?: number
+  // CSV: receives the serialized CSV text.
+  // XLSX: receives the serialized workbook as base64.
   onChange?: (content: string) => void
-  // Multi-sheet support: handled via client-side caching of workbook
 }
 
 interface ParsedData {
@@ -24,6 +25,51 @@ interface ParsedData {
 
 const MAX_DISPLAY_ROWS = 10000
 const SIZE_WARNING_BYTES = 5 * 1024 * 1024 // 5MB
+
+/**
+ * Extract a single sheet from a parsed workbook into table data.
+ * Uses spreadsheet-letter columns (A, B, C…) and a full 1:1 grid
+ * (blank rows included, first row NOT swallowed as a header) so that
+ * row/column indexes map exactly to worksheet cell addresses for editing.
+ */
+function extractSheet(workbook: XLSX.WorkBook, sheetName: string): ParsedData {
+  const worksheet = workbook.Sheets[sheetName]
+  if (!worksheet) {
+    return { columns: [], rows: [], error: 'Sheet not found in workbook' }
+  }
+
+  const ref = worksheet['!ref']
+  if (!ref) {
+    return { columns: [], rows: [] }
+  }
+
+  const range = XLSX.utils.decode_range(ref)
+  const columns: string[] = []
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    columns.push(XLSX.utils.encode_col(c))
+  }
+
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+    header: 1,
+    defval: '',
+    blankrows: true,
+    raw: false,
+  })
+
+  let rows = aoa.map(cells => {
+    const row: Record<string, unknown> = {}
+    columns.forEach((col, i) => {
+      row[col] = cells[i] ?? ''
+    })
+    return row
+  })
+
+  if (rows.length > MAX_DISPLAY_ROWS) {
+    rows = rows.slice(0, MAX_DISPLAY_ROWS)
+  }
+
+  return { columns, rows }
+}
 
 export function SpreadsheetViewer({
   content,
@@ -49,8 +95,9 @@ export function SpreadsheetViewer({
   // File change indicator (badge on refresh button)
   const [hasFileChanged, setHasFileChanged] = useState(false)
 
-  // CSV is editable, Excel is read-only
-  const isEditable = fileType === 'csv' && !!onChange
+  // Editable when the host provides a change handler
+  // (App passes one for CSV and for .xlsx files; .xls stays read-only)
+  const isEditable = !!onChange
 
   // Check if Excel is installed on mount and listen for messages
   useEffect(() => {
@@ -91,33 +138,61 @@ export function SpreadsheetViewer({
     setShowSizeWarning(false)
   }, [sizeBytes, proceedWithLargeFile])
 
-  // Parse content based on file type
+  // CSV: parse on content change
   useEffect(() => {
-    if (showSizeWarning && !proceedWithLargeFile) {
-      return
-    }
+    if (fileType !== 'csv') return
+    if (showSizeWarning && !proceedWithLargeFile) return
 
-    setIsLoading(true)
+    parseCSV(content)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, fileType, showSizeWarning, proceedWithLargeFile])
 
-    // Clear cached workbook when content changes (forces re-parse on refresh)
-    setCachedWorkbook(null)
+  // XLSX: parse the workbook ONCE per content change and cache it.
+  //
+  // Fix for #110: this effect must NOT depend on selectedSheet. The old
+  // combined effect cleared cachedWorkbook whenever the default sheet was
+  // set (selectedSheet was a dependency), which left the cache null and
+  // permanently hid the sheet selector. Sheet switching is now a separate,
+  // extraction-only effect below.
+  useEffect(() => {
+    if (fileType !== 'xlsx') return
+    if (showSizeWarning && !proceedWithLargeFile) return
 
     try {
-      if (fileType === 'csv') {
-        parseCSV(content)
-      } else if (fileType === 'xlsx') {
-        parseExcel(content, encoding, selectedSheet)
+      const workbook = XLSX.read(content, {
+        type: encoding === 'base64' ? 'base64' : 'string',
+        // Keeps column widths / row heights through an edit-save round-trip
+        cellStyles: true,
+      })
+
+      if (workbook.SheetNames.length === 0) {
+        setParsedData({ columns: [], rows: [], error: 'Workbook contains no sheets' })
+        setIsLoading(false)
+        return
       }
+
+      setCachedWorkbook(workbook)
+      // Keep the current sheet across refreshes when it still exists
+      setSelectedSheet(prev =>
+        prev && workbook.SheetNames.includes(prev) ? prev : workbook.SheetNames[0]
+      )
     } catch (error) {
-      console.error('Parse error:', error)
+      console.error('Excel parse error:', error)
       setParsedData({
         columns: [],
         rows: [],
-        error: error instanceof Error ? error.message : 'Failed to parse file',
+        error: error instanceof Error ? error.message : 'Failed to parse Excel file',
       })
       setIsLoading(false)
     }
-  }, [content, fileType, encoding, showSizeWarning, proceedWithLargeFile, selectedSheet])
+  }, [content, fileType, encoding, showSizeWarning, proceedWithLargeFile])
+
+  // XLSX: extract the selected sheet from the cached workbook
+  useEffect(() => {
+    if (fileType !== 'xlsx' || !cachedWorkbook || !selectedSheet) return
+    setParsedData(extractSheet(cachedWorkbook, selectedSheet))
+    setIsLoading(false)
+  }, [fileType, cachedWorkbook, selectedSheet])
 
   const parseCSV = (csvContent: string) => {
     Papa.parse(csvContent, {
@@ -145,60 +220,6 @@ export function SpreadsheetViewer({
         setIsLoading(false)
       },
     })
-  }
-
-  const parseExcel = (base64Content: string, enc?: string, sheetName?: string) => {
-    try {
-      // CLIENT-SIDE CACHING: Parse workbook ONCE and cache it
-      let workbook = cachedWorkbook
-      if (!workbook) {
-        workbook = XLSX.read(base64Content, {
-          type: enc === 'base64' ? 'base64' : 'string',
-        })
-        setCachedWorkbook(workbook)
-
-        // Set default selected sheet if not already set
-        if (!selectedSheet && workbook.SheetNames.length > 0) {
-          setSelectedSheet(workbook.SheetNames[0])
-        }
-      }
-
-      // Determine which sheet to display
-      const targetSheet = sheetName || selectedSheet || workbook.SheetNames[0]
-      if (!targetSheet || !workbook.Sheets[targetSheet]) {
-        setParsedData({
-          columns: [],
-          rows: [],
-          error: 'Sheet not found in workbook',
-        })
-        setIsLoading(false)
-        return
-      }
-
-      const worksheet = workbook.Sheets[targetSheet]
-
-      // Convert to JSON with header row
-      let rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet)
-
-      // Get column names from first row
-      const columns = rows.length > 0 ? Object.keys(rows[0]) : []
-
-      // Truncate if too many rows
-      if (rows.length > MAX_DISPLAY_ROWS) {
-        rows = rows.slice(0, MAX_DISPLAY_ROWS)
-      }
-
-      setParsedData({ columns, rows })
-      setIsLoading(false)
-    } catch (error) {
-      console.error('Excel parse error:', error)
-      setParsedData({
-        columns: [],
-        rows: [],
-        error: error instanceof Error ? error.message : 'Failed to parse Excel file',
-      })
-      setIsLoading(false)
-    }
   }
 
   // Handle cell edits (CSV only)
@@ -330,6 +351,91 @@ export function SpreadsheetViewer({
     onChange(csvString)
   }, [parsedData, onChange])
 
+  // ── Excel editing (XLSX only) ────────────────────────────────────────
+  // Edits write directly into the cached workbook's worksheet cells, so
+  // formulas/values in untouched cells are preserved. The whole workbook
+  // is then re-serialized and sent to the extension for dirty/save handling.
+
+  const serializeWorkbook = useCallback((workbook: XLSX.WorkBook) => {
+    if (!onChange) return
+    try {
+      const base64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' }) as string
+      onChange(base64)
+    } catch (error) {
+      console.error('Excel serialize error:', error)
+      sendToExtension('error', {
+        message: error instanceof Error ? error.message : 'Failed to serialize workbook',
+      })
+    }
+  }, [onChange])
+
+  const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, value: string) => {
+    if (!cachedWorkbook || !selectedSheet || !parsedData || !onChange) return
+    const worksheet = cachedWorkbook.Sheets[selectedSheet]
+    if (!worksheet) return
+
+    const colIndex = parsedData.columns.indexOf(columnId)
+    if (colIndex === -1) return
+
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
+    const addr = XLSX.utils.encode_cell({
+      r: range.s.r + rowIndex,
+      c: range.s.c + colIndex,
+    })
+
+    if (value === '') {
+      delete worksheet[addr]
+    } else {
+      // Replacing the whole cell object drops any formula the cell had —
+      // basic editing stores plain values only
+      const numeric = value.trim() !== '' && !Number.isNaN(Number(value))
+      worksheet[addr] = numeric ? { t: 'n', v: Number(value) } : { t: 's', v: value }
+    }
+
+    const newRows = [...parsedData.rows]
+    newRows[rowIndex] = { ...newRows[rowIndex], [columnId]: value }
+    setParsedData({ ...parsedData, rows: newRows })
+
+    serializeWorkbook(cachedWorkbook)
+  }, [cachedWorkbook, selectedSheet, parsedData, onChange, serializeWorkbook])
+
+  const handleExcelAddRow = useCallback(() => {
+    if (!cachedWorkbook || !selectedSheet || !parsedData || !onChange) return
+    const worksheet = cachedWorkbook.Sheets[selectedSheet]
+    if (!worksheet) return
+
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
+    range.e.r += 1
+    worksheet['!ref'] = XLSX.utils.encode_range(range)
+
+    const emptyRow: Record<string, unknown> = {}
+    for (const col of parsedData.columns) {
+      emptyRow[col] = ''
+    }
+    setParsedData({ ...parsedData, rows: [...parsedData.rows, emptyRow] })
+
+    serializeWorkbook(cachedWorkbook)
+  }, [cachedWorkbook, selectedSheet, parsedData, onChange, serializeWorkbook])
+
+  const handleExcelAddColumn = useCallback(() => {
+    if (!cachedWorkbook || !selectedSheet || !parsedData || !onChange) return
+    const worksheet = cachedWorkbook.Sheets[selectedSheet]
+    if (!worksheet) return
+
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
+    range.e.c += 1
+    worksheet['!ref'] = XLSX.utils.encode_range(range)
+
+    const newCol = XLSX.utils.encode_col(range.e.c)
+    setParsedData({
+      ...parsedData,
+      columns: [...parsedData.columns, newCol],
+      rows: parsedData.rows.map(row => ({ ...row, [newCol]: '' })),
+    })
+
+    serializeWorkbook(cachedWorkbook)
+  }, [cachedWorkbook, selectedSheet, parsedData, onChange, serializeWorkbook])
+
   // Handle conflict dialog actions
   const handleConfirmDiscard = useCallback(() => {
     sendToExtension('confirmRefresh', {})
@@ -346,7 +452,7 @@ export function SpreadsheetViewer({
   // Handle sheet switching (Excel only)
   const handleSheetChange = useCallback((sheetName: string) => {
     setSelectedSheet(sheetName)
-    // Re-parse will happen automatically via useEffect dependency
+    // Sheet extraction happens automatically via useEffect dependency
   }, [])
 
   // Handle refresh from disk
@@ -373,16 +479,7 @@ export function SpreadsheetViewer({
     return { rowCount, colCount, truncated }
   }, [parsedData, sizeBytes])
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
-        <div className="text-[var(--r-ink-strong)]">Parsing {filename}...</div>
-      </div>
-    )
-  }
-
-  // Size warning
+  // Size warning (checked first: no data is parsed while it's showing)
   if (showSizeWarning) {
     const sizeMB = sizeBytes ? (sizeBytes / (1024 * 1024)).toFixed(1) : '?'
     return (
@@ -403,8 +500,17 @@ export function SpreadsheetViewer({
     )
   }
 
+  // Loading state
+  if (isLoading || !parsedData) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
+        <div className="text-[var(--r-ink-strong)]">Parsing {filename}...</div>
+      </div>
+    )
+  }
+
   // Error state
-  if (parsedData?.error) {
+  if (parsedData.error) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-[var(--vscode-editor-background)] gap-2">
         <div className="text-[var(--r-error)] font-semibold">
@@ -417,16 +523,7 @@ export function SpreadsheetViewer({
     )
   }
 
-  // No data
-  if (!parsedData || parsedData.rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[var(--vscode-editor-background)]">
-        <div className="text-[var(--r-ink-muted)]">
-          {filename} is empty
-        </div>
-      </div>
-    )
-  }
+  const isEmpty = parsedData.rows.length === 0
 
   return (
     <>
@@ -496,21 +593,31 @@ export function SpreadsheetViewer({
         </div>
       )}
 
-      {/* Table */}
-      <div className="flex-1 overflow-hidden">
-        <DataTable
-          data={parsedData.rows}
-          columns={parsedData.columns}
-          editable={isEditable}
-          onCellChange={handleCellChange}
-          onAddRow={isEditable ? handleAddRow : undefined}
-          onAddColumn={isEditable ? handleAddColumn : undefined}
-          onRenameColumn={isEditable ? handleRenameColumn : undefined}
-          onDeleteColumn={isEditable ? handleDeleteColumn : undefined}
-          onInsertRowAt={isEditable ? handleInsertRowAt : undefined}
-          onDeleteRow={isEditable ? handleDeleteRow : undefined}
-        />
-      </div>
+      {/* Table — empty state rendered inline so the toolbar and sheet
+          selector stay accessible (an empty first sheet must not hide
+          the other sheets in a multi-sheet workbook) */}
+      {isEmpty ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-[var(--r-ink-muted)]">
+            {fileType === 'xlsx' && selectedSheet ? `${selectedSheet} is empty` : `${filename} is empty`}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-hidden">
+          <DataTable
+            data={parsedData.rows}
+            columns={parsedData.columns}
+            editable={isEditable}
+            onCellChange={fileType === 'xlsx' ? handleExcelCellChange : handleCellChange}
+            onAddRow={isEditable ? (fileType === 'xlsx' ? handleExcelAddRow : handleAddRow) : undefined}
+            onAddColumn={isEditable ? (fileType === 'xlsx' ? handleExcelAddColumn : handleAddColumn) : undefined}
+            onRenameColumn={isEditable && fileType === 'csv' ? handleRenameColumn : undefined}
+            onDeleteColumn={isEditable && fileType === 'csv' ? handleDeleteColumn : undefined}
+            onInsertRowAt={isEditable && fileType === 'csv' ? handleInsertRowAt : undefined}
+            onDeleteRow={isEditable && fileType === 'csv' ? handleDeleteRow : undefined}
+          />
+        </div>
+      )}
     </div>
     </>
   )

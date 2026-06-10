@@ -395,6 +395,14 @@ function App() {
     sendToExtension('contentChanged', { content: newContent })
   }, [])
 
+  // Handle Excel content changes — newContent is the serialized workbook
+  // as base64. Updating local content keeps the viewer's parsed workbook in
+  // sync and makes a later revert (different base64 string) re-render.
+  const handleExcelChange = useCallback((newContent: string) => {
+    setContent(newContent)
+    sendToExtension('contentChanged', { content: newContent })
+  }, [])
+
   // Side panel toggle helper — TOC / Properties / Agent share one slot, mutually exclusive.
   // 'agent' is intentionally not restored from localStorage on init (it's auto-pinned on
   // load only for agent files), so writing it here is harmless across sessions.
@@ -573,6 +581,8 @@ function App() {
 
   // Route to SpreadsheetViewer for CSV/Excel files
   if (fileType === 'csv' || fileType === 'xlsx') {
+    // .xlsx is editable; legacy .xls stays read-only (saving would re-encode it as xlsx)
+    const isXlsxEditable = fileType === 'xlsx' && filename.toLowerCase().endsWith('.xlsx')
     return (
       <SpreadsheetViewer
         content={content}
@@ -580,7 +590,7 @@ function App() {
         fileType={fileType}
         encoding={encoding}
         sizeBytes={sizeBytes}
-        onChange={fileType === 'csv' ? handleCSVChange : undefined}
+        onChange={fileType === 'csv' ? handleCSVChange : (isXlsxEditable ? handleExcelChange : undefined)}
       />
     )
   }

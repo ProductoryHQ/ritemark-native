@@ -522,7 +522,7 @@
       },
       {
         "viewType": "ritemark.excelViewer",
-        "displayName": "Excel Preview",
+        "displayName": "Excel Editor",
         "selector": [
           {
             "filenamePattern": "*.xlsx"
