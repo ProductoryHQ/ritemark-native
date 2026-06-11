@@ -376,6 +376,15 @@ export function SpreadsheetViewer({
     }
   }, [onChange])
 
+  // Formula lookup for the fx bar — the grid is anchored at A1, so display
+  // indexes ARE the cell address. Returns the formula with a leading '='.
+  const getExcelCellFormula = useCallback((rowPosition: number, columnIndex: number): string | undefined => {
+    if (!cachedWorkbook || !selectedSheet) return undefined
+    const worksheet = cachedWorkbook.Sheets[selectedSheet]
+    const cell = worksheet?.[XLSX.utils.encode_cell({ r: rowPosition, c: columnIndex })]
+    return cell?.f ? `=${cell.f}` : undefined
+  }, [cachedWorkbook, selectedSheet])
+
   const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, value: string) => {
     if (!cachedWorkbook || !selectedSheet || !parsedData || !onChange) return
     const worksheet = cachedWorkbook.Sheets[selectedSheet]
@@ -565,43 +574,10 @@ export function SpreadsheetViewer({
           hasFileChanged={hasFileChanged}
         />
 
-      {/* Status bar */}
-      <div className="flex items-center justify-between px-3 py-1 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] text-xs text-[var(--r-ink-muted)]">
-        <span>
-          {isEditable && (
-            <span className="text-[var(--r-accent)]">
-              (click cell to edit)
-            </span>
-          )}
-        </span>
-        <span>
-          {statusInfo?.rowCount.toLocaleString()} rows × {statusInfo?.colCount} columns
-          {statusInfo?.truncated && (
-            <span className="ml-2 text-[var(--vscode-editorWarning-foreground)]">
-              (showing first {MAX_DISPLAY_ROWS.toLocaleString()})
-            </span>
-          )}
-        </span>
-      </div>
-
-      {/* Sheet selector (Excel only, if multiple sheets) */}
-      {fileType === 'xlsx' && cachedWorkbook && cachedWorkbook.SheetNames.length > 1 && (
-        <div className="flex gap-1 px-2 py-1 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] overflow-x-auto">
-          {cachedWorkbook.SheetNames.map(sheetName => (
-            <Button
-              key={sheetName}
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSheetChange(sheetName)}
-              className={`h-auto px-3 py-1 text-xs rounded ${
-                sheetName === selectedSheet
-                  ? 'bg-[var(--r-accent)] text-[var(--vscode-button-foreground)] font-medium hover:bg-[var(--r-accent)] hover:text-[var(--vscode-button-foreground)]'
-                  : 'text-[var(--r-ink-strong)]'
-              }`}
-            >
-              {sheetName}
-            </Button>
-          ))}
+      {/* Truncation warning — only rendered when a large file is cut off */}
+      {statusInfo?.truncated && (
+        <div className="flex items-center justify-end px-3 py-1 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] text-xs text-[var(--vscode-editorWarning-foreground)]">
+          <span>showing first {MAX_DISPLAY_ROWS.toLocaleString()} rows</span>
         </div>
       )}
 
@@ -632,7 +608,33 @@ export function SpreadsheetViewer({
             onDeleteColumn={isEditable && fileType === 'csv' ? handleDeleteColumn : undefined}
             onInsertRowAt={isEditable && fileType === 'csv' ? handleInsertRowAt : undefined}
             onDeleteRow={isEditable && fileType === 'csv' ? handleDeleteRow : undefined}
+            getCellFormula={fileType === 'xlsx' ? getExcelCellFormula : undefined}
           />
+        </div>
+      )}
+
+      {/* Sheet tab strip — bottom of the viewport, Excel-style (Excel only,
+          if multiple sheets). The hairline runs across inactive tabs and the
+          strip remainder but is BROKEN over the active tab, whose editor
+          background merges seamlessly with the grid above (no gap, no line). */}
+      {fileType === 'xlsx' && cachedWorkbook && cachedWorkbook.SheetNames.length > 1 && (
+        <div className="flex bg-[var(--vscode-sideBar-background)] overflow-x-auto shrink-0">
+          {cachedWorkbook.SheetNames.map(sheetName => (
+            <Button
+              key={sheetName}
+              variant="ghost"
+              size="sm"
+              onClick={() => handleSheetChange(sheetName)}
+              className={`h-auto rounded-none px-3.5 py-1 text-xs border-t border-b-2 ${
+                sheetName === selectedSheet
+                  ? 'bg-[var(--vscode-editor-background)] text-[var(--r-accent)] font-semibold border-t-transparent border-x border-x-[var(--r-hairline)] border-b-[var(--r-accent)] hover:bg-[var(--vscode-editor-background)] hover:text-[var(--r-accent)]'
+                  : 'border-t-[var(--r-hairline)] border-x border-x-transparent border-b-transparent text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)]'
+              }`}
+            >
+              {sheetName}
+            </Button>
+          ))}
+          <div className="flex-1 min-w-4 border-t border-[var(--r-hairline)]" />
         </div>
       )}
     </div>

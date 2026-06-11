@@ -1,4 +1,4 @@
-# Sprint 80: Excel Editing + Issue #110 Fix
+# Sprint 81: Excel Editing + Issue #110 Fix
 
 ## Goal
 
@@ -77,12 +77,12 @@ Upgrade the Excel editor from read-only to basic editing for .xlsx files, and fi
 **Known deviations (retroactive record):**
 - Work was implemented before this sprint doc was created; this plan is a retroactive record.
 - Branch naming: harness-designated session branch `claude/excel-editing-issue-110-8o1ou1`
-  used instead of `sprint-80-excel-editing` (remote session branch is fixed; sprint code is
+  used instead of `sprint-81-excel-editing` (remote session branch is fixed; sprint code is
   correctly NOT on `main`).
 
 ## Approval
 
 - [x] Jarmo approved this sprint plan ("plan approved", 2026-06-10)
 - [x] qa-validator pass before merge (2026-06-10 — PASS; one pre-existing warning:
-      debug console.log at excelEditorProvider.ts:87-89, pre-dates Sprint 80, cleanup deferred)
+      debug console.log at excelEditorProvider.ts:87-89, pre-dates Sprint 81, cleanup deferred)
 - [ ] Gate 2: Jarmo tested locally before release
