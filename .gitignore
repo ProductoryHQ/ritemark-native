@@ -118,3 +118,6 @@ docs/releases/**/*.xlsx
 extensions/ritemark/binaries/agents/darwin-arm64/
 extensions/ritemark/binaries/agents/darwin-x64/
 extensions/ritemark/binaries/agents/win32-x64/
+
+# Excel lock files
+~$*.xlsx
