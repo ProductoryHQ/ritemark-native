@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-06-08 (Sprint 79 close — runtime unification; daemon generalized for Sprint 80)
+**Last updated:** 2026-06-11 (Sprint 80 close — scheduled-tasks daemon; Sprint 81 close — Excel editing + #110 multi-sheet fix)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -87,6 +87,8 @@ extensions/ritemark/src/
 ├── export/          PDF/DOCX export
 └── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts
 ```
+
+Editor provider contracts: `ritemarkEditor.ts` is a `CustomTextEditorProvider` (markdown + CSV, editable). `excelEditorProvider.ts` is a full `CustomEditorProvider<ExcelDocument>` since Sprint 81 — .xlsx is editable (dirty tracking via `CustomDocumentContentChangeEvent`, save/save-as/revert/hot-exit backup; no undo-redo stack), .xls stays read-only. `docxEditorProvider.ts` and `pdfEditorProvider.ts` are read-only (`CustomReadonlyEditorProvider`).
 
 Entry point `extension.ts` registers all providers, commands, and views.
 

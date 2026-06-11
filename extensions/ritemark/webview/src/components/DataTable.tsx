@@ -23,6 +23,9 @@ export interface DataTableProps {
   onDeleteColumn?: (columnName: string) => void
   onInsertRowAt?: (index: number) => void
   onDeleteRow?: (index: number) => void
+  /** Returns the cell's formula (with leading =) when it has one — shown in the
+   *  fx bar instead of the cached value. Excel-backed grids only. */
+  getCellFormula?: (rowPosition: number, columnIndex: number) => string | undefined
 }
 
 interface ActiveCell {
@@ -30,7 +33,7 @@ interface ActiveCell {
   columnIndex: number
 }
 
-export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onAddColumn, onRenameColumn, onDeleteColumn, onInsertRowAt, onDeleteRow }: DataTableProps) {
+export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onAddColumn, onRenameColumn, onDeleteColumn, onInsertRowAt, onDeleteRow, getCellFormula }: DataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const [sorting, setSorting] = useState<SortingState>([])
   const [hoverInsertIndex, setHoverInsertIndex] = useState<number | null>(null)
@@ -162,7 +165,12 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
 
   const activeColumnId = activeCell ? columns[activeCell.columnIndex] : ''
   const activeCellValue = activeCell ? getCellValue(activeCell) : ''
-  const formulaValue = isSameCell(editingCell, activeCell) ? editValue : activeCellValue
+  // Excel-style: a formula cell shows its formula in the fx bar (read-only —
+  // there is no formula engine; editing the cell in the grid replaces the
+  // formula with a plain value, which is the documented basic-editing scope).
+  const activeFormula = activeCell ? getCellFormula?.(activeCell.rowPosition, activeCell.columnIndex) : undefined
+  const isEditingActive = isSameCell(editingCell, activeCell)
+  const formulaValue = isEditingActive ? editValue : (activeFormula ?? activeCellValue)
 
   useEffect(() => {
     if (!activeCell || editingCell) return
@@ -230,8 +238,11 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
             </span>
             <textarea
               value={formulaValue}
+              readOnly={!!activeFormula && !isEditingActive}
+              title={activeFormula && !isEditingActive ? 'Formula cell — formulas are read-only; editing the cell in the grid replaces the formula with a value' : undefined}
               onChange={(e) => {
                 if (!activeCell) return
+                if (activeFormula && !isSameCell(editingCell, activeCell)) return
                 if (!isSameCell(editingCell, activeCell)) {
                   setEditingCell(activeCell)
                 }

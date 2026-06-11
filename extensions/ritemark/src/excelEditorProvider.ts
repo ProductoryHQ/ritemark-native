@@ -7,12 +7,25 @@ import { trackEvent } from './analytics/posthog';
 
 /**
  * Custom editor provider for Excel files (.xlsx, .xls)
- * Provides read-only preview with multi-sheet support
+ * Multi-sheet preview with basic editing for .xlsx (cell edits, add row/column).
+ * .xls stays read-only (SheetJS would re-encode it as xlsx on save).
  */
-export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<ExcelDocument> {
+export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDocument> {
   // File watchers and debounce timers
   private fileWatchers = new Map<string, vscode.FileSystemWatcher>();
   private fileChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
+  // Webview panels per document (for revert/refresh pushes)
+  private webviewPanels = new Map<string, vscode.WebviewPanel>();
+  // Documents with unsaved webview edits (uri.toString())
+  private dirtyDocuments = new Set<string>();
+  // Files currently being saved by us — suppresses our own watcher events
+  private savingFiles = new Set<string>();
+  // One-time-per-session caveat about basic editing fidelity
+  private editCaveatShown = false;
+
+  private readonly _onDidChangeCustomDocument =
+    new vscode.EventEmitter<vscode.CustomDocumentContentChangeEvent<ExcelDocument>>();
+  public readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     return vscode.window.registerCustomEditorProvider(
@@ -21,12 +34,20 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
       {
         webviewOptions: {
           retainContextWhenHidden: true
-        }
+        },
+        supportsMultipleEditorsPerDocument: false
       }
     );
   }
 
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  /**
+   * Only .xlsx supports editing; .xls is read-only
+   */
+  private isEditable(document: ExcelDocument): boolean {
+    return document.uri.fsPath.toLowerCase().endsWith('.xlsx');
+  }
 
   /**
    * Called when VS Code needs to open an Excel file
@@ -38,8 +59,9 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
     _token: vscode.CancellationToken
   ): Promise<ExcelDocument> {
     try {
-      // Use async file IO (refinement from Codex review)
-      const buffer = await fs.readFile(uri.fsPath);
+      // Restore from hot-exit backup when present
+      const dataPath = openContext.backupId ? vscode.Uri.parse(openContext.backupId).fsPath : uri.fsPath;
+      const buffer = await fs.readFile(dataPath);
       return new ExcelDocument(uri, buffer);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -77,6 +99,8 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
 
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri);
 
+    this.webviewPanels.set(document.uri.toString(), webviewPanel);
+
     // Create file watcher for external changes
     this.createFileWatcher(document, webviewPanel.webview);
 
@@ -90,9 +114,29 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
             this.sendExcelData(webviewPanel.webview, document);
             break;
 
+          case 'contentChanged':
+            // Webview edited the workbook — update document and mark dirty
+            this.handleContentChanged(document, message.content as string);
+            break;
+
           case 'refresh':
-            // Refresh: re-read file and send fresh content
-            await this.handleRefresh(webviewPanel.webview, document);
+            // Refresh: unsaved edits require an explicit discard confirmation
+            // (the webview shows a ConflictDialog and answers with
+            // confirmRefresh / cancelRefresh)
+            if (this.dirtyDocuments.has(document.uri.toString())) {
+              webviewPanel.webview.postMessage({ type: 'confirmDiscard' });
+            } else {
+              await this.handleRefresh(webviewPanel.webview, document);
+            }
+            break;
+
+          case 'confirmRefresh':
+            // User confirmed discarding local edits in favor of disk state
+            await this.discardEditsAndRefresh(document, webviewPanel.webview);
+            break;
+
+          case 'cancelRefresh':
+            // User kept their local edits — nothing to do
             break;
 
           case 'checkExcel':
@@ -123,7 +167,111 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
     // Clean up file watcher when webview is disposed
     webviewPanel.onDidDispose(() => {
       this.disposeFileWatcher(document.uri.fsPath);
+      if (this.webviewPanels.get(document.uri.toString()) === webviewPanel) {
+        this.webviewPanels.delete(document.uri.toString());
+      }
+      this.dirtyDocuments.delete(document.uri.toString());
     });
+  }
+
+  /**
+   * Apply a webview edit (full serialized workbook, base64) to the document
+   */
+  private handleContentChanged(document: ExcelDocument, base64Content: string): void {
+    if (!this.isEditable(document) || typeof base64Content !== 'string') {
+      return;
+    }
+
+    document.update(Buffer.from(base64Content, 'base64'));
+    this.dirtyDocuments.add(document.uri.toString());
+    this._onDidChangeCustomDocument.fire({ document });
+
+    if (!this.editCaveatShown) {
+      this.editCaveatShown = true;
+      void trackEvent('feature_used', { feature: 'excel_edit' });
+      vscode.window.showInformationMessage(
+        'Excel editing is basic: edited cells replace formulas with plain values, and complex formatting may be simplified when the file is saved.'
+      );
+    }
+  }
+
+  // ── Save / revert / backup (vscode.CustomEditorProvider) ──────────────
+
+  async saveCustomDocument(document: ExcelDocument, _token: vscode.CancellationToken): Promise<void> {
+    await this.writeFileSuppressingWatcher(document.uri.fsPath, document.buffer, document.uri.fsPath);
+    this.dirtyDocuments.delete(document.uri.toString());
+  }
+
+  async saveCustomDocumentAs(
+    document: ExcelDocument,
+    destination: vscode.Uri,
+    _token: vscode.CancellationToken
+  ): Promise<void> {
+    await this.writeFileSuppressingWatcher(destination.fsPath, document.buffer, document.uri.fsPath);
+  }
+
+  async revertCustomDocument(document: ExcelDocument, _token: vscode.CancellationToken): Promise<void> {
+    const buffer = await fs.readFile(document.uri.fsPath);
+    document.update(buffer);
+    this.dirtyDocuments.delete(document.uri.toString());
+    // Push fresh content so the webview re-renders the reverted workbook
+    const panel = this.webviewPanels.get(document.uri.toString());
+    if (panel) {
+      this.sendExcelData(panel.webview, document);
+    }
+  }
+
+  /**
+   * Confirmed refresh of a dirty document: discard local edits and reload
+   * from disk. Goes through VS Code's revert so the dirty indicator clears
+   * (the webview that sent the request is the active editor); falls back to
+   * a manual reload if the command fails.
+   */
+  private async discardEditsAndRefresh(document: ExcelDocument, webview: vscode.Webview): Promise<void> {
+    this.dirtyDocuments.delete(document.uri.toString());
+    try {
+      await vscode.commands.executeCommand('workbench.action.files.revert', document.uri);
+    } catch {
+      await this.handleRefresh(webview, document);
+    }
+  }
+
+  async backupCustomDocument(
+    document: ExcelDocument,
+    context: vscode.CustomDocumentBackupContext,
+    _token: vscode.CancellationToken
+  ): Promise<vscode.CustomDocumentBackup> {
+    const destination = context.destination;
+    await fs.mkdir(path.dirname(destination.fsPath), { recursive: true });
+    await fs.writeFile(destination.fsPath, document.buffer);
+    return {
+      id: destination.toString(),
+      delete: async () => {
+        try {
+          await fs.unlink(destination.fsPath);
+        } catch {
+          // Backup already gone — nothing to do
+        }
+      }
+    };
+  }
+
+  /**
+   * Write the buffer to disk while suppressing our own file watcher,
+   * so saving doesn't surface a "file changed externally" badge.
+   */
+  private async writeFileSuppressingWatcher(
+    targetPath: string,
+    buffer: Buffer,
+    watchedPath: string
+  ): Promise<void> {
+    this.savingFiles.add(watchedPath);
+    try {
+      await fs.writeFile(targetPath, buffer);
+    } finally {
+      // Keep suppression slightly longer than the watcher debounce window
+      setTimeout(() => this.savingFiles.delete(watchedPath), 1000);
+    }
   }
 
   /**
@@ -137,17 +285,12 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
       // Re-read file from disk
       const buffer = await fs.readFile(document.uri.fsPath);
       const filename = path.basename(document.uri.fsPath);
-      const ext = path.extname(document.uri.fsPath).toLowerCase();
+
+      // Keep the document in sync so a later save doesn't resurrect stale edits
+      document.update(buffer);
 
       // Send fresh content to webview
-      webview.postMessage({
-        type: 'load',
-        fileType: ext === '.xlsx' || ext === '.xls' ? 'xlsx' : 'xlsx',
-        content: buffer.toString('base64'),
-        encoding: 'base64',
-        filename: filename,
-        sizeBytes: buffer.length
-      });
+      this.sendExcelData(webview, document);
 
       // Show success notification
       vscode.window.showInformationMessage(`Refreshed ${filename}`);
@@ -167,11 +310,10 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
   ): void {
     const base64 = document.buffer.toString('base64');
     const filename = path.basename(document.uri.fsPath);
-    const ext = path.extname(document.uri.fsPath).toLowerCase();
 
     webview.postMessage({
       type: 'load',
-      fileType: ext === '.xlsx' || ext === '.xls' ? 'xlsx' : 'xlsx',
+      fileType: 'xlsx',
       content: base64,
       encoding: 'base64',
       filename: filename,
@@ -288,6 +430,11 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
   ): void {
     const filePath = document.uri.fsPath;
 
+    // Ignore changes caused by our own save
+    if (this.savingFiles.has(filePath)) {
+      return;
+    }
+
     // Clear existing debounce timer
     const existingTimer = this.fileChangeDebounceTimers.get(filePath);
     if (existingTimer) {
@@ -298,7 +445,6 @@ export class ExcelEditorProvider implements vscode.CustomReadonlyEditorProvider<
     const timer = setTimeout(() => {
       const filename = path.basename(filePath);
 
-      // Excel is read-only, so never dirty
       webview.postMessage({
         type: 'fileChanged',
         filename,
