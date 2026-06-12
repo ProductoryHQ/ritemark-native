@@ -147,8 +147,12 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
     //    js/main.js runs — so its message listener is registered before the
     //    draw.io app can emit its 'init' event.
     const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data: blob:; script-src ${webview.cspSource} 'nonce-${nonce}' 'unsafe-eval'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource} data:; connect-src ${webview.cspSource} data:;">`;
+    // VS Code injects default webview styles (body padding: 0 20px) that
+    // draw.io's layout math doesn't expect — the UI overflows the viewport by
+    // 20px on the right. Reset to a full-bleed document.
+    const reset = `<style>html, body { margin: 0 !important; padding: 0 !important; width: 100%; height: 100%; overflow: hidden; }</style>`;
     return drawioHtmlRaw
-      .replace('<head>', `<head><base href="${drawioBaseUri}/">${csp}`)
+      .replace('<head>', `<head><base href="${drawioBaseUri}/">${csp}${reset}`)
       .replace(
         '<script src="js/bootstrap.js"></script>',
         `<script src="js/bootstrap.js"></script>` +
