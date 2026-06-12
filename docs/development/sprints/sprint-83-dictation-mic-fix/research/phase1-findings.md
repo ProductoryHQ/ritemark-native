@@ -1,4 +1,4 @@
-# Sprint 80 Phase 1 Research: Voice Dictation Mic Access — Codebase Audit
+# Sprint 83 Phase 1 Research: Voice Dictation Mic Access — Codebase Audit
 
 Date: 2026-06-10
 Status: Complete — findings fed into sprint-plan.md
@@ -52,7 +52,7 @@ the same entitlements file). This is architecturally correct.
 
 Searched the entire repository for `NSMicrophoneUsageDescription`. Results:
 
-- `docs/development/sprints/sprint-80-dictation-mic-fix/sprint-plan.md` — documentation only
+- `docs/development/sprints/sprint-83-dictation-mic-fix/sprint-plan.md` — documentation only
 - `docs/development/sprints/sprint-23-estonian-stt/notes/status-report-2025-01-18.md` — historical note only
 
 The key is NOT present in:

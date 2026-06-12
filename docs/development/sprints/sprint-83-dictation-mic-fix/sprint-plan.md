@@ -1,7 +1,7 @@
-# Sprint 80: Voice Dictation — Microphone Access Fix (macOS Tahoe)
+# Sprint 83: Voice Dictation — Microphone Access Fix (macOS Tahoe)
 
 Track: Plain full track
-Branch: sprint-80-dictation-mic-fix
+Branch: sprint-83-dictation-mic-fix
 Status: Phase 2 (PLAN) — awaiting Jarmo approval
 
 ---
@@ -21,7 +21,7 @@ we can run `plutil -p Ritemark.app/Contents/Info.plist | grep -i micro` and repr
       (e.g. the Claude desktop app visible in their permission list, or Chrome on a mic-test
       page)? This is the H3-vs-H4 discriminator.
 
-**Q3 — Sprint number:** Sprint 80 appears to be the next free number based on the sprint directory.
+**Q3 — Sprint number:** Sprint 83 appears to be the next free number based on the sprint directory.
 Please confirm.
 
 ---
@@ -261,8 +261,8 @@ pipeline so the root cause cannot silently regress.
 Upon approval, the FIRST action is:
 
 ```bash
-git checkout -b sprint-80-dictation-mic-fix
-git branch --show-current   # must print: sprint-80-dictation-mic-fix
+git checkout -b sprint-83-dictation-mic-fix
+git branch --show-current   # must print: sprint-83-dictation-mic-fix
 ```
 
 No implementation code may be written until that branch is checked out.
