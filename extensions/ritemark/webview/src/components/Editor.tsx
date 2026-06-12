@@ -688,6 +688,29 @@ export function Editor({
             })
             .run()
         }
+        // Ack so flows that open another editor next (e.g. /diagram) wait
+        // until the insert has reached the TextDocument — opening a new tab
+        // earlier steals focus, and an externalChange reload from disk (which
+        // doesn't have the image yet) would wipe the fresh insert.
+        sendToExtension('imageInserted', { path: message.path })
+      } else if (message.type === 'imageRefreshed' && message.displaySrc && message.path) {
+        // The image file changed on disk (e.g. a .drawio.svg saved from the
+        // diagram editor) — surgically swap the src of matching image nodes.
+        // title holds the markdown-relative path; the new displaySrc carries a
+        // cache-buster so the webview actually refetches.
+        const { state, view } = editor
+        const tr = state.tr
+        let changed = false
+        state.doc.descendants((node, pos) => {
+          if (node.type.name === 'image' && node.attrs.title === message.path) {
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: message.displaySrc })
+            changed = true
+          }
+        })
+        if (changed) {
+          tr.setMeta('addToHistory', false)
+          view.dispatch(tr)
+        }
       } else if (message.type === 'imageError' && message.error) {
         console.error('Failed to save image:', message.error)
       }

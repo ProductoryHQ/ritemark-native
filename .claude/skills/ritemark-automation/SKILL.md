@@ -1,9 +1,9 @@
 ---
 name: ritemark-automation
-description: Drive the Ritemark dev instance from the terminal via Chrome DevTools Protocol — for end-to-end testing, demo recordings, and release screenshots. Use whenever you need to launch Ritemark, interact with its UI (AI sidebar, integrated browser, Settings, command palette), or capture screenshots/screen recordings programmatically. Built on agent-browser + the launch skill, with Ritemark-specific knowledge (trust dialog, separate browser-tab CDP targets, workspace requirement for AI features, feature-flag JSON layer).
+description: Drive the Ritemark dev instance from the terminal via Chrome DevTools Protocol — for end-to-end testing, webview-internals debugging, demo recordings, and release screenshots. Use whenever you need to launch Ritemark, interact with its UI (AI sidebar, integrated browser, Settings, command palette), capture screenshots programmatically, or debug INSIDE a webview / custom editor (evaluate JS in webview targets, trace postMessage bridges, diagnose vscode-resource serving). Built on agent-browser + raw CDP (scripts/cdp-eval.js), with Ritemark-specific knowledge (trust dialog, webview target topology, active-frame nesting, service-worker resource rules, workspace requirement for AI features).
 allowed-tools: Read, Bash, Glob, Grep
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Ritemark Automation Skill
@@ -239,6 +239,122 @@ WID=$(osascript -e 'tell application "System Events" to get id of window 1 of ap
 ```
 
 Practical pattern: write the automation as a single bash script with `sleep 2` between visible steps so the recording reads as a deliberate sequence rather than a blur of instant transitions.
+
+## Debugging INSIDE webviews — raw CDP (proven on Sprint 82 draw.io)
+
+agent-browser drives only the top-level workbench page. To inspect what happens
+*inside* a webview (custom editors, the AI sidebar, an embedded app like
+draw.io), go one level deeper with raw CDP. This section is how the Sprint 82
+blank-draw.io-editor bug was root-caused and fix-verified entirely from the
+terminal — no human eyes needed.
+
+### Target discovery — use /json/list, not `agent-browser tab`
+
+`agent-browser tab` lists only `page` targets. Webviews are `iframe`-type
+targets, visible only via the raw HTTP endpoint:
+
+```bash
+curl -s http://localhost:9224/json/list | node -e "
+const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+d.forEach(t=>console.log(t.type+' | '+t.title.slice(0,50)+' | '+t.url.slice(0,90)))"
+```
+
+Reading the list:
+- `page` + workbench-dev.html → the workbench (what agent-browser drives)
+- `iframe` + `vscode-webview://<id>/index.html?...purpose=webviewView` → a **sidebar** webview (AI sidebar, Agent Library)
+- `iframe` + `vscode-webview://...` without `purpose` → an **editor** webview (custom editors)
+- `service_worker` + `vscode-webview://.../service-worker.js` → the resource-serving SW (one per webview origin)
+
+Target IDs and `webSocketDebuggerUrl`s change on every Reload Window — always re-list.
+
+### Evaluating inside a webview — scripts/cdp-eval.js
+
+This skill ships a helper (`scripts/cdp-eval.js` in the skill directory) that
+connects to a target's `webSocketDebuggerUrl` and runs `Runtime.evaluate`:
+
+```bash
+export NODE_PATH=/Users/jarmotuisk/Projects/ritemark-native/vscode/node_modules   # ABSOLUTE — 'ws' lives there
+WS=$(curl -s http://localhost:9224/json/list | node -e "...pick .webSocketDebuggerUrl...")
+node .claude/skills/ritemark-automation/scripts/cdp-eval.js "$WS" "document.title"
+node .claude/skills/ritemark-automation/scripts/cdp-eval.js --await "$WS" "fetch(url).then(r=>r.status)"
+```
+
+**The #1 structural gotcha:** the `vscode-webview://...` target document is VS
+Code's *wrapper*, not your HTML. Your webview HTML lives in a same-origin child
+iframe `#active-frame`. Always probe through it:
+
+```js
+(function(){
+  const af = document.getElementById('active-frame');
+  if (!af || !af.contentDocument) return 'not ready';
+  const d = af.contentDocument;   // YOUR document
+  const w = af.contentWindow;     // YOUR window (globals, fetch with your SW controller)
+  return d.title;
+})()
+```
+
+Identify *which* webview you're in by probing (`document.title`, known element
+ids) — don't trust list order. Probe ALL iframe targets in a loop and `skip`
+the ones that don't match.
+
+### Webview resource-serving truths (hard-won, do not relearn)
+
+How `vscode-resource` URIs are actually served on **desktop** VS Code:
+
+1. Only **subresource fetches from the webview document itself** are served —
+   the service worker authorizes each request by the requesting client's URL.
+2. An `<iframe src="https://file+.vscode-resource...">` **navigation** is NOT
+   served → the iframe loads an empty document (`readyState complete`, 0
+   scripts, empty body). No error anywhere.
+3. A **srcdoc** iframe's subresources also fail (404) — its client URL is
+   `about:srcdoc`, which the SW can't map to a webview. `navigator.serviceWorker.controller`
+   being non-null does NOT mean requests get served.
+4. `fetch()` from the page is additionally gated by the page **CSP
+   `connect-src`** — "Failed to fetch" may be CSP, not the SW. Diagnose by
+   comparing `fetch` in parent vs child contexts (cdp-eval `--await`).
+5. Consequence: an app with many runtime-loaded resources (like draw.io) must
+   run **directly in the webview document** (patched `<base href>` + CSP),
+   never in an iframe. See `src/drawioEditorProvider.ts` for the full pattern,
+   incl. the hidden same-origin relay iframe used as the embed-protocol partner.
+
+Also: VS Code injects default webview styles (`body { padding: 0 20px }`).
+A full-bleed app needs an explicit `margin:0 !important; padding:0 !important`
+reset or it overflows the viewport by 20px on the right.
+
+### Bridge debugging pattern — trace array + CDP probe
+
+When debugging postMessage protocols inside a webview, add a diagnostic trail
+to the bridge script and read it via cdp-eval instead of staring at consoles:
+
+```js
+const trace = window.__rmBridge = { loaded: true, events: [] };
+// push 'host:<type>' / 'drawio:<event>' / 'out:<action>' at each hop
+```
+
+```bash
+node scripts/cdp-eval.js "$WS" "(function(){const af=document.getElementById('active-frame');
+  return JSON.stringify(af.contentWindow.__rmBridge ? af.contentWindow.__rmBridge.events : 'no bridge');})()"
+```
+
+A missing marker tells you which script never ran; a truncated event sequence
+tells you exactly which hop broke. This located three separate draw.io bugs
+(unserved iframe, `</script>` terminating an inline JSON embed, and the
+embed-partner source check) in minutes each.
+
+### Keyboard-focus gotchas when custom editors are open
+
+- `Cmd+P` / `keyboard type` go to the **focused webview**, not the workbench.
+  With a custom editor focused, your "filename + Enter" can be **typed into a
+  document** and silently corrupt workspace fixtures. Symptoms: test files
+  mutate, mystery files appear.
+- Before quick-open: `ab tab 0`, `ab press Escape`, then screenshot to VERIFY
+  the palette is showing the expected entry before pressing Enter. Safer:
+  `ab snapshot -i | grep <filename>` and click the explorer/tab ref directly.
+- Re-copy workspace fixtures from their source of truth at the start of each
+  run — assume previous runs polluted them.
+- After code changes to an editor provider, prefer a **full kill + relaunch**
+  over Reload Window: reloads can restore a custom-editor webview with stale
+  HTML and you'll be debugging the previous build.
 
 ## Cleanup — always do this
 

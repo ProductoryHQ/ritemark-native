@@ -6,6 +6,8 @@ import { RitemarkEditorProvider } from './ritemarkEditor';
 import { ExcelEditorProvider } from './excelEditorProvider';
 import { PdfEditorProvider } from './pdfEditorProvider';
 import { DocxEditorProvider } from './docxEditorProvider';
+import { DrawioEditorProvider } from './drawioEditorProvider';
+import { isEnabled } from './features';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
@@ -522,6 +524,13 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     DocxEditorProvider.register(context)
   );
+
+  // Register draw.io diagram editor (Sprint 82)
+  if (isEnabled('drawio-diagrams')) {
+    context.subscriptions.push(
+      DrawioEditorProvider.register(context)
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Browser tab (Sprint 65)

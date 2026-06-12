@@ -31,6 +31,7 @@
     "onView:ritemark.agentLibraryView",
     "onCustomEditor:ritemark.pdfViewer",
     "onCustomEditor:ritemark.docxViewer",
+    "onCustomEditor:ritemark.drawioEditor",
     "onCommand:ritemark.browser.openUrl",
     "onView:ritemark.browserView"
   ],
@@ -559,6 +560,16 @@
         "selector": [
           {
             "filenamePattern": "*.docx"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "ritemark.drawioEditor",
+        "displayName": "Draw.io Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.drawio.svg"
           }
         ],
         "priority": "default"

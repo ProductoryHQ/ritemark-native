@@ -40,11 +40,33 @@ function buildCsvTemplate(columns = 10, rows = 20): string {
   return `${headers}\n${emptyRows.join('\n')}`;
 }
 
+// Sprint 82 R5: find a unique diagram.drawio.svg filename in the given directory
+function getUniqueDrawioPath(dir: string): string {
+  const base = path.join(dir, 'diagram.drawio.svg');
+  if (!fs.existsSync(base)) {
+    return base;
+  }
+  let i = 2;
+  while (fs.existsSync(path.join(dir, `diagram-${i}.drawio.svg`))) {
+    i++;
+  }
+  return path.join(dir, `diagram-${i}.drawio.svg`);
+}
+
+// Sprint 82 R5: minimal empty .drawio.svg — an SVG whose `content` attribute
+// holds an uncompressed empty mxfile, the format draw.io itself exports.
+// Verified to load and round-trip in the Phase 0 audit harness.
+const EMPTY_DRAWIO_SVG_TEMPLATE =
+  '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1px" height="1px" viewBox="0 0 1 1" content="&lt;mxfile&gt;&lt;diagram id=&quot;ritemark-diagram&quot; name=&quot;Page-1&quot;&gt;&lt;mxGraphModel dx=&quot;800&quot; dy=&quot;600&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; guides=&quot;1&quot; tooltips=&quot;1&quot; connect=&quot;1&quot; arrows=&quot;1&quot; fold=&quot;1&quot; page=&quot;1&quot; pageScale=&quot;1&quot; pageWidth=&quot;850&quot; pageHeight=&quot;1100&quot; math=&quot;0&quot; shadow=&quot;0&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;"><defs/><g/></svg>';
+
 export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'ritemark.editor';
 
   // Track all active webview panels for broadcasting tool execution
   private static activeWebviews: Set<vscode.Webview> = new Set();
+
+  /** Resolvers for insertDiagram waiting on the webview's imageInserted ack. */
+  private pendingInsertAcks: Map<string, () => void> = new Map();
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
   private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
 
@@ -249,12 +271,15 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
       // Check if file exists
       if (fs.existsSync(absolutePath)) {
-        // Convert to webview URI
+        // Convert to webview URI. The mtime version param busts the webview's
+        // cache when the file content changed since the last render (pairs
+        // with the live 'imageRefreshed' watcher in resolveCustomTextEditor).
         const webviewUri = webview.asWebviewUri(
           vscode.Uri.file(absolutePath)
         ).toString();
-
-        imageMappings[imagePath] = webviewUri;
+        let version = '';
+        try { version = `?v=${Math.round(fs.statSync(absolutePath).mtimeMs)}`; } catch { /* keep unversioned */ }
+        imageMappings[imagePath] = `${webviewUri}${version}`;
       }
     }
 
@@ -515,6 +540,25 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // listener below covers content changes more reliably than onDidChange).
     this.createDeleteWatcher(document, webview);
 
+    // Sprint 82 polish: when an image file under the document's folder changes
+    // on disk (e.g. a .drawio.svg saved from the diagram editor), refresh the
+    // embedded image in place. The webview swaps the matching image node's src
+    // for a cache-busted URI; the markdown itself is untouched (turndown
+    // serializes from the title attribute, which keeps the relative path).
+    const imageWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(docDir, '**/*.{png,jpg,jpeg,gif,svg,webp}')
+    );
+    imageWatcher.onDidChange((uri) => {
+      if (isDisposed) { return; }
+      const rel = path.relative(path.dirname(document.uri.fsPath), uri.fsPath).split(path.sep).join('/');
+      if (!document.getText().includes(rel)) { return; }
+      void webview.postMessage({
+        type: 'imageRefreshed',
+        path: `./${rel}`,
+        displaySrc: `${webview.asWebviewUri(uri).toString()}?v=${Date.now()}`
+      });
+    });
+
     // 3-second polling fallback. Catches external writes that VS Code's
     // TextDocument auto-revert misses (single-file mode, AI-panel subprocess
     // writes, etc). Compared against fileLoadTimes mtime baseline.
@@ -592,6 +636,21 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'resizeImage':
             // Resize image file (user confirmed resize in webview)
             this.resizeImage(document, message.relativePath, message.dataUrl);
+            return;
+
+          case 'insertDiagram':
+            // Sprint 82 R5: create a new .drawio.svg in ./images/ and open its editor
+            this.insertDiagram(document, webview);
+            return;
+
+          case 'imageInserted':
+            // Webview confirms an imageSaved insert reached the editor doc
+            this.pendingInsertAcks.get(message.path)?.();
+            return;
+
+          case 'openDrawioDiagram':
+            // Sprint 82 R4: click-to-edit a draw.io diagram from the markdown preview
+            this.openDrawioDiagram(document, message.relativePath);
             return;
 
           case 'selectionChanged':
@@ -856,6 +915,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       // Remove from active set using stored reference
       RitemarkEditorProvider.activeWebviews.delete(webview);
       changeDocumentSubscription.dispose();
+      imageWatcher.dispose();
 
       // Dispose the slim delete-only watcher
       this.disposeDeleteWatcher(document.uri.fsPath);
@@ -1072,6 +1132,86 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       console.error('Failed to resize image:', error);
       vscode.window.showErrorMessage(
         `Failed to resize image: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Sprint 82 R5: create a new empty .drawio.svg in ./images/ relative to the
+   * markdown file, insert its image reference via the existing imageSaved flow,
+   * and open the draw.io editor for it.
+   */
+  private async insertDiagram(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    try {
+      const imagesDir = path.join(path.dirname(document.uri.fsPath), 'images');
+      await fsp.mkdir(imagesDir, { recursive: true });
+
+      const diagramPath = getUniqueDrawioPath(imagesDir);
+      await fsp.writeFile(diagramPath, EMPTY_DRAWIO_SVG_TEMPLATE, 'utf-8');
+
+      // Reuse the imageSaved flow: the webview inserts an image node at the
+      // pending slash-command position with title = relative path.
+      const relativePath = `./images/${path.basename(diagramPath)}`;
+      const webviewUri = webview.asWebviewUri(vscode.Uri.file(diagramPath)).toString();
+
+      // Wait for the webview to ack the insert before opening the diagram
+      // editor: openWith steals focus from the markdown editor, and an
+      // externalChange reload from disk during that window (disk doesn't have
+      // the image reference yet) would wipe the fresh insert.
+      const inserted = new Promise<void>((resolve) => {
+        this.pendingInsertAcks.set(relativePath, resolve);
+      });
+      webview.postMessage({
+        type: 'imageSaved',
+        path: relativePath,
+        displaySrc: webviewUri
+      });
+      await Promise.race([
+        inserted,
+        new Promise<void>((resolve) => setTimeout(resolve, 2000))
+      ]);
+      this.pendingInsertAcks.delete(relativePath);
+
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(diagramPath),
+        'ritemark.drawioEditor'
+      );
+    } catch (error) {
+      console.error('Failed to insert diagram:', error);
+      webview.postMessage({
+        type: 'imageError',
+        error: error instanceof Error ? error.message : 'Failed to insert diagram'
+      });
+    }
+  }
+
+  /**
+   * Sprint 82 R4: open a .drawio.svg referenced from the markdown preview in
+   * the draw.io editor tab (or focus the existing tab for that file).
+   */
+  private async openDrawioDiagram(
+    document: vscode.TextDocument,
+    relativePath: string
+  ): Promise<void> {
+    try {
+      const absPath = path.resolve(path.dirname(document.uri.fsPath), relativePath);
+      if (!fs.existsSync(absPath)) {
+        vscode.window.showErrorMessage(`Diagram file not found: ${relativePath}`);
+        return;
+      }
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(absPath),
+        'ritemark.drawioEditor'
+      );
+    } catch (error) {
+      console.error('Failed to open draw.io diagram:', error);
+      vscode.window.showErrorMessage(
+        `Failed to open diagram: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
