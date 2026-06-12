@@ -8,11 +8,13 @@ sprints:
   - sprint-80
   - sprint-81
   - sprint-82
+  - sprint-83
 tags:
   - sprint-79
   - sprint-80
   - sprint-81
   - sprint-82
+  - sprint-83
   - runtime-unification
   - scheduled-tasks
   - daemon
@@ -25,10 +27,12 @@ tags:
   - spreadsheets
   - drawio
   - diagrams
+  - dictation
+  - voice
 ---
 
-<!-- DRAFT — v1.8.0 release notes. Sprints 79, 80, 81, 82 scope locked; more sprints may still land. -->
-<!-- Version number TBD — bump to v1.8.0 if upcoming sprint adds user-facing features, keep v1.7.4 if purely internal. -->
+<!-- DRAFT — v1.8.0 release notes. Scope complete: sprints 79, 80, 81, 82, 83. Awaiting release gates. -->
+<!-- Version number TBD — confirm v1.8.0 at release time. -->
 
 # Ritemark v1.8.0 — Your AI Agents, On a Schedule
 
@@ -60,7 +64,7 @@ v1.7.3 was an AI-surface release — Agent Library, Agent Configurator, OpenCode
 
 **Alongside (Sprint 82): diagrams in markdown.** Type `/diagram` in any markdown file and Ritemark drops a draw.io diagram next to your document, embeds it at the cursor, and opens a full editor. Double-click an embedded diagram to edit it; diagrams autosave like markdown, and the embedded picture live-refreshes the moment you save. The editor is a complete draw.io (v30.0.4) vendored into the app and running fully offline — no CDN, no account. And the files are clever: a `.drawio.svg` is a normal SVG that renders anywhere (GitHub, other editors) while carrying its own editable source inside, for a lossless round-trip. This closes #111.
 
-Sprint docs: `docs/development/sprints/sprint-79-runtime-unification/`, `docs/development/sprints/sprint-80-scheduled-tasks-daemon/`, `docs/development/sprints/sprint-81-excel-editing/`, `docs/development/sprints/sprint-82-drawio-diagrams/`
+Sprint docs: `docs/development/sprints/sprint-79-runtime-unification/`, `docs/development/sprints/sprint-80-scheduled-tasks-daemon/`, `docs/development/sprints/sprint-81-excel-editing/`, `docs/development/sprints/sprint-82-drawio-diagrams/`, `docs/development/sprints/sprint-83-dictation-mic-fix/`
 
 * * *
 
@@ -144,8 +148,9 @@ This is always active — not flag-gated.
 
 * * *
 
-## Polish
+## Fixes &amp; Polish
 
+- **Voice dictation works again on macOS Tahoe (sprint-83).** Pressing the mic button now correctly triggers the macOS microphone permission prompt and starts capture. Previously dictation could fail with a misleading "microphone not found" even when permission was granted. Errors are now honest and specific, too: Ritemark distinguishes a packaging misconfiguration, macOS denying microphone access (with guidance), and no microphone device being found — instead of one generic message. Closes [#116](https://github.com/ProductoryHQ/ritemark-native/issues/116).
 - **Status bar scheduling feedback.** Scheduling state is always visible in the status bar — idle ("N scheduled"), running (a spinner with the task label), and waiting ("N needs review") — and completion toasts surface the first line of agent output with Open result / Show runs jumps.
 - **Excel grid alignment.** The grid is anchored at A1 so row numbers match real cell addresses, and the active sheet tab merges seamlessly with the grid for an Excel-native feel.
 
@@ -209,6 +214,10 @@ The Excel custom editor moved from preview-only to a read/write `CustomEditorPro
 A new `drawioEditorProvider.ts` custom editor hosts the vendored draw.io webapp directly inside the webview document, bridged through a clean-room implementation of draw.io's embed JSON protocol — with a hidden same-origin relay iframe acting as the protocol partner. The full draw.io bundle (v30.0.4, Apache 2.0, ~36 MB) is committed under `media/drawio/` with its LICENSE and NOTICE; `scripts/vendor-drawio.sh` re-vendors it. Critically, that bundle is **not** part of the React webview bundle, so it has zero impact on the bundle-size budget tracked in #107.
 
 On the markdown side, a per-document image watcher plus an `imageRefreshed` surgical node refresh (with cache-busted URIs) updates an embed in place the moment its underlying file changes — for any embedded image, not just diagrams. The `/diagram` insert uses an `imageInserted` ack handshake to close a focus-steal race that could otherwise wipe the insert. The whole feature is gated by the new `drawio-diagrams` flag, which ships `stable` (on by default, kill-switch only).
+
+### Voice dictation microphone fix (sprint-83)
+
+The mic failure on macOS Tahoe was a Permissions-Policy regression, not a TCC one. Electron 39+ enforces iframe Permissions-Policy for media, so the webview iframe never received the `microphone` feature and `getUserMedia` failed at the policy layer before macOS TCC was even consulted — which is why dictation reported "microphone not found" even when permission had been granted. Patch `004-ritemark-build-system.patch` now delegates `microphone` to webview iframes via `webviewElement.ts` allowRules. This is policy delegation only — TCC and the getUserMedia prompt still gate actual access. Separately, `scripts/codesign-app.sh` gained a packaging preflight that asserts `NSMicrophoneUsageDescription` survives signing, so a stripped usage-description string can't silently re-break dictation in a future build. Deferred to follow-up [#117](https://github.com/ProductoryHQ/ritemark-native/issues/117): a bridge-side permission query plus per-status modal UX.
 
 ### Architectural debt closed (sprint-79)
 

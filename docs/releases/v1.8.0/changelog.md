@@ -1,4 +1,4 @@
-<!-- DRAFT — update as remaining sprint(s) land -->
+<!-- DRAFT — scope complete (sprints 79–83); awaiting release gates -->
 
 ## [1.8.0] - TBD
 
@@ -36,6 +36,8 @@
 
 ### Fixed
 - #110 — the multi-sheet selector now appears reliably for multi-sheet workbooks
+- #116 — voice dictation works again on macOS Tahoe: pressing the mic button now correctly triggers the macOS microphone permission prompt and starts capture, instead of failing with a misleading "microphone not found" even when permission was granted
+- Voice dictation errors are now honest and specific — the app distinguishes a packaging misconfiguration, macOS denying microphone access (with guidance to fix it), and no microphone device being found, instead of one generic message
 - `document-search` feature flag set to `status: 'disabled'` (the RAG code it gated was removed in Sprint 74 — zombie flag)
 
 ### Notes
@@ -46,4 +48,5 @@
 - Diagram editing ships behind the new `drawio-diagrams` flag (`stable`, ON by default — kill-switch only, not surfaced in Settings). The vendored draw.io webapp (v30.0.4, Apache 2.0, 36 MB) is committed under `media/drawio/` with LICENSE/NOTICE; `scripts/vendor-drawio.sh` re-vendors it. It is NOT part of the webview bundle, so it has no impact on the bundle-size budget (#107). The editor uses a hidden same-origin relay iframe as the protocol partner for draw.io's embed JSON protocol.
 - Live embed refresh is driven by a per-document image watcher plus an `imageRefreshed` surgical node refresh with cache-busted URIs; the `/diagram` insert uses an `imageInserted` ack handshake to prevent a focus-steal race from wiping the insert.
 - Diagram known limitation: choosing a Google Font for diagram text requires network; everything else works fully offline (no CDN, no account).
+- Voice dictation root cause: Electron 39+ enforces iframe Permissions-Policy for media, so the webview iframe never received the `microphone` feature and `getUserMedia` failed at the policy layer before TCC was consulted. Patch `004-ritemark-build-system.patch` now delegates `microphone` to webview iframes (`webviewElement.ts` allowRules — policy delegation only; TCC and the getUserMedia prompt still gate actual access). `scripts/codesign-app.sh` gained a packaging preflight asserting `NSMicrophoneUsageDescription` survives signing. Deferred to follow-up #117: bridge-side permission query + per-status modal UX.
 - macOS arm64 and x64 DMGs notarized; Windows installer signed. All artifacts published with a verified update feed.
