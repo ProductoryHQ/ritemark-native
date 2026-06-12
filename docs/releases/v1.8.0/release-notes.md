@@ -7,10 +7,12 @@ sprints:
   - sprint-79
   - sprint-80
   - sprint-81
+  - sprint-82
 tags:
   - sprint-79
   - sprint-80
   - sprint-81
+  - sprint-82
   - runtime-unification
   - scheduled-tasks
   - daemon
@@ -21,16 +23,18 @@ tags:
   - browser
   - excel
   - spreadsheets
+  - drawio
+  - diagrams
 ---
 
-<!-- DRAFT — v1.8.0 release notes. Sprints 79, 80, 81 scope locked; more sprints may still land. -->
+<!-- DRAFT — v1.8.0 release notes. Sprints 79, 80, 81, 82 scope locked; more sprints may still land. -->
 <!-- Version number TBD — bump to v1.8.0 if upcoming sprint adds user-facing features, keep v1.7.4 if purely internal. -->
 
 # Ritemark v1.8.0 — Your AI Agents, On a Schedule
 
 **Status:** Draft
 **Type:** [TBD — patch or minor]
-**Focus:** Ritemark can now run AI agents **on a schedule** while the app is open — daily briefings, weekly summaries, recurring reports — with a no-cron-required Schedule picker and a safe-by-default approval model. That headline feature (Sprint 80) is built on the runtime unification from Sprint 79, which put all three AI runtimes (Claude Code, Codex, OpenCode) behind one internal architecture with a single **approval policy** (Auto · Ask · Plan) and brought **file attachments** to Codex and OpenCode. Alongside it, **.xlsx files are now editable** (Sprint 81) rather than read-only previews.
+**Focus:** Ritemark can now run AI agents **on a schedule** while the app is open — daily briefings, weekly summaries, recurring reports — with a no-cron-required Schedule picker and a safe-by-default approval model. That headline feature (Sprint 80) is built on the runtime unification from Sprint 79, which put all three AI runtimes (Claude Code, Codex, OpenCode) behind one internal architecture with a single **approval policy** (Auto · Ask · Plan) and brought **file attachments** to Codex and OpenCode. Alongside it, your documents do more: **.xlsx files are now editable** (Sprint 81) rather than read-only previews, and you can **embed and edit draw.io diagrams** directly in markdown with a fully offline vendored editor (Sprint 82).
 
 * * *
 
@@ -46,7 +50,7 @@ tags:
 
 ## Why This Release
 
-v1.7.3 was an AI-surface release — Agent Library, Agent Configurator, OpenCode runtime. v1.8.0 is the follow-through, and it builds in three layers.
+v1.7.3 was an AI-surface release — Agent Library, Agent Configurator, OpenCode runtime. v1.8.0 is the follow-through. Scheduled AI agents are the headline; around them, a supporting pair makes your documents do more — editable spreadsheets and embeddable diagrams.
 
 **The foundation (Sprint 79): one runtime architecture.** Until now, the three runtimes had three different ideas about when to ask permission. Claude Code applied every edit automatically with no way to gate it. Codex followed VS Code settings. OpenCode prompted on everything. There was no single control that meant the same thing across all of them. v1.8.0 replaces that with one per-conversation mode picker — Auto, Ask, Plan — in the composer. File attachments (images, PDFs, documents) used to work only with Claude Code; Codex and OpenCode accepted the attachment UI but silently ignored the files — that gap is now closed too. The rest of Sprint 79 is invisible unless you're building on Ritemark: a shared `AgentRuntime` interface that all three runtimes implement, and a single approval gate and dispatch path instead of three parallel code paths. That shared interface is what makes the headline feature possible.
 
@@ -54,7 +58,9 @@ v1.7.3 was an AI-surface release — Agent Library, Agent Configurator, OpenCode
 
 **Alongside (Sprint 81): editable spreadsheets.** `.xlsx` files were a read-only preview; now they're editable. Click a cell, type, Cmd+S to save, with dirty tracking, hot-exit backup, and revert. The editor gained an fx formula bar (so you can see a cell's formula Excel-style) and reliable multi-sheet tabs at the bottom of the viewport — which also fixes #110, where the sheet selector could fail to appear. Editing is cell-value scope: formulas and styles are preserved on save but not edited in-app, since Ritemark has no formula engine.
 
-Sprint docs: `docs/development/sprints/sprint-79-runtime-unification/`, `docs/development/sprints/sprint-80-scheduled-tasks-daemon/`, `docs/development/sprints/sprint-81-excel-editing/`
+**Alongside (Sprint 82): diagrams in markdown.** Type `/diagram` in any markdown file and Ritemark drops a draw.io diagram next to your document, embeds it at the cursor, and opens a full editor. Double-click an embedded diagram to edit it; diagrams autosave like markdown, and the embedded picture live-refreshes the moment you save. The editor is a complete draw.io (v30.0.4) vendored into the app and running fully offline — no CDN, no account. And the files are clever: a `.drawio.svg` is a normal SVG that renders anywhere (GitHub, other editors) while carrying its own editable source inside, for a lossless round-trip. This closes #111.
+
+Sprint docs: `docs/development/sprints/sprint-79-runtime-unification/`, `docs/development/sprints/sprint-80-scheduled-tasks-daemon/`, `docs/development/sprints/sprint-81-excel-editing/`, `docs/development/sprints/sprint-82-drawio-diagrams/`
 
 * * *
 
@@ -89,6 +95,20 @@ The feature is **on by default**. One limitation to know: scheduled tasks run on
 The custom editor was renamed from "Excel Preview" to **"Excel Editor"** to reflect that it now edits.
 
 Editing scope is cell values. Formulas, styles, and merged cells are preserved on save but not editable in-app; clearing cells doesn't shrink the used range; and if the file changes on disk while you have unsaved edits, your edits stay in memory and a refresh asks for confirmation.
+
+### Draw.io diagrams embedded in markdown (sprint-82)
+
+You can now draw diagrams without leaving Ritemark, and keep them living inside your documents:
+
+- **Type `/diagram` to embed one.** In any markdown file, type `/diagram` and Ritemark creates `images/diagram.drawio.svg` next to the file, embeds it at the cursor, and opens the diagram editor — all in one step.
+- **A full draw.io editor.** Any `*.drawio.svg` file opens in a complete draw.io editor (v30.0.4). It's **vendored into the app and runs fully offline** — no CDN call, no account, no sign-in. To edit an embedded diagram, **double-click** it in markdown (a single click selects it, and a hover tooltip explains how).
+- **Diagrams autosave.** Just like markdown files, there's no Ctrl+S to remember — the tab's dirty-dot briefly flashes as the save indicator and your changes are written.
+- **The embed live-refreshes.** Edit in the diagram tab, switch back to the markdown, and the picture is already updated — the embed refreshes the moment the diagram is saved. This works for **all** embedded images, not just diagrams: if any image file under the document's folder changes on disk, the embed updates in place.
+- **Files that render anywhere.** A `.drawio.svg` is dual-format: a normal SVG that displays correctly in GitHub, other editors, and any SVG viewer, while carrying its own editable diagram source inside. The round-trip is lossless — open it in Ritemark, edit, save, and it's still a clean SVG.
+
+This closes [#111](https://github.com/ProductoryHQ/ritemark-native/issues/111). The feature is **on by default**.
+
+One limitation to know: choosing a **Google Font** for diagram text requires a network connection to fetch the font. Everything else — drawing, editing, saving, embedding — works fully offline.
 
 ### One approval policy for every AI runtime: Auto, Ask, Plan (sprint-79)
 
@@ -183,6 +203,12 @@ A new `createRuntime()` factory in `src/runtime/runtimeFactory.ts` is now the si
 ### Editable Excel custom editor (sprint-81)
 
 The Excel custom editor moved from preview-only to a read/write `CustomEditorProvider`: edit operations mutate an in-memory workbook model, dirty state and hot-exit backup flow through VS Code's custom-document lifecycle, and save writes cell values back while preserving formulas, styles, and merged cells that aren't part of the basic-editing scope. The multi-sheet selector reliability fix (#110) and the A1-anchored grid land here.
+
+### Draw.io diagram custom editor + live embed refresh (sprint-82)
+
+A new `drawioEditorProvider.ts` custom editor hosts the vendored draw.io webapp directly inside the webview document, bridged through a clean-room implementation of draw.io's embed JSON protocol — with a hidden same-origin relay iframe acting as the protocol partner. The full draw.io bundle (v30.0.4, Apache 2.0, ~36 MB) is committed under `media/drawio/` with its LICENSE and NOTICE; `scripts/vendor-drawio.sh` re-vendors it. Critically, that bundle is **not** part of the React webview bundle, so it has zero impact on the bundle-size budget tracked in #107.
+
+On the markdown side, a per-document image watcher plus an `imageRefreshed` surgical node refresh (with cache-busted URIs) updates an embed in place the moment its underlying file changes — for any embedded image, not just diagrams. The `/diagram` insert uses an `imageInserted` ack handshake to close a focus-steal race that could otherwise wipe the insert. The whole feature is gated by the new `drawio-diagrams` flag, which ships `stable` (on by default, kill-switch only).
 
 ### Architectural debt closed (sprint-79)
 

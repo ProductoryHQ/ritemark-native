@@ -4,6 +4,10 @@
 
 ### Added
 - Scheduled AI agents — add a `schedule:` block to an agent `.md` file's frontmatter (or use the new Schedule picker in the Agent editor) and the agent runs headlessly at the configured time while Ritemark is open: daily briefings, weekly summaries, recurring reports
+- Embed draw.io diagrams in markdown — type `/diagram` in any markdown file and Ritemark creates `images/diagram.drawio.svg` next to the file, embeds it at the cursor, and opens the diagram editor
+- Full draw.io editor (v30.0.4, vendored, fully offline — no CDN, no account) opens for any `*.drawio.svg` file; double-click an embedded diagram in markdown to edit it (single click selects, hover tooltip explains)
+- Diagrams autosave like markdown files — no Ctrl+S needed; the tab dirty-dot briefly flashes as the save indicator
+- Embedded images live-refresh in the markdown editor — the moment a diagram is saved the embed updates in place, and the same applies to any image file under the document's folder that changes on disk
 - Schedule picker in the Agent editor — Interval mode (every N minutes/hours from presets) or Days mode (weekday chips Mon–Sun, with Every day / Weekdays / Weekends presets and a time of day), a live "Runs daily at 09:00" summary, and an Advanced (cron) escape hatch with a copy button; no cron knowledge required, local time throughout
 - SCHEDULED section in the Agent Library — per-task run history (last 10 runs) that persists across restarts, fully separate from chat history; amber "needs review" rows surface scheduled runs that were blocked, with a Review & approve flow
 - Status bar scheduling state — "N scheduled" when idle, a spinner with the task label while a run is in progress, and amber "N needs review" when a blocked run is waiting; completion toasts show the first line of agent output with Open result / Show runs buttons
@@ -22,6 +26,7 @@
 - Browser tools injected uniformly via `BrowserToolsInjector` across all runtimes; Codex now receives browser tools as MCP (same as Claude Code / OpenCode)
 - Approval policy mapped per runtime from the composer's `approvalMode`: Claude Code via SDK permission mode + `canUseTool`, Codex via `approvalPolicy`/`sandbox` (Ask = `untrusted` + `read-only`), OpenCode via native ACP `request_permission`
 - `CLAUDE_MODELS` and `DEFAULT_MODEL` moved from `src/agent/types.ts` to `src/ai/modelConfig.ts` — single source for all model identifiers
+- `.drawio.svg` files are dual-format — a normal SVG that renders anywhere (GitHub, other editors) and carries its own editable diagram source inside, for a lossless round-trip; the new `drawioEditorProvider.ts` hosts the vendored draw.io webapp directly in the webview document over a clean-room bridge of draw.io's embed JSON protocol
 
 ### Removed
 - "Always allow" option removed from the approval card — it was OpenCode-only and never actually persisted; cards now offer only Approve / Reject
@@ -38,4 +43,7 @@
 - The daemon is a new `src/daemon/` subsystem: a handler-agnostic `Scheduler` over a `ScheduledTask` interface (with `GitSyncHandler` / `ScriptHandler` stubs proving extensibility), a pure tested cron engine, `DaemonResultStore` (workspaceState), and `DaemonStatusEvents`.
 - Excel editing is basic-editing scope: cell values only. Formulas, styles, and merged cells are preserved on save but not editable; editing a formula cell in the grid replaces the formula with a plain value (Ritemark has no formula engine — the grid shows the last value Excel calculated). Clearing cells does not shrink the used range, and if the file changes on disk while you have unsaved edits your edits stay in memory and a refresh asks for confirmation.
 - The unified dispatch path now preserves per-turn context (active file, browser context, `@mentions`) consistently across all three runtimes.
+- Diagram editing ships behind the new `drawio-diagrams` flag (`stable`, ON by default — kill-switch only, not surfaced in Settings). The vendored draw.io webapp (v30.0.4, Apache 2.0, 36 MB) is committed under `media/drawio/` with LICENSE/NOTICE; `scripts/vendor-drawio.sh` re-vendors it. It is NOT part of the webview bundle, so it has no impact on the bundle-size budget (#107). The editor uses a hidden same-origin relay iframe as the protocol partner for draw.io's embed JSON protocol.
+- Live embed refresh is driven by a per-document image watcher plus an `imageRefreshed` surgical node refresh with cache-busted URIs; the `/diagram` insert uses an `imageInserted` ack handshake to prevent a focus-steal race from wiping the insert.
+- Diagram known limitation: choosing a Google Font for diagram text requires network; everything else works fully offline (no CDN, no account).
 - macOS arm64 and x64 DMGs notarized; Windows installer signed. All artifacts published with a verified update feed.
