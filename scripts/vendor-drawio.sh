@@ -39,5 +39,19 @@ done
 cp -r "$TMP/war/styles" "$TMP/war/mxgraph" "$TMP/war/images" "$TMP/war/math4" "$DEST/"
 cp "$TMP/war/resources/dia.txt" "$DEST/resources/"
 
+# Apache 2.0 compliance: redistributed subsets must carry the license text.
+curl -fSL "https://raw.githubusercontent.com/jgraph/drawio/${VERSION}/LICENSE" -o "$DEST/LICENSE" \
+  || cp "$REPO_ROOT/extensions/ritemark/media/drawio/LICENSE" "$DEST/LICENSE" 2>/dev/null \
+  || { echo "WARNING: could not obtain LICENSE — add it manually"; }
+cat > "$DEST/NOTICE" <<EOF
+draw.io (diagrams.net)
+Copyright (c) JGraph Ltd 2006-2026
+
+This directory contains a vendored subset of the draw.io webapp
+(https://github.com/jgraph/drawio), redistributed under the Apache
+License 2.0 (see LICENSE in this directory). Version: see VERSION.
+Re-vendor with scripts/vendor-drawio.sh.
+EOF
+
 echo "$VERSION" > "$DEST/VERSION"
 echo "Vendored draw.io $VERSION ($(du -sh "$DEST" | cut -f1)) to $DEST"

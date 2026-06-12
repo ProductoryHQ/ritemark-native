@@ -48,11 +48,25 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
       localResourceRoots: [drawioRoot]
     };
 
-    const drawioIndexUri = webviewPanel.webview.asWebviewUri(
-      vscode.Uri.joinPath(drawioRoot, 'index.html')
-    );
+    // The draw.io app runs DIRECTLY in the webview document — not in an iframe.
+    // Both iframe strategies fail on desktop VS Code (verified empirically via
+    // CDP, Sprint 82 QA): a vscode-resource src iframe loads an empty document
+    // (iframe navigations bypass the webview service worker), and a srcdoc
+    // iframe's subresources get 404s (the service worker authorizes requests by
+    // client URL, and a srcdoc client reports about:srcdoc). The webview's own
+    // document is the one client whose resource requests are served, so the
+    // patched draw.io index.html becomes the webview HTML itself, with the
+    // bridge script appended.
+    const drawioHtmlRaw = Buffer.from(
+      await vscode.workspace.fs.readFile(vscode.Uri.joinPath(drawioRoot, 'index.html'))
+    ).toString('utf-8');
+    const drawioBaseUri = webviewPanel.webview.asWebviewUri(drawioRoot).toString();
 
-    webviewPanel.webview.html = this.getEditorHtml(webviewPanel.webview, drawioIndexUri);
+    webviewPanel.webview.html = this.getEditorHtml(
+      webviewPanel.webview,
+      drawioHtmlRaw,
+      drawioBaseUri
+    );
 
     // Tracks whether the latest document text came from our own save edit,
     // so a future external-change sync (if added) wouldn't echo. Also guards
@@ -70,8 +84,14 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
           });
           break;
 
+        case 'drawio:error':
+          vscode.window.showErrorMessage(
+            `Diagram save failed: ${message.data ?? 'unknown error'}`
+          );
+          break;
+
         case 'drawio:save': {
-          if (typeof message.data !== 'string' || applyingSave) {
+          if (typeof message.data !== 'string' || message.data.length === 0 || applyingSave) {
             break;
           }
           applyingSave = true;
@@ -101,79 +121,149 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
     });
   }
 
-  private getEditorHtml(webview: vscode.Webview, drawioIndexUri: vscode.Uri): string {
+  private getEditorHtml(webview: vscode.Webview, drawioHtmlRaw: string, drawioBaseUri: string): string {
     const nonce = getNonce();
-    // The iframe is a separate document: the drawio webapp's own scripts run in
-    // the iframe context and are not constrained by this page's CSP. The outer
-    // page only needs frame-src for the webview resource origin and a nonce
-    // for the bridge script. Verified by the Sprint 82 Phase 0 audit.
-    const iframeSrc = `${drawioIndexUri.toString()}?embed=1&proto=json&offline=1&lang=en&spin=1`;
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${webview.cspSource}; script-src 'nonce-${nonce}'; style-src 'unsafe-inline';">
-  <title>Draw.io Editor</title>
-  <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
-    iframe { display: block; width: 100%; height: 100%; border: none; }
-  </style>
-</head>
-<body>
-  <iframe id="drawio-frame" src="${iframeSrc}"></iframe>
-  <script nonce="${nonce}">
-    // Sprint 82 R3: bridge between the VS Code extension host and the
-    // draw.io embed iframe (clean-room, documented JSON protocol).
+
+    // Prepare the draw.io document for srcdoc hosting:
+    // Patch the vendored index.html into webview-hostable form:
+    //  - <base> makes its relative subresources resolve to vscode-resource URIs
+    //    (served by the webview service worker, scoped by localResourceRoots).
+    //  - CSP: scripts/styles/images/fonts/XHR from the vendored bundle
+    //    (cspSource), eval (mxGraph codecs), inline styles, data: images. All
+    //    executable content is the bundle we vendored — not remote code.
+    //  - draw.io reads its config from location.search, which the webview
+    //    document does not carry — override the parsed urlParams right after
+    //    bootstrap.js defines them (embed mode, JSON protocol, offline).
+    //  - window.opener = <relay iframe>: draw.io's embed protocol partner is
+    //    (embedMessageSource || window.opener || window.parent), and
+    //    initializeEmbedMode() refuses to start when that partner IS the app's
+    //    own window — so a plain self-alias is rejected, and window.parent is
+    //    VS Code's wrapper (unreachable). The bridge therefore creates a tiny
+    //    same-origin srcdoc iframe and points window.opener at it: draw.io
+    //    accepts it as a distinct window, sends its events into it, and the
+    //    relay hands them straight back to the bridge (same-origin function
+    //    calls in both directions).
+    //  - the bridge script is injected right after bootstrap.js — BEFORE
+    //    js/main.js runs — so its message listener is registered before the
+    //    draw.io app can emit its 'init' event.
+    const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data: blob:; script-src ${webview.cspSource} 'nonce-${nonce}' 'unsafe-eval'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource} data:; connect-src ${webview.cspSource} data:;">`;
+    return drawioHtmlRaw
+      .replace('<head>', `<head><base href="${drawioBaseUri}/">${csp}`)
+      .replace(
+        '<script src="js/bootstrap.js"></script>',
+        `<script src="js/bootstrap.js"></script>` +
+        `<script nonce="${nonce}">urlParams['embed']='1';urlParams['proto']='json';urlParams['offline']='1';urlParams['lang']='en';urlParams['spin']='1';</script>` +
+        this.getBridgeScript(nonce)
+      );
+  }
+
+  private getBridgeScript(nonce: string): string {
+    return `<script nonce="${nonce}">
+    // Sprint 82 R3: bridge between the VS Code extension host and the draw.io
+    // app running in THIS document (clean-room, documented JSON protocol).
+    // draw.io posts its embed events to window.opener, which is aliased to
+    // this window above, so both sides of the protocol meet here.
     const vscode = acquireVsCodeApi();
-    const frame = document.getElementById('drawio-frame');
-    let pendingDocumentText = null;
-    let drawioInitialized = false;
+    // Diagnostic trail (inspectable from devtools; harmless in production).
+    const trace = window.__rmBridge = { loaded: true, events: [] };
+
+    // Relay iframe — draw.io's embed protocol partner (see provider comment).
+    // Same-origin srcdoc: the app posts its events INTO this window; the relay
+    // hands the strings back to this bridge via a direct same-origin call, and
+    // exposes a sender whose calls reach draw.io with event.source === relay,
+    // which is what the app's installMessageHandler source-check requires.
+    window.__rmFromDrawio = function (data) {
+      if (typeof data === 'string') { handleDrawioMessage(data); }
+    };
+    const relay = document.createElement('iframe');
+    relay.style.display = 'none';
+    relay.setAttribute('aria-hidden', 'true');
+    relay.srcdoc = '<script nonce="${nonce}">' +
+      'window.addEventListener("message", function (e) {' +
+      '  if (e.source === window.parent) { window.parent.__rmFromDrawio(e.data); }' +
+      '});' +
+      'window.__rmSend = function (s) { window.parent.postMessage(s, "*"); };' +
+      '<\\/script>';
+    document.documentElement.appendChild(relay);
+    window.opener = relay.contentWindow;
 
     function postToDrawio(msg) {
-      frame.contentWindow.postMessage(JSON.stringify(msg), '*');
+      trace.events.push('out:' + msg.action);
+      const send = relay.contentWindow && relay.contentWindow.__rmSend;
+      if (send) { send(JSON.stringify(msg)); }
     }
 
-    window.addEventListener('message', (event) => {
-      // Messages from the extension host arrive as objects; messages from
-      // the draw.io iframe arrive as JSON strings.
-      if (typeof event.data === 'string') {
-        let msg;
-        try { msg = JSON.parse(event.data); } catch { return; }
-        switch (msg.event) {
-          case 'init':
-            drawioInitialized = true;
-            if (pendingDocumentText !== null) {
-              postToDrawio({ action: 'load', xml: pendingDocumentText, autosave: 0 });
-              pendingDocumentText = null;
-            }
-            break;
-          case 'save':
-            // Ctrl+S inside draw.io: ask for the full .drawio.svg content.
-            postToDrawio({ action: 'export', format: 'xmlsvg' });
-            break;
-          case 'export': {
-            // data is a data:image/svg+xml;base64,... URL of the complete file.
+    // Document delivery is retried until draw.io acks with its 'load' event:
+    // the app registers its embed listener late in startup (and its 'init'
+    // event does not reliably fire in this hosting mode), so a single load
+    // post could land before anyone is listening. The first string draw.io
+    // receives also pins its embedMessageSource to this window, which is what
+    // routes the app's own save/export events back to this bridge.
+    let documentText = null;
+    let loadAcked = false;
+    let loadAttempts = 0;
+
+    function tryLoad() {
+      if (loadAcked || documentText === null) { return; }
+      if (loadAttempts++ > 30) { return; }
+      postToDrawio({ action: 'load', xml: documentText, autosave: 0 });
+      setTimeout(tryLoad, loadAttempts < 5 ? 400 : 1500);
+    }
+
+    // draw.io protocol events, delivered by the relay iframe.
+    function handleDrawioMessage(data) {
+      let msg;
+      try { msg = JSON.parse(data); } catch { return; }
+      if (msg.event) { trace.events.push('drawio:' + msg.event); }
+      switch (msg.event) {
+        case 'init':
+          // App announced readiness — deliver immediately (retry loop also covers this).
+          loadAcked = false;
+          tryLoad();
+          break;
+        case 'load':
+          // App acked the document — stop the retry loop.
+          loadAcked = true;
+          break;
+        case 'save':
+          // Ctrl+S inside draw.io: ask for the full .drawio.svg content.
+          postToDrawio({ action: 'export', format: 'xmlsvg' });
+          break;
+        case 'export': {
+          // data is a data:image/svg+xml;base64,... URL of the complete file.
+          try {
             const base64 = (msg.data || '').split(',')[1] || '';
             const bytes = atob(base64);
             const buf = new Uint8Array(bytes.length);
             for (let i = 0; i < bytes.length; i++) { buf[i] = bytes.charCodeAt(i); }
             const svg = new TextDecoder('utf-8').decode(buf);
-            vscode.postMessage({ type: 'drawio:save', data: svg });
-            break;
+            if (svg.length > 0) {
+              vscode.postMessage({ type: 'drawio:save', data: svg });
+            } else {
+              vscode.postMessage({ type: 'drawio:error', data: 'draw.io returned an empty export — file not saved' });
+            }
+          } catch (e) {
+            vscode.postMessage({ type: 'drawio:error', data: 'Failed to decode diagram export: ' + (e && e.message ? e.message : e) });
           }
+          break;
         }
-        return;
       }
+    }
 
+    // Extension-host messages (objects on the main window).
+    window.addEventListener('message', (event) => {
+      if (event.origin && event.origin !== window.origin) { return; }
       const msg = event.data;
       if (!msg || typeof msg.type !== 'string') { return; }
+      // Keep host objects away from the draw.io message handler.
+      event.stopImmediatePropagation();
+      trace.events.push('host:' + msg.type);
       switch (msg.type) {
         case 'drawio:load':
-          if (drawioInitialized) {
-            postToDrawio({ action: 'load', xml: msg.data, autosave: 0 });
-          } else {
-            pendingDocumentText = msg.data;
-          }
+          documentText = msg.data;
+          loadAcked = false;
+          loadAttempts = 0;
+          tryLoad();
           break;
         case 'drawio:saved':
           postToDrawio({ action: 'status', message: '', modified: false });
@@ -182,9 +272,7 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
     });
 
     vscode.postMessage({ type: 'drawio:ready' });
-  </script>
-</body>
-</html>`;
+  </script>`;
   }
 }
 

@@ -1,0 +1,7 @@
+draw.io (diagrams.net)
+Copyright (c) JGraph Ltd 2006-2026
+
+This directory contains a vendored subset of the draw.io webapp
+(https://github.com/jgraph/drawio), redistributed under the Apache
+License 2.0 (see LICENSE in this directory). Version: see VERSION.
+Re-vendor with scripts/vendor-drawio.sh.
