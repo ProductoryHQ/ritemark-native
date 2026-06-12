@@ -2,7 +2,7 @@
 
 Track: Plain full track
 Branch: sprint-83-dictation-mic-fix
-Status: Phase 2 (PLAN) — awaiting Jarmo approval
+Status: Phase 3 shipped (S0 + S2) — PR #120, awaiting Jarmo's manual mic test (Phase 5)
 
 ---
 
@@ -248,14 +248,15 @@ pipeline so the root cause cannot silently regress.
 ## Status
 
 **Track:** Full 6-phase
-**Current Phase:** 2 (PLAN)
-**Next Phase:** 3 (DEVELOP) — BLOCKED on Jarmo approval and sprint branch creation
+**Current Phase:** 5 (QA) — implementation shipped in PR #120
+**Shipped (2026-06-12):** S0 — `microphone` delegated to webview iframes via patch 004 (`webviewElement.ts` allowRules); S2 — codesign preflight asserts `NSMicrophoneUsageDescription` survives packaging; honest error classification in `useVoiceDictation.ts` (policy-block vs TCC-denial vs no-device).
+**Deferred to a follow-up sprint:** S3–S6 (bridge-side permission query + per-status modal UX). Known gap: the policy-block error message does not trigger the mic-permission modal (tooltip only) — deliberate, since it is a packaging bug the user cannot fix.
 
 ---
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (work proceeded on the remote session branch; renumbered 80→83 and rebased onto main 2026-06-12)
 
 **GATE: Phase 2 → 3 requires Jarmo's explicit approval.**
 Upon approval, the FIRST action is:
