@@ -208,9 +208,9 @@ export function ResizableImage({ node, selected }: ResizableImageProps) {
           ref={imgRef}
           src={src}
           alt={alt || ''}
-          title={isDrawioDiagram ? 'Click to edit diagram' : undefined}
+          title={isDrawioDiagram ? 'Double-click to edit diagram in a new tab' : undefined}
           onLoad={handleImageLoad}
-          onClick={isDrawioDiagram ? handleDiagramClick : undefined}
+          onDoubleClick={isDrawioDiagram ? handleDiagramClick : undefined}
           draggable={false}
           style={previewSize ? { width: previewSize.width, height: previewSize.height } : undefined}
         />

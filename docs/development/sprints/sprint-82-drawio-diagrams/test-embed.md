@@ -6,7 +6,7 @@ Manual test file. Open this in the Ritemark editor.
 
 Click the diagram below — it must open in the draw.io editor:
 
-![Sprint 82 test diagram](./test-diagram.drawio.svg)![](./images/diagram.drawio.svg)
+![Sprint 82 test diagram](./test-diagram.drawio.svg)
 
 ## QA checklist
 

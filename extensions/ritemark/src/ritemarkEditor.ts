@@ -64,6 +64,9 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
   // Track all active webview panels for broadcasting tool execution
   private static activeWebviews: Set<vscode.Webview> = new Set();
+
+  /** Resolvers for insertDiagram waiting on the webview's imageInserted ack. */
+  private pendingInsertAcks: Map<string, () => void> = new Map();
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
   private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
 
@@ -268,12 +271,15 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
       // Check if file exists
       if (fs.existsSync(absolutePath)) {
-        // Convert to webview URI
+        // Convert to webview URI. The mtime version param busts the webview's
+        // cache when the file content changed since the last render (pairs
+        // with the live 'imageRefreshed' watcher in resolveCustomTextEditor).
         const webviewUri = webview.asWebviewUri(
           vscode.Uri.file(absolutePath)
         ).toString();
-
-        imageMappings[imagePath] = webviewUri;
+        let version = '';
+        try { version = `?v=${Math.round(fs.statSync(absolutePath).mtimeMs)}`; } catch { /* keep unversioned */ }
+        imageMappings[imagePath] = `${webviewUri}${version}`;
       }
     }
 
@@ -534,6 +540,25 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // listener below covers content changes more reliably than onDidChange).
     this.createDeleteWatcher(document, webview);
 
+    // Sprint 82 polish: when an image file under the document's folder changes
+    // on disk (e.g. a .drawio.svg saved from the diagram editor), refresh the
+    // embedded image in place. The webview swaps the matching image node's src
+    // for a cache-busted URI; the markdown itself is untouched (turndown
+    // serializes from the title attribute, which keeps the relative path).
+    const imageWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(docDir, '**/*.{png,jpg,jpeg,gif,svg,webp}')
+    );
+    imageWatcher.onDidChange((uri) => {
+      if (isDisposed) { return; }
+      const rel = path.relative(path.dirname(document.uri.fsPath), uri.fsPath).split(path.sep).join('/');
+      if (!document.getText().includes(rel)) { return; }
+      void webview.postMessage({
+        type: 'imageRefreshed',
+        path: `./${rel}`,
+        displaySrc: `${webview.asWebviewUri(uri).toString()}?v=${Date.now()}`
+      });
+    });
+
     // 3-second polling fallback. Catches external writes that VS Code's
     // TextDocument auto-revert misses (single-file mode, AI-panel subprocess
     // writes, etc). Compared against fileLoadTimes mtime baseline.
@@ -616,6 +641,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'insertDiagram':
             // Sprint 82 R5: create a new .drawio.svg in ./images/ and open its editor
             this.insertDiagram(document, webview);
+            return;
+
+          case 'imageInserted':
+            // Webview confirms an imageSaved insert reached the editor doc
+            this.pendingInsertAcks.get(message.path)?.();
             return;
 
           case 'openDrawioDiagram':
@@ -885,6 +915,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       // Remove from active set using stored reference
       RitemarkEditorProvider.activeWebviews.delete(webview);
       changeDocumentSubscription.dispose();
+      imageWatcher.dispose();
 
       // Dispose the slim delete-only watcher
       this.disposeDeleteWatcher(document.uri.fsPath);
@@ -1125,11 +1156,24 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       // pending slash-command position with title = relative path.
       const relativePath = `./images/${path.basename(diagramPath)}`;
       const webviewUri = webview.asWebviewUri(vscode.Uri.file(diagramPath)).toString();
+
+      // Wait for the webview to ack the insert before opening the diagram
+      // editor: openWith steals focus from the markdown editor, and an
+      // externalChange reload from disk during that window (disk doesn't have
+      // the image reference yet) would wipe the fresh insert.
+      const inserted = new Promise<void>((resolve) => {
+        this.pendingInsertAcks.set(relativePath, resolve);
+      });
       webview.postMessage({
         type: 'imageSaved',
         path: relativePath,
         displaySrc: webviewUri
       });
+      await Promise.race([
+        inserted,
+        new Promise<void>((resolve) => setTimeout(resolve, 2000))
+      ]);
+      this.pendingInsertAcks.delete(relativePath);
 
       await vscode.commands.executeCommand(
         'vscode.openWith',

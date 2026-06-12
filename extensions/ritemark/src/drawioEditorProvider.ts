@@ -205,12 +205,22 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
     // routes the app's own save/export events back to this bridge.
     let documentText = null;
     let loadAcked = false;
+    let userEdited = false;
     let loadAttempts = 0;
+    let autosaveTimer = null;
 
     function tryLoad() {
-      if (loadAcked || documentText === null) { return; }
+      // Never reload over the user's work: once the document is acked or the
+      // user has edited, programmatic loads stop for good. A late re-load
+      // here caused the "my shapes slide back to where they were" bug —
+      // draw.io morph-animates the revert to the stale model.
+      if (loadAcked || userEdited || documentText === null) { return; }
       if (loadAttempts++ > 30) { return; }
-      postToDrawio({ action: 'load', xml: documentText, autosave: 0 });
+      // autosave: 1 → draw.io emits an 'autosave' event on every change, which
+      // the bridge debounces into the export→save chain. Diagrams autosave
+      // like markdown files do — no manual Ctrl+S needed (Jarmo UX decision,
+      // Sprint 82 QA).
+      postToDrawio({ action: 'load', xml: documentText, autosave: 1 });
       setTimeout(tryLoad, loadAttempts < 5 ? 400 : 1500);
     }
 
@@ -221,9 +231,11 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
       if (msg.event) { trace.events.push('drawio:' + msg.event); }
       switch (msg.event) {
         case 'init':
-          // App announced readiness — deliver immediately (retry loop also covers this).
-          loadAcked = false;
-          tryLoad();
+          // App announced readiness. Only relevant if the document was never
+          // delivered — the app fires 'init' LATE in this hosting mode, often
+          // after a retried load already succeeded and the user started
+          // editing; resetting state here would revert the canvas.
+          if (!loadAcked) { tryLoad(); }
           break;
         case 'load':
           // App acked the document — stop the retry loop.
@@ -232,6 +244,19 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
         case 'save':
           // Ctrl+S inside draw.io: ask for the full .drawio.svg content.
           postToDrawio({ action: 'export', format: 'xmlsvg' });
+          break;
+        case 'autosave':
+          // Fires on every change (autosave:1 in the load action). Debounce
+          // into the same export→save chain so the file tracks the canvas —
+          // matching Ritemark's markdown autosave UX. Ignore until the
+          // document has actually loaded so startup noise can't trigger an
+          // empty save.
+          if (!loadAcked) { break; }
+          userEdited = true;
+          clearTimeout(autosaveTimer);
+          autosaveTimer = setTimeout(() => {
+            postToDrawio({ action: 'export', format: 'xmlsvg' });
+          }, 800);
           break;
         case 'export': {
           // data is a data:image/svg+xml;base64,... URL of the complete file.
@@ -242,6 +267,9 @@ export class DrawioEditorProvider implements vscode.CustomTextEditorProvider {
             for (let i = 0; i < bytes.length; i++) { buf[i] = bytes.charCodeAt(i); }
             const svg = new TextDecoder('utf-8').decode(buf);
             if (svg.length > 0) {
+              // Keep the cached text current so any future programmatic load
+              // would deliver the latest saved state, never the open-time one.
+              documentText = svg;
               vscode.postMessage({ type: 'drawio:save', data: svg });
             } else {
               vscode.postMessage({ type: 'drawio:error', data: 'draw.io returned an empty export — file not saved' });
