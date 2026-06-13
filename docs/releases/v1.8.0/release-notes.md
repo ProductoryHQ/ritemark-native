@@ -1,6 +1,6 @@
 ---
 date: 'TBD'
-title: 'Ritemark v1.8.0 — Your AI Agents, On a Schedule'
+title: 'Ritemark v1.8.0 — Draw.io Diagrams in Your Markdown'
 author: Jarmo Tuisk
 status: DRAFT
 sprints:
@@ -15,9 +15,11 @@ tags:
   - sprint-81
   - sprint-82
   - sprint-83
-  - runtime-unification
+  - drawio
+  - diagrams
   - scheduled-tasks
   - daemon
+  - runtime-unification
   - file-attachments
   - codex
   - acp
@@ -25,8 +27,6 @@ tags:
   - browser
   - excel
   - spreadsheets
-  - drawio
-  - diagrams
   - dictation
   - voice
 ---
@@ -34,11 +34,11 @@ tags:
 <!-- DRAFT — v1.8.0 release notes. Scope complete: sprints 79, 80, 81, 82, 83. Awaiting release gates. -->
 <!-- Version number TBD — confirm v1.8.0 at release time. -->
 
-# Ritemark v1.8.0 — Your AI Agents, On a Schedule
+# Ritemark v1.8.0 — Draw.io Diagrams in Your Markdown
 
 **Status:** Draft
 **Type:** [TBD — patch or minor]
-**Focus:** Ritemark can now run AI agents **on a schedule** while the app is open — daily briefings, weekly summaries, recurring reports — with a no-cron-required Schedule picker and a safe-by-default approval model. That headline feature (Sprint 80) is built on the runtime unification from Sprint 79, which put all three AI runtimes (Claude Code, Codex, OpenCode) behind one internal architecture with a single **approval policy** (Auto · Ask · Plan) and brought **file attachments** to Codex and OpenCode. Alongside it, your documents do more: **.xlsx files are now editable** (Sprint 81) rather than read-only previews, and you can **embed and edit draw.io diagrams** directly in markdown with a fully offline vendored editor (Sprint 82).
+**Focus:** You can now **embed and edit draw.io diagrams directly in markdown** — a big step for technical writers. Type `/diagram`, draw in a full draw.io editor (v30.0.4, vendored into the app, fully offline), and the picture in your document live-refreshes the moment you save; the `.drawio.svg` files render anywhere while staying losslessly editable (Sprint 82). Second headline: Ritemark can now run AI agents **on a schedule** while the app is open — daily briefings, weekly summaries, recurring reports — with a no-cron-required Schedule picker and a safe-by-default approval model (Sprint 80). Scheduling is built on the runtime unification from Sprint 79, which put all three AI runtimes (Claude Code, Codex, OpenCode) behind one internal architecture with a single **approval policy** (Auto · Ask · Plan) and brought **file attachments** to Codex and OpenCode. And the document story rounds out with **editable .xlsx files** (Sprint 81), no longer read-only previews.
 
 * * *
 
@@ -54,15 +54,15 @@ tags:
 
 ## Why This Release
 
-v1.7.3 was an AI-surface release — Agent Library, Agent Configurator, OpenCode runtime. v1.8.0 is the follow-through. Scheduled AI agents are the headline; around them, a supporting pair makes your documents do more — editable spreadsheets and embeddable diagrams.
+v1.7.3 was an AI-surface release — Agent Library, Agent Configurator, OpenCode runtime. v1.8.0 turns back to the documents themselves. The headline is for technical writers: draw.io diagrams now live inside your markdown, drawn and edited without ever leaving Ritemark. Right behind it, scheduled AI agents put your assistants on a timer, and editable spreadsheets round out the document story.
 
-**The foundation (Sprint 79): one runtime architecture.** Until now, the three runtimes had three different ideas about when to ask permission. Claude Code applied every edit automatically with no way to gate it. Codex followed VS Code settings. OpenCode prompted on everything. There was no single control that meant the same thing across all of them. v1.8.0 replaces that with one per-conversation mode picker — Auto, Ask, Plan — in the composer. File attachments (images, PDFs, documents) used to work only with Claude Code; Codex and OpenCode accepted the attachment UI but silently ignored the files — that gap is now closed too. The rest of Sprint 79 is invisible unless you're building on Ritemark: a shared `AgentRuntime` interface that all three runtimes implement, and a single approval gate and dispatch path instead of three parallel code paths. That shared interface is what makes the headline feature possible.
+**The headline (Sprint 82): draw.io diagrams in markdown.** This is a big step for technical writers — architecture diagrams, flowcharts, and sequence diagrams finally live where the prose lives. Type `/diagram` in any markdown file and Ritemark drops a draw.io diagram next to your document, embeds it at the cursor, and opens a full editor. Double-click an embedded diagram to edit it; diagrams autosave like markdown, and the embedded picture live-refreshes the moment you save. The editor is a complete draw.io (v30.0.4) vendored into the app and running fully offline — no CDN, no account. And the files are clever: a `.drawio.svg` is a normal SVG that renders anywhere (GitHub, other editors) while carrying its own editable source inside, for a lossless round-trip. This closes #111.
 
-**The headline (Sprint 80): scheduled AI agents.** Because every runtime now sits behind one interface, Ritemark can construct a fresh, isolated agent on demand and run it headlessly — which is exactly what scheduling needs. Add a `schedule:` block to an agent `.md` file (or use the new Schedule picker in the Agent editor) and the agent runs at the time you set: a 9 a.m. daily brief, a Friday-afternoon weekly summary, a recurring report. No cron syntax required — pick an interval or weekday chips and a time, and read a plain-English "Runs daily at 09:00" summary. Scheduled runs are safe by default: they can read your files but cannot write files or run shell commands without an explicit, one-time approval, and they run as isolated sessions that never touch your live conversations. The Agent Library gets a SCHEDULED section with per-task run history, and the status bar shows what's scheduled, running, or waiting for review. It runs only while Ritemark is open — there is no background OS daemon yet.
+**The second headline (Sprint 80): scheduled AI agents.** Because every runtime now sits behind one interface (Sprint 79, below), Ritemark can construct a fresh, isolated agent on demand and run it headlessly — which is exactly what scheduling needs. Add a `schedule:` block to an agent `.md` file (or use the new Schedule picker in the Agent editor) and the agent runs at the time you set: a 9 a.m. daily brief, a Friday-afternoon weekly summary, a recurring report. No cron syntax required — pick an interval or weekday chips and a time, and read a plain-English "Runs daily at 09:00" summary. Scheduled runs are safe by default: they can read your files but cannot write files or run shell commands without an explicit, one-time approval, and they run as isolated sessions that never touch your live conversations. The Agent Library gets a SCHEDULED section with per-task run history, and the status bar shows what's scheduled, running, or waiting for review. It runs only while Ritemark is open — there is no background OS daemon yet.
+
+**The foundation (Sprint 79): one runtime architecture.** Until now, the three runtimes had three different ideas about when to ask permission. Claude Code applied every edit automatically with no way to gate it. Codex followed VS Code settings. OpenCode prompted on everything. There was no single control that meant the same thing across all of them. v1.8.0 replaces that with one per-conversation mode picker — Auto, Ask, Plan — in the composer. File attachments (images, PDFs, documents) used to work only with Claude Code; Codex and OpenCode accepted the attachment UI but silently ignored the files — that gap is now closed too. The rest of Sprint 79 is invisible unless you're building on Ritemark: a shared `AgentRuntime` interface that all three runtimes implement, and a single approval gate and dispatch path instead of three parallel code paths. That shared interface is what makes scheduled agents possible.
 
 **Alongside (Sprint 81): editable spreadsheets.** `.xlsx` files were a read-only preview; now they're editable. Click a cell, type, Cmd+S to save, with dirty tracking, hot-exit backup, and revert. The editor gained an fx formula bar (so you can see a cell's formula Excel-style) and reliable multi-sheet tabs at the bottom of the viewport — which also fixes #110, where the sheet selector could fail to appear. Editing is cell-value scope: formulas and styles are preserved on save but not edited in-app, since Ritemark has no formula engine.
-
-**Alongside (Sprint 82): diagrams in markdown.** Type `/diagram` in any markdown file and Ritemark drops a draw.io diagram next to your document, embeds it at the cursor, and opens a full editor. Double-click an embedded diagram to edit it; diagrams autosave like markdown, and the embedded picture live-refreshes the moment you save. The editor is a complete draw.io (v30.0.4) vendored into the app and running fully offline — no CDN, no account. And the files are clever: a `.drawio.svg` is a normal SVG that renders anywhere (GitHub, other editors) while carrying its own editable source inside, for a lossless round-trip. This closes #111.
 
 Sprint docs: `docs/development/sprints/sprint-79-runtime-unification/`, `docs/development/sprints/sprint-80-scheduled-tasks-daemon/`, `docs/development/sprints/sprint-81-excel-editing/`, `docs/development/sprints/sprint-82-drawio-diagrams/`, `docs/development/sprints/sprint-83-dictation-mic-fix/`
 
@@ -70,14 +70,38 @@ Sprint docs: `docs/development/sprints/sprint-79-runtime-unification/`, `docs/de
 
 ## What's New
 
+### Draw.io diagrams embedded in markdown (sprint-82)
+
+![A draw.io architecture diagram embedded inline in a markdown document, rendered right between the prose sections](./screenshots/1-8-0-drawio-embedded-to-markdown.png)
+
+You can now draw diagrams without leaving Ritemark, and keep them living inside your documents — a big step for technical writers:
+
+- **Type `/diagram` to embed one.** In any markdown file, type `/diagram` and Ritemark creates `images/diagram.drawio.svg` next to the file, embeds it at the cursor, and opens the diagram editor — all in one step.
+
+    ![Typing /diagram in a markdown document opens the slash menu with the new Diagram command](./screenshots/1-8-0-insert-drawio-fullscreen.png)
+- **A full draw.io editor.** Any `*.drawio.svg` file opens in a complete draw.io editor (v30.0.4). It's **vendored into the app and runs fully offline** — no CDN call, no account, no sign-in. To edit an embedded diagram, **double-click** it in markdown (a single click selects it, and a hover tooltip explains how).
+- **Diagrams autosave.** Just like markdown files, there's no Ctrl+S to remember — the tab's dirty-dot briefly flashes as the save indicator and your changes are written.
+- **The embed live-refreshes.** Edit in the diagram tab, switch back to the markdown, and the picture is already updated — the embed refreshes the moment the diagram is saved. This works for **all** embedded images, not just diagrams: if any image file under the document's folder changes on disk, the embed updates in place.
+- **Files that render anywhere.** A `.drawio.svg` is dual-format: a normal SVG that displays correctly in GitHub, other editors, and any SVG viewer, while carrying its own editable diagram source inside. The round-trip is lossless — open it in Ritemark, edit, save, and it's still a clean SVG.
+
+![Then the full draw.io editor opens inside Ritemark — shape palette, canvas with an architecture diagram, and format panel, with the AI sidebar alongside](./screenshots/1-8-0-drawio-full-app-in-ritemark.png)
+
+This closes [#111](https://github.com/ProductoryHQ/ritemark-native/issues/111). The feature is **on by default**.
+
+One limitation to know: choosing a **Google Font** for diagram text requires a network connection to fetch the font. Everything else — drawing, editing, saving, embedding — works fully offline.
+
 ### Scheduled AI agents — run an agent on a timer (sprint-80)
 
 You can now have an AI agent run on a schedule, in the background, while Ritemark is open. The classic use cases: a daily briefing every morning, a weekly summary every Friday, a recurring report. You set it up once and the agent runs headlessly at the time you choose.
+
+![The Agent editor with the new Schedule panel on the left — an analytics agent configured to run on a recurring schedule](./screenshots/1-8-0-agent-schedule-fullscreen.png)
 
 There are two ways to schedule an agent:
 
 - **The Schedule picker in the Agent editor.** Open an agent and choose **Interval** mode (every N minutes or hours, from presets) or **Days** mode (weekday chips Mon–Sun, with Every day / Weekdays / Weekends presets, plus a time of day). A live summary reads back what you picked — "Runs daily at 09:00" — so there's no guessing. Everything is in **local time**, no timezone confusion. If you actually want raw cron, there's an **Advanced** escape hatch with a copy button — but you never need it.
 - **Frontmatter.** Add a `schedule:` block to the agent's `.md` file directly. Agent files are picked up from both `.claude/agents/` and `.agents/`, and edits take effect live — no restart.
+
+![Schedule picker close-up — Days mode with the Weekdays preset, Mon–Fri chips, a 09:00 time, and the plain-English summary "Runs on weekdays at 09:00"](./screenshots/1-8-0-agent-schedule-closeup.png)
 
 **Safe by default.** A scheduled run happens without you watching, so Ritemark is conservative: scheduled runs **auto-approve file reads** but **block file writes and shell commands**. If a run tries to write a file or run a command, it stops, raises a warning toast, and adds an amber **"needs review"** row in the Agent Library's SCHEDULED section. Click **Review & approve** and you see a confirmation dialog with the exact blocked action; approve it and the agent re-runs with that single action allowed — once. Future runs stay restricted.
 
@@ -96,23 +120,11 @@ The feature is **on by default**. One limitation to know: scheduled tasks run on
 - **Add rows and columns.** An empty sheet shows an **"Add a row to start editing"** button; rows and columns can be added as you go. The grid is anchored at A1, so row numbers line up with real cell addresses.
 - **Reliable multi-sheet workbooks.** Sheet tabs sit at the bottom of the viewport, Excel-style, with the active tab merging seamlessly into the grid. This also fixes [#110](https://github.com/ProductoryHQ/ritemark-native/issues/110), where the multi-sheet selector could fail to appear.
 
+![Editing a cell in an .xlsx workbook — the cell is in edit mode and the fx formula bar at the top shows its contents](./screenshots/1-8-0-excel-simple-edit-fullscreen.png)
+
 The custom editor was renamed from "Excel Preview" to **"Excel Editor"** to reflect that it now edits.
 
 Editing scope is cell values. Formulas, styles, and merged cells are preserved on save but not editable in-app; clearing cells doesn't shrink the used range; and if the file changes on disk while you have unsaved edits, your edits stay in memory and a refresh asks for confirmation.
-
-### Draw.io diagrams embedded in markdown (sprint-82)
-
-You can now draw diagrams without leaving Ritemark, and keep them living inside your documents:
-
-- **Type `/diagram` to embed one.** In any markdown file, type `/diagram` and Ritemark creates `images/diagram.drawio.svg` next to the file, embeds it at the cursor, and opens the diagram editor — all in one step.
-- **A full draw.io editor.** Any `*.drawio.svg` file opens in a complete draw.io editor (v30.0.4). It's **vendored into the app and runs fully offline** — no CDN call, no account, no sign-in. To edit an embedded diagram, **double-click** it in markdown (a single click selects it, and a hover tooltip explains how).
-- **Diagrams autosave.** Just like markdown files, there's no Ctrl+S to remember — the tab's dirty-dot briefly flashes as the save indicator and your changes are written.
-- **The embed live-refreshes.** Edit in the diagram tab, switch back to the markdown, and the picture is already updated — the embed refreshes the moment the diagram is saved. This works for **all** embedded images, not just diagrams: if any image file under the document's folder changes on disk, the embed updates in place.
-- **Files that render anywhere.** A `.drawio.svg` is dual-format: a normal SVG that displays correctly in GitHub, other editors, and any SVG viewer, while carrying its own editable diagram source inside. The round-trip is lossless — open it in Ritemark, edit, save, and it's still a clean SVG.
-
-This closes [#111](https://github.com/ProductoryHQ/ritemark-native/issues/111). The feature is **on by default**.
-
-One limitation to know: choosing a **Google Font** for diagram text requires a network connection to fetch the font. Everything else — drawing, editing, saving, embedding — works fully offline.
 
 ### One approval policy for every AI runtime: Auto, Ask, Plan (sprint-79)
 
