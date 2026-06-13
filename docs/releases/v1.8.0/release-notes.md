@@ -1,8 +1,8 @@
 ---
-date: 'TBD'
+date: '2026-06-13'
 title: 'Ritemark v1.8.0 — Draw.io Diagrams in Your Markdown'
 author: Jarmo Tuisk
-status: DRAFT
+status: Published
 sprints:
   - sprint-79
   - sprint-80
@@ -31,13 +31,10 @@ tags:
   - voice
 ---
 
-<!-- DRAFT — v1.8.0 release notes. Scope complete: sprints 79, 80, 81, 82, 83. Awaiting release gates. -->
-<!-- Version number TBD — confirm v1.8.0 at release time. -->
-
 # Ritemark v1.8.0 — Draw.io Diagrams in Your Markdown
 
-**Status:** Draft
-**Type:** [TBD — patch or minor]
+**Status:** Published
+**Type:** Minor (1.7.3 → 1.8.0)
 **Focus:** You can now **embed and edit draw.io diagrams directly in markdown** — a big step for technical writers. Type `/diagram`, draw in a full draw.io editor (v30.0.4, vendored into the app, fully offline), and the picture in your document live-refreshes the moment you save; the `.drawio.svg` files render anywhere while staying losslessly editable (Sprint 82). Second headline: Ritemark can now run AI agents **on a schedule** while the app is open — daily briefings, weekly summaries, recurring reports — with a no-cron-required Schedule picker and a safe-by-default approval model (Sprint 80). Scheduling is built on the runtime unification from Sprint 79, which put all three AI runtimes (Claude Code, Codex, OpenCode) behind one internal architecture with a single **approval policy** (Auto · Ask · Plan) and brought **file attachments** to Codex and OpenCode. And the document story rounds out with **editable .xlsx files** (Sprint 81), no longer read-only previews.
 
 * * *
@@ -46,9 +43,9 @@ tags:
 
 | Asset | Platform | URL |
 |-------|----------|-----|
-| Ritemark-arm64.dmg | macOS (Apple Silicon, arm64) — notarized | TBD |
-| Ritemark-x64.dmg | macOS (Intel, x64) — notarized | TBD |
-| Ritemark-Setup.exe | Windows x64 | TBD |
+| Ritemark-arm64.dmg | macOS (Apple Silicon, arm64) — notarized | https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.0/Ritemark-arm64.dmg |
+| Ritemark-x64.dmg | macOS (Intel, x64) — notarized | https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.0/Ritemark-x64.dmg |
+| Ritemark-Setup.exe | Windows x64 | https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.0/Ritemark-Setup.exe |
 
 * * *
 
@@ -241,4 +238,14 @@ The mic failure on macOS Tahoe was a Permissions-Policy regression, not a TCC on
 
 ## Tests and Validation
 
-[TODO: fill before release — Gate 1/2 sign-off, platform artifacts]
+- **Gate 1 (macOS arm64):** PASSED by Jarmo on the signed un-notarized DMG.
+- **Gate 2 (macOS x64 + Windows x64):** PASSED by Jarmo — the x64 DMG and the Windows installer were both installed, launched, and exercised (editor loads, agents start).
+- **Notarization:** All macOS DMGs are notarized and stapled (Developer ID JKBSC3ZDT5); the bundled agent binaries (`claude`, `codex-app-server`, `opencode`) are re-signed under our Team ID.
+- **Manual QA:** Exercised across the five sprints — scheduled agents (S1 / S3 / R4 scenarios), Excel multi-sheet plus cell edit, draw.io render / edit / autosave / offline, dictation mic prompt, and the unified approval gate.
+- **Hardening:** The 60-minute post-build notarization hardening window was observed for both Mac builds.
+
+* * *
+
+## Known Issues
+
+- **Codex model picker can show a stale model list** on machines where the Codex CLI cache is outdated. Workaround: update the Codex CLI and restart Ritemark. A robustness fix — a "Codex default" option plus a staleness guard — is tracked in [#121](https://github.com/ProductoryHQ/ritemark-native/issues/121) for a follow-up release.
