@@ -34,8 +34,19 @@ Release (`docs/development/releases/vX.Y.Z/` + GitHub milestone `vX.Y.Z`)
 - `release-plan.md` is the internal source of truth for sprint map, issue intake, risks/blockers, tracker, feature-complete state, and decisions.
 - `docs/releases/vX.Y.Z/` is for release execution/public assets: test checklist, changelog, release notes, screenshots.
 - DLC canon docs live in `docs/DLC/`.
-- `.claude/agents/harness-equalizer.md` is a scheduled twice-daily drift checker for `.claude/**` and `.agents/**` harness alignment. Treat it as a reviewer/maintainer, not as a new lifecycle state source.
+- `.claude/agents/harness-equalizer.md` is a scheduled twice-daily drift checker that keeps the Codex harness aligned with the Claude canon (one-directional: CLAUDE -> CODEX). Treat it as a reviewer/maintainer, not as a new lifecycle state source.
 - Do not equate `.agents/skills` with `.claude/agents`: Codex skills are procedural playbooks; Claude agents are role agents. Compare them by responsibility coverage only.
+
+### Harness Governance (Claude is canon)
+
+`CLAUDE.md` and `.claude/**` are the canonical harness; this file and `.agents/**` / `.codex/**` are derived from them ("additive to the existing `.claude/` setup"). Drift is reconciled one way only: **CLAUDE -> CODEX**. The `harness-equalizer` never edits the Claude side; if the canon looks wrong it flags it for Jarmo rather than changing it.
+
+Codex has two distinct extension mechanisms, both kept in sync with their Claude counterparts:
+
+- **Codex skills** — `.agents/skills/*/SKILL.md` — procedural playbooks. Counterpart of `.claude/skills/*`.
+- **Codex role agents (subagents)** — `.codex/agents/*.toml` — standalone TOML files (`name`, `description`, `developer_instructions`; optional `model`, `mcp_servers`, `skills.config`), auto-discovered by Codex and spawned by `name`. Counterpart of `.claude/agents/*.md`.
+
+These are different object types: a Claude role agent maps to a `.codex/agents/*.toml`, not to a skill, and a Codex agent should reference its matching skill rather than duplicate it. The Claude-runtime-only agents (`harness-equalizer`, `knowledge-builder`) have no Codex counterpart by design.
 
 ### Default Workflow
 

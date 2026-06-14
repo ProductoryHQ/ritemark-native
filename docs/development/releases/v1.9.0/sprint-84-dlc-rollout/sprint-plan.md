@@ -18,6 +18,8 @@ Implement the new development lifecycle canon so repo docs, GitHub templates, an
 - [x] `.agents` skills impacted by DLC are updated.
 - [x] `.claude` agents/skills impacted by DLC are updated or have a compatibility note.
 - [x] A scheduled `harness-equalizer` agent exists to check `.claude/**` and `.agents/**` drift twice daily.
+- [x] `harness-equalizer` is written as a proper work-instruction (Role/Objective/Process/Output/Constraints) with a directional **CLAUDE → CODEX** governance model.
+- [x] Claude role agents are mirrored into Codex as `.codex/agents/*.toml` subagents (verified format, not the dead-config `.agents/agents/*.md`).
 - [x] No implementation code changes are mixed into this sprint.
 
 ## Implementation Checklist
@@ -51,6 +53,15 @@ Implement the new development lifecycle canon so repo docs, GitHub templates, an
 - [x] Add `.claude/agents/harness-equalizer.md` with Ritemark `schedule:` frontmatter for twice-daily harness comparison.
 - [x] Clarify that `.agents/skills` are Codex skills, not equivalents of `.claude/agents`; compare them only by responsibility coverage.
 - [x] Remove the obsolete Sprint 80 test fixture `.claude/agents/s1-daily-brief.md` (`enabled: false` happy-path scheduler agent, no live code references) — in-scope harness cleanup, approved by Jarmo 2026-06-14.
+
+### 5. Directional harness equalizer + Codex role-agents (added 2026-06-14, Jarmo-approved plan)
+
+- [x] Rewrite `.claude/agents/harness-equalizer.md` as a work-instruction: Role / Objective / Process / Output / Constraints; directional **CLAUDE → CODEX** (the equalizer never edits the Claude canon, only flags it); `schedule:` frontmatter unchanged.
+- [x] **Verification:** confirmed from two primary sources (official `developers.openai.com/codex/subagents` + GitHub issue `openai/codex#18823`) that Codex role agents are `.codex/agents/*.toml` (`name`/`description`/`developer_instructions`), **not** `.agents/agents/*.md` — the latter would have been dead config.
+- [x] Create `.codex/agents/*.toml` for the 8 domain role agents: pr-reviewer, qa-validator, release-manager, sprint-manager, vscode-expert, webview-expert, product-marketer, ux-expert. Each points to its matching Codex skill where one exists.
+- [x] Skip Claude-runtime-only agents (`harness-equalizer`, `knowledge-builder`) — recorded as intentional asymmetry.
+- [x] Document the directional canon + `.codex/agents/` convention in `AGENTS.md` (new "Harness Governance" subsection).
+- [x] Validate all 8 TOML files parse with the 3 required fields; `scheduleParser.test.ts` still green.
 
 ## Testing / Verification Procedure
 
