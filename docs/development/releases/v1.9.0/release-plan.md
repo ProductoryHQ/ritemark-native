@@ -58,7 +58,7 @@ Introduce the Ritemark Cloud strategy: a paid account-backed sharing service whe
 
 | Sprint | Purpose | Issues | Dependency | PR | Status |
 |---|---|---|---|---|---|
-| sprint-84-dlc-rollout | Implement new DLC process docs/templates/harness updates, including scheduled harness equalizer | — (process sprint) | This release plan | #122 | Implemented; PR #122 approved |
+| sprint-84-dlc-rollout | Implement new DLC process docs/templates/harness updates, including scheduled harness equalizer | — (process sprint) | This release plan | #122 | Merged to main 2026-06-14 (`ae68c92`) |
 | sprint-85-cloud-accounts | Accounts foundation: backend repo, auth, device flow, account page, Settings sign-in | TBD | Sprint 84 | TBD | Proposed |
 | sprint-86-billing-entitlements | Subscription checkout, customer portal, webhook state machine, entitlement middleware | TBD | Sprint 85 | TBD | Proposed |
 | sprint-87-share-backend | Entitlement-gated publish/serve pipeline, agent-native endpoints, abuse stack | TBD | Sprint 86 | TBD | Proposed |
@@ -101,7 +101,7 @@ Introduce the Ritemark Cloud strategy: a paid account-backed sharing service whe
 
 | Sprint | Branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
-| sprint-84-dlc-rollout | `sprint-84-dlc-rollout` | #122 | — (process sprint) | PR #122 approved; pending merge | `./scripts/validate-qa.sh` passed 2026-06-14 | process/internal |
+| sprint-84-dlc-rollout | `sprint-84-dlc-rollout` | #122 | — (process sprint) | Merged to main 2026-06-14 (`ae68c92`) | `./scripts/validate-qa.sh` passed 2026-06-14 | process/internal |
 | sprint-85-cloud-accounts | TBD | TBD | TBD | not started | not run | not drafted |
 | sprint-86-billing-entitlements | TBD | TBD | TBD | not started | not run | not drafted |
 | sprint-87-share-backend | TBD | TBD | TBD | not started | not run | not drafted |
