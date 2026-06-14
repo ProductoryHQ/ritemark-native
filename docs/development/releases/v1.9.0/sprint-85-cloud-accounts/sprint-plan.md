@@ -14,6 +14,7 @@ Strategy source: `docs/development/analysis/2026-06-12-cloud-sharing-sprint-plan
 - [scenarios.md](scenarios.md) — BDD behaviour examples (becomes the manual QA matrix).
 - [technical-plan.md](technical-plan.md) — architecture and workstreams.
 - [tasks.md](tasks.md) — implementation checklist.
+- [research/backend-repo-placement-analysis.md](research/backend-repo-placement-analysis.md) — D1 decision memo: separate repo vs monorepo (recommends separate `ritemark-cloud`).
 
 ## Goal
 
@@ -47,7 +48,7 @@ These were scattered across the two analysis docs + the release-plan prerequisit
 
 | # | Decision | Strategy recommendation | Status |
 |---|---|---|---|
-| D1 | Backend repo | New repo `ritemark-cloud` (keeps backend out of the VS Code build pipeline) | ☐ open |
+| D1 | Backend repo | Separate repo `ritemark-cloud` — see [research/backend-repo-placement-analysis.md](research/backend-repo-placement-analysis.md) (secrets-vs-public-toggle + forced version-skew tolerance + alien toolchains) | ☐ open — memo written, awaiting Jarmo's lock |
 | D2 | Auth stack | Better Auth, self-hosted on Workers (control, EU story, $0) vs Clerk (managed, faster) | ☐ open |
 | D3 | Identity providers | GitHub OAuth + email magic link (Apple sign-in deferred) | ☐ open |
 | D4 | Infra | Cloudflare Workers + D1 (+ R2 later for sharing) | ☐ open |
