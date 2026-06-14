@@ -2,7 +2,7 @@
 name: Feature Request
 about: Suggest a new feature or improvement
 title: "[Feature] "
-labels: enhancement
+labels: enhancement,status:open
 assignees: ''
 ---
 
@@ -13,6 +13,13 @@ What problem does this feature solve? What is the current limitation?
 ## Proposed Solution
 
 Describe how you'd like this to work.
+
+## Lifecycle Fit
+
+- **Candidate release milestone:** vX.Y.Z / none / unknown
+- **Candidate sprint:** sprint-NN-name / none / unknown
+- **Role in release:** headline / supporting feature / polish / architecture
+- **Needs research or audit before implementation?** no / yes / unknown
 
 ## Alternatives Considered
 

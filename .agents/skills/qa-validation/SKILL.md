@@ -13,6 +13,18 @@ Run the project checks that catch the recurring failure modes in `ritemark-nativ
 - Build-sensitive files changed and confidence matters.
 - You need a concrete pass/fail answer before distribution work.
 
+
+## DLC Release Tracker Check
+
+For release-bound work, also verify before ready/ship/commit handoff:
+
+- The sprint lives under `docs/development/releases/vX.Y.Z/sprint-NN-name/`.
+- The parent `release-plan.md` tracker row references the branch/PR/issues.
+- GitHub Issues are in the expected lifecycle state (`Open → In sprint → Done`) or explicitly deferred.
+- Release notes/changelog impact is recorded, or the sprint plan says why none is needed.
+
+This check does not replace `./scripts/validate-qa.sh`; it prevents lifecycle drift between docs, GitHub, and PRs.
+
 ## Core Commands
 
 Run these from repo root:

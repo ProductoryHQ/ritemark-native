@@ -31,6 +31,18 @@ Invoke automatically when you detect:
 
 ## Validation Checks
 
+
+### DLC Tracker Check
+
+For release-bound work, verify lifecycle alignment before reporting ready:
+
+- Sprint folder is under `docs/development/releases/vX.Y.Z/sprint-NN-name/`.
+- Parent `release-plan.md` tracker row references the branch/PR/issues.
+- GitHub issue states follow `Open → In sprint → Done` or are explicitly deferred.
+- Release-note/changelog decision is recorded in the sprint plan or release plan.
+
+Missing DLC tracker state is a process blocker even when build checks pass.
+
 ### Primary QA gate (mandatory)
 
 ```bash

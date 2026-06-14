@@ -2,7 +2,7 @@
 name: Bug Report
 about: Report a bug in Ritemark
 title: "[Bug] "
-labels: bug
+labels: bug,status:open
 assignees: ''
 ---
 
@@ -24,15 +24,23 @@ What you expected to happen.
 
 What actually happened.
 
-## Screenshots
+## Release Impact
 
-If applicable, add screenshots to help explain the problem.
+- **Blocks current release?** no / yes / unknown
+- **Candidate release milestone:** vX.Y.Z / none / unknown
+- **Candidate sprint:** sprint-NN-name / none / unknown
+- **Regression from version:**
+- **Workaround:**
 
 ## Environment
 
 - **OS:** macOS / Windows / Linux (version)
 - **Ritemark version:** (Help > About, or check the title bar)
 - **File type:** .md / .csv / .xlsx / .flow.json
+
+## Screenshots
+
+If applicable, add screenshots to help explain the problem.
 
 ## Additional Context
 
