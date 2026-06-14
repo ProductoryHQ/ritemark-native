@@ -18,6 +18,18 @@ Never describe a release or DMG as ready unless both gates are cleared:
 
 If a gate is open, say `RELEASE BLOCKED` and name the missing item.
 
+
+## DLC Pre-Release Planning Check
+
+Before version bumps, tags, packaging, or release publication, verify the release has reached `Feature complete` or `Release candidate` in the DLC hierarchy:
+
+- `docs/development/releases/vX.Y.Z/release-plan.md` exists.
+- GitHub milestone `vX.Y.Z` exists.
+- Release plan tracker lists every included sprint and shows merged/deferred status.
+- Feature-complete checklist is satisfied or every exception is explicitly deferred.
+
+If these are missing, block release execution with `RELEASE BLOCKED` and ask for release-plan/milestone cleanup before running distribution steps.
+
 ## Start Every Release Discussion
 
 Run or require these before version bumps, tags, DMG distribution, GitHub release, or upload:

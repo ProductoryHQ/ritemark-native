@@ -24,6 +24,18 @@ Companion skill to `release-manager` agent. The agent owns workflow + gate enfor
 | Full release | VS Code core / patches / branding changed | `X.Y.Z` (e.g. `1.7.0`) |
 | Extension-only | Changes confined to `extensions/ritemark/` | `X.Y.Z-ext.N` (e.g. `1.7.0-ext.1`) |
 
+
+## DLC Planning Precheck
+
+Before Step 0 for any full or extension-only release, check the parent release plan and milestone:
+
+```bash
+test -f docs/development/releases/vX.Y.Z/release-plan.md
+gh api repos/ProductoryHQ/ritemark-native/milestones --paginate --jq '.[].title' | grep -qx 'vX.Y.Z'
+```
+
+Do not start version bumps, tags, packaging, or GitHub release work until the release plan says the release is feature complete or a release candidate.
+
 ## Workflow — Full release (DMG)
 
 ### ⛔⛔ TWO HARD RULES THAT GOVERN NOTARIZATION ORDER ⛔⛔

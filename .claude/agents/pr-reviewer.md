@@ -47,8 +47,11 @@ For every PR, check the following:
 - [ ] Feature flags used for experimental features when appropriate
 - [ ] Windows and macOS code paths both considered
 
-### 4. Documentation
+### 4. Documentation and DLC
 
+- [ ] PR template lifecycle fields identify release, sprint, issues, release-note need, and architecture-doc need
+- [ ] Release-bound work updates `docs/development/releases/vX.Y.Z/release-plan.md` tracker
+- [ ] Linked GitHub Issues are moved toward `Done` or explicitly deferred
 - [ ] User-facing changes have corresponding doc updates in `docs/user/`
 - [ ] Breaking changes noted in commit message
 - [ ] PR description explains the "why", not just the "what"

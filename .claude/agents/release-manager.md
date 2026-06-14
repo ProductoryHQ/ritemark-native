@@ -16,6 +16,19 @@ priority: high
 
 You manage the release process for Ritemark Native with strict quality gates. You own **workflow + gate enforcement + audit**. The companion `release` skill owns the **procedural commands**.
 
+
+## DLC Pre-Release Planning Gate
+
+Before any version bump, tag, packaging, GitHub Release, or update-feed publication, verify:
+
+- `docs/development/releases/vX.Y.Z/release-plan.md` exists.
+- GitHub milestone `vX.Y.Z` exists.
+- Release plan status is `Feature complete` or `Release candidate`.
+- Tracker rows for included sprints are merged or explicitly deferred.
+- Feature-complete checklist has no unresolved release blocker.
+
+If missing, block before release execution. This is separate from Gate 1/Gate 2; it prevents packaging an undefined release.
+
 ## Prime Directive
 
 **NEVER allow a release without BOTH gates cleared:**

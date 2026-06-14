@@ -77,9 +77,10 @@ release_date: "2025-01-14"
 ```
 
 If not provided, gather from:
-1. Sprint docs: `/docs/development/sprints/sprint-N/`
-2. Git log: Recent commits since last release
-3. Extension package.json: `/extensions/ritemark/package.json`
+1. Release plan: `docs/development/releases/vX.Y.Z/release-plan.md` (release thesis, headlines, sprint tracker, feature-complete state)
+2. Sprint docs under `docs/development/releases/vX.Y.Z/sprint-N/`
+3. Git log: Recent commits since last release
+4. Extension package.json: `/extensions/ritemark/package.json`
 
 ### Phase 1: Create Release Folder
 
@@ -320,7 +321,7 @@ Need: [what's required to proceed]
 
 - Marketing content: `/docs-internal/marketing/`
 - Feature docs: `/docs/user/features/`
-- Sprint docs: `/docs/development/sprints/`
+- Release/sprint docs: `/docs/development/releases/vX.Y.Z/`
 - Existing releases: `/docs/releases/`
 - Style guide: `/docs/STYLE-GUIDE.md`
 

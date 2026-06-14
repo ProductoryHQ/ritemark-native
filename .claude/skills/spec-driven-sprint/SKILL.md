@@ -28,7 +28,7 @@ If the sprint is a **single-domain fix, refactor, or build tweak**, do NOT pull 
 
 ## The Five Artifacts
 
-All five live under `docs/development/sprints/sprint-NN-short-name/`. Always create them in this order — each builds on the previous.
+All five live under `docs/development/releases/vX.Y.Z/sprint-NN-short-name/` for release-bound sprints. Always create them in this order — each builds on the previous.
 
 ### 1. `spec.md` — the behaviour contract
 
@@ -191,7 +191,7 @@ The audit trail this leaves is the entire point of SDD. A future reader can answ
 When a requirement is high-risk (might be impossible, might require parser surgery, might fail on a platform we don't have), put a **dedicated audit** under `research/` BEFORE implementation:
 
 ```
-docs/development/sprints/sprint-NN/research/
+docs/development/releases/vX.Y.Z/sprint-NN/research/
 └── <topic>-audit.md   # e.g. comment-callout-audit.md
 ```
 
@@ -254,4 +254,4 @@ When you (the agent) are operating under this skill:
 - `sprint-manager` agent — picks SDD vs plain full track at sprint kickoff and surfaces the decision for user override.
 - `qa-validator` agent — runs the build / patches / TypeScript / debug-code gate at sprint-end. It does **not** check `[x]`-vs-code consistency (see Discrepancy Detection above for why that is a manual discipline).
 - `pr-reviewer` agent — the real safety net for "did the code do what `tasks.md` claimed?" — catches what discipline misses.
-- Sprint 72 (`docs/development/sprints/sprint-72-markdown-navigation-annotations/`) is the canonical worked example — read its spec.md, scenarios.md, technical-plan.md, tasks.md, and sprint-plan.md to see this skill in practice.
+- Historical Sprint 72 (`docs/development/sprints/sprint-72-markdown-navigation-annotations/`) is the canonical worked example — read its spec.md, scenarios.md, technical-plan.md, tasks.md, and sprint-plan.md to see this skill in practice.

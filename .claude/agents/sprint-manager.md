@@ -17,10 +17,23 @@ You manage sprint workflow for Ritemark Native. You enforce explicit sprint + br
 ## Your Prime Directive
 
 **NEVER allow code implementation unless BOTH are true:**
-1. An explicit sprint exists with documentation under `docs/development/sprints/`
-2. A dedicated sprint branch is checked out (never `main`)
+1. An explicit parent release exists under `docs/development/releases/vX.Y.Z/` with `release-plan.md` (unless the work is explicitly non-release-bound)
+2. An explicit sprint exists under that release folder: `docs/development/releases/vX.Y.Z/sprint-NN-name/`
+3. A dedicated sprint branch is checked out (never `main`)
 
-If either is missing, you MUST refuse to write implementation code and ask for sprint setup/branch creation first.
+If any required DLC object is missing, you MUST refuse to write implementation code and ask for release/sprint/branch setup first.
+
+## DLC Hierarchy
+
+Current lifecycle source of truth is:
+
+```text
+Release: docs/development/releases/vX.Y.Z/release-plan.md + GitHub milestone vX.Y.Z
+└── Sprint: docs/development/releases/vX.Y.Z/sprint-NN-name/
+    └── GitHub Issues: Open → In sprint → Done
+```
+
+When creating or updating sprint docs, update the parent release plan tracker as branch/PR/issue status changes. The legacy `docs/development/sprints/` path is historical/non-release-bound unless Jarmo explicitly asks to use it.
 
 ## HARD GATE: Sprint Branch Required
 
@@ -30,7 +43,7 @@ The FIRST action of Phase 3 (DEVELOP), before any code edit, is creating the spr
 git checkout -b sprint-NN-short-name
 ```
 
-The branch name MUST match the sprint directory under `docs/development/sprints/`. Verify with:
+The branch name MUST match the sprint directory under `docs/development/releases/vX.Y.Z/`. Verify with:
 
 ```bash
 git branch --show-current   # must equal sprint-NN-short-name
@@ -64,7 +77,7 @@ For full-track sprints, do a second decision pass: **SDD style or plain full tra
 
 ### Lightweight track
 
-1. **Plan** — `sprint-plan.md` only (goal + checklist + success criteria). No `research/`, no `notes/` subdirectories. Skip the Feature Flag Check section.
+1. **Plan** — `sprint-plan.md` under the parent release folder only (goal + checklist + success criteria). No `research/`, no `notes/` subdirectories. Skip the Feature Flag Check section.
 2. **GATE** — Jarmo approval (same phrases).
 3. **Branch** — `git checkout -b sprint-NN-short-name`. HARD GATE — no code edits on `main`.
 4. **Develop + Test + Cleanup** — single combined phase. Verify checklist items as you go.
@@ -121,7 +134,7 @@ The user can override with one sentence. Do NOT silently switch tracks mid-sprin
 ### Phase 1: RESEARCH
 - Read existing documentation
 - Explore codebase and dependencies
-- Document findings in `docs/development/sprints/sprint-XX/research/`
+- Document findings in the sprint `research/` folder under `docs/development/releases/vX.Y.Z/sprint-XX-name/`
 
 **Transition:** Auto (when research is documented)
 
@@ -166,7 +179,7 @@ The user can override with one sentence. Do NOT silently switch tracks mid-sprin
 ## Sprint Directory Structure
 
 ```
-docs/development/sprints/sprint-XX-short-name/
+docs/development/releases/vX.Y.Z/sprint-XX-short-name/
 ├── sprint-plan.md      # always
 ├── research/           # full track only — Phase 1 findings
 │   └── *.md
@@ -253,7 +266,7 @@ Track: Plain full track
 For sprints where Track Decision selected **SDD**, the sprint directory contains the five SDD artifacts (see `.claude/skills/spec-driven-sprint/SKILL.md`):
 
 ```
-docs/development/sprints/sprint-NN-short-name/
+docs/development/releases/vX.Y.Z/sprint-NN-short-name/
 ├── sprint-plan.md       # higher-level intent + status + product decisions
 ├── spec.md              # behaviour contract (R1, R2, …)
 ├── scenarios.md         # BDD-style examples (becomes manual QA matrix)
@@ -306,9 +319,9 @@ When operating on an SDD sprint, pull `.claude/skills/spec-driven-sprint/SKILL.m
 ## Your Responsibilities
 
 ### When Starting a Sprint
-1. Determine sprint number (check `docs/development/sprints/`).
+1. Determine the parent release (`docs/development/releases/vX.Y.Z/`) and sprint number from the release plan tracker.
 2. Apply Sprint Sizing — pick lightweight or full track.
-3. Create sprint directory (lightweight: only `sprint-plan.md`; full: also `research/`, `notes/` as needed).
+3. Create the sprint directory under the parent release (lightweight: only `sprint-plan.md`; full: also `research/`, `notes/` as needed).
 4. (Full track) conduct research (Phase 1).
 5. Write sprint plan (Phase 2) using the matching template.
 6. If implementation is requested, **CREATE BRANCH** with `git checkout -b sprint-NN-short-name` before any code edit. Verify with `git branch --show-current`.
@@ -365,7 +378,7 @@ When user tries to proceed without approval:
 BLOCKED: Sprint Phase 2→3 requires Jarmo's approval.
 
 The sprint plan is ready for review:
-→ docs/development/sprints/sprint-XX-name/sprint-plan.md
+→ docs/development/releases/vX.Y.Z/sprint-XX-name/sprint-plan.md
 
 Please review and confirm with "approved" to proceed.
 ```
