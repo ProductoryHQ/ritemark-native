@@ -1,6 +1,6 @@
 # Sprint 84 — DLC Rollout
 
-**Status:** Implemented — QA passed 2026-06-14; pending commit/PR  
+**Status:** Implemented — QA passed 2026-06-14; committed `51728f3`, PR [#122](https://github.com/ProductoryHQ/ritemark-native/pull/122) open, pending review/merge  
 **Parent release:** `docs/development/releases/v1.9.0/release-plan.md`  
 **Branch:** `sprint-84-dlc-rollout`  
 **Track:** Lightweight process/documentation sprint  
