@@ -7,6 +7,8 @@ user/account management is built first.
 
 ---
 
+> **⚠️ Status update (2026-06-14): superseded for execution.** This dated doc remains the strategic Plan of Record, but the **canonical execution docs are now [`../releases/v1.9.0/release-plan.md`](../releases/v1.9.0/release-plan.md) and the per-sprint SDD folders** beneath that release. **Sprint numbers here predate renumbering:** this doc's Sprint **83 → 85** (cloud-accounts), **84 → 86** (billing-entitlements), **85 → 87** (share-backend), **86 → 88** (client-launch), because the real Sprint 84 became the DLC rollout. Read every sprint number below through that mapping.
+
 ## 1. Strategy frame
 
 **Product:** Ritemark Cloud — a paid account service. First feature: document sharing

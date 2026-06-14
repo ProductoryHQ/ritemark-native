@@ -4,6 +4,8 @@
 **Status:** Research / pre-sprint analysis (no implementation decision yet)
 **Question:** How should Ritemark add cloud sharing (one file at a time — markdown/HTML via link) as its first monetization vector?
 
+> **⚠️ Status update (2026-06-14): partially superseded.** This is pre-decision research. Jarmo's strategic decisions (2026-06-12) **reversed** several recommendations below: **no free tier, no anonymous publishing, no BYO publishing — paid-only, accounts-first.** So the free-tier / BYO-publish / free-quota framing in §1, §4, §5-C and §8 does **not** reflect the chosen plan. Execution source of truth: [`2026-06-12-cloud-sharing-sprint-plan.md`](2026-06-12-cloud-sharing-sprint-plan.md) (Plan of Record) + [`../releases/v1.9.0/release-plan.md`](../releases/v1.9.0/release-plan.md). The competitor / monetization / technical / abuse-legal / agent-native research below remains valid and is the evidence base for the chosen plan.
+
 This document synthesizes (a) a codebase inventory of reusable infrastructure and (b) five
 parallel deep-research passes: competitor landscape, monetization patterns, technical
 architectures, live-collab/viewer UX, and AI-era publishing + EU legal. Claims below were
