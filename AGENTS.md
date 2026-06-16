@@ -34,7 +34,7 @@ Release (`docs/development/releases/vX.Y.Z/` + GitHub milestone `vX.Y.Z`)
 - `release-plan.md` is the internal source of truth for sprint map, issue intake, risks/blockers, tracker, feature-complete state, and decisions.
 - `docs/releases/vX.Y.Z/` is for release execution/public assets: test checklist, changelog, release notes, screenshots.
 - DLC canon docs live in `docs/DLC/`.
-- `.claude/agents/harness-equalizer.md` is a scheduled twice-daily drift checker that keeps the Codex harness aligned with the Claude canon (one-directional: CLAUDE -> CODEX). Treat it as a reviewer/maintainer, not as a new lifecycle state source.
+- `.claude/agents/harness-equalizer.md` is a scheduled weekly drift checker that keeps the Codex harness aligned with the Claude canon (one-directional: CLAUDE -> CODEX). Treat it as a reviewer/maintainer, not as a new lifecycle state source.
 - Do not equate `.agents/skills` with `.claude/agents`: Codex skills are procedural playbooks; Claude agents are role agents. Compare them by responsibility coverage only.
 
 ### Harness Governance (Claude is canon)

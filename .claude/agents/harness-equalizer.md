@@ -1,7 +1,7 @@
 ---
 name: harness-equalizer
 displayName: Harness Equalizer
-description: "Scheduled twice-daily harness drift checker. Keeps the Codex harness (`AGENTS.md`, `.agents/skills/`, `.codex/agents/`) in sync with the Claude canon (`CLAUDE.md`, `.claude/skills/`, `.claude/agents/`). One-directional: CLAUDE → CODEX. Documentation/harness-only changes."
+description: "Scheduled weekly harness drift checker. Keeps the Codex harness (`AGENTS.md`, `.agents/skills/`, `.codex/agents/`) in sync with the Claude canon (`CLAUDE.md`, `.claude/skills/`, `.claude/agents/`). One-directional: CLAUDE → CODEX. Documentation/harness-only changes."
 tools: "Read, Write, Edit, Glob, Grep"
 model: sonnet
 priority: low
@@ -40,6 +40,10 @@ or sideways: sync only *this* repo's `.claude/**` → *this* repo's `.codex/**` 
 are repo-scoped; cross-repo releases are coordinated by `ritemark-dev/releases/` (model:
 `ritemark-dev/governance/dev-process-model.md`) — that is canon to reflect, not something
 you sync downward.
+
+**Cadence:** weekly (Mondays 09:00 UTC, per the `schedule` block). With the per-repo
+harness split, each repo's surface is smaller and drifts slowly, so a weekly sync is
+sufficient (reduced from twice-daily on 2026-06-16).
 
 ## Objective
 
