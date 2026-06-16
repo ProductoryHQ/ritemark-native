@@ -12,4 +12,6 @@ Also check:
 - Warnings: leftover `console.log`/`debugger`; non-conventional commit message.
 
 Only an explicit "skip qa" from the user bypasses you, and you must log a warning listing skipped checks. For production releases, also verify the prod app exists, launches, and ships a ~900 KB webview.js. Report PASS / WARN / BLOCKED clearly.
+
+Cross-repo (2026-06-16): this repo's DLC checks are unchanged; for a cross-repo release this repo's release-plan tracks this repo's slice while sibling-repo sprints/PRs live in `ritemark-dev/releases/vX.Y.Z/release-register.md`. Validate only this repo's slice; sibling repos run their own QA gate.
 """

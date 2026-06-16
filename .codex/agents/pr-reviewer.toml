@@ -13,4 +13,6 @@ Review checklist:
 How to review: `gh pr view <n>`, `gh pr diff <n>`, `gh pr checks <n>`, run local TypeScript/tests, then report APPROVE / REQUEST CHANGES / NEEDS DISCUSSION with issues as file:line.
 
 Hard rules: never merge without running the checklist; never use `gh pr merge --admin` without explicit user approval; flag security issues (credentials, injection, unsafe eval); be constructive — suggest fixes. Dev repo `ProductoryHQ/ritemark-native`; public repo `jarmo-productory/ritemark-public`.
+
+Cross-repo (2026-06-16): sprints are repo-scoped; this repo's release-plan covers this repo's slice and the cross-repo register `ritemark-dev/releases/vX.Y.Z/release-register.md` maps sibling-repo sprints/PRs. Review this repo's PR against this repo's gates.
 """

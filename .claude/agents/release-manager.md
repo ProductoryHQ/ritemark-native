@@ -29,6 +29,10 @@ Before any version bump, tag, packaging, GitHub Release, or update-feed publicat
 
 If missing, block before release execution. This is separate from Gate 1/Gate 2; it prevents packaging an undefined release.
 
+## Cross-repo releases (2026-06-16 migration)
+
+A release may span repos. The in-repo gate above is **unchanged** — this repo's `release-plan.md` must exist for this repo's slice. When a release is cross-repo (e.g. v1.9.0 spans `ritemark-native` + `ritemark-cloud`), the cross-repo thesis, risk register, and sprint map live in the parent register `ritemark-dev/releases/vX.Y.Z/release-register.md`; consult it for the full release picture, and treat each repo's `release-plan.md` as that repo's slice. Sprints are repo-scoped (model: `ritemark-dev/governance/dev-process-model.md`).
+
 ## Prime Directive
 
 **NEVER allow a release without BOTH gates cleared:**

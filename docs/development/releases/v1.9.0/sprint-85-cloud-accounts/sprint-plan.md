@@ -1,85 +1,60 @@
-# Sprint 85 — Cloud Accounts (Foundation)
+# Sprint 85 — Cloud Accounts (native **client** slice)
 
-Track: **SDD** (auto-detected: multi-component backend + auth/security edge cases + new architectural layer)
+Track: **SDD**
 Branch: `sprint-85-cloud-accounts`
-Status: **Phase 2 (PLAN)** — awaiting Jarmo plan approval **and** the external-decision lock below. No implementation code until both clear.
-Parent release: [`../release-plan.md`](../release-plan.md) — v1.9.0 Cloud Sharing
-Strategy source: `docs/development/analysis/2026-06-12-cloud-sharing-sprint-plan.md` (Plan of Record, rev. 2) + `…-cloud-sharing-strategies.md` (research)
+Status: **Phase 2 (PLAN)** — awaiting Jarmo plan approval. No client implementation code until approved.
+Repo: `ritemark-native` (this repo). Cross-repo release: **v1.9.0 Cloud Accounts**.
 
-> **Numbering note:** the strategy Plan of Record calls this sprint "Sprint 83 — cloud-accounts". After Sprint 84 became the DLC rollout, the cloud sequence was renumbered: accounts **85** → billing **86** → share-backend **87** → client-launch **88**. This folder uses the release-plan numbering.
+> **Scope (post governance migration, 2026-06-16):** This sprint builds **only the client slice** in
+> `ritemark-native` — the Settings "Account" section, the device-flow client, and `SecretStorage`
+> token handling. The **account service backend** is a separate repo-scoped sprint in `ritemark-cloud`
+> (`sprint-01-account-service`). The two are coordinated by the cross-repo register:
+> `ritemark-dev/releases/v1.9.0/release-register.md`. (Folder keeps the name `sprint-85-cloud-accounts`
+> to match the branch and the in-repo DLC gate; it is the native client slice of the cloud-accounts
+> release.)
 
-## SDD Artifacts
+## SDD Artifacts (this repo / client slice)
 
-- [spec.md](spec.md) — behaviour contract **+ Architecture Proposal** (this sprint's spec doubles as the Architecture Gate submission).
-- [scenarios.md](scenarios.md) — BDD behaviour examples (becomes the manual QA matrix).
-- [technical-plan.md](technical-plan.md) — architecture and workstreams.
-- [tasks.md](tasks.md) — implementation checklist.
-- [research/backend-repo-placement-analysis.md](research/backend-repo-placement-analysis.md) — D1 decision memo: separate repo vs monorepo (recommends separate `ritemark-cloud`).
+- [spec.md](spec.md) — client behaviour contract (R8 Account section + device-flow client) + the
+  architectural pointer to the backend.
+- [scenarios.md](scenarios.md) — client BDD examples + the shared revoke-kills-session E2E exit test.
+- [technical-plan.md](technical-plan.md) — client workstreams (device-flow client, Settings section,
+  architecture-doc update).
+- [tasks.md](tasks.md) — client implementation checklist.
+
+> Backend SDD (service, auth, data model, device-flow endpoints, accounts web page) lives in
+> `ritemark-cloud/docs/development/releases/v1.9.0/sprint-01-account-service/`. The repo-placement
+> decision (D1) is locked in `ritemark-dev/decisions/D1-backend-repo-placement.md`.
 
 ## Goal
 
-A deployed, operated Ritemark Cloud **account service**, and a Ritemark desktop that can sign in end-to-end, hold a revocable device token, and lose access when the device is revoked. Ships **dark** (no user-facing launch). No publishing or billing yet — this is the platform other cloud sprints ride on.
+Ritemark desktop can sign in to Ritemark Cloud end-to-end: device flow → long-lived revocable device
+token in `SecretStorage` → short-TTL access JWTs → and it loses access when the device is revoked.
+The Settings "Account" section proves the loop. Ships dark.
 
-## Why first / dependency rationale
+## MVP Scope (client)
 
-Jarmo's strategic decisions (2026-06-12) — **no free tier, no anonymous publishing, no BYO publishing** — mean entitlement checks must exist *before* any share endpoint. So the account/identity layer is built first, and is designed **wider than sharing**: entitlements are a list of products (`sharing`, later `sync`, …), never a boolean.
+- **Device-flow client** in the extension host: request device code, open browser to sign-in +
+  approval, poll, store the device token in `SecretStorage`, exchange/refresh access JWTs. Follows the
+  outbound-HTTPS pattern in `src/update/githubClient.ts`.
+- **Settings "Account" section**: signed-out → "Sign in to Ritemark Cloud"; signed-in → identity +
+  device status + sign-out. Uses existing shadcn `ui/` components and `account:*` bridge messages
+  following `webview/src/bridge.ts`. **No stubbing of the Settings page** (HARD RULE #1).
+- **Architecture doc**: add the Layer 0 backend **pointer** to `docs/development/architecture.md`.
 
-## MVP Scope (workstream-level; full contract in spec.md)
+## Out of scope (this repo / sprint)
 
-- **Backend repo + service:** new repo (`ritemark-cloud` proposed), Hono on Cloudflare Workers + D1, deployed to staging + prod with CI.
-- **Data model (platform-wide):** `users`, `oauth_identities`, `devices` (revocable per-device tokens), `subscriptions` (provider customer id, product, status, period end), `audit_log`. Entitlements derived from subscriptions, carried in short-TTL (~15 min) access JWTs.
-- **Auth:** GitHub OAuth + email magic link; **no passwords stored, ever**.
-- **Desktop device flow** (RFC 8628 against our own service): device code → browser sign-in + approval → app polls → long-lived revocable device token in `SecretStorage` → exchanged for short-lived access JWTs.
-- **Accounts web page (minimal):** sign-in, device approval, device list/revoke, **account deletion (GDPR Art. 17) from day one**.
-- **Client slice:** "Account" section in Ritemark Settings (sign in/out, device status) — proves the loop E2E.
-- **Ops baseline:** staging + prod, wrangler CI deploy, structured logging, alerting.
+The account service and everything backend (→ `ritemark-cloud` account-service sprint). Billing,
+sharing UI, publish endpoints (later releases).
 
-## Out of scope (this sprint)
+## Dependency
 
-Billing/checkout/entitlement enforcement UI (→ Sprint 86), any publish/share endpoint (→ Sprint 87), share client UI (→ Sprint 88). The `subscriptions` table exists but is not yet written to by a billing provider.
-
-## Architecture Gate (HARD — blocks Phase 3)
-
-This initiative adds a new **backend Layer 0** that `docs/development/architecture.md` does not describe. Per the `architectural-design` skill, this triggers the Sprint Architecture Gate. **`spec.md` doubles as the Architecture Proposal** (auth model, repo placement, data model, infra choice, token lifecycle). Jarmo's sign-off on `spec.md` **is** the gate approval; `architecture.md` gains the new layer as part of this sprint's definition of done.
-
-## Decisions needed before Phase 3 (consolidated — gates implementation)
-
-These were scattered across the two analysis docs + the release-plan prerequisites; consolidated here with the strategy's recommendation. **Each needs Jarmo's lock (confirm recommendation or override) before any code.**
-
-| # | Decision | Strategy recommendation | Status |
-|---|---|---|---|
-| D1 | Backend repo | Separate repo `ritemark-cloud` — see [research/backend-repo-placement-analysis.md](research/backend-repo-placement-analysis.md) (secrets-vs-public-toggle + forced version-skew tolerance + alien toolchains) | ☐ open — memo written, awaiting Jarmo's lock |
-| D2 | Auth stack | Better Auth, self-hosted on Workers (control, EU story, $0) vs Clerk (managed, faster) | ☐ open |
-| D3 | Identity providers | GitHub OAuth + email magic link (Apple sign-in deferred) | ☐ open |
-| D4 | Infra | Cloudflare Workers + D1 (+ R2 later for sharing) | ☐ open |
-| D5 | Email provider | Resend or Scaleway TEM (EU) | ☐ open |
-| D6 | Sharing domain | `ritemark.site` (cookie-less, separate from app/update-feed domain) — register now even though serving lands in Sprint 87 | ☐ open |
-| D7 | Billing provider (forward dep) | Paddle as Merchant of Record (buys out EU VAT OSS) — not built here, but the `subscriptions` schema must match the provider's model | ☐ open |
-| D8 | Trial policy | 14-day trial, no card upfront | ☐ open (mainly Sprint 86) |
-| D9 | Price | $6/mo or $60/yr | ☐ open (mainly Sprint 88 launch) |
-
-External setup Jarmo owns (not code): register GitHub OAuth app, acquire `ritemark.site`, create Paddle/Stripe account, create `abuse@…` mailbox, confirm email provider.
-
-## Success Criteria (mirror spec acceptance criteria)
-
-- [ ] Account service deployed to staging **and** prod with CI (wrangler), structured logging, and alerting.
-- [ ] User can sign in from Ritemark desktop end-to-end (device flow).
-- [ ] Device token stored in `SecretStorage`; short-TTL access JWT exchange works.
-- [ ] Web page lists devices; revoking a device kills the app session (the headline exit test).
-- [ ] Account deletion (GDPR Art. 17) works from day one.
-- [ ] No passwords are ever stored.
-- [ ] `architecture.md` updated with the new backend Layer 0.
-
-## Primary Risk
-
-First backend service this team has operated. Mitigation: minimal surface, managed primitives only (Workers/D1), proven auth library instead of hand-rolled, staging/prod + alerting from day one. (Release-plan Risk Register: "First operated backend service" — High.)
-
-## Cross-Repo Tracking Question (needs a decision)
-
-Most of this sprint's code lands in the **new `ritemark-cloud` repo**, not `ritemark-native`. Open question for Jarmo: how is a sprint that primarily builds another repo tracked under this DLC? Options to consider — keep the sprint docs here (canonical) and reference `ritemark-cloud` PRs in the tracker; or mirror a lightweight sprint pointer in the backend repo. This is itself a small DLC-process gap to resolve before Phase 3.
+Consumes `ritemark-cloud`'s account service (the device flow talks to the live backend). The client
+**cannot be E2E-tested until the service is deployed** — coordinate via the register; the shared
+"revoke kills the app session" test needs both repos' code.
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan (Phase 2→3 gate).
-- [ ] Decisions D1–D7 locked (D8–D9 may defer to later sprints).
-- [ ] Architecture Gate: Jarmo signed off on `spec.md` as the Architecture Proposal.
+- [ ] Jarmo approved this (client) sprint plan (Phase 2→3 gate).
+- [ ] Architecture Gate: the backend Architecture Proposal lives in the `ritemark-cloud` spec; this
+      repo's gate item is the `architecture.md` Layer 0 pointer.

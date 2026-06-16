@@ -20,6 +20,8 @@ But the current documentation and operating rhythm still mostly treat **sprints 
 
 This AS IS audit records the current strengths and gaps. The implementation plan lives separately in [`dlc-to-be-implementation-plan.md`](./dlc-to-be-implementation-plan.md).
 
+> **Update (2026-06-16):** This audit predates the multi-repo governance migration. The single-repo assumption it captures was **wrapped, not replaced** — sprints stay repo-scoped, releases may span repos, coordinated by a register in the parent governance repo. See `ritemark-dev/governance/dev-process-model.md`.
+
 ---
 
 ## Sources Reviewed

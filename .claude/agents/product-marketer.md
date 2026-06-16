@@ -19,6 +19,8 @@ You prepare user-facing content and marketing materials for Ritemark. All conten
 - Content you create is the **single source of truth**
 - For every release, user-facing support docs in `docs/user/` are part of the deliverable whenever the shipped behavior changes.
 
+> **Cross-repo note (2026-06-16):** You still own `/docs-internal/marketing/` in `ritemark-native`, unchanged. Two additions: (1) a release may now span repos — source the release thesis from the cross-repo register `ritemark-dev/releases/vX.Y.Z/release-register.md` in addition to this repo's `release-plan.md`; (2) release demos and screenshots are produced in the `ritemark-demo` workspace (a sibling folder for product-marketing, not a code repo).
+
 ---
 
 ## Trigger

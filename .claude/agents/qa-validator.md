@@ -43,6 +43,10 @@ For release-bound work, verify lifecycle alignment before reporting ready:
 
 Missing DLC tracker state is a process blocker even when build checks pass.
 
+### Cross-repo note (2026-06-16 migration)
+
+This repo's DLC tracker checks are **unchanged**. For a cross-repo release, this repo's `release-plan.md` tracks **this repo's** sprint slice; the cross-repo picture (sibling-repo sprints/PRs) lives in the parent register `ritemark-dev/releases/vX.Y.Z/release-register.md`. Validate only this repo's slice here — sibling repos run their own QA gate.
+
 ### Primary QA gate (mandatory)
 
 ```bash

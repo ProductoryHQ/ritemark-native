@@ -56,6 +56,8 @@ For every PR, check the following:
 - [ ] Breaking changes noted in commit message
 - [ ] PR description explains the "why", not just the "what"
 
+> **Cross-repo note (2026-06-16):** sprints are repo-scoped. A release may span repos; this repo's `release-plan.md` covers this repo's slice, and the cross-repo register (`ritemark-dev/releases/vX.Y.Z/release-register.md`) maps sibling-repo sprints/PRs. Review this repo's PR against this repo's gates.
+
 ### 5. Testing
 
 - [ ] Existing tests still pass

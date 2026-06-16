@@ -35,6 +35,13 @@ Release: docs/development/releases/vX.Y.Z/release-plan.md + GitHub milestone vX.
 
 When creating or updating sprint docs, update the parent release plan tracker as branch/PR/issue status changes. The legacy `docs/development/sprints/` path is historical/non-release-bound unless Jarmo explicitly asks to use it.
 
+## Cross-repo model (2026-06-16 migration)
+
+**Sprints are repo-scoped; a release may be single- or cross-repo.** The Prime Directive above is **unchanged** — an in-repo `release-plan.md` under `docs/development/releases/vX.Y.Z/` is still required, and you still refuse without it. What changed is a layer *above* the repos:
+
+- A sprint belongs to exactly **one** repo. Never plan a cross-repo sprint — split work that spans repos into one sprint per repo (e.g. v1.9.0 = a native `account-client` sprint **here** + a cloud `account-service` sprint in `ritemark-cloud`).
+- A **cross-repo release** is coordinated by a register in the parent governance repo: `ritemark-dev/releases/vX.Y.Z/release-register.md`. The register maps the participating repo sprints; each repo's own `release-plan.md` still holds its slice. Full model: `ritemark-dev/governance/dev-process-model.md`.
+
 ## HARD GATE: Sprint Branch Required
 
 The FIRST action of Phase 3 (DEVELOP), before any code edit, is creating the sprint branch:

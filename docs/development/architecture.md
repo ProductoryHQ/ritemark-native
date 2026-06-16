@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-06-11 (Sprint 80 — scheduled-tasks daemon; Sprint 81 — Excel editing + #110; Sprint 82 — draw.io diagram embedding)
+**Last updated:** 2026-06-16 (Sprint 85 — multi-repo governance migration + Layer 0 Cloud backend pointer; Sprint 80 — scheduled-tasks daemon; Sprint 81 — Excel editing + #110; Sprint 82 — draw.io diagram embedding)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -36,6 +36,18 @@ Ritemark Native is a **VS Code OSS fork — as a git submodule, not a hard fork*
 ```
 
 **Layer boundaries are isolation boundaries.** Patches never touch the extension source; the webview never touches Node APIs directly. Every cross-boundary interaction is explicit and documented. This is what makes the system maintainable across VS Code upstream bumps.
+
+---
+
+## Layer 0 — Ritemark Cloud backend (external service)
+
+Starting with v1.9.0, Ritemark gains an optional **cloud backend** that lives **outside this app and outside this repo**. It is a separate service (Hono on Cloudflare Workers + D1), not part of the VS Code build, reached only by the **extension host over HTTPS** — the webview never calls it directly (consistent with the Layer 4↔3 boundary). **Local Markdown editing has zero dependency on it.**
+
+- **Code & detail:** `ritemark-cloud` (separate private repo — D1 locked). This document does **not** describe the backend internals (auth, data model, endpoints); see that repo's `CONTRACT.md` and `architecture` docs.
+- **Client touch-points in *this* repo:** a device-flow client in the extension host + a Settings "Account" section. The device token lives in VS Code `SecretStorage`; it is exchanged for short-TTL access JWTs. (Built in the `sprint-85-cloud-accounts` client slice.)
+- **Token lifecycle (summary):** long-lived revocable **device token** (`SecretStorage`) → short-TTL **access JWT** (carries entitlements) via refresh. Full contract in `ritemark-cloud/CONTRACT.md`.
+- **Why a separate repo, not a layer in the build:** see `ritemark-dev/decisions/D1-backend-repo-placement.md` (secrets vs this repo's public toggle; alien CI/cadence; forced version-skew tolerance).
+- **Governance:** the v1.9.0 release spans this repo + `ritemark-cloud`; coordinated by `ritemark-dev/releases/v1.9.0/release-register.md`.
 
 ---
 

@@ -16,4 +16,6 @@ Tag order: the release tag push triggers expensive x64 + Windows CI -- NEVER pus
 Update-feed requirement (MANDATORY): every release (full `X.Y.Z` or extension-only `X.Y.Z-ext.N`) must regenerate, verify, and publish the canonical update feed alongside the assets. Stale/missing feed -> BLOCKED.
 
 After Gate 2 and publish, recommend the `product-marketer` agent for changelog/notes (unless hotfix with no user-facing change or Jarmo says skip). Public repo `jarmo-productory/ritemark-public`; dev repo `ProductoryHQ/ritemark-native`.
+
+Cross-repo releases (2026-06-16): a release may span repos; the in-repo gate above is unchanged (this repo's release-plan covers this repo's slice). For cross-repo releases the thesis/risk/sprint-map live in `ritemark-dev/releases/vX.Y.Z/release-register.md`. Sprints are repo-scoped (model: `ritemark-dev/governance/dev-process-model.md`).
 """

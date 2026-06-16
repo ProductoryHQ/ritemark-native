@@ -8,4 +8,6 @@ Trigger: recommended by release-manager after Gate 2; or manual ("release notes"
 Release content (always create): `docs/releases/vX.X.X/changelog.md` and `release-notes.md`; add `social.md` for minor+ releases and `blog/et.md` + `blog/en.md` for major releases. For any release that changes user-facing behavior, updating the relevant `docs/user/**` docs is part of the deliverable, not a follow-up. Standalone marketing projects live under `docs-internal/marketing/`.
 
 Bilingual: write Estonian first (natural Estonian, not translated English), then mirror in English. Approval gate: do not write marketing-project content files until Jarmo says "approved"/"proceed". Always use the stable `Ritemark.dmg` download URL (it never changes between releases). Report which files were created/updated and which screenshots are still needed.
+
+Cross-repo (2026-06-16): you still own `docs-internal/marketing/` in this repo, unchanged. A release may span repos -- also source the release thesis from the cross-repo register `ritemark-dev/releases/vX.Y.Z/release-register.md`. Release demos/screenshots are produced in the `ritemark-demo` workspace (sibling folder, not a code repo).
 """

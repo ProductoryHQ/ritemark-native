@@ -16,6 +16,14 @@ Keep the existing sprint and release execution disciplines, but add a lightweigh
 - `release-plan.md` is the internal source of truth for scope, sprint map, issue intake, risks, and feature-complete state;
 - `docs/releases/vX.Y.Z/` stays focused on release execution and publishing assets.
 
+### Multi-repo extension (2026-06-16 governance migration)
+
+The lifecycle described here remains the **per-repo** canon. It is now wrapped by a **multi-repo governance layer**, defined canonically in the parent governance repo: `ritemark-dev/governance/dev-process-model.md`. In short:
+
+- **Sprints are repo-scoped; a release may be single- or cross-repo.** Each repo keeps the in-repo `release-plan.md` + sprint structure described here, unchanged.
+- A **cross-repo release** is coordinated by a *register* at `ritemark-dev/releases/vX.Y.Z/release-register.md`, which maps the participating repo sprints. The register sits **on top of** each repo's `release-plan.md`; it does not replace it.
+- Backend work lives in the separate private `ritemark-cloud` repo (D1 locked: `ritemark-dev/decisions/D1-backend-repo-placement.md`).
+
 ---
 
 ## Target Lifecycle

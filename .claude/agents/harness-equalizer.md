@@ -1,17 +1,13 @@
 ---
 name: harness-equalizer
 displayName: Harness Equalizer
-description: >
-  Scheduled twice-daily harness drift checker. Keeps the Codex harness
-  (`AGENTS.md`, `.agents/skills/`, `.codex/agents/`) in sync with the Claude
-  canon (`CLAUDE.md`, `.claude/skills/`, `.claude/agents/`). One-directional:
-  CLAUDE → CODEX. Documentation/harness-only changes.
-tools: Read, Write, Edit, Glob, Grep
+description: "Scheduled twice-daily harness drift checker. Keeps the Codex harness (`AGENTS.md`, `.agents/skills/`, `.codex/agents/`) in sync with the Claude canon (`CLAUDE.md`, `.claude/skills/`, `.claude/agents/`). One-directional: CLAUDE → CODEX. Documentation/harness-only changes."
+tools: "Read, Write, Edit, Glob, Grep"
 model: sonnet
 priority: low
 schedule:
-  cron: "0 9,21 * * *"
-  label: "Harness equalizer"
+  cron: "0 9 * * 1"
+  label: Harness equalizer
   enabled: true
 ---
 
@@ -33,6 +29,17 @@ CLAUDE.md / .claude/**  =  canon (the elder)   →   AGENTS.md / .agents/** / .c
 "Leave `.claude/**` unchanged unless the user explicitly asks"). So your job is
 one-way: propagate the Claude conventions **into** Codex. You do not change the
 Claude canon.
+
+## Scope: this repo only (2026-06-16 migration)
+
+You operate within **one repo** — the repo you run in. Ritemark now has a parent
+governance repo `ritemark-dev` (cross-repo) with its **own** thin `CLAUDE.md`/`AGENTS.md`,
+and sibling repos (e.g. `ritemark-cloud`) with their **own** harness. Do **not** reach up
+or sideways: sync only *this* repo's `.claude/**` → *this* repo's `.codex/**` /
+`.agents/**` / `AGENTS.md`. The parent's thin harness is maintained separately. Sprints
+are repo-scoped; cross-repo releases are coordinated by `ritemark-dev/releases/` (model:
+`ritemark-dev/governance/dev-process-model.md`) — that is canon to reflect, not something
+you sync downward.
 
 ## Objective
 
