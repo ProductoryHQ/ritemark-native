@@ -1,0 +1,80 @@
+/**
+ * Bundled baseline catalog — the offline floor (Sprint 89, GH #109).
+ *
+ * This is the lowest layer of the resolver waterfall: used only when live probes,
+ * the remote catalog, and the on-disk cache are all unavailable. It guarantees the
+ * app renders a correct, current model list with zero network.
+ *
+ * Shipped inside the VSIX as a typed const (NOT a .json import — tsconfig has no
+ * `resolveJsonModule`, and a compiled const is type-checked and needs no runtime
+ * file read). The PUBLISHED catalog (`feeds/model-catalog.json` in ritemark-public)
+ * mirrors this shape and is what gets edited to add a model without an app release.
+ *
+ * Keep this seed in sync with the published catalog at publish time (Phase 4).
+ * Model ids current as of 2026-07-01: claude-sonnet-5 shipped 2026-06-30.
+ */
+
+import type { ModelCatalog } from './schema';
+
+export const BUNDLED_CATALOG: ModelCatalog = {
+  schemaVersion: 1,
+  updatedAt: '2026-07-01T00:00:00Z',
+  providers: {
+    anthropic: {
+      defaults: { 'claude-code': 'claude-sonnet-5' },
+      models: [
+        { id: 'claude-sonnet-5', label: 'Sonnet 5', description: 'Fast & capable (recommended)', tier: 'medium', deprecated: false, order: 0 },
+        { id: 'claude-opus-4-8', label: 'Opus 4.8', description: 'Most powerful Opus-tier', tier: 'high', deprecated: false, order: 1 },
+        { id: 'claude-fable-5', label: 'Fable 5', description: 'Most capable, long-horizon work', tier: 'high', deprecated: false, order: 2 },
+        { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 3 },
+      ],
+    },
+    openai: {
+      defaults: { 'flow-llm': 'gpt-5.2' },
+      models: [
+        { id: 'gpt-5.2', label: 'GPT-5.2', description: 'Latest flagship reasoning model', tier: 'high', deprecated: false, order: 0 },
+        { id: 'gpt-5.1', label: 'GPT-5.1', description: 'Previous flagship, complex tasks', tier: 'high', deprecated: false, order: 1 },
+        { id: 'gpt-5-mini', label: 'GPT-5 Mini', description: 'Cost-efficient with good reasoning', tier: 'medium', deprecated: false, order: 2 },
+        { id: 'gpt-5-nano', label: 'GPT-5 Nano', description: 'Fastest and cheapest', tier: 'low', deprecated: false, order: 3 },
+        { id: 'gpt-4o', label: 'GPT-4o', description: 'Previous-gen multimodal, great for tools', tier: 'medium', deprecated: false, order: 4 },
+        { id: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast and cheap, simple tasks', tier: 'low', deprecated: false, order: 5 },
+      ],
+    },
+    gemini: {
+      defaults: { 'flow-llm': 'gemini-2.5-flash' },
+      models: [
+        { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro', description: 'Most capable Gemini with reasoning', tier: 'high', deprecated: false, order: 0 },
+        { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', description: 'Fast Gemini 3 for quick tasks', tier: 'medium', deprecated: false, order: 1 },
+        { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Powerful, complex tasks', tier: 'high', deprecated: false, order: 2 },
+        { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Fast and efficient (stable)', tier: 'low', deprecated: false, order: 3 },
+        { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', description: 'Cheapest Gemini', tier: 'low', deprecated: false, order: 4 },
+      ],
+    },
+    codex: {
+      defaults: { codex: 'gpt-5.3-codex' },
+      models: [
+        { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', description: 'Latest frontier agentic coding model', tier: 'high', deprecated: false, order: 0 },
+        { id: 'codex-spark', label: 'Codex Spark', description: 'Fast & light', tier: 'low', deprecated: false, order: 1 },
+        { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex', description: 'Balanced', tier: 'medium', deprecated: false, order: 2 },
+      ],
+    },
+    // opencode is BYOK/multi-vendor: ids are composite `<vendor>/<model>`; consumers
+    // group by the id prefix. Kept in sync with the curated OpenCode picker list.
+    opencode: {
+      defaults: {},
+      models: [
+        { id: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning', tier: 'high', deprecated: false, order: 0 },
+        { id: 'google/gemini-3.5-flash', label: 'Gemini 3.5 Flash', description: 'Google — latest, fast & capable', tier: 'medium', deprecated: false, order: 1 },
+        { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Google — proven, large context', tier: 'high', deprecated: false, order: 2 },
+        { id: 'openai/gpt-5.2', label: 'GPT-5.2', description: 'OpenAI — latest flagship reasoning model', tier: 'high', deprecated: false, order: 3 },
+        { id: 'openai/gpt-4o', label: 'GPT-4o', description: 'OpenAI — fast multimodal generalist', tier: 'medium', deprecated: false, order: 4 },
+        { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', description: 'Anthropic — fast & capable', tier: 'medium', deprecated: false, order: 5 },
+        { id: 'anthropic/claude-opus-4-8', label: 'Claude Opus 4.8', description: 'Anthropic — most powerful', tier: 'high', deprecated: false, order: 6 },
+        { id: 'openrouter/anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 7 },
+        { id: 'openrouter/google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', description: 'OpenRouter — Google via OpenRouter', tier: 'high', deprecated: false, order: 8 },
+        { id: 'openrouter/openai/gpt-5.2', label: 'GPT-5.2', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 9 },
+        { id: 'openrouter/meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', description: 'OpenRouter — open-weight, low cost', tier: 'low', deprecated: false, order: 10 },
+      ],
+    },
+  },
+};

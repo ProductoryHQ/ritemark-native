@@ -315,7 +315,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   agenticEnabled: false,
   selectedAgent: 'claude-code',
-  selectedModel: 'claude-sonnet-4-5',
+  // No hardcoded model id (Sprint 89 #109): the real list + default arrive via
+  // agent:config; ChatInput falls back to models[0] until then.
+  selectedModel: '',
   agents: [],
   models: [],
 
@@ -333,13 +335,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
 
   codexEnabled: false,
   codexModels: [],
-  codexSelectedModel: 'gpt-5.3-codex',
+  codexSelectedModel: '',
   codexStatus: DEFAULT_CODEX_STATUS,
   codexConversation: [],
   dismissedCodexNoticeKey: null,
   dismissedCurrentPlanKey: null,
 
-  pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'auto' },
+  pendingRuntime: { runtimeId: 'claude-code', modelId: '', mode: 'auto' },
 
   opencodeEnabled: false,
   acpProviders: { google: false, openai: false, anthropic: false, openrouter: false },
@@ -1301,17 +1303,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
       }
 
-      case 'agent:models-update': {
-        const newModels = message.models || [];
-        if (newModels.length > 0) {
-          const current = get().selectedModel;
-          const selectedModel = newModels.some((m: { id: string }) => m.id === current)
-            ? current
-            : (newModels[0]?.id || current);
-          set({ models: newModels, selectedModel });
-        }
-        break;
-      }
+      // (Sprint 89 #109) 'agent:models-update' removed — the extension now re-sends
+      // full 'agent:config' (with a reconciled selectedModel) on catalog refresh.
 
       case 'selection-update':
         set({

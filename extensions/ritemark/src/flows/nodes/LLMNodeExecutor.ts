@@ -10,7 +10,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import OpenAI from 'openai';
 import { getAPIKeyManager } from '../../ai/apiKeyManager';
-import { usesResponsesAPI, getReasoningEffort, DEFAULT_MODELS, GEMINI_LLM_MODELS } from '../../ai/modelConfig';
+import { usesResponsesAPI, getReasoningEffort } from '../../ai/modelConfig';
+import * as modelCatalog from '../../ai/modelCatalog';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -196,7 +197,7 @@ async function executeWithOpenAI(
   }
 
   const openai = new OpenAI({ apiKey });
-  const model = data.model || DEFAULT_MODELS.flowLLM;
+  const model = data.model || modelCatalog.getDefault('openai', 'flow-llm');
 
   // Build input with system prompt if provided
   const input = systemPrompt
@@ -276,7 +277,7 @@ async function executeWithGemini(
     : userPrompt;
 
   // Use Gemini REST API (v1beta for preview models like Gemini 3)
-  const model = data.model || DEFAULT_MODELS.flowLLMGemini;
+  const model = data.model || modelCatalog.getDefault('gemini', 'flow-llm');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {

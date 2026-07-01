@@ -25,18 +25,9 @@ const CLAUDE_AGENT_SDK_VERSION: string | null = (() => {
   }
 })();
 
-// Memoised result of `discoverClaudeModels()`. Populated on the first sidebar
-// open after Claude becomes `ready`, reused across subsequent renders.
-// Invalidated whenever the Claude runtime changes (install, settings update,
-// status refresh) — see `_handleExternalClaudeStatusInvalidation`.
-let cachedDiscoveredClaudeModels: ModelOption[] | null = null;
-let claudeModelDiscoveryInFlight = false;
 import {
   AGENTS,
-  CLAUDE_FALLBACK_MODELS,
-  DEFAULT_MODEL,
   DEFAULT_TOOLS,
-  discoverClaudeModels,
   getSetupStatus,
   getAgentEnvironmentStatus,
   clearSetupCache,
@@ -55,7 +46,6 @@ import {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
   type AgentId,
-  type ModelOption,
   type SetupStatus,
   type AgentEnvironmentStatus,
   type OnboardingStatus,
@@ -66,14 +56,14 @@ import { createBrowserMcpServer, BROWSER_MCP_SERVER_NAME, BROWSER_TOOL_ALLOW_NAM
 import { isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
-import { CodexManager, getCodexModels, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
+import { CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
 import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { createRuntime } from '../runtime/runtimeFactory';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
-import { BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
+import * as modelCatalog from '../ai/modelCatalog';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 
@@ -684,6 +674,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Re-send agent config to the webview. Called when the model catalog resolves
+   * fresh model lists (live probe / remote fetch / 6h refresh) so the sidebar
+   * dropdown updates without a reload (Sprint 89 #109, spec R1/R4).
+   */
+  public notifyModelCatalogUpdated(): void {
+    void this._sendAgentConfig();
+  }
+
+  /**
    * Send agent configuration to webview (selected agent, available agents, feature flag state)
    */
   private async _sendAgentConfig() {
@@ -691,7 +690,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const codexEnabled = isEnabled('codex-integration');
     const config = vscode.workspace.getConfiguration('ritemark.ai');
     const selectedAgent = config.get<string>('selectedAgent', 'claude-code');
-    const selectedModel = config.get<string>('selectedModel', DEFAULT_MODEL);
+    const selectedModel = config.get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code'));
 
     let setupStatus: SetupStatus | undefined;
     let environmentStatus: AgentEnvironmentStatus | undefined;
@@ -730,22 +729,27 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       ? byokProviderFlags(await this._readByokKeys())
       : { google: false, openai: false, anthropic: false, openrouter: false };
 
-    const claudeModels = cachedDiscoveredClaudeModels ?? CLAUDE_FALLBACK_MODELS;
+    const claudeModels = modelCatalog.getModels('anthropic');
+    // Reconcile a persisted-but-stale selection against the resolved list so the
+    // sidebar never shows or runs a model id that no longer exists (Sprint 89 #109).
+    const reconciledModel = claudeModels.some((m) => m.id === selectedModel)
+      ? selectedModel
+      : modelCatalog.getDefault('anthropic', 'claude-code');
 
     this._view?.webview.postMessage({
       type: 'agent:config',
       agenticEnabled,
       codexEnabled,
       selectedAgent,
-      selectedModel,
+      selectedModel: reconciledModel,
       agents: visibleAgents,
       models: claudeModels,
-      codexModels: getCodexModels(),
+      codexModels: modelCatalog.getModels('codex'),
       // Sprint 76 R6/R7: OpenCode availability + BYOK provider booleans + curated
       // models. The webview model picker filters models by configured providers.
       opencodeEnabled,
       acpProviders,
-      byokProviderModels: opencodeEnabled ? BYOK_PROVIDER_MODELS : undefined,
+      byokProviderModels: opencodeEnabled ? modelCatalog.getByokProviderModels() : undefined,
       codexStatus,
       setupStatus,
       environmentStatus,
@@ -756,44 +760,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       claudeSdkVersion: CLAUDE_AGENT_SDK_VERSION,
     });
 
-    // Warmup: when Claude is ready but we haven't yet asked the bundled SDK
-    // for its canonical model list, kick off discovery now. The result is
-    // posted as `agent:models-update` so the dropdown swaps in real display
-    // names (e.g. "Claude Sonnet 4.5") in place of the generic fallback.
-    if (
-      setupStatus?.state === 'ready' &&
-      !cachedDiscoveredClaudeModels &&
-      !claudeModelDiscoveryInFlight
-    ) {
-      void this._warmupClaudeModels(setupStatus);
-    }
-  }
-
-  private async _warmupClaudeModels(setupStatus: SetupStatus): Promise<void> {
-    if (!setupStatus.binaryPath || !this._workspacePath) {
-      return;
-    }
-    claudeModelDiscoveryInFlight = true;
-    try {
-      let anthropicApiKey: string | undefined;
-      if (setupStatus.authMethod === 'api-key' && this._secrets) {
-        anthropicApiKey = await this._secrets.get('anthropic-api-key');
-      }
-      const models = await discoverClaudeModels({
-        workspacePath: this._workspacePath,
-        pathToClaudeCodeExecutable: setupStatus.binaryPath,
-        ...(anthropicApiKey ? { anthropicApiKey } : {}),
-      });
-      if (models && models.length > 0) {
-        cachedDiscoveredClaudeModels = models;
-        this._view?.webview.postMessage({
-          type: 'agent:models-update',
-          models,
-        });
-      }
-    } finally {
-      claudeModelDiscoveryInFlight = false;
-    }
+    // Model lists come from the model-catalog resolver (live /v1/models → remote
+    // → cache → bundled). Discovery + refresh is owned by `src/ai/modelCatalog`
+    // (activated in extension.ts + refreshed on Claude status changes below).
   }
 
   private async _handleExternalCodexStatusInvalidation(
@@ -823,18 +792,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     } else if (reason === 'login-finished') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
-      // Auth context may have changed (different logged-in account), and
-      // model availability can be account-specific. Drop cache so fresh
-      // discovery runs on next config send.
-      cachedDiscoveredClaudeModels = null;
     } else if (reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
-      // Runtime may have changed (new binary, new settings) — drop the cached
-      // model list so the next _sendAgentConfig triggers fresh discovery.
-      cachedDiscoveredClaudeModels = null;
     }
 
+    // Auth/runtime context may have changed (account, binary, settings) and model
+    // availability can be account-specific — re-resolve the catalog before sending.
+    await modelCatalog.refresh();
     await this._sendAgentConfig();
     this._sendOnboardingStatus();
   }

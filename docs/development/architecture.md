@@ -108,7 +108,7 @@ Each runtime was integrated independently. The result is three structurally simi
 | **Approval** | `agent-answer-plan` webview message → PlanApprovalCard | `codex-approve` → CodexApprovalCard | `acp-approval-response` → CodexApprovalCard (shared shape, different message type) |
 | **Browser tools** | `BrowserMcpServer` injected via `AgentSessionConfig.mcpServers` | `codexBrowserTools.ts` — dynamic tool injection via Codex protocol | Not implemented |
 | **File attachments** | Full `FileAttachment` (image/pdf/text) | Images converted to data URLs; PDF/text not supported | No attachment support |
-| **Model config** | `CLAUDE_MODELS` in `src/agent/types.ts` | `getCodexModels()` in `src/codex/codexModels.ts` | `BYOK_PROVIDER_MODELS` in `src/ai/modelConfig.ts` |
+| **Model config** | `modelCatalog.getModels('anthropic')` — live `/v1/models` → catalog | `modelCatalog.getModels('codex')` — `~/.codex` cache → catalog | `modelCatalog.getModels('opencode')` — curated BYOK — all via `src/ai/modelCatalog` (Sprint 89) |
 | **Webview execute message** | `ai-execute-agent` | `codex-execute` | `acp-execute` |
 | **Webview cancel message** | `ai-cancel-agent` | `codex-cancel` | `acp-cancel` |
 
@@ -347,14 +347,27 @@ interface ScheduledTask {
 
 ## Model Configuration (Single Source of Truth)
 
-### AS IS — One location (post-Sprint 79)
+### AS IS — Model Catalog resolver (post-Sprint 89, GH #109)
 
-| Location | Models |
+The authority is the **`src/ai/modelCatalog/`** subsystem — a provenance-tracked waterfall
+resolving model lists + per-surface defaults for every runtime and view:
+
+**live provider probe → remote catalog → on-disk cache → bundled baseline** (highest-trust-that-succeeds wins).
+
+| Layer | Source |
 |---|---|
-| `src/ai/modelConfig.ts` | `CLAUDE_MODELS`, `DEFAULT_MODEL`, `OPENAI_LLM_MODELS`, `BYOK_PROVIDER_MODELS` |
-| `src/codex/codexModels.ts` | `getCodexModels()` dynamic (Codex list fetched at runtime, not static) |
+| Live | Anthropic `GET /v1/models` (primary, API-key); OpenAI `models.list()`; Gemini `/v1/models`; Codex `~/.codex/models_cache.json`; OpenCode ACP `configOptions` (deferred) |
+| Remote | `feeds/model-catalog.json` in `jarmo-productory/ritemark-public` — edit to add a model with **no app release** (HTTPS + strict schema v1 + 512 KB cap + origin allowlist) |
+| Cache | last good remote fetch in `globalState` (offline survival) |
+| Bundled | `bundledCatalog.ts` typed baseline shipped in the VSIX (offline floor) |
 
-`CODEX_MODELS` deleted (deprecated static list). `agent/types.ts` retains only type definitions. `CLAUDE_MODELS` / `DEFAULT_MODEL` re-exported from `src/agent/index.ts` for backward compatibility (callers that import from `../agent`). Full elimination of the runtime `flow:modelConfig` mirror message (for static config) requires the shared module approach — see ARCH-9.
+Public API: `getModels(provider)`, `getDefault(provider, surface)`, `onUpdate(cb)`, `refresh()`.
+Gated by the `remote-model-catalog` flag (off → bundled/cache floor only). Default Claude model: `claude-sonnet-5`.
+
+`src/ai/modelConfig.ts` is **retained but narrowed** — only OpenAI/Gemini image arrays,
+`DEFAULT_MODELS` (image defaults), and the `ModelConfig` types remain. Deleted: `CLAUDE_MODELS`,
+`DEFAULT_MODEL`, `BYOK_PROVIDER_MODELS`, `ClaudeModelOption`, `ByokProvider`/`ByokModelOption`/
+`toOpenCodeModelValue`; deleted files `src/agent/claudeModels.ts` + `src/codex/codexModels.ts`.
 
 ---
 
@@ -380,7 +393,7 @@ Post-Sprint 79 items tracked as GitHub Issues:
 | [#106](https://github.com/ProductoryHQ/ritemark-native/issues/106) | Typed webview ↔ host protocol — `bridge.ts` is stringly-typed; renames fail silently at runtime | Sprint 79 (reduces message count 9→3 first) |
 | [#107](https://github.com/ProductoryHQ/ritemark-native/issues/107) | Webview bundle ~7.6 MB IIFE (documented as ~900 KB); no CI size budget; all surfaces loaded on every `.md` open | #105 esbuild first |
 | [#108](https://github.com/ProductoryHQ/ritemark-native/issues/108) | Build-integrity gate — Gate 1 has passed 0-byte builds (v1.7.1); checks presence not integrity | #105 esbuild first |
-| [#109](https://github.com/ProductoryHQ/ritemark-native/issues/109) | Model gateway — agent runtimes and flow nodes have separate auth/model-resolution/retry/telemetry paths | Sprint 79 R6 |
+| [#109](https://github.com/ProductoryHQ/ritemark-native/issues/109) | Model gateway — **model-resolution unified in Sprint 89** (`src/ai/modelCatalog/` resolver + publishable catalog); shared **retry + telemetry** unification still deferred | Sprint 89 (partial) |
 | [#97](https://github.com/ProductoryHQ/ritemark-native/issues/97) | Cross-runtime conversation context — switching agents drops prior context; open design decision | **Decide before Sprint 80 daemon wiring** |
 
 ---
@@ -392,7 +405,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 - **VS Code as submodule, not fork** — customise via patches; keep upstream sync cheap. The brittleness of patch files is the accepted price.
 - **Extension symlinked, not copied** — single source of truth in `extensions/ritemark/`; symlinked into `vscode/extensions/ritemark` at build time. Never edit the submodule copy.
 - **Webview is sandboxed** — no filesystem/Node access; everything through `bridge.ts`. Never give the webview direct FS access to "simplify" things. ARCH-9 hardens this boundary; it must not dissolve it.
-- **Model IDs centralised** — only in `src/ai/modelConfig.ts` (post-Sprint 79). Never hardcode model names anywhere else.
+- **Model catalog is the single authority** — model lists + defaults resolve through `src/ai/modelCatalog/` (live provider probes → remote `ritemark-public` catalog → cache → bundled baseline), evolved from the static `modelConfig.ts` registry in Sprint 89 (GH #109). Never hardcode model ids in runtimes, views, or the webview; add models by editing the published catalog (no app release). The single-authority spirit is preserved; the mechanism is now dynamic + remotely updatable.
 - **Flows are JSON + pluggable executors** — new automation capability = new node executor, not a new engine.
 - **Features ON by default, gated by flags** — never delete code to disable (broke Settings in v1.3.0). Disable only via `src/features/flags.ts` and only on explicit instruction.
 - **Layout invariants owned by patch 002** — sidebar, terminal, titlebar placement is contractual; enforced by `.claude/hooks/pre-commit-validator.sh`.
@@ -427,3 +440,6 @@ The decisions that define the system. Changing any of these is an architecture-l
 | 2026-06-08 | Pre-Sprint 80 | Generalized the daemon from agent-specific (`AgentDaemon`/`DaemonSession`) to a handler-agnostic `Scheduler` + `ScheduledTask` interface with pluggable handlers (`AgentTaskHandler` in Sprint 80; `GitSyncHandler`/`ScriptHandler` interface-only). Scheduler no longer depends on `AgentRuntime`; the agent handler is the adapter that bridges them. |
 | 2026-06-10 | Sprint 82 | Draw.io diagram embedding (GH#111): `drawioEditorProvider.ts` added to [editors] — `CustomTextEditorProvider` for `*.drawio.svg` hosting the vendored draw.io v30.0.4 webapp subset (`media/drawio/`, 36 MB, Apache 2.0 incl. LICENSE/NOTICE, committed to git); clean-room bridge over the draw.io embed JSON protocol. `/diagram` slash command creates `images/diagram[-N].drawio.svg` and reuses the `imageSaved` insertion flow; `.drawio.svg` images in TipTap are double-click-to-edit. New `drawio-diagrams` flag (stable, kill-switch). `scripts/vendor-drawio.sh` re-vendors the bundle. The drawio bundle is NOT part of `media/webview.js` (no impact on GH#107). |
 | 2026-06-12 | Sprint 82 (QA close) | Draw.io hosting rearchitected after manual QA found the editor blank: the app runs DIRECTLY in the webview document (patched `index.html` + `<base>` + CSP), NOT in an iframe — desktop VS Code serves vscode-resource requests only for the webview document itself (iframe navigations unserved; srcdoc clients 404 — the SW authorizes by client URL). draw.io's embed-protocol partner is a hidden same-origin relay iframe (`window.opener` → relay; its `initializeEmbedMode` rejects a self-window partner). Diagrams AUTOSAVE (debounced `autosave` event → export→save chain) matching markdown UX; markdown embeds live-refresh via an image watcher + `imageRefreshed` (cache-busted, surgical node-src swap); `/diagram` insert waits for the webview's `imageInserted` ack before opening the editor (focus-steal + externalChange reload wiped the insert). |
+| 2026-07-01 | Sprint 89 | **Model Gateway (GH #109, model-resolution part).** New `src/ai/modelCatalog/` subsystem: provenance-tracked waterfall (live provider probe → remote `ritemark-public` catalog → `globalState` cache → bundled `bundledCatalog.ts` floor). Anthropic `GET /v1/models` is the primary live Claude source (supersedes the bundled SDK `supportedModels()`, which is capped at the CLI version). Publishable `feeds/model-catalog.json` adds a model with **no app release** (HTTPS + schema v1 + 512 KB cap + origin allowlist; pinned-key signature deferred). Deleted zombies `CLAUDE_MODELS`/`DEFAULT_MODEL`/`BYOK_PROVIDER_MODELS` + files `claudeModels.ts`/`codexModels.ts`. Consumers (UnifiedViewProvider, FlowEditorProvider, LLMNodeExecutor, extension.ts, webview store) rewired to `modelCatalog.*`; persisted-stale selection reconciled against the resolved list. New `remote-model-catalog` flag (stable). Default Claude model `claude-sonnet-5`. UnifiedViewProvider 1267→1223 LOC (pre-existing >1100 debt, reduced not increased). Retry/telemetry unification (rest of #109) deferred. |
+
+**Sprint 89 architecture-gate decision memo (2026-07-01, approved by Jarmo):** the Sprint 79 locked decision "Model IDs centralised in `modelConfig.ts`" is evolved — the single authority is now `src/ai/modelCatalog/` (resolver + remote catalog), not a static array. The single-place-to-look spirit is preserved; the mechanism is now dynamic and remotely updatable. Remote-catalog host: `jarmo-productory/ritemark-public`. Trust model v1: HTTPS + strict schema v1 + 512 KB cap + origin allowlist; pinned-key signature deferred to a follow-up issue.

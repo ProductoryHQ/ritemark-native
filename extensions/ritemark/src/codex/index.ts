@@ -19,7 +19,8 @@ export {
 } from './codexManager';
 export { CodexAppServer } from './codexAppServer';
 export { CodexAuth } from './codexAuth';
-export { getCodexModels } from './codexModels';
+// getCodexModels() deleted in Sprint 89 (GH #109) — Codex models now resolve via
+// src/ai/modelCatalog (providerDiscovery.discoverCodex reads ~/.codex/models_cache.json).
 export { traceCodex, showCodexTrace } from './codexTrace';
 export {
   emitCodexStatusInvalidated,

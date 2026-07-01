@@ -19,13 +19,11 @@ import { isValidFlowSchedule } from './flowSchedule';
 import { FlowScheduleState } from './FlowScheduleState';
 import { getAPIKeyManager } from '../ai/apiKeyManager';
 import {
-  OPENAI_LLM_MODELS,
   OPENAI_IMAGE_MODELS,
-  GEMINI_LLM_MODELS,
   GEMINI_IMAGE_MODELS,
-  DEFAULT_MODELS,
-  BYOK_PROVIDER_MODELS
+  DEFAULT_MODELS
 } from '../ai/modelConfig';
+import * as modelCatalog from '../ai/modelCatalog';
 
 /**
  * Sanitize a string for use in a filename
@@ -181,8 +179,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
           case 'codex:getModels':
             // Return available Codex models
             try {
-              const { getCodexModels } = require('../codex');
-              const models = getCodexModels();
+              const models = modelCatalog.getModels('codex');
               webview.postMessage({ type: 'codex:modelsResult', models });
             } catch {
               webview.postMessage({ type: 'codex:modelsResult', models: [] });
@@ -246,15 +243,15 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     webview.postMessage({
       type: 'flow:modelConfig',
       config: {
-        openaiLLM: OPENAI_LLM_MODELS.map(m => ({ id: m.id, name: m.name })),
+        openaiLLM: modelCatalog.getModels('openai').map(m => ({ id: m.id, name: m.label })),
         openaiImage: OPENAI_IMAGE_MODELS.filter(m => !m.deprecated).map(m => ({ id: m.id, name: m.name })),
-        geminiLLM: GEMINI_LLM_MODELS.map(m => ({ id: m.id, name: m.name })),
+        geminiLLM: modelCatalog.getModels('gemini').map(m => ({ id: m.id, name: m.label })),
         geminiImage: GEMINI_IMAGE_MODELS.map(m => ({ id: m.id, name: m.name })),
         defaults: DEFAULT_MODELS,
         // Sprint 76 R6: curated BYOK provider models for the OpenCode runtime.
         // Single source of truth (modelConfig.ts); webview filters by which
         // providers the user has keys for (booleans from R3a).
-        byokProviderModels: BYOK_PROVIDER_MODELS,
+        byokProviderModels: modelCatalog.getByokProviderModels(),
       },
     });
   }
@@ -742,14 +739,15 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     try {
       let models: Array<{ id: string; name: string }>;
 
-      if (provider === 'openai') {
-        models = modelType === 'image'
+      if (modelType === 'image') {
+        models = provider === 'openai'
           ? await this.fetchOpenAIImageModels()
-          : await this.fetchOpenAIModels();
+          : await this.fetchGeminiImageModels();
       } else {
-        models = modelType === 'image'
-          ? await this.fetchGeminiImageModels()
-          : await this.fetchGeminiModels();
+        // LLM lists resolve through the model catalog (live probe → remote → cache
+        // → bundled), replacing the standalone REST fetchers (Sprint 89 #109).
+        await modelCatalog.refresh();
+        models = modelCatalog.getModels(provider).map(m => ({ id: m.id, name: m.label }));
       }
 
       webview.postMessage({ type: 'flow:models', provider, modelType, models });
@@ -830,48 +828,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     }
   }
 
-  /**
-   * Fetch OpenAI LLM models
-   */
-  private async fetchOpenAIModels(): Promise<Array<{ id: string; name: string }>> {
-    const apiKeyManager = getAPIKeyManager();
-    const apiKey = await apiKeyManager.getAPIKey();
-
-    if (!apiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
-
-    const openai = new OpenAI({ apiKey });
-    const response = await openai.models.list();
-
-    // Filter for chat models only and sort
-    const chatModels = response.data
-      .filter(m =>
-        m.id.includes('gpt') ||
-        m.id.includes('o1') ||
-        m.id.includes('o3')
-      )
-      .filter(m =>
-        !m.id.includes('instruct') &&
-        !m.id.includes('vision') &&
-        !m.id.includes('audio') &&
-        !m.id.includes('realtime') &&
-        !m.id.includes('tts') &&
-        !m.id.includes('whisper') &&
-        !m.id.includes('embedding') &&
-        !m.id.includes('davinci') &&
-        !m.id.includes('babbage') &&
-        !m.id.includes('search') &&
-        !m.id.includes('image')
-      )
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .map(m => ({
-        id: m.id,
-        name: this.formatModelName(m.id)
-      }));
-
-    return chatModels;
-  }
+  // fetchOpenAIModels() removed in Sprint 89 (GH #109) — OpenAI LLM lists now
+  // resolve through modelCatalog (providerDiscovery.discoverOpenAI).
 
   /**
    * Fetch OpenAI Image models
@@ -908,41 +866,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     return imageModels;
   }
 
-  /**
-   * Fetch Gemini models
-   */
-  private async fetchGeminiModels(): Promise<Array<{ id: string; name: string }>> {
-    const apiKey = await this.context.secrets.get('google-ai-key');
-
-    if (!apiKey) {
-      throw new Error('Google AI API key not configured');
-    }
-
-    // Use v1beta to include preview models like Gemini 3
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
-    );
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Filter for generative models and format
-    const models = (data.models || [])
-      .filter((m: { name: string; supportedGenerationMethods?: string[] }) =>
-        m.supportedGenerationMethods?.includes('generateContent')
-      )
-      .map((m: { name: string; displayName?: string }) => ({
-        id: m.name.replace('models/', ''),
-        name: m.displayName || m.name.replace('models/', '')
-      }))
-      .sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id));
-
-    return models;
-  }
+  // fetchGeminiModels() removed in Sprint 89 (GH #109) — Gemini LLM lists now
+  // resolve through modelCatalog (providerDiscovery.discoverGemini).
 
   /**
    * Fetch Gemini Image models
