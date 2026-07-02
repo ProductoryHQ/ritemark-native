@@ -174,6 +174,16 @@ function svgStringToDataUrl(svg: string): string {
 }
 
 export async function renderMermaidToPngDataUrl(svg: string): Promise<string> {
+  return rasterizeSvgToPngDataUrl(svg)
+}
+
+/**
+ * Rasterize an arbitrary SVG string to a PNG data URL via an offscreen canvas.
+ * Shared by mermaid export and the SVG/draw.io export pre-pass (Sprint 90 #127):
+ * pdfkit/docx cannot decode SVG, so SVGs must be converted to PNG in the webview
+ * (a browser context) before the export HTML is handed to the host exporters.
+ */
+export async function rasterizeSvgToPngDataUrl(svg: string): Promise<string> {
   const fixedSvg = ensureSvgDimensions(svg)
   // Data URL avoids VS Code webview CSP issues some users hit when loading
   // SVG via blob: URL; data: is broadly allowed in webview img-src.
