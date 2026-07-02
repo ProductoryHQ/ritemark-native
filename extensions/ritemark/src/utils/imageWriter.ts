@@ -12,6 +12,36 @@ export function sanitizeImageBaseName(rawBaseName: string): string {
     .replace(/^-|-$/g, '');
 }
 
+// image/<subtype> → on-disk extension. Compound subtypes like `svg+xml` are the
+// reason a naive `(\w+)` regex fails: it matches `svg` but chokes on `+xml`,
+// so an SVG picked via the image picker was rejected as "Invalid image data URL"
+// even though the picker offered .svg (issue: SVG insert, Sprint 90 R6).
+const IMAGE_SUBTYPE_TO_EXT: Record<string, string> = {
+  png: 'png',
+  jpeg: 'jpg',
+  jpg: 'jpg',
+  gif: 'gif',
+  webp: 'webp',
+  bmp: 'bmp',
+  tiff: 'tiff',
+  'svg+xml': 'svg',
+};
+
+/**
+ * Parse a base64 image data URL into a file extension + raw base64 payload.
+ * Returns null for anything that is not a base64 `data:image/*` URL. Handles
+ * compound subtypes (`svg+xml`) that map to a clean extension (`svg`).
+ */
+export function parseImageDataUrl(dataUrl: string): { extension: string; base64: string } | null {
+  const match = dataUrl.match(/^data:image\/([\w+.-]+);base64,(.+)$/);
+  if (!match) {
+    return null;
+  }
+  const subtype = match[1].toLowerCase();
+  const extension = IMAGE_SUBTYPE_TO_EXT[subtype] ?? subtype.replace(/[^a-z0-9]/g, '');
+  return { extension, base64: match[2] };
+}
+
 export interface WriteImageOptions {
   // The save-as-markdown flow already builds canonical filenames via
   // buildExtractedImageFilename (webview) — `<sanitized-base>--image-N.<ext>`.

@@ -11,7 +11,7 @@ import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from './export/save
 import { DictationController } from './voiceDictation/controller';
 import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
-import { writeImageRelativeTo } from './utils/imageWriter';
+import { writeImageRelativeTo, parseImageDataUrl } from './utils/imageWriter';
 import { trackEvent } from './analytics/posthog';
 import { resolveInternalLinkTarget, isMarkdownFile } from './internalLinkResolver';
 import {
@@ -1059,14 +1059,13 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     webview: vscode.Webview
   ): Promise<void> {
     try {
-      // Extract base64 data from data URL (format: data:image/png;base64,...)
-      const matches = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
-      if (!matches) {
+      // Parse the data URL (handles svg+xml and other compound subtypes).
+      const parsed = parseImageDataUrl(dataUrl);
+      if (!parsed) {
         throw new Error('Invalid image data URL');
       }
 
-      const extension = matches[1];
-      const base64Data = matches[2];
+      const { extension, base64: base64Data } = parsed;
 
       const docDir = path.dirname(document.uri.fsPath);
       const imagesDir = path.join(docDir, 'images');
@@ -1118,16 +1117,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         throw new Error(`Image file not found: ${relativePath}`);
       }
 
-      // Extract base64 data from data URL (format: data:image/png;base64,...)
-      const matches = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
-      if (!matches) {
+      // Parse the data URL (handles svg+xml and other compound subtypes).
+      const parsed = parseImageDataUrl(dataUrl);
+      if (!parsed) {
         throw new Error('Invalid image data URL');
       }
 
-      const base64Data = matches[2];
-
       // Overwrite the original file with resized image
-      fs.writeFileSync(imagePath, Buffer.from(base64Data, 'base64'));
+      fs.writeFileSync(imagePath, Buffer.from(parsed.base64, 'base64'));
     } catch (error) {
       console.error('Failed to resize image:', error);
       vscode.window.showErrorMessage(
@@ -1580,7 +1577,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource} data:; img-src ${webview.cspSource} data: blob:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource} data:; img-src ${webview.cspSource} data: blob:; connect-src ${webview.cspSource};">
   <title>Ritemark</title>
   <style>
     * {

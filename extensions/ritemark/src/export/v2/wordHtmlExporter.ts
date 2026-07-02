@@ -263,30 +263,37 @@ function parseBlocks(node: HtmlNode, style: ExportTemplateStyle, documentUri: vs
       const imgData = tryLoadImageSource(imagePath, documentUri);
       if (!imgData) return [];
 
-      const dims = getImageDimensions(imgData);
-      // docx library converts pixels to EMU via: px * 9525
-      // A4 usable width: 8.27" - 2*1" margins = 6.27" ≈ 602px at 96 DPI
-      // Letter usable width: 8.5" - 2*1" margins = 6.5" ≈ 624px at 96 DPI
-      // Use 600px as safe max that fits both page sizes
-      const maxWidth = 600;
-      // Cap height to ~50% of page so diagrams don't dominate layout
-      // Letter: 11" - 2*1" margins = 9" usable, 55% ≈ 5" ≈ 480px at 96 DPI
-      const maxHeight = 480;
-      let imgWidth = dims?.width || maxWidth;
-      let imgHeight = dims?.height || 400;
-      const scaleFactor = Math.min(maxWidth / imgWidth, maxHeight / imgHeight, 1);
-      if (scaleFactor < 1) {
-        imgWidth = Math.round(imgWidth * scaleFactor);
-        imgHeight = Math.round(imgHeight * scaleFactor);
-      }
+      // Never let one undecodable image abort the whole export (issue #127 R2):
+      // skip this node on failure instead of propagating to the outer handler.
+      try {
+        const dims = getImageDimensions(imgData);
+        // docx library converts pixels to EMU via: px * 9525
+        // A4 usable width: 8.27" - 2*1" margins = 6.27" ≈ 602px at 96 DPI
+        // Letter usable width: 8.5" - 2*1" margins = 6.5" ≈ 624px at 96 DPI
+        // Use 600px as safe max that fits both page sizes
+        const maxWidth = 600;
+        // Cap height to ~50% of page so diagrams don't dominate layout
+        // Letter: 11" - 2*1" margins = 9" usable, 55% ≈ 5" ≈ 480px at 96 DPI
+        const maxHeight = 480;
+        let imgWidth = dims?.width || maxWidth;
+        let imgHeight = dims?.height || 400;
+        const scaleFactor = Math.min(maxWidth / imgWidth, maxHeight / imgHeight, 1);
+        if (scaleFactor < 1) {
+          imgWidth = Math.round(imgWidth * scaleFactor);
+          imgHeight = Math.round(imgHeight * scaleFactor);
+        }
 
-      return [new Paragraph({
-        children: [new ImageRun({
-          data: imgData,
-          transformation: { width: imgWidth, height: imgHeight },
-        })],
-        spacing: { after: 120 },
-      })];
+        return [new Paragraph({
+          children: [new ImageRun({
+            data: imgData,
+            transformation: { width: imgWidth, height: imgHeight },
+          })],
+          spacing: { after: 120 },
+        })];
+      } catch (err) {
+        console.warn(`[export] skipping unrenderable image in Word: ${imagePath}`, err);
+        return [];
+      }
     }
     default:
       return node.childNodes.flatMap(child => parseBlocks(child, style, documentUri));

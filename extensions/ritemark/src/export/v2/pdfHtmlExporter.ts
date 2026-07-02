@@ -269,21 +269,27 @@ function renderNode(doc: PDFKit.PDFDocument, node: HtmlNode, documentUri: vscode
       const imgBuffer = tryLoadImageSource(imagePath, documentUri);
       if (!imgBuffer) return;
 
-      const usableWidth = doc.page.width - PAGE_MARGIN * 2;
-      const usableHeight = doc.page.height - PAGE_MARGIN * 2 - RESERVED_FOOTER_SPACE;
-      // Cap images to ~50% of page height so they don't dominate the layout.
-      // Wide/landscape images get full width; tall/portrait images get constrained.
-      const maxHeight = Math.min(usableHeight * 0.55, 400);
-      // Get actual image dimensions for proper scaling
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfImage = (doc as any).openImage(imgBuffer);
-      const scale = Math.min(usableWidth / pdfImage.width, maxHeight / pdfImage.height, 1);
-      const renderWidth = pdfImage.width * scale;
-      const renderHeight = pdfImage.height * scale;
+      // Never let one undecodable image abort the whole export (issue #127 R2):
+      // openImage/image throw on malformed buffers, so skip this node on failure.
+      try {
+        const usableWidth = doc.page.width - PAGE_MARGIN * 2;
+        const usableHeight = doc.page.height - PAGE_MARGIN * 2 - RESERVED_FOOTER_SPACE;
+        // Cap images to ~50% of page height so they don't dominate the layout.
+        // Wide/landscape images get full width; tall/portrait images get constrained.
+        const maxHeight = Math.min(usableHeight * 0.55, 400);
+        // Get actual image dimensions for proper scaling
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pdfImage = (doc as any).openImage(imgBuffer);
+        const scale = Math.min(usableWidth / pdfImage.width, maxHeight / pdfImage.height, 1);
+        const renderWidth = pdfImage.width * scale;
+        const renderHeight = pdfImage.height * scale;
 
-      ensurePageRoom(doc, renderHeight + 8);
-      doc.image(pdfImage, PAGE_MARGIN, doc.y, { width: renderWidth, height: renderHeight });
-      doc.y += renderHeight + 6;
+        ensurePageRoom(doc, renderHeight + 8);
+        doc.image(pdfImage, PAGE_MARGIN, doc.y, { width: renderWidth, height: renderHeight });
+        doc.y += renderHeight + 6;
+      } catch (err) {
+        console.warn(`[export] skipping unrenderable image in PDF: ${imagePath}`, err);
+      }
       return;
     }
   }

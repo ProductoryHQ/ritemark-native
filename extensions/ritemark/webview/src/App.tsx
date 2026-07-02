@@ -11,6 +11,7 @@ import type { AgentFrontmatter, AgentSkill } from './components/agent'
 import { FindBar } from './components/FindBar'
 import { InlineTableOfContents } from './components/InlineTableOfContents'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
+import { inlineSvgImagesForExport } from './lib/svgRasterExport'
 import { writeClipboard } from './lib/clipboard'
 import { getHeadings } from './lib/headingUtils'
 import type { Heading } from './lib/headingUtils'
@@ -454,7 +455,7 @@ function App() {
   // Export handlers
   const handleExportPDF = useCallback(async (templateId = 'default') => {
     const rawHtml = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
-    const html = await inlineMermaidDiagramsForExport(rawHtml)
+    const html = await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml))
 
     sendToExtension('exportPDF', {
       content, // markdown fallback (V1 compatibility)
@@ -466,7 +467,7 @@ function App() {
 
   const handleExportWord = useCallback(async (templateId = 'default') => {
     const rawHtml = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
-    const html = await inlineMermaidDiagramsForExport(rawHtml)
+    const html = await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml))
 
     sendToExtension('exportWord', {
       markdown: content, // markdown fallback (V1 compatibility)

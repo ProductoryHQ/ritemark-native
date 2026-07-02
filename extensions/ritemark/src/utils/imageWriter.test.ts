@@ -12,7 +12,7 @@ import assert from 'assert';
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { writeImageRelativeTo, sanitizeImageBaseName } from './imageWriter';
+import { writeImageRelativeTo, sanitizeImageBaseName, parseImageDataUrl } from './imageWriter';
 
 const tempRoot = join(tmpdir(), `ritemark-image-writer-test-${process.pid}`);
 
@@ -101,6 +101,20 @@ try {
       `no files should have landed in trap dir; got [${trapDirFiles.join(', ')}]`
     );
   }
+
+  // parseImageDataUrl — SVG insert (Sprint 90 R6). The image picker offers .svg
+  // and builds `data:image/svg+xml;base64,…`; the parser must accept the
+  // compound subtype and map it to a clean `svg` extension, not reject it.
+  assert.deepStrictEqual(
+    parseImageDataUrl(`data:image/svg+xml;base64,${ONE_PIXEL_PNG_BASE64}`),
+    { extension: 'svg', base64: ONE_PIXEL_PNG_BASE64 },
+    'svg+xml data URL must parse to extension "svg"'
+  );
+  assert.strictEqual(parseImageDataUrl(`data:image/png;base64,${ONE_PIXEL_PNG_BASE64}`)?.extension, 'png');
+  assert.strictEqual(parseImageDataUrl(`data:image/jpeg;base64,${ONE_PIXEL_PNG_BASE64}`)?.extension, 'jpg');
+  assert.strictEqual(parseImageDataUrl(`data:image/webp;base64,${ONE_PIXEL_PNG_BASE64}`)?.extension, 'webp');
+  assert.strictEqual(parseImageDataUrl('not a data url'), null, 'non-data-URL must return null');
+  assert.strictEqual(parseImageDataUrl('data:text/plain;base64,AAAA'), null, 'non-image data URL must return null');
 
   console.log('imageWriter.test.ts: PASS');
 } finally {
