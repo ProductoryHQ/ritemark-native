@@ -33,6 +33,14 @@ Data-URL formats that pass the current regex but the encoder cannot decode (GIF/
 **R5 — Embedded SVG/diagrams appear in PDF and Word.**
 SVG images — inline `data:image/svg+xml` **and** file-referenced `.svg` including `.drawio.svg` — are rasterized to PNG and embedded, so the diagram is visible in the exported document. Rasterization uses the webview's `<canvas>` (browser context already present) — **no native module**. Supersedes the R1 skip for SVGs once wired.
 
+### R6 — Inserting an SVG via the image picker works (added mid-sprint, Jarmo 2026-07-02)
+
+Discovered during Phase 2 QA: the `/image` picker offers `.svg`, builds a
+`data:image/svg+xml;base64,…` URL, but `saveImage` rejected it with "Invalid
+image data URL" (a `(\w+)` regex can't match the compound `svg+xml` subtype).
+Pre-existing bug, not a Sprint 90 regression. Fix: parse the data URL through a
+shared helper that accepts compound subtypes and maps `svg+xml → svg`.
+
 ## Non-goals (out of scope)
 
 - **#124** draw.io create-without-slash / link-existing / rename-with-references — separate follow-on sprint (proposed Sprint 91). Diagrams exporting correctly (R5) is the only #124-adjacent benefit delivered here.

@@ -42,6 +42,12 @@
 ### W5 — Failure degradation (R5/R2)
 - [x] Rasterization failure leaves tag untouched → host Phase-1 guard skips (S12)
 
+### W6 — SVG insert fix (R6, added mid-sprint)
+- [x] `parseImageDataUrl` helper in imageWriter.ts — accepts `svg+xml`, maps to `svg` ext
+- [x] `saveImage` + `resizeImage` (ritemarkEditor.ts) use the helper
+- [x] Tests in `imageWriter.test.ts` (svg+xml→svg, png/jpeg/webp, null cases)
+- [ ] Live re-verify: `/image` → pick a .svg → inserts without "Invalid image data URL"
+
 ### Phase 2 gate
 - [ ] Manual QA S10–S12 (dev instance — real PDF/Word with inline SVG + draw.io diagram)
 - [ ] Update `docs/development/architecture.md` export-subsystem note
