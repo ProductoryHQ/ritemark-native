@@ -101,8 +101,9 @@ These mirror spec.md acceptance criteria at the high level. Tick only when obser
 - [~] (R4) All consumer surfaces (AI sidebar, Flow LLM nodes, BYOK picker) draw from `modelCatalog` ✓.
       Settings connectivity-test model deferred (current valid haiku id, not stale). `UnifiedViewProvider`
       1223 LOC — reduced from 1267 but still over the ≤1100 target (**pre-existing debt**, flagged)
-- [~] (R5) `bundledCatalog.ts` seeds `claude-sonnet-5` ✓; fetch + cache + schema-validate code ✓ + tested.
-      **`feeds/model-catalog.json` not yet published to ritemark-public** (WS4 — outward-facing, deferred to Jarmo)
+- [x] (R5) `bundledCatalog.ts` seeds `claude-sonnet-5` ✓; fetch + cache + schema-validate code ✓ + tested.
+      `feeds/model-catalog.json` **published** to `ritemark-public` `main` — confirmed byte-identical to
+      `research/model-catalog.json` via live fetch during the v1.8.1 merge (2026-07-03)
 - [~] (R6) `architecture.md` updated + dated gate memo ✓. #109 marked **partial-resolved**
       (model-resolution done; retry/telemetry deferred — so #109 stays open, not closed)
 
@@ -137,6 +138,7 @@ for the SDK path may change).
 | 2026-07-01 | Phase 1–3 | WS1 subsystem complete (schema/bundled/resolver/remoteSource/providerDiscovery/index + tests). WS2 host rewire + zombie deletions (`CLAUDE_MODELS`/`DEFAULT_MODEL`/`BYOK_PROVIDER_MODELS` + `claudeModels.ts`/`codexModels.ts`). WS3 webview store defaults cleared + extension-side stale-id reconcile. `extension.ts` wires `activate` + discovery provider (anthropic/openai/gemini keys + codex cache) + `onUpdate`→sidebar. Verifier green: compile 0, webview tsc 0, 12/12 catalog unit tests, all runnable unit tests. UnifiedViewProvider 1267→1223 LOC. |
 | 2026-07-01 | QA gate | `qa-validator` (independent evaluator) found 5 real defects: (1) deprecated live-absent model preservation, (2) `LLMNodeExecutor` default via catalog, (3) flow LLM lists via catalog + fetchers removed, (4) `onUpdate` had no subscriber, (5) docs not updated. **All 5 fixed + re-verified green** (compile 0, webview tsc 0, 12/12 catalog tests). |
 | 2026-07-01 | Phase 4 (WS5) | `architecture.md` updated: Model Configuration section rewritten to the catalog resolver; #109 marked partial-resolved (model-resolution done, retry/telemetry deferred); locked decision evolved + dated gate memo. **WS4 publish of `feeds/model-catalog.json` to ritemark-public DEFERRED — outward-facing, awaiting Jarmo's go.** Commits deferred (worktree has no vscode symlink/patches → pre-commit Checks 1/8 fail environmentally). |
+| 2026-07-03 | Fold into v1.8.1 | Jarmo: fold Sprint 89 into v1.8.1 alongside Sprint 90 (export integrity). WS4 status corrected — `feeds/model-catalog.json` was already live on `ritemark-public` `main`, confirmed byte-identical to the prepared seed; the "awaiting Jarmo's go" note above was stale, not the real state. Rebased `sprint-89-model-gateway` onto post-Sprint-90 `main` (only conflict: generated `webview.js` bundle, resolved by rebuilding from source — zero real source overlap between the two sprints). Re-verified after rebase: `npm run compile` 0, webview `typecheck` 0, 12/12 catalog tests, Sprint 90's export tests unaffected. `modelCatalog.test.ts` wired into `npm test`. R4's `UnifiedViewProvider` LOC gap (1223 vs ≤1100 target) carried forward as tracked debt, not re-opened for rework here. |
 
 ---
 

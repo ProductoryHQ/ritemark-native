@@ -383,7 +383,7 @@ Gated by the `remote-model-catalog` flag (off → bundled/cache floor only). Def
 | `CODEX_MODELS` deprecated constant | Done — deleted; `CLAUDE_MODELS` + `DEFAULT_MODEL` moved to `modelConfig.ts` |
 | Codex browser tools: dynamic injection vs MCP server (two patterns) | Done — Phase B: dynamic injection moved inside `CodexRuntime`; `_codexBrowserToolsEnabledForThread` now internal |
 | File attachments broken for Codex (partial) and ACP (missing) | Done — `UnifiedAttachment` type; ACP fenced-block fallback with notice |
-| `UnifiedViewProvider` at 2480 LOC | Done — 2480 → 1097 LOC (target was ≤ 1100) |
+| `UnifiedViewProvider` at 2480 LOC | Done in Sprint 79 — 2480 → 1097 LOC (target ≤ 1100). **Reopened as tracked debt by Sprint 89**: catalog wiring pushed it to 1223 LOC, back over target — see Version History 2026-07-01 entry; no dedicated extraction sprint yet |
 
 Post-Sprint 79 items tracked as GitHub Issues:
 
