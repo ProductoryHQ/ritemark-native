@@ -29,8 +29,9 @@ export {
   type ClaudeStatusInvalidationEvent,
 } from './claudeStatusEvents';
 export { AGENTS } from './types';
-export { CLAUDE_MODELS, DEFAULT_MODEL } from '../ai/modelConfig';
-export { CLAUDE_FALLBACK_MODELS } from './claudeModels';
+// CLAUDE_MODELS/DEFAULT_MODEL/CLAUDE_FALLBACK_MODELS deleted in Sprint 89 (GH #109);
+// model lists now come from src/ai/modelCatalog. discoverModels.ts is retained and
+// consumed directly by modelCatalog/providerDiscovery.ts (SDK OAuth fallback probe).
 export { discoverClaudeModels } from './discoverModels';
 export type {
   ModelOption,

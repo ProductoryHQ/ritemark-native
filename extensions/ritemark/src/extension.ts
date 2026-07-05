@@ -10,6 +10,8 @@ import { DrawioEditorProvider } from './drawioEditorProvider';
 import { isEnabled } from './features';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
+import * as modelCatalog from './ai/modelCatalog';
+import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
@@ -272,6 +274,25 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
     })
+  );
+
+  // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
+  // → remote catalog (ritemark-public) → on-disk cache → bundled baseline. The live
+  // provider uses the user's own API keys (Anthropic /v1/models is provider-cadence and
+  // supersedes the bundled SDK's supportedModels()). Never throws; getModels()/getDefault()
+  // serve the bundled floor immediately.
+  modelCatalog.setDiscoveryProvider(async () => {
+    const results: modelCatalog.DiscoveryResults = {};
+    results.codex = await discoverCodex();
+    results.anthropic = await discoverAnthropic({ apiKey: (await context.secrets.get('anthropic-api-key')) ?? null });
+    results.openai = await discoverOpenAI((await context.secrets.get('openai-api-key')) ?? null);
+    results.gemini = await discoverGemini((await context.secrets.get('google-ai-key')) ?? null);
+    return results;
+  });
+  void modelCatalog.activate(context).catch((err) => console.warn('[modelCatalog] activate failed', err));
+  // Push refreshed model lists to the sidebar when the catalog resolves (spec R1/R4).
+  context.subscriptions.push(
+    modelCatalog.onUpdate(() => unifiedViewProvider?.notifyModelCatalogUpdated())
   );
 
   // First-run starter-pack seeding — must run before the provider's first
