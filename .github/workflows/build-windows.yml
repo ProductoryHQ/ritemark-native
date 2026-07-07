@@ -112,6 +112,17 @@ jobs:
         # before ever running this on CI. The VS-detection check below then
         # confirms the real code path so a wrong layout assumption fails in
         # seconds, not after a full ~9-minute npm ci cycle.
+        #
+        # VS Code's OWN build/npm/preinstall.ts does a SEPARATE, independent
+        # compiler-toolchain check (unrelated to node-gyp): it hardcodes
+        # `Microsoft Visual Studio\2022` / `\2019` folder-name lookups and
+        # throws "Invalid C/C++ Compiler Toolchain" if neither exists. VS2026
+        # lives at `...\Visual Studio\18\...`, so that check also needs a
+        # nudge -- preinstall.ts itself documents the fix: a `vs2022_install`
+        # env var that bypasses the hardcoded path via fs.existsSync. Emit the
+        # path node-gyp just found as a step output so the next step can wire
+        # it up without re-deriving it.
+        id: node-gyp-patch
         shell: bash
         run: |
           set -e
@@ -144,11 +155,15 @@ jobs:
 
           cat > "$RUNNER_TEMP/check-vs.js" <<'EOF'
           const path = require('path')
+          const fs = require('fs')
           const gypDir = process.argv[2]
           const { findVisualStudio } = require(path.join(gypDir, 'lib', 'find-visualstudio.js'))
           const nodeSemver = { major: parseInt(process.versions.node.split('.')[0], 10) }
           findVisualStudio(nodeSemver, undefined).then((info) => {
             console.log('VS2026 detection OK:', JSON.stringify(info, null, 2))
+            if (process.env.GITHUB_OUTPUT) {
+              fs.appendFileSync(process.env.GITHUB_OUTPUT, `vs_path=${info.path}\n`)
+            }
           }).catch((err) => {
             console.error('VS2026 detection FAILED:', err.message)
             process.exit(1)
@@ -169,6 +184,12 @@ jobs:
           # NODE_GYP_FORCE_PYTHON is the authoritative node-gyp 11 override
           # (npm_config_python is no longer honoured as of npm 9).
           NODE_GYP_FORCE_PYTHON: ${{ steps.setup-python.outputs.python-path }}
+          # See the "Patch bundled node-gyp" step: VS Code's own
+          # build/npm/preinstall.ts only recognises Visual Studio 2022/2019 by
+          # folder name and throws "Invalid C/C++ Compiler Toolchain"
+          # otherwise. Point its documented override at the VS2026 install
+          # node-gyp just found.
+          vs2022_install: ${{ steps.node-gyp-patch.outputs.vs_path }}
         run: |
           success=0
           for i in 1 2 3; do
