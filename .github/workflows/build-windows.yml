@@ -171,6 +171,43 @@ jobs:
           EOF
           node "$RUNNER_TEMP/check-vs.js" "$NODE_GYP_DIR"
 
+      - name: Skip native builds for bundled copilot extension
+        # extensions/copilot (GitHub Copilot Chat, built into VS Code 1.117) is
+        # STRIPPED entirely from the final Ritemark app -- see the later
+        # "Strip bundled copilot extension from output" step. We never ship its
+        # native modules.
+        #
+        # Its transitive deps `keytar` and `@keyv/sqlite`->`sqlite3` are native
+        # addons. copilot's OWN lockfile pins `node-gyp@10.3.1` locally
+        # (extensions/copilot/node_modules/node-gyp), so their install scripts
+        # (`prebuild-install || node-gyp rebuild`) PATH-resolve node-gyp to that
+        # local copy -- which shadows the VS2026-aware node-gyp@12.4.0 we patch
+        # into npm globally and, like 11.2.0, cannot map VC++ major 18 -> VS2026.
+        # Result: "Could not find any Visual Studio installation to use", the
+        # ONLY fatal failure once Layers 1+2 are in place (build/remote already
+        # compile fine under VS2026 via npm's global patched node-gyp; ssh2's
+        # optional openssl-dependent crypto binding fails non-fatally and is
+        # unrelated).
+        #
+        # We can't drop the copilot extension (gulp's
+        # prepareBuiltInCopilotExtensionShims hard-requires the dir), and env-var
+        # node-gyp overrides don't reach this arborist-driven `npm ci` lifecycle
+        # path (proven in the node-gyp patch step's own comment). Since copilot's
+        # native modules are never shipped, skip its install scripts entirely.
+        # This is safe for the build: keytar/sqlite3 are esbuild EXTERNALS in
+        # copilot's .esbuild.ts (never bundled at compile time), and copilot's
+        # compile re-runs its own script/postinstall.ts (which only COPIES
+        # prebuilt @vscode/tree-sitter-wasm .wasm / tiktoken / @github/copilot CLI
+        # assets -- no node-gyp, no build-wasm). @github/copilot (needed by the
+        # gulp shim) has no install script, so its sdk/ tarball contents are
+        # unaffected.
+        shell: bash
+        working-directory: r/vscode
+        run: |
+          echo "ignore-scripts=true" >> extensions/copilot/.npmrc
+          echo "extensions/copilot/.npmrc is now:"
+          cat extensions/copilot/.npmrc
+
       - name: Install VS Code dependencies
         shell: bash
         working-directory: r/vscode
