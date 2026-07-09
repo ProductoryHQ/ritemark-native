@@ -2,9 +2,9 @@ name: Build Windows (x64)
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
+    # Release CI is dispatched explicitly (gh workflow run build-windows.yml --ref <ref>).
+    # The version comes from branding/product.json, not the git ref, so any ref works.
+    # Tag pushes no longer auto-trigger this expensive windows-8core build (v1.8.2, #130/CI de-risk).
 
 env:
   VSCODE_VERSION: '1.117.0'
@@ -75,6 +75,11 @@ jobs:
           echo "Extension copied to vscode/extensions/ritemark"
 
       - name: Patch bundled node-gyp for VS2026 detection
+        # DRIFT-PREVENTION: .github/workflows/windows-canary.yml runs a copy of
+        # this node-gyp patch + VS-detection logic weekly on the free
+        # windows-latest runner as an early-warning. If you change the node-gyp
+        # pin or VS-detection logic here, update windows-canary.yml too.
+        #
         # windows-8core now ships Visual Studio 2026 (internal major version
         # 18) instead of/alongside VS 2022. node-gyp 11.2.0 (bundled with this
         # runner's Node 22.22.1) only recognises major versions 15/16/17 ->

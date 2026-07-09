@@ -1,10 +1,9 @@
 name: Build macOS (x64)
 
 on:
-  workflow_dispatch:  # Manual trigger (backup)
-  push:
-    tags:
-      - 'v*'          # Triggers ONLY on version tags: v1.0.0, v1.2.0, etc.
+  workflow_dispatch:  # Release CI is dispatched explicitly (gh workflow run build-macos-x64.yml --ref <ref>).
+                      # RITEMARK_VERSION is read from branding/product.json, not the git ref, so any ref works.
+                      # Tag pushes no longer auto-trigger this build (v1.8.2, CI de-risk).
 
 jobs:
   build:

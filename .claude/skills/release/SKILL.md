@@ -107,17 +107,24 @@ Only once **(a)** Gate 1 has passed AND **(b)** ≥60 min have elapsed since the
 
 This notarizes AND staples. Verify staple + Gatekeeper acceptance before proceeding.
 
-### Step 5 — Tag + push (triggers CI)
+### Step 5 — Dispatch CI builds (Windows + macOS x64)
+
+> **Changed in v1.8.2:** CI no longer auto-triggers on tag push. `build-windows.yml` and `build-macos-x64.yml` are `workflow_dispatch`-only. Dispatch them explicitly against the release ref. The build version is read from `branding/product.json`, **not** the git ref, so any ref (branch, tag, or commit) works — you do NOT need to create the tag to build. Create the tag later, at publish time (Step 8).
 
 **Toggle repo to private first** — public repos cannot use larger Windows runners:
 
 ```bash
 gh repo edit ProductoryHQ/ritemark-native --visibility private --accept-visibility-change-consequences
-git tag vX.Y.Z
-git push origin vX.Y.Z
 ```
 
-After Windows build completes (Step 6), toggle back:
+Dispatch both builds against the release ref (e.g. `main`, or the release branch/commit):
+
+```bash
+gh workflow run build-macos-x64.yml --ref <ref>
+gh workflow run build-windows.yml  --ref <ref>
+```
+
+After the Windows build completes (Step 6), toggle back:
 
 ```bash
 gh repo edit ProductoryHQ/ritemark-native --visibility public --accept-visibility-change-consequences
@@ -195,7 +202,7 @@ For changes confined to `extensions/ritemark/` only.
 
 ### Windows builds — public/private repo toggle
 
-GitHub does NOT allow larger runners (windows-8core) on public repos. Before pushing the tag (which triggers `build-windows.yml`), switch repo to private. After the Windows build completes, switch back to public. Without the toggle, the Windows build fails with a billing/permissions error.
+GitHub does NOT allow larger runners (windows-8core) on public repos. Before dispatching `build-windows.yml` (Step 5, `gh workflow run`), switch repo to private. After the Windows build completes, switch back to public. Without the toggle, the Windows build fails with a billing/permissions error. (A separate `windows-canary.yml` runs weekly on the FREE `windows-latest` standard runner — no toggle needed — to catch runner-image toolchain breakage early; see W4.)
 
 ### Node version + architecture
 

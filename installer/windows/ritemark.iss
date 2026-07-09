@@ -17,8 +17,12 @@
 #endif
 
 #define AppName "Ritemark"
-; Keep in sync with extensions/ritemark/package.json version
-#define AppVersion "1.7.2"
+; Keep in sync with extensions/ritemark/package.json version.
+; Overridable from the command line: ISCC.exe /DAppVersion="1.8.2" ...
+; (scripts/create-windows-installer.sh also sed-replaces this default.)
+#ifndef AppVersion
+  #define AppVersion "1.8.2"
+#endif
 #define AppPublisher "Productory"
 #define AppURL "https://ritemark.app"
 #define AppExeName "Ritemark.exe"
@@ -56,6 +60,21 @@ AppMutex={#AppMutex}
 ; Don't require admin by default (user install)
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+
+; --- Code signing (Azure Trusted Signing) — #130 Smart App Control fix ---
+; Only active when the build passes /DSign and registers a "azuresign" sign
+; tool via ISCC's /Sazuresign="<signtool cmd> $f". This REQUIRES a native
+; Windows ISCC with signtool.exe + the Trusted Signing dlib — it does NOT work
+; in the Docker/Linux build (scripts/create-windows-installer.sh), which has no
+; signtool and therefore produces an UNSIGNED installer for local dev only.
+; Release installers MUST be built on Windows with /DSign so that Inno signs
+; the Setup.exe, its extracted temp loader, AND the uninstaller — the exact
+; pieces Smart App Control rejects when unsigned (#130). See
+; .claude/skills/windows-installer/SKILL.md "Code signing".
+#ifdef Sign
+SignTool=azuresign $f
+SignedUninstaller=yes
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

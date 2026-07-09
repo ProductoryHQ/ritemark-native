@@ -1,0 +1,122 @@
+name: Windows CI Canary
+
+# Lightweight weekly early-warning for Windows runner-image toolchain breakage.
+#
+# WHY: the real build (build-windows.yml) runs on the `windows-8core` LARGER
+# runner, which is NOT available on public repos — so it only runs behind a
+# private-repo toggle, right before a release, where a broken runner image
+# (e.g. the 2026-07 Visual Studio 2026 bump that broke node-gyp VS detection)
+# is discovered at the worst possible moment. This canary runs the cheap,
+# failure-prone part — the node-gyp Visual Studio detection + a native-module
+# compile — every week on the FREE `windows-latest` standard runner, so a
+# toolchain regression surfaces on a Monday, not mid-release.
+#
+# SCOPE: this is an EARLY WARNING, not a gate. It does NOT clone/build VS Code
+# or produce an installer. `windows-latest` (standard) and `windows-8core`
+# (larger) can run slightly different image versions, so a green canary does
+# not GUARANTEE the 8-core build is green — but a RED canary reliably means the
+# shared Windows toolchain (Node + node-gyp + MSVC/VS detection) has shifted and
+# the release build needs attention before the next release. See
+# docs/development/architecture.md + the VS2026 CI-break memory.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+env:
+  # Keep in lockstep with build-windows.yml so the canary exercises the same
+  # Node (hence the same bundled npm/node-gyp) the real build relies on.
+  NODE_VERSION: '22.22.1'
+
+jobs:
+  canary:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Configure Git for Windows
+        shell: bash
+        run: |
+          git config --global core.longpaths true
+          git config --global core.autocrlf false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Patch bundled node-gyp + verify Visual Studio detection
+        # Mirrors build-windows.yml's node-gyp patch step (kept in sync with it):
+        # swap npm's bundled node-gyp for 12.4.0 (which maps VC++ major 18 ->
+        # VS2026) and then run findVisualStudio() to confirm the runner's actual
+        # VS toolchain is detectable. This is the exact check that went red when
+        # the runner image moved to Visual Studio 2026; if a future image bump
+        # ships an even newer VS major, THIS STEP FAILS FAST and prints the
+        # detected version, giving us a week of lead time before a release build.
+        id: node-gyp-check
+        shell: bash
+        run: |
+          set -e
+          NODE_DIR="$(dirname "$(command -v node)")"
+          NPM_DIR="$NODE_DIR/node_modules/npm"
+          NODE_GYP_DIR="$NPM_DIR/node_modules/node-gyp"
+          NODE_GYP_JS="$NODE_GYP_DIR/bin/node-gyp.js"
+
+          if [ ! -f "$NODE_GYP_JS" ]; then
+            echo "::error::Bundled node-gyp not found at $NODE_GYP_JS -- npm/Node layout on the runner image changed. Investigate before the next release build."
+            exit 1
+          fi
+          echo "Runner-bundled node-gyp before patch: $(node "$NODE_GYP_JS" --version)"
+
+          STAGING="$RUNNER_TEMP/node-gyp-staging"
+          mkdir -p "$STAGING"
+          ( cd "$STAGING" && npm init -y --silent >/dev/null && npm install node-gyp@12.4.0 --install-strategy=nested --save-exact --no-audit --no-fund --loglevel=error )
+          rm -rf "$NODE_GYP_DIR"
+          cp -R "$STAGING/node_modules/node-gyp" "$NODE_GYP_DIR"
+
+          PATCHED_VERSION="$(node "$NODE_GYP_JS" --version)"
+          if [ "$PATCHED_VERSION" != "v12.4.0" ]; then
+            echo "::error::node-gyp patch did not take effect (got '$PATCHED_VERSION')"
+            exit 1
+          fi
+
+          cat > "$RUNNER_TEMP/check-vs.js" <<'EOF'
+          const path = require('path')
+          const gypDir = process.argv[2]
+          const { findVisualStudio } = require(path.join(gypDir, 'lib', 'find-visualstudio.js'))
+          const nodeSemver = { major: parseInt(process.versions.node.split('.')[0], 10) }
+          findVisualStudio(nodeSemver, undefined).then((info) => {
+            console.log('Visual Studio detection OK:', JSON.stringify(info, null, 2))
+          }).catch((err) => {
+            console.error('Visual Studio detection FAILED:', err.message)
+            console.error('::error::The Windows runner image VS toolchain is no longer detected by node-gyp 12.4.0 -- the runner image likely shipped a newer Visual Studio. Update the node-gyp pin / VS override in build-windows.yml before the next release.')
+            process.exit(1)
+          })
+          EOF
+          node "$RUNNER_TEMP/check-vs.js" "$NODE_GYP_DIR"
+
+      - name: Compile a native module (toolchain smoke test)
+        # Detection passing isn't the same as the MSVC toolchain actually
+        # compiling. Force a from-source build of one small, reliably-compiling
+        # native addon using the patched node-gyp. If the C++ toolchain on the
+        # runner image regresses (missing MSVC, broken SDK, Python mismatch),
+        # this fails even when VS detection "passes".
+        shell: bash
+        run: |
+          set -e
+          NODE_DIR="$(dirname "$(command -v node)")"
+          export npm_config_node_gyp="$NODE_DIR/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js"
+          PROBE="$RUNNER_TEMP/native-probe"
+          mkdir -p "$PROBE"
+          cd "$PROBE"
+          npm init -y --silent >/dev/null
+          # @vscode/spdlog is a small C++ addon used by VS Code itself; building
+          # it from source exercises node-gyp -> MSVC end to end.
+          npm install @vscode/spdlog --build-from-source --no-audit --no-fund --foreground-scripts --loglevel=error
+          node -e "require('@vscode/spdlog'); console.log('Native compile + load OK (@vscode/spdlog)')"
