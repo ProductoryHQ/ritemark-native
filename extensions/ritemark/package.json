@@ -649,8 +649,8 @@
     ]
   },
   "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "compile": "tsc --noEmit -p ./ && node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
     "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/utils/imageWriter.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/acp/acpClient.test.ts && npx tsx src/acp/acpManager.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/ai-sidebar/planText.test.ts && npx tsx webview/src/components/ai-sidebar/composerQueue.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts && npx tsx webview/src/components/agent/agentSchema.test.ts && npx tsx webview/src/components/agent/cronSchedule.test.ts && npx tsx src/daemon/scheduleParser.test.ts && npx tsx src/daemon/cron.test.ts && npx tsx src/daemon/DaemonResultStore.test.ts && npx tsx src/agent/frontmatterRoundtrip.test.ts && npx tsx src/export/v2/imageSource.test.ts && npx tsx src/export/saveAsMarkdown.test.ts && npx tsx webview/src/lib/svgRasterExport.test.ts && npx tsx src/ai/modelCatalog/modelCatalog.test.ts",
     "test:integration": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/LLMNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration:free": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts",
@@ -687,6 +687,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/turndown": "^5.0.5",
     "@types/vscode": "^1.94.0",
+    "esbuild": "^0.24.2",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"
   }

@@ -33,6 +33,8 @@ Runtime invariants (extension symlink, webview bundle freshness + size + `ai-sid
 
 Build-environment prerequisites that the hook can't enforce at commit time (Node v20.x arm64 for prod, Node v22.21.1 arm64 for dev mode, `arch -arm64` shell wrapper) live in `.claude/skills/vscode-development/SKILL.md`.
 
+**Bundle-safe extension code (Sprint 92, #105):** the extension host is one esbuild bundle (`out/extension.js` + the standalone `out/browser/browserMcpAdapter.js`), not loose files. New host code must not do `__dirname`-depth path math, must add native/runtime-asset/dynamic-path deps to the esbuild `external` list, and must give separately-spawned processes their own entry point. Full rule: `.claude/skills/vscode-development/SKILL.md` ## Extension host build.
+
 Layout invariants (right sidebar AI panel + terminal placement, titlebar toolbar, etc.) are owned by patch 002. Detailed contract: `.claude/skills/vscode-development/references/layout-invariants.md`.
 
 * * *

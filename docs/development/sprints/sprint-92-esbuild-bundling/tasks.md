@@ -4,6 +4,22 @@ Every task lists concrete file paths, exact commands where applicable, and a bin
 
 ---
 
+## Progress (2026-07-08 — implementation on branch `sprint-92-esbuild-bundling`)
+
+**DONE + build-verified:** T0-1/T0-2/T0-3 (audit → `notes/require-audit.md`, no scope change) · T1-1/T1-2/T1-3 (esbuild.config.mjs, `npm run compile` rewired) · T2-1/T2-2 (both `__dirname` landmines fixed) · T3-1 (validate-build-output.sh: content-sentinel + bumped floor) · T3-2 (Check 7 `npm run compile` passes) · T4-1 (type gate fails on error) · T5-1 (architecture.md #105 resolved) · T5-2 (create-extension-release.sh untouched) · T5-3/T5-4 (R10/R11: vscode-development skill + bundle-safe rule + CLAUDE.md pointer).
+
+**Verified build result:** `out/` collapsed ~130 files → **4** (`extension.js` 5.18 MB + `browser/browserMcpAdapter.js` 9 KB + maps). Externals correct (vscode/pdfkit/ESM-SDKs out; openai + pure-JS in). `npm run compile` = ~110 ms.
+
+**T-EXTRA (added — breakage found & fixed):** `scripts/build-prod.sh` lines 297-304 checked `out/ritemarkEditor.js` (now gone → would FAIL every prod build). Replaced with the bundled-extension floor (1 MB) + a `resolveCustomTextEditor` content-sentinel + a `browserMcpAdapter.js` check. Same class as T3-1.
+
+**REMAINING — needs the app running (runtime QA):**
+- T2-3: launch dev mode, confirm all 3 agent runtimes (Claude/Codex/OpenCode) launch with the `__dirname` fix.
+- T4-2: full prod build + editor/sidebar/settings/export QA (esp. PDF/DOCX export, since `pdfkit` is external).
+
+**Found in passing (out of scope):** duplicate `case 'refresh':` in `ritemarkEditor.ts:791` (dead-duplicates line 720) — flagged, not fixed here.
+
+---
+
 ## Phase 0 — Audit spike (mandatory first, before any esbuild config is written)
 
 - [ ] **T0-1 (spike).** Re-run and formally record the dynamic-require audit (R5): `grep -rn "require(\`\|require(path\.\|import(\`\|import(path\." extensions/ritemark/src/`. Cross-check against the two known landmines. Write findings to `notes/require-audit.md` (create the file — this is the sprint's first artifact under `docs/development/sprints/sprint-92-esbuild-bundling/notes/`).

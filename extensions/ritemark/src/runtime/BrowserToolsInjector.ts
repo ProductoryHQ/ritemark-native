@@ -25,8 +25,10 @@ export class BrowserToolsInjector {
       return [];
     }
 
-    // The compiled adapter lives alongside this file in the out/ tree.
-    const adapterPath = path.join(__dirname, '..', 'browser', 'browserMcpAdapter.js');
+    // Sprint 92 R3: after esbuild bundling this file is inlined into `out/extension.js`,
+    // so `__dirname` is `out/` (pre-bundle it was `out/runtime/`, hence the old '..').
+    // The adapter is its own esbuild entry point, emitted at `out/browser/browserMcpAdapter.js`.
+    const adapterPath = path.join(__dirname, 'browser', 'browserMcpAdapter.js');
 
     return [
       {

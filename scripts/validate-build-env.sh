@@ -137,8 +137,19 @@ check_file_size() {
 }
 
 check_file_size "extensions/ritemark/media/webview.js" 500000 "webview.js"
-check_file_size "extensions/ritemark/out/extension.js" 1000 "extension.js"
-check_file_size "extensions/ritemark/out/ritemarkEditor.js" 1000 "ritemarkEditor.js"
+# Sprint 92: the extension host is one esbuild bundle (~5MB) — ritemarkEditor.js is
+# inlined into it, not a standalone file. Floor reflects the bundle; the sentinel-grep
+# confirms the editor code is actually present (guards a large-but-broken bundle).
+check_file_size "extensions/ritemark/out/extension.js" 1000000 "extension.js (bundle)"
+check_file_size "extensions/ritemark/out/browser/browserMcpAdapter.js" 1000 "browserMcpAdapter.js"
+echo -n "Checking extension.js contains editor code... "
+if grep -q "resolveCustomTextEditor" "extensions/ritemark/out/extension.js" 2>/dev/null; then
+  echo -e "${GREEN}OK${NC} (resolveCustomTextEditor present)"
+else
+  echo -e "${RED}FAIL${NC}"
+  echo "  Bundle missing editor code (resolveCustomTextEditor) — broken build."
+  ERRORS=$((ERRORS + 1))
+fi
 
 # -----------------------------------------------------------------------------
 # Check 5: Webview Config Files

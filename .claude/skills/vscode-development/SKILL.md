@@ -213,8 +213,9 @@ arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && node -p "process.
 ./scripts/apply-patches.sh --dry-run
 # Must show: all "Already applied"
 
-# 3. Compile extension
-cd extensions/ritemark && npx tsc --noEmit && cd ../..
+# 3. Compile extension — Sprint 92: `npm run compile` = `tsc --noEmit` (typecheck)
+#    + esbuild (emit the 2 bundles). `tsc --noEmit` ALONE no longer produces out/.
+cd extensions/ritemark && npm run compile && cd ../..
 
 # 4. Run production build (~25 min) — NEVER pipe through tail!
 arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" && ./scripts/build-prod.sh 2>&1'
@@ -232,6 +233,25 @@ arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && cd "${CLAUDE_PROJ
   ```
 
 For the release sequence (sign, DMG, notarize, GitHub Release), see the `release` skill.
+
+## Extension host build — esbuild bundled (Sprint 92, #105)
+
+The extension host is **esbuild-bundled**, not the old ~130 loose `out/*.js` tree (that was the root cause of the Windows EMFILE class, the v1.7.1 0-byte-tsc trap, and DMG bloat — all now resolved).
+
+- `npm run compile` = `tsc --noEmit -p ./` (type-check only) **then** `node esbuild.config.mjs` (emit). Type errors still fail the build; esbuild strips types without checking.
+- Output is **two** self-contained bundles: `out/extension.js` (package.json `main`; first-party code + inlined pure-JS deps) and `out/browser/browserMcpAdapter.js` (a standalone Node subprocess spawned by `BrowserToolsInjector` — its own entry point because a child process can't `require()` code loaded in the host).
+- `external` (NOT inlined; stay in `node_modules`): `vscode` (host), `fsevents` (native, macOS-only), `pdfkit` (loads its own font data at runtime), and — invisibly, because they're loaded via `new Function('return import(...)')` — the two ESM agent SDKs `@anthropic-ai/claude-agent-sdk` and `@agentclientprotocol/sdk`. So `node_modules` is retained but its footprint is largely inlined away.
+- `npm run watch` runs esbuild in watch mode (fast rebuilds). Run `tsc --noEmit --watch` separately if you want live type-checking during watch.
+
+### ⚠️ Bundle-safe extension code (rule — applies to ALL future extension-host code)
+
+Because the host is one flat bundle, new code must not reintroduce the layout assumptions bundling breaks:
+
+1. **No `__dirname`-depth path math.** Do not compute paths assuming a module's directory depth under `out/` (the whole host is now `out/extension.js`). Derive the extension root from a bundle-independent source — prefer `context.extensionPath` / `vscode.extensions.getExtension('ritemark.ritemark')?.extensionPath`. (Sprint 92 fixed two such landmines: `bundledAgentRuntime.ts`, `BrowserToolsInjector.ts`.)
+2. **Native / runtime-asset / dynamically-`require()`d-by-path packages → esbuild `external`.** A new pure-JS dependency is auto-inlined; a package with a `.node` binary, a `binding.gyp`, or one that reads its own data files at runtime (like `pdfkit`) must be added to the `external` list in `esbuild.config.mjs` instead.
+3. **Separately-spawned processes need their own esbuild entry point.** Code launched as its own OS process (like `browserMcpAdapter`) cannot live in the main bundle — add it as a second entry point.
+
+(This rule + the build description above are mirrored to the Codex canon by the scheduled `harness-equalizer` — do not hand-edit `.codex/**` / `AGENTS.md`.)
 
 ## Node Versions
 
@@ -445,7 +465,7 @@ arch -arm64 /bin/zsh -c 'unset ELECTRON_RUN_AS_NODE && source "$HOME/.nvm/nvm.sh
 
 ### Dev mode serves from `out/`, not `src/`
 
-`./scripts/code.sh` reads from `out/`. TypeScript auto-compiles, **but CSS and static assets do NOT auto-copy.** After editing CSS or fonts, manually `cp` to `out/`. `CSSDevelopmentService` ripgreps `out/` at startup to build the import map. Cmd+R reloads CSS *content*; full restart needed for *new* CSS files.
+`./scripts/code.sh` reads from `out/`. Rebuild the bundle with `npm run compile` (or `npm run watch` for esbuild watch mode — Sprint 92; it's no longer `tsc -watch`), **but CSS and static assets do NOT auto-copy.** After editing CSS or fonts, manually `cp` to `out/`. `CSSDevelopmentService` ripgreps `out/` at startup to build the import map. Cmd+R reloads CSS *content*; full restart needed for *new* CSS files.
 
 For production: register `.woff2` in esbuild loader + resource globs in gulpfile.
 
