@@ -13,7 +13,9 @@ Ritemark **already has** a two-tier update platform (built in Sprint 42):
 | Tier | Vehicle | Delivery UX today | Pipeline cost today |
 |---|---|---|---|
 | **Full release** | 2× DMG + 1× Setup.exe | Notification → browser → manual download/install | 2–4 days: local 25-min build, 2× 60-min notarization windows, repo private/public toggle, fragile Windows CI (`windows-8core` + VS2026 breakage), 19–25 manual steps |
-| **Extension release** | ~45 MB zip | In-app download → extract to `~/.ritemark/extensions/ritemark-{version}/` → reload window | Minutes: no signing, no notarization, no Windows CI, no repo toggle |
+| **Extension release** | per-file manifest (~45 MB total) | In-app per-file download → staged into `~/.ritemark/extensions/ritemark-{version}/` → reload window | Minutes: no signing, no notarization, no Windows CI, no repo toggle |
+
+> **Correction (verified 2026-07-08, sprint-93 planning):** the extension-update transport is a **per-file manifest** (`userExtensionInstaller` downloads each `manifest.files[]` entry + verifies its checksum), NOT a zip. Wherever this doc says "zip" below, read "per-file manifest upload." After sprint-92 (esbuild) the manifest shrinks from ~105 files to ~2.
 
 The extension tier installs **outside the signed app bundle** (`userExtensionInstaller.ts:44`), so it needs no Apple involvement and works identically on macOS and Windows. The feed (`update-feed.json`, schema v1) already supports both tiers with `minAppVersion` compatibility gating and the resolver (`updateResolver.ts`) already prefers/blocks correctly.
 
