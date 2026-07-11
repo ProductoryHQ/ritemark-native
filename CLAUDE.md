@@ -124,7 +124,7 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (10)
+### Current patches (11)
 
 | Patch | Purpose |
 | --- | --- |
@@ -138,6 +138,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `008-ritemark-windows-binary-strip.patch` | Strip debug symbols from Windows agent binaries |
 | `009-ritemark-browser-context-bridge.patch` | Bridges VS Code webview context to the integrated browser panel |
 | `010-ritemark-browser-action-bridge.patch` | Enables AI agent actions (click, navigate, fill) in the integrated browser |
+| `011-ritemark-cloud-file-error.patch` | Maps Windows OneDrive/SharePoint cloud-file read errors to an actionable message |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 

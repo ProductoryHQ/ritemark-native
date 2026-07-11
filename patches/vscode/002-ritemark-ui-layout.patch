@@ -1136,8 +1136,8 @@ index ecc6af48668..189a6071cac 100644
  		id: VIEWLET_ID,
 -		title: localize2('explore', "Explorer"),
 -		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Explorer"),
-+		title: localize2('explore', "Project"), // Ritemark: renamed from Explorer
-+		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Project"), // Ritemark: renamed
++		title: localize2('explore', "File Browser"), // RiteMark: renamed from Explorer → Project → File Browser
++		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&File Browser"), // RiteMark: renamed
  		keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyE },
  		order: 0
  	},

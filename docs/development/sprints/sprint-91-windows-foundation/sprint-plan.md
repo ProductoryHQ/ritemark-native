@@ -3,9 +3,9 @@
 Track: SDD (auto-detected: 4 distinct user-facing/technical workstreams spanning signing, VS Code core error surfacing, patch-layer UI, and CI — plus an edge-case-heavy domain: Smart App Control reputation gating, cloud-file-placeholder OS error codes, and cross-platform patch verification. Multi-component flow: Inno Setup installer ↔ signtool/Trusted Signing ↔ CI workflow ↔ VS Code core file-open path.)
 Override with: "use plain full track" / already SDD, no override requested.
 
-Branch: `sprint-91-windows-foundation` (NOT YET CREATED — awaiting Jarmo's approval of this plan, per the HARD gate below)
+Branch: `sprint-91-windows-foundation` (created, pushed to origin)
 
-Status: Phase 2 (PLAN) — awaiting Jarmo approval
+Status: Phase 5 (PR pending) — implementation complete across two machines (macOS wiring + Windows session + macOS verification); W1-11/W1-12 intentionally deferred to release time (see tasks.md)
 
 Parent release: [`docs/development/releases/v1.8.2/release-plan.md`](../../releases/v1.8.2/release-plan.md) — v1.8.2 "Sturdy & Seamless Delivery (Windows-first)", sprint #1 of 3. Release type: **shell** (patches + installer + code-signing + build system).
 
@@ -56,12 +56,12 @@ Four workstreams (full detail in spec.md / technical-plan.md / tasks.md):
 ## Success Criteria
 
 Mirrors the release plan's sprint-91 feature-complete bar:
-- [ ] Installer + uninstaller + `.tmp` loader + bundled binaries all signed (#130) — **cert-gated**.
-- [ ] App submitted to Microsoft for reputation review; interim SAC workaround documented (#130) — **cert-gated**.
-- [ ] Clean Windows 11 (Smart App Control enabled) install test passes — headline exit test (#130) — **cert-gated**.
-- [ ] OneDrive/SharePoint placeholder shows an actionable error; real OS error code logged (#134).
-- [ ] New File / New Folder buttons render inline in File Browser on Windows (#131); macOS unchanged (already correct).
-- [ ] Windows / macOS-x64 CI trigger via `workflow_dispatch` only (tag auto-trigger removed); weekly Windows canary green.
+- [x] Installer + uninstaller + `.tmp` loader + bundled binaries all signed (#130). Cert landed 2026-07-11; all `.exe`s verified with `signtool verify /pa`.
+- [ ] App submitted to Microsoft for reputation review; interim SAC workaround documented (#130) — workaround doc (`docs/user/windows-smart-app-control.md`) done; **submission itself deferred to release time (W1-11)**, needs the final v1.8.2 binary.
+- [x] Clean Windows 11 (Smart App Control enabled) install test passes — headline exit test (#130). Verified 2026-07-11: no Error 4551, no SAC block, no SmartScreen warning.
+- [x] OneDrive/SharePoint placeholder shows an actionable error; real OS error code logged (#134). Live-reproduced (`errno=-4094, syscall=read`), patch 011.
+- [x] New File / New Folder buttons render inline in File Browser on Windows (#131); macOS unchanged (already correct). Verified on both platforms (W3-4 Windows, W3-5 macOS).
+- [ ] Windows / macOS-x64 CI trigger via `workflow_dispatch` only (tag auto-trigger removed) — done; weekly Windows canary green — **not yet dispatchable** (new `workflow_dispatch` workflows only register with GitHub Actions once merged to the default branch; will confirm right after this PR merges, W4-6).
 
 ## External Critical-Path Note (read this before Phase 3)
 
@@ -85,4 +85,4 @@ Per repo CLAUDE.md and the user's global instruction ("never start sprint coding
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-07-08, per branch creation + WINDOWS-HANDOVER.md's confirmation that implementation was unlocked)

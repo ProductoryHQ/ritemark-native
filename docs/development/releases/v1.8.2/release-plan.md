@@ -48,7 +48,7 @@ Grounded in the release-level research at [`docs/development/analysis/2026-07-07
 
 | # | Sprint | Purpose | Issues | Tier | Depends on | Status |
 |---|---|---|---|---|---|---|
-| 1 | sprint-91-windows-foundation | Install + open files on Windows; CI de-risk | #130 #134 #131 | shell | cert procurement (external) | Planned — SDD not written |
+| 1 | sprint-91-windows-foundation | Install + open files on Windows; CI de-risk | #130 #134 #131 | shell | cert procurement (external) | In review — PR pending. W2/W3/W4 done, W1 signing wired + verified on clean Windows; W1-11 (Microsoft SAC submission) + W1-12 (flip signing check to enforce) deferred to release time. |
 | 2 | sprint-92-esbuild-bundling | Bundle extension host; kill EMFILE/0-byte/bloat | #105 | shell | — | Planned — SDD not written |
 | 3 | sprint-93-seamless-delivery | Extension release lane + "Relaunch to update" + two-tier process/harness | (seamless research) | extension | sprint-92 (small bundle) | Planned — SDD not written |
 
