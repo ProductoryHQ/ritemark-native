@@ -1,0 +1,100 @@
+# Sprint 93: Seamless Extension Delivery — Tasks
+
+Every task lists concrete file paths, exact commands where applicable, and a binary "done when" criterion. Re-cut 2026-07-10 — old W1 (CI de-risk, already shipped in sprint-91) and W-D (esbuild, now sprint-92) task groups removed. Organized by workstream, matching `technical-plan.md`.
+
+## Prerequisite
+
+- [ ] Confirm sprint-92-esbuild-bundling's status: landed (bundled `out/` tree, ~3 files) or dropped/delayed (current ~130-file tree). Either is fine per the soft-dependency framing in `technical-plan.md` — this only determines which file-count W2.1's dynamic enumeration will actually enumerate, not whether the fix is correct.
+  Done when: the current state of `extensions/ritemark/out/` is confirmed and noted here before starting W2.1.
+
+## W2 — One-command extension release
+
+### W2.1 — Preflight script
+- [ ] Create `scripts/release-extension-preflight.sh` with: clean-git check, release-tier guard, `engines.vscode` check, compile-clean check, webview-bundle-freshness + `ai-sidebar` sentinel check (reuse logic from `.claude/hooks/pre-commit-validator.sh` Check 5/6 rather than reimplementing — read that hook first).
+  Done when: script exits 0 on the current clean `main`-equivalent tree and exits non-zero with a named-path reason when run against a synthetic diff touching `patches/001-ritemark-branding.patch`.
+- [ ] Implement the release-tier guard's path denylist as a single array/variable: `patches/`, `vscode` (submodule pointer), `branding/product.json`, `extensions/ritemark/binaries/agents/`, `scripts/build-prod.sh`, `scripts/codesign-app.sh`, `scripts/create-dmg.sh`, `scripts/apply-patches.sh`, `scripts/update-vscode.sh`, `scripts/create-patch.sh`, `installer/windows/ritemark.iss`, `scripts/codesign-windows.sh` (the last two are NEW shell-tier paths introduced by sprint-91 — confirm they exist on the branch/main before hardcoding; if sprint-91 hasn't merged yet, note them as "expected, verify on merge").
+  Done when: the denylist array in the script textually matches the list written into `CLAUDE.md`'s new "Release tiers" section (R11) — copy-paste identical, not independently authored.
+- [ ] Implement `engines.vscode` check: read `extensions/ritemark/package.json` `.engines.vscode` (verified: `"^1.94.0"`), compare against the currently-built shell's VS Code version.
+  Done when: script fails when a synthetic `engines.vscode` bump exceeds the shell version, passes when equal or lower.
+
+### W2.2 — Fix the file-enumeration bug + wire `release-extension.sh`
+- [ ] Read `scripts/create-extension-release.sh` end-to-end (already read during planning — re-verify no drift since this doc was written).
+  Done when: confirmed the manifest/feed-generation logic (lines 98-204) is still correct and unchanged from the planning-time read.
+- [ ] Replace the hardcoded `FILES` variable (lines 117-141) with dynamic enumeration: `find "$EXTENSION_DIR/out" -type f -name '*.js' -not -name '*.map'` plus `media/webview.js`, `media/webview.js.map`, `package.json` (and `out/**/*.js.map` if sourcemaps should ship — decide and document).
+  Done when: running the script against the current tree produces a manifest whose `files[]` list matches `find extensions/ritemark/out -name '*.js' -not -name '*.map' | wc -l` in count, with zero references to the three now-confirmed-nonexistent paths (`out/excelEditor.js`, `out/aiProvider.js`, `out/commands/index.js`).
+- [ ] Decide naming: keep `create-extension-release.sh` as the fixed script with a thin `release-extension.sh` wrapper that calls preflight first, OR rename directly. Update all cross-references (this tasks.md, `technical-plan.md`, the `release` skill, `release-manager.md`) consistently with the final name.
+  Done when: `grep -rn "release-extension" scripts/ .claude/ docs/development/sprints/sprint-93-seamless-delivery/` shows a single consistent script name used everywhere.
+- [ ] Wire `release-extension-preflight.sh` (W2.1) as the first step of `release-extension.sh`; abort on non-zero.
+  Done when: a synthetic shell-tier-touching diff aborts the whole pipeline before any file is packaged.
+- [ ] Dry-run end-to-end test against the current tree.
+  Done when: script completes manifest + feed generation with no unhandled errors; `gh release create` is the only step NOT executed in dry-run mode (or is executed against a scratch/test tag if `--dry-run` isn't implemented — decide at implementation time).
+
+## W3 — Claude-Code-style update UX
+
+### W3.1 — `mode` setting
+- [ ] Edit `extensions/ritemark/package.json`'s existing `"Ritemark Updates"` `contributes.configuration` block (verified location: lines 182-197): add `ritemark.updates.mode` (`enum: ["auto","prompt"]`, `default: "auto"`) next to `ritemark.updates.enabled`/`ritemark.updates.dismissed`.
+  Done when: `grep -A4 '"ritemark.updates.mode"' extensions/ritemark/package.json` shows the enum + default exactly as specified.
+
+### W3.2 — Background download + stage
+- [ ] In `extensions/ritemark/src/update/updateService.ts`'s `notifyIfNeeded()` (private method), branch on `vscode.workspace.getConfiguration('ritemark.updates').get<string>('mode', 'auto')` — for `action === 'extension'` AND `mode === 'auto'`, call `this.installer.applyUpdate(manifest)` directly (bypassing `installExtensionUpdateWithProgress`'s `withProgress` wrapper) instead of calling `showExtensionUpdateNotification`.
+  Done when: with `mode: 'auto'` and a mocked compatible extension release, no `vscode.window.showInformationMessage` call fires during the check, but `applyUpdate` is invoked (verify via a unit test or manual trace).
+- [ ] On successful silent `applyUpdate`, set `pendingRestartVersion` (reuse existing `storage.setPendingRestartVersion`) and trigger the status-bar item (W3.3) instead of `promptReloadWindow`'s dialog.
+  Done when: after a successful silent stage, `storage.getPendingRestartVersion()` returns the new version AND the status-bar item is visible (manual QA, scenario S6).
+- [ ] On `applyUpdate` failure (checksum mismatch or any other throw), catch, log via `console.warn`, do NOT set `pendingRestartVersion`, do NOT show the status-bar item.
+  Done when: a test/manual run with a deliberately-mismatched sha256 fixture confirms `pendingRestartVersion` remains unset after the call (scenario S8).
+- [ ] New/updated unit test file `extensions/ritemark/src/update/updateService.test.ts` (verify existence first — create if missing): cases for `mode: 'auto'` silent-success, `mode: 'auto'` checksum-failure (no state change), `mode: 'prompt'` unchanged notification path, `action: 'full'` unaffected by `mode`.
+  Done when: `cd extensions/ritemark && npx tsx src/update/updateService.test.ts` passes all four cases, and this test is added to `package.json`'s `scripts.test` chain.
+
+### W3.3 — Status-bar item
+- [ ] Create `extensions/ritemark/src/update/updateStatusBar.ts`: exports a function/class managing a single `vscode.StatusBarItem` (hidden by default), `show(version: string)` sets text `"$(sync) Ritemark ${version} ready"` + tooltip + `command: 'ritemark.updates.relaunch'`, `hide()` reverses it.
+  Done when: file compiles (`npm run compile` in `extensions/ritemark`) with no new TS errors.
+- [ ] Register command `ritemark.updates.relaunch` in `extensions/ritemark/src/extension.ts`: handler calls `vscode.commands.executeCommand('workbench.action.reloadWindow')`.
+  Done when: `grep -n "ritemark.updates.relaunch" extensions/ritemark/src/extension.ts` shows the registration, and `package.json`'s `contributes.commands` lists it (check an existing internal-only command, if any, for the palette-visibility pattern first).
+- [ ] Wire `updateStatusBar.show()`/`hide()` into `extension.ts`'s activation + disposal (`context.subscriptions.push(...)`).
+  Done when: status-bar item disposes cleanly on extension deactivation (verify via existing disposal pattern used elsewhere in the codebase, or standard VS Code pattern if this is the first status-bar item).
+
+### W3.4 — Apply-on-next-start verification (confirm hypothesis, minimal new code expected)
+- [ ] Read the actual VS Code core mechanism (under the `vscode/` submodule) by which the extension host resolves which `~/.ritemark/extensions/ritemark-*` directory is active on startup, confirming or correcting the `dataFolderName`-driven hypothesis in `technical-plan.md`.
+  Done when: the exact file/mechanism is identified and documented in a one-paragraph note appended below this line, confirming (or correcting) that it picks the highest-compatible-version directory with no extra Ritemark code needed for R8.
+- [ ] Regression-verify `updateService.ts`'s `reconcilePendingRestartVersion()` still correctly clears `pendingRestartVersion` once `getCurrentVersion()` matches or exceeds it, under the NEW silent-stage path from W3.2.
+  Done when: existing/extended unit test confirms `pendingRestartVersion` clears after a simulated restart where `getCurrentVersion()` returns the staged version.
+
+### W3.5 — Rollback safety
+- [ ] Confirm `cleanupOldVersions()` has zero call sites today: `grep -rn "cleanupOldVersions" extensions/ritemark/src/`.
+  Done when: confirmed only the method's own definition matches (already verified during planning — re-confirm on the active branch before adding a call site).
+- [ ] Add a call site: after a NEW version has successfully activated at least once (not merely staged), call `cleanupOldVersions` in a way that keeps N−1, not just the current version (this REQUIRES either changing `cleanupOldVersions`'s signature to accept a "keep these N versions" list, or calling it with awareness that it currently deletes everything except ONE version — pick one, document the choice).
+  Done when: after a successful update + restart + confirmed activation, exactly TWO `ritemark-*` directories remain under `~/.ritemark/extensions/` (scenario S11).
+- [ ] Implement the chosen activation-integrity signal (marker file or VS Code activation-failure hook — pick per `technical-plan.md` W3.5's two candidate approaches; document the choice with a one-paragraph rationale appended below this line before implementing).
+  Done when: a fixture with a deliberately-broken staged `out/extension.js` (syntactically invalid, per the v1.7.1 "Invalid or unexpected token" precedent) results in the app successfully falling back to N−1 on next start, verified manually (scenario S10 — boot-time failure mode, difficult to unit test).
+- [ ] If the marker-file approach touches `product.json` or any bootstrap script under `scripts/`, run it back through W2.1's release-tier denylist mentally — confirm this sprint's OWN shell-tier guard wouldn't have blocked shipping this exact change as an extension release. If it would, flag to Jarmo before proceeding.
+  Done when: an explicit go/no-go note is recorded in `sprint-plan.md`'s Product Decisions.
+
+## W4 — Process & harness
+
+- [ ] `CLAUDE.md` (repo root): add a "Release tiers" section — state the shell-vs-extension decision rule verbatim matching W2.1's denylist (including the two new sprint-91 paths).
+  Done when: `grep -A20 "## Release [Tt]iers" CLAUDE.md` shows the rule with the same path list as `scripts/release-extension-preflight.sh`.
+- [ ] `.claude/skills/release/SKILL.md`: replace the stale "Workflow — Extension-only release" section (lines 187-195, describing `vsce package` — a mechanism this codebase does not use) with the real procedure (`./scripts/release-extension.sh <version>`, per-file manifest model), and state explicitly which gates DON'T apply (no notarization, no 60-min hardening, no Windows CI, no repo-visibility toggle). Do NOT touch Step 5 (CI dispatch) — already updated by sprint-91.
+  Done when: `grep -n "vsce package" .claude/skills/release/SKILL.md` returns nothing, and the new section reads as a complete, accurate replacement.
+- [ ] `.claude/agents/sprint-manager.md`: add a rule that every generated `sprint-plan.md` (both lightweight and full-track templates) must declare `Release tier: extension` or `Release tier: shell`, extension is default, shell requires naming the specific shell-tier path.
+  Done when: both the lightweight and full-track sprint-plan templates in this file show a `Release tier:` line in their template body.
+- [ ] `.claude/agents/release-manager.md`: EXTEND the existing "Release Types" table / Workflow Overview (do not duplicate) with the asymmetric gate model — extension release = light gate (Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, approval phrase), shell release = existing Gate 1 + Gate 2 + hardening + notarization, unchanged.
+  Done when: the "Extension-only release" section (currently lines 115-124) explicitly states no notarization/hardening/Windows-CI/repo-toggle apply, without altering the full-release table above it.
+- [ ] `.claude/agents/qa-validator.md`: add a reference to a slim extension-tier QA checklist distinct from full `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`. Define the slim checklist's shape (scoped to changed surfaces only) either inline or as a new template file `docs/releases/TEMPLATE-EXTENSION-QA.md` (decide at implementation time; note the choice here).
+  Done when: qa-validator's doc references the slim checklist by name/path and states when it applies (extension-tier) vs. when the full checklist applies (shell-tier).
+- [ ] New `docs/development/RELEASING.md`: one-page guide for Jarmo — what an extension release is, what he does (test via the in-app "Relaunch to update" flow or a local dev install, test, say the approval phrase), what a shell release is and when it happens (~monthly, batched per the seamless-delivery analysis doc), FAQ, zero-jargon where possible.
+  Done when: file exists, is under 1 printed page (~500-700 words), and a person with no engineering background could follow it to test a release.
+- [ ] Explicit no-op note: confirm no edits were made to `.codex/**` or `AGENTS.md` as part of this sprint — `harness-equalizer` syncs those automatically post-merge.
+  Done when: `git diff --stat sprint-92-esbuild-bundling...sprint-93-seamless-delivery -- .codex AGENTS.md` (once the branch exists) returns empty output.
+
+## Sprint close
+
+- [ ] `qa-validator` sign-off (surface routing recommendation to the user at Phase 4→5).
+- [ ] Jarmo local test pass covering the `scenarios.md` matrix (S1-S16).
+- [ ] Update `docs/development/architecture.md` if any subsystem shape changed beyond what sprint-92 already logged (new status-bar affordance, update-platform behavior change) — cross-check against the doc's Sprint Architecture Gate rule.
+- [ ] File the Phase E (native shell auto-update) GitHub `enhancement` issue on `ProductoryHQ/ritemark-native`, referencing this sprint and the source analysis doc, before closing.
+
+## Sequencing summary
+
+- **Soft dependency on sprint-92** (see technical-plan.md) — W2.2's dynamic-enumeration fix is correct either way; sprint-92 only affects the RESULT SIZE, not correctness.
+- **Independently completable within this sprint:** W2 and W3 have no cross-dependency on each other; W4 (docs) can be written in parallel with either.
+- **Riskiest single item:** W3.5's activation-integrity signal (rollback) — flagged for a short implementation-time research note before coding, per `technical-plan.md`.

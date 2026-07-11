@@ -1,0 +1,22 @@
+Ritemark: actionable error message for OneDrive/SharePoint cloud-file read failures
+Sprint 91: #134 — when a cloud-only (dehydrated) file fails to read, show a user-friendly
+message instead of the generic "Unknown (FileSystemError)".
+diff --git a/src/vs/platform/files/node/diskFileSystemProvider.ts b/src/vs/platform/files/node/diskFileSystemProvider.ts
+index 2e2e64bd622..755fd212eda 100644
+--- a/src/vs/platform/files/node/diskFileSystemProvider.ts
++++ b/src/vs/platform/files/node/diskFileSystemProvider.ts
+@@ -868,6 +868,14 @@ export class DiskFileSystemProvider extends AbstractDiskFileSystemProvider imple
+ 				code = FileSystemProviderErrorCode.Unknown;
+ 				break;
+ 			default:
++				// Ritemark: detect Windows cloud-file errors (OneDrive/SharePoint Files On-Demand)
++				// Cloud placeholders open() successfully but read() fails with UV_UNKNOWN (-4094)
++				// because Windows ERROR_CLOUD_FILE_* codes have no libuv mapping. This pattern
++				// (UNKNOWN + read/open syscall on Windows) is highly specific to cloud files.
++				if (isWindows && error.code === 'UNKNOWN' && (error.syscall === 'read' || error.syscall === 'open')) {
++					resultError = localize('cloudFileNotAvailable', "This file can't be read. If it's stored in OneDrive or SharePoint, right-click it in File Explorer \u2192 Always keep on this device, then reopen.");
++					this.logService.warn(`[Ritemark] Possible cloud-file error (errno=${error.errno}, syscall=${error.syscall}): ${error.message}`);
++				}
+ 				code = FileSystemProviderErrorCode.Unknown;
+ 		}
+

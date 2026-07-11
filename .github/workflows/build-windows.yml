@@ -2,9 +2,9 @@ name: Build Windows (x64)
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
+    # Release CI is dispatched explicitly (gh workflow run build-windows.yml --ref <ref>).
+    # The version comes from branding/product.json, not the git ref, so any ref works.
+    # Tag pushes no longer auto-trigger this expensive windows-8core build (v1.8.2, #130/CI de-risk).
 
 env:
   VSCODE_VERSION: '1.117.0'
@@ -75,6 +75,11 @@ jobs:
           echo "Extension copied to vscode/extensions/ritemark"
 
       - name: Patch bundled node-gyp for VS2026 detection
+        # DRIFT-PREVENTION: .github/workflows/windows-canary.yml runs a copy of
+        # this node-gyp patch + VS-detection logic weekly on the free
+        # windows-latest runner as an early-warning. If you change the node-gyp
+        # pin or VS-detection logic here, update windows-canary.yml too.
+        #
         # windows-8core now ships Visual Studio 2026 (internal major version
         # 18) instead of/alongside VS 2022. node-gyp 11.2.0 (bundled with this
         # runner's Node 22.22.1) only recognises major versions 15/16/17 ->
@@ -412,6 +417,42 @@ jobs:
             printf '\n/* Ritemark: hide VS Code chat view container from activity bar */\n.activitybar .action-item a[class*="workbench-panel-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="workbench-panel-chat"]) { display: none !important; }\n.activitybar .action-item a[class*="copilot-chat"] { display: none !important; }\n.activitybar .action-item:has(a[class*="copilot-chat"]) { display: none !important; }\n' >> "$CSS_FILE"
             echo "Chat activity bar CSS hide rule appended"
           fi
+
+      - name: Patch Ritemark.exe icon (branding)
+        # rcedit modifies the PE binary, which invalidates any existing signature.
+        # This MUST run BEFORE the signing step.
+        shell: bash
+        working-directory: r
+        run: |
+          RCEDIT="vscode/node_modules/rcedit/bin/rcedit.exe"
+          if [ -f "$RCEDIT" ] && [ -f "branding/icons/icon.ico" ]; then
+            "$RCEDIT" "VSCode-win32-x64/Ritemark.exe" --set-icon "branding/icons/icon.ico"
+            echo "Ritemark.exe icon patched with branding/icons/icon.ico"
+          else
+            echo "WARNING: rcedit or icon not found, skipping icon patch"
+          fi
+
+      - name: Sign Windows binaries (Azure Trusted Signing)
+        # Signs all .exe files in the build output with Authenticode via the
+        # official azure/trusted-signing-action. This includes Ritemark.exe,
+        # bundled agent binaries, and Electron helpers — signing everything is
+        # correct for Smart App Control compliance.
+        # Skipped when AZURE_SIGNING_ENABLED repo variable is not 'true'.
+        if: ${{ vars.AZURE_SIGNING_ENABLED == 'true' }}
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
+          endpoint: https://neu.codesigning.azure.net
+          trusted-signing-account-name: ritemark-signing
+          certificate-profile-name: ritemark-public-trust
+          files-folder: r/VSCode-win32-x64
+          files-folder-filter: exe
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Validate build
         shell: bash

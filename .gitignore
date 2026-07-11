@@ -121,3 +121,4 @@ extensions/ritemark/binaries/agents/win32-x64/
 
 # Excel lock files
 ~$*.xlsx
+.signing-env
