@@ -3,9 +3,9 @@
 Track: SDD (per `docs/development/releases/v1.8.2/release-plan.md` Sprint Map, which already designates this sprint "SDD not written" before this doc existed. Retrospective justification against the standard signals: this is nominally a single-domain build-tooling change, BUT it carries a genuinely risky, audit-first requirement (dynamic-require/path-resolution sweep across the whole extension host, R5) with two ALREADY-CONFIRMED landmines whose fix approach is a proposed shape pending Phase 3 verification, plus explicit mid-sprint droppability (R9) and a downstream dependency from sprint-93. That risk profile — not requirement count — is why this stays SDD rather than lightweight/plain-full-track.)
 Override with: "use plain full track" — not recommended given the confirmed landmines; already SDD per the release plan.
 
-Branch: `sprint-92-esbuild-bundling` (NOT YET CREATED — awaiting Jarmo's approval of this plan, per the HARD gate below)
+Branch: `sprint-92-esbuild-bundling` (created, pushed to origin; rebased onto `main` 2026-07-11 after sprint-91 merged — sprint-91's content is now part of `main` directly, so the original "base on sprint-91 branch" rationale is satisfied via `main` instead)
 
-Status: Phase 2 (PLAN) — awaiting Jarmo approval
+Status: Phase 5 (PR pending) — implementation complete, full runtime QA (T2-3, T4-2) done this session
 
 Parent release: [`docs/development/releases/v1.8.2/release-plan.md`](../../releases/v1.8.2/release-plan.md) — v1.8.2 "Sturdy & Seamless Delivery (Windows-first)", sprint #2 of 3.
 
@@ -61,16 +61,16 @@ Single workstream (full detail in spec.md R1-R9):
 ## Success Criteria
 
 Mirrors `spec.md`'s Acceptance criteria at a high level:
-- [ ] `out/extension.js` is a single bundled output; per-module `out/*.js` files no longer exist for the bundled entry (R1).
-- [ ] `browserMcpAdapter.ts` bundles to its own standalone `out/browser/browserMcpAdapter.js`, still launchable via `node <path>` with zero sibling-file dependencies (R2).
-- [ ] `findBundledAgentRuntime()` resolves correctly with no `extensionRoot` override post-bundling; all three agent runtimes (Claude Code, Codex, OpenCode) launch in a bundled dev build (R3).
-- [ ] `npm run compile` still fails loudly on a deliberate type error (R4).
-- [ ] Phase 3 audit confirms zero unresolved dynamic-require landmines beyond the two fixed in R3, or the scope-change protocol was invoked (R5).
-- [ ] `scripts/validate-build-output.sh` passes against a bundled build with no reference to nonexistent per-module paths (R6).
-- [ ] `docs/development/architecture.md` updated per the Sprint Architecture Gate (R8).
-- [ ] `vscode-development` skill no longer describes the extension host as a loose-file tree; compile-command description matches reality (R10).
-- [ ] "Bundle-safe extension code" rule present in the skill + pointed to from `CLAUDE.md` (R11).
-- [ ] Full prod build boots cleanly: editor, AI sidebar, Settings all load with zero activation errors.
+- [x] `out/extension.js` is a single bundled output; per-module `out/*.js` files no longer exist for the bundled entry (R1).
+- [x] `browserMcpAdapter.ts` bundles to its own standalone `out/browser/browserMcpAdapter.js`, still launchable via `node <path>` with zero sibling-file dependencies (R2).
+- [x] `findBundledAgentRuntime()` resolves correctly with no `extensionRoot` override post-bundling; Claude Code and Codex verified via live sessions in a bundled dev build, OpenCode verified by code-path equivalence + binary presence (R3).
+- [x] `npm run compile` still fails loudly on a deliberate type error (R4).
+- [x] Phase 3 audit confirms zero unresolved dynamic-require landmines beyond the two fixed in R3 (R5).
+- [x] `scripts/validate-build-output.sh` passes against a bundled build with no reference to nonexistent per-module paths (R6).
+- [x] `docs/development/architecture.md` updated per the Sprint Architecture Gate (R8).
+- [x] `vscode-development` skill no longer describes the extension host as a loose-file tree; compile-command description matches reality (R10).
+- [x] "Bundle-safe extension code" rule present in the skill + pointed to from `CLAUDE.md` (R11).
+- [x] Full prod build boots cleanly: editor, AI sidebar, Settings all load with zero activation errors.
 
 ## Pre-Implementation Gate
 
@@ -93,4 +93,4 @@ Per repo CLAUDE.md and the user's global instruction ("never start sprint coding
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (on or before 2026-07-10, per the branch's first implementation commit timestamp)
