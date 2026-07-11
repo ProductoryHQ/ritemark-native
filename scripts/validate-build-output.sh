@@ -300,6 +300,43 @@ echo "  open \"$APP_PATH\""
 echo ""
 
 # -----------------------------------------------------------------------------
+# Check 7: Windows Code Signing Verification (win32 only, opt-in)
+# -----------------------------------------------------------------------------
+if [[ "$TARGET" == "win32-x64" ]]; then
+  if [[ "${RITEMARK_SKIP_SIGNING_CHECK:-1}" == "1" ]]; then
+    echo "Signing check: SKIPPED (RITEMARK_SKIP_SIGNING_CHECK=1, default)"
+    echo "  Set RITEMARK_SKIP_SIGNING_CHECK=0 to enforce signature verification."
+    echo ""
+  else
+    echo "Checking Authenticode signatures..."
+    SIGNTOOL=$(find "/c/Program Files (x86)/Windows Kits/10/bin" -path "*/x64/signtool.exe" 2>/dev/null | sort -V | tail -1)
+    if [[ -z "$SIGNTOOL" ]]; then
+      echo -e "  ${YELLOW}WARN${NC}: signtool.exe not found — cannot verify signatures"
+      WARNINGS=$((WARNINGS + 1))
+    else
+      SIGN_TARGETS=("$BUILD_DIR/Ritemark.exe")
+      AGENTS_SIGN_DIR="$EXT_PATH/binaries/agents/win32-x64"
+      if [[ -d "$AGENTS_SIGN_DIR" ]]; then
+        for exe in "$AGENTS_SIGN_DIR"/*.exe; do
+          [[ -f "$exe" ]] && SIGN_TARGETS+=("$exe")
+        done
+      fi
+
+      for stgt in "${SIGN_TARGETS[@]}"; do
+        echo -n "  $(basename "$stgt")... "
+        if "$SIGNTOOL" verify /pa "$stgt" > /dev/null 2>&1; then
+          echo -e "${GREEN}OK${NC} (signed)"
+        else
+          echo -e "${RED}FAIL${NC} (not signed or invalid signature)"
+          ERRORS=$((ERRORS + 1))
+        fi
+      done
+    fi
+    echo ""
+  fi
+fi
+
+# -----------------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------------
 echo "========================================"

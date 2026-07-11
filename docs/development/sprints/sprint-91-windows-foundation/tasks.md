@@ -20,7 +20,7 @@ Grouped by workstream. Every task has a concrete file path (or command) and a bi
 - [x] **W1-4. DONE 2026-07-11.** Add a "Sign bundled binaries" step to `.github/workflows/build-windows.yml`, placed after "Copy extension to build output" and before "Strip bundled copilot extension". Wire `Azure/artifact-signing-action` (or a `signtool.exe` call via `scripts/codesign-windows.sh`) with placeholder/documented secret names.
   Done when: `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/build-windows.yml'))"` passes; the step is present in the correct position (verify via `grep -n` for step name ordering).
 
-- [ ] **W1-5.** Extend `scripts/validate-build-output.sh` Section 9 (Windows Compatibility) with a signature check on `Ritemark.exe` + bundled agent `.exe`s, gated behind `RITEMARK_SKIP_SIGNING_CHECK` env var (default: skip, since no cert exists yet) so existing unsigned CI runs don't start failing before the cert lands.
+- [x] **W1-5. DONE 2026-07-11.** Extend `scripts/validate-build-output.sh` Section 9 (Windows Compatibility) with a signature check on `Ritemark.exe` + bundled agent `.exe`s, gated behind `RITEMARK_SKIP_SIGNING_CHECK` env var (default: skip, since no cert exists yet) so existing unsigned CI runs don't start failing before the cert lands.
   Done when: running `RITEMARK_SKIP_SIGNING_CHECK=1 ./scripts/validate-build-output.sh win32-x64` behaves identically to today (no new failures); the check code path exists and is ready to flip on once signing is live.
 
 - [x] **W1-6. DONE 2026-07-11.** Write `docs/user/windows-smart-app-control.md` documenting the interim SAC workaround (Windows SmartScreen "More info" → "Run anyway", or admin-managed install path).
