@@ -4,9 +4,9 @@ Track: SDD (three workstreams — one-command extension release, Claude-Code-sty
 
 **RE-CUT 2026-07-10.** This directory previously held a combined draft (`sprint-91-seamless-updates`, four workstreams + a droppable esbuild sub-workstream). Per `docs/development/releases/v1.8.2/release-plan.md`'s Housekeeping note, that draft is superseded: CI de-risk already shipped in `sprint-91-windows-foundation`; esbuild bundling is now its own sprint, `sprint-92-esbuild-bundling`. This document and its four SDD siblings (`spec.md`, `scenarios.md`, `technical-plan.md`, `tasks.md`) are rewritten to cover ONLY this sprint's remaining scope (old W2/W3/W4), with requirement IDs R3-R17 preserved unchanged for traceability.
 
-Branch: `sprint-93-seamless-delivery` (NOT YET CREATED — awaiting Jarmo's approval of this plan, per the HARD gate below)
+Branch: `sprint-93-seamless-delivery` (created 2026-07-12, based on `main` — sprint-92 already merged there, so this satisfies the original "base off sprint-92" intent without a separate branch)
 
-Status: Phase 2 (PLAN) — awaiting Jarmo approval
+Status: Phase 3 (IMPLEMENTATION) — approved by Jarmo 2026-07-12, starting with W2 per tasks.md sequencing
 
 Parent release: [`docs/development/releases/v1.8.2/release-plan.md`](../../releases/v1.8.2/release-plan.md) — v1.8.2 "Sturdy & Seamless Delivery (Windows-first)", sprint #3 of 3.
 
@@ -96,4 +96,4 @@ VS Code's own `updateUrl` (Squirrel.Mac on macOS, `inno_updater.exe` on Windows)
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-07-12, "tee vahecommit ja siis alusta 93'ga")
