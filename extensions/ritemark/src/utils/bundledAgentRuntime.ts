@@ -11,8 +11,14 @@ export interface BundledAgentRuntime {
   arch: NodeJS.Architecture;
 }
 
-function extensionRootFrom(startDir: string): string {
-  return resolve(startDir, '..', '..');
+export function extensionRootFrom(startDir: string): string {
+  // Sprint 92 R3: after esbuild bundling, this code is inlined into `out/extension.js`,
+  // so `__dirname` at runtime is the `out/` directory — ONE level below the extension
+  // root (pre-bundle it was `out/utils/`, two levels below, hence the old '..','..').
+  // Callers in the extension host should prefer passing an explicit `extensionRoot`
+  // (e.g. `context.extensionPath`); this __dirname fallback assumes the bundle lives at
+  // `<extensionRoot>/out/`. If the esbuild `outdir` changes, update this offset.
+  return resolve(startDir, '..');
 }
 
 function platformArchTag(platform: NodeJS.Platform, arch: NodeJS.Architecture): string {

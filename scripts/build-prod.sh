@@ -285,22 +285,33 @@ else
   echo -e "${GREEN}OK${NC}: webview.js (${WEBVIEW_SIZE} bytes)"
 fi
 
-# Check extension.js (must be >1KB)
+# Check extension.js — Sprint 92: now the whole esbuild bundle (~5MB with inlined
+# deps), so a floor of 1MB catches a broken/tiny/0-byte bundle (the v1.7.1 trap).
 EXTENSION_SIZE=$(stat -f%z "$EXT_DEST/out/extension.js" 2>/dev/null || echo 0)
-if [[ $EXTENSION_SIZE -lt 1000 ]]; then
-  echo -e "${RED}FAIL: extension.js (${EXTENSION_SIZE} bytes, need >1000)${NC}"
+if [[ $EXTENSION_SIZE -lt 1000000 ]]; then
+  echo -e "${RED}FAIL: extension.js bundle (${EXTENSION_SIZE} bytes, need >1000000)${NC}"
   VALIDATION_FAILED=1
 else
-  echo -e "${GREEN}OK${NC}: extension.js (${EXTENSION_SIZE} bytes)"
+  echo -e "${GREEN}OK${NC}: extension.js bundle (${EXTENSION_SIZE} bytes)"
 fi
 
-# Check ritemarkEditor.js (must be >1KB)
-EDITOR_SIZE=$(stat -f%z "$EXT_DEST/out/ritemarkEditor.js" 2>/dev/null || echo 0)
-if [[ $EDITOR_SIZE -lt 1000 ]]; then
-  echo -e "${RED}FAIL: ritemarkEditor.js (${EDITOR_SIZE} bytes, need >1000)${NC}"
+# Sprint 92: ritemarkEditor.js no longer exists standalone — it is inlined into the
+# bundle. Assert its code is actually present (esbuild does not minify, so the method
+# name survives verbatim) — guards the "large bundle but a module was dropped" case.
+if grep -q "resolveCustomTextEditor" "$EXT_DEST/out/extension.js" 2>/dev/null; then
+  echo -e "${GREEN}OK${NC}: extension.js contains editor code (resolveCustomTextEditor)"
+else
+  echo -e "${RED}FAIL: extension.js bundle is missing editor code (resolveCustomTextEditor)${NC}"
+  VALIDATION_FAILED=1
+fi
+
+# Sprint 92: the standalone spawned subprocess bundle must also exist.
+ADAPTER_SIZE=$(stat -f%z "$EXT_DEST/out/browser/browserMcpAdapter.js" 2>/dev/null || echo 0)
+if [[ $ADAPTER_SIZE -lt 1000 ]]; then
+  echo -e "${RED}FAIL: browserMcpAdapter.js (${ADAPTER_SIZE} bytes, need >1000)${NC}"
   VALIDATION_FAILED=1
 else
-  echo -e "${GREEN}OK${NC}: ritemarkEditor.js (${EDITOR_SIZE} bytes)"
+  echo -e "${GREEN}OK${NC}: browserMcpAdapter.js (${ADAPTER_SIZE} bytes)"
 fi
 
 # Check icons (must have 10+)

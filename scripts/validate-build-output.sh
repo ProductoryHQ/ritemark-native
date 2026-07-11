@@ -137,11 +137,42 @@ check_file_size() {
   fi
 }
 
+# Sprint 92: assert a bundle actually contains expected code (not just non-empty).
+# Guards the "0-byte / broken bundle passes because the file exists" class (#108-adjacent):
+# a bundle can be large yet missing a module if esbuild silently dropped it.
+check_content() {
+  local file=$1
+  local needle=$2
+  local name=$3
+
+  echo -n "Checking $name... "
+  if [[ ! -f "$file" ]]; then
+    echo -e "${RED}FAIL${NC}"
+    echo "  File not found: $file"
+    ERRORS=$((ERRORS + 1))
+    return
+  fi
+  if grep -q -- "$needle" "$file"; then
+    echo -e "${GREEN}OK${NC} (found '$needle')"
+  else
+    echo -e "${RED}FAIL${NC}"
+    echo "  Bundle is missing '$needle' — esbuild may have dropped a module, or the bundle is broken."
+    ERRORS=$((ERRORS + 1))
+  fi
+}
+
 # Only check these if extension directory exists
 if [[ -d "$EXT_PATH" ]]; then
   check_file_size "$EXT_PATH/media/webview.js" 500000 "webview.js"
-  check_file_size "$EXT_PATH/out/extension.js" 1000 "extension.js"
-  check_file_size "$EXT_PATH/out/ritemarkEditor.js" 1000 "ritemarkEditor.js"
+  # Sprint 92: the extension host is now a single esbuild bundle (out/extension.js,
+  # ~5MB with inlined deps) — not ~130 loose files. The floor reflects the bundled
+  # size so a tiny/0-byte extension.js (the v1.7.1 0-byte-tsc-trap class) fails here.
+  check_file_size "$EXT_PATH/out/extension.js" 1000000 "extension.js (bundle)"
+  # browserMcpAdapter is its own small standalone bundle (spawned subprocess).
+  check_file_size "$EXT_PATH/out/browser/browserMcpAdapter.js" 1000 "browserMcpAdapter.js (subprocess bundle)"
+  # ritemarkEditor.js no longer exists standalone — assert its code is INSIDE the bundle
+  # (esbuild does not minify/mangle, so the method name survives verbatim).
+  check_content "$EXT_PATH/out/extension.js" "resolveCustomTextEditor" "extension.js contains editor code"
   check_file_size "$EXT_PATH/package.json" 500 "package.json"
 fi
 
