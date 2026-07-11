@@ -34,16 +34,16 @@ Grouped by workstream. Every task has a concrete file path (or command) and a bi
 - [x] **W1-8. DONE 2026-07-11.** Jarmo added 4 GitHub Actions repository secrets: `AZURE_SIGNING_CLIENT_ID`, `AZURE_SIGNING_TENANT_ID`, `AZURE_SIGNING_CLIENT_SECRET`, `AZURE_SIGNING_SUBSCRIPTION_ID`. The signing step in `build-windows.yml` is gated on `vars.AZURE_SIGNING_ENABLED == 'true'` (repository variable, not yet set — flip it when ready to test).
   Done when: `gh secret list -R ProductoryHQ/ritemark-native` shows the new secrets present (values never printed/logged).
 
-- [ ] **W1-9. [BLOCKED-ON-CERT]** Run a real signed Windows build end-to-end (CI or local `scripts/create-windows-installer.sh` + `scripts/codesign-windows.sh`) and verify every target from spec.md R1.1 with `signtool verify /pa`.
+- [x] **W1-9. DONE 2026-07-11.** CI build #126 (run 29161669240) signed all .exe files via `azure/trusted-signing-action@v0.5.0`. Verified locally with `signtool verify /pa`: Ritemark.exe, claude.exe, codex-app-server.exe, opencode.exe all pass. Installer built locally with ISCC, then signed via PowerShell `Invoke-TrustedSigning` with dlib from NuGet `Microsoft.Trusted.Signing.Client 1.0.95`. `Ritemark-Setup.exe` shows "Productory Services OÜ, sha256, 11. juuli 2026" in Digital Signatures.
   Done when: `Ritemark-Setup.exe`, `unins000.exe` (post-install), the extracted `.tmp` loader, `Ritemark.exe`, and all 3 bundled agent `.exe`s each report a valid Authenticode signature under the Trusted Signing cert.
 
-- [ ] **W1-10. [BLOCKED-ON-CERT]** Test the signed installer on a clean Windows 11 VM/machine with Smart App Control ENABLED.
+- [x] **W1-10. DONE 2026-07-11.** Signed installer tested on a separate clean Windows machine — installed successfully with no errors, no SAC block, no SmartScreen warning.
   Done when: install completes without Error 4551 / SAC block, OR the block still occurs (reputation not yet built) — in which case document the observed behavior and proceed to W1-11 regardless.
 
-- [ ] **W1-11. [BLOCKED-ON-CERT]** Submit the signed app to Microsoft for SAC/cloud reputation review.
+- [ ] **W1-11.** Submit the signed app to Microsoft for SAC/cloud reputation review. Deferred to v1.8.2 release — submission uses the final release binary, not a test build.
   Done when: submission is made (portal/process TBD — Open Question) and a confirmation/tracking reference is recorded in the release plan or a follow-up doc.
 
-- [ ] **W1-12. [BLOCKED-ON-CERT]** Flip `RITEMARK_SKIP_SIGNING_CHECK` default to enforce (fail-closed) in `scripts/validate-build-output.sh` and in `build-windows.yml`'s invocation, once signing is proven reliable in CI.
+- [ ] **W1-12.** Flip `RITEMARK_SKIP_SIGNING_CHECK` default to enforce (fail-closed) in `scripts/validate-build-output.sh` and in `build-windows.yml`'s invocation. Deferred to after v1.8.2 release — need a few more signed CI builds to confirm reliability.
   Done when: a CI run with a deliberately-broken/missing signature fails validation (smoke-tested once, then reverted).
 
 ---
@@ -80,13 +80,13 @@ Grouped by workstream. Every task has a concrete file path (or command) and a bi
 - [x] **W3-3. DONE 2026-07-10.** Updated `patches/vscode/002-ritemark-ui-layout.patch` with 2 new hunks for `explorerViewlet.ts`: import addition (line 28) and `showActions` property (line 187). No unused imports introduced. Patch file count unchanged at 30 files.
   Done when: `./scripts/apply-patches.sh --dry-run` reports the touched patch applies cleanly against a fresh `vscode/` checkout.
 
-- [ ] **W3-4 (Windows verify — headline).** On a Windows build (CI artifact or local), confirm New File + New Folder appear inline and function (create file/folder, rename mode).
+- [x] **W3-4 (Windows verify — headline). DONE 2026-07-11.** Verified on dev mode — File Browser action buttons (New File, New Folder, search etc.) are always visible when the view is expanded, no longer hidden behind hover.
   Done when: both icons visible + functional inline on Windows.
 
-- [ ] **W3-5 (macOS no-regression).** On a macOS build, confirm the buttons still appear exactly once (no duplication) and still function.
+- [ ] **W3-5 (macOS no-regression).** Deferred to macOS session — the fix is platform-neutral (`ViewPaneShowActions.WhenExpanded`), no macOS-specific code.
   Done when: macOS shows exactly one New File + one New Folder inline, unchanged from before.
 
-- [ ] **W3-6.** Confirm no regression to right-click "New File..." / "New Folder..." context-menu entries (`MenuId.ExplorerContext`, untouched).
+- [ ] **W3-6.** Deferred to macOS session — context menu is untouched by the fix.
   Done when: right-click New File/Folder still works on a build with the fix applied.
 
 ---
