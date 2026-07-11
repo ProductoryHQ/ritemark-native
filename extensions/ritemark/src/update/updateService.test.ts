@@ -17,6 +17,7 @@ const Module = require('module') as {
 
 let configuredMode = 'auto';
 let informationMessageCalls = 0;
+let mockCurrentExtensionVersion = '0.0.0';
 
 const vscodeMod = {
   workspace: {
@@ -37,7 +38,7 @@ const vscodeMod = {
     executeCommand: async () => undefined,
   },
   extensions: {
-    getExtension: () => undefined,
+    getExtension: () => ({ packageJSON: { version: mockCurrentExtensionVersion } }),
   },
   env: {
     appRoot: '/tmp/ritemark-update-service-test-approot',
@@ -217,7 +218,29 @@ async function run() {
     console.log("✓ Test 4: action='full' unaffected by mode='auto'");
   }
 
-  console.log('\nAll 4 tests passed!');
+  // Test 5 (W3.4 regression guard): reconcilePendingRestartVersion must still
+  // clear pendingRestartVersion once getCurrentVersion() matches/exceeds it,
+  // under the NEW silent-stage path (not just the old notification path).
+  // Simulates: a silent stage set pendingRestartVersion, the app restarted,
+  // and VS Code's own extension-directory dedup (confirmed in tasks.md W3.4)
+  // now resolves the active extension to that staged version.
+  {
+    mockCurrentExtensionVersion = '1.8.2-ext.2';
+    const storage = new UpdateStorage(createMemento());
+    await storage.setPendingRestartVersion('1.8.2-ext.2');
+    assert.strictEqual(storage.getPendingRestartVersion(), '1.8.2-ext.2', 'precondition: pendingRestartVersion set before restart');
+
+    const service = new UpdateService(storage);
+    const snapshot = await service.getStatusSnapshot();
+
+    assert.strictEqual(storage.getPendingRestartVersion(), '', 'pendingRestartVersion must clear once the current version matches the staged one');
+    assert.notStrictEqual(snapshot.state, 'restart-required', 'status must no longer report restart-required after reconciliation');
+
+    mockCurrentExtensionVersion = '0.0.0';
+    console.log('✓ Test 5: reconcilePendingRestartVersion clears after a simulated restart onto the staged version');
+  }
+
+  console.log('\nAll 5 tests passed!');
 }
 
 run().catch((error) => {
