@@ -22,7 +22,7 @@ import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLM
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
 import { registerFlowTestCommand } from './flows/FlowTestRunner';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
-import { UpdateService, UpdateStorage, scheduleStartupCheck } from './update';
+import { UpdateService, UpdateStorage, scheduleStartupCheck, UpdateStatusBar, RELAUNCH_COMMAND_ID } from './update';
 import { initAnalytics, shutdownAnalytics } from './analytics/posthog';
 import { registerReactionCommand } from './analytics/reactions';
 import { BrowserTerminalLinkProvider } from './browser/BrowserTerminalLinkProvider';
@@ -262,7 +262,19 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize update service
   const updateStorage = new UpdateStorage(context.globalState);
-  const updateService = new UpdateService(updateStorage);
+  const updateStatusBar = new UpdateStatusBar();
+  context.subscriptions.push(updateStatusBar);
+  const updateService = new UpdateService(updateStorage, (version) => updateStatusBar.show(version));
+
+  // Sprint 93 R7: clicking the "Relaunch to update" status-bar item reloads
+  // the window. No confirmation dialog — the staged version is already the
+  // active one on disk (atomic-rename in userExtensionInstaller.ts), so
+  // there's no separate "activate" step short of a reload.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(RELAUNCH_COMMAND_ID, () => {
+      void vscode.commands.executeCommand('workbench.action.reloadWindow');
+    })
+  );
 
   // Schedule startup update check (10 second delay)
   scheduleStartupCheck(updateService);

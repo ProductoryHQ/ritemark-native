@@ -73,7 +73,10 @@ export class UpdateService {
   private isChecking = false;
   private initialized = false;
 
-  constructor(private storage: UpdateStorage) {
+  constructor(
+    private storage: UpdateStorage,
+    private onUpdateStagedSilently?: (version: string) => void
+  ) {
     this.installer = new UserExtensionInstaller();
   }
 
@@ -333,6 +336,15 @@ export class UpdateService {
       }
     }
 
+    // Sprint 93 R6/R10: 'auto' mode only governs the extension tier — full app
+    // updates always go through the existing foreground notification, since
+    // there's no silent-install path for a DMG/installer.
+    const mode = vscode.workspace.getConfiguration('ritemark.updates').get<string>('mode', 'auto');
+    if (this.lastResolved.action === 'extension' && mode === 'auto') {
+      await this.applyUpdateSilently(this.lastResolved.manifest, this.lastResolved.targetVersion);
+      return;
+    }
+
     const choice = this.lastResolved.action === 'full'
       ? await showFullUpdateNotification(this.lastResolved.manifest)
       : await showExtensionUpdateNotification(this.lastResolved.manifest);
@@ -350,6 +362,31 @@ export class UpdateService {
       case 'later':
       default:
         break;
+    }
+  }
+
+  /**
+   * Sprint 93 R6/R7: silently download, verify, and stage an extension update
+   * with no foreground UI (bypasses installExtensionUpdateWithProgress's
+   * withProgress wrapper — calls the installer directly). Checksum
+   * verification and staging-cleanup-on-failure are already enforced inside
+   * applyUpdate; on failure this just logs and leaves state untouched — the
+   * next periodic check (existing 6h interval) retries naturally.
+   */
+  private async applyUpdateSilently(manifest: UpdateManifest, targetVersion: string): Promise<void> {
+    try {
+      const result = await this.installer.applyUpdate(manifest);
+      if (!result.success) {
+        console.warn(`Ritemark: silent extension update failed: ${result.error}`);
+        return;
+      }
+
+      await this.storage.clearSkippedVersion();
+      await this.storage.clearSnooze();
+      await this.storage.setPendingRestartVersion(targetVersion);
+      this.onUpdateStagedSilently?.(targetVersion);
+    } catch (error) {
+      console.warn('Ritemark: silent extension update failed:', error instanceof Error ? error.message : error);
     }
   }
 

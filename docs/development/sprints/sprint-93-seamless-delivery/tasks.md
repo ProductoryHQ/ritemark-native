@@ -40,26 +40,30 @@ Every task lists concrete file paths, exact commands where applicable, and a bin
 ## W3 — Claude-Code-style update UX
 
 ### W3.1 — `mode` setting
-- [ ] Edit `extensions/ritemark/package.json`'s existing `"Ritemark Updates"` `contributes.configuration` block (verified location: lines 182-197): add `ritemark.updates.mode` (`enum: ["auto","prompt"]`, `default: "auto"`) next to `ritemark.updates.enabled`/`ritemark.updates.dismissed`.
+- [x] Edit `extensions/ritemark/package.json`'s existing `"Ritemark Updates"` `contributes.configuration` block (verified location: lines 182-197): add `ritemark.updates.mode` (`enum: ["auto","prompt"]`, `default: "auto"`) next to `ritemark.updates.enabled`/`ritemark.updates.dismissed`.
   Done when: `grep -A4 '"ritemark.updates.mode"' extensions/ritemark/package.json` shows the enum + default exactly as specified.
 
 ### W3.2 — Background download + stage
-- [ ] In `extensions/ritemark/src/update/updateService.ts`'s `notifyIfNeeded()` (private method), branch on `vscode.workspace.getConfiguration('ritemark.updates').get<string>('mode', 'auto')` — for `action === 'extension'` AND `mode === 'auto'`, call `this.installer.applyUpdate(manifest)` directly (bypassing `installExtensionUpdateWithProgress`'s `withProgress` wrapper) instead of calling `showExtensionUpdateNotification`.
+- [x] In `extensions/ritemark/src/update/updateService.ts`'s `notifyIfNeeded()` (private method), branch on `vscode.workspace.getConfiguration('ritemark.updates').get<string>('mode', 'auto')` — for `action === 'extension'` AND `mode === 'auto'`, call `this.installer.applyUpdate(manifest)` directly (bypassing `installExtensionUpdateWithProgress`'s `withProgress` wrapper) instead of calling `showExtensionUpdateNotification`.
   Done when: with `mode: 'auto'` and a mocked compatible extension release, no `vscode.window.showInformationMessage` call fires during the check, but `applyUpdate` is invoked (verify via a unit test or manual trace).
-- [ ] On successful silent `applyUpdate`, set `pendingRestartVersion` (reuse existing `storage.setPendingRestartVersion`) and trigger the status-bar item (W3.3) instead of `promptReloadWindow`'s dialog.
+- [x] On successful silent `applyUpdate`, set `pendingRestartVersion` (reuse existing `storage.setPendingRestartVersion`) and trigger the status-bar item (W3.3) instead of `promptReloadWindow`'s dialog.
   Done when: after a successful silent stage, `storage.getPendingRestartVersion()` returns the new version AND the status-bar item is visible (manual QA, scenario S6).
-- [ ] On `applyUpdate` failure (checksum mismatch or any other throw), catch, log via `console.warn`, do NOT set `pendingRestartVersion`, do NOT show the status-bar item.
+  Wired via a constructor callback (`onUpdateStagedSilently`), not a direct import, to avoid a circular dependency between `updateService.ts` and `updateStatusBar.ts`; `extension.ts` connects the two (`new UpdateService(updateStorage, (v) => updateStatusBar.show(v))`).
+- [x] On `applyUpdate` failure (checksum mismatch or any other throw), catch, log via `console.warn`, do NOT set `pendingRestartVersion`, do NOT show the status-bar item.
   Done when: a test/manual run with a deliberately-mismatched sha256 fixture confirms `pendingRestartVersion` remains unset after the call (scenario S8).
-- [ ] New/updated unit test file `extensions/ritemark/src/update/updateService.test.ts` (verify existence first — create if missing): cases for `mode: 'auto'` silent-success, `mode: 'auto'` checksum-failure (no state change), `mode: 'prompt'` unchanged notification path, `action: 'full'` unaffected by `mode`.
+- [x] New/updated unit test file `extensions/ritemark/src/update/updateService.test.ts` (verify existence first — create if missing): cases for `mode: 'auto'` silent-success, `mode: 'auto'` checksum-failure (no state change), `mode: 'prompt'` unchanged notification path, `action: 'full'` unaffected by `mode`.
   Done when: `cd extensions/ritemark && npx tsx src/update/updateService.test.ts` passes all four cases, and this test is added to `package.json`'s `scripts.test` chain.
+  **DONE 2026-07-12.** All 4 cases pass; also added to `scripts.test:update`. Vscode-stub pattern matches `BrowserToolsInjector.test.ts`'s precedent exactly — had to switch from static `import` to runtime `require()` for the vscode-dependent modules, since tsx's ESM-aware resolver bypasses a `Module._resolveFilename` stub for statically-imported modules but not for runtime `require()` calls.
 
 ### W3.3 — Status-bar item
-- [ ] Create `extensions/ritemark/src/update/updateStatusBar.ts`: exports a function/class managing a single `vscode.StatusBarItem` (hidden by default), `show(version: string)` sets text `"$(sync) Ritemark ${version} ready"` + tooltip + `command: 'ritemark.updates.relaunch'`, `hide()` reverses it.
+- [x] Create `extensions/ritemark/src/update/updateStatusBar.ts`: exports a function/class managing a single `vscode.StatusBarItem` (hidden by default), `show(version: string)` sets text `"$(sync) Ritemark ${version} ready"` + tooltip + `command: 'ritemark.updates.relaunch'`, `hide()` reverses it.
   Done when: file compiles (`npm run compile` in `extensions/ritemark`) with no new TS errors.
-- [ ] Register command `ritemark.updates.relaunch` in `extensions/ritemark/src/extension.ts`: handler calls `vscode.commands.executeCommand('workbench.action.reloadWindow')`.
+- [x] Register command `ritemark.updates.relaunch` in `extensions/ritemark/src/extension.ts`: handler calls `vscode.commands.executeCommand('workbench.action.reloadWindow')`.
   Done when: `grep -n "ritemark.updates.relaunch" extensions/ritemark/src/extension.ts` shows the registration, and `package.json`'s `contributes.commands` lists it (check an existing internal-only command, if any, for the palette-visibility pattern first).
-- [ ] Wire `updateStatusBar.show()`/`hide()` into `extension.ts`'s activation + disposal (`context.subscriptions.push(...)`).
+  **Decision: NOT added to `contributes.commands`.** Checked the existing internal-only command precedent (`ritemark.pinAgent` — zero `contributes.commands` entry, and no `menus.commandPalette`/`when:false` pattern exists anywhere in this codebase). The status-bar item's own `.command` binding works regardless of a `contributes.commands` declaration; omitting it matches the established convention for commands that aren't meant to be user-discoverable via the palette.
+- [x] Wire `updateStatusBar.show()`/`hide()` into `extension.ts`'s activation + disposal (`context.subscriptions.push(...)`).
   Done when: status-bar item disposes cleanly on extension deactivation (verify via existing disposal pattern used elsewhere in the codebase, or standard VS Code pattern if this is the first status-bar item).
+  `UpdateStatusBar` implements `dispose()`; pushed directly to `context.subscriptions` (same pattern as every other disposable in `extension.ts`).
 
 ### W3.4 — Apply-on-next-start verification (confirm hypothesis, minimal new code expected)
 - [ ] Read the actual VS Code core mechanism (under the `vscode/` submodule) by which the extension host resolves which `~/.ritemark/extensions/ritemark-*` directory is active on startup, confirming or correcting the `dataFolderName`-driven hypothesis in `technical-plan.md`.

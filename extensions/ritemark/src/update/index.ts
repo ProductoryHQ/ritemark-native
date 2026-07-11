@@ -90,3 +90,6 @@ export {
   installExtensionUpdateWithProgress,
   promptReloadWindow
 } from './updateNotification';
+
+// Status bar (Sprint 93 R7 — "Relaunch to update" affordance)
+export { UpdateStatusBar, RELAUNCH_COMMAND_ID } from './updateStatusBar';
