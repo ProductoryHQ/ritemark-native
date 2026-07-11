@@ -419,71 +419,26 @@ jobs:
           fi
 
       - name: Sign Windows binaries (Azure Trusted Signing)
-        # Signs Ritemark.exe + bundled agent .exe files with Authenticode.
-        # Runs BEFORE validation so signtool verify can be added to the validator.
-        # Requires GitHub Secrets: AZURE_SIGNING_CLIENT_ID, _TENANT_ID, _CLIENT_SECRET, _SUBSCRIPTION_ID
-        # Skipped if secrets are not configured (unsigned dev/test builds).
+        # Signs all .exe files in the build output with Authenticode via the
+        # official azure/trusted-signing-action. This includes Ritemark.exe,
+        # bundled agent binaries, and Electron helpers — signing everything is
+        # correct for Smart App Control compliance.
+        # Skipped when AZURE_SIGNING_ENABLED repo variable is not 'true'.
         if: ${{ vars.AZURE_SIGNING_ENABLED == 'true' }}
-        shell: bash
-        working-directory: r
-        env:
-          AZURE_SIGNING_ENDPOINT: https://neu.codesigning.azure.net
-          AZURE_SIGNING_ACCOUNT: ritemark-signing
-          AZURE_SIGNING_PROFILE: ritemark-public-trust
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
-        run: |
-          # Install Azure Trusted Signing client (dlib)
-          dotnet tool install -g Microsoft.Trusted.Signing.Client 2>/dev/null || true
-
-          # Find the dlib
-          DLIB=$(find "$USERPROFILE/.dotnet/tools/.store" -name "Azure.CodeSigning.Dlib.dll" -path "*/x64/*" 2>/dev/null | head -1)
-          if [ -z "$DLIB" ]; then
-            echo "ERROR: Azure.CodeSigning.Dlib.dll not found after install"
-            exit 1
-          fi
-
-          # Create metadata JSON
-          cat > /tmp/signing-metadata.json <<METAEOF
-          {
-            "Endpoint": "$AZURE_SIGNING_ENDPOINT",
-            "CodeSigningAccountName": "$AZURE_SIGNING_ACCOUNT",
-            "CertificateProfileName": "$AZURE_SIGNING_PROFILE"
-          }
-          METAEOF
-
-          # Find signtool
-          SIGNTOOL=$(find "/c/Program Files (x86)/Windows Kits/10/bin" -path "*/x64/signtool.exe" 2>/dev/null | sort -V | tail -1)
-
-          # Collect targets
-          TARGETS=("VSCode-win32-x64/Ritemark.exe")
-          for exe in VSCode-win32-x64/resources/app/extensions/ritemark/binaries/agents/win32-x64/*.exe; do
-            [ -f "$exe" ] && TARGETS+=("$exe")
-          done
-
-          echo "Signing ${#TARGETS[@]} files..."
-          "$SIGNTOOL" sign /v /fd SHA256 \
-            /tr "http://timestamp.acs.microsoft.com" /td SHA256 \
-            /dlib "$DLIB" /dmdf /tmp/signing-metadata.json \
-            "${TARGETS[@]}"
-
-          # Verify each
-          FAILED=0
-          for target in "${TARGETS[@]}"; do
-            if "$SIGNTOOL" verify /pa "$target" > /dev/null 2>&1; then
-              echo "✓ $(basename "$target")"
-            else
-              echo "✗ $(basename "$target") — FAILED"
-              FAILED=$((FAILED + 1))
-            fi
-          done
-
-          if [ $FAILED -gt 0 ]; then
-            echo "ERROR: $FAILED file(s) failed signature verification"
-            exit 1
-          fi
-          echo "All ${#TARGETS[@]} files signed and verified"
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
+          endpoint: https://neu.codesigning.azure.net
+          trusted-signing-account-name: ritemark-signing
+          certificate-profile-name: ritemark-public-trust
+          files-folder: r/VSCode-win32-x64
+          files-folder-filter: exe
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Validate build
         shell: bash
