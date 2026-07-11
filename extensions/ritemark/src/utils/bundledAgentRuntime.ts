@@ -11,7 +11,7 @@ export interface BundledAgentRuntime {
   arch: NodeJS.Architecture;
 }
 
-function extensionRootFrom(startDir: string): string {
+export function extensionRootFrom(startDir: string): string {
   // Sprint 92 R3: after esbuild bundling, this code is inlined into `out/extension.js`,
   // so `__dirname` at runtime is the `out/` directory — ONE level below the extension
   // root (pre-bundle it was `out/utils/`, two levels below, hence the old '..','..').

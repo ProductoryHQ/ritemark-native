@@ -18,6 +18,11 @@ Every task lists concrete file paths, exact commands where applicable, and a bin
 
 **Found in passing (out of scope):** duplicate `case 'refresh':` in `ritemarkEditor.ts:791` (dead-duplicates line 720, pre-existing since Jan 2026) — flagged, not fixed here.
 
+**qa-validator gate findings — all addressed 2026-07-12:**
+- `notes/require-audit.md`'s design-decision #2 wrongly listed `pdfkit` among the *inlined* deps, contradicting the actual `esbuild.config.mjs` (which correctly externals it for its runtime `.afm` font-file loading). Fixed — audit doc now matches code.
+- Added a regression test for the T2-1 default (no-override) path: exported `extensionRootFrom` and added a case in `bundledAgentRuntime.test.ts` asserting it resolves one level up from a simulated `out/` dir. Closes the gap the qa-validator flagged against T2-1's own "Done when" bar.
+- Deduped the `esbuild` devDependency (`^0.24.2` → `^0.28.1`, matching `tsx`'s already-resolved transitive version) — was shipping two copies of esbuild's native binary (~19 MB) in `node_modules`. Verified: `npm ls esbuild` shows a single deduped `0.28.1`, `npm run compile` + `tsc --noEmit` + the test suite all still pass.
+
 ---
 
 ## Phase 0 — Audit spike (mandatory first, before any esbuild config is written)

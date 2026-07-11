@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
+  extensionRootFrom,
   findBundledAgentRuntime,
   inferCodexRuntimeLaunchMode,
   isBundledAgentRuntimePath,
@@ -49,6 +50,15 @@ try {
 
   assert.strictEqual(missingCodexCli, null);
   assert.strictEqual(existsSync(join(tempRoot, 'missing')), false);
+
+  // Sprint 92 R3: the no-override default resolves the extension root as ONE level
+  // above the bundle's own directory (`out/`) — this is the exact math the
+  // `bundledAgentRuntime.ts`/`BrowserToolsInjector.ts` __dirname landmines depend on
+  // post-bundling. Regression-guard it directly so a future offset change (e.g. the
+  // esbuild outdir moving deeper) fails loudly here instead of only in manual QA.
+  const simulatedOutDir = join(tempRoot, 'out');
+  mkdirSync(simulatedOutDir, { recursive: true });
+  assert.strictEqual(extensionRootFrom(simulatedOutDir), tempRoot);
 
   console.log('bundledAgentRuntime.test.ts passed');
 } finally {
