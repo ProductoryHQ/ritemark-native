@@ -1,15 +1,17 @@
 #!/bin/bash
 #
-# Create Extension-Only Release
+# release-extension.sh - One-command extension-only release
 #
-# Generates update-manifest.json and prepares files for an extension-only
+# Runs release-extension-preflight.sh first (clean tree, release-tier guard,
+# engines.vscode check, compile-clean, webview-bundle-freshness), then
+# generates update-manifest.json and prepares files for an extension-only
 # GitHub release. Does NOT modify the app bundle.
 #
 # Usage:
-#   ./scripts/create-extension-release.sh <version>
+#   ./scripts/release-extension.sh <version> [--skip-preflight]
 #
 # Example:
-#   ./scripts/create-extension-release.sh 1.0.1-ext.1
+#   ./scripts/release-extension.sh 1.8.2-ext.1
 #
 # Prerequisites:
 #   - Extension must be compiled (npm run compile in extensions/ritemark)
@@ -17,6 +19,23 @@
 #
 
 set -e
+
+SCRIPT_DIR_EARLY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKIP_PREFLIGHT=false
+for arg in "$@"; do
+  if [ "$arg" == "--skip-preflight" ]; then
+    SKIP_PREFLIGHT=true
+  fi
+done
+
+if [ "$SKIP_PREFLIGHT" = false ]; then
+  echo "Running preflight checks..."
+  if ! "$SCRIPT_DIR_EARLY/release-extension-preflight.sh"; then
+    echo "Preflight failed — aborting release. Fix the errors above, or pass --skip-preflight to bypass (not recommended)."
+    exit 1
+  fi
+  echo ""
+fi
 
 # Colors
 RED='\033[0;31m'
@@ -113,32 +132,25 @@ cat > "$MANIFEST" << EOF
   "files": [
 EOF
 
-# Files to include in extension release
-FILES="
-out/extension.js
-out/ritemarkEditor.js
-out/excelEditor.js
-out/aiProvider.js
-out/commands/index.js
-out/export/htmlExporter.js
-out/export/pdfExporter.js
-out/export/docxExporter.js
-out/update/index.js
-out/update/updateService.js
-out/update/updateStorage.js
-out/update/updateScheduler.js
-out/update/updateNotification.js
-out/update/versionService.js
-out/update/versionComparison.js
-out/update/githubClient.js
-out/update/updateFeed.js
-out/update/updateResolver.js
-out/update/updateManifest.js
-out/update/userExtensionInstaller.js
+# Files to include in extension release.
+#
+# Sprint 93: the file list used to be hardcoded here and went stale (three
+# listed paths no longer existed, ~100 real files were omitted) — a landmine
+# nobody caught because this script wasn't wired into any CI/release step.
+# Enumerate `out/**/*.js` dynamically instead so this can never drift from
+# reality again, whether the extension host is the sprint-92 esbuild bundle
+# (out/extension.js + out/browser/browserMcpAdapter.js) or, if that sprint
+# were ever rolled back, the older ~130-file per-module tree — either way the
+# enumeration is correct, only the resulting file COUNT differs.
+#
+# .js.map sourcemaps under out/ are intentionally NOT shipped (internal-dev
+# artifacts, not needed by end users); media/webview.js.map is the one
+# pre-existing exception, kept as-is to match today's shipped behavior.
+FILES=$(find "$EXTENSION_DIR/out" -type f -name '*.js' -not -name '*.map' | sed "s|^$EXTENSION_DIR/||" | sort)
+FILES="$FILES
 media/webview.js
 media/webview.js.map
-package.json
-"
+package.json"
 
 echo "Processing files..."
 

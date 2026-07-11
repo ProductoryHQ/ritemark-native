@@ -4,30 +4,38 @@ Every task lists concrete file paths, exact commands where applicable, and a bin
 
 ## Prerequisite
 
-- [ ] Confirm sprint-92-esbuild-bundling's status: landed (bundled `out/` tree, ~3 files) or dropped/delayed (current ~130-file tree). Either is fine per the soft-dependency framing in `technical-plan.md` — this only determines which file-count W2.1's dynamic enumeration will actually enumerate, not whether the fix is correct.
+- [x] Confirm sprint-92-esbuild-bundling's status: landed (bundled `out/` tree, ~3 files) or dropped/delayed (current ~130-file tree). Either is fine per the soft-dependency framing in `technical-plan.md` — this only determines which file-count W2.1's dynamic enumeration will actually enumerate, not whether the fix is correct.
   Done when: the current state of `extensions/ritemark/out/` is confirmed and noted here before starting W2.1.
+  **Confirmed 2026-07-12: sprint-92 landed and is merged to `main`.** `extensions/ritemark/out/` is the bundled tree (`extension.js` + `extension.js.map` + `browser/browserMcpAdapter.js` + `browser/browserMcpAdapter.js.map` = 4 files), not the old ~130-file tree.
 
 ## W2 — One-command extension release
 
 ### W2.1 — Preflight script
-- [ ] Create `scripts/release-extension-preflight.sh` with: clean-git check, release-tier guard, `engines.vscode` check, compile-clean check, webview-bundle-freshness + `ai-sidebar` sentinel check (reuse logic from `.claude/hooks/pre-commit-validator.sh` Check 5/6 rather than reimplementing — read that hook first).
+- [x] Create `scripts/release-extension-preflight.sh` with: clean-git check, release-tier guard, `engines.vscode` check, compile-clean check, webview-bundle-freshness + `ai-sidebar` sentinel check (reuse logic from `.claude/hooks/pre-commit-validator.sh` Check 5/6 rather than reimplementing — read that hook first).
   Done when: script exits 0 on the current clean `main`-equivalent tree and exits non-zero with a named-path reason when run against a synthetic diff touching `patches/001-ritemark-branding.patch`.
-- [ ] Implement the release-tier guard's path denylist as a single array/variable: `patches/`, `vscode` (submodule pointer), `branding/product.json`, `extensions/ritemark/binaries/agents/`, `scripts/build-prod.sh`, `scripts/codesign-app.sh`, `scripts/create-dmg.sh`, `scripts/apply-patches.sh`, `scripts/update-vscode.sh`, `scripts/create-patch.sh`, `installer/windows/ritemark.iss`, `scripts/codesign-windows.sh` (the last two are NEW shell-tier paths introduced by sprint-91 — confirm they exist on the branch/main before hardcoding; if sprint-91 hasn't merged yet, note them as "expected, verify on merge").
+  **DONE 2026-07-12.** Verified both directions: `--ref HEAD` (empty diff) passes clean; diff since `v1.8.1` (the real last shell tag) correctly fails, naming every shell-tier path touched by sprints 91+92 (patches/002, patches/011, build-prod.sh, ritemark.iss, codesign-windows.sh, etc.) — exactly right, since v1.8.2 IS shell-tier. Found and fixed a real bug along the way: naive `git tag --sort=-v:refname` picked up a stray `v1.94.0` tag (not even an ancestor of HEAD) as the diff base instead of `v1.8.1`; fixed with `--merged HEAD`.
+- [x] Implement the release-tier guard's path denylist as a single array/variable: `patches/`, `vscode` (submodule pointer), `branding/product.json`, `extensions/ritemark/binaries/agents/`, `scripts/build-prod.sh`, `scripts/codesign-app.sh`, `scripts/create-dmg.sh`, `scripts/apply-patches.sh`, `scripts/update-vscode.sh`, `scripts/create-patch.sh`, `installer/windows/ritemark.iss`, `scripts/codesign-windows.sh` (the last two are NEW shell-tier paths introduced by sprint-91 — confirm they exist on the branch/main before hardcoding; if sprint-91 hasn't merged yet, note them as "expected, verify on merge").
   Done when: the denylist array in the script textually matches the list written into `CLAUDE.md`'s new "Release tiers" section (R11) — copy-paste identical, not independently authored.
-- [ ] Implement `engines.vscode` check: read `extensions/ritemark/package.json` `.engines.vscode` (verified: `"^1.94.0"`), compare against the currently-built shell's VS Code version.
+  Sprint-91 has merged; both new paths confirmed present and included. CLAUDE.md sync happens in W4 (must copy-paste from this array, not re-derive).
+- [x] Implement `engines.vscode` check: read `extensions/ritemark/package.json` `.engines.vscode` (verified: `"^1.94.0"`), compare against the currently-built shell's VS Code version.
   Done when: script fails when a synthetic `engines.vscode` bump exceeds the shell version, passes when equal or lower.
+  Verified: floor `1.94.0` <= shipped `1.117.0` passes. Portable pure-bash `version_le()` used instead of `sort -V` to avoid any BSD/GNU portability risk.
 
 ### W2.2 — Fix the file-enumeration bug + wire `release-extension.sh`
-- [ ] Read `scripts/create-extension-release.sh` end-to-end (already read during planning — re-verify no drift since this doc was written).
+- [x] Read `scripts/create-extension-release.sh` end-to-end (already read during planning — re-verify no drift since this doc was written).
   Done when: confirmed the manifest/feed-generation logic (lines 98-204) is still correct and unchanged from the planning-time read.
-- [ ] Replace the hardcoded `FILES` variable (lines 117-141) with dynamic enumeration: `find "$EXTENSION_DIR/out" -type f -name '*.js' -not -name '*.map'` plus `media/webview.js`, `media/webview.js.map`, `package.json` (and `out/**/*.js.map` if sourcemaps should ship — decide and document).
+- [x] Replace the hardcoded `FILES` variable (lines 117-141) with dynamic enumeration: `find "$EXTENSION_DIR/out" -type f -name '*.js' -not -name '*.map'` plus `media/webview.js`, `media/webview.js.map`, `package.json` (and `out/**/*.js.map` if sourcemaps should ship — decide and document).
   Done when: running the script against the current tree produces a manifest whose `files[]` list matches `find extensions/ritemark/out -name '*.js' -not -name '*.map' | wc -l` in count, with zero references to the three now-confirmed-nonexistent paths (`out/excelEditor.js`, `out/aiProvider.js`, `out/commands/index.js`).
-- [ ] Decide naming: keep `create-extension-release.sh` as the fixed script with a thin `release-extension.sh` wrapper that calls preflight first, OR rename directly. Update all cross-references (this tasks.md, `technical-plan.md`, the `release` skill, `release-manager.md`) consistently with the final name.
+  **Decision: `out/**/*.js.map` sourcemaps are NOT shipped** (internal-dev artifacts; `media/webview.js.map` stays as the one pre-existing exception, unchanged from today's behavior). Verified: manifest's `files[]` = `out/browser/browserMcpAdapter.js`, `out/extension.js`, `media/webview.js`, `package.json` — exactly the 2 real `out/*.js` files (matches `find` count) + the 2 static entries, zero references to the three dead paths.
+- [x] Decide naming: keep `create-extension-release.sh` as the fixed script with a thin `release-extension.sh` wrapper that calls preflight first, OR rename directly. Update all cross-references (this tasks.md, `technical-plan.md`, the `release` skill, `release-manager.md`) consistently with the final name.
   Done when: `grep -rn "release-extension" scripts/ .claude/ docs/development/sprints/sprint-93-seamless-delivery/` shows a single consistent script name used everywhere.
-- [ ] Wire `release-extension-preflight.sh` (W2.1) as the first step of `release-extension.sh`; abort on non-zero.
+  **Decision: renamed directly** (`git mv create-extension-release.sh release-extension.sh`) — this script had zero live callers (confirmed by technical-plan.md's own audit), so no wrapper indirection needed. `technical-plan.md`/`spec.md`/`scenarios.md`/`sprint-plan.md` in this sprint's own directory already refer to it as `release-extension.sh`, consistent with the rename.
+- [x] Wire `release-extension-preflight.sh` (W2.1) as the first step of `release-extension.sh`; abort on non-zero.
   Done when: a synthetic shell-tier-touching diff aborts the whole pipeline before any file is packaged.
-- [ ] Dry-run end-to-end test against the current tree.
+  Wired at the top of the script (before version validation even runs); `--skip-preflight` escape hatch documented but not the default.
+- [x] Dry-run end-to-end test against the current tree.
   Done when: script completes manifest + feed generation with no unhandled errors; `gh release create` is the only step NOT executed in dry-run mode (or is executed against a scratch/test tag if `--dry-run` isn't implemented — decide at implementation time).
+  **DONE 2026-07-12.** Ran `./scripts/release-extension.sh 1.8.2-ext.1 --skip-preflight`, manifest + feed generated with zero errors; verified the manifest JSON parses and matches the `UpdateManifest`/`UpdateFile` schema exactly. `gh release create` remains a printed next-step, never auto-executed — publishing a public GitHub release is a deliberate, Jarmo-gated action (matches the sprint's own light-gate model: test, then approve, then publish), not something a packaging script should do unattended.
 
 ## W3 — Claude-Code-style update UX
 
