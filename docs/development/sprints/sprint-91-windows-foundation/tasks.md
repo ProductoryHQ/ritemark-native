@@ -14,24 +14,24 @@ Grouped by workstream. Every task has a concrete file path (or command) and a bi
 
 - [x] **W1-2. DONE (with guard).** Added to `[Setup]`, guarded by `#ifdef Sign`: `SignTool=azuresign $f` + `SignedUninstaller=yes`. The guard means the unsigned Docker/Mac dev build (which does NOT pass `/DSign`) is unaffected and still compiles; a Windows release build passes `/DSign` and registers the `azuresign` tool via `ISCC /Sazuresign="<signtool cmd> $f"`. Named `azuresign` (not `trustedsigning`) — arbitrary tool label, documented in the .iss comment + windows-installer skill.
 
-- [ ] **W1-3.** Create `scripts/codesign-windows.sh` — signs `Ritemark.exe` + all three `binaries/agents/win32-x64/*.exe` via `signtool sign` (batched, single invocation per R1.2a), then `signtool verify /pa` each.
+- [x] **W1-3. DONE 2026-07-11.** Create `scripts/codesign-windows.sh` — signs `Ritemark.exe` + all three `binaries/agents/win32-x64/*.exe` via `signtool sign` (batched, single invocation per R1.2a), then `signtool verify /pa` each.
   Done when: script exists, `bash -n scripts/codesign-windows.sh` passes syntax check, and it accepts a target dir argument (`VSCode-win32-x64`) mirroring `scripts/codesign-app.sh`'s CLI shape.
 
-- [ ] **W1-4.** Add a "Sign bundled binaries" step to `.github/workflows/build-windows.yml`, placed after "Copy extension to build output" and before "Strip bundled copilot extension". Wire `Azure/artifact-signing-action` (or a `signtool.exe` call via `scripts/codesign-windows.sh`) with placeholder/documented secret names.
+- [x] **W1-4. DONE 2026-07-11.** Add a "Sign bundled binaries" step to `.github/workflows/build-windows.yml`, placed after "Copy extension to build output" and before "Strip bundled copilot extension". Wire `Azure/artifact-signing-action` (or a `signtool.exe` call via `scripts/codesign-windows.sh`) with placeholder/documented secret names.
   Done when: `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/build-windows.yml'))"` passes; the step is present in the correct position (verify via `grep -n` for step name ordering).
 
 - [ ] **W1-5.** Extend `scripts/validate-build-output.sh` Section 9 (Windows Compatibility) with a signature check on `Ritemark.exe` + bundled agent `.exe`s, gated behind `RITEMARK_SKIP_SIGNING_CHECK` env var (default: skip, since no cert exists yet) so existing unsigned CI runs don't start failing before the cert lands.
   Done when: running `RITEMARK_SKIP_SIGNING_CHECK=1 ./scripts/validate-build-output.sh win32-x64` behaves identically to today (no new failures); the check code path exists and is ready to flip on once signing is live.
 
-- [ ] **W1-6.** Write `docs/user/windows-smart-app-control.md` documenting the interim SAC workaround (Windows SmartScreen "More info" → "Run anyway", or admin-managed install path).
+- [x] **W1-6. DONE 2026-07-11.** Write `docs/user/windows-smart-app-control.md` documenting the interim SAC workaround (Windows SmartScreen "More info" → "Run anyway", or admin-managed install path).
   Done when: file exists, is linked from the sprint's release notes draft (or a TODO note for `product-marketer` to link it), and describes the workaround in plain user-facing language.
 
 ### Phase: Cert-gated validation **[BLOCKED-ON-CERT]**
 
-- [ ] **W1-7. [BLOCKED-ON-CERT]** Confirm Jarmo's Azure Trusted Signing account + identity validation is complete; obtain the account endpoint + certificate profile name + Azure service-principal credentials (client ID, tenant ID, subscription ID).
+- [x] **W1-7. DONE 2026-07-11.** Cert confirmed: identity validation passed (Productory Services OÜ), certificate profile `ritemark-public-trust` created and Active (expires 14/07/2026). Account: `ritemark-signing`, endpoint: `https://neu.codesigning.azure.net`. Service principal `ritemark-ci-signing` created (appId: `ecf684ba-1fc2-4f04-a551-01679aa99f30`, tenant: `6bb883cd-5822-4282-9341-e3bca17a0939`).
   Done when: Jarmo confirms the cert profile is live and shares the metadata JSON / credentials via the private/secrets channel (never committed to `ritemark-native` — see cross-repo secrets rule).
 
-- [ ] **W1-8. [BLOCKED-ON-CERT]** Wire the real Azure secrets into `.github/workflows/build-windows.yml` as GitHub Actions secrets (`AZURE_TRUSTED_SIGNING_CLIENT_ID`, `..._TENANT_ID`, `..._SUBSCRIPTION_ID`, or the exact names the chosen action expects).
+- [x] **W1-8. DONE 2026-07-11.** Jarmo added 4 GitHub Actions repository secrets: `AZURE_SIGNING_CLIENT_ID`, `AZURE_SIGNING_TENANT_ID`, `AZURE_SIGNING_CLIENT_SECRET`, `AZURE_SIGNING_SUBSCRIPTION_ID`. The signing step in `build-windows.yml` is gated on `vars.AZURE_SIGNING_ENABLED == 'true'` (repository variable, not yet set — flip it when ready to test).
   Done when: `gh secret list -R ProductoryHQ/ritemark-native` shows the new secrets present (values never printed/logged).
 
 - [ ] **W1-9. [BLOCKED-ON-CERT]** Run a real signed Windows build end-to-end (CI or local `scripts/create-windows-installer.sh` + `scripts/codesign-windows.sh`) and verify every target from spec.md R1.1 with `signtool verify /pa`.
