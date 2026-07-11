@@ -129,9 +129,47 @@ Then implement (all on the **Windows** side — the signed installer can't be bu
 
 ## 7. Definition of "Windows session productive"
 
-- [ ] Task A: #131 root cause pinned on Windows → W3 fix written + verified inline (Windows) + no macOS duplication.
-- [ ] Task B: #134 real OS error code captured → W2 core patch written (verify against a real placeholder if reproducible; else mark intentionally-untested per `feedback_intentionally_untested`).
+- [x] Task A: #131 root cause pinned on Windows → W3 fix written + verified inline (Windows) + no macOS duplication.
+- [x] Task B: #134 real OS error code captured → W2 core patch written (verify against a real placeholder if reproducible; else mark intentionally-untested per `feedback_intentionally_untested`).
 - [ ] (Optional now) dispatch `windows-canary.yml` once to confirm it's green.
-- [ ] (When cert lands) W1 signing wired + signed installer built + clean-Win11-SAC test.
+- [x] (When cert lands) W1 signing wired + signed installer built + clean-Win11-SAC test.
 
 Commit your work on the branch with clear messages (end each with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`); push to `origin/sprint-91-windows-foundation` so the macOS side stays in sync. Report findings back to Jarmo — he coordinates both machines.
+
+---
+
+## 8. MAC HANDOVER — from Windows session, 2026-07-11
+
+**For:** a fresh Claude Code session on macOS, continuing sprint-91.
+**From:** the Windows session, 2026-07-11, latest commit on `origin/sprint-91-windows-foundation`.
+
+### What was done on Windows
+
+| Task | Status | Detail |
+|---|---|---|
+| **W3 (#131)** | ✅ Done | Root cause: `ViewPaneShowActions.Default` hides buttons until hover. Fix: `showActions: ViewPaneShowActions.WhenExpanded` in `explorerViewlet.ts:187`. Patch 002 updated. Verified in dev mode. |
+| **W2 (#134)** | ✅ Done | Live-reproduced OneDrive error (dehydrate + kill OneDrive → `{code:'UNKNOWN', errno:-4094, syscall:'read'}`). New patch `011-ritemark-cloud-file-error.patch` — detects UNKNOWN+read/open on Windows, shows actionable message. No regression on local files. |
+| **W1 (#130)** | ✅ Done (except W1-11, W1-12) | Azure Trusted Signing cert live (Productory Services OÜ). CI signing via `azure/trusted-signing-action@v0.5.0` works. Icon patching moved to CI (before signing). Signed installer tested on clean Windows — **no errors, no SAC block**. |
+| **W4** | ✅ Previously done | Canary dispatch still pending. |
+
+### Remaining for macOS session
+
+1. **W3-5** — Verify File Browser buttons on macOS (no duplication, still one New File + one New Folder).
+2. **W3-6** — Verify right-click context menu still works.
+3. **W1-11** — Submit signed app to Microsoft for SAC reputation review (use the final v1.8.2 release binary).
+4. **W1-12** — Flip `RITEMARK_SKIP_SIGNING_CHECK=0` once signing is proven reliable across multiple CI builds.
+5. **W4-6** — Dispatch `windows-canary.yml` once to confirm green.
+
+### Key facts for macOS session
+
+- **Patch 002** has 2 new hunks for `explorerViewlet.ts` (import + showActions). 30 files total (unchanged count).
+- **Patch 011** is NEW — `diskFileSystemProvider.ts` cloud-file error detection. 1 file.
+- **CI signing** is gated on repo variable `AZURE_SIGNING_ENABLED=true` (already set). Uses `azure/trusted-signing-action@v0.5.0`.
+- **Icon patching** now happens in CI (`rcedit` step before signing) — do NOT patch icon locally after CI build (invalidates signature).
+- **Installer signing** was done locally via PowerShell `Invoke-TrustedSigning` (TrustedSigning module + NuGet dlib). CI does not build the installer yet — that's a future improvement.
+- **`.signing-env`** exists locally (gitignored) for local signing credentials.
+- **`azure-signing-commands.md`** is a temp file, not committed — can be deleted.
+
+
+
+
