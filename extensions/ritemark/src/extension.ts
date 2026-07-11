@@ -22,7 +22,16 @@ import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLM
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
 import { registerFlowTestCommand } from './flows/FlowTestRunner';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
-import { UpdateService, UpdateStorage, scheduleStartupCheck, UpdateStatusBar, RELAUNCH_COMMAND_ID } from './update';
+import {
+  UpdateService,
+  UpdateStorage,
+  scheduleStartupCheck,
+  UpdateStatusBar,
+  RELAUNCH_COMMAND_ID,
+  ActivationIntegrityTracker,
+  quarantineVersion,
+  confirmActivationAndCleanup
+} from './update';
 import { initAnalytics, shutdownAnalytics } from './analytics/posthog';
 import { registerReactionCommand } from './analytics/reactions';
 import { BrowserTerminalLinkProvider } from './browser/BrowserTerminalLinkProvider';
@@ -200,6 +209,28 @@ function copyRecursive(src: string, dest: string): void {
 export function activate(context: vscode.ExtensionContext) {
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;
+
+  // Sprint 93 R9: rollback safety. If THIS exact version already started
+  // activating on a prior launch but never confirmed success (a runtime
+  // crash mid-activation), quarantine it now so the next restart falls
+  // through to the kept N-1 version via VS Code's own extension-directory
+  // dedup (confirmed in tasks.md W3.4). See activationIntegrity.ts for the
+  // documented limitation on load-time (syntax error) failures.
+  const activationIntegrity = new ActivationIntegrityTracker(context.globalState);
+  if (activationIntegrity.didPreviousAttemptFail(currentVersion)) {
+    console.warn(`Ritemark: ${currentVersion} failed to activate on the previous attempt — quarantining and requesting reload.`);
+    void quarantineVersion(currentVersion).then(() => {
+      void vscode.window.showWarningMessage(
+        `Ritemark ${currentVersion} failed to start correctly last time. Reverting to the previous version.`,
+        'Reload Window'
+      ).then(selection => {
+        if (selection === 'Reload Window') {
+          void vscode.commands.executeCommand('workbench.action.reloadWindow');
+        }
+      });
+    });
+  }
+  void activationIntegrity.setLastAttemptedVersion(currentVersion);
   const designFoundationsThemeMigration = 'sprint-52-design-foundations-v1';
   const lastThemeVersion = context.globalState.get<string>('ritemark.themeAppliedVersion');
   const lastDesignThemeMigration = context.globalState.get<string>('ritemark.designFoundationsThemeMigration');
@@ -717,6 +748,10 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Sprint 93 R9: activate() reached its end with no synchronous throw —
+  // confirm this version and trim old installs down to N-1 (current +
+  // previously-confirmed), never just "the newest one."
+  void confirmActivationAndCleanup(activationIntegrity, currentVersion);
 }
 
 export async function deactivate() {

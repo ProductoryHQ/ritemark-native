@@ -39,9 +39,13 @@ export class UserExtensionInstaller {
   private stagingDir: string;
   private extensionsDir: string;
 
-  constructor() {
-    // ~/.ritemark/ (matches VS Code's dataFolderName in product.json)
-    this.userDataPath = path.join(os.homedir(), '.ritemark');
+  /**
+   * @param userDataPathOverride Test-only escape hatch. Production code must
+   * never pass this — always resolves to ~/.ritemark/ (matches VS Code's
+   * dataFolderName in product.json).
+   */
+  constructor(userDataPathOverride?: string) {
+    this.userDataPath = userDataPathOverride ?? path.join(os.homedir(), '.ritemark');
     this.stagingDir = path.join(this.userDataPath, 'staging');
     this.extensionsDir = path.join(this.userDataPath, 'extensions');
   }
@@ -161,21 +165,26 @@ export class UserExtensionInstaller {
   }
 
   /**
-   * Cleanup old extension versions, keeping only the specified version
+   * Cleanup old extension versions, keeping only the specified versions.
+   *
+   * Sprint 93 R9: accepts multiple versions (not just one) so a successful
+   * update can keep N-1 alongside current — a rollback target stays on disk
+   * instead of every prior version being deleted the moment a new one
+   * activates.
    */
-  async cleanupOldVersions(keepVersion: string): Promise<void> {
+  async cleanupOldVersions(keepVersions: string[]): Promise<void> {
     try {
       if (!await this.exists(this.extensionsDir)) {
         return;
       }
 
+      const keepDirNames = new Set(keepVersions.map(v => `ritemark-${v}`));
       const entries = await fs.promises.readdir(this.extensionsDir, { withFileTypes: true });
-      const keepDirName = `ritemark-${keepVersion}`;
 
       for (const entry of entries) {
         if (entry.isDirectory() &&
             entry.name.startsWith('ritemark-') &&
-            entry.name !== keepDirName) {
+            !keepDirNames.has(entry.name)) {
           const dirPath = path.join(this.extensionsDir, entry.name);
           console.log(`Cleaning up old extension version: ${entry.name}`);
           await this.removeDir(dirPath);
@@ -184,6 +193,16 @@ export class UserExtensionInstaller {
     } catch (error) {
       console.error('Failed to cleanup old versions:', error);
     }
+  }
+
+  /**
+   * Remove a single installed version's directory outright (Sprint 93 R9
+   * quarantine path — a version that failed to activate twice in a row).
+   */
+  async removeInstalledVersion(version: string): Promise<void> {
+    const dirPath = path.join(this.extensionsDir, `ritemark-${version}`);
+    console.warn(`Quarantining extension version: ritemark-${version}`);
+    await this.removeDir(dirPath);
   }
 
   /**
