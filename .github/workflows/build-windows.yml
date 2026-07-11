@@ -418,6 +418,20 @@ jobs:
             echo "Chat activity bar CSS hide rule appended"
           fi
 
+      - name: Patch Ritemark.exe icon (branding)
+        # rcedit modifies the PE binary, which invalidates any existing signature.
+        # This MUST run BEFORE the signing step.
+        shell: bash
+        working-directory: r
+        run: |
+          RCEDIT="vscode/node_modules/rcedit/bin/rcedit.exe"
+          if [ -f "$RCEDIT" ] && [ -f "branding/icons/icon.ico" ]; then
+            "$RCEDIT" "VSCode-win32-x64/Ritemark.exe" --set-icon "branding/icons/icon.ico"
+            echo "Ritemark.exe icon patched with branding/icons/icon.ico"
+          else
+            echo "WARNING: rcedit or icon not found, skipping icon patch"
+          fi
+
       - name: Sign Windows binaries (Azure Trusted Signing)
         # Signs all .exe files in the build output with Authenticode via the
         # official azure/trusted-signing-action. This includes Ritemark.exe,
