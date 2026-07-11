@@ -103,7 +103,7 @@ Grouped by workstream. Every task has a concrete file path (or command) and a bi
 
 - [x] **W4-5.** Created `.github/workflows/windows-canary.yml` — `windows-latest`, weekly `schedule` cron (`0 6 * * 1`) + `workflow_dispatch`. **DESIGN DEVIATION (intentional, better than spec):** instead of cloning VS Code + full `npm ci` (~9 min, noisy), the canary runs the precise failure signal — the node-gyp VS2026 patch + `findVisualStudio()` detection check (verbatim from `build-windows.yml`) — plus a forced from-source native compile of `@vscode/spdlog` as an MSVC toolchain smoke test. Same early-warning signal, faster, less flaky, no vscode clone. YAML validated: `runs-on: windows-latest`, triggers `[schedule, workflow_dispatch]`, no `push`.
 
-- [ ] **W4-6. [PENDING PUSH]** Dispatch the canary once (`gh workflow run windows-canary.yml --ref sprint-91-windows-foundation`) to confirm it runs green standalone. Blocked until the branch is pushed to the remote (gh workflow run resolves workflows from the remote).
+- [x] **W4-6. DONE 2026-07-11.** `workflow_dispatch` doesn't register with GitHub Actions until the workflow file lands on the default branch, so this was actually blocked on merge, not just push. Dispatched immediately after PR #137 merged to `main` — run [29168894204](https://github.com/ProductoryHQ/ritemark-native/actions/runs/29168894204), green.
 
 - [x] **W4-7.** Cross-reference comments added in BOTH directions: `windows-canary.yml` ("Mirrors build-windows.yml's node-gyp patch step, kept in sync") and `build-windows.yml`'s node-gyp step ("DRIFT-PREVENTION: windows-canary.yml runs a copy … update it too").
 
