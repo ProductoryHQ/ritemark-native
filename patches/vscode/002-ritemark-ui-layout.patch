@@ -1098,10 +1098,30 @@ index bdc603ff1a4..e0bbe7af85f 100644
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index ecc6af48668..a42a1bd4f31 100644
+index ecc6af48668..189a6071cac 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-@@ -256,7 +256,7 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
+@@ -25,7 +25,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
+ import { IWorkbenchContribution } from '../../../common/contributions.js';
+ import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
+ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
+-import { ViewPane } from '../../../browser/parts/views/viewPane.js';
++import { ViewPane, ViewPaneShowActions } from '../../../browser/parts/views/viewPane.js';
+ import { KeyChord, KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
+ import { Registry } from '../../../../platform/registry/common/platform.js';
+ import { IProgressService, ProgressLocation } from '../../../../platform/progress/common/progress.js';
+@@ -185,7 +185,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
+ 	protected override createView(viewDescriptor: IViewDescriptor, options: IViewletViewOptions): ViewPane {
+ 		if (viewDescriptor.id === VIEW_ID) {
+ 			return this.instantiationService.createInstance(ExplorerView, {
+-				...options, delegate: {
++				...options,
++				showActions: ViewPaneShowActions.WhenExpanded, // Ritemark: always show New File/Folder buttons
++				delegate: {
+ 					willOpenElement: e => {
+ 						if (!isMouseEvent(e)) {
+ 							return; // only delay when user clicks
+@@ -256,7 +258,7 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
   */
  export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewContainer({
  	id: VIEWLET_ID,
@@ -1110,14 +1130,14 @@ index ecc6af48668..a42a1bd4f31 100644
  	ctorDescriptor: new SyncDescriptor(ExplorerViewPaneContainer),
  	storageId: 'workbench.explorer.views.state',
  	icon: explorerViewIcon,
-@@ -265,8 +265,8 @@ export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewC
+@@ -265,8 +267,8 @@ export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewC
  	order: 0,
  	openCommandActionDescriptor: {
  		id: VIEWLET_ID,
 -		title: localize2('explore', "Explorer"),
 -		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Explorer"),
-+		title: localize2('explore', "File Browser"), // RiteMark: renamed from Explorer → Project → File Browser
-+		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&File Browser"), // RiteMark: renamed
++		title: localize2('explore', "Project"), // Ritemark: renamed from Explorer
++		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Project"), // Ritemark: renamed
  		keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyE },
  		order: 0
  	},
