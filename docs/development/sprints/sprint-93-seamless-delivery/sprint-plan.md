@@ -4,9 +4,9 @@ Track: SDD (three workstreams — one-command extension release, Claude-Code-sty
 
 **RE-CUT 2026-07-10.** This directory previously held a combined draft (`sprint-91-seamless-updates`, four workstreams + a droppable esbuild sub-workstream). Per `docs/development/releases/v1.8.2/release-plan.md`'s Housekeeping note, that draft is superseded: CI de-risk already shipped in `sprint-91-windows-foundation`; esbuild bundling is now its own sprint, `sprint-92-esbuild-bundling`. This document and its four SDD siblings (`spec.md`, `scenarios.md`, `technical-plan.md`, `tasks.md`) are rewritten to cover ONLY this sprint's remaining scope (old W2/W3/W4), with requirement IDs R3-R17 preserved unchanged for traceability.
 
-Branch: `sprint-93-seamless-delivery` (NOT YET CREATED — awaiting Jarmo's approval of this plan, per the HARD gate below)
+Branch: `sprint-93-seamless-delivery` (created 2026-07-12, based on `main` — sprint-92 already merged there, so this satisfies the original "base off sprint-92" intent without a separate branch)
 
-Status: Phase 2 (PLAN) — awaiting Jarmo approval
+Status: Phase 5 (PR pending) — implementation complete (W2, W3, W4), qa-validator gate next
 
 Parent release: [`docs/development/releases/v1.8.2/release-plan.md`](../../releases/v1.8.2/release-plan.md) — v1.8.2 "Sturdy & Seamless Delivery (Windows-first)", sprint #3 of 3.
 
@@ -47,6 +47,7 @@ Full requirement-level detail lives in `spec.md` (R3-R17).
 - **2026-07-07 (carried over):** Version-skew support window = latest shell version only (`minAppVersion` = latest shell). Multi-version compatibility matrices are out of scope. (Already structurally enforced by `generate-update-feed.mjs`'s per-`appVersion` de-duplication, per `technical-plan.md` — this decision has more mechanical backing than the original draft knew.)
 - **2026-07-07 (carried over):** Extension releases get a slim per-surface QA checklist; full `TEST-CHECKLIST.md` stays reserved for shell releases. Jarmo may override at plan approval.
 - **2026-07-07 (carried over):** Phase E (native shell auto-update via VS Code's `updateUrl`) is an explicit non-goal — tracked as a future GitHub `enhancement` issue, not implemented here.
+- **2026-07-12 (W3.5 go/no-go, implementation time):** the activation-integrity mechanism (`activationIntegrity.ts`, `context.globalState`-based) touches only `extensions/ritemark/src/` — no `product.json`, no `scripts/` bootstrap file — so W2.1's own shell-tier release guard would never have blocked shipping it as a fast-lane extension release. **GO, no tension, no escalation needed.** Separately: this mechanism only catches RUNTIME activation failures (an exception during `activate()`'s body); it does NOT solve a syntactically-invalid `out/extension.js` (the v1.7.1 precedent, a load-time failure that prevents this module's own code from running at all). A true fix for that narrower case would need a check before the extension host attempts to load the module — i.e. a VS Code core patch, genuinely shell-tier. Decision: **do not build that now** — the load-time case is already substantially mitigated by W2.1's preflight (blocks releasing when `tsc --noEmit` fails) and W2.2's dynamic file enumeration + content-sentinel checks, and VS Code core itself isolates a failed activation without crashing the app (confirmed by reading `extHostExtensionService.ts`'s `ExtensionsActivator`/`onExtensionActivationError`). Filed as a residual gap, not silently expanded into this sprint's scope.
 
 ## Feature Flag Check
 
@@ -58,17 +59,17 @@ Full requirement-level detail lives in `spec.md` (R3-R17).
 
 Mirrors `spec.md`'s Acceptance section at a high level:
 
-- [ ] `scripts/release-extension.sh` ships a compatible extension release end-to-end using the verified per-file manifest model (not zip) (R3)
-- [ ] The stale-file-enumeration bug in the existing release script is fixed — no more nonexistent-path references, no more omitted real files (R3, S2)
-- [ ] Release-tier guard blocks an extension release when shell-tier files changed, INCLUDING the two new sprint-91 paths (R4)
-- [ ] `engines.vscode` compatibility check blocks an incompatible extension release (R5)
-- [ ] Extension updates download, verify, and stage silently in `auto` mode; status-bar "Relaunch to update" works (R6, R7)
-- [ ] Un-clicked staged updates auto-apply on next app start (R8)
-- [ ] Failed activation rolls back to N−1 without leaving a broken extension host (R9)
-- [ ] `mode: "prompt"` preserves today's notification flow; full-app updates unaffected by `mode` (R10)
-- [ ] `CLAUDE.md`, `release` skill, `sprint-manager`, `release-manager`, `qa-validator`, and new `docs/development/RELEASING.md` all reflect the two-tier release model (R11-R16)
-- [ ] No manual `.codex/**`/`AGENTS.md` edits land in this sprint (R17)
-- [ ] TypeScript compiles; pre-commit hook passes; `qa-validator` signs off
+- [x] `scripts/release-extension.sh` ships a compatible extension release end-to-end using the verified per-file manifest model (not zip) (R3)
+- [x] The stale-file-enumeration bug in the existing release script is fixed — no more nonexistent-path references, no more omitted real files (R3, S2)
+- [x] Release-tier guard blocks an extension release when shell-tier files changed, INCLUDING the two new sprint-91 paths (R4)
+- [x] `engines.vscode` compatibility check blocks an incompatible extension release (R5)
+- [x] Extension updates download, verify, and stage silently in `auto` mode; status-bar "Relaunch to update" works (R6, R7)
+- [x] Un-clicked staged updates auto-apply on next app start (R8)
+- [x] Failed activation rolls back to N−1 without leaving a broken extension host (R9) — covers runtime activation failures; a syntax-error load-time failure is a documented residual gap, see W3.5's go/no-go note above.
+- [x] `mode: "prompt"` preserves today's notification flow; full-app updates unaffected by `mode` (R10)
+- [x] `CLAUDE.md`, `release` skill, `sprint-manager`, `release-manager`, `qa-validator`, and new `docs/development/RELEASING.md` all reflect the two-tier release model (R11-R16)
+- [x] No manual `.codex/**`/`AGENTS.md` edits land in this sprint (R17)
+- [x] TypeScript compiles; pre-commit hook passes; `qa-validator` signs off (2026-07-12, PASS — 0 blockers)
 
 ## Pre-Implementation Gate
 
@@ -96,4 +97,4 @@ VS Code's own `updateUrl` (Squirrel.Mac on macOS, `inno_updater.exe` on Windows)
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-07-12, "tee vahecommit ja siis alusta 93'ga")

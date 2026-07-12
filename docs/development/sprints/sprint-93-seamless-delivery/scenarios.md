@@ -58,6 +58,7 @@ BDD examples. Each maps to a requirement in `spec.md`. Re-cut 2026-07-10 — old
 - Given a staged version whose activation deliberately throws (fixture: syntactically valid but intentionally-broken `extension.js`/`out/extension.js` in the staged directory, mirroring the v1.7.1 "Invalid or unexpected token" precedent)
 - When the app starts and attempts to activate the newest version directory
 - Then the extension host falls back to the previous (N−1) version directory, Ritemark activates successfully on N−1, and the failure is reported (not silently swallowed)
+- **Platform note (intentionally verified on macOS only for this launch):** `quarantineVersion()` deletes the currently-loaded version's own on-disk directory while the extension host still has it loaded in memory. This is safe because Node has already read those files into memory and closed the handles by the time `activate()` runs — plausible on both macOS and Windows, but only exercised on macOS for v1.8.2. If a future Windows user reports a locked-file/EPERM error on rollback, that's the case to revisit (matching the project's existing pattern for niche, hard-to-fixture edge cases). Extension-tier ships without Windows CI, so this is verified empirically rather than gated.
 
 **S11 — `cleanupOldVersions` only fires after confirmed activation, keeping exactly N + N−1 (R9)**
 - Given a successful update + restart + confirmed activation of the new version

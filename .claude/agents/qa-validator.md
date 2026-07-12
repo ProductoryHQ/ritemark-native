@@ -257,6 +257,17 @@ ls -la "VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extension
 # Must be ~900KB
 ```
 
+## Extension-Only Release Validation (Sprint 93)
+
+For an **extension-tier** release (per `CLAUDE.md`'s "Release Tiers" section — no shell-tier paths changed), the full `docs/releases/vX.Y.Z/TEST-CHECKLIST.md` process does NOT apply. Use this slim checklist instead, scoped to the surfaces the sprint actually changed:
+
+1. `./scripts/release-extension-preflight.sh` passes (clean tree, release-tier guard, `engines.vscode`, compile-clean, webview-freshness).
+2. `npx tsc --noEmit` in `extensions/ritemark/` is clean.
+3. Manual smoke test of ONLY the changed surfaces (e.g. if the sprint touched the update platform, test the update flow — not an unrelated full app QA pass).
+4. Jarmo tests via the in-app "Relaunch to update" flow or a local dev install pointed at the staged files, then gives the approval phrase.
+
+No notarization, no hardening window, no Windows CI, no repo-visibility toggle — see `release-manager`'s "Extension-only release" workflow table for the full gate detail.
+
 ## Integration with Sprint Workflow
 
 When the user invokes you for a sprint phase transition (sprint-manager surfaces the recommendation; the user routes from the main session):

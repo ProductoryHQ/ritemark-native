@@ -191,10 +191,14 @@ Lightweight sprints create only `sprint-plan.md`. Don't pre-create empty `resear
 
 ## Sprint Plan Templates
 
+Every generated `sprint-plan.md` declares `Release tier: extension` or `Release tier: shell` (Sprint 93 — see `CLAUDE.md`'s "Release Tiers" section for the exact path list). **Extension is the default** — only declare `shell` when the sprint plan already names the specific shell-tier path(s) it touches (`patches/`, `vscode`, `branding/product.json`, etc.). This line feeds `release-manager`'s gate choice at Phase 6 (light gate for extension, full Gate 1/Gate 2 for shell) — get it right at planning time rather than discovering it at release time.
+
 ### Lightweight template
 
 ```markdown
 # Sprint XX: [Title]
+
+Release tier: extension
 
 ## Goal
 [One sentence]
@@ -221,6 +225,7 @@ Lightweight sprints create only `sprint-plan.md`. Don't pre-create empty `resear
 # Sprint XX: [Title]
 
 Track: Plain full track
+Release tier: extension
 
 ## Goal
 [One sentence describing the sprint objective]

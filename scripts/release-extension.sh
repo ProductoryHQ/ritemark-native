@@ -1,15 +1,17 @@
 #!/bin/bash
 #
-# Create Extension-Only Release
+# release-extension.sh - One-command extension-only release
 #
-# Generates update-manifest.json and prepares files for an extension-only
+# Runs release-extension-preflight.sh first (clean tree, release-tier guard,
+# engines.vscode check, compile-clean, webview-bundle-freshness), then
+# generates update-manifest.json and prepares files for an extension-only
 # GitHub release. Does NOT modify the app bundle.
 #
 # Usage:
-#   ./scripts/create-extension-release.sh <version>
+#   ./scripts/release-extension.sh <version> [--skip-preflight]
 #
 # Example:
-#   ./scripts/create-extension-release.sh 1.0.1-ext.1
+#   ./scripts/release-extension.sh 1.8.2-ext.1
 #
 # Prerequisites:
 #   - Extension must be compiled (npm run compile in extensions/ritemark)
@@ -17,6 +19,23 @@
 #
 
 set -e
+
+SCRIPT_DIR_EARLY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKIP_PREFLIGHT=false
+for arg in "$@"; do
+  if [ "$arg" == "--skip-preflight" ]; then
+    SKIP_PREFLIGHT=true
+  fi
+done
+
+if [ "$SKIP_PREFLIGHT" = false ]; then
+  echo "Running preflight checks..."
+  if ! "$SCRIPT_DIR_EARLY/release-extension-preflight.sh"; then
+    echo "Preflight failed — aborting release. Fix the errors above, or pass --skip-preflight to bypass (not recommended)."
+    exit 1
+  fi
+  echo ""
+fi
 
 # Colors
 RED='\033[0;31m'
@@ -47,6 +66,18 @@ VERSION="$1"
 if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-ext\.[0-9]+)?$'; then
     echo -e "${RED}Error: Invalid version format: $VERSION${NC}"
     echo "Expected format: X.Y.Z or X.Y.Z-ext.N"
+    exit 1
+fi
+
+# Sprint 93 pr-reviewer finding: package.json ships as part of the manifest
+# (see FILES below) but nothing verified its version actually matched the CLI
+# argument. Ship a mismatched package.json and getCurrentVersion()
+# (versionService.ts) never matches targetVersion — pendingRestartVersion
+# never reconciles, clients could re-offer the same "update" indefinitely.
+PACKAGE_VERSION=$(node -pe "require('$EXTENSION_DIR/package.json').version")
+if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+    echo -e "${RED}Error: extensions/ritemark/package.json version ($PACKAGE_VERSION) does not match the requested release version ($VERSION)${NC}"
+    echo "Bump package.json's version to $VERSION before running this script."
     exit 1
 fi
 
@@ -113,34 +144,35 @@ cat > "$MANIFEST" << EOF
   "files": [
 EOF
 
-# Files to include in extension release
-FILES="
-out/extension.js
-out/ritemarkEditor.js
-out/excelEditor.js
-out/aiProvider.js
-out/commands/index.js
-out/export/htmlExporter.js
-out/export/pdfExporter.js
-out/export/docxExporter.js
-out/update/index.js
-out/update/updateService.js
-out/update/updateStorage.js
-out/update/updateScheduler.js
-out/update/updateNotification.js
-out/update/versionService.js
-out/update/versionComparison.js
-out/update/githubClient.js
-out/update/updateFeed.js
-out/update/updateResolver.js
-out/update/updateManifest.js
-out/update/userExtensionInstaller.js
+# Files to include in extension release.
+#
+# Sprint 93: the file list used to be hardcoded here and went stale (three
+# listed paths no longer existed, ~100 real files were omitted) — a landmine
+# nobody caught because this script wasn't wired into any CI/release step.
+# Enumerate `out/**/*.js` dynamically instead so this can never drift from
+# reality again, whether the extension host is the sprint-92 esbuild bundle
+# (out/extension.js + out/browser/browserMcpAdapter.js) or, if that sprint
+# were ever rolled back, the older ~130-file per-module tree — either way the
+# enumeration is correct, only the resulting file COUNT differs.
+#
+# .js.map sourcemaps under out/ are intentionally NOT shipped (internal-dev
+# artifacts, not needed by end users); media/webview.js.map is the one
+# pre-existing exception, kept as-is to match today's shipped behavior.
+FILES=$(find "$EXTENSION_DIR/out" -type f -name '*.js' -not -name '*.map' | sed "s|^$EXTENSION_DIR/||" | sort)
+FILES="$FILES
 media/webview.js
 media/webview.js.map
-package.json
-"
+package.json"
 
 echo "Processing files..."
+
+# Guard against the flatten-collision class of bug this rewrite exists to kill:
+# two distinct out/ subpaths (e.g. out/browser/foo.js and out/browser-foo.js)
+# can flatten to the same DOWNLOAD_NAME, silently cp over each other, and leave
+# the manifest listing two entries pointing at one uploaded asset with mismatched
+# checksums. Moot for today's 2-file esbuild bundle, but fail loudly if the tree
+# ever grows back into the per-module shape where collisions are possible.
+SEEN_DOWNLOAD_NAMES=""
 
 FIRST=true
 for file in $FILES; do
@@ -156,6 +188,15 @@ for file in $FILES; do
             # For out/ files, replace / with - to flatten
             DOWNLOAD_NAME=$(echo "$file" | sed 's|^out/||' | tr '/' '-')
         fi
+
+        # Reject a flattened-name collision before it silently corrupts the release
+        if echo "$SEEN_DOWNLOAD_NAMES" | grep -qxF "$DOWNLOAD_NAME"; then
+            echo -e "${RED}✗ Download-name collision: '$DOWNLOAD_NAME' (from '$file') already used by another file.${NC}" >&2
+            echo -e "${RED}  Two source paths flatten to the same upload asset — aborting to avoid a corrupt manifest.${NC}" >&2
+            exit 1
+        fi
+        SEEN_DOWNLOAD_NAMES="$SEEN_DOWNLOAD_NAMES
+$DOWNLOAD_NAME"
 
         # Copy to upload directory
         cp "$src" "$OUTPUT_DIR/upload/$DOWNLOAD_NAME"
