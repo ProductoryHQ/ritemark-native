@@ -69,7 +69,7 @@ Mirrors `spec.md`'s Acceptance section at a high level:
 - [x] `mode: "prompt"` preserves today's notification flow; full-app updates unaffected by `mode` (R10)
 - [x] `CLAUDE.md`, `release` skill, `sprint-manager`, `release-manager`, `qa-validator`, and new `docs/development/RELEASING.md` all reflect the two-tier release model (R11-R16)
 - [x] No manual `.codex/**`/`AGENTS.md` edits land in this sprint (R17)
-- [ ] TypeScript compiles; pre-commit hook passes; `qa-validator` signs off
+- [x] TypeScript compiles; pre-commit hook passes; `qa-validator` signs off (2026-07-12, PASS — 0 blockers)
 
 ## Pre-Implementation Gate
 

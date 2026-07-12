@@ -117,7 +117,8 @@ Every task lists concrete file paths, exact commands where applicable, and a bin
 
 ## Sprint close
 
-- [ ] `qa-validator` sign-off (surface routing recommendation to the user at Phase 4→5).
+- [x] `qa-validator` sign-off (surface routing recommendation to the user at Phase 4→5).
+  Signed off 2026-07-12: PASS, 0 blockers. Verified primary QA gate, tsc, 11/11 patches, `test:update` (16/16), release-tier preflight (positive + negative), denylist parity. Single `npm test` failure (`SaveFileNodeExecutor.integration.test.ts`, "Cannot find module 'vscode'") confirmed pre-existing/environmental — zero diff vs `main`.
 - [ ] Jarmo local test pass covering the `scenarios.md` matrix (S1-S16).
 - [x] Update `docs/development/architecture.md` if any subsystem shape changed beyond what sprint-92 already logged (new status-bar affordance, update-platform behavior change) — cross-check against the doc's Sprint Architecture Gate rule.
   Added a Version History row + bumped `Last updated`, covering the two new `src/update/` modules and the release-tier rule.
