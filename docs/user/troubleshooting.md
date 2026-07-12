@@ -140,13 +140,21 @@ For very large data, use a dedicated spreadsheet app.
 
 ## Updates
 
-### "Update available" won't go away
+Ritemark ships two kinds of updates. Most day-to-day fixes and features arrive as a small **extension update** (auto-installed in the background by default); occasional bigger changes ship as a **full app update** (a DMG you install manually).
+
+### Small updates (most common) — nothing to do
+
+By default, small extension updates download and verify in the background automatically. When one's ready, a **"Ritemark X.Y.Z ready"** notice appears in the status bar (bottom of the window) — click it to relaunch and apply it. No separate download step.
+
+Don't want this automatic? Set `ritemark.updates.mode` to `"prompt"` in Settings to go back to being asked before each install.
+
+### "Update available" won't go away (full app updates only)
 
 1. Download the new version from GitHub
 2. Or dismiss with "Don't show again"
 3. Settings remember your preference
 
-### How to update
+### How to update (full app updates only)
 
 1. Download new DMG from GitHub
 2. Open DMG

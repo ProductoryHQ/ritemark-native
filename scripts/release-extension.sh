@@ -69,6 +69,18 @@ if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-ext\.[0-9]+)?$'; then
     exit 1
 fi
 
+# Sprint 93 pr-reviewer finding: package.json ships as part of the manifest
+# (see FILES below) but nothing verified its version actually matched the CLI
+# argument. Ship a mismatched package.json and getCurrentVersion()
+# (versionService.ts) never matches targetVersion — pendingRestartVersion
+# never reconciles, clients could re-offer the same "update" indefinitely.
+PACKAGE_VERSION=$(node -pe "require('$EXTENSION_DIR/package.json').version")
+if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+    echo -e "${RED}Error: extensions/ritemark/package.json version ($PACKAGE_VERSION) does not match the requested release version ($VERSION)${NC}"
+    echo "Bump package.json's version to $VERSION before running this script."
+    exit 1
+fi
+
 # Extract base version
 BASE_VERSION=$(echo "$VERSION" | sed 's/-ext\.[0-9]*$//')
 if [ "$BASE_VERSION" == "$VERSION" ]; then
