@@ -1,6 +1,6 @@
 # Release Plan — v1.8.2 Sturdy & Seamless Delivery (Windows-first)
 
-**Status:** Release candidate (2026-07-12) — all three sprints (91/92/93) merged to `main`; version bumped to 1.8.2; building macOS arm64 for Gate 1. Windows signing (#130) is gated on the Azure Trusted Signing cert — per the contingency below, it may defer to v1.8.3 (mac-first publish is safe: the per-platform update feed retains the prior win32 entry).
+**Status:** Release candidate (2026-07-12) — all three sprints (91/92/93) merged to `main`; version bumped to 1.8.2; macOS arm64 built + signed + at Gate 1. **Windows signing tested on real Windows machines and works (Jarmo, 2026-07-12) — so v1.8.2 ships as a FULL cross-platform release; the mac-first / defer-to-v1.8.3 contingency is NOT needed.** Windows installer rides Gate 2 alongside macOS x64.
 **Target:** v1.8.2
 **GitHub milestone:** `v1.8.2` — to be created
 **Release type:** Full app release (shell tier — patches + installer + code-signing + build system)
