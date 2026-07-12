@@ -6,7 +6,7 @@ Track: SDD (three workstreams — one-command extension release, Claude-Code-sty
 
 Branch: `sprint-93-seamless-delivery` (created 2026-07-12, based on `main` — sprint-92 already merged there, so this satisfies the original "base off sprint-92" intent without a separate branch)
 
-Status: Phase 3 (IMPLEMENTATION) — approved by Jarmo 2026-07-12, starting with W2 per tasks.md sequencing
+Status: Phase 5 (PR pending) — implementation complete (W2, W3, W4), qa-validator gate next
 
 Parent release: [`docs/development/releases/v1.8.2/release-plan.md`](../../releases/v1.8.2/release-plan.md) — v1.8.2 "Sturdy & Seamless Delivery (Windows-first)", sprint #3 of 3.
 
@@ -59,16 +59,16 @@ Full requirement-level detail lives in `spec.md` (R3-R17).
 
 Mirrors `spec.md`'s Acceptance section at a high level:
 
-- [ ] `scripts/release-extension.sh` ships a compatible extension release end-to-end using the verified per-file manifest model (not zip) (R3)
-- [ ] The stale-file-enumeration bug in the existing release script is fixed — no more nonexistent-path references, no more omitted real files (R3, S2)
-- [ ] Release-tier guard blocks an extension release when shell-tier files changed, INCLUDING the two new sprint-91 paths (R4)
-- [ ] `engines.vscode` compatibility check blocks an incompatible extension release (R5)
-- [ ] Extension updates download, verify, and stage silently in `auto` mode; status-bar "Relaunch to update" works (R6, R7)
-- [ ] Un-clicked staged updates auto-apply on next app start (R8)
-- [ ] Failed activation rolls back to N−1 without leaving a broken extension host (R9)
-- [ ] `mode: "prompt"` preserves today's notification flow; full-app updates unaffected by `mode` (R10)
-- [ ] `CLAUDE.md`, `release` skill, `sprint-manager`, `release-manager`, `qa-validator`, and new `docs/development/RELEASING.md` all reflect the two-tier release model (R11-R16)
-- [ ] No manual `.codex/**`/`AGENTS.md` edits land in this sprint (R17)
+- [x] `scripts/release-extension.sh` ships a compatible extension release end-to-end using the verified per-file manifest model (not zip) (R3)
+- [x] The stale-file-enumeration bug in the existing release script is fixed — no more nonexistent-path references, no more omitted real files (R3, S2)
+- [x] Release-tier guard blocks an extension release when shell-tier files changed, INCLUDING the two new sprint-91 paths (R4)
+- [x] `engines.vscode` compatibility check blocks an incompatible extension release (R5)
+- [x] Extension updates download, verify, and stage silently in `auto` mode; status-bar "Relaunch to update" works (R6, R7)
+- [x] Un-clicked staged updates auto-apply on next app start (R8)
+- [x] Failed activation rolls back to N−1 without leaving a broken extension host (R9) — covers runtime activation failures; a syntax-error load-time failure is a documented residual gap, see W3.5's go/no-go note above.
+- [x] `mode: "prompt"` preserves today's notification flow; full-app updates unaffected by `mode` (R10)
+- [x] `CLAUDE.md`, `release` skill, `sprint-manager`, `release-manager`, `qa-validator`, and new `docs/development/RELEASING.md` all reflect the two-tier release model (R11-R16)
+- [x] No manual `.codex/**`/`AGENTS.md` edits land in this sprint (R17)
 - [ ] TypeScript compiles; pre-commit hook passes; `qa-validator` signs off
 
 ## Pre-Implementation Gate
