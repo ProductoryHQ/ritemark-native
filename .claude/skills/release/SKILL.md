@@ -184,15 +184,17 @@ If feed/metadata is stale or missing, the release is BLOCKED — even if binarie
 
 Surface to user: "Recommend invoking `product-marketer` for changelog, release notes, landing-page copy."
 
-## Workflow — Extension-only release
+## Workflow — Extension-only release (Sprint 93)
 
-For changes confined to `extensions/ritemark/` only.
+For changes confined to `extensions/ritemark/` — i.e. extension-tier per `CLAUDE.md`'s "Release Tiers" section. This codebase does **not** use `vsce`/`.vsix` packaging anywhere — that text was stale/aspirational from an earlier draft. The real mechanism is a per-file manifest + canonical update feed, matching `src/update/userExtensionInstaller.ts`'s download-per-file model.
 
 1. Bump version in `extensions/ritemark/package.json` to `X.Y.Z-ext.N`.
-2. Build extension: `cd extensions/ritemark && npm run compile && cd webview && npm run build && cd ..`
-3. Package: `vsce package --out dist/ritemark-X.Y.Z-ext.N.vsix` (verify command path with `.vscodeignore`).
-4. Create GitHub Release with `.vsix` asset.
-5. Update extension-only feed metadata with correct `minimumAppVersion`.
+2. `./scripts/release-extension.sh X.Y.Z-ext.N` — runs `release-extension-preflight.sh` first (clean tree, release-tier guard, `engines.vscode` check, compile-clean, webview-freshness), then builds the manifest + files into `release-staging/upload/` and generates the canonical update feed via `generate-update-feed.mjs --mode extension`.
+3. Review `release-staging/upload/` — the script prints (does not auto-run) the exact `gh release create` command to publish.
+4. **Light gate, not the full Gate 1/Gate 2 process below:** Jarmo tests via the in-app "Relaunch to update" flow (or a local dev install pointed at the staged files) on the changed surfaces only, then gives the approval phrase. No notarization, no 60-min hardening wait, no Windows CI dispatch, no repo-visibility toggle — none of those apply to an extension-only release.
+5. Only after Jarmo's approval: run the `gh release create` command the script printed, uploading the individual files from `release-staging/upload/` (never a `.vsix`).
+
+See `docs/development/RELEASING.md` for the plain-language version Jarmo can follow without engineering background.
 
 ## Gotchas
 

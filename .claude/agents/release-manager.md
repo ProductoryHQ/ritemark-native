@@ -112,14 +112,18 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 
 **Step 5 is HARD-GATED on Step 4.** The tag push triggers a long, costly multi-platform CI run (x64 + Windows). NEVER push the tag until Jarmo has explicitly cleared Gate 1 — testing the **un-notarized** arm64 DMG locally and saying "tested locally" / "approved" / "ship it". A failed Gate 1 means a respin; doing it after the CI run wastes the whole CI build.
 
-### Extension-only release
+### Extension-only release (Sprint 93 — LIGHT gate, deliberately asymmetric to the full-release table above)
 
-1. Bump version in `extensions/ritemark/package.json` to `X.Y.Z-ext.N`.
-2. Build extension + webview.
-3. Package `.vsix`.
-4. **Gate 1:** verify build artifacts and webview bundle integrity (the same hard checks as full release apply to the bundle).
-5. **Gate 2:** Jarmo tests the new extension on a current Ritemark install.
-6. GitHub Release with `.vsix` asset + extension-only feed metadata with correct `minimumAppVersion`.
+No `.vsix`/`vsce` packaging — this codebase ships a per-file manifest + canonical update feed instead (matches `src/update/userExtensionInstaller.ts`'s download model).
+
+| # | Step | Owner | Gate |
+| --- | --- | --- | --- |
+| 0 | Bump version in `extensions/ritemark/package.json` to `X.Y.Z-ext.N` | Agent | — |
+| 1 | `./scripts/release-extension.sh X.Y.Z-ext.N` — runs its own preflight first (clean tree, release-tier guard, `engines.vscode`, compile-clean, webview-freshness) | Agent | BLOCKING — must pass |
+| **2** | **Jarmo tests via the in-app "Relaunch to update" flow (or a local dev install), on the changed surfaces only** | **Jarmo** | **Light gate — one step, not two** |
+| 3 | `gh release create` with the individual files from `release-staging/upload/` + the regenerated feed | Agent | **REQUIRES step 2 cleared** |
+
+**Explicitly do NOT apply to this path:** notarization, the ≥60-minute hardening window, Windows CI dispatch, the public/private repo-visibility toggle. Those exist because a full release replaces the signed app bundle; an extension release never touches it. If a sprint's release-tier guard (`CLAUDE.md`'s "Release Tiers") finds shell-tier paths changed, it blocks this path entirely — that sprint must go through the full-release table instead.
 
 For exact commands, invoke the `release` skill.
 

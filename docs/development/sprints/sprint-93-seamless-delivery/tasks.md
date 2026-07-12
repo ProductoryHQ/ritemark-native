@@ -94,20 +94,26 @@ Every task lists concrete file paths, exact commands where applicable, and a bin
 
 ## W4 — Process & harness
 
-- [ ] `CLAUDE.md` (repo root): add a "Release tiers" section — state the shell-vs-extension decision rule verbatim matching W2.1's denylist (including the two new sprint-91 paths).
+- [x] `CLAUDE.md` (repo root): add a "Release tiers" section — state the shell-vs-extension decision rule verbatim matching W2.1's denylist (including the two new sprint-91 paths).
   Done when: `grep -A20 "## Release [Tt]iers" CLAUDE.md` shows the rule with the same path list as `scripts/release-extension-preflight.sh`.
-- [ ] `.claude/skills/release/SKILL.md`: replace the stale "Workflow — Extension-only release" section (lines 187-195, describing `vsce package` — a mechanism this codebase does not use) with the real procedure (`./scripts/release-extension.sh <version>`, per-file manifest model), and state explicitly which gates DON'T apply (no notarization, no 60-min hardening, no Windows CI, no repo-visibility toggle). Do NOT touch Step 5 (CI dispatch) — already updated by sprint-91.
+  Verified byte-identical via diff between the two files' path lists.
+- [x] `.claude/skills/release/SKILL.md`: replace the stale "Workflow — Extension-only release" section (lines 187-195, describing `vsce package` — a mechanism this codebase does not use) with the real procedure (`./scripts/release-extension.sh <version>`, per-file manifest model), and state explicitly which gates DON'T apply (no notarization, no 60-min hardening, no Windows CI, no repo-visibility toggle). Do NOT touch Step 5 (CI dispatch) — already updated by sprint-91.
   Done when: `grep -n "vsce package" .claude/skills/release/SKILL.md` returns nothing, and the new section reads as a complete, accurate replacement.
-- [ ] `.claude/agents/sprint-manager.md`: add a rule that every generated `sprint-plan.md` (both lightweight and full-track templates) must declare `Release tier: extension` or `Release tier: shell`, extension is default, shell requires naming the specific shell-tier path.
+  Confirmed zero matches. Step 5 (Full release workflow, a different section) untouched.
+- [x] `.claude/agents/sprint-manager.md`: add a rule that every generated `sprint-plan.md` (both lightweight and full-track templates) must declare `Release tier: extension` or `Release tier: shell`, extension is default, shell requires naming the specific shell-tier path.
   Done when: both the lightweight and full-track sprint-plan templates in this file show a `Release tier:` line in their template body.
-- [ ] `.claude/agents/release-manager.md`: EXTEND the existing "Release Types" table / Workflow Overview (do not duplicate) with the asymmetric gate model — extension release = light gate (Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, approval phrase), shell release = existing Gate 1 + Gate 2 + hardening + notarization, unchanged.
+- [x] `.claude/agents/release-manager.md`: EXTEND the existing "Release Types" table / Workflow Overview (do not duplicate) with the asymmetric gate model — extension release = light gate (Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, approval phrase), shell release = existing Gate 1 + Gate 2 + hardening + notarization, unchanged.
   Done when: the "Extension-only release" section (currently lines 115-124) explicitly states no notarization/hardening/Windows-CI/repo-toggle apply, without altering the full-release table above it.
-- [ ] `.claude/agents/qa-validator.md`: add a reference to a slim extension-tier QA checklist distinct from full `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`. Define the slim checklist's shape (scoped to changed surfaces only) either inline or as a new template file `docs/releases/TEMPLATE-EXTENSION-QA.md` (decide at implementation time; note the choice here).
+  Rewrote as a single-step light-gate table (steps 0-3), explicitly listing what does NOT apply. Full-release table above is untouched.
+- [x] `.claude/agents/qa-validator.md`: add a reference to a slim extension-tier QA checklist distinct from full `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`. Define the slim checklist's shape (scoped to changed surfaces only) either inline or as a new template file `docs/releases/TEMPLATE-EXTENSION-QA.md` (decide at implementation time; note the choice here).
   Done when: qa-validator's doc references the slim checklist by name/path and states when it applies (extension-tier) vs. when the full checklist applies (shell-tier).
-- [ ] New `docs/development/RELEASING.md`: one-page guide for Jarmo — what an extension release is, what he does (test via the in-app "Relaunch to update" flow or a local dev install, test, say the approval phrase), what a shell release is and when it happens (~monthly, batched per the seamless-delivery analysis doc), FAQ, zero-jargon where possible.
+  **Decision: inline**, matching this document's own established style (the existing "Production Build Validation" section is already inline numbered checks, not a separate template file) — a 4-item slim checklist doesn't earn its own template file.
+- [x] New `docs/development/RELEASING.md`: one-page guide for Jarmo — what an extension release is, what he does (test via the in-app "Relaunch to update" flow or a local dev install, test, say the approval phrase), what a shell release is and when it happens (~monthly, batched per the seamless-delivery analysis doc), FAQ, zero-jargon where possible.
   Done when: file exists, is under 1 printed page (~500-700 words), and a person with no engineering background could follow it to test a release.
-- [ ] Explicit no-op note: confirm no edits were made to `.codex/**` or `AGENTS.md` as part of this sprint — `harness-equalizer` syncs those automatically post-merge.
+  589 words.
+- [x] Explicit no-op note: confirm no edits were made to `.codex/**` or `AGENTS.md` as part of this sprint — `harness-equalizer` syncs those automatically post-merge.
   Done when: `git diff --stat sprint-92-esbuild-bundling...sprint-93-seamless-delivery -- .codex AGENTS.md` (once the branch exists) returns empty output.
+  Confirmed empty (checked against `main`, which is this branch's actual base since sprint-92 already merged there).
 
 ## Sprint close
 

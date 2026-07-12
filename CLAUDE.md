@@ -75,6 +75,31 @@ Branch name matches the sprint directory under `docs/development/sprints/`. Veri
 
 * * *
 
+## Release Tiers (Sprint 93)
+
+A change is **shell-tier** if it touches any of these paths (`vscode` is the submodule pointer) — everything else is **extension-tier** (default):
+
+```
+patches/
+vscode
+branding/product.json
+extensions/ritemark/binaries/agents/
+scripts/build-prod.sh
+scripts/codesign-app.sh
+scripts/create-dmg.sh
+scripts/apply-patches.sh
+scripts/update-vscode.sh
+scripts/create-patch.sh
+installer/windows/ritemark.iss
+scripts/codesign-windows.sh
+```
+
+This list is the single source of truth — `scripts/release-extension-preflight.sh`'s denylist array must stay copy-paste identical to it (edit both in the same commit, never one without the other).
+
+**Shell-tier** = a full app rebuild + release (Gate 1 technical + Gate 2 Jarmo-tested, notarization, 60-min hardening — see `release-manager` agent). **Extension-tier** = `./scripts/release-extension.sh <version>` (per-file manifest, no app rebuild) — a light gate: Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, then gives the approval phrase. No notarization, no hardening wait, no Windows CI, no repo-visibility toggle for an extension-only release. See `docs/development/RELEASING.md` for the plain-language version of this decision.
+
+* * *
+
 ## Expert Agents (MANDATORY Routing)
 
 | Domain | Agent | Trigger keywords |
