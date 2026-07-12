@@ -125,6 +125,12 @@ Every task lists concrete file paths, exact commands where applicable, and a bin
 - [x] File the Phase E (native shell auto-update) GitHub `enhancement` issue on `ProductoryHQ/ritemark-native`, referencing this sprint and the source analysis doc, before closing.
   Filed as [#139](https://github.com/ProductoryHQ/ritemark-native/issues/139).
 
+### Residual gap from PR #141 review (follow-up, not in this sprint's scope)
+
+- **Manifest hardening (pre-existing, stakes raised by `auto` mode) — NEEDS A FOLLOW-UP `enhancement` ISSUE.** `userExtensionInstaller.ts`'s `downloadFilesToStaging()`/`verifyAllChecksums()` join `manifest.file.path` and `extensionDirName` into on-disk paths and fetch `file.url` with no `..`-containment check and no host allowlist. Safe under normal operation (`release-extension.sh` only emits real relative paths + URLs pinned to `github.com/jarmo-productory/ritemark-public`, and every file is sha256-verified), but the new default `auto` mode runs the same install path with zero user visibility, so a bugged/compromised manifest pipeline has a larger blast radius than the old click-to-install flow. Proposed hardening: `path.relative`/`..`-rejection on `file.path` + `extensionDirName`, and a host allowlist on the feed + `file.url`. **Not filed as a GH issue during the autonomous run (issue creation was tool-blocked); Jarmo to file at review, or approve filing.**
+
+Other PR #141 review findings were addressed in-branch: activation-integrity double-confirm guard (extension.ts), download-name collision guard (release-extension.sh), and "twice in a row" wording tightened (RELEASING.md + userExtensionInstaller.ts docstring + scenarios.md S10 macOS-only platform note).
+
 ## Sequencing summary
 
 - **Soft dependency on sprint-92** (see technical-plan.md) — W2.2's dynamic-enumeration fix is correct either way; sprint-92 only affects the RESULT SIZE, not correctness.

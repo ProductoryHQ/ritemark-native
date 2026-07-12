@@ -166,6 +166,14 @@ package.json"
 
 echo "Processing files..."
 
+# Guard against the flatten-collision class of bug this rewrite exists to kill:
+# two distinct out/ subpaths (e.g. out/browser/foo.js and out/browser-foo.js)
+# can flatten to the same DOWNLOAD_NAME, silently cp over each other, and leave
+# the manifest listing two entries pointing at one uploaded asset with mismatched
+# checksums. Moot for today's 2-file esbuild bundle, but fail loudly if the tree
+# ever grows back into the per-module shape where collisions are possible.
+SEEN_DOWNLOAD_NAMES=""
+
 FIRST=true
 for file in $FILES; do
     src="$EXTENSION_DIR/$file"
@@ -180,6 +188,15 @@ for file in $FILES; do
             # For out/ files, replace / with - to flatten
             DOWNLOAD_NAME=$(echo "$file" | sed 's|^out/||' | tr '/' '-')
         fi
+
+        # Reject a flattened-name collision before it silently corrupts the release
+        if echo "$SEEN_DOWNLOAD_NAMES" | grep -qxF "$DOWNLOAD_NAME"; then
+            echo -e "${RED}✗ Download-name collision: '$DOWNLOAD_NAME' (from '$file') already used by another file.${NC}" >&2
+            echo -e "${RED}  Two source paths flatten to the same upload asset — aborting to avoid a corrupt manifest.${NC}" >&2
+            exit 1
+        fi
+        SEEN_DOWNLOAD_NAMES="$SEEN_DOWNLOAD_NAMES
+$DOWNLOAD_NAME"
 
         # Copy to upload directory
         cp "$src" "$OUTPUT_DIR/upload/$DOWNLOAD_NAME"

@@ -197,7 +197,8 @@ export class UserExtensionInstaller {
 
   /**
    * Remove a single installed version's directory outright (Sprint 93 R9
-   * quarantine path — a version that failed to activate twice in a row).
+   * quarantine path — a version whose prior activation attempt never confirmed,
+   * detected on its next launch).
    */
   async removeInstalledVersion(version: string): Promise<void> {
     const dirPath = path.join(this.extensionsDir, `ritemark-${version}`);

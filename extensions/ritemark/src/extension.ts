@@ -217,7 +217,8 @@ export function activate(context: vscode.ExtensionContext) {
   // dedup (confirmed in tasks.md W3.4). See activationIntegrity.ts for the
   // documented limitation on load-time (syntax error) failures.
   const activationIntegrity = new ActivationIntegrityTracker(context.globalState);
-  if (activationIntegrity.didPreviousAttemptFail(currentVersion)) {
+  const versionQuarantinedThisLaunch = activationIntegrity.didPreviousAttemptFail(currentVersion);
+  if (versionQuarantinedThisLaunch) {
     console.warn(`Ritemark: ${currentVersion} failed to activate on the previous attempt — quarantining and requesting reload.`);
     void quarantineVersion(currentVersion).then(() => {
       void vscode.window.showWarningMessage(
@@ -750,8 +751,13 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Sprint 93 R9: activate() reached its end with no synchronous throw —
   // confirm this version and trim old installs down to N-1 (current +
-  // previously-confirmed), never just "the newest one."
-  void confirmActivationAndCleanup(activationIntegrity, currentVersion);
+  // previously-confirmed), never just "the newest one." Skip when this same
+  // launch already quarantined the current version (a prior-attempt failure):
+  // its directory was just deleted, so it must not be re-recorded as
+  // confirmed-good — otherwise state and disk would disagree.
+  if (!versionQuarantinedThisLaunch) {
+    void confirmActivationAndCleanup(activationIntegrity, currentVersion);
+  }
 }
 
 export async function deactivate() {

@@ -42,6 +42,6 @@ You don't have to — Claude will say "this ships as an extension release" or "t
 
 **Can I turn off automatic updates?** Yes — `ritemark.updates.mode` in Settings can be set to `"prompt"` instead of `"auto"` if you'd rather approve each install manually with the old-style notification. Full app updates (shell releases) aren't affected by this setting either way — those always need your explicit install.
 
-**What if an update breaks something?** Ritemark keeps the previous working version on disk and can fall back to it automatically if the new one fails to start correctly twice in a row.
+**What if an update breaks something?** Ritemark keeps the previous working version on disk. If a new version fails to start correctly, the next launch detects that it never confirmed and automatically reverts to the previous working version.
 
 **Why are shell releases slower?** They replace the entire signed app bundle, which has to go through Apple notarization and a hardening window before it's safe to publish widely. Extension releases never touch that bundle, so none of that applies.
