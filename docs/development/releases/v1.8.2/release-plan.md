@@ -1,6 +1,6 @@
 # Release Plan — v1.8.2 Sturdy & Seamless Delivery (Windows-first)
 
-**Status:** Planning (pre-sprint)
+**Status:** Release candidate (2026-07-12) — all three sprints (91/92/93) merged to `main`; version bumped to 1.8.2; building macOS arm64 for Gate 1. Windows signing (#130) is gated on the Azure Trusted Signing cert — per the contingency below, it may defer to v1.8.3 (mac-first publish is safe: the per-platform update feed retains the prior win32 entry).
 **Target:** v1.8.2
 **GitHub milestone:** `v1.8.2` — to be created
 **Release type:** Full app release (shell tier — patches + installer + code-signing + build system)
@@ -50,7 +50,7 @@ Grounded in the release-level research at [`docs/development/analysis/2026-07-07
 |---|---|---|---|---|---|---|
 | 1 | sprint-91-windows-foundation | Install + open files on Windows; CI de-risk | #130 #134 #131 | shell | cert procurement (external) | Merged (PR #137, e68f229). W1-11 (Microsoft SAC submission) + W1-12 (flip signing check to enforce) deferred to release time. |
 | 2 | sprint-92-esbuild-bundling | Bundle extension host; kill EMFILE/0-byte/bloat | #105 | shell | — | Merged (PR #138, cd0aec6). |
-| 3 | sprint-93-seamless-delivery | Extension release lane + "Relaunch to update" + two-tier process/harness | (seamless research) | extension | sprint-92 (small bundle) | In review — PR pending. All W2/W3/W4 done; qa-validator gate in progress. |
+| 3 | sprint-93-seamless-delivery | Extension release lane + "Relaunch to update" + two-tier process/harness | (seamless research) | extension | sprint-92 (small bundle) | Merged (PR #141, f0b9d34). qa-validator PASS + pr-reviewer findings addressed + dev-mode smoke test green. |
 
 **Execution order / dependency spine:** sprint-91 and sprint-92 are independent domains (installer/signing vs build tooling) and can interleave — start sprint-91 immediately (and kick off cert procurement), run sprint-92 while the cert validates, land sprint-91's signing when the cert arrives, then sprint-93 on top of the bundled host. Each sprint runs its own DLC (plan → approve → branch `sprint-NN-name` → implement → QA → PR); no code lands before each sprint-plan's approval, per the repo's HARD gates.
 
