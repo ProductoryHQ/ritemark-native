@@ -83,8 +83,8 @@ sprint-91's #130 signing is gated on an **external procurement lead time** (not 
 - [ ] CLAUDE.md, `release` skill, `sprint-manager`, `release-manager`, `qa-validator`, and new `docs/development/RELEASING.md` reflect the two-tier model.
 
 **Release-level**
-- [ ] Version bumped to `1.8.2` in `branding/product.json` + `extensions/ritemark/package.json`.
-- [ ] Gate 1 (macOS arm64 build, sign, DMG) — un-notarized, Jarmo local test.
+- [x] Version bumped to `1.8.2` in `branding/product.json` + `extensions/ritemark/package.json` (commit `27db3fb`).
+- [~] Gate 1 (macOS arm64 build, sign, DMG) — un-notarized DMG built + signed + verified (`dist/Ritemark-1.8.2-darwin-arm64.dmg`, built 2026-07-12 18:00, hardening clock started). `create-dmg` hit the known non-interactive AppleScript -1712 timeout; used the `hdiutil` fallback. **Awaiting Jarmo local test.**
 - [ ] Gate 2 (macOS x64 + **signed** Windows installer, incl. clean-Win11-SAC test) — Jarmo local test.
 - [ ] Notarization (arm64 + x64) — only after respective gate + 60-min hardening.
 - [ ] GitHub Release published to `jarmo-productory/ritemark-public` + canonical update feed regenerated.
