@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-07-08 (Sprint 92 — extension host esbuild bundling #105)
+**Last updated:** 2026-07-12 (Sprint 93 — seamless extension delivery)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -433,6 +433,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-07-12 | Sprint 93 | `src/update/` gains two modules: `updateStatusBar.ts` ("Relaunch to update" status-bar affordance) and `activationIntegrity.ts` (N-1 rollback + activation-crash quarantine). New `ritemark.updates.mode` setting (`auto`/`prompt`) governs silent vs. prompted extension-tier updates; full-app updates unaffected. `release-extension.sh` (renamed from `create-extension-release.sh`) + new `release-extension-preflight.sh` are the one-command extension-release path, gated by the new shell/extension release-tier rule (`CLAUDE.md` "Release Tiers"). |
 | 2026-06-06 | Baseline | Initial document (agent runtime scope). Captures AS IS post-Sprint 78: 3 runtimes, 2 browser integration patterns, 3 model config locations. Defines TO BE for Sprint 79 (runtime adapter unification). |
 | 2026-06-06 | Pre-Sprint 79 | Expanded to full system scope. Added: system layers overview, webview↔host protocol, flows architecture, build pipeline (with ARCH-8 and ARCH-10 observations), broader TO BE roadmap (ARCH-8 through ARCH-13), locked decisions. Reconciled with `docs-internal/architecture/` (high-level-architecture.md + to-be-proposal.md). |
 | 2026-06-08 | Sprint 79 | Runtime unification: `src/runtime/` added (AgentRuntime, RuntimeRegistry, UnifiedApprovalGate, BrowserToolsInjector); ClaudeCodeRuntime/CodexRuntime/AcpRuntime adapters; `UnifiedViewProvider` 2480→1097 LOC; unified `agent-execute`/`agent-cancel`/`agent-approve` webview messages; browser IPC server + `browserMcpAdapter.ts` for ACP browser injection via Unix socket; `AgentDaemon` foundation (inactive); `CLAUDE_MODELS`/`DEFAULT_MODEL` moved to `modelConfig.ts`; `CODEX_MODELS` deleted; `document-search` flag disabled; ARCH-2/3/4/5 resolved. |

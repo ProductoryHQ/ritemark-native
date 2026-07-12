@@ -119,8 +119,10 @@ Every task lists concrete file paths, exact commands where applicable, and a bin
 
 - [ ] `qa-validator` sign-off (surface routing recommendation to the user at Phase 4→5).
 - [ ] Jarmo local test pass covering the `scenarios.md` matrix (S1-S16).
-- [ ] Update `docs/development/architecture.md` if any subsystem shape changed beyond what sprint-92 already logged (new status-bar affordance, update-platform behavior change) — cross-check against the doc's Sprint Architecture Gate rule.
-- [ ] File the Phase E (native shell auto-update) GitHub `enhancement` issue on `ProductoryHQ/ritemark-native`, referencing this sprint and the source analysis doc, before closing.
+- [x] Update `docs/development/architecture.md` if any subsystem shape changed beyond what sprint-92 already logged (new status-bar affordance, update-platform behavior change) — cross-check against the doc's Sprint Architecture Gate rule.
+  Added a Version History row + bumped `Last updated`, covering the two new `src/update/` modules and the release-tier rule.
+- [x] File the Phase E (native shell auto-update) GitHub `enhancement` issue on `ProductoryHQ/ritemark-native`, referencing this sprint and the source analysis doc, before closing.
+  Filed as [#139](https://github.com/ProductoryHQ/ritemark-native/issues/139).
 
 ## Sequencing summary
 
