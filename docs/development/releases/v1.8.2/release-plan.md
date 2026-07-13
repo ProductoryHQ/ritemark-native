@@ -1,6 +1,8 @@
 # Release Plan — v1.8.2 Sturdy & Seamless Delivery (Windows-first)
 
-**Status:** Release candidate (2026-07-12) — all three sprints (91/92/93) merged to `main`; version bumped to 1.8.2; macOS arm64 built + signed + at Gate 1. **Windows signing tested on real Windows machines and works (Jarmo, 2026-07-12) — so v1.8.2 ships as a FULL cross-platform release; the mac-first / defer-to-v1.8.3 contingency is NOT needed.** Windows installer rides Gate 2 alongside macOS x64.
+**Status:** Release candidate (2026-07-12) — all three sprints (91/92/93) merged to `main`; version bumped to 1.8.2; macOS arm64 built + signed + Gate 1 passed (Jarmo installed & ran v1.8.2). **Windows signing tested on real Windows machines and works (Jarmo, 2026-07-12) — so v1.8.2 ships as a FULL cross-platform release; the mac-first / defer-to-v1.8.3 contingency is NOT needed.** Windows installer rides Gate 2 alongside macOS x64.
+
+> **KNOWN ISSUE — seamless extension update is non-functional in this build ([#142](https://github.com/ProductoryHQ/ritemark-native/issues/142)).** Live-tested 2026-07-13: a `X.Y.Z-ext.N` update never loads because VS Code ranks it as a semver pre-release below the bundled `X.Y.Z`; it also loops on "Restart required" and self-deletes the staged files. **Decision (Jarmo, 2026-07-13): ship v1.8.2 anyway** — v1.8.2 is the first build carrying the update client, nothing updates *to* it yet, and full/DMG releases are unaffected. **Constraint: do NOT publish any `-ext.N` extension-tier release until #142 is fixed** (the extension fast-lane is unusable until then; the next release must go the full-DMG path). Fix targeted before the fast-lane is relied upon.
 **Target:** v1.8.2
 **GitHub milestone:** `v1.8.2` — to be created
 **Release type:** Full app release (shell tier — patches + installer + code-signing + build system)
