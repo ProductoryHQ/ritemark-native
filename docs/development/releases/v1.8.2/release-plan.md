@@ -86,7 +86,11 @@ sprint-91's #130 signing is gated on an **external procurement lead time** (not 
 
 **Release-level**
 - [x] Version bumped to `1.8.2` in `branding/product.json` + `extensions/ritemark/package.json` (commit `27db3fb`).
-- [~] Gate 1 (macOS arm64 build, sign, DMG) — un-notarized DMG built + signed + verified (`dist/Ritemark-1.8.2-darwin-arm64.dmg`, built 2026-07-12 18:00, hardening clock started). `create-dmg` hit the known non-interactive AppleScript -1712 timeout; used the `hdiutil` fallback. **Awaiting Jarmo local test.**
+- [x] Gate 1 (macOS arm64) — built, signed, Jarmo installed & ran v1.8.2. `create-dmg` hit the known non-interactive AppleScript -1712 timeout; used the `hdiutil` fallback (both arches).
+- [x] Gate 2 macOS x64 — Jarmo tested (2026-07-13). Windows installer follows from Jarmo's Windows machine.
+- [x] Notarization (arm64 + x64) — both DMGs notarized + stapled + Gatekeeper-accepted.
+- [x] **macOS PUBLISHED (2026-07-13)** — [v1.8.2](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.8.2) on `ritemark-public` with arm64 + x64 DMGs + `update-feed.json`. Feed serves v1.8.2 macOS; Windows falls back to v1.8.1's installer (mac-first pattern). No `-ext.N` entries (per #142).
+- [ ] **Windows (pending Jarmo):** build + sign installer from CI run `29239840648`, test on Win11, upload `Ritemark-Setup.exe` to the v1.8.2 release → then regenerate feed with the win32 asset.
 - [ ] Gate 2 (macOS x64 + **signed** Windows installer, incl. clean-Win11-SAC test) — Jarmo local test.
 - [ ] Notarization (arm64 + x64) — only after respective gate + 60-min hardening.
 - [ ] GitHub Release published to `jarmo-productory/ritemark-public` + canonical update feed regenerated.
