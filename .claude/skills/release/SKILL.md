@@ -204,6 +204,18 @@ For changes confined to `extensions/ritemark/` only.
 
 GitHub does NOT allow larger runners (windows-8core) on public repos. Before dispatching `build-windows.yml` (Step 5, `gh workflow run`), switch repo to private. After the Windows build completes, switch back to public. Without the toggle, the Windows build fails with a billing/permissions error. (A separate `windows-canary.yml` runs weekly on the FREE `windows-latest` standard runner — no toggle needed — to catch runner-image toolchain breakage early; see W4.)
 
+### Windows installer + update feed (CRITICAL)
+
+When the Windows installer is built and signed on a Windows machine (not in CI), the `update-feed.json` is NOT automatically regenerated. The Mac-side release script generates the feed but only includes `darwin` platforms. **You MUST manually add the `win32/x64` entry** to the feed after uploading `Ritemark-Setup.exe`:
+
+1. Download current feed: `gh release download vX.Y.Z -R jarmo-productory/ritemark-public -p update-feed.json -D /tmp`
+2. Add `win32/x64` platform entry (with correct `size`, `sha256`, `downloadUrl`)
+3. Re-upload: `gh release upload vX.Y.Z /tmp/update-feed.json --clobber -R jarmo-productory/ritemark-public`
+
+Without this, **Windows users on older versions will never see the update** — the feed tells them there's no Windows build available.
+
+Also: always upload only the canonical `Ritemark-Setup.exe` name (not versioned filename).
+
 ### Node version + architecture
 
 Production builds require **Node v20.x arm64** (`nvm use 20`). Default shell has x64 Node v23 — this fails with missing `@rollup/rollup-darwin-arm64` and similar arm64 native binaries. Always wrap with the `arch -arm64 /bin/zsh` invocation.
