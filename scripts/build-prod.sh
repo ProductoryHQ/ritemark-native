@@ -245,31 +245,12 @@ else
 fi
 echo ""
 
-# Stamp the BUNDLED extension's version to the semver "floor" X.Y.Z-0 (GH #142).
-# The built-in extension must sort strictly BELOW any over-the-air patch
-# X.Y.Z-ext.N so that VS Code's own extension scanner — which uses standard
-# semver, where "-0" (numeric) ranks below "-ext.N" (alphanumeric) and below a
-# plain release — always prefers a user-installed update over the built-in.
-# Without this, X.Y.Z-ext.N is a pre-release BELOW the bundled X.Y.Z and never
-# loads. The source extensions/ritemark/package.json stays at the clean X.Y.Z
-# (it is the source of truth release-extension.sh validates); only the copy
-# inside the .app bundle is floored here.
-EXT_PACKAGE_JSON="$APP_PATH/Contents/Resources/app/extensions/ritemark/package.json"
-FLOOR_VERSION="${RITEMARK_VERSION}-0"
-echo "Flooring bundled extension version to: $FLOOR_VERSION"
-python3 -c '
-import json
-path = "'"$EXT_PACKAGE_JSON"'"
-with open(path) as f:
-    data = json.load(f)
-data["version"] = "'"$FLOOR_VERSION"'"
-with open(path, "w") as f:
-    json.dump(data, f, indent=2)
-    f.write("\n")
-'
-
-if python3 -c "import json; assert json.load(open('$EXT_PACKAGE_JSON'))['version'] == '$FLOOR_VERSION'" 2>/dev/null; then
-  echo -e "${GREEN}Bundled extension version floored to $FLOOR_VERSION${NC}"
+# Floor the BUNDLED extension's version to X.Y.Z-0 so over-the-air X.Y.Z-ext.N
+# patches win VS Code's extension scanner (GH #142). Shared with the CI release
+# workflows via scripts/floor-bundled-extension.sh.
+if "$PROJECT_DIR/scripts/floor-bundled-extension.sh" \
+    "$APP_PATH/Contents/Resources/app/extensions/ritemark" "$RITEMARK_VERSION"; then
+  echo -e "${GREEN}Bundled extension version floored${NC}"
 else
   echo -e "${RED}ERROR: Failed to floor bundled extension version${NC}"
   exit 1

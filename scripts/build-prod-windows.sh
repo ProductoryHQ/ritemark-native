@@ -112,38 +112,15 @@ fi
 cp -r "$EXTENSION_DIR" "extensions/ritemark"
 echo "  Copied extension from $EXTENSION_DIR"
 
-# Stamp the BUNDLED extension's version to the semver "floor" X.Y.Z-0 (GH #142).
-# The built-in must sort strictly BELOW any over-the-air patch X.Y.Z-ext.N so
-# VS Code's standard-semver extension scanner always prefers a user-installed
-# update. Source extensions/ritemark/package.json stays at clean X.Y.Z; only
-# this build copy (which gulp bundles into the app) is floored. See build-prod.sh.
+# Floor the BUNDLED extension's version to X.Y.Z-0 so over-the-air X.Y.Z-ext.N
+# patches win VS Code's extension scanner (GH #142). gulp bundles this copy into
+# the app. Shared with the CI workflows via scripts/floor-bundled-extension.sh.
 FLOOR_BASE=$(grep '"ritemarkVersion"' "$ROOT_DIR/branding/product.json" | sed 's/.*"ritemarkVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
-if [ -n "$FLOOR_BASE" ]; then
-    FLOOR_VERSION="${FLOOR_BASE}-0"
-    echo "  Flooring bundled extension version to: $FLOOR_VERSION"
-    python -c '
-import json, sys
-path = "extensions/ritemark/package.json"
-with open(path) as f:
-    data = json.load(f)
-data["version"] = sys.argv[1]
-with open(path, "w") as f:
-    json.dump(data, f, indent=2)
-    f.write("\n")
-' "$FLOOR_VERSION" || python3 -c '
-import json, sys
-path = "extensions/ritemark/package.json"
-with open(path) as f:
-    data = json.load(f)
-data["version"] = sys.argv[1]
-with open(path, "w") as f:
-    json.dump(data, f, indent=2)
-    f.write("\n")
-' "$FLOOR_VERSION"
-else
+if [ -z "$FLOOR_BASE" ]; then
     echo -e "${RED}ERROR: could not read ritemarkVersion from branding/product.json to floor bundled extension${NC}"
     exit 1
 fi
+"$ROOT_DIR/scripts/floor-bundled-extension.sh" "extensions/ritemark" "$FLOOR_BASE"
 echo ""
 
 # Step 4: Compile extension
