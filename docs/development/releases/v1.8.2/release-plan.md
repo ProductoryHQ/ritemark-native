@@ -90,7 +90,7 @@ sprint-91's #130 signing is gated on an **external procurement lead time** (not 
 - [x] Gate 2 macOS x64 — Jarmo tested (2026-07-13). Windows installer follows from Jarmo's Windows machine.
 - [x] Notarization (arm64 + x64) — both DMGs notarized + stapled + Gatekeeper-accepted.
 - [x] **macOS PUBLISHED (2026-07-13)** — [v1.8.2](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.8.2) on `ritemark-public` with arm64 + x64 DMGs + `update-feed.json`. Feed serves v1.8.2 macOS; Windows falls back to v1.8.1's installer (mac-first pattern). No `-ext.N` entries (per #142).
-- [ ] **Windows (pending Jarmo):** build + sign installer from CI run `29239840648`, test on Win11, upload `Ritemark-Setup.exe` to the v1.8.2 release → then regenerate feed with the win32 asset.
+- [x] **Windows (2026-07-13):** Jarmo built + signed + Win11-tested the installer, uploaded `Ritemark-Setup.exe` to the v1.8.2 release, and regenerated the feed with the win32 asset. Reviewed by Claude — win32 sha256 matches the uploaded asset, installer is a signed PE32, feed resolves all three platforms, no `-ext.N` entries. **v1.8.2 is fully cross-platform live.**
 - [ ] Gate 2 (macOS x64 + **signed** Windows installer, incl. clean-Win11-SAC test) — Jarmo local test.
 - [ ] Notarization (arm64 + x64) — only after respective gate + 60-min hardening.
 - [ ] GitHub Release published to `jarmo-productory/ritemark-public` + canonical update feed regenerated.
