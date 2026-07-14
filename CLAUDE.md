@@ -214,6 +214,8 @@ ritemark-native/
 
 Feature ideas/requests → **GitHub Issues** on `ProductoryHQ/ritemark-native` with the `enhancement` label. Sprint planning pulls from open `enhancement` issues.
 
+New issues are auto-triaged by a scheduled cloud routine (2×/day): small extension-tier fixes become agent PRs immediately; everything else is routed to Jarmo's product queue with a pre-analysis comment. Contract: `docs/development/issue-triage-policy.md` (change via PR — the routine reads `main` each run).
+
 `docs/WISHLIST.md` is **deprecated** — kept as historical reference only. Do not add new items there. `.claude/agents/` and `.claude/skills/` are git-tracked — discoverable with `ls`.
 
 * * *
