@@ -1,57 +1,139 @@
 /**
  * Version Comparison Utilities
  *
- * Handles semantic versioning with extension build suffix.
- * Format: {major}.{minor}.{patch} or {major}.{minor}.{patch}-ext.{build}
+ * Handles semantic versioning with two Ritemark-specific pre-release forms
+ * layered on top of a standard {major}.{minor}.{patch} base:
  *
- * Examples:
- * - "1.0.1" - Base app version
- * - "1.0.1-ext.5" - Extension build 5 for app 1.0.1
+ * - "1.0.1"        - plain release (the base app version)
+ * - "1.0.1-0"      - the BUILT-IN FLOOR shipped inside a production app bundle
+ *                    (see #142). Sorts strictly BELOW any "-ext.N" patch so a
+ *                    user-installed extension update always wins VS Code's own
+ *                    extension scanner.
+ * - "1.0.1-ext.5"  - extension build 5, an over-the-air patch for app 1.0.1
+ *
+ * Ordering within one base is exactly standard semver precedence:
+ *   1.0.1-0  <  1.0.1-ext.1  <  1.0.1-ext.2  <  1.0.1
+ * (numeric pre-release identifiers rank below alphanumeric ones, and a plain
+ * release outranks every pre-release of the same base). Matching semver here
+ * is the whole point: VS Code's scanner uses standard semver, so Ritemark's
+ * own resolver MUST agree or it offers updates that never load (#142).
  */
 
 /**
- * Parsed version with base and extension build number
+ * Parsed version with base numbers and the raw pre-release identifiers.
  */
 interface ParsedVersion {
   major: number;
   minor: number;
   patch: number;
-  extBuild: number; // 0 if no -ext suffix
+  /**
+   * Dot-separated pre-release identifiers (the tokens after '-'), or an empty
+   * array for a plain release. Compared per semver: numeric identifiers rank
+   * below alphanumeric ones, and an empty pre-release outranks any non-empty
+   * one at the same base.
+   */
+  preRelease: string[];
+  /** Back-compat convenience: N for "X.Y.Z-ext.N", else 0. */
+  extBuild: number;
 }
 
 /**
- * Parse a version string into components
- * Handles formats: "1.2.3", "v1.2.3", "1.2.3-ext.5", "v1.2.3-ext.5"
+ * Parse a version string into components.
+ * Handles: "1.2.3", "v1.2.3", "1.2.3-0", "1.2.3-ext.5", "v1.2.3-ext.5".
+ * Build metadata ("+...") is stripped and ignored for precedence, per semver.
  */
 function parseVersion(version: string): ParsedVersion {
   // Remove 'v' prefix if present
   let cleanVersion = version.startsWith('v') ? version.slice(1) : version;
 
-  // Check for -ext.N suffix
-  let extBuild = 0;
-  const extMatch = cleanVersion.match(/-ext\.(\d+)$/);
-  if (extMatch) {
-    extBuild = parseInt(extMatch[1], 10);
-    cleanVersion = cleanVersion.replace(/-ext\.\d+$/, '');
+  // Strip build metadata — ignored for precedence.
+  const plusIndex = cleanVersion.indexOf('+');
+  if (plusIndex !== -1) {
+    cleanVersion = cleanVersion.slice(0, plusIndex);
   }
 
-  // Parse base version
-  const parts = cleanVersion.split('.');
+  // Split base from pre-release at the first hyphen.
+  let base = cleanVersion;
+  let preRelease: string[] = [];
+  const hyphenIndex = cleanVersion.indexOf('-');
+  if (hyphenIndex !== -1) {
+    base = cleanVersion.slice(0, hyphenIndex);
+    const pre = cleanVersion.slice(hyphenIndex + 1);
+    preRelease = pre.length > 0 ? pre.split('.') : [];
+  }
+
+  const parts = base.split('.');
+
+  let extBuild = 0;
+  if (preRelease[0] === 'ext' && /^\d+$/.test(preRelease[1] ?? '')) {
+    extBuild = parseInt(preRelease[1], 10);
+  }
 
   return {
     major: parseInt(parts[0] || '0', 10),
     minor: parseInt(parts[1] || '0', 10),
     patch: parseInt(parts[2] || '0', 10),
+    preRelease,
     extBuild
   };
 }
 
 /**
- * Extract the base app version (without -ext suffix)
+ * Compare a single pair of semver pre-release identifiers.
+ * Numeric identifiers always rank below alphanumeric ones (semver §11.4.3).
+ */
+function compareIdentifier(a: string, b: string): number {
+  const aNum = /^\d+$/.test(a);
+  const bNum = /^\d+$/.test(b);
+  if (aNum && bNum) {
+    return parseInt(a, 10) - parseInt(b, 10);
+  }
+  if (aNum) {
+    return -1; // numeric < alphanumeric
+  }
+  if (bNum) {
+    return 1;
+  }
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * Compare two pre-release identifier lists per semver §11.4.
+ * An empty list (a plain release) outranks any non-empty list.
+ */
+function comparePreRelease(a: string[], b: string[]): number {
+  if (a.length === 0 && b.length === 0) {
+    return 0;
+  }
+  if (a.length === 0) {
+    return 1; // release > pre-release
+  }
+  if (b.length === 0) {
+    return -1;
+  }
+  const shared = Math.min(a.length, b.length);
+  for (let i = 0; i < shared; i++) {
+    const cmp = compareIdentifier(a[i], b[i]);
+    if (cmp !== 0) {
+      return cmp;
+    }
+  }
+  // All shared identifiers equal — the longer list has higher precedence.
+  return a.length - b.length;
+}
+
+/**
+ * Extract the base app version (without any pre-release / build suffix).
+ * "1.0.1", "1.0.1-0" and "1.0.1-ext.5" all yield "1.0.1".
  */
 export function getBaseVersion(version: string): string {
-  const cleanVersion = version.startsWith('v') ? version.slice(1) : version;
-  return cleanVersion.replace(/-ext\.\d+$/, '');
+  let clean = version.startsWith('v') ? version.slice(1) : version;
+  const plusIndex = clean.indexOf('+');
+  if (plusIndex !== -1) {
+    clean = clean.slice(0, plusIndex);
+  }
+  const hyphenIndex = clean.indexOf('-');
+  return hyphenIndex === -1 ? clean : clean.slice(0, hyphenIndex);
 }
 
 /**
@@ -110,8 +192,9 @@ export function compareVersions(v1: string, v2: string): number {
     return a.patch - b.patch;
   }
 
-  // Compare extension build
-  return a.extBuild - b.extBuild;
+  // Compare pre-release identifiers per semver:
+  //   X.Y.Z-0  <  X.Y.Z-ext.1  <  X.Y.Z-ext.2  <  X.Y.Z
+  return comparePreRelease(a.preRelease, b.preRelease);
 }
 
 /**
