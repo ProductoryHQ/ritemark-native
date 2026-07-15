@@ -76,7 +76,7 @@ Release ships as a full DMG regardless (see Ship-Mechanism Constraint) — #142'
 
 | Sprint | Branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
-| sprint-94-comment-callouts | `sprint-94-comment-callouts` (not yet created — created only after Jarmo approves the sprint plan) | TBD | #81 | not started | not run | not drafted |
+| sprint-94-comment-callouts | `sprint-94-comment-callouts` (6 commits, ca59e75…5f3e294) | TBD | #81 | ready to merge (Jarmo runtime-tested 2026-07-15) | 2 independent audits green | drafted (CHANGELOG v1.8.3) |
 | sprint-95-text-work-fixes | `sprint-95-text-work-fixes` (not yet created) | TBD | #142, #103, #135 | not started | not run | not drafted |
 
 ## Risk Register

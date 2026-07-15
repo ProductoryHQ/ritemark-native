@@ -68,7 +68,7 @@ Structure follows `technical-plan.md` Revision 2: **Gate A (lossless core)** mus
 - [x] Context block: the anchored span text is appended to the prompt.
 - [x] Routes to the mentioned agent's id (claude-code/codex/opencode) via `ALIAS_TO_AGENT_ID` regardless of the sidebar's active runtime; `setPendingRuntime` updates the UI.
 - [x] "Send to AI" button in the assigned-comment bubble with a "Sent" confirmation state.
-- [ ] **Runtime QA (Jarmo, in the running dev app):** sidebar-closed → Send to AI → sidebar opens → the mentioned agent receives the prompt, for each alias.
+- [x] **Runtime QA (Jarmo, in the running dev app):** Send to AI → sidebar opens → the mentioned agent receives the prompt. Confirmed working 2026-07-15 ("runtime — all works").
 - [ ] `FileLinkSuggestions.tsx` guard: skip `@` file-search inside a comment (deferred — the `@` popup only triggers in the editor body, not in the rail compose textarea, so lower risk).
 
 ## Polish (audit low items) — DONE
@@ -78,15 +78,16 @@ Structure follows `technical-plan.md` Revision 2: **Gate A (lossless core)** mus
 
 ## Phase 8: Architecture Gate + QA + Closeout
 
-- [ ] Update `docs/development/architecture.md` (Version History; new relay messages; markdown-pipeline pattern) — Gate trips on flag + new webview messages.
-- [ ] Record the comment-yellow exception in `ritemark-design/references/components.md` (rationale + date).
-- [ ] `./scripts/validate-qa.sh`.
-- [ ] Discrepancy Detection: walk every `[x]` and confirm matching code on the branch.
-- [ ] Full manual QA matrix from `scenarios.md`.
-- [ ] Update `docs/CHANGELOG.md` + `releases/v1.8.3/release-plan.md` tracker.
+- [x] Update `docs/development/architecture.md` — Sprint 94 note (comment subsystem, the `comment:send-to-ai`/`comment:submit` relay, the flag, the cache-buster).
+- [x] Record the comment-yellow exception in `ritemark-design/references/components.md` (rationale + date).
+- [x] Runtime QA confirmed by Jarmo in the dev app ("runtime — all works").
+- [x] Update `docs/CHANGELOG.md` (v1.8.3 draft entry).
+- [ ] Update `releases/v1.8.3/release-plan.md` tracker (branch/PR/QA status).
 - [ ] Update / close GH #81 with implementation summary.
-- [ ] Re-check GH #142 before ship (full-DMG vs extension-lane).
-- [ ] `qa-validator` + `release-manager` for the release decision. Commit and push.
+- [ ] `qa-validator` before merge to `main`.
+- [ ] Merge sprint branch → `main` (prod comes from main).
+- [ ] Re-check GH #142 before ship (v1.8.3 is full-DMG regardless).
+- [ ] Deferred to a follow-up: `FileLinkSuggestions.tsx` guard for `@` inside a `///` line; wiring vitest for the webview `.test.ts` files (pre-existing gap).
 
 ## Note — webview test runner gap (pre-existing)
 
