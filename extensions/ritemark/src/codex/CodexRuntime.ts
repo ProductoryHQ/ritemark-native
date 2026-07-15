@@ -297,7 +297,7 @@ export class CodexRuntime implements AgentRuntime {
       ? {
           mode: 'plan' as const,
           settings: {
-            model: resolvedModel ?? 'gpt-5.3-codex',
+            model: resolvedModel ?? 'gpt-5.6-sol',
             reasoning_effort: null,
             developer_instructions: config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
           },
