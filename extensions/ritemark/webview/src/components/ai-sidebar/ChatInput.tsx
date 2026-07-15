@@ -70,6 +70,12 @@ interface PathChip {
   isFolder: boolean;
 }
 
+/** Short uppercase extension label for the non-image attachment chip (e.g. "MD", "TXT"). */
+function getFileExtensionLabel(name: string): string {
+  const match = name.match(/\.([a-zA-Z0-9]+)$/);
+  return match ? match[1].toUpperCase() : 'FILE';
+}
+
 function classifyFile(file: File): AttachmentKind | null {
   if (file.type.startsWith('image/')) return 'image';
   if (file.type === 'application/pdf') return 'pdf';
@@ -1061,14 +1067,17 @@ export function ChatInput() {
                     />
                   </div>
                 ) : (
-                  <div className="flex h-7 items-center gap-1.5 px-2 max-w-[160px]">
-                    {att.kind === 'pdf' ? (
-                      <Icon name="file-text" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
-                    ) : (
-                      <Icon name="file-image" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
-                    )}
-                    <span className="text-[10px] text-[var(--r-ink-muted)] truncate">
-                      {att.name}
+                  // Sprint fix (#103): non-image attachments (text/markdown/PDF) previously
+                  // rendered as a low-contrast h-7 chip that was easy to miss. Match the
+                  // image thumbnail's w-14 h-14 footprint with an icon + extension label
+                  // so an attached file is unmistakable at a glance.
+                  <div
+                    className="w-14 h-14 flex flex-col items-center justify-center gap-1 px-1"
+                    title={att.name}
+                  >
+                    <Icon name="file-text" size={20} className="shrink-0 text-[var(--r-ink-muted)]" />
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-[var(--r-ink-muted)] truncate max-w-full">
+                      {getFileExtensionLabel(att.name)}
                     </span>
                   </div>
                 )}
