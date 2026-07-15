@@ -1,0 +1,445 @@
+<meta charset="utf-8">
+<title>Margin Comments — Sprint 94 Interactive Mock</title>
+<style>
+  :root {
+    --r-surface: #FFFFFF; --r-surface-muted: #F8FAFC; --r-surface-soft: #F1F5F9;
+    --r-hairline: #E2E8F0; --r-hairline-strong: #CBD5E1;
+    --r-ink-strong: #1E1B4B; --r-ink-body: #475569; --r-ink-muted: #64748B; --r-ink-faint: #94A3B8;
+    --r-accent: #4338CA; --r-accent-deep: #3730A3; --r-accent-soft: #E0E7FF; --r-accent-fainter: #C7D2FE;
+    --r-comment-hl: #FEF3C7; --r-comment-hl-strong: #FDE68A; --r-comment-marker: #F59E0B; --r-comment-marker-ink: #92400E;
+    --shadow-md: 0 4px 6px -1px rgba(30,27,75,0.08), 0 2px 4px -2px rgba(30,27,75,0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(30,27,75,0.10), 0 4px 6px -4px rgba(30,27,75,0.08);
+    --shadow-pop: 0 8px 24px -6px rgba(30,27,75,0.18);
+    --shadow-accent: 0 4px 6px -1px rgba(67,56,202,0.25);
+    --font-ui: 'Sofia Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-editor: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    --page-bg: #EEF0F4; --page-ink: #1E1B4B;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --r-surface: #1E1B4B; --r-surface-muted: #191635; --r-surface-soft: #251F5C;
+      --r-hairline: #3730A3; --r-hairline-strong: #4338CA;
+      --r-ink-strong: #F8FAFC; --r-ink-body: #C7D2FE; --r-ink-muted: #94A3B8; --r-ink-faint: #64748B;
+      --r-accent: #818CF8; --r-accent-deep: #6366F1; --r-accent-soft: rgba(129,140,248,0.16); --r-accent-fainter: rgba(129,140,248,0.28);
+      --r-comment-hl: rgba(251,191,36,0.20); --r-comment-hl-strong: rgba(251,191,36,0.36);
+      --r-comment-marker: #FBBF24; --r-comment-marker-ink: #451A03;
+      --shadow-accent: 0 4px 6px -1px rgba(129,140,248,0.30);
+      --shadow-pop: 0 8px 24px -6px rgba(0,0,0,0.5); --page-bg: #131024; --page-ink: #F8FAFC;
+    }
+  }
+  :root[data-theme="dark"] {
+    --r-surface: #1E1B4B; --r-surface-muted: #191635; --r-surface-soft: #251F5C;
+    --r-hairline: #3730A3; --r-hairline-strong: #4338CA;
+    --r-ink-strong: #F8FAFC; --r-ink-body: #C7D2FE; --r-ink-muted: #94A3B8; --r-ink-faint: #64748B;
+    --r-accent: #818CF8; --r-accent-deep: #6366F1; --r-accent-soft: rgba(129,140,248,0.16); --r-accent-fainter: rgba(129,140,248,0.28);
+    --r-comment-hl: rgba(251,191,36,0.20); --r-comment-hl-strong: rgba(251,191,36,0.36);
+    --r-comment-marker: #FBBF24; --r-comment-marker-ink: #451A03;
+    --shadow-accent: 0 4px 6px -1px rgba(129,140,248,0.30);
+    --shadow-pop: 0 8px 24px -6px rgba(0,0,0,0.5); --page-bg: #131024; --page-ink: #F8FAFC;
+  }
+  :root[data-theme="light"] {
+    --r-surface: #FFFFFF; --r-surface-muted: #F8FAFC; --r-surface-soft: #F1F5F9;
+    --r-hairline: #E2E8F0; --r-hairline-strong: #CBD5E1;
+    --r-ink-strong: #1E1B4B; --r-ink-body: #475569; --r-ink-muted: #64748B; --r-ink-faint: #94A3B8;
+    --r-accent: #4338CA; --r-accent-deep: #3730A3; --r-accent-soft: #E0E7FF; --r-accent-fainter: #C7D2FE;
+    --r-comment-hl: #FEF3C7; --r-comment-hl-strong: #FDE68A; --r-comment-marker: #F59E0B; --r-comment-marker-ink: #92400E;
+    --shadow-accent: 0 4px 6px -1px rgba(67,56,202,0.25);
+    --shadow-pop: 0 8px 24px -6px rgba(30,27,75,0.18); --page-bg: #EEF0F4; --page-ink: #1E1B4B;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page-bg); color: var(--page-ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 30px 24px 80px; }
+  .masthead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+  .eyebrow { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--r-accent); font-weight: 600; }
+  h1.title { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin: 6px 0 4px; }
+  .sub { color: var(--r-ink-muted); max-width: 66ch; margin: 0; }
+  .inline-code { font-family: var(--font-mono); font-size: 0.86em; background: var(--r-surface-soft); padding: 1px 5px; border-radius: 3px; color: var(--r-ink-strong); }
+  .theme-toggle { flex: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: var(--r-surface); color: var(--r-ink-body); border: 1px solid var(--r-hairline); border-radius: 999px; padding: 6px 14px; font-family: inherit; font-size: 12px; font-weight: 600; }
+  .theme-toggle:hover { border-color: var(--r-hairline-strong); }
+
+  .hint-bar { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; font-size: 12.5px; color: var(--r-ink-muted); }
+  .hint-bar .pill { display: inline-flex; align-items: center; gap: 5px; background: var(--r-accent-soft); color: var(--r-accent); border-radius: 999px; padding: 3px 10px; font-weight: 600; font-size: 11.5px; }
+
+  /* ============ app window ============ */
+  .app-window { border-radius: 10px; border: 1px solid var(--r-hairline); box-shadow: var(--shadow-lg); background: var(--r-surface); }
+  .titlebar { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 14px; background: var(--r-surface-muted); border-bottom: 1px solid var(--r-hairline); border-radius: 10px 10px 0 0; font-size: 12px; color: var(--r-ink-muted); }
+  .dots { display: flex; gap: 6px; } .dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--r-hairline-strong); display: block; }
+  .tab { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; padding: 4px 10px; background: var(--r-surface); border: 1px solid var(--r-hairline); border-bottom: none; border-radius: 6px 6px 0 0; color: var(--r-ink-body); font-weight: 500; font-size: 12px; }
+  .tab .dot-unsaved { width: 7px; height: 7px; border-radius: 50%; background: var(--r-accent); }
+  .doc-toolbar { display: flex; align-items: center; gap: 10px; padding: 6px 18px; border-bottom: 1px solid var(--r-hairline); background: var(--r-surface); font-size: 12px; color: var(--r-ink-muted); }
+  .doc-toolbar .cnt { display: inline-flex; align-items: center; gap: 6px; } .doc-toolbar .cnt b { color: var(--r-ink-body); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .doc-toolbar .grow { flex: 1; }
+  .del-all { display: inline-flex; align-items: center; gap: 5px; background: transparent; border: 1px solid var(--r-hairline); color: var(--r-ink-muted); border-radius: 6px; padding: 4px 9px; font-family: var(--font-ui); font-size: 11.5px; font-weight: 600; cursor: pointer; }
+  .del-all:hover { border-color: var(--r-comment-marker); color: var(--r-comment-marker-ink); }
+  .del-all[disabled] { opacity: 0.4; cursor: default; }
+
+  /* ============ stage: editor + rail ============ */
+  .stage { position: relative; display: grid; grid-template-columns: minmax(0,1fr) 232px; gap: 22px; padding: 26px 22px 46px 34px; }
+  .doc { font-family: var(--font-editor); color: var(--r-ink-strong); max-width: 600px; outline: none; }
+  .doc:focus { outline: none; }
+  .doc h1 { font-size: 1.9em; font-weight: 600; margin: 0.1em 0 0.5em; letter-spacing: -0.5px; }
+  .doc h2 { font-size: 1.4em; font-weight: 600; margin: 1.05em 0 0.4em; }
+  .doc p { margin: 0.6em 0; }
+  .doc ::selection { background: var(--r-accent-fainter); }
+  .doc mark.hl { background: var(--r-comment-hl); color: inherit; border-radius: 2px; padding: 0.5px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; cursor: pointer; transition: background 120ms ease; }
+  .doc mark.hl.active { background: var(--r-comment-hl-strong); }
+  .rail { position: relative; }
+  .mention { color: var(--r-accent); font-weight: 600; font-family: var(--font-ui); }
+
+  /* floating formatting toolbar — REAL style from FormattingBubbleMenu.tsx:296
+     (real app hardcodes bg-white; mock tokenizes it so dark mode stays legible) */
+  .fmt { position: absolute; z-index: 40; display: none; align-items: center; gap: 4px;
+         background: var(--r-surface); border: 1px solid var(--r-hairline-strong);
+         border-radius: 4px; box-shadow: var(--shadow-lg); padding: 8px; }
+  .fmt button { background: transparent; border: none; cursor: pointer; color: var(--r-ink-strong);
+                padding: 4px 12px; border-radius: 4px; font-family: var(--font-ui); font-size: 14px; line-height: 1;
+                display: inline-flex; align-items: center; transition: background 100ms ease; }
+  .fmt button:hover { background: var(--r-surface-soft); }
+  .fmt button.b { font-weight: 700; } .fmt button.i { font-style: italic; } .fmt button.h { font-weight: 600; }
+  .fmt .sep { width: 1px; height: 24px; background: var(--r-hairline-strong); margin: 0 4px; }
+  /* Add comment = same ink as every other toolbar button; icon + short label, never wraps */
+  .fmt button.cmt { gap: 6px; white-space: nowrap; }
+
+  /* rail items (markers + bubbles) absolutely positioned by JS */
+  .rail-item { position: absolute; left: 0; right: 0; }
+  .marker { display: inline-flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: var(--r-surface); border: 1px solid var(--r-hairline); border-radius: 6px; padding: 6px 9px; font-family: var(--font-ui); font-size: 12px; color: var(--r-ink-muted); cursor: pointer; box-shadow: var(--shadow-md); }
+  .marker:hover { border-color: var(--r-hairline-strong); }
+  .marker .mk-ico { color: var(--r-comment-marker); flex: none; display: inline-flex; }
+  .marker .mk-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .bubble { background: var(--r-surface); border: 1px solid var(--r-hairline); border-radius: 10px; box-shadow: var(--shadow-pop); padding: 10px 11px; }
+  .rail-item .bubble { transform-origin: top right; animation: bubbleIn 150ms cubic-bezier(0.22,0.61,0.36,1); }
+  @keyframes bubbleIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .rail-item .bubble { animation: none; } }
+  .b-head { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+  .avatar { width: 20px; height: 20px; border-radius: 50%; background: var(--r-accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex: none; }
+  .avatar.you { background: var(--r-ink-muted); }
+  .b-head .who { font-size: 12px; font-weight: 600; color: var(--r-ink-strong); }
+  .b-head .when { font-size: 11px; color: var(--r-ink-faint); }
+  .b-head .grow { flex: 1; }
+  .b-del { background: transparent; border: none; color: var(--r-ink-faint); cursor: pointer; padding: 3px; border-radius: 5px; display: inline-flex; }
+  .b-del:hover { color: #EF4444; background: rgba(239,68,68,0.09); }
+  .b-text { font-family: var(--font-editor); font-size: 13px; color: var(--r-ink-body); line-height: 1.5; word-wrap: break-word; }
+
+  .b-input { font-family: var(--font-editor); font-size: 13px; color: var(--r-ink-strong); line-height: 1.5; min-height: 20px; outline: none; }
+  .b-input:empty:before { content: attr(data-ph); color: var(--r-ink-faint); }
+  .b-foot { display: flex; align-items: center; gap: 8px; margin-top: 9px; justify-content: flex-end; }
+  .btn { font-family: var(--font-ui); font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 5px 11px; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 5px; line-height: 1; transition: transform 120ms ease, background 120ms ease; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--r-accent); color: #fff; box-shadow: var(--shadow-accent); }
+  .btn-primary:hover { background: var(--r-accent-deep); }
+  .btn-ghost { background: transparent; color: var(--r-ink-muted); }
+  .btn-ghost:hover { color: var(--r-ink-body); background: var(--r-surface-soft); }
+
+  /* storage section */
+  .store { margin-top: 30px; }
+  .store h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .store p.cap { margin: 0 0 12px; color: var(--r-ink-muted); font-size: 13px; max-width: 72ch; }
+  .store pre { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--r-ink-body); background: var(--r-surface); border: 1px solid var(--r-hairline); padding: 14px 16px; border-radius: 8px; overflow-x: auto; line-height: 1.65; }
+  .store pre .cm { color: var(--r-comment-marker-ink); } :root[data-theme="dark"] .store pre .cm { color: var(--r-comment-marker); }
+  @media (prefers-color-scheme: dark) { .store pre .cm { color: var(--r-comment-marker); } }
+  .store pre .mk2 { color: var(--r-accent); }
+  .foot { margin-top: 34px; padding-top: 16px; border-top: 1px solid var(--r-hairline); font-size: 12px; color: var(--r-ink-muted); }
+  .foot code { font-family: var(--font-mono); }
+  @media (max-width: 720px) { .stage { grid-template-columns: 1fr; } .rail { display: none; } }
+</style>
+
+<div class="wrap">
+  <div class="masthead">
+    <div>
+      <div class="eyebrow">Sprint 94 · Issue #81 · interactive</div>
+      <h1 class="title">Margin comments</h1>
+      <p class="sub">A working preview. Two ways to add a note: <strong>select text → Add comment</strong> (anchors a yellow highlight), or type <span class="inline-code">/// your note</span> at the start of a line and press Enter for a quick standalone margin note. Assign to an agent with <span class="inline-code">@claude</span>. Hover a marker to read or delete.</p>
+    </div>
+    <button class="theme-toggle" id="tt" aria-label="Toggle theme">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <span id="tt-label">Dark</span>
+    </button>
+  </div>
+
+  <div class="hint-bar">
+    <span class="pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>Live</span>
+    Try it: highlight a sentence to raise the toolbar — or type <span class="inline-code" style="margin:0 2px">///</span> on a fresh line for a quick note.
+  </div>
+
+  <div class="app-window">
+    <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span><span class="tab"><span class="dot-unsaved"></span>product-brief.md</span></div>
+    <div class="doc-toolbar">
+      <span class="cnt"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--r-comment-marker)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><b id="count">0</b> comments</span>
+      <span class="grow"></span>
+      <button class="del-all" id="delAll" disabled><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Delete comments</button>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="doc" id="doc" spellcheck="false">
+        <h1>Q3 Product Brief</h1>
+        <p>We are shipping margin comments so writers can leave notes and hand work to an AI agent without ever seeing raw markdown syntax.</p>
+        <h2>Goals</h2>
+        <p>The margins look healthy this quarter, but the numbers need a second look before we publish anything to the wider team.</p>
+        <p>Ship date is end of September, pending a final review from operations and a sign-off from finance.</p>
+        <p>The full report is attached below, along with the supporting spreadsheets.</p>
+      </div>
+      <div class="rail" id="rail"></div>
+
+      <!-- floating formatting toolbar -->
+      <div class="fmt" id="fmt">
+        <button class="b" data-cmd="bold" title="Bold">B</button>
+        <button class="i" data-cmd="italic" title="Italic">I</button>
+        <span class="sep"></span>
+        <button class="h" data-cmd="h1" title="Heading 1">H1</button>
+        <button class="h" data-cmd="h2" title="Heading 2">H2</button>
+        <button class="h" data-cmd="h3" title="Heading 3">H3</button>
+        <span class="sep"></span>
+        <button data-cmd="ul" title="Bullet list"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
+        <button data-cmd="quote" title="Blockquote"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h4M14 21c3 0 7-1 7-8V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h4"/></svg></button>
+        <button data-cmd="link" title="Add link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+        <span class="sep"></span>
+        <button class="cmt" data-cmd="comment" title="Add comment"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Comment</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="store">
+    <h2>What lands on disk</h2>
+    <p class="cap">Portable, and stripped from every export. Two note kinds map to two storage forms — the round-trip encoding this sprint has to prove (the exact risk that deferred Sprint 72).</p>
+    <pre><span style="color:var(--r-ink-faint)"># anchored note (select → Add comment): a mark wraps the span</span>
+The <span class="mk2">&lt;mark data-comment="c1"&gt;</span>margins look healthy this quarter<span class="mk2">&lt;/mark&gt;</span>, but the numbers need a second look.
+<span class="cm">&lt;!-- comment c1 @claude: double-check these against the finance sheet. --&gt;</span>
+
+<span style="color:var(--r-ink-faint)"># /// quick note: a plain standalone comment, no anchor</span>
+<span class="cm">&lt;!-- comment c2 @claude: remember to refresh these figures. --&gt;</span></pre>
+  </div>
+
+  <div class="foot">
+    Formatting toolbar reproduces <code>extensions/ritemark/webview/src/components/FormattingBubbleMenu.tsx</code> (white bar, <code>border-hairline-strong</code>, <code>rounded</code>, <code>shadow-lg</code>) with an appended <strong>Add comment</strong> action. Tokens from <code>ritemark-design/tokens.css</code>. Comment-yellow is an owner-requested functional exception to the indigo-only rule (record in <code>components.md</code> before build). Interactive demo uses vanilla contenteditable; the real feature is a TipTap mark + node view.
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement, tt = document.getElementById('tt'), ttl = document.getElementById('tt-label');
+  function cur(){ var e = root.getAttribute('data-theme'); if (e) return e; return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light'; }
+  function syncTheme(){ ttl.textContent = cur()==='dark'?'Light':'Dark'; }
+  tt.addEventListener('click', function(){ root.setAttribute('data-theme', cur()==='dark'?'light':'dark'); syncTheme(); }); syncTheme();
+
+  var doc = document.getElementById('doc'), rail = document.getElementById('rail'), stage = document.getElementById('stage'),
+      fmt = document.getElementById('fmt'), countEl = document.getElementById('count'), delAll = document.getElementById('delAll');
+  // id -> { id, markEl (nullable), anchorEl, text, mentions, markerHost, bubbleHost, composeHost, open, hover }
+  var comments = {};
+  var seq = 0;
+
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function renderMentions(t){ return esc(t).replace(/@(\w+)/g, '<span class="mention">@$1</span>'); }
+
+  // ---- selection → toolbar ----
+  function hideFmt(){ fmt.style.display='none'; }
+  function showFmtForSelection(){
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount){ hideFmt(); return; }
+    var range = sel.getRangeAt(0);
+    if (!doc.contains(range.commonAncestorContainer)){ hideFmt(); return; }
+    var rect = range.getBoundingClientRect(), sRect = stage.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0){ hideFmt(); return; }
+    fmt.style.display = 'flex';
+    var half = fmt.offsetWidth/2;
+    var left = rect.left - sRect.left + rect.width/2;
+    left = Math.max(half + 4, Math.min(left, sRect.width - half - 4));
+    fmt.style.left = left + 'px';
+    fmt.style.top = Math.max(4, rect.top - sRect.top - fmt.offsetHeight - 8) + 'px';
+    fmt.style.transform = 'translateX(-50%)';
+  }
+  doc.addEventListener('mouseup', function(){ setTimeout(showFmtForSelection, 0); });
+  doc.addEventListener('keyup', function(){ setTimeout(showFmtForSelection, 0); });
+  document.addEventListener('mousedown', function(e){ if (!fmt.contains(e.target) && !doc.contains(e.target)) hideFmt(); });
+
+  // ---- toolbar buttons ----
+  fmt.addEventListener('mousedown', function(e){ e.preventDefault(); }); // keep selection
+  fmt.addEventListener('click', function(e){
+    var btn = e.target.closest('button'); if (!btn) return;
+    var cmd = btn.dataset.cmd;
+    if (cmd === 'comment'){ startComment(); return; }
+    doc.focus();
+    if (cmd === 'bold') document.execCommand('bold');
+    else if (cmd === 'italic') document.execCommand('italic');
+    else if (cmd === 'h1') document.execCommand('formatBlock', false, 'h1');
+    else if (cmd === 'h2') document.execCommand('formatBlock', false, 'h2');
+    else if (cmd === 'h3') document.execCommand('formatBlock', false, 'h3');
+    else if (cmd === 'ul') document.execCommand('insertUnorderedList');
+    else if (cmd === 'quote') document.execCommand('formatBlock', false, 'blockquote');
+    // link is a no-op stub in this preview
+    setTimeout(showFmtForSelection, 0);
+  });
+
+  // ---- create anchored comment (from a text selection) ----
+  function startComment(){
+    var sel = window.getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+    if (!doc.contains(range.commonAncestorContainer)) return;
+    var id = 'c' + (++seq);
+    var mark = document.createElement('mark');
+    mark.className = 'hl active'; mark.dataset.commentId = id;
+    try { range.surroundContents(mark); }
+    catch(_) { mark.appendChild(range.extractContents()); range.insertNode(mark); }
+    sel.removeAllRanges(); hideFmt();
+    comments[id] = { id: id, markEl: mark, anchorEl: mark, text: '', mentions: [], open: false };
+    openCompose(id);
+  }
+
+  // ---- /// quick-add: a standalone right-side note, no text anchor ----
+  function currentBlock(){
+    var sel = window.getSelection(); if (!sel.rangeCount) return null;
+    var n = sel.getRangeAt(0).startContainer;
+    while (n && n.parentNode !== doc) n = n.parentNode;
+    return (n && n.parentNode === doc) ? n : null;
+  }
+  doc.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    var block = currentBlock(); if (!block) return;
+    var t = block.textContent || '';
+    if (!/^\/\/\/\s?/.test(t)) return;              // only when the line starts with ///
+    e.preventDefault();
+    var note = t.replace(/^\/\/\/\s?/, '').trim();
+    var anchor = block.previousElementSibling || block.nextElementSibling || doc;
+    block.remove();                                  // the /// line lifts out of the body
+    var id = 'c' + (++seq);
+    comments[id] = { id: id, markEl: null, anchorEl: anchor, text: note, mentions: [], open: false };
+    if (note){                                       // "/// text ⏎" saves straight away
+      comments[id].mentions = (note.match(/@(\w+)/g) || []).map(function(m){ return m.slice(1); });
+      addMarker(id); layout(); updateCount();
+    } else {                                         // bare "/// ⏎" opens an empty margin bubble
+      openCompose(id);
+    }
+  });
+
+  function topFor(el){
+    if (!el || !el.getBoundingClientRect) return 0;
+    var r = el.getBoundingClientRect(), railR = rail.getBoundingClientRect();
+    return Math.max(0, r.top - railR.top);
+  }
+  function setActive(c, on){ if (c.markEl) c.markEl.classList.toggle('active', on); }
+
+  function openCompose(id){
+    var c = comments[id];
+    var host = document.createElement('div'); host.className = 'rail-item'; host.style.top = topFor(c.anchorEl) + 'px';
+    host.innerHTML =
+      '<div class="bubble">' +
+        '<div class="b-head"><span class="avatar you">J</span><span class="who">You</span></div>' +
+        '<div class="b-input" contenteditable="true" data-ph="Comment, or @claude to assign"></div>' +
+        '<div class="b-foot"><button class="btn btn-ghost" data-a="cancel">Cancel</button><button class="btn btn-primary" data-a="save">Comment</button></div>' +
+      '</div>';
+    rail.appendChild(host); c.composeHost = host;
+    var input = host.querySelector('.b-input');
+    input.focus();
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); save(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); cancel(); }
+    });
+    host.querySelector('[data-a="save"]').addEventListener('click', save);
+    host.querySelector('[data-a="cancel"]').addEventListener('click', cancel);
+    function save(){
+      var text = input.textContent.trim();
+      if (!text){ cancel(); return; }
+      c.text = text; c.mentions = (text.match(/@(\w+)/g) || []).map(function(m){ return m.slice(1); });
+      host.remove(); c.composeHost = null; setActive(c, false);
+      addMarker(id); layout(); updateCount();
+    }
+    function cancel(){
+      host.remove(); if (c.markEl) unwrap(c.markEl); delete comments[id]; layout(); updateCount();
+    }
+    layout();
+  }
+
+  function addMarker(id){
+    var c = comments[id];
+    var host = document.createElement('div'); host.className = 'rail-item';
+    var preview = c.text.length > 26 ? c.text.slice(0,26) + '…' : c.text;
+    host.innerHTML = '<button class="marker"><span class="mk-ico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="mk-txt"></span></button>';
+    host.querySelector('.mk-txt').textContent = preview;
+    rail.appendChild(host); c.markerHost = host;
+    var btn = host.querySelector('.marker');
+    btn.addEventListener('click', function(){ toggleBubble(id); });
+    host.addEventListener('mouseenter', function(){ if (!c.open) showBubble(id, true); });
+    host.addEventListener('mouseleave', function(){ if (c.hover){ hideBubble(id); } });
+  }
+
+  function showBubble(id, hover){
+    var c = comments[id]; if (c.bubbleHost) return;
+    c.hover = !!hover; c.open = !hover ? true : c.open;
+    setActive(c, true);
+    var assigned = c.mentions.length > 0;
+    var who = assigned ? cap(c.mentions[0]) : 'You';
+    var av = assigned ? c.mentions[0][0].toUpperCase() : 'J';
+    var host = c.markerHost;
+    var bub = document.createElement('div'); bub.className = 'bubble'; bub.style.marginTop = '0';
+    bub.innerHTML =
+      '<div class="b-head"><span class="avatar '+(assigned?'':'you')+'">'+esc(av)+'</span>' +
+        '<span class="who">'+esc(who)+'</span>'+(assigned?'<span class="when">assigned</span>':'')+'<span class="grow"></span>' +
+        '<button class="b-del" title="Delete comment"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>' +
+      '</div>' +
+      '<div class="b-text">'+renderMentions(c.text)+'</div>' +
+      (assigned ? '<div class="b-foot"><button class="btn btn-primary" data-a="send"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>Send to AI</button></div>' : '');
+    // replace marker with bubble while open
+    host.querySelector('.marker').style.display = 'none';
+    host.appendChild(bub); c.bubbleHost = bub;
+    if (hover){ host.addEventListener('mouseleave', onLeave); }
+    function onLeave(){ hideBubble(id); host.removeEventListener('mouseleave', onLeave); }
+    bub.querySelector('.b-del').addEventListener('click', function(e){ e.stopPropagation(); removeComment(id); });
+    var send = bub.querySelector('[data-a="send"]'); if (send) send.addEventListener('click', function(e){ e.stopPropagation();
+      send.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Sent to sidebar'; send.style.background='var(--r-accent-deep)';
+    });
+    layout();
+  }
+  function hideBubble(id){
+    var c = comments[id]; if (!c || !c.bubbleHost) return;
+    if (c.open && c.hover){ /* keep */ }
+    c.bubbleHost.remove(); c.bubbleHost = null; c.hover = false;
+    if (c.markerHost){ c.markerHost.querySelector('.marker').style.display=''; }
+    if (!c.open) setActive(c, false);
+    layout();
+  }
+  function toggleBubble(id){
+    var c = comments[id];
+    if (c.bubbleHost && c.open){ c.open=false; hideBubble(id); }
+    else { c.open = true; if (c.bubbleHost){ c.hover=false; } else showBubble(id, false); }
+  }
+
+  function removeComment(id){
+    var c = comments[id]; if (!c) return;
+    if (c.bubbleHost) c.bubbleHost.remove();
+    if (c.markerHost) c.markerHost.remove();
+    if (c.composeHost) c.composeHost.remove();
+    if (c.markEl) unwrap(c.markEl);          // standalone /// notes have no span to unwrap
+    delete comments[id]; layout(); updateCount();
+  }
+  function unwrap(mark){
+    if (!mark || !mark.parentNode) return;
+    var p = mark.parentNode; while (mark.firstChild) p.insertBefore(mark.firstChild, mark); p.removeChild(mark); p.normalize();
+  }
+
+  // ---- rail layout: align items to their marks, resolve overlaps ----
+  function layout(){
+    var items = [];
+    Object.keys(comments).forEach(function(id){
+      var c = comments[id]; var host = c.composeHost || (c.bubbleHost && c.bubbleHost.parentNode) || c.markerHost;
+      if (host) items.push({ host: host, top: topFor(c.anchorEl) });
+    });
+    // include compose hosts that are their own rail-item
+    items.sort(function(a,b){ return a.top - b.top; });
+    var prevBottom = -12;
+    items.forEach(function(it){
+      var top = Math.max(it.top, prevBottom + 12);
+      it.host.style.top = top + 'px';
+      prevBottom = top + it.host.offsetHeight;
+    });
+    rail.style.minHeight = (prevBottom + 20) + 'px';
+  }
+  function updateCount(){ var n = Object.keys(comments).length; countEl.textContent = n; delAll.disabled = n === 0; }
+  function cap(s){ return s ? s[0].toUpperCase()+s.slice(1) : s; }
+
+  delAll.addEventListener('click', function(){ Object.keys(comments).forEach(removeComment); });
+  window.addEventListener('resize', function(){ hideFmt(); layout(); });
+})();
+</script>

@@ -86,6 +86,7 @@ interface Features {
   voiceDictation: boolean
   markdownExport: boolean
   saveAsMarkdownFromPreview: boolean
+  commentCallouts?: boolean
 }
 
 function App() {
@@ -672,6 +673,7 @@ function App() {
             placeholder="Start writing..."
             className="h-full"
             imageMappings={imageMappings}
+            commentCallouts={features.commentCallouts}
           />
         </div>
       </div>

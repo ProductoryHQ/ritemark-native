@@ -70,9 +70,28 @@ function normalizeTableMarkup(html: string): string {
     .replace(/<colgroup[\s\S]*?<\/colgroup>/gi, '');
 }
 
+/**
+ * Sprint 94 (#81): comments are editor-only and must never appear in any export.
+ * Standalone `<ritemark-comment>` notes are removed whole; anchored
+ * `<mark data-comment>` highlights are unwrapped so the underlying text survives
+ * without the comment. Runs at the single shared PDF/Word chokepoint so neither
+ * exporter can leak a note.
+ *
+ * NOTE (audit H2): the export input is `editor.getHTML()`, whose HTML serializer
+ * escapes only `&`, `"`, and nbsp in attribute values — a literal `>` CAN appear
+ * inside `data-comment`. So the tag matcher must be quote-aware: `(?:"[^"]*"|[^">])*`
+ * consumes either a full double-quoted value (which may contain `>`) or any
+ * non-`"`/`>` char, stopping only at the real closing `>`.
+ */
+function stripComments(html: string): string {
+  return html
+    .replace(/<ritemark-comment\b(?:"[^"]*"|[^">])*>[\s\S]*?<\/ritemark-comment>/gi, '')
+    .replace(/<mark\b(?:"[^"]*"|[^">])*\bdata-comment=(?:"[^"]*"|[^">])*>([\s\S]*?)<\/mark>/gi, '$1');
+}
+
 function normalizeHtml(html: string): string {
   const source = html || '';
-  const safe = normalizeTableMarkup(stripUnsafeTags(source));
+  const safe = normalizeTableMarkup(stripUnsafeTags(stripComments(source)));
   return safe.trim() ? safe : '<p></p>';
 }
 

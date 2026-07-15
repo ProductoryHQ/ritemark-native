@@ -231,7 +231,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       features: {
         voiceDictation: isEnabled('voice-dictation'),
         markdownExport: isEnabled('markdown-export'),
-        saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview')
+        saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview'),
+        commentCallouts: isEnabled('comment-callouts')
       },
       ...agentFields,
     };
