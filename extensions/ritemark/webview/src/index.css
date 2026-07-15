@@ -339,3 +339,6 @@ body {
 .rm-bubble-foot { display: flex; justify-content: flex-end; margin-top: 9px; }
 .rm-send { display: inline-flex; align-items: center; gap: 5px; }
 .rm-send:disabled { opacity: 1; background: var(--ritemark-indigo-deep, #3730a3); cursor: default; }
+
+/* edit-comment button — indigo hover (distinct from the red delete) */
+.rm-bubble-edit:hover { color: var(--ritemark-indigo, #4338ca); background: var(--ritemark-indigo-soft, #e0e7ff); }

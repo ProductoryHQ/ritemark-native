@@ -135,18 +135,24 @@ const CommentIcon = ({ size = 13 }: { size?: number }) => (
   </svg>
 )
 
-/** Compose bubble shown for a freshly-created (empty) anchored comment. */
+/** Compose bubble — used to create a new comment and to edit an existing one. */
 function ComposeBubble({
+  initial = '',
   onSave,
   onCancel,
 }: {
+  initial?: string
   onSave: (text: string) => void
   onCancel: () => void
 }) {
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initial)
   const ref = useRef<HTMLTextAreaElement | null>(null)
   useEffect(() => {
-    ref.current?.focus()
+    const el = ref.current
+    if (!el) return
+    el.focus()
+    // Place the cursor at the end when editing existing text.
+    el.setSelectionRange(el.value.length, el.value.length)
   }, [])
   // H1: a literal `-->` cannot be stored inside an HTML comment — reject at input.
   const terminator = hasCommentTerminator(text)
@@ -199,6 +205,7 @@ export function MarginCommentRail({
   const [markers, setMarkers] = useState<RailMarker[]>([])
   const [openKey, setOpenKey] = useState<string | null>(null)
   const [sentKey, setSentKey] = useState<string | null>(null)
+  const [editKey, setEditKey] = useState<string | null>(null)
   const rafRef = useRef<number | null>(null)
 
   const rescan = useCallback(() => {
@@ -311,8 +318,9 @@ export function MarginCommentRail({
   return (
     <div className="rm-comment-rail" aria-hidden={false}>
       {markers.map((m) => {
-        // A freshly-created comment (mark or node) has an empty note → compose.
-        const composing = m.note === ''
+        // Compose when the note is empty (freshly created) OR the user chose Edit.
+        const editing = editKey === m.key
+        const composing = m.note === '' || editing
         const open = composing || openKey === m.key
         const assigned = !!m.agent
         const preview = m.note.length > 24 ? m.note.slice(0, 24) + '…' : m.note
@@ -327,8 +335,17 @@ export function MarginCommentRail({
           >
             {composing ? (
               <ComposeBubble
-                onSave={(text) => applyNote(m, text)}
-                onCancel={() => applyNote(m, '')}
+                initial={m.note}
+                onSave={(text) => {
+                  applyNote(m, text)
+                  setEditKey(null)
+                }}
+                onCancel={() => {
+                  // Editing an existing note → revert to read; a brand-new
+                  // empty note → discard it.
+                  if (editing) setEditKey(null)
+                  else applyNote(m, '')
+                }}
               />
             ) : open ? (
               <div className="rm-bubble">
@@ -336,6 +353,19 @@ export function MarginCommentRail({
                   {assigned && <span className="rm-agent-badge">{m.agent}</span>}
                   <span className="rm-bubble-who">{assigned ? '' : 'Comment'}</span>
                   <span className="rm-grow" />
+                  <button
+                    className="rm-bubble-del rm-bubble-edit"
+                    title="Edit comment"
+                    onClick={() => {
+                      setOpenKey(m.key)
+                      setEditKey(m.key)
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+                    </svg>
+                  </button>
                   <button
                     className="rm-bubble-del"
                     title="Delete comment"
