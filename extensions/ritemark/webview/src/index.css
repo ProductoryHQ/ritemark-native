@@ -342,3 +342,17 @@ body {
 
 /* edit-comment button — indigo hover (distinct from the red delete) */
 .rm-bubble-edit:hover { color: var(--ritemark-indigo, #4338ca); background: var(--ritemark-indigo-soft, #e0e7ff); }
+
+/* inline @agent mention chip (replaces the separate agent badge) */
+.rm-mention {
+  background: var(--ritemark-indigo-soft, #e0e7ff);
+  color: var(--ritemark-indigo, #4338ca);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-weight: 600;
+  font-family: var(--ritemark-ui-font-family);
+}
+.ritemark-dark .rm-mention, [data-theme="dark"] .rm-mention {
+  background: rgba(129, 140, 248, 0.18);
+  color: var(--ritemark-dark-indigo, #818cf8);
+}

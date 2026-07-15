@@ -10,7 +10,7 @@
  * decoupled from the schema and re-aligns on every editor update / scroll /
  * resize.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { getMarkRange } from '@tiptap/core'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import {
@@ -134,6 +134,30 @@ const CommentIcon = ({ size = 13 }: { size?: number }) => (
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
   </svg>
 )
+
+/**
+ * Render a note's text with any `@claude`/`@codex`/`@opencode` mention shown
+ * inline with a light-background chip (instead of a separate agent badge) — the
+ * assignment lives in the text, not in extra chrome.
+ */
+function renderNoteWithMentions(note: string): ReactNode {
+  const re = /@(?:claude|codex|opencode)\b/gi
+  const out: ReactNode[] = []
+  let last = 0
+  let i = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(note)) !== null) {
+    if (m.index > last) out.push(note.slice(last, m.index))
+    out.push(
+      <span key={i++} className="rm-mention">
+        {m[0]}
+      </span>,
+    )
+    last = m.index + m[0].length
+  }
+  if (last < note.length) out.push(note.slice(last))
+  return out.length ? out : note
+}
 
 /** Compose bubble — used to create a new comment and to edit an existing one. */
 function ComposeBubble({
@@ -350,8 +374,7 @@ export function MarginCommentRail({
             ) : open ? (
               <div className="rm-bubble">
                 <div className="rm-bubble-head">
-                  {assigned && <span className="rm-agent-badge">{m.agent}</span>}
-                  <span className="rm-bubble-who">{assigned ? '' : 'Comment'}</span>
+                  <span className="rm-bubble-who">Comment</span>
                   <span className="rm-grow" />
                   <button
                     className="rm-bubble-del rm-bubble-edit"
@@ -377,7 +400,7 @@ export function MarginCommentRail({
                     </svg>
                   </button>
                 </div>
-                <div className="rm-bubble-text">{m.note}</div>
+                <div className="rm-bubble-text">{renderNoteWithMentions(m.note)}</div>
                 {assigned && (
                   <div className="rm-bubble-foot">
                     <button
@@ -403,7 +426,7 @@ export function MarginCommentRail({
             ) : (
               <button className="rm-marker" onClick={() => setOpenKey(m.key)}>
                 <span className="rm-marker-ico"><CommentIcon /></span>
-                <span className="rm-marker-txt">{preview}</span>
+                <span className="rm-marker-txt">{renderNoteWithMentions(preview)}</span>
               </button>
             )}
           </div>
