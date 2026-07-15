@@ -25,8 +25,9 @@ The platform subdirectories are populated by `scripts/fetch-agent-runtimes.sh` (
 
 | Agent | Vendor | Version | Source | License |
 |---|---|---|---|---|
-| Codex | OpenAI | 0.130.0 (`rust-v0.130.0`) | GitHub Releases — `codex-app-server-*` archives | Apache-2.0 |
-| Claude | Anthropic | 2.1.131 | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
+| Codex | OpenAI | 0.144.4 (`rust-v0.144.4`) | GitHub Releases — `codex-app-server-*` archives | Apache-2.0 |
+| Claude | Anthropic | 2.1.156 | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
+| OpenCode | sst | 1.15.13 | npm optional packages — `opencode-<platform>-<arch>` | MIT |
 
 Versions are pinned in `manifest.json`. Updates ship inside Ritemark releases (Sprint 64, Q4 decision). A separate runtime update channel is not in scope for this sprint.
 
