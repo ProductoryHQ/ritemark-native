@@ -54,6 +54,30 @@ export function parseCommentBody(raw: string): ParsedCommentBody {
   return { alias: null, text: body }
 }
 
+/**
+ * Detect which agent a comment is assigned to — the first `@claude`/`@codex`/
+ * `@opencode` mention ANYWHERE in the body (case-insensitive), not just a leading
+ * prefix. This drives the assigned state + the Send-to-AI action, so writing
+ * `@claude` mid-note (or after editing) also assigns it.
+ */
+/** Matches an `@agent` mention followed by end/whitespace/colon — so `@codex.com`
+ *  (a domain) does not count, but `@claude`, `@claude ` and `@claude:` do.
+ *  Exported so the rail highlights exactly the mentions that assign. */
+export const MENTION_SOURCE = `@(${COMMENT_AGENT_ALIASES.join('|')})(?=$|[\\s:])`
+
+export function detectAgentAlias(body: string): CommentAgentAlias | null {
+  const m = new RegExp(MENTION_SOURCE, 'i').exec(body)
+  return m ? (m[1].toLowerCase() as CommentAgentAlias) : null
+}
+
+/** Strip recognized `@agent` mentions from a note to build a clean AI prompt. */
+export function stripAgentMentions(body: string): string {
+  return body
+    .replace(new RegExp(`${MENTION_SOURCE}\\s*:?`, 'gi'), '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 /** True when a body contains the HTML-comment terminator; such a body must be
  *  rejected at input time because it cannot be stored inside `<!-- -->`. */
 export function hasCommentTerminator(body: string): boolean {

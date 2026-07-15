@@ -14,7 +14,7 @@
  * The element's text content is the full, verbatim body (source of truth); the
  * derived `data-agent` alias is a render hint only.
  */
-import { escapeHtmlAttr, escapeHtmlText, parseCommentBody } from './commentModel'
+import { escapeHtmlAttr, escapeHtmlText, detectAgentAlias } from './commentModel'
 
 interface CommentToken {
   type: 'ritemarkComment'
@@ -43,7 +43,7 @@ export const commentMarkedExtension = {
         }
       },
       renderer(token: CommentToken): string {
-        const { alias } = parseCommentBody(token.body)
+        const alias = detectAgentAlias(token.body)
         const agentAttr = alias ? ` data-agent="${escapeHtmlAttr(alias)}"` : ''
         // Note lives in the `data-note` attribute (source of truth), HTML-escaped
         // so it can't break out. An attribute preserves `\n`, so multi-line bodies

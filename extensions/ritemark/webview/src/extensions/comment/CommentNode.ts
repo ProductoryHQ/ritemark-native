@@ -15,7 +15,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import type { CommentAgentAlias } from './commentModel'
-import { hasCommentTerminator, parseCommentBody } from './commentModel'
+import { hasCommentTerminator, detectAgentAlias } from './commentModel'
 
 export interface CommentNodeAttrs {
   note: string
@@ -112,7 +112,7 @@ export const CommentNode = Node.create({
         // bubble surfaces the error rather than saving a broken comment.
         const raw = m[1]
         const note = hasCommentTerminator(raw) ? '' : raw.trim()
-        const alias = note ? parseCommentBody(note).alias : null
+        const alias = note ? detectAgentAlias(note) : null
         const start = $from.before()
         const end = $from.after()
         return editor

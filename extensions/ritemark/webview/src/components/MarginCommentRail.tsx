@@ -14,9 +14,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { getMarkRange } from '@tiptap/core'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import {
-  parseCommentBody,
   hasCommentTerminator,
+  detectAgentAlias,
+  stripAgentMentions,
   ALIAS_TO_AGENT_ID,
+  MENTION_SOURCE,
   type CommentAgentAlias,
 } from '../extensions/comment/commentModel'
 import { sendToExtension } from '../bridge'
@@ -141,7 +143,7 @@ const CommentIcon = ({ size = 13 }: { size?: number }) => (
  * assignment lives in the text, not in extra chrome.
  */
 function renderNoteWithMentions(note: string): ReactNode {
-  const re = /@(?:claude|codex|opencode)\b/gi
+  const re = new RegExp(MENTION_SOURCE, 'gi')
   const out: ReactNode[] = []
   let last = 0
   let i = 0
@@ -290,7 +292,7 @@ export function MarginCommentRail({
     (m: RailMarker, text: string) => {
       if (!editor) return
       const note = text.trim()
-      const alias = note ? parseCommentBody(note).alias : null
+      const alias = note ? detectAgentAlias(note) : null
       if (m.kind === 'mark') {
         // Full mark range (audit H-A) so a link-spanning comment fills/clears
         // all its fragments, not just the first.
@@ -322,7 +324,7 @@ export function MarginCommentRail({
       if (!editor || !m.agent) return
       const agentId = ALIAS_TO_AGENT_ID[m.agent as CommentAgentAlias]
       if (!agentId) return
-      const instruction = parseCommentBody(m.note).text || m.note
+      const instruction = stripAgentMentions(m.note) || m.note
       let prompt = instruction
       if (m.kind === 'mark' && m.from != null && m.to != null) {
         const anchored = editor.state.doc.textBetween(m.from, m.to, ' ')

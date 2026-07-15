@@ -9,7 +9,12 @@ import { Marked } from 'marked'
 import { createTurndownService } from '../../utils/turndownService'
 import { commentMarkedExtension } from './commentMarkedExtension'
 import { addCommentTurndownRules } from './commentTurndownRules'
-import { parseCommentBody, hasCommentTerminator } from './commentModel'
+import {
+  parseCommentBody,
+  hasCommentTerminator,
+  detectAgentAlias,
+  stripAgentMentions,
+} from './commentModel'
 
 function mdToHtml(md: string): string {
   const m = new Marked({ breaks: true, gfm: true })
@@ -69,6 +74,15 @@ assert.equal(parseCommentBody('@codex fix').alias, 'codex', 'no-colon form assig
 assert.equal(parseCommentBody('@Claude fix').alias, 'claude', 'capitalized alias assigns (case-insensitive)')
 assert.equal(parseCommentBody('@codex.com is our site').alias, null, '@codex.com is NOT an alias (audit L-A)')
 assert.equal(parseCommentBody('ask @claude ok').alias, null, 'a mid-sentence mention is not an assignment')
+
+// ---- agent detection (mention anywhere in the note assigns) ----
+assert.equal(detectAgentAlias('@claude: fix'), 'claude', 'leading mention assigns')
+assert.equal(detectAgentAlias('Väike kommentaar siia! @claude'), 'claude', 'a trailing mention assigns too')
+assert.equal(detectAgentAlias('note @Codex here'), 'codex', 'a mid-note capitalized mention assigns')
+assert.equal(detectAgentAlias('see @codex.com'), null, '@codex.com (a domain) does NOT assign')
+assert.equal(detectAgentAlias('plain note'), null, 'no mention → not assigned')
+assert.equal(stripAgentMentions('@claude: rewrite this'), 'rewrite this', 'leading mention stripped for the prompt')
+assert.equal(stripAgentMentions('Väike kommentaar siia! @claude'), 'Väike kommentaar siia!', 'trailing mention stripped for the prompt')
 
 // ---- terminator guard ----
 assert.equal(hasCommentTerminator('oops --> broken'), true, 'a `-->` body is flagged')
