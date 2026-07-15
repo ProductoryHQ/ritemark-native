@@ -229,7 +229,24 @@ export class UpdateService {
 
     const currentVersion = getCurrentVersion();
     if (compareVersions(currentVersion, pendingRestartVersion) >= 0) {
+      // The staged version (or newer) is now running — restart succeeded.
       await this.storage.clearPendingRestartVersion();
+      return;
+    }
+
+    // #142 guard (bug A): if the staged version is no longer installed on
+    // disk it can never load, so a stale pendingRestartVersion would prompt
+    // "Reload to update" forever. Clear it once the staged directory is gone.
+    try {
+      const installed = await this.installer.listInstalledVersions();
+      if (!installed.includes(pendingRestartVersion)) {
+        console.warn(
+          `Clearing pendingRestartVersion ${pendingRestartVersion}: no longer installed on disk`
+        );
+        await this.storage.clearPendingRestartVersion();
+      }
+    } catch (error) {
+      console.error('Failed to reconcile pending restart version:', error);
     }
   }
 

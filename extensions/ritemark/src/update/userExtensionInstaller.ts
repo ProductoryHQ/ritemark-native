@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import * as os from 'os';
 import { UpdateManifest, UpdateFile } from './updateManifest';
+import { compareVersions } from './versionComparison';
 
 /**
  * Progress callback for download operations
@@ -171,6 +172,12 @@ export class UserExtensionInstaller {
    * update can keep N-1 alongside current — a rollback target stays on disk
    * instead of every prior version being deleted the moment a new one
    * activates.
+   *
+   * #142 guard (bug B): never delete a version NEWER than everything in the
+   * keep list. Such a version is a staged update waiting for a restart, not
+   * stale garbage. Without this, the built-in floor's own activation
+   * (keepVersions = ['X.Y.Z-0']) would delete the freshly-staged
+   * 'X.Y.Z-ext.N' before it ever gets a chance to load.
    */
   async cleanupOldVersions(keepVersions: string[]): Promise<void> {
     try {
@@ -179,16 +186,30 @@ export class UserExtensionInstaller {
       }
 
       const keepDirNames = new Set(keepVersions.map(v => `ritemark-${v}`));
+      const newestKeep = keepVersions.reduce<string | null>(
+        (max, v) => (max === null || compareVersions(v, max) > 0 ? v : max),
+        null
+      );
       const entries = await fs.promises.readdir(this.extensionsDir, { withFileTypes: true });
 
       for (const entry of entries) {
-        if (entry.isDirectory() &&
-            entry.name.startsWith('ritemark-') &&
-            !keepDirNames.has(entry.name)) {
-          const dirPath = path.join(this.extensionsDir, entry.name);
-          console.log(`Cleaning up old extension version: ${entry.name}`);
-          await this.removeDir(dirPath);
+        if (!entry.isDirectory() ||
+            !entry.name.startsWith('ritemark-') ||
+            keepDirNames.has(entry.name)) {
+          continue;
         }
+
+        const version = entry.name.replace('ritemark-', '');
+        if (newestKeep !== null && compareVersions(version, newestKeep) > 0) {
+          // Staged update newer than anything we keep — preserve it so a
+          // pending restart can load it (#142 bug B).
+          console.log(`Preserving staged newer extension version: ${entry.name}`);
+          continue;
+        }
+
+        const dirPath = path.join(this.extensionsDir, entry.name);
+        console.log(`Cleaning up old extension version: ${entry.name}`);
+        await this.removeDir(dirPath);
       }
     } catch (error) {
       console.error('Failed to cleanup old versions:', error);
