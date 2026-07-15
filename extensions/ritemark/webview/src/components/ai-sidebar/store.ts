@@ -1181,6 +1181,24 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         set({ isOnline: message.isOnline });
         break;
 
+      case 'comment:submit': {
+        // Sprint 94 (#81): a comment assigned to an agent (@claude/@codex/
+        // @opencode) was sent from the editor. Route it to the mentioned runtime
+        // and submit — reuses the normal send path (→ agent-execute).
+        const rt: 'claude-code' | 'codex' | 'opencode' =
+          message.agentId === 'codex'
+            ? 'codex'
+            : message.agentId === 'opencode'
+              ? 'opencode'
+              : 'claude-code';
+        get().setPendingRuntime({ runtimeId: rt });
+        if (!message.prompt) break;
+        if (rt === 'codex') get().sendCodexMessage(message.prompt);
+        else if (rt === 'opencode') get().sendOpenCodeMessage(message.prompt);
+        else get().sendAgentMessage(message.prompt);
+        break;
+      }
+
       case 'agent:config': {
         // Set workspace context for per-project history scoping, then immediately
         // reload the conversation list so the history panel shows all saved entries.

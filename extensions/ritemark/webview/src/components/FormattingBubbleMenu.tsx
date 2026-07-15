@@ -28,12 +28,15 @@ interface FormattingBubbleMenuProps {
   externalLinkEdit?: { url: string } | null
   /** Callback when external link edit is handled (to clear the trigger) */
   onExternalLinkEditDone?: () => void
+  /** Sprint 94 (#81): show the "Comment" action (gated on the comment-callouts flag). */
+  commentCallouts?: boolean
 }
 
 export function FormattingBubbleMenu({
   editor,
   externalLinkEdit,
-  onExternalLinkEditDone
+  onExternalLinkEditDone,
+  commentCallouts = false
 }: FormattingBubbleMenuProps) {
   // Link dialog state management
   const [showLinkDialog, setShowLinkDialog] = useState(false)
@@ -434,6 +437,25 @@ export function FormattingBubbleMenu({
           >
             <Icon name="link-simple" size={16} />
           </button>
+
+          {/* Comment Button (Sprint 94 #81) — anchors an empty comment on the
+              selection; the margin rail opens a compose bubble for it. */}
+          {commentCallouts && (
+            <>
+              <div className="w-px h-6 bg-hairline-strong mx-1" />
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() =>
+                  editor.chain().focus().setCommentMark({ note: '', agentAlias: null }).run()
+                }
+                className="px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center gap-1.5"
+                title="Add comment"
+              >
+                <Icon name="chat" size={16} />
+                Comment
+              </button>
+            </>
+          )}
         </div>
       </BubbleMenu>
 

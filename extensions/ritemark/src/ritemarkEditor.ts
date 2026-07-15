@@ -231,7 +231,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       features: {
         voiceDictation: isEnabled('voice-dictation'),
         markdownExport: isEnabled('markdown-export'),
-        saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview')
+        saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview'),
+        commentCallouts: isEnabled('comment-callouts')
       },
       ...agentFields,
     };
@@ -498,9 +499,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       feature: this.getFileType(document.uri.fsPath) === 'csv' ? 'csv_editor' : 'editor',
     });
 
-    // Get URI for the webview bundle
+    // Get URI for the webview bundle. Append a `?v=<mtime>` cache-buster (same
+    // trick as image resources) so a rebuilt bundle is actually reloaded — the
+    // webview otherwise serves a cached copy across window reloads.
     const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js');
-    const scriptUri = webviewPanel.webview.asWebviewUri(scriptPath);
+    const scriptBaseUri = webviewPanel.webview.asWebviewUri(scriptPath).toString();
+    let scriptVersion = '';
+    try { scriptVersion = `?v=${Math.round(fs.statSync(scriptPath.fsPath).mtimeMs)}`; } catch { /* keep unversioned */ }
+    const scriptUri = `${scriptBaseUri}${scriptVersion}`;
 
     // Debug logging for Windows path issues
     console.log('[Ritemark] Extension URI:', this.context.extensionUri.toString());
@@ -708,6 +714,18 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             // Open settings to configure API key
             vscode.commands.executeCommand('workbench.action.openSettings', 'ritemark.openaiApiKey');
             return;
+
+          case 'comment:send-to-ai': {
+            // Sprint 94 (#81): relay an agent-assigned comment to the AI sidebar.
+            // Lazy require avoids a load-time circular import with ./extension.
+            const agentId = message.agentId as string | undefined;
+            const prompt = message.prompt as string | undefined;
+            if (agentId && prompt) {
+              const ext = require('./extension') as typeof import('./extension');
+              ext.unifiedViewProvider?.submitCommentPrompt(agentId, prompt);
+            }
+            return;
+          }
 
           case 'wordCountChanged':
             // Update word count in status bar
@@ -1568,7 +1586,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     }
   }
 
-  private getHtml(webview: vscode.Webview, scriptUri: vscode.Uri): string {
+  private getHtml(webview: vscode.Webview, scriptUri: string): string {
     // Get nonce for Content Security Policy
     const nonce = this.getNonce();
 

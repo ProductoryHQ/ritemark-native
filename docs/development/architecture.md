@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-07-12 (Sprint 93 — seamless extension delivery)
+**Last updated:** 2026-07-15 (Sprint 94 — comment callouts)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -66,6 +66,8 @@ The load-bearing boundary. The TipTap editor cannot read files, make AI calls, o
 ```
 
 **Protocol type safety (AS IS):** `sendToExtension(type: string, data: Record<string, unknown>)` is stringly-typed. The host and webview agree on message names and payload shapes only by convention. A renamed `type` or changed payload field fails silently at runtime in a sandboxed context where it is hard to observe. See ARCH-9.
+
+**Comment callouts (Sprint 94, #81).** Editor-only comments live entirely in the editor webview (TipTap `CommentMark` for anchored highlights, an atom `CommentNode` for `///` notes, and a DOM-scanning `MarginCommentRail`); they round-trip through a scoped `marked` tokenizer + Turndown rules and are stripped at the shared export chokepoint (`export/v2/htmlPipeline.ts`). The one cross-subsystem seam is **Send-to-AI**: the editor and the AI sidebar are separate webviews, so an assigned comment relays across two new host messages — `comment:send-to-ai` (editor → `RitemarkEditorProvider`) and `comment:submit` (`UnifiedViewProvider` → sidebar, then the store's existing `sendAgentMessage`/`sendCodexMessage`/`sendOpenCodeMessage` → `agent-execute`). No `AgentRuntime` change. Gated by the `comment-callouts` experimental flag (default on). The comment webview.js bundle is now cache-busted via `?v=<mtime>` (was silently serving stale bundles across reloads).
 
 ---
 

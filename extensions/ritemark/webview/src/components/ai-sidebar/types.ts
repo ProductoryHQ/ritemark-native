@@ -346,6 +346,8 @@ export interface ByokModelOption {
 export type ExtensionMessage =
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
+  // Sprint 94 (#81): a comment assigned to an agent, relayed from the editor.
+  | { type: 'comment:submit'; agentId: string; prompt: string }
   | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]> }
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }

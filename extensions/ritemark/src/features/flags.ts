@@ -39,12 +39,25 @@ export type FlagId =
   // Sprint 82: draw.io diagram embedding
   | 'drawio-diagrams'
   // Sprint 89: remote model catalog (GH #109) — fetch model lists from ritemark-public
-  | 'remote-model-catalog';
+  | 'remote-model-catalog'
+  // Sprint 94: comment callouts (#81) — editor-only comments + AI assignment
+  | 'comment-callouts';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  // Sprint 94 (#81): editor-only comments (anchored highlights + `///` notes,
+  // assignable to an AI agent). Experimental so it is a real runtime kill-switch
+  // (a `stable` flag is hardcoded true and needs a rebuild to disable); the
+  // package.json setting defaults it ON. Disabling stops the comment round-trip.
+  'comment-callouts': {
+    id: 'comment-callouts',
+    label: 'Comment Callouts',
+    description: 'Editor-only comments: anchored highlights and /// notes, assignable to an AI agent (#81).',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   // Sprint 89 (GH #109): when disabled, the model-catalog resolver skips live
   // provider probes + the remote fetch and serves the bundled/cached floor only.
   'remote-model-catalog': {
