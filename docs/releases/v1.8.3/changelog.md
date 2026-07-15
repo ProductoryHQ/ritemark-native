@@ -11,5 +11,5 @@
 - **Seamless extension-update mechanism fixed (#142).** Repaired the in-app extension-update path so future lightweight updates actually load; infrastructure only, not user-visible, and the enabler for the upcoming `1.8.3-ext.1` updates
 
 ### Notes
-- macOS (Apple Silicon + Intel) is published now; the signed Windows installer follows shortly. Until it lands, Windows stays on the previous version.
+- Fully cross-platform and live: macOS (Apple Silicon + Intel, Apple-notarized) and Windows (x64, Authenticode-signed via Azure Trusted Signing). The update feed serves v1.8.3 to both macOS and Windows.
 - A fast-follow `1.8.3-ext.1` extension update will address two known Comments issues without a full reinstall: multi-bullet comments splitting per bullet (#150) and the low-contrast Comment button label on hover in dark theme (#151).

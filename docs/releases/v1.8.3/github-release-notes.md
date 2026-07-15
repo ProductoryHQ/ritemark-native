@@ -6,9 +6,9 @@ Ritemark v1.8.3 — Comments arrive, plus AI assignment and GPT-5.6.
 |-------|----------|-----|
 | Ritemark-arm64.dmg | macOS (Apple Silicon, arm64) — notarized | https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.3/Ritemark-arm64.dmg |
 | Ritemark-x64.dmg | macOS (Intel, x64) — notarized | https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.3/Ritemark-x64.dmg |
-| Ritemark-Setup.exe | Windows x64 — code-signed (arriving shortly) | https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.3/Ritemark-Setup.exe |
+| Ritemark-Setup.exe | Windows x64 — Authenticode-signed (Azure Trusted Signing) | https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.3/Ritemark-Setup.exe |
 
-Both macOS downloads are signed and notarized by Apple — no Gatekeeper warnings.
+Both macOS downloads are signed and notarized by Apple — no Gatekeeper warnings. The Windows installer is Authenticode-signed via Azure Trusted Signing.
 
 ## Comments
 - **Select any text → Comment** for a highlighted anchor plus a Google-Docs-style margin note.
@@ -24,5 +24,5 @@ Both macOS downloads are signed and notarized by Apple — no Gatekeeper warning
 - Attachment chips are now visible for `.md` / `.txt` files in the AI composer (#103).
 
 ## Notes
-- **macOS builds (Apple Silicon + Intel) are published now; the Windows installer follows shortly.** Until it lands, Windows stays on the previous version.
+- **Fully cross-platform and live now — macOS (Apple Silicon + Intel, notarized) and Windows (x64, code-signed).** The update feed serves v1.8.3 to both platforms.
 - A fast-follow `1.8.3-ext.1` update will fix multi-bullet comments splitting per bullet (#150) and the low-contrast Comment button on hover in dark theme (#151).
