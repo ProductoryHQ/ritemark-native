@@ -245,6 +245,18 @@ else
 fi
 echo ""
 
+# Floor the BUNDLED extension's version to X.Y.Z-0 so over-the-air X.Y.Z-ext.N
+# patches win VS Code's extension scanner (GH #142). Shared with the CI release
+# workflows via scripts/floor-bundled-extension.sh.
+if "$PROJECT_DIR/scripts/floor-bundled-extension.sh" \
+    "$APP_PATH/Contents/Resources/app/extensions/ritemark" "$RITEMARK_VERSION"; then
+  echo -e "${GREEN}Bundled extension version floored${NC}"
+else
+  echo -e "${RED}ERROR: Failed to floor bundled extension version${NC}"
+  exit 1
+fi
+echo ""
+
 # =============================================================================
 # Step 4.5: Remove unwanted built-in extensions (VS Code 1.117+)
 # Microsoft started bundling GitHub Copilot Chat + Mermaid Chat Features as

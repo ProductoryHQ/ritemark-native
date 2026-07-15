@@ -161,12 +161,75 @@ function testDismissCurrentPlanStoresKey() {
   }
 }
 
+// #135: a "new chat" (extension-driven clear-chat) must reset currentConversationId,
+// otherwise the next session reuses the old id and overwrites the previous entry in
+// history — collapsing multiple sessions into one.
+function testNewChatResetsConversationIdSoSessionsDoNotCollapse() {
+  try {
+    useAISidebarStore.setState({
+      ...useAISidebarStore.getState(),
+      currentConversationId: 'conv-1',
+      agentConversation: [{
+        id: 'agent-turn-1',
+        userPrompt: 'First session',
+        activities: [],
+        isRunning: false,
+        isPlan: false,
+        planHandled: false,
+        timestamp: 1,
+      }],
+    });
+
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'clear-chat' });
+
+    assert.equal(
+      useAISidebarStore.getState().currentConversationId,
+      null,
+      'new chat must reset currentConversationId so the next session gets a fresh id (#135)'
+    );
+  } finally {
+    resetStore();
+  }
+}
+
+// #135: /clear must also reset the id — otherwise a new message after clearing
+// reuses the cleared conversation's id and overwrites it.
+function testClearChatResetsConversationId() {
+  try {
+    useAISidebarStore.setState({
+      ...useAISidebarStore.getState(),
+      currentConversationId: 'conv-1',
+      agentConversation: [{
+        id: 'agent-turn-1',
+        userPrompt: 'x',
+        activities: [],
+        isRunning: false,
+        isPlan: false,
+        planHandled: false,
+        timestamp: 1,
+      }],
+    });
+
+    useAISidebarStore.getState().clearChat();
+
+    assert.equal(
+      useAISidebarStore.getState().currentConversationId,
+      null,
+      '/clear must reset currentConversationId (#135)'
+    );
+  } finally {
+    resetStore();
+  }
+}
+
 function main() {
   testStartNewConversationResetsProviderSessions();
   testClearChatResetsProviderSessions();
   testDismissedCurrentPlanKeyResetsForNewConversation();
   testDismissedCurrentPlanKeyResetsForClearChatMessage();
   testDismissCurrentPlanStoresKey();
+  testNewChatResetsConversationIdSoSessionsDoNotCollapse();
+  testClearChatResetsConversationId();
   console.log('Conversation reset tests passed.');
 }
 

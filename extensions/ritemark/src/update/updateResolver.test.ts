@@ -85,10 +85,14 @@ test('prefers full update when app version is behind latest full release', () =>
 });
 
 test('offers extension update when app base is current', () => {
+  // A fresh production install ships the built-in extension at the semver
+  // "floor" 1.5.0-0 (GH #142), NOT plain 1.5.0 — the floor sorts below any
+  // 1.5.0-ext.N patch so VS Code's scanner prefers the OTA update. The patch
+  // 1.5.0-ext.1 is therefore a valid upgrade over the running floor.
   const result = resolveUpdate({
     feed: createFeed(),
     currentAppVersion: '1.5.0',
-    currentExtensionVersion: '1.5.0',
+    currentExtensionVersion: '1.5.0-0',
     platform: 'darwin',
     arch: 'arm64'
   });

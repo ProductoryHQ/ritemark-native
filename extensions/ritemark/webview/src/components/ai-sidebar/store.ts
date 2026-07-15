@@ -1117,7 +1117,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
       state.agentConversation.length > 0 ||
       state.codexConversation.length > 0 ||
       state.chatMessages.length > 0;
-    if (hasContent && state.currentConversationId) {
+    // Save even when currentConversationId is still null — a session may not have
+    // been persisted yet (persist runs on agent results); saveCurrentConversation
+    // generates an id for it. Without this the un-persisted session is lost (#135).
+    if (hasContent) {
       get().saveCurrentConversation();
     }
 
@@ -1153,6 +1156,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
   clearChat: () => {
     resetProviderSessions();
     set({
+      // Reset the id too — otherwise the next message reuses the old
+      // conversation id and overwrites the previous entry in history (#135).
+      currentConversationId: null,
       chatMessages: [],
       conversationHistory: [],
       streamingContent: '',
@@ -1413,15 +1419,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => ({
         break;
 
       case 'clear-chat':
-        set({
-          chatMessages: [],
-          conversationHistory: [],
-          streamingContent: '',
-          isStreaming: false,
-          agentConversation: [],
-          codexConversation: [],
-          dismissedCurrentPlanKey: null,
-        });
+        // "New chat" (ritemark.newChat command). Must save the current session
+        // and reset currentConversationId — otherwise the next session reuses the
+        // same id and OVERWRITES the previous one in history (#135). Route through
+        // startNewConversation so it behaves exactly like the `/new` command.
+        get().startNewConversation();
         break;
 
       case 'toggle-history-panel':

@@ -1061,14 +1061,16 @@ export function ChatInput() {
                     />
                   </div>
                 ) : (
-                  <div className="flex h-7 items-center gap-1.5 px-2 max-w-[160px]">
-                    {att.kind === 'pdf' ? (
-                      <Icon name="file-text" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
-                    ) : (
-                      <Icon name="file-image" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
-                    )}
-                    <span className="text-[10px] text-[var(--r-ink-muted)] truncate">
-                      {att.name}
+                  /* #103: non-image files get a card the same size as an image
+                     thumbnail (w-14 h-14) so an attached .md/.txt/.json is
+                     obvious, with the extension shown as a label. */
+                  <div
+                    className="w-14 h-14 flex flex-col items-center justify-center gap-1 px-1"
+                    title={att.name}
+                  >
+                    <Icon name="file-text" size={20} className="shrink-0 text-[var(--r-ink-muted)]" />
+                    <span className="max-w-full truncate text-[9px] font-semibold uppercase tracking-wide text-[var(--r-ink-muted)]">
+                      {att.name.includes('.') ? att.name.split('.').pop() : 'file'}
                     </span>
                   </div>
                 )}
