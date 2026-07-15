@@ -13,6 +13,7 @@
  * note at the cursor.
  */
 import { Node, mergeAttributes } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 import type { CommentAgentAlias } from './commentModel'
 import { hasCommentTerminator, parseCommentBody } from './commentModel'
 
@@ -117,7 +118,12 @@ export const CommentNode = Node.create({
         return editor
           .chain()
           .command(({ tr }) => {
-            tr.replaceRangeWith(start, end, this.type.create({ note, agentAlias: alias }))
+            const created = this.type.create({ note, agentAlias: alias })
+            tr.replaceRangeWith(start, end, created)
+            // Collapse to a text cursor after the note so the atom doesn't stay
+            // node-selected (which would raise the formatting toolbar).
+            const after = Math.min(start + created.nodeSize, tr.doc.content.size)
+            tr.setSelection(TextSelection.near(tr.doc.resolve(after)))
             return true
           })
           .run()

@@ -61,14 +61,20 @@ Structure follows `technical-plan.md` Revision 2: **Gate A (lossless core)** mus
 - [ ] Manual: full load/edit/save/copy cycle (anchored + standalone, single + multi-line) in dev mode.
 - [ ] `qa-validator` on the core (user routes).
 
-## Gate B — AI assignment (only after Gate A green)
+## Gate B — AI assignment — IMPLEMENTED (compile-verified; runtime test pending in the full app)
 
-- [ ] `@alias` parsed from body (source of truth) at create/edit; agent badge on assigned marker.
-- [ ] `FileLinkSuggestions.tsx` guard: skip `@` file-search inside a comment.
-- [ ] Send-to-AI relay (Codex #1): editor `comment:send-to-ai` → `RitemarkEditorProvider` → `UnifiedViewProvider` (reveal sidebar) → `comment:submit` → store `sendAgentMessage`/`sendCodexMessage` → existing `agent-execute`.
-- [ ] Context block scoped to the anchored span / containing block.
-- [ ] Route to the mentioned agent's id even if it differs from the sidebar's active runtime.
-- [ ] Manual: sidebar-closed → Send to AI → opens → prompt received, for each alias + unknown-alias fallback.
+- [x] `@alias` parsed from body (source of truth); agent badge on the assigned marker.
+- [x] Send-to-AI relay (Codex #1): editor `comment:send-to-ai` (`sendToExtension`) → `RitemarkEditorProvider` case → `unifiedViewProvider.submitCommentPrompt()` (reveals sidebar) → `comment:submit` → store routes to `sendAgentMessage`/`sendCodexMessage`/`sendOpenCodeMessage` → existing `agent-execute`. New `ExtensionMessage` variant `comment:submit`.
+- [x] Context block: the anchored span text is appended to the prompt.
+- [x] Routes to the mentioned agent's id (claude-code/codex/opencode) via `ALIAS_TO_AGENT_ID` regardless of the sidebar's active runtime; `setPendingRuntime` updates the UI.
+- [x] "Send to AI" button in the assigned-comment bubble with a "Sent" confirmation state.
+- [ ] **Runtime QA (Jarmo, in the running dev app):** sidebar-closed → Send to AI → sidebar opens → the mentioned agent receives the prompt, for each alias.
+- [ ] `FileLinkSuggestions.tsx` guard: skip `@` file-search inside a comment (deferred — the `@` popup only triggers in the editor body, not in the rail compose textarea, so lower risk).
+
+## Polish (audit low items) — DONE
+
+- [x] `///`-lift collapses to a text cursor after the note (no lingering node-selection / toolbar pop) — `TextSelection.near`.
+- [x] L-C: rail no longer rescans on `selectionUpdate` (positions don't change on cursor move) — perf.
 
 ## Phase 8: Architecture Gate + QA + Closeout
 

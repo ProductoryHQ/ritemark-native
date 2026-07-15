@@ -334,3 +334,8 @@ body {
 .rm-btn-primary { background: var(--ritemark-indigo, #4338ca); color: #fff; box-shadow: 0 4px 6px -1px rgba(67,56,202,0.25); }
 .rm-btn-primary:hover { background: var(--ritemark-indigo-deep, #3730a3); }
 .rm-btn-primary:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+
+/* Send-to-AI action in an assigned comment bubble (Gate B) */
+.rm-bubble-foot { display: flex; justify-content: flex-end; margin-top: 9px; }
+.rm-send { display: inline-flex; align-items: center; gap: 5px; }
+.rm-send:disabled { opacity: 1; background: var(--ritemark-indigo-deep, #3730a3); cursor: default; }

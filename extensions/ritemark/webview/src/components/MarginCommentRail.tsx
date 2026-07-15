@@ -13,7 +13,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getMarkRange } from '@tiptap/core'
 import type { Editor as TipTapEditor } from '@tiptap/react'
-import { parseCommentBody, hasCommentTerminator } from '../extensions/comment/commentModel'
+import {
+  parseCommentBody,
+  hasCommentTerminator,
+  ALIAS_TO_AGENT_ID,
+  type CommentAgentAlias,
+} from '../extensions/comment/commentModel'
+import { sendToExtension } from '../bridge'
 
 interface RailMarker {
   key: string
@@ -192,6 +198,7 @@ export function MarginCommentRail({
 }) {
   const [markers, setMarkers] = useState<RailMarker[]>([])
   const [openKey, setOpenKey] = useState<string | null>(null)
+  const [sentKey, setSentKey] = useState<string | null>(null)
   const rafRef = useRef<number | null>(null)
 
   const rescan = useCallback(() => {
@@ -206,15 +213,15 @@ export function MarginCommentRail({
     if (!editor || !container) return
     rescan()
     const on = () => rescan()
+    // Positions only change on content edits / scroll / resize — NOT on cursor
+    // moves, so we intentionally do not listen to `selectionUpdate` (audit L-C).
     editor.on('update', on)
-    editor.on('selectionUpdate', on)
     container.addEventListener('scroll', on, { passive: true })
     window.addEventListener('resize', on)
     const ro = new ResizeObserver(on)
     ro.observe(container)
     return () => {
       editor.off('update', on)
-      editor.off('selectionUpdate', on)
       container.removeEventListener('scroll', on)
       window.removeEventListener('resize', on)
       ro.disconnect()
@@ -278,6 +285,27 @@ export function MarginCommentRail({
     [editor, rescan],
   )
 
+  // Hand an agent-assigned comment to the AI sidebar (Gate B relay).
+  const sendToAI = useCallback(
+    (m: RailMarker) => {
+      if (!editor || !m.agent) return
+      const agentId = ALIAS_TO_AGENT_ID[m.agent as CommentAgentAlias]
+      if (!agentId) return
+      const instruction = parseCommentBody(m.note).text || m.note
+      let prompt = instruction
+      if (m.kind === 'mark' && m.from != null && m.to != null) {
+        const anchored = editor.state.doc.textBetween(m.from, m.to, ' ')
+        if (anchored) {
+          prompt = `${instruction}\n\n---\nThis comment refers to the following text:\n"${anchored}"`
+        }
+      }
+      sendToExtension('comment:send-to-ai', { agentId, prompt })
+      setSentKey(m.key)
+      window.setTimeout(() => setSentKey((k) => (k === m.key ? null : k)), 2500)
+    },
+    [editor],
+  )
+
   if (!markers.length) return null
 
   return (
@@ -320,6 +348,27 @@ export function MarginCommentRail({
                   </button>
                 </div>
                 <div className="rm-bubble-text">{m.note}</div>
+                {assigned && (
+                  <div className="rm-bubble-foot">
+                    <button
+                      className="rm-btn-primary rm-send"
+                      onClick={() => sendToAI(m)}
+                      disabled={sentKey === m.key}
+                    >
+                      {sentKey === m.key ? (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                          Sent
+                        </>
+                      ) : (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg>
+                          Send to AI
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <button className="rm-marker" onClick={() => setOpenKey(m.key)}>

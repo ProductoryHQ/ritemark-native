@@ -565,6 +565,25 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Sprint 94 (#81): a comment assigned to an AI agent was sent from the editor.
+   * Reveal the sidebar and hand the prompt to the store, which routes it to the
+   * mentioned runtime and submits (→ the normal agent-execute path). If the view
+   * isn't resolved yet, focus the container first so `_view` gets populated.
+   */
+  public submitCommentPrompt(agentId: string, prompt: string) {
+    const dispatch = () =>
+      this._view?.webview.postMessage({ type: 'comment:submit', agentId, prompt });
+    if (this._view) {
+      this.show();
+      dispatch();
+    } else {
+      // Not resolved yet — reveal the view, then dispatch once it's ready.
+      vscode.commands.executeCommand('ritemark.unifiedView.focus');
+      setTimeout(dispatch, 400);
+    }
+  }
+
+  /**
    * Clear chat history and start fresh conversation
    */
   public clearChat() {

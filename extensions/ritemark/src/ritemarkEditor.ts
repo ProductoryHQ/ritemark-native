@@ -710,6 +710,18 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             vscode.commands.executeCommand('workbench.action.openSettings', 'ritemark.openaiApiKey');
             return;
 
+          case 'comment:send-to-ai': {
+            // Sprint 94 (#81): relay an agent-assigned comment to the AI sidebar.
+            // Lazy require avoids a load-time circular import with ./extension.
+            const agentId = message.agentId as string | undefined;
+            const prompt = message.prompt as string | undefined;
+            if (agentId && prompt) {
+              const ext = require('./extension') as typeof import('./extension');
+              ext.unifiedViewProvider?.submitCommentPrompt(agentId, prompt);
+            }
+            return;
+          }
+
           case 'wordCountChanged':
             // Update word count in status bar
             if (RitemarkEditorProvider._wordCountStatusBar) {
