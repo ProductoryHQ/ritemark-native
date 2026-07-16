@@ -11,6 +11,7 @@ import {
   requestWorkspaceFileSearch,
   type WorkspaceFileLinkResult,
 } from '../lib/workspaceFileSearch'
+import { newCommentId } from '../extensions/comment/CommentMark'
 
 /**
  * FormattingBubbleMenu Component
@@ -296,7 +297,14 @@ export function FormattingBubbleMenu({
           return true
         }}
       >
-        <div className="flex items-center gap-1 bg-white border border-hairline-strong rounded shadow-lg p-2">
+        {/* The toolbar is an always-white floating pill, so its interactive
+            surface token must stay light too — otherwise the theme-aware
+            `--r-surface-soft` turns dark in dark mode and hover/active states
+            render dark-on-white text (invisible), e.g. the Comment label (#151). */}
+        <div
+          className="flex items-center gap-1 bg-white border border-hairline-strong rounded shadow-lg p-2"
+          style={{ '--r-surface-soft': 'var(--ritemark-surface-soft)' } as React.CSSProperties}
+        >
           {/* Bold Button - Keyboard: Ctrl+B / Cmd+B */}
           <button
             onMouseDown={(e) => e.preventDefault()} // Prevents editor from losing focus
@@ -446,7 +454,7 @@ export function FormattingBubbleMenu({
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() =>
-                  editor.chain().focus().setCommentMark({ note: '', agentAlias: null }).run()
+                  editor.chain().focus().setCommentMark({ id: newCommentId(), note: '', agentAlias: null }).run()
                 }
                 className="px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center gap-1.5"
                 title="Add comment"

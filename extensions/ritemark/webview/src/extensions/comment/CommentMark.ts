@@ -11,8 +11,24 @@ import { Mark, mergeAttributes } from '@tiptap/core'
 import type { CommentAgentAlias } from './commentModel'
 
 export interface CommentMarkAttrs {
+  /**
+   * Stable comment id shared by every fragment of one comment (#150). A
+   * multi-block selection produces several ProseMirror mark ranges (marks can't
+   * span block boundaries); giving them all the same id lets the rail treat
+   * them as ONE comment instead of N.
+   */
+  id: string | null
   note: string
   agentAlias: CommentAgentAlias | null
+}
+
+/** Generate a stable comment id (#150). */
+export function newCommentId(): string {
+  try {
+    return crypto.randomUUID()
+  } catch {
+    return `c-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+  }
 }
 
 declare module '@tiptap/core' {
@@ -35,6 +51,11 @@ export const CommentMark = Mark.create({
 
   addAttributes() {
     return {
+      id: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-comment-id') || null,
+        renderHTML: (attrs) => (attrs.id ? { 'data-comment-id': attrs.id } : {}),
+      },
       note: {
         default: '',
         parseHTML: (el) => el.getAttribute('data-comment') || '',
