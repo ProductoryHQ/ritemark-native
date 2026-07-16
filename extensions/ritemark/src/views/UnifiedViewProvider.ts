@@ -9,6 +9,7 @@ import {
   apiKeyChanged,
   isOnline,
   connectivityChanged,
+  forceConnectivityCheck,
   type EditorSelection
 } from '../ai/index';
 
@@ -450,6 +451,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'agent-setup:dismiss-welcome':
           vscode.workspace.getConfiguration('ritemark.ai').update('hasSeenClaudeWelcome', true, vscode.ConfigurationTarget.Global);
+          break;
+
+        case 'connectivity:recheck':
+          await forceConnectivityCheck();
+          this._sendConnectivityStatus();
           break;
 
         // Codex messages
