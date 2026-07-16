@@ -68,6 +68,26 @@ assert.equal(
   'empty-note mark is unwrapped, not persisted (audit M-A)',
 )
 
+// ---- shared comment id (#150): multi-block comment stays ONE comment ----
+assert.match(
+  roundTrip('The <mark data-comment="check" data-comment-id="c1">margins</mark> line.'),
+  /data-comment-id="c1"/,
+  'anchored mark preserves its shared id',
+)
+{
+  // Two blocks whose fragments share one id must ALL keep that id, so on reload
+  // the rail groups them into a single comment instead of one-per-block.
+  const md =
+    'First <mark data-comment="rethink" data-comment-id="c9">para</mark> here.\n\n' +
+    'Second <mark data-comment="rethink" data-comment-id="c9">para</mark> too.'
+  const ids = (roundTrip(md).match(/data-comment-id="c9"/g) || []).length
+  assert.equal(ids, 2, 'every fragment of a multi-block comment keeps the same id')
+}
+assert.ok(
+  !/data-comment-id/.test(roundTrip('The <mark data-comment="x">margins</mark> line.')),
+  'a legacy id-less mark round-trips without inventing an id (back-compat)',
+)
+
 // ---- mention parsing ----
 assert.equal(parseCommentBody('@claude: fix').alias, 'claude', 'colon form assigns')
 assert.equal(parseCommentBody('@codex fix').alias, 'codex', 'no-colon form assigns')

@@ -16,6 +16,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import type { CommentAgentAlias } from './commentModel'
 import { hasCommentTerminator, detectAgentAlias } from './commentModel'
+import { newCommentId } from './CommentMark'
 
 export interface CommentNodeAttrs {
   note: string
@@ -84,7 +85,7 @@ export const CommentNode = Node.create({
         const { editor } = this
         const { empty } = editor.state.selection
         if (!empty) {
-          return editor.commands.setCommentMark({ note: '', agentAlias: null })
+          return editor.commands.setCommentMark({ id: newCommentId(), note: '', agentAlias: null })
         }
         return editor.commands.insertCommentNode()
       },

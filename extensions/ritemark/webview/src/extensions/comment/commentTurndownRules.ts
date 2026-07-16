@@ -38,9 +38,13 @@ export function addCommentTurndownRules(service: TurndownService): void {
       // An unfilled comment (empty note) is not a real comment — unwrap it so it
       // doesn't persist and force a compose bubble on every reload (audit M-A).
       if (!note.trim()) return content
+      // Shared comment id (#150) — persist it so a multi-block comment reloads
+      // as ONE comment instead of re-fragmenting into one per block.
+      const id = el.getAttribute('data-comment-id')
+      const idAttr = id ? ` data-comment-id="${escapeHtmlAttr(id)}"` : ''
       const agent = el.getAttribute('data-agent')
       const agentAttr = agent ? ` data-agent="${escapeHtmlAttr(agent)}"` : ''
-      return `<mark data-comment="${escapeHtmlAttr(note)}"${agentAttr}>${content}</mark>`
+      return `<mark data-comment="${escapeHtmlAttr(note)}"${idAttr}${agentAttr}>${content}</mark>`
     },
   })
 }
