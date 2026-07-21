@@ -504,8 +504,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         }
 
         case 'conversation:reset':
-          traceCodex('webview->extension', 'conversation:reset');
-          this._resetProviderSessions();
+          traceCodex('webview->extension', 'conversation:reset', { conversationId: message.conversationId });
+          // Scoped to the named conversation. The webview sends this only when a
+          // conversation is genuinely thrown away (clear / close / delete), never
+          // on a switch — see webview store `resetProviderSession`.
+          this._disposeRuntimeSessions(message.conversationId ?? DEFAULT_CONVERSATION_ID);
           break;
 
         // Sprint 76 R3a: return provider-configured booleans (never key values)
@@ -603,10 +606,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Clear chat history and start fresh conversation
+   * Clear chat history and start a fresh conversation.
+   *
+   * The webview owns which conversation is being cleared, so it answers the
+   * `clear-chat` message with a scoped `conversation:reset`. This used to dispose
+   * EVERY runtime for EVERY conversation, which since Sprint 99 left other
+   * conversations showing a transcript whose agent had silently forgotten it.
    */
   public clearChat() {
-    this._resetProviderSessions();
     this._view?.webview.postMessage({ type: 'clear-chat' });
   }
 
@@ -875,11 +882,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         }
       })();
     }, 2000);
-  }
-
-  private _resetProviderSessions(): void {
-    traceCodex('runtime', 'reset provider sessions');
-    this._runtimeRegistry.getAll().forEach(r => r.dispose());
   }
 
   private _postCodexSidebarStatus(status: CodexSidebarStatus): void {
