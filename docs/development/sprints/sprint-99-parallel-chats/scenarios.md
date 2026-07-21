@@ -496,6 +496,20 @@ And no notification centre, activity panel, or global background-work overview e
 Given a thread has two queued prompts
 Then the user cannot edit, reorder, promote, or remove them (issue #95 is not resolved by this sprint)
 
+
+### Scenario: OpenCode chats appear to queue under provider throttling (NOT a bug)
+
+Measured during the Phase-0 ACP spike (see `technical-plan.md` §2 D1).
+
+- **Given** two open OpenCode threads using the zero-config OpenCode Zen free models
+- **When** both are prompted at once and the provider is throttling
+- **Then** their turns may stream strictly one after the other, with first-token latency climbing
+  across turns (observed 7.5 s → 12.4 s → 19.0 s)
+- **And** this is upstream rate limiting, not a serialization regression: a control run with one
+  process per session reproduced the identical latency profile
+- **QA note:** do not file serialized OpenCode streaming as a concurrency bug without first checking
+  whether a non-throttled provider (BYOK key configured) reproduces it.
+
 ---
 
 *Derived from the Jarmo-approved [`design.md`](design.md) (2026-07-21). Scenarios marked [RESOLVED GAP] cover behaviour design.md did not determine; the decision and reasoning for each are in `spec.md` § Resolved Design Gaps.*

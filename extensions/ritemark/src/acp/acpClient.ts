@@ -180,24 +180,29 @@ export class AcpClient {
   /**
    * Cancel an in-flight turn.
    *
-   * Sprint 76 R1/R5: OpenCode 1.15.13 returns -32601 ("Method not found") for
-   * session/cancel (audit T9), so ACP cancellation cannot be relied upon. We
-   * fall back to killing the agent process — the session is abandoned but the
-   * UI can return to idle. We still attempt the protocol cancel first in case a
-   * future/other ACP agent implements it; failures are swallowed to the trace.
+   * OpenCode 1.15.13 does not implement `session/cancel` — it answers -32601 and
+   * the turn keeps streaming to `end_turn` rather than `cancelled` (verified in
+   * the Sprint 99 Phase-0 spike). So the protocol cancel is best-effort and the
+   * process kill is what actually stops the work.
+   *
+   * The kill is NOT conditional on the protocol call failing, and cannot be:
+   * `Connection.cancel` is a JSON-RPC *notification* in @agentclientprotocol/sdk
+   * 0.22.1 (`dist/acp.js:838`), so it never resolves to an error — the -32601
+   * only ever appears on the agent's stderr. An earlier version of this method
+   * wrapped it in try/catch as though the error were observable; it was not.
+   *
+   * Sprint 99: killing the process is only acceptable while one session exists
+   * per process. Once several conversations share a subprocess this must stop
+   * killing it — see technical-plan.md §5 C3.
+   *
+   * // Sprint 100: re-check against 1.18.1 — if it implements session/cancel,
+   * // this becomes a real per-session cancel and the kill goes away entirely.
    */
   async cancel(sessionId: string): Promise<void> {
     if (this.connection) {
-      try {
-        await this.connection.cancel({ sessionId });
-        this.trace?.('client', 'cancel:protocol', { sessionId });
-      } catch (error) {
-        // Expected on OpenCode 1.15.13 (-32601). Fall through to process kill.
-        this.trace?.('client', 'cancel:protocol-unsupported', {
-          sessionId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      // Fire-and-forget: correct for any agent that implements it, no-op otherwise.
+      this.connection.cancel({ sessionId });
+      this.trace?.('client', 'cancel:protocol-notification-sent', { sessionId });
     }
     this.killProcess('SIGTERM');
   }

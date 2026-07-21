@@ -61,23 +61,49 @@ block another session's `session/update`. `AcpClient` is already fully session-p
 `prompt(sessionId, …)` (`acpClient.ts:154`), `cancel(sessionId)` (`:189`). The single-session
 assumption lives entirely in Ritemark's `acpManager.ts`.
 
-Chosen (a) because option (b) means 5 × 104 MB Bun processes plus 5 more `browserMcpAdapter` Node
-subprocesses at the design's 5-thread cap — a user-visible resource regression in a markdown editor —
-and 5 cold starts. Option (a) also gives all three runtimes the same shape, which matters for R1.
+Chosen (a) because option (b) means five separate Bun processes plus five more `browserMcpAdapter`
+Node subprocesses at the design's 5-thread cap — a user-visible resource regression in a markdown
+editor — and five cold starts. (The spike below measured the real cost: **1291 MB vs 339 MB**.)
+Option (a) also gives all three runtimes the same shape, which matters for R1.
 
-**The risk that would kill (a):** OpenCode serializing turns internally, or leaking state between
-sessions in one process. ACP-the-protocol supports concurrency; OpenCode-the-implementation on
-1.15.13 has already been caught not implementing `session/cancel` (`acpClient.ts:183-187`, `-32601`).
+**SPIKE RESULT (2026-07-21): D1 SURVIVES — decision confirmed, not provisional.**
 
-**Phase 0 spike (blocking, before any ACP wiring):** open two `session/new` sessions on one
-connection, fire two `session/prompt` calls, assert both stream `session/update` interleaved rather
-than sequentially. Also measure `ps -o rss` on a live `opencode acp` process — the 104 MB figure is
-the binary size, not resident memory, and option (b)'s cost estimate is currently inferred. If the
-spike fails, fall back to (b): per-instance IPC sockets already exist (§4), so the fallback is cheap.
+*Q1 — concurrency.* One process, two sessions, two `session/prompt` calls in the same tick, with
+real model-backed turns (OpenCode Zen free models are the zero-config default, so no BYOK key was
+needed). Streaming windows overlapped 1795–2228 ms with 33–36 alternation blocks. A control run
+using two SEPARATE processes overlapped 2396–2632 ms with 15–27 blocks — **shared alternated more
+finely than split**. One process is not a concurrency bottleneck. Five `session/new` calls on one
+connection all returned distinct `ses_…` ids, and every `session/update` carried `params.sessionId`
+(the field `acpManager.ts:225` currently ignores).
 
-**Sprint 100 dependency:** under (a), `cancel()` must not fall back to killing the process
-(`acpClient.ts:202`) — that would kill every other chat. Until OpenCode implements `session/cancel`,
-cancel for ACP is best-effort at the session level. Marked `// Sprint 100: re-check against 1.18.1`.
+*Q2 — memory, and the plan's estimate was wrong in option (b)'s favour.* Measured idle RSS:
+
+| topology | RSS |
+|---|---|
+| 1 process / 5 sessions (option a) | **339 MB** |
+| 5 processes / 1 session (option b) | **1291 MB** (203–284 MB each) |
+
+Marginal cost of a session inside one process is ~1 MB. The 104 MB figure previously cited here is
+the *binary size*; real per-process idle RSS is 203–284 MB, so option (b) at the 5-thread cap costs
+**~1.3 GB before** the five extra `browserMcpAdapter` Node subprocesses. This makes (a) a much
+stronger choice than when the decision was first taken.
+
+*Known false alarm for QA.* One early run serialized strictly, with first-token latency climbing
+7.5 s → 12.4 s → 19.0 s. The split-process control reproduced the same profile, so it was upstream
+free-tier throttling, not a client-side lock. **Under provider throttling, parallel ACP chats will
+legitimately appear to queue with no bug present** — recorded in `scenarios.md` so QA does not read
+it as a serialization regression.
+
+*Q3 — `session/cancel` is still unimplemented on 1.15.13,* returning
+`-32601 "Method not found": session/cancel`, and it is a genuine no-op: after cancel the turn kept
+streaming and settled `end_turn`, not `cancelled`.
+
+**The spike also found a bug that promotes C3 from cleanup to hard blocker.** In SDK 0.22.1
+`Connection.cancel` is a **notification**, not a request (`dist/acp.js:838-840` →
+`sendNotification`). So `acpClient.ts:189-201`'s `try/catch` **can never observe the -32601** — the
+error surfaces only on the agent's stderr. The catch is dead code and `killProcess('SIGTERM')`
+(`:202`) therefore fires **unconditionally on every cancel**, not as a fallback. With one chat that
+matches the documented intent; under D1 it is an unconditional kill of every chat. See C3.
 
 ### D2 — One shared browser for all chats, with serialized tool access
 
@@ -188,10 +214,23 @@ the failure most likely to be reported as "OpenCode silently does nothing"); `th
 entirely; drop the "already running" throw (`:82-84`); `cancel()` (`:161-167`) and `handleExit()`
 (`:272-280`) must stop nuking global state.
 
-**C3 — Cancel.** `acpClient.ts:202` kills the process when protocol cancel fails. Under (a) that
-kills every chat. Scope it: session-level cancel only, no process kill. Marked
-`// Sprint 100: re-check against 1.18.1` — if the bumped binary implements `session/cancel`, this
-becomes a real cancel; if not, ACP cancel stays best-effort and D1's fallback to (b) is reconsidered.
+**C3 — Cancel (HARD BLOCKER — must land before any multi-session ACP wiring).** The spike proved
+`killProcess('SIGTERM')` at `acpClient.ts:202` is unconditional, not a fallback. Left alone, the
+first cancel in any chat kills every other OpenCode chat. Delete the kill and correct the misleading
+comment at `:180-188` (it claims the -32601 is caught; it cannot be).
+
+That leaves 1.15.13 with no working cancel, so cancel must degrade honestly rather than either
+killing everyone or silently doing nothing:
+
+- Send the protocol cancel notification anyway (harmless, and correct for any agent that implements it).
+- If this is the **only** live ACP session, keep today's behaviour and kill the process — nothing else
+  is harmed and the user gets a real cancel.
+- If **other** ACP sessions are live, do not kill. Mark the session cancel-requested and discard its
+  updates until it settles; from the user's side the chat returns to idle immediately, and the
+  wasted upstream work is invisible.
+
+Marked `// Sprint 100: re-check against 1.18.1` — if the bumped binary implements `session/cancel`,
+this collapses to a real per-session cancel and the special-casing goes away.
 
 **C4 — IPC.** `BrowserIpcServer` already builds a per-instance socket path from
 `crypto.randomUUID()` (`AcpRuntime.ts:86-91`, `BrowserIpcServer.ts:38-43`) — option (b) would get
@@ -263,7 +302,7 @@ of OPEN thread ids per workspace (R13).
 
 | Phase | Content | Gate |
 |---|---|---|
-| **0** | ACP concurrency spike + OpenCode RSS measurement (D1). Fix A1 (live pending-approval bug) — independent of everything else. | Spike result recorded here before ACP wiring starts |
+| **0** | ~~ACP concurrency spike + RSS measurement (D1)~~ **DONE — D1 confirmed.** ~~Fix A1 (live pending-approval bug)~~ **DONE.** Remaining: C3 cancel fix, promoted to blocker by the spike. | ✅ Spike recorded in §2 D1; A1 shipped with a regression test |
 | **1** | R1 interface (`createSession`/`RuntimeSession`) + E1/E2 store reshape + D1 message protocol, landed together | Two chats visibly coexist with ONE runtime wired (Codex) |
 | **2** | Workstream B (Codex) complete, incl. B1 data-loss fix | Scenario suite for Codex×Codex concurrency green |
 | **3** | Workstream A (Claude) — A2, A3 | Claude×Claude and Claude×Codex green |
