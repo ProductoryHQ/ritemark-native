@@ -145,3 +145,56 @@ export function isConversationRunning(conversation: ConversationState): boolean 
     || conversation.codexConversation.some((t) => t.isRunning)
   );
 }
+
+/** Copy shown on a turn that was cut off by a relaunch (R13). */
+export const INTERRUPTED_TURN_MESSAGE =
+  'Interrupted — Ritemark closed while this turn was running. Send the prompt again to continue.';
+
+/**
+ * Sprint 99 (R13): make a restored thread honest about what happened.
+ *
+ * A turn that was mid-flight at shutdown must not come back looking live, and a
+ * pending approval or question restored from disk is un-actionable — the runtime
+ * process that raised it is gone. So we stop the turn, drop the stale prompts,
+ * and mark it interrupted. This is **informational only**: no retry affordance,
+ * because a partially applied turn's side effects (files written, commands run)
+ * are not tracked and offering "resume" would be a correctness claim the code
+ * cannot back (Resolved Gap 5).
+ */
+export function markConversationInterrupted(conversation: ConversationState): ConversationState {
+  let touched = false;
+
+  const agentConversation = conversation.agentConversation.map((turn) => {
+    if (!turn.isRunning && !turn.approval && !turn.pendingQuestion && !turn.pendingPlanApproval) return turn;
+    touched = true;
+    const next = { ...turn, isRunning: false };
+    delete next.approval;
+    delete next.pendingQuestion;
+    delete next.pendingPlanApproval;
+    if (!next.result) {
+      next.result = {
+        text: '',
+        filesModified: [],
+        metrics: { durationMs: 0, costUsd: null, model: null },
+        error: INTERRUPTED_TURN_MESSAGE,
+      };
+    }
+    return next;
+  });
+
+  const codexConversation = conversation.codexConversation.map((turn) => {
+    if (!turn.isRunning && !turn.approval && !turn.pendingQuestion) return turn;
+    touched = true;
+    const next = { ...turn, isRunning: false };
+    delete next.approval;
+    delete next.pendingQuestion;
+    delete next.rpcProgressMessage;
+    if (!next.result) {
+      next.result = { status: 'interrupted', error: INTERRUPTED_TURN_MESSAGE };
+    }
+    return next;
+  });
+
+  if (!touched) return conversation;
+  return { ...conversation, agentConversation, codexConversation, isStreaming: false };
+}

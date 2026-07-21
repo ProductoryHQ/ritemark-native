@@ -22,6 +22,8 @@ import {
   generateId,
   generateTitle,
   setWorkspaceContext,
+  saveOpenThreadIds,
+  loadOpenThreadIds,
   type SavedConversationV2,
 } from './chatHistoryStorage';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
@@ -30,9 +32,20 @@ import {
   MIRRORED_CONVERSATION_KEYS,
   createConversationState,
   isConversationEmpty,
+  markConversationInterrupted,
   type ConversationState,
   type PendingRuntimeSelection,
 } from './conversationState';
+import {
+  deriveThreadStatus,
+  deriveThreadTitle,
+  evaluateSoftCap,
+  runtimeOfConversation,
+  type CapCandidate,
+  type ThreadRuntime,
+  type ThreadStatus,
+} from './threadStatus';
+import { clearSlot, pruneSlots, setSlot, type ComposerSlots } from './composerQueue';
 import { resolveInboundConversationId } from './conversationRouting';
 import type {
   AgentId,
@@ -195,6 +208,24 @@ function projectActiveConversation(conversation: ConversationState): Conversatio
   return mirror;
 }
 
+/**
+ * A thread open on the rail, as the rail and History need to see it. Derived —
+ * never stored — so it cannot drift from `conversations`.
+ */
+export interface OpenThreadSummary {
+  id: string;
+  title: string;
+  runtime: ThreadRuntime;
+  status: ThreadStatus;
+  hasQueuedPrompt: boolean;
+  isActive: boolean;
+}
+
+/** A thread-open action parked behind the soft-cap prompt (R11). */
+export type PendingThreadOpen =
+  | { kind: 'new' }
+  | { kind: 'reopen'; conversationId: string };
+
 interface AISidebarState {
   // ── Connection state (APP-GLOBAL) ──
   hasApiKey: boolean;
@@ -255,6 +286,23 @@ interface AISidebarState {
   savedConversations: SavedConversationV2[];
   showHistoryPanel: boolean;
 
+  // ── Composer state, keyed per thread (Sprint 99 R14 / E5) ──
+  /**
+   * Queued follow-up prompt per conversation. Lives in the store rather than in
+   * `ChatInput` state because the rail needs it too: a thread with a queued
+   * prompt is NOT idle and must not offer a close × (Resolved Gap 4).
+   */
+  composerQueues: ComposerSlots;
+  /** Unsent draft text per conversation, so switching threads loses nothing. */
+  composerDrafts: ComposerSlots;
+  setComposerQueue: (conversationId: string, prompt: string) => void;
+  clearComposerQueue: (conversationId: string) => void;
+  setComposerDraft: (conversationId: string, text: string) => void;
+
+  // ── Soft cap gate (Sprint 99 R11 + Resolved Gaps 2/3) ──
+  /** Set when "+" or a History reopen hit the soft cap and needs a decision. */
+  pendingThreadOpen: PendingThreadOpen | null;
+
   // ── Setup state (Claude Code) (APP-GLOBAL) ──
   setupStatus: SetupStatus | null;
   environmentStatus: AgentEnvironmentStatus | null;
@@ -293,6 +341,22 @@ interface AISidebarState {
   listOpenConversations: () => string[];
   /** Close a thread: frees its runtime session, keeps the transcript in History. */
   closeConversation: (id: string) => void;
+  /**
+   * User pressed "+". Refocuses an existing empty thread, opens a new one, or —
+   * at the soft cap — raises `pendingThreadOpen` for the user to decide (R11).
+   */
+  requestNewThread: () => void;
+  /**
+   * User picked a conversation in History. Switches to it if it is already open,
+   * otherwise reopens it onto the rail under the same cap rule as "+" (Gap 3).
+   */
+  requestOpenConversation: (id: string) => void;
+  /** "Open anyway" / "opened after closing something" — perform the pending open. */
+  confirmThreadOpen: () => void;
+  /** Dismiss the cap prompt without opening anything. */
+  cancelThreadOpen: () => void;
+  /** Rail/History view model for every open thread, in creation order. */
+  listOpenThreads: () => OpenThreadSummary[];
   /** Restore persisted transcript fields into the active thread (webview state restore). */
   restoreActiveConversation: (partial: Partial<ConversationState>) => void;
 
@@ -368,6 +432,20 @@ interface AISidebarState {
 }
 
 const initialConversation = createConversationState(generateId());
+
+/**
+ * Sprint 99 (R13): the open-thread set is restored ONCE per webview, on the
+ * first `agent:config` that carries a workspace path — that is the first moment
+ * the workspace-scoped storage prefix is known. A later `agent:config` must not
+ * re-open threads the user has since closed, so the guard lives here at module
+ * scope rather than in component state.
+ */
+let openThreadsRestored = false;
+
+/** Test-only: forget the restore guard so a relaunch can be simulated. */
+export function resetOpenThreadRestoreForTest(): void {
+  openThreadsRestored = false;
+}
 
 export const useAISidebarStore = create<AISidebarState>((set, get) => {
   // ── Conversation write helpers ───────────────────────────────────────────
@@ -498,6 +576,130 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     return next;
   }
 
+  /**
+   * Sprint 99 (R13 / E7): mirror the open set to localStorage and drop composer
+   * slots belonging to threads that are no longer open. Called after every
+   * change to `conversations` so the persisted rail can never lag the store.
+   */
+  function syncOpenThreads(): void {
+    const state = get();
+    const ids = Object.values(state.conversations)
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .map((c) => c.id);
+    saveOpenThreadIds(ids);
+
+    const composerQueues = pruneSlots(state.composerQueues, ids);
+    const composerDrafts = pruneSlots(state.composerDrafts, ids);
+    if (composerQueues !== state.composerQueues || composerDrafts !== state.composerDrafts) {
+      set({ composerQueues, composerDrafts });
+    }
+  }
+
+  /** Read one open thread's rail/History view model. */
+  function summarizeThread(conversation: ConversationState, activeId: string | null): OpenThreadSummary {
+    return {
+      id: conversation.id,
+      title: deriveThreadTitle(conversation),
+      runtime: runtimeOfConversation(conversation),
+      status: deriveThreadStatus(conversation),
+      hasQueuedPrompt: !!get().composerQueues[conversation.id]?.trim(),
+      isActive: conversation.id === activeId,
+    };
+  }
+
+  /** Cap inputs for the open set, in rail order. */
+  function capCandidates(): CapCandidate[] {
+    const state = get();
+    return Object.values(state.conversations)
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .map((c) => {
+        const summary = summarizeThread(c, state.activeConversationId);
+        return { id: c.id, title: summary.title, status: summary.status, hasQueuedPrompt: summary.hasQueuedPrompt };
+      });
+  }
+
+  /**
+   * Rebuild a stored conversation as an OPEN thread.
+   *
+   * R13: transcripts restore immediately, sessions do NOT — nothing here starts
+   * a runtime. The session re-attaches on the user's next prompt in the thread.
+   */
+  function rehydrateStoredConversation(id: string, template: ConversationState | null): ConversationState | null {
+    const data = loadConversation(id);
+    if (!data) return null;
+
+    let agentConv = data.agentConversation || [];
+    let codexConv = data.codexConversation || [];
+    if (data.agentId === 'codex' && codexConv.length === 0 && agentConv.length > 0) {
+      codexConv = agentConv as unknown as typeof codexConv;
+      agentConv = [];
+    }
+    const restoredAgentId: AgentId =
+      data.agentId === 'claude-code' || data.agentId === 'codex' ? data.agentId : 'claude-code';
+
+    return markConversationInterrupted(createConversationState(id, {
+      createdAt: data.createdAt,
+      agentConversation: stampConversationId(agentConv, id),
+      codexConversation: stampConversationId(codexConv, id),
+      chatMessages: data.chatMessages || [],
+      conversationHistory: data.conversationHistory || [],
+      selectedAgent: restoredAgentId,
+      selectedModel: template?.selectedModel ?? '',
+      codexSelectedModel: template?.codexSelectedModel ?? '',
+      opencodeSelectedModel: template?.opencodeSelectedModel ?? '',
+      pendingRuntime: {
+        runtimeId: restoredAgentId,
+        modelId: template?.pendingRuntime.modelId ?? '',
+        mode: template?.pendingRuntime.mode ?? 'auto',
+      },
+      ...computeContextState(agentConv),
+    }));
+  }
+
+  /**
+   * Repopulate the rail from the persisted open-thread set (R13).
+   *
+   * Threads whose stored record has gone (pruned by the 50-conversation cap, or
+   * deleted) are simply skipped. The thread the user is already looking at is
+   * kept active; it is only replaced when it is an untouched blank and there is
+   * real restored work to show instead.
+   */
+  function restoreOpenThreads(): void {
+    const state = get();
+    const storedIds = loadOpenThreadIds();
+    if (storedIds.length === 0) return;
+
+    const template = state.activeConversationId ? state.conversations[state.activeConversationId] : null;
+    const restored: ConversationState[] = [];
+    for (const id of storedIds) {
+      if (state.conversations[id]) continue;
+      const conversation = rehydrateStoredConversation(id, template);
+      if (conversation) restored.push(conversation);
+    }
+    if (restored.length === 0) return;
+
+    const conversations = { ...state.conversations };
+    for (const conversation of restored) conversations[conversation.id] = conversation;
+
+    // Drop the throwaway blank the webview booted with — but only if the user
+    // has not typed in it, and only when something real replaces it (R10).
+    let activeId = state.activeConversationId;
+    const active = activeId ? conversations[activeId] : null;
+    if (active && isConversationEmpty(active)) {
+      delete conversations[active.id];
+      activeId = restored[restored.length - 1].id;
+    }
+
+    const nextActive = activeId ? conversations[activeId] : null;
+    if (!nextActive) return;
+    set({
+      conversations,
+      activeConversationId: nextActive.id,
+      ...projectActiveConversation(nextActive),
+    });
+    syncOpenThreads();
+  }
+
   return {
     // ── Initial state ──
     hasApiKey: false,
@@ -527,6 +729,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     savedConversations: [],
     showHistoryPanel: false,
+
+    composerQueues: {},
+    composerDrafts: {},
+    pendingThreadOpen: null,
 
     setupStatus: null,
     environmentStatus: null,
@@ -590,6 +796,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         activeConversationId: conversation.id,
         ...projectActiveConversation(conversation),
       });
+      syncOpenThreads();
       return conversation.id;
     },
 
@@ -607,6 +814,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         ...projectActiveConversation(target),
         showHistoryPanel: false,
       });
+      if (pruned) syncOpenThreads();
     },
 
     listOpenConversations: () => {
@@ -632,12 +840,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       if (id !== state.activeConversationId) {
         set({ conversations: remaining });
+        syncOpenThreads();
         return;
       }
 
       const nextId = Object.values(remaining).sort((a, b) => a.createdAt - b.createdAt)[0];
       if (nextId) {
         set({ conversations: remaining, activeConversationId: nextId.id, ...projectActiveConversation(nextId) });
+        syncOpenThreads();
         return;
       }
       const fresh = createConversationState(generateId(), {
@@ -651,6 +861,81 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         conversations: { [fresh.id]: fresh },
         activeConversationId: fresh.id,
         ...projectActiveConversation(fresh),
+      });
+      syncOpenThreads();
+    },
+
+    listOpenThreads: () => {
+      const state = get();
+      return Object.values(state.conversations)
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .map((c) => summarizeThread(c, state.activeConversationId));
+    },
+
+    requestNewThread: () => {
+      // R10: one empty thread at a time — "+" refocuses the blank that exists
+      // rather than stacking another. Checked across the whole open set, not
+      // just the active thread, so a blank parked in the background is reused.
+      const state = get();
+      const existingEmpty = Object.values(state.conversations)
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .find(isConversationEmpty);
+      if (existingEmpty) {
+        if (existingEmpty.id !== state.activeConversationId) get().switchConversation(existingEmpty.id);
+        set({ showHistoryPanel: false });
+        return;
+      }
+
+      const evaluation = evaluateSoftCap(capCandidates());
+      if (evaluation.atCap) {
+        set({ pendingThreadOpen: { kind: 'new' }, showHistoryPanel: false });
+        return;
+      }
+      get().startNewConversation();
+    },
+
+    requestOpenConversation: (id) => {
+      const state = get();
+      // Already on the rail → this is just a switch, and the cap is irrelevant.
+      if (state.conversations[id]) {
+        get().switchConversation(id);
+        return;
+      }
+      // Resolved Gap 3: a reopened thread is an open thread, so it obeys the
+      // same cap rule as "+". Exempting it would be an easy way to accumulate
+      // ten open threads without ever seeing the prompt.
+      const evaluation = evaluateSoftCap(capCandidates());
+      if (evaluation.atCap) {
+        set({ pendingThreadOpen: { kind: 'reopen', conversationId: id }, showHistoryPanel: false });
+        return;
+      }
+      get().loadSavedConversation(id);
+    },
+
+    confirmThreadOpen: () => {
+      const pending = get().pendingThreadOpen;
+      if (!pending) return;
+      set({ pendingThreadOpen: null });
+      if (pending.kind === 'new') get().startNewConversation();
+      else get().loadSavedConversation(pending.conversationId);
+    },
+
+    cancelThreadOpen: () => set({ pendingThreadOpen: null }),
+
+    setComposerQueue: (conversationId, prompt) => {
+      set({ composerQueues: setSlot(get().composerQueues, conversationId, prompt) });
+    },
+
+    clearComposerQueue: (conversationId) => {
+      set({ composerQueues: clearSlot(get().composerQueues, conversationId) });
+    },
+
+    setComposerDraft: (conversationId, text) => {
+      const drafts = get().composerDrafts;
+      set({
+        composerDrafts: text
+          ? setSlot(drafts, conversationId, text)
+          : clearSlot(drafts, conversationId),
       });
     },
 
@@ -1380,6 +1665,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         ...projectActiveConversation(restored),
         showHistoryPanel: false,
       });
+      syncOpenThreads();
 
       // Update agent selection in extension
       vscode.postMessage({ type: 'ai-select-agent', agentId: loadedAgentId, conversationId: id });
@@ -1453,6 +1739,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         activeConversationId: fresh.id,
         ...projectActiveConversation(fresh),
       });
+      syncOpenThreads();
     },
 
     // ── Message handler ──
@@ -1493,6 +1780,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (message.workspacePath) {
             setWorkspaceContext(message.workspacePath);
             get().loadConversationList();
+            // R13 / E7: the workspace prefix is only known now, so this is the
+            // first moment the persisted open-thread set can be read. Runs once
+            // per webview — a later agent:config must not re-open threads the
+            // user has since closed.
+            if (!openThreadsRestored) {
+              openThreadsRestored = true;
+              restoreOpenThreads();
+            }
           }
           const newCodexModels = message.codexModels || [];
           const newClaudeModels = message.models || [];

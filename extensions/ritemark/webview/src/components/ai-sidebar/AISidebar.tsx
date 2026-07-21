@@ -20,6 +20,8 @@ import { OpenCodeSetupView } from './OpenCodeSetupView';
 import { ChatInput } from './ChatInput';
 import { SelectionIndicator } from './SelectionIndicator';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
+import { ThreadRail } from './ThreadRail';
+import { ThreadCapDialog } from './ThreadCapDialog';
 import { ActivePlanBanner } from './ActivePlanBanner';
 import { getActiveApprovedPlanForClaude, getActiveApprovedPlanForCodex } from './lifecycle';
 import { markdownStyles } from './RenderedMarkdown';
@@ -140,6 +142,9 @@ export function AISidebar() {
       {/* Chat History Panel (overlay) */}
       {showHistoryPanel && <ChatHistoryPanel />}
 
+      {/* Soft-cap prompt for "+" / History reopen (R11) */}
+      <ThreadCapDialog />
+
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}
 
@@ -172,14 +177,22 @@ export function AISidebar() {
               SelectionIndicator above is still used for Welcome and Setup
               flows where there's no chat input to anchor to. */}
 
-          {/* Main content area */}
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {agentConversation.length > 0 || codexConversation.length > 0
-              ? <UnifiedConversationView />
-              : legacyConversation !== null
-              ? <LegacyConversationView />
-              : isCodex ? <CodexView />
-              : <AgentView />}
+          {/*
+            Sprint 99 (R6): messages + thread rail share ONE row; the composer
+            below is a sibling of that row, so it spans the full sidebar width
+            and the rail stops at the composer boundary. Do not nest ChatInput
+            inside this flex row — that was the explicit correction from Jarmo.
+          */}
+          <div className="flex-1 min-h-0 flex overflow-hidden">
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+              {agentConversation.length > 0 || codexConversation.length > 0
+                ? <UnifiedConversationView />
+                : legacyConversation !== null
+                ? <LegacyConversationView />
+                : isCodex ? <CodexView />
+                : <AgentView />}
+            </div>
+            <ThreadRail />
           </div>
 
           {/* Shared input */}

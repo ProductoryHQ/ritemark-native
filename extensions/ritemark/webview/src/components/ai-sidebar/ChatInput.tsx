@@ -17,7 +17,7 @@ import {
 } from '../ui/select';
 import { useAISidebarStore } from './store';
 import { SelectedContextTab } from './SelectedContextTab';
-import { shouldQueueInsteadOfSend, shouldAutoSendQueuedPrompt } from './composerQueue';
+import { shouldQueueInsteadOfSend, shouldAutoSendQueuedPrompt, slotFor } from './composerQueue';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
@@ -143,8 +143,27 @@ function getDisplayPath(fullPath: string): string {
 
 export function ChatInput() {
   const [value, setValue] = useState('');
-  // Sprint 74 R2 (#82): prompt parked while the agent runs; auto-sends on completion
-  const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
+
+  // ── Sprint 99 (E5 / R14): the composer belongs to the ACTIVE thread ──
+  //
+  // There is one ChatInput for N threads, so its two pieces of unsent user
+  // content — the queued follow-up (Sprint 74 R2, #82) and the draft text — are
+  // keyed by conversation id in the store rather than held as plain component
+  // state. Queue SEMANTICS are unchanged (#95 owns redesigning them); what
+  // changed is that a prompt queued in thread A can never fire in thread B.
+  const activeConversationId = useAISidebarStore((s) => s.activeConversationId);
+  const composerQueues = useAISidebarStore((s) => s.composerQueues);
+  const composerDrafts = useAISidebarStore((s) => s.composerDrafts);
+  const setComposerQueue = useAISidebarStore((s) => s.setComposerQueue);
+  const clearComposerQueue = useAISidebarStore((s) => s.clearComposerQueue);
+  const setComposerDraft = useAISidebarStore((s) => s.setComposerDraft);
+
+  const queuedPrompt = slotFor(composerQueues, activeConversationId);
+  const setQueuedPrompt = useCallback((prompt: string | null) => {
+    if (!activeConversationId) return;
+    if (prompt === null) clearComposerQueue(activeConversationId);
+    else setComposerQueue(activeConversationId, prompt);
+  }, [activeConversationId, setComposerQueue, clearComposerQueue]);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [pathChips, setPathChips] = useState<PathChip[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -328,19 +347,45 @@ export function ChatInput() {
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on
   // unrelated re-renders while idle.
-  const prevAgentRunningRef = useRef(agentRunning);
+  //
+  // Sprint 99 (R14): the "was running" memory is now PER THREAD. Without that,
+  // leaving thread A while it runs and arriving at idle thread B would read as
+  // A's running → idle transition and fire A's queued prompt into B. Keying the
+  // memory by conversation id makes that structurally impossible, and it also
+  // gives the switch-back case for free: a thread that finished in the
+  // background is remembered as "was running", so returning to it sends its
+  // queued prompt into that thread — where it was typed.
+  const prevRunningByThreadRef = useRef(new Map<string, boolean>());
   useEffect(() => {
-    const wasRunning = prevAgentRunningRef.current;
-    prevAgentRunningRef.current = agentRunning;
+    if (!activeConversationId) return;
+    const memory = prevRunningByThreadRef.current;
+    const wasRunning = memory.get(activeConversationId) ?? agentRunning;
+    memory.set(activeConversationId, agentRunning);
     if (shouldAutoSendQueuedPrompt({ wasRunning, isRunning: agentRunning, queuedPrompt })) {
       const prompt = queuedPrompt as string;
       setQueuedPrompt(null);
       handleSend(prompt);
     }
-  }, [agentRunning, queuedPrompt, handleSend]);
+  }, [activeConversationId, agentRunning, queuedPrompt, setQueuedPrompt, handleSend]);
+
+  // R14: switching threads swaps the draft too — the text you were typing stays
+  // with the thread you were typing it in.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const draftsRef = useRef(composerDrafts);
+  draftsRef.current = composerDrafts;
+  const prevConversationIdRef = useRef(activeConversationId);
+  useEffect(() => {
+    const previousId = prevConversationIdRef.current;
+    if (previousId === activeConversationId) return;
+    prevConversationIdRef.current = activeConversationId;
+    if (previousId) setComposerDraft(previousId, valueRef.current);
+    setValue(activeConversationId ? (draftsRef.current[activeConversationId] ?? '') : '');
+  }, [activeConversationId, setComposerDraft]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
-  const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
+  // Sprint 99 (R11): '/new' goes through the same cap gate as the rail's '+'.
+  const requestNewThread = useAISidebarStore((s) => s.requestNewThread);
   const toggleHistoryPanel = useAISidebarStore((s) => s.toggleHistoryPanel);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
 
@@ -352,7 +397,7 @@ export function ChatInput() {
           clearChat();
           break;
         case 'new':
-          startNewConversation();
+          requestNewThread();
           break;
         case 'history':
           toggleHistoryPanel();
@@ -400,7 +445,7 @@ export function ChatInput() {
       setValue('');
       setShowCommandPopup(false);
     },
-    [clearChat, startNewConversation, toggleHistoryPanel, openApiKeySettings, cancelRequest, agentConversation, isClaudeCode, sendAgentMessage]
+    [clearChat, requestNewThread, toggleHistoryPanel, openApiKeySettings, cancelRequest, agentConversation, isClaudeCode, sendAgentMessage]
   );
 
   const handleKeyDown = useCallback(
