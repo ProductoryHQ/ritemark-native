@@ -205,28 +205,38 @@ C1 rename-not-`.obsolete` · C2 gate on `extensionLocation`, never `isBuiltin` (
 production · C4 `minimumAppVersion` IS already enforced at `updateResolver.ts:52` — the real gaps
 are installer-layer enforcement and missing `validateManifest` validation.
 
-### Phase 2: shell watchdog (patch 012)
-- [ ] Implement quarantine + fallback + reload prompt in the extension-host activation-error path.
-- [ ] Scope check: must not affect any extension other than `ritemark.ritemark`.
-- [ ] Scope check: must only quarantine copies loaded from the USER extensions dir, never the
-      built-in.
-- [ ] `scripts/create-patch.sh "shell-watchdog"` → verify patch applies cleanly via
-      `./scripts/apply-patches.sh --dry-run`.
+### Phase 2: shell watchdog (patch 012) — COMPLETE
+- [x] Quarantine + fallback + reload prompt implemented in `$onExtensionActivationError`
+      (`mainThreadExtensionService.ts`), inserted BEFORE the `isDev` early-return.
+- [x] Scope check: early-returns unless the id is exactly `ritemark.ritemark`.
+- [x] Scope check: only quarantines when the failing `extensionLocation` matches an installed
+      `ExtensionType.User` copy — the built-in copy is never touched. (Gating on `isBuiltin` would
+      have been wrong: `dedupExtensions` rewrites it to `true` on a winning user copy.)
+- [x] `patches/vscode/012-ritemark-shell-watchdog.patch` created; `apply-patches.sh --dry-run`
+      clean (12/12, 0 conflicts); reverse/re-apply round-trip verified; `compile-check-ts-native`
+      and `valid-layers-check` both pass.
+- [x] CLAUDE.md patch table updated (12 patches).
 
-### Phase 3: copy-then-overlay installer
-- [ ] Rewrite `applyUpdate` to clone the bundled extension dir into staging before overlay.
-- [ ] macOS: `cp -c -R` (auto-falls back to copyfile — no explicit fallback branch needed, per Phase 1).
-- [ ] Windows recursive copy path.
-- [ ] New util `src/update/bundledExtensionPath.ts` — resolve the BUILT-IN copy from
-      `vscode.env.appRoot` (NOT `getExtension().extensionPath`, which returns the user copy and
-      would self-perpetuate corruption). Fail closed if not found.
-- [ ] Enforce `minimumAppVersion` at the INSTALLER layer (`updateResolver.ts:52` already enforces
-      at resolve time; `applyUpdate` currently accepts any manifest) + validate the field in
-      `validateManifest` (`updateManifest.ts:71-136`).
-- [ ] Fix the `Already installed` short-circuit re-release trap (`userExtensionInstaller.ts:116-122`).
-- [ ] Add path-traversal containment to `downloadFilesToStaging` (`:282` joins unchecked).
-- [ ] (Nice-to-have) manifest support for explicit file deletions.
-- [ ] Update/extend existing installer tests for the new clone+overlay path.
+### Phase 3: copy-then-overlay installer — COMPLETE
+- [x] Rewrote `applyUpdate` to clone the bundled extension dir into staging before overlay.
+- [x] macOS: `cp -c -R` (auto-falls back to copyfile — no explicit fallback branch needed, per Phase 1).
+- [x] Windows/other: `fs.promises.cp` recursive copy.
+- [x] New util `src/update/bundledExtensionPath.ts` — resolves the BUILT-IN copy from
+      `vscode.env.appRoot`, `appRoot`-injectable for tests, validates a readable `package.json`,
+      returns `null` (installer fails closed) rather than guessing.
+- [x] `minimumAppVersion` enforced at the INSTALLER layer before anything touches disk, and
+      validated in `validateManifest`.
+- [x] Fixed the `Already installed` short-circuit re-release trap: a structurally broken install
+      (no `node_modules`) is now replaced instead of skipped, so a repaired re-release of the same
+      version reaches exactly the users who need it.
+- [x] Path-traversal containment: `isContainedRelativePath` in `updateManifest.ts` (validation)
+      plus `resolveInStaging` in the installer (enforcement) — deliberately not relying on each
+      other having run.
+- [x] Manifest file deletions via `op?: 'write' | 'delete'` — newly meaningful now that absent
+      means "inherited from the bundled copy" rather than "not present".
+- [x] `src/update/applyUpdate.test.ts` — 8 tests, registered in `test` and `test:update`. Closes
+      the Phase-1 risk that `applyUpdate` had ZERO coverage. Test 1 reproduces the incident shape
+      (delta-only manifest) and asserts a complete directory results.
 
 ### Phase 4: publish-side guards
 - [ ] Completeness check in `release-extension-preflight.sh`: shipped runtime deps vs bundled
