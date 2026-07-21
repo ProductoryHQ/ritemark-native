@@ -321,14 +321,19 @@ does not mention it) — the model reaches for it unprompted and Codex's own too
 Verified byte-identical to the pre-rewrite code in this path. Whether structured questions
 *should* be available outside plan mode is a product gap, and is the class of problem Sprint 101
 (#154, agent capability context) addresses.
-| **2** | Workstream B (Codex) complete, incl. B1 data-loss fix | Scenario suite for Codex×Codex concurrency green |
-| **3** | Workstream A (Claude) — A2, A3 | Claude×Claude and Claude×Codex green |
-| **4** | Workstream C (ACP) — C1 safety first | OpenCode approval-isolation scenarios green |
+| **2** | ~~Workstream B (Codex)~~ **DONE in Phase 1** — B1–B6 all landed | ✅ Codex×Codex unit coverage: deltas route by threadId with orphans dropped, `turn/completed` isolated, B1 data-loss fix, `exit` fan-out, cancel declines outstanding approvals |
+| **3** | ~~Workstream A (Claude)~~ **DONE in Phase 1** | ✅ Conversations hold independent sessions; the model+ask-mode reuse shortcut is gone |
+| **4** | ~~Workstream C (ACP)~~ **DONE in Phase 1** | ✅ C1 write-approval state is per session (no cross-chat bypass); unroutable write denied; per-session cancel |
 | **5** | E6 rail + E5 queue + D2 browser mutex + R13 persistence | Full scenario suite; dev-mode self-validation |
 
 Phase 1 lands the interface and the store together deliberately: doing the interface alone leaves
-nothing observable, and doing the store alone has nothing to drive it. From Phase 2 on, each runtime
-is independently demoable.
+nothing observable, and doing the store alone has nothing to drive it.
+
+**Phases 2–4 collapsed into Phase 1.** All three adapters were migrated in one pass rather than
+sequentially, because the interface change forced every adapter to move at once — a half-migrated
+adapter does not compile. Their gates are met by unit coverage (see the table). What this does NOT
+give is the scenario suite in `scenarios.md`, most of which needs UI that does not exist yet, so
+**Phase 5 carries the real end-to-end verification burden.**
 
 ## 9. Feature flag
 
