@@ -125,12 +125,57 @@ function testClaudeLifecycleInstructionsAreIncluded() {
   assert.match(turnPrompt, /User prompt$/, 'turn prompt should preserve original prompt');
 }
 
+/**
+ * Regression: the model can emit several tool_use blocks in ONE assistant message
+ * (two Writes in Ask mode, say), so canUseTool is invoked concurrently. When the
+ * three pending-decision slots were scalars, the second invocation overwrote the
+ * first, leaving that promise with no resolver — the tool call hung until the
+ * 15-minute inactivity timeout. Both must now resolve independently.
+ */
+async function testConcurrentToolApprovalsBothResolve() {
+  const session = new AgentSession({
+    workspacePath: process.cwd(),
+    approvalMode: 'ask',
+  }) as AgentSession & Record<string, unknown>;
+
+  const seen: string[] = [];
+  session._emitToolApproval = (request: { toolUseId: string }) => {
+    seen.push(request.toolUseId);
+  };
+
+  // Two approvals in flight at once — neither answered yet.
+  const first = session._handleCanUseTool(
+    'Write',
+    { file_path: '/tmp/a.md', content: 'a' },
+    { signal: new AbortController().signal, toolUseID: 'tool-a' }
+  );
+  const second = session._handleCanUseTool(
+    'Write',
+    { file_path: '/tmp/b.md', content: 'b' },
+    { signal: new AbortController().signal, toolUseID: 'tool-b' }
+  );
+
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(seen, ['tool-a', 'tool-b'], 'both approvals should have been emitted');
+
+  // Answer out of order — the second request must not have displaced the first.
+  assert.equal(session.answerToolApproval('tool-b', true), true, 'second approval still pending');
+  assert.equal(session.answerToolApproval('tool-a', false), true, 'first approval still pending');
+
+  const firstResult = await first;
+  const secondResult = await second;
+
+  assert.equal(firstResult.behavior, 'deny', 'tool-a was denied');
+  assert.equal(secondResult.behavior, 'allow', 'tool-b was allowed');
+}
+
 async function main() {
   testDefaultSettingSources();
   testDefaultToolsIncludePlanAndQuestionLifecycle();
   testClaudeLifecycleInstructionsAreIncluded();
   await testSynchronousPlanApprovalAnswer();
   await testSynchronousQuestionAnswer();
+  await testConcurrentToolApprovalsBothResolve();
   console.log('AgentRunner lifecycle tests passed.');
 }
 
