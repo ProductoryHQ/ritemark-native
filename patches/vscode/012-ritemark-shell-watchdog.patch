@@ -1,0 +1,123 @@
+# RiteMark Patch: ritemark-shell-watchdog
+#
+# Purpose: Quarantine a broken user-dir copy of ritemark.ritemark on activation failure and fall back to the bundled built-in
+#
+# Why: A seamless extension update that ships an incomplete package dies at module load before activate() runs, so extension-side recovery cannot help; the shell must rescue it (incident v1.8.3-ext.1, issue #142)
+#
+# File(s): src/vs/workbench/api/browser/mainThreadExtensionService.ts
+# Created: 2026-07-21
+#
+diff --git a/src/vs/workbench/api/browser/mainThreadExtensionService.ts b/src/vs/workbench/api/browser/mainThreadExtensionService.ts
+index 4cfaf6a58cb..a9fa3c452ac 100644
+--- a/src/vs/workbench/api/browser/mainThreadExtensionService.ts
++++ b/src/vs/workbench/api/browser/mainThreadExtensionService.ts
+@@ -14,8 +14,10 @@ import { localize } from '../../../nls.js';
+ import { ICommandService } from '../../../platform/commands/common/commands.js';
+ import { ILocalExtension } from '../../../platform/extensionManagement/common/extensionManagement.js';
+ import { areSameExtensions } from '../../../platform/extensionManagement/common/extensionManagementUtil.js';
+-import { ExtensionIdentifier, IExtensionDescription } from '../../../platform/extensions/common/extensions.js';
++import { ExtensionIdentifier, ExtensionType, IExtensionDescription } from '../../../platform/extensions/common/extensions.js';
++import { IFileService } from '../../../platform/files/common/files.js';
+ import { INotificationService } from '../../../platform/notification/common/notification.js';
++import { IUriIdentityService } from '../../../platform/uriIdentity/common/uriIdentity.js';
+ import { IRemoteConnectionData, ManagedRemoteConnection, RemoteConnection, RemoteConnectionType, ResolvedAuthority, WebSocketRemoteConnection } from '../../../platform/remote/common/remoteAuthorityResolver.js';
+ import { ExtHostContext, ExtHostExtensionServiceShape, MainContext, MainThreadExtensionServiceShape } from '../common/extHost.protocol.js';
+ import { IExtension, IExtensionsWorkbenchService } from '../../contrib/extensions/common/extensions.js';
+@@ -30,6 +32,11 @@ import { Dto } from '../../services/extensions/common/proxyIdentifier.js';
+ import { IHostService } from '../../services/host/browser/host.js';
+ import { ITimerService } from '../../services/timer/browser/timerService.js';
+ 
++// --- Start Ritemark: shell watchdog
++const RITEMARK_EXTENSION_ID = 'ritemark.ritemark';
++const QUARANTINE_SUFFIX = '.quarantined';
++// --- End Ritemark
++
+ @extHostNamedCustomer(MainContext.MainThreadExtensionService)
+ export class MainThreadExtensionService implements MainThreadExtensionServiceShape {
+ 
+@@ -46,6 +53,8 @@ export class MainThreadExtensionService implements MainThreadExtensionServiceSha
+ 		@ITimerService private readonly _timerService: ITimerService,
+ 		@ICommandService private readonly _commandService: ICommandService,
+ 		@IWorkbenchEnvironmentService protected readonly _environmentService: IWorkbenchEnvironmentService,
++		@IFileService private readonly _fileService: IFileService,
++		@IUriIdentityService private readonly _uriIdentityService: IUriIdentityService,
+ 	) {
+ 		this._extensionHostKind = extHostContext.extensionHostKind;
+ 
+@@ -99,6 +108,12 @@ export class MainThreadExtensionService implements MainThreadExtensionServiceSha
+ 			}
+ 		}
+ 
++		// --- Start Ritemark: shell watchdog for a broken user-dir copy of the built-in extension
++		if (await this._quarantineBrokenRitemarkUserExtension(extensionId)) {
++			return;
++		}
++		// --- End Ritemark
++
+ 		const isDev = !this._environmentService.isBuilt || this._environmentService.isExtensionDevelopment;
+ 		if (isDev) {
+ 			this._notificationService.error(error);
+@@ -108,6 +123,63 @@ export class MainThreadExtensionService implements MainThreadExtensionServiceSha
+ 		console.error(error.message);
+ 	}
+ 
++	// --- Start Ritemark: shell watchdog
++	/**
++	 * Ritemark ships its editor extension as a built-in, but the seamless-update mechanism can
++	 * install a newer copy into the user extensions directory, which then wins the scanner.
++	 * If that user copy is incomplete it throws at module load, before `activate()` runs — so no
++	 * extension-side recovery can help, because the recovery code lives in the dead extension.
++	 *
++	 * This quarantines the failing user copy by renaming its directory. On the next window the
++	 * scanner cannot read its manifest, marks it invalid and filters it out, so the built-in copy
++	 * is used instead. Strictly scoped: only `ritemark.ritemark`, and only a copy that is
++	 * installed as a user extension — the built-in copy is never touched.
++	 *
++	 * @returns `true` when a copy was quarantined and the user was prompted to reload.
++	 */
++	private async _quarantineBrokenRitemarkUserExtension(extensionId: ExtensionIdentifier): Promise<boolean> {
++		if (!ExtensionIdentifier.equals(extensionId, RITEMARK_EXTENSION_ID)) {
++			return false;
++		}
++
++		try {
++			const failed = await this._extensionService.getExtension(extensionId.value);
++			if (!failed) {
++				return false;
++			}
++
++			// `isBuiltin` is unreliable here: a user copy that overrides a built-in has the flag
++			// set to true by `dedupExtensions`. Match the failing location against the installed
++			// user-type copy instead — that type is not rewritten.
++			const local = await this._extensionsWorkbenchService.queryLocal();
++			const userCopy = local.find(extension => extension.local
++				&& extension.local.type === ExtensionType.User
++				&& areSameExtensions(extension.identifier, { id: extensionId.value })
++				&& this._uriIdentityService.extUri.isEqual(extension.local.location, failed.extensionLocation));
++			if (!userCopy) {
++				// The built-in copy itself failed — quarantining it would leave no copy at all.
++				return false;
++			}
++
++			const quarantined = failed.extensionLocation.with({ path: `${failed.extensionLocation.path}${QUARANTINE_SUFFIX}` });
++			await this._fileService.move(failed.extensionLocation, quarantined, true);
++
++			this._notificationService.notify({
++				severity: Severity.Error,
++				message: localize('ritemark.updateBroken', "The installed Ritemark update could not be loaded and has been removed. Reload the window to go back to the version that came with the app."),
++				actions: {
++					primary: [toAction({ id: 'reload', label: localize('reload', "Reload Window"), run: () => this._hostService.reload() })]
++				}
++			});
++			return true;
++		} catch (err) {
++			// Never let the watchdog itself break activation-error reporting.
++			console.error(`Failed to quarantine ${RITEMARK_EXTENSION_ID}: ${err}`);
++			return false;
++		}
++	}
++	// --- End Ritemark
++
+ 	private async _handleMissingInstalledDependency(extension: IExtensionDescription, missingInstalledDependency: ILocalExtension): Promise<void> {
+ 		const extName = extension.displayName || extension.name;
+ 		if (this._extensionEnablementService.isEnabled(missingInstalledDependency)) {
