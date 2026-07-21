@@ -278,6 +278,12 @@ export class CodexSession implements RuntimeSession {
     if (appServer && this._threadId && this._turnId) {
       await appServer.turnInterrupt(this._threadId, this._turnId).catch(() => {});
     }
+    // Decline anything this conversation had outstanding. Interrupting the turn
+    // does not answer an approval the app-server is already blocked on, so
+    // pressing Stop while an approval card was up used to leave that request
+    // dangling for the rest of the process's life. dispose() and resetThread()
+    // already did this; cancel() did not.
+    this._runtime._clearRequestsFor(this.conversationId, this._openRequestIds, true);
   }
 
   respondToApproval(requestId: string, approved: boolean, _alwaysAllow: boolean): void {

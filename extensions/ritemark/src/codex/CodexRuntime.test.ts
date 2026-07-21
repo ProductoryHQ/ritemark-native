@@ -125,6 +125,29 @@ async function openTurn(runtime: CodexRuntime, conversationId: string, config: R
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+/** Cancelling must decline what this conversation left outstanding, not just interrupt the turn. */
+async function testCancelDeclinesOutstandingApprovals(): Promise<void> {
+  const { runtime } = makeRuntime(['thread-cancel']);
+  const session = await openTurn(runtime, 'conv-cancel', dummyConfig);
+
+  // Simulate an approval this conversation raised and is still waiting on:
+  // the session tracks it AND the runtime holds the server-side request id.
+  session._trackRequest('codex-77');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = runtime as any;
+  r._requestIdMap.set('codex-77', 77);
+  r._requestConversation.set('codex-77', 'conv-cancel');
+
+  calls.length = 0;
+  await session.cancel();
+
+  assert.ok(
+    calls.includes('sendApprovalResponse'),
+    'cancel must answer the outstanding approval, not leave the app-server blocked on it',
+  );
+  console.log('✓ Test 10: cancel declines outstanding approvals');
+}
+
 async function run() {
   // Test 1: CodexRuntime structurally satisfies AgentRuntime
   {
@@ -275,7 +298,9 @@ async function run() {
     console.log('✓ Test 9: B4 — exit fans out to all conversations');
   }
 
-  console.log('\nAll 9 CodexRuntime tests passed!');
+  await testCancelDeclinesOutstandingApprovals();
+
+  console.log('\nAll 10 CodexRuntime tests passed!');
 }
 
 run().then(

@@ -98,6 +98,32 @@ function makeTaggedManager(events: Array<{ sessionId: string; p: AgentProgress }
   });
 }
 
+/**
+ * Cancelling the last session kills the process, which rejects the in-flight
+ * session/prompt with the SDK's "ACP connection closed". That is the cancel
+ * working — it must not reach the user as a turn error.
+ */
+async function testSoleSessionCancelReportsCancelledNotError(): Promise<void> {
+  const events: AgentProgress[] = [];
+  const manager = makeManager(events, { AGENT_SLOW: '1' });
+  const sessionId = await manager.start();
+
+  const turn = manager.prompt(sessionId, 'count slowly');
+  await new Promise((r) => setTimeout(r, 120));   // let the turn start streaming
+  await manager.cancel(sessionId);                 // sole session → process is killed
+
+  const result = await turn;
+  assert.strictEqual(result.stopReason, 'cancelled',
+    'a user cancel must settle the turn as cancelled, not reject with a raw protocol error');
+
+  const errors = events.filter((e) => e.type === 'error');
+  assert.deepStrictEqual(errors, [],
+    'pressing Stop must not surface an error line to the user');
+
+  manager.dispose();
+  console.log('✓ sole-session cancel settles as cancelled with no user-facing error');
+}
+
 async function run() {
   // ── env: OPENCODE_PERMISSION is the mandatory permission lever (R4) ──
   {
@@ -207,6 +233,8 @@ async function run() {
     );
     mgr.dispose();
   }
+
+  await testSoleSessionCancelReportsCancelledNotError();
 
   console.log('acpManager.test.ts: all tests passed');
 }

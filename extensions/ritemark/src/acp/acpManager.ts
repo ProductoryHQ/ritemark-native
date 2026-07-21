@@ -189,7 +189,27 @@ export class AcpManager {
 
     state.sawContentThisTurn = false;
     state.cancelRequested = false;
-    const result = await client.prompt(sessionId, text);
+
+    let result: PromptResponse;
+    try {
+      result = await client.prompt(sessionId, text);
+    } catch (err) {
+      // Cancelling the last session kills the process, which rejects the
+      // in-flight prompt with the SDK's "ACP connection closed". That is the
+      // cancel working, not a failure — surfacing it showed the user a raw
+      // protocol error every time they pressed Stop.
+      if (state.cancelRequested) {
+        state.cancelRequested = false;
+        this.flushThoughts(state);
+        traceAcp('manager', 'prompt rejected by user cancel — reported as cancelled', {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return { stopReason: 'cancelled' } as PromptResponse;
+      }
+      throw err;
+    }
+
     this.flushThoughts(state); // emit any trailing reasoning as one entry
 
     if (state.cancelRequested) {
