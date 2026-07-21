@@ -7,6 +7,8 @@
 // See docs/development/sprints/sprint-92-esbuild-bundling/ (spec R1-R11) and
 // notes/require-audit.md for why the externals below are what they are.
 import esbuild from 'esbuild';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const watch = process.argv.includes('--watch');
 
@@ -18,7 +20,14 @@ const watch = process.argv.includes('--watch');
 // - pdfkit:   reads its built-in font `.afm` data files from its own package dir at
 //   runtime; bundling its JS breaks that resolution. node_modules stays for the ESM SDKs
 //   anyway. Re-evaluate the full inline/external split against export QA (tasks T4-2).
-const external = [
+//
+// Sprint 98: EXPORTED so publish-side guards can read the real array instead of
+// regex-scraping this file. `scripts/check-bundled-extension-complete.sh` asserts
+// every entry here (except `vscode`, which the host provides) actually exists in
+// the BUNDLED extension's node_modules — the 1.8.3-ext.1 incident was a missing
+// `pdfkit` at module load. Importing this file must therefore stay side-effect
+// free; the build only runs when the file is the process entry point (below).
+export const external = [
   'vscode',
   'fsevents',
   '@anthropic-ai/claude-agent-sdk',
@@ -47,11 +56,19 @@ const options = {
   // stays standalone, no shared chunk with extension.js).
 };
 
-if (watch) {
-  const ctx = await esbuild.context(options);
-  await ctx.watch();
-  console.log('[esbuild] watching for changes…');
-} else {
-  await esbuild.build(options);
-  console.log('[esbuild] build complete');
+// Only build when this file is the entry point (`node esbuild.config.mjs`), so that
+// `import { external } from './esbuild.config.mjs'` is a pure read.
+const isEntryPoint =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isEntryPoint) {
+  if (watch) {
+    const ctx = await esbuild.context(options);
+    await ctx.watch();
+    console.log('[esbuild] watching for changes…');
+  } else {
+    await esbuild.build(options);
+    console.log('[esbuild] build complete');
+  }
 }

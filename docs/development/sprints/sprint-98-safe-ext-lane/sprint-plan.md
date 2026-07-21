@@ -216,6 +216,14 @@ are installer-layer enforcement and missing `validateManifest` validation.
       clean (12/12, 0 conflicts); reverse/re-apply round-trip verified; `compile-check-ts-native`
       and `valid-layers-check` both pass.
 - [x] CLAUDE.md patch table updated (12 patches).
+- [x] **Dev-mode validation found and fixed a real bug.** The first implementation renamed the
+      extension DIRECTORY. In a live dev instance the broken copy was quarantined in ~3 s, but
+      VS Code's profile bookkeeping FOLLOWED the rename — `extensions.json` was rewritten to
+      `relativeLocation: ritemark-1.8.5-ext.1.quarantined`, which still had a readable
+      `package.json`, so the next launch would have scanned and loaded the broken copy again. The
+      quarantine did not stick. Fixed by renaming the MANIFEST (`package.json` →
+      `package.json.quarantined`) instead: the directory path stays valid so nothing follows it,
+      but the copy is unreadable and drops out of the scan. Re-validated end to end (below).
 
 ### Phase 3: copy-then-overlay installer — COMPLETE
 - [x] Rewrote `applyUpdate` to clone the bundled extension dir into staging before overlay.
@@ -238,22 +246,44 @@ are installer-layer enforcement and missing `validateManifest` validation.
       the Phase-1 risk that `applyUpdate` had ZERO coverage. Test 1 reproduces the incident shape
       (delta-only manifest) and asserts a complete directory results.
 
-### Phase 4: publish-side guards
-- [ ] Completeness check in `release-extension-preflight.sh`: shipped runtime deps vs bundled
-      `node_modules`.
-- [ ] Manifest-vs-shipped-files sanity check.
-- [ ] New install-and-activate smoke test script; wire as a mandatory blocking step before
-      `release-extension.sh` produces publishable output.
-- [ ] Deliberately reproduce the 1.8.3-ext.1 failure mode locally and confirm the smoke test
-      catches it (this is the proof step for Success Criteria).
+### Phase 4: publish-side guards — COMPLETE
+- [x] Completeness check `scripts/check-bundled-extension-complete.sh` — runs against the BUILT
+      APP's copy (per Phase 1, the source tree passes trivially), so it is wired into
+      `build-prod.sh` after the version floor, NOT into `release-extension-preflight.sh`. Blocking.
+      Checks: host entry points, version floor (`X.Y.Z-0`), every esbuild `external` present in
+      bundled `node_modules`, static-require sweep over `out/extension.js`, sentinel assets
+      (`themes/*.json`, `media/*.svg`, `starter-pack/`, `media/webview.js`).
+- [x] `esbuild.config.mjs` now EXPORTS `external` (and only builds when it is the process entry
+      point) so the check reads the real array instead of regex-scraping the file.
+- [x] Manifest-vs-staged sanity check in `release-extension.sh` (every entry resolves to a staged
+      asset, sizes match, no orphan staged files). The `⚠ not found, skipping` branch is now FATAL
+      for every required file; `media/webview.js.map` is declared optional (the production webview
+      build emits no sourcemap, so it has been silently skipped on every release to date).
+- [x] `scripts/ext-install-smoke-test.sh` — clone bundled → overlay manifest delta (honouring
+      `op: 'delete'`) → `require()` the result in a bare Node process with `scripts/lib/vscode-stub.js`.
+      Temp-dir only, trap-cleaned, never touches `~/.ritemark/` or the installed app. Wired into
+      `release-extension.sh` after feed generation, before the ready banner (`set -e` = blocking).
+- [x] Incident reproduced with `--skip-clone` against the real 1.8.3-ext.1 staging artifact: exits
+      1 on `Cannot find module 'pdfkit'` (thrown from `src/export/v2/pdfHtmlExporter.ts` at module
+      load). Same staging dir passes with the clone step. Proof step satisfied.
 
-### Phase 5: canary ring
-- [ ] Add `ritemark.updates.channel` setting to `package.json`.
-- [ ] Wire channel → feed URL selection in the update flow (`updateFeed.ts` / whatever calls
-      `fetchUpdateFeed`).
-- [ ] Change ext publish flow to `gh release create --prerelease`.
-- [ ] Add/verify canary feed clobber step (`canary` tag release, `update-feed.json` asset).
-- [ ] `scripts/promote-extension-release.sh <version>` with `--rollback`.
+### Phase 5: canary ring — COMPLETE
+- [x] `ritemark.updates.channel` (`stable` | `canary`, default `stable`) added after
+      `ritemark.updates.mode` with `enumDescriptions`.
+- [x] `feedUrlForChannel()` + `STABLE_UPDATE_FEED_URL` / `CANARY_UPDATE_FEED_URL` exported from
+      `updateFeed.ts`; the single production call site (`updateService.ts`) reads the setting and
+      passes the resolved URL. Unknown channel values fall back to stable. `UpdateFeed.channel`
+      widened to `'stable' | 'canary'` and the degenerate no-op ternary now really parses.
+- [x] `release-extension.sh` defaults to `--channel canary` and prints a `gh release create
+      --prerelease` command plus the `canary`-tag create/clobber commands. Publication stays
+      manual and gated on Jarmo's approval phrase.
+- [x] `generate-update-feed.mjs` is channel-aware — each channel reads and writes only its own
+      feed (a canary publish can no longer merge into and clobber the stable feed). The canary
+      feed is seeded from stable on first generation. `main()` runs only as an entry point so the
+      promote script can import `CHANNELS` / `sortByVersionDesc` instead of re-deriving them.
+- [x] `scripts/promote-extension-release.sh <version>` with `--rollback`, `--force`, `--dry-run`.
+      Merges/removes one `extensionReleases` entry and `gh release upload --clobber`s the feed onto
+      the current `latest` release. NEVER deletes a GitHub release in either direction.
 
 ### Phase 6: docs + lane reopen
 - [ ] Update `docs/development/architecture.md` (update subsystem, patch list).
@@ -310,7 +340,7 @@ This step sits BEFORE `qa-validator` sign-off and before any release gate. It is
 
 ## Status
 **Track:** Plain full 6-phase
-**Current Phase:** 3 (BUILD) — Phase 1 research complete, patch 012 in progress
+**Current Phase:** 6 (docs + lane reopen) — Phases 1-5 complete
 **Approval Required:** Yes
 
 ## Approval

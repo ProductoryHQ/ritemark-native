@@ -3,10 +3,22 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 
 const REPO_OWNER = 'jarmo-productory';
 const REPO_NAME = 'ritemark-public';
-const DEFAULT_FEED_URL = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/update-feed.json`;
+
+// Sprint 98: the feed is cumulative-by-fetch — it reads the CURRENT feed and
+// merges the new release into it. That made it channel-blind: generating a
+// canary feed would have read the STABLE feed and then been clobbered over it,
+// silently promoting an unverified build to every user. Each channel now reads
+// and writes only its own feed. Keep `feedUrlForChannel` in sync with
+// `feedUrlForChannel` in extensions/ritemark/src/update/updateFeed.ts.
+export const CHANNELS = {
+  stable: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/update-feed.json`,
+  canary: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/canary/update-feed.json`
+};
+const DEFAULT_CHANNEL = 'stable';
 
 function parseArgs(argv) {
   const args = {};
@@ -44,7 +56,7 @@ function ensureArray(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-function compareVersions(a, b) {
+export function compareVersions(a, b) {
   const parse = (version) => {
     const clean = version.startsWith('v') ? version.slice(1) : version;
     const extMatch = clean.match(/-ext\.(\d+)$/);
@@ -63,7 +75,7 @@ function compareVersions(a, b) {
   return left.extBuild - right.extBuild;
 }
 
-function sortByVersionDesc(items) {
+export function sortByVersionDesc(items) {
   return [...items].sort((a, b) => compareVersions(b.version, a.version));
 }
 
@@ -168,16 +180,32 @@ async function main() {
   const mode = args.mode;
   const version = args.version;
   const outputPath = args.output;
-  const feedUrl = typeof args['existing-feed-url'] === 'string' ? args['existing-feed-url'] : DEFAULT_FEED_URL;
+  const channel = typeof args.channel === 'string' ? args.channel : DEFAULT_CHANNEL;
 
-  if (!mode || !version || !outputPath) {
-    throw new Error('Usage: generate-update-feed.mjs --mode <full|extension> --version <version> --output <file>');
+  if (!Object.prototype.hasOwnProperty.call(CHANNELS, channel)) {
+    throw new Error(`Unsupported channel: ${channel} (expected one of: ${Object.keys(CHANNELS).join(', ')})`);
   }
 
-  const existingFeed = (await fetchExistingFeed(feedUrl)) ?? {
+  const feedUrl = typeof args['existing-feed-url'] === 'string'
+    ? args['existing-feed-url']
+    : CHANNELS[channel];
+
+  if (!mode || !version || !outputPath) {
+    throw new Error('Usage: generate-update-feed.mjs --mode <full|extension> --version <version> --output <file> [--channel <stable|canary>]');
+  }
+
+  // A canary feed is seeded from the STABLE feed the first time it is generated
+  // (there is no canary feed yet), so canary users keep seeing every stable
+  // release. After that it merges into its own feed only.
+  let existingFeed = await fetchExistingFeed(feedUrl);
+  if (!existingFeed && channel !== DEFAULT_CHANNEL) {
+    console.error(`No ${channel} feed found — seeding it from the ${DEFAULT_CHANNEL} feed.`);
+    existingFeed = await fetchExistingFeed(CHANNELS[DEFAULT_CHANNEL]);
+  }
+  existingFeed = existingFeed ?? {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
-    channel: 'stable',
+    channel,
     fullReleases: [],
     extensionReleases: []
   };
@@ -201,7 +229,7 @@ async function main() {
     const feed = {
       schemaVersion: 1,
       generatedAt: new Date().toISOString(),
-      channel: 'stable',
+      channel,
       fullReleases: sortByVersionDesc([
         release,
         ...existingFeed.fullReleases.filter(item => item.version !== version)
@@ -242,7 +270,7 @@ async function main() {
     const feed = {
       schemaVersion: 1,
       generatedAt: new Date().toISOString(),
-      channel: 'stable',
+      channel,
       fullReleases: sortByVersionDesc(existingFeed.fullReleases),
       extensionReleases: sortByVersionDesc([
         release,
@@ -258,7 +286,12 @@ async function main() {
   throw new Error(`Unsupported mode: ${mode}`);
 }
 
-main().catch((error) => {
-  console.error(`Failed to generate update feed: ${error.message}`);
-  process.exit(1);
-});
+// Sprint 98: only run when invoked directly, so scripts/promote-extension-release.sh
+// can import CHANNELS / the version comparator instead of re-deriving them (the
+// same class of drift hazard as the shell-tier denylist).
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(`Failed to generate update feed: ${error.message}`);
+    process.exit(1);
+  });
+}

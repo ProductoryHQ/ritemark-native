@@ -19,6 +19,7 @@ import { UserExtensionInstaller } from './userExtensionInstaller';
 import { UpdateManifest, getTotalDownloadSize } from './updateManifest';
 import {
   fetchUpdateFeed,
+  feedUrlForChannel,
 } from './updateFeed';
 import { resolveUpdate, ResolvedUpdateResult } from './updateResolver';
 import {
@@ -253,7 +254,12 @@ export class UpdateService {
   private async resolveLatestUpdate(): Promise<ResolvedUpdateResult> {
     const currentAppVersion = getCurrentAppVersion();
     const currentExtensionVersion = getCurrentVersion();
-    const feed = await fetchUpdateFeed();
+    // Sprint 98: `canary` points at the pre-release verification ring so an ext
+    // release can be proven on one machine before it reaches the public feed.
+    const channel = vscode.workspace
+      .getConfiguration('ritemark.updates')
+      .get<string>('channel', 'stable');
+    const feed = await fetchUpdateFeed(feedUrlForChannel(channel));
 
     if (feed) {
       this.lastKnownFeedSource = 'feed';

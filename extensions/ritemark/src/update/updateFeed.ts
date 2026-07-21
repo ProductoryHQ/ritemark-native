@@ -9,8 +9,34 @@ import { UpdateManifest, UpdateFile } from './updateManifest';
 
 const REPO_OWNER = 'jarmo-productory';
 const REPO_NAME = 'ritemark-public';
-export const DEFAULT_UPDATE_FEED_URL =
+
+/** Public ring. Always the CURRENT `latest` GitHub release, so prereleases never reach it. */
+export const STABLE_UPDATE_FEED_URL =
   `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/update-feed.json`;
+
+/**
+ * Pre-release verification ring (Sprint 98). A fixed `canary` tag release whose
+ * `update-feed.json` asset is republished (`gh release upload --clobber`) on every
+ * ext publish. An ext release lands here first; `scripts/promote-extension-release.sh`
+ * merges it into the stable feed only after it has been verified.
+ */
+export const CANARY_UPDATE_FEED_URL =
+  `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/canary/update-feed.json`;
+
+export const DEFAULT_UPDATE_FEED_URL = STABLE_UPDATE_FEED_URL;
+
+export type UpdateChannel = 'stable' | 'canary';
+
+/**
+ * Resolve the feed URL for a channel. Anything unrecognised (including a typo in
+ * the user's settings) falls back to stable — a broken channel value must never
+ * silently opt someone OUT of stable updates.
+ *
+ * Mirror of `CHANNELS` in scripts/generate-update-feed.mjs — keep both in sync.
+ */
+export function feedUrlForChannel(channel: string | undefined): string {
+  return channel === 'canary' ? CANARY_UPDATE_FEED_URL : STABLE_UPDATE_FEED_URL;
+}
 
 export interface UpdateFeedPlatformAsset {
   platform: string;
@@ -51,7 +77,7 @@ export interface UpdateFeedExtensionRelease {
 export interface UpdateFeed {
   schemaVersion: number;
   generatedAt: string;
-  channel: 'stable';
+  channel: UpdateChannel;
   fullReleases: UpdateFeedFullRelease[];
   extensionReleases: UpdateFeedExtensionRelease[];
 }
@@ -180,7 +206,9 @@ export function parseUpdateFeed(json: string): UpdateFeed | null {
     return {
       schemaVersion: 1,
       generatedAt: parsed.generatedAt,
-      channel: parsed.channel === 'stable' ? 'stable' : 'stable',
+      // A feed that declares no (or an unknown) channel is treated as stable —
+      // that is what every feed generated before Sprint 98 looks like.
+      channel: parsed.channel === 'canary' ? 'canary' : 'stable',
       fullReleases,
       extensionReleases
     };

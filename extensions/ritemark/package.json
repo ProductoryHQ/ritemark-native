@@ -198,6 +198,16 @@
             "enum": ["auto", "prompt"],
             "default": "auto",
             "description": "How extension updates are applied: 'auto' stages silently and relaunches on next start or click; 'prompt' shows the existing install notification. Full app updates are unaffected by this setting."
+          },
+          "ritemark.updates.channel": {
+            "type": "string",
+            "enum": ["stable", "canary"],
+            "enumDescriptions": [
+              "Receive updates only after they have been verified and published to everyone.",
+              "Receive extension updates as soon as they are published, before they reach everyone else. For pre-release verification only — a canary build has not yet been confirmed working."
+            ],
+            "default": "stable",
+            "description": "Which update ring to follow. Leave on 'stable' unless you are helping verify a release: 'canary' fetches an unverified pre-release update feed."
           }
         }
       },

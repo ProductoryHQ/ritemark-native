@@ -2,13 +2,13 @@
 #
 # Purpose: Quarantine a broken user-dir copy of ritemark.ritemark on activation failure and fall back to the bundled built-in
 #
-# Why: A seamless extension update that ships an incomplete package dies at module load before activate() runs, so extension-side recovery cannot help; the shell must rescue it (incident v1.8.3-ext.1, issue #142)
+# Why: A seamless extension update that ships an incomplete package dies at module load before activate() runs, so extension-side recovery cannot help; the shell must rescue it (incident v1.8.3-ext.1, issue #142). Quarantine renames the MANIFEST, not the directory: the profile extensions.json entry follows a directory rename, which would leave the broken copy registered under its new name and scanned again on the next launch (found in dev-mode validation).
 #
 # File(s): src/vs/workbench/api/browser/mainThreadExtensionService.ts
 # Created: 2026-07-21
 #
 diff --git a/src/vs/workbench/api/browser/mainThreadExtensionService.ts b/src/vs/workbench/api/browser/mainThreadExtensionService.ts
-index 4cfaf6a58cb..a9fa3c452ac 100644
+index 4cfaf6a58cb..df0ba063e04 100644
 --- a/src/vs/workbench/api/browser/mainThreadExtensionService.ts
 +++ b/src/vs/workbench/api/browser/mainThreadExtensionService.ts
 @@ -14,8 +14,10 @@ import { localize } from '../../../nls.js';
@@ -29,7 +29,7 @@ index 4cfaf6a58cb..a9fa3c452ac 100644
  
 +// --- Start Ritemark: shell watchdog
 +const RITEMARK_EXTENSION_ID = 'ritemark.ritemark';
-+const QUARANTINE_SUFFIX = '.quarantined';
++const QUARANTINED_MANIFEST_NAME = 'package.json.quarantined';
 +// --- End Ritemark
 +
  @extHostNamedCustomer(MainContext.MainThreadExtensionService)
@@ -57,7 +57,7 @@ index 4cfaf6a58cb..a9fa3c452ac 100644
  		const isDev = !this._environmentService.isBuilt || this._environmentService.isExtensionDevelopment;
  		if (isDev) {
  			this._notificationService.error(error);
-@@ -108,6 +123,63 @@ export class MainThreadExtensionService implements MainThreadExtensionServiceSha
+@@ -108,6 +123,69 @@ export class MainThreadExtensionService implements MainThreadExtensionServiceSha
  		console.error(error.message);
  	}
  
@@ -68,10 +68,15 @@ index 4cfaf6a58cb..a9fa3c452ac 100644
 +	 * If that user copy is incomplete it throws at module load, before `activate()` runs — so no
 +	 * extension-side recovery can help, because the recovery code lives in the dead extension.
 +	 *
-+	 * This quarantines the failing user copy by renaming its directory. On the next window the
-+	 * scanner cannot read its manifest, marks it invalid and filters it out, so the built-in copy
-+	 * is used instead. Strictly scoped: only `ritemark.ritemark`, and only a copy that is
-+	 * installed as a user extension — the built-in copy is never touched.
++	 * This quarantines the failing user copy by renaming its manifest. On the next window the
++	 * scanner cannot read `package.json`, marks the extension invalid and filters it out, so the
++	 * built-in copy is used instead. Strictly scoped: only `ritemark.ritemark`, and only a copy
++	 * that is installed as a user extension — the built-in copy is never touched.
++	 *
++	 * The manifest is renamed rather than the directory: the profile's `extensions.json` entry
++	 * follows a directory rename, which would leave the broken copy registered under its new name
++	 * and scanned again on the next launch. The directory path stays valid here, and the entry
++	 * with it, but the copy is no longer loadable so it drops out of the scan.
 +	 *
 +	 * @returns `true` when a copy was quarantined and the user was prompted to reload.
 +	 */
@@ -99,8 +104,9 @@ index 4cfaf6a58cb..a9fa3c452ac 100644
 +				return false;
 +			}
 +
-+			const quarantined = failed.extensionLocation.with({ path: `${failed.extensionLocation.path}${QUARANTINE_SUFFIX}` });
-+			await this._fileService.move(failed.extensionLocation, quarantined, true);
++			const manifest = this._uriIdentityService.extUri.joinPath(failed.extensionLocation, 'package.json');
++			const quarantined = this._uriIdentityService.extUri.joinPath(failed.extensionLocation, QUARANTINED_MANIFEST_NAME);
++			await this._fileService.move(manifest, quarantined, true);
 +
 +			this._notificationService.notify({
 +				severity: Severity.Error,
