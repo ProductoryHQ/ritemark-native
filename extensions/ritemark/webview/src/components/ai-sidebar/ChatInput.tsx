@@ -219,7 +219,12 @@ export function ChatInput() {
     && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
   const lastTurn = agentConversation[agentConversation.length - 1];
   const lastCodexTurn = codexConversation[codexConversation.length - 1];
-  // Check both arrays — cancel routes by active turn, not by selected agent
+  // Check both arrays — cancel routes by active turn, not by selected agent.
+  //
+  // Sprint 99 (E3): `agentConversation` / `codexConversation` / `isStreaming` are
+  // the store's projection of the ACTIVE conversation, so Send/Stop and the queue
+  // already reflect that thread alone — a background thread running does not lock
+  // this composer. Do NOT "fix" this by scanning every open conversation.
   const agentRunning = (lastTurn?.isRunning ?? false) || (lastCodexTurn?.isRunning ?? false);
   const isLoading = isAgentMode ? agentRunning : isStreaming;
   // Sprint 74 R2 (#82): while an agent runs, the composer stays unlocked and

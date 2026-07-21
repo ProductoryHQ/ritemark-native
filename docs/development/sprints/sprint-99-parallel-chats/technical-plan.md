@@ -317,8 +317,20 @@ is independently demoable.
 
 `parallelChats` (R15), default ON, code-level kill-switch only (Settings has no flag UI —
 [[project_feature_flags_no_ui]]). Flag OFF collapses to the most-recently-active conversation; the
-others stay in History (spec §6). The flag must be functional at the end of every phase, not only at
-sprint end.
+others stay in History (spec §6).
+
+**Phase-1 finding — the flag does not yet gate anything user-visible.** There is no generic flag
+channel to the AI-sidebar webview. Individual flags reach it as bespoke booleans inside the
+`agent:config` message (`agenticEnabled`, `codexEnabled`, `opencodeEnabled`); Flows has its own
+separate `flow:featureFlags` message. `parallelChats` is registered and readable host-side, but the
+webview cannot currently read it, and the Phase-1 agent correctly declined to invent plumbing for it.
+
+Since parallel chats are overwhelmingly a webview-side behaviour, the kill-switch is not real until
+this is closed. **Decision needed before Phase 5** (recorded here so it is not discovered at sprint
+end): either add a `parallelChats` boolean to `agent:config` — cheapest, consistent with the three
+flags already carried there — or introduce a general flags message for the sidebar, which is the
+better shape but is scope this sprint did not plan for. Default recommendation: the `agent:config`
+boolean, and note the general channel as follow-up debt in `architecture.md`.
 
 ## 10. Sprint 100 coordination
 

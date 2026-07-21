@@ -65,7 +65,13 @@ import { createRuntime } from '../runtime/runtimeFactory';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
 import * as modelCatalog from '../ai/modelCatalog';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
-import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
+import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
+
+/**
+ * Conversation id used when a webview message predates the Sprint 99 protocol.
+ * // Sprint 99 Phase 1: remove once every webview path sends conversationId.
+ */
+const DEFAULT_CONVERSATION_ID = 'default';
 
 const BROWSER_ROUTING_HINT = 'Ritemark has an integrated browser. When opening URLs or browsing the web, prefer the mcp__ritemark_browser__* tools over Bash open/xdg-open commands.';
 
@@ -73,7 +79,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
 
   private _view?: vscode.WebviewView;
-  private _activeAbortController: AbortController | null = null;
+  /**
+   * Live runtime sessions, keyed by conversation then runtime.
+   *
+   * A conversation talks to one runtime at a time, but switching runtime inside
+   * one conversation must not disturb any other conversation's sessions — hence
+   * the nesting rather than a flat map.
+   */
+  private readonly _runtimeSessions = new Map<string, Map<AgentId, RuntimeSession>>();
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
 
@@ -155,10 +168,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'ai-cancel':
-          if (this._activeAbortController) {
-            this._activeAbortController.abort();
-            this._activeAbortController = null;
-          }
+          this._disposeAllRuntimeSessions();
           break;
 
         case 'execute-widget':
@@ -191,6 +201,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'agent-execute': {
           const { agentId, model, attachments } = message;
+          // Sprint 99: every conversation-scoped message carries its conversation.
+          // A missing id means a webview path that has not been migrated yet.
+          const conversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
           const skipActiveFile = message.skipActiveFile === true;
           const skipBrowserContext = message.skipBrowserContext === true;
           const mentionedAgentPaths: string[] | undefined = message.mentionedAgentPaths;
@@ -292,19 +305,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               : undefined,
             onProgress: (progress) => {
               if (isClaudeCode) {
-                this._view?.webview.postMessage({ type: 'agent-progress', agentId, progress });
+                this._view?.webview.postMessage({ type: 'agent-progress', conversationId, agentId, progress });
               } else {
                 if (progress.type === 'text') {
-                  this._view?.webview.postMessage({ type: 'codex-streaming', delta: progress.message });
+                  this._view?.webview.postMessage({ type: 'codex-streaming', conversationId, delta: progress.message });
                 } else {
-                  this._view?.webview.postMessage({ type: 'codex-progress', progress });
+                  this._view?.webview.postMessage({ type: 'codex-progress', conversationId, progress });
                 }
               }
             },
-            onApprovalRequest: (req) => this._approvalGate.request(req),
+            onApprovalRequest: (req) => this._approvalGate.request({ ...req, conversationId }),
             onComplete: (result) => {
               this._view?.webview.postMessage({
-                type: 'agent-result',
+                type: 'agent-result', conversationId,
                 agentId,
                 text: result.text ?? '',
                 filesModified: result.filesModified ?? [],
@@ -314,11 +327,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               this._refreshExplorerForAgentWrites(result.filesModified);
             },
             onQuestion: (question) => {
-              this._view?.webview.postMessage({ type: 'agent-question', agentId, question });
+              this._view?.webview.postMessage({ type: 'agent-question', conversationId, agentId, question });
             },
             onCodexComplete: (result) => {
               this._view?.webview.postMessage({
-                type: 'codex-result',
+                type: 'codex-result', conversationId,
                 agentId,
                 status: result.status,
                 error: result.error,
@@ -329,23 +342,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               // Codex app-server died mid-turn — finalize the turn so the webview
               // isn't stuck on "running" forever.
               this._view?.webview.postMessage({
-                type: 'codex-result',
+                type: 'codex-result', conversationId,
                 agentId,
                 status: 'error',
                 error: 'Codex exited unexpectedly. Please try again.',
               });
             },
             onCodexPlanDelta: (delta) => {
-              this._view?.webview.postMessage({ type: 'codex-plan-text-delta', delta });
+              this._view?.webview.postMessage({ type: 'codex-plan-text-delta', conversationId, delta });
             },
             onCodexPlanUpdate: (explanation, plan) => {
-              this._view?.webview.postMessage({ type: 'codex-plan-update', explanation, plan });
+              this._view?.webview.postMessage({ type: 'codex-plan-update', conversationId, explanation, plan });
             },
             onCodexQuestion: (requestId, questions) => {
-              this._view?.webview.postMessage({ type: 'codex-question', requestId, questions });
+              this._view?.webview.postMessage({ type: 'codex-question', conversationId, requestId, questions });
             },
             onRpcProgress: (_method, msg) => {
-              this._view?.webview.postMessage({ type: 'codex-rpc-progress', method: _method, message: msg });
+              this._view?.webview.postMessage({ type: 'codex-rpc-progress', conversationId, method: _method, message: msg });
             },
             // Codex dynamic browser tools (dispatched in extension host, results sent back to Codex)
             onBrowserToolCall: (agentId === 'codex' && browserEnabled)
@@ -358,8 +371,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               : undefined,
           };
           try {
-            await runtime.start(sessionConfig);
-            await runtime.prompt({ prompt, attachments: turnAttachments, activeFile, mode: codexTurnMode, model, timeoutMinutes: agentTimeout });
+            const session = await this._openRuntimeSession(conversationId, agentId as AgentId, runtime, sessionConfig);
+            await session.prompt({ prompt, attachments: turnAttachments, activeFile, mode: codexTurnMode, model, timeoutMinutes: agentTimeout });
           } catch (err) {
             // Unhandled runtime error — surface it to the webview so the turn finishes
             const errMsg = err instanceof Error ? err.message : String(err);
@@ -373,23 +386,26 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         }
 
         case 'agent-cancel': {
-          const runtime = this._runtimeRegistry.get(message.agentId as import('../agent/types').AgentId);
-          await runtime.cancel();
+          // Cancels ONLY the named conversation; sibling conversations keep running.
+          const session = this._findRuntimeSession(message.conversationId, message.agentId as AgentId);
+          await session?.cancel();
           break;
         }
 
-        case 'agent-answer-question':
+        case 'agent-answer-question': {
           traceClaude('webview->extension', 'agent-answer-question', { toolUseId: message.toolUseId });
-          (this._runtimeRegistry.get('claude-code') as import('../agent/ClaudeCodeRuntime').ClaudeCodeRuntime)
-            .answerQuestion(message.toolUseId, message.answers || {});
+          const session = this._findRuntimeSession(message.conversationId, 'claude-code');
+          (session as import('../agent/ClaudeCodeRuntime').ClaudeCodeSession | undefined)
+            ?.answerQuestion(message.toolUseId, message.answers || {});
           break;
+        }
 
         case 'agent-approve': {
           const { requestId, approved, alwaysAllow, agentId: approveAgentId } = message;
           this._approvalGate.respond(requestId, approved === true, alwaysAllow === true);
           if (approveAgentId) {
-            const rt = this._runtimeRegistry.get(approveAgentId as import('../agent/types').AgentId);
-            rt?.respondToApproval(requestId, approved === true, alwaysAllow === true);
+            const session = this._findRuntimeSession(message.conversationId, approveAgentId as AgentId);
+            session?.respondToApproval(requestId, approved === true, alwaysAllow === true);
           }
           break;
         }
@@ -479,10 +495,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           await vscode.commands.executeCommand('ritemark.aiSettings');
           break;
 
-        case 'codex-answer-question':
+        case 'codex-answer-question': {
           traceCodex('webview->extension', 'codex-answer-question', { requestId: message.requestId });
-          (this._runtimeRegistry.get('codex') as CodexRuntime).answerQuestion(message.requestId, message.answers || {});
+          const session = this._findRuntimeSession(message.conversationId, 'codex');
+          (session as import('../codex/CodexRuntime').CodexSession | undefined)
+            ?.answerQuestion(message.requestId, message.answers || {});
           break;
+        }
 
         case 'conversation:reset':
           traceCodex('webview->extension', 'conversation:reset');
@@ -1248,4 +1267,53 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer')
     );
   }
+
+  // ── Runtime sessions (Sprint 99) ─────────────────────────────────────
+
+  /**
+   * Open, or re-configure, this conversation's session with a runtime.
+   *
+   * Reuse is strictly per conversation: a warm session keeps that chat's context
+   * across turns, and no conversation is ever handed another's session.
+   */
+  private async _openRuntimeSession(
+    conversationId: string,
+    agentId: AgentId,
+    runtime: AgentRuntime,
+    config: RuntimeSessionConfig,
+  ): Promise<RuntimeSession> {
+    let byAgent = this._runtimeSessions.get(conversationId);
+    if (!byAgent) {
+      byAgent = new Map<AgentId, RuntimeSession>();
+      this._runtimeSessions.set(conversationId, byAgent);
+    }
+
+    const session = await runtime.createSession(conversationId, config);
+    byAgent.set(agentId, session);
+    return session;
+  }
+
+  private _findRuntimeSession(
+    conversationId: string | undefined,
+    agentId: AgentId,
+  ): RuntimeSession | undefined {
+    return this._runtimeSessions.get(conversationId ?? DEFAULT_CONVERSATION_ID)?.get(agentId);
+  }
+
+  /** Tear down one conversation's sessions, leaving every other conversation alone. */
+  private _disposeRuntimeSessions(conversationId: string): void {
+    const byAgent = this._runtimeSessions.get(conversationId);
+    if (!byAgent) return;
+    for (const session of byAgent.values()) {
+      session.dispose();
+    }
+    this._runtimeSessions.delete(conversationId);
+  }
+
+  private _disposeAllRuntimeSessions(): void {
+    for (const conversationId of Array.from(this._runtimeSessions.keys())) {
+      this._disposeRuntimeSessions(conversationId);
+    }
+  }
+
 }

@@ -134,4 +134,33 @@ import type { ReviewDecision } from './codexProtocol';
   console.log('✓ Test 9: Default approval policy is "untrusted" (always ask)');
 }
 
-console.log('\nAll 9 tests passed!');
+// Test 10 (Sprint 99 B3): threadId is propagated out of the route result, so the
+// adapter can attribute an approval to the right conversation. The fixtures in
+// tests 1 and 2 are the real wire shape — threadId/turnId, NOT conversationId.
+{
+  const cmd = routeApprovalRequest({
+    id: 48,
+    method: 'item/commandExecution/requestApproval',
+    params: { threadId: 'thread-7', turnId: 'turn-1', command: ['ls'], cwd: '/' },
+  });
+  assert.strictEqual((cmd as { threadId?: string }).threadId, 'thread-7', 'command approval carries threadId');
+
+  const patch = routeApprovalRequest({
+    id: 49,
+    method: 'item/fileChange/requestApproval',
+    params: { threadId: 'thread-8', turnId: 'turn-2', fileChanges: {} },
+  });
+  assert.strictEqual((patch as { threadId?: string }).threadId, 'thread-8', 'file-change approval carries threadId');
+
+  // Missing threadId must be undefined, never a guess — the adapter treats an
+  // unattributable approval as undeliverable and declines it.
+  const orphan = routeApprovalRequest({
+    id: 50,
+    method: 'item/commandExecution/requestApproval',
+    params: { command: ['ls'], cwd: '/' },
+  });
+  assert.strictEqual((orphan as { threadId?: string }).threadId, undefined, 'absent threadId stays undefined');
+  console.log('✓ Test 10: threadId propagated out of ApprovalRouteResult (Sprint 99 B3)');
+}
+
+console.log('\nAll 10 tests passed!');

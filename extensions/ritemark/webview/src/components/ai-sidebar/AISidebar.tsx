@@ -43,29 +43,26 @@ export function AISidebar() {
     // Restore persisted state if available
     const savedState = vscode.getState() as Record<string, unknown> | null;
     if (savedState) {
-      // Re-hydrate relevant store state from saved state
+      // Re-hydrate the ACTIVE conversation from saved webview state.
+      // Sprint 99: this restores one thread (the one that was on screen). The
+      // full open-thread set persists per workspace in Phase 5 (R13).
       const store = useAISidebarStore.getState();
+      const restored: Parameters<typeof store.restoreActiveConversation>[0] = {};
       if (savedState.chatMessages) {
-        useAISidebarStore.setState({
-          chatMessages: savedState.chatMessages as typeof store.chatMessages,
-          conversationHistory: (savedState.conversationHistory || []) as typeof store.conversationHistory,
-          currentConversationId: (savedState.currentConversationId as string | null) ?? null,
-        });
+        restored.chatMessages = savedState.chatMessages as typeof store.chatMessages;
+        restored.conversationHistory = (savedState.conversationHistory || []) as typeof store.conversationHistory;
       }
       if (savedState.agentConversation) {
-        useAISidebarStore.setState({
-          agentConversation: savedState.agentConversation as typeof store.agentConversation,
-        });
+        restored.agentConversation = savedState.agentConversation as typeof store.agentConversation;
       }
       if (savedState.codexConversation) {
-        useAISidebarStore.setState({
-          codexConversation: savedState.codexConversation as typeof store.codexConversation,
-        });
+        restored.codexConversation = savedState.codexConversation as typeof store.codexConversation;
       }
       if ('dismissedCurrentPlanKey' in savedState) {
-        useAISidebarStore.setState({
-          dismissedCurrentPlanKey: (savedState.dismissedCurrentPlanKey as string | null) ?? null,
-        });
+        restored.dismissedCurrentPlanKey = (savedState.dismissedCurrentPlanKey as string | null) ?? null;
+      }
+      if (Object.keys(restored).length > 0) {
+        store.restoreActiveConversation(restored);
       }
     }
 

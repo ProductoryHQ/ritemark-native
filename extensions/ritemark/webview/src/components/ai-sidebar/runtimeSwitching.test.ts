@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, hydrateConversations } from './store';
+import { createConversationState, type ConversationState } from './conversationState';
 import { vscode } from '../../lib/vscode';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
 
@@ -7,6 +8,17 @@ const initialState = useAISidebarStore.getState();
 
 function resetStore(): void {
   useAISidebarStore.setState(initialState, true);
+}
+
+/**
+ * Sprint 99: conversation state lives in `conversations[id]`, not in top-level
+ * store fields. Seed through the conversation map — writing the flat mirror
+ * fields directly no longer reaches the source of truth.
+ */
+function seedActiveConversation(partial: Partial<ConversationState> = {}): string {
+  const conversation = createConversationState('conv-active', partial);
+  hydrateConversations([conversation], conversation.id);
+  return conversation.id;
 }
 
 function makeCodexTurn(overrides: Partial<CodexConversationTurn> = {}): CodexConversationTurn {
@@ -43,8 +55,7 @@ function makeAgentTurn(overrides: Partial<AgentConversationTurn> = {}): AgentCon
 
 function testSetPendingRuntimeMergesPartialUpdate() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'ask' },
     });
 
@@ -61,8 +72,7 @@ function testSetPendingRuntimeMergesPartialUpdate() {
 
 function testSetPendingRuntimeModeOnly() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       pendingRuntime: { runtimeId: 'codex', modelId: 'o4-mini', mode: 'auto' },
     });
 
@@ -85,8 +95,7 @@ function testCancelRequestRoutesToCodexWhenCodexIsRunning() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       selectedAgent: 'codex',
       codexConversation: [makeCodexTurn({ isRunning: true })],
       agentConversation: [],
@@ -117,8 +126,7 @@ function testCancelRequestRoutesToClaudeWhenClaudeIsRunning() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       agentConversation: [makeAgentTurn({ isRunning: true })],
       codexConversation: [],
     });
@@ -148,8 +156,7 @@ function testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       selectedAgent: 'codex',
       codexConversation: [makeCodexTurn({ isRunning: true })],
       agentConversation: [makeAgentTurn({ isRunning: true })],
@@ -177,8 +184,7 @@ function testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       codexConversation: [makeCodexTurn({ isRunning: false })],
       agentConversation: [makeAgentTurn({ isRunning: false })],
     });

@@ -191,20 +191,32 @@ export class AcpClient {
    * only ever appears on the agent's stderr. An earlier version of this method
    * wrapped it in try/catch as though the error were observable; it was not.
    *
-   * Sprint 99: killing the process is only acceptable while one session exists
-   * per process. Once several conversations share a subprocess this must stop
-   * killing it — see technical-plan.md §5 C3.
+   * Sprint 99 (C3): several conversations now share one subprocess, so the kill
+   * can no longer be unconditional — it would take every other chat down with
+   * it. The caller decides via `options.killProcess`:
+   *
+   *  - only live session → kill, exactly as before (nothing else is harmed and
+   *    the user gets a real cancel);
+   *  - siblings live      → do NOT kill. AcpManager marks the session
+   *    cancel-requested and discards its updates until the turn settles, so the
+   *    chat goes idle immediately and the wasted upstream work stays invisible.
+   *
+   * Defaults to true so a single-session embedder keeps today's behaviour.
    *
    * // Sprint 100: re-check against 1.18.1 — if it implements session/cancel,
    * // this becomes a real per-session cancel and the kill goes away entirely.
    */
-  async cancel(sessionId: string): Promise<void> {
+  async cancel(sessionId: string, options?: { killProcess?: boolean }): Promise<void> {
     if (this.connection) {
       // Fire-and-forget: correct for any agent that implements it, no-op otherwise.
       this.connection.cancel({ sessionId });
       this.trace?.('client', 'cancel:protocol-notification-sent', { sessionId });
     }
-    this.killProcess('SIGTERM');
+    if (options?.killProcess ?? true) {
+      this.killProcess('SIGTERM');
+    } else {
+      this.trace?.('client', 'cancel:kill-suppressed-siblings-live', { sessionId });
+    }
   }
 
   /** Tear down the connection and kill the agent process. */
