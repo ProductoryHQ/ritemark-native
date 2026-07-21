@@ -304,6 +304,23 @@ of OPEN thread ids per workspace (R13).
 |---|---|---|
 | **0** | ~~ACP concurrency spike + RSS measurement (D1)~~ **DONE — D1 confirmed.** ~~Fix A1 (live pending-approval bug)~~ **DONE.** Remaining: C3 cancel fix, promoted to blocker by the spike. | ✅ Spike recorded in §2 D1; A1 shipped with a regression test |
 | **1** | R1 interface (`createSession`/`RuntimeSession`) + E1/E2 store reshape + D1 message protocol, landed together | Two chats visibly coexist with ONE runtime wired (Codex) |
+
+**Phase 1 verification (2026-07-21).** Automated: 44 unit tests green (including new
+concurrency tests — two Codex threads receive their own deltas; one conversation switching
+Auto↔Ask does not reset another's thread; two ACP sessions do not share write-approval state),
+both typechecks clean, extension activates in dev mode with zero errors.
+Manually confirmed by Jarmo in the dev instance: the Codex `request_user_input` question card
+and the Claude `AskUserQuestion` card both render and accept answers in **plan mode** — the two
+paths that moved onto the session last and had the thinnest coverage.
+
+Known non-issue, diagnosed and NOT a Sprint 99 regression: Codex logs
+`request_user_input is unavailable in Default mode` on stderr when a turn runs outside plan
+mode. Ritemark never advertises that tool outside plan mode (`CODEX_PLAN_DEVELOPER_INSTRUCTIONS`
+and `CODEX_PLAN_TURN_REMINDER` are both gated on `shouldUsePlanMode`; `CODEX_BASE_INSTRUCTIONS`
+does not mention it) — the model reaches for it unprompted and Codex's own tool router refuses.
+Verified byte-identical to the pre-rewrite code in this path. Whether structured questions
+*should* be available outside plan mode is a product gap, and is the class of problem Sprint 101
+(#154, agent capability context) addresses.
 | **2** | Workstream B (Codex) complete, incl. B1 data-loss fix | Scenario suite for Codex×Codex concurrency green |
 | **3** | Workstream A (Claude) — A2, A3 | Claude×Claude and Claude×Codex green |
 | **4** | Workstream C (ACP) — C1 safety first | OpenCode approval-isolation scenarios green |
