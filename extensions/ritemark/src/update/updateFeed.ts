@@ -57,9 +57,12 @@ export interface UpdateFeedFullRelease {
 
 export interface UpdateFeedExtensionFile {
   path: string;
-  downloadUrl: string;
-  size: number;
-  sha256: string;
+  /** 'delete' removes an inherited file; absent means write (the default). */
+  op?: 'write' | 'delete';
+  /** Required for writes, absent for deletes. */
+  downloadUrl?: string;
+  size?: number;
+  sha256?: string;
 }
 
 export interface UpdateFeedExtensionRelease {
@@ -115,8 +118,20 @@ function parseExtensionFile(value: unknown): UpdateFeedExtensionFile | null {
     return null;
   }
 
-  const { path, downloadUrl, size, sha256 } = value;
-  if (!isString(path) || !isString(downloadUrl) || !isString(sha256) || !isNumber(size)) {
+  const { path, op, downloadUrl, size, sha256 } = value;
+  if (!isString(path)) {
+    return null;
+  }
+
+  // A delete entry names a path to remove and carries no download metadata.
+  // Requiring downloadUrl/size/sha256 for every entry silently DROPPED deletes,
+  // so a release that removed a file inherited from the bundled base left the
+  // stale file installed.
+  if (op === 'delete') {
+    return { path, op: 'delete' };
+  }
+
+  if (!isString(downloadUrl) || !isString(sha256) || !isNumber(size)) {
     return null;
   }
 
@@ -254,12 +269,18 @@ export function findPlatformAsset(
 }
 
 export function toExtensionManifest(release: UpdateFeedExtensionRelease): UpdateManifest {
-  const files: UpdateFile[] = release.files.map(file => ({
-    path: file.path,
-    url: file.downloadUrl,
-    size: file.size,
-    sha256: file.sha256
-  }));
+  const files: UpdateFile[] = release.files.map(file => (
+    file.op === 'delete'
+      // Without this the entry would fall through as a write with no url, and
+      // the installer would refuse the whole update.
+      ? { path: file.path, op: 'delete' as const }
+      : {
+          path: file.path,
+          url: file.downloadUrl,
+          size: file.size,
+          sha256: file.sha256
+        }
+  ));
 
   return {
     version: release.version,

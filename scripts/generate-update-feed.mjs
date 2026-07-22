@@ -194,13 +194,22 @@ async function main() {
     throw new Error('Usage: generate-update-feed.mjs --mode <full|extension> --version <version> --output <file> [--channel <stable|canary>]');
   }
 
-  // A canary feed is seeded from the STABLE feed the first time it is generated
-  // (there is no canary feed yet), so canary users keep seeing every stable
-  // release. After that it merges into its own feed only.
+  // A canary feed is seeded from the STABLE feed the first time it is generated.
+  // On EVERY later canary generation its fullReleases are refreshed from stable
+  // too: full app releases are published to stable only, so a frozen snapshot
+  // would leave canary testers unable to see app updates. The client also
+  // resolves fullReleases from stable directly (updateService), so this is
+  // belt-and-braces — but it keeps the published canary feed honest if anyone
+  // reads it on its own.
   let existingFeed = await fetchExistingFeed(feedUrl);
   if (!existingFeed && channel !== DEFAULT_CHANNEL) {
     console.error(`No ${channel} feed found — seeding it from the ${DEFAULT_CHANNEL} feed.`);
     existingFeed = await fetchExistingFeed(CHANNELS[DEFAULT_CHANNEL]);
+  } else if (existingFeed && channel !== DEFAULT_CHANNEL) {
+    const stable = await fetchExistingFeed(CHANNELS[DEFAULT_CHANNEL]);
+    if (stable?.fullReleases?.length) {
+      existingFeed = { ...existingFeed, fullReleases: stable.fullReleases };
+    }
   }
   existingFeed = existingFeed ?? {
     schemaVersion: 1,
@@ -259,12 +268,18 @@ async function main() {
       installType: manifest.installType || 'user-extension',
       extensionId: manifest.extensionId || 'ritemark',
       extensionDirName: manifest.extensionDirName,
-      files: (manifest.files || []).map(file => ({
-        path: file.path,
-        downloadUrl: file.url || file.downloadUrl,
-        size: file.size,
-        sha256: file.sha256
-      }))
+      // A delete entry carries no download metadata; emitting placeholder
+      // url/size/sha256 would make the client parser accept it as a write.
+      files: (manifest.files || []).map(file => (
+        file.op === 'delete'
+          ? { path: file.path, op: 'delete' }
+          : {
+              path: file.path,
+              downloadUrl: file.url || file.downloadUrl,
+              size: file.size,
+              sha256: file.sha256
+            }
+      ))
     };
 
     const feed = {
