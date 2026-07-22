@@ -128,6 +128,37 @@ else
   ERRORS=$((ERRORS + 1))
 fi
 
+# Check 11: a bundled-runtime version bump must come with a re-verified matrix
+#
+# Sprint 100. Bumping an agent binary changes behaviour our code depends on in
+# ways one successful chat does not exercise — the OpenCode permission gate and
+# session/cancel are the two that bite. The matrix is only worth having if it is
+# re-measured, so a version change in the manifest without a matching matrix
+# update is blocked here.
+#
+# Evidence comes from ./scripts/verify-agent-runtimes.sh, not from prose.
+MANIFEST="extensions/ritemark/binaries/agents/manifest.json"
+MATRIX="docs/development/agent-runtime-compatibility.md"
+if git diff --cached --name-only | grep -qx "$MANIFEST"; then
+  # Only care about version changes, not sha/url churn or formatting.
+  OLD_VERSIONS=$(git show HEAD:"$MANIFEST" 2>/dev/null \
+    | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const m=JSON.parse(d);console.log(m.runtimes.map(r=>r.agent+'@'+r.version).sort().join(','))}catch{console.log('')}})" 2>/dev/null)
+  NEW_VERSIONS=$(git show :"$MANIFEST" 2>/dev/null \
+    | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const m=JSON.parse(d);console.log(m.runtimes.map(r=>r.agent+'@'+r.version).sort().join(','))}catch{console.log('')}})" 2>/dev/null)
+  if [[ -n "$NEW_VERSIONS" && "$OLD_VERSIONS" != "$NEW_VERSIONS" ]]; then
+    if git diff --cached --name-only | grep -qx "$MATRIX"; then
+      echo "OK: runtime version change accompanied by a matrix update"
+    else
+      echo "ERROR: bundled runtime versions changed but $MATRIX was not updated"
+      echo "  was: ${OLD_VERSIONS:-<none>}"
+      echo "  now: $NEW_VERSIONS"
+      echo "  Run ./scripts/verify-agent-runtimes.sh and record the results (including"
+      echo "  anything it SKIPS — a skip is 'not proven', not a pass)."
+      ERRORS=$((ERRORS + 1))
+    fi
+  fi
+fi
+
 # Summary
 if [[ $ERRORS -gt 0 ]]; then
   echo ""

@@ -161,8 +161,43 @@ Verify the local build:
 | ritemarkVersion missing | `grep ritemarkVersion product.json` |
 | Timestamps show 1980 | `stat -f "%Sm" Ritemark.app` |
 | ~~Info.plist version wrong~~ | NOT a blocker — `CFBundleShortVersionString` always shows VS Code base version; Ritemark version lives in `product.json` (`ritemarkVersion`) |
+| **Agent runtime bumped without re-verification** | If `extensions/ritemark/binaries/agents/manifest.json` changed a runtime `version` since the last release tag, `docs/development/agent-runtime-compatibility.md` MUST have been re-verified for those versions — see below |
 
 **SOFT WARNINGS** (proceed but flag to Jarmo): DMG older than app build, uncommitted changes, open sprint WIP, notarization pending, release notes missing or out-of-date.
+
+### Step 2b — Bundled agent runtime verification (when a runtime version changed)
+
+Skip this whole step if no runtime version moved since the last release tag:
+
+```bash
+git diff <last-vX.Y.Z-tag>..HEAD -- extensions/ritemark/binaries/agents/manifest.json
+```
+
+If a `version` field changed, the bump is only shippable with evidence:
+
+```bash
+./scripts/verify-agent-runtimes.sh
+```
+
+It must exit 0, and `docs/development/agent-runtime-compatibility.md` must carry a **Last verified**
+line naming the shipping versions.
+
+**Why this is a blocker and not a nicety.** A runtime bump changes behaviour Ritemark depends on in
+ways that one successful chat does not exercise. Sprint 100 found two of them:
+
+- OpenCode's permission gate is the *entire* safety boundary for that runtime — and showing the
+  approval prompt is not the same as denial actually blocking the write. Both directions need
+  proving, separately.
+- `session/cancel` — Ritemark no longer kills the subprocess on cancel, because 1.18.4 honours the
+  protocol call. If a future version regresses that, Stop breaks silently for every OpenCode chat
+  and nothing else notices.
+
+`.claude/hooks/pre-commit-validator.sh` Check 11 blocks a manifest version change that arrives
+without a matrix update, so by release time this should already hold. Verify rather than assume: the
+hook only fires on a commit that stages the manifest.
+
+**A SKIP in the script output is "not proven", not a pass.** If the script skips a check (no model
+available, binary missing), the matrix must say so and Jarmo decides whether to ship without it.
 
 ### Step 2a — DMG content verification
 
