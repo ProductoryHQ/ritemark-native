@@ -215,11 +215,33 @@ This step sits BEFORE `qa-validator` sign-off and before any release gate. It is
 ## Status
 
 **Track:** Plain full track
-**Current Phase:** 2 (PLAN) — awaiting Jarmo approval
+**Current Phase:** 5 (VALIDATE) — code complete, both hard gates proven, awaiting Jarmo's dev validation
+
+**Shipped:** Claude 2.1.156 → **2.1.217** (SDK pinned exactly `0.3.217`), OpenCode 1.15.13 → **1.18.4**,
+Codex unchanged at 0.144.4. Both Sprint 99 `// Sprint 100: re-check` markers resolved and removed.
+
+**Both hard gates PROVEN, not inferred.** Hard Gate 1: a write pauses for host approval, denial
+leaves no file on disk, approval writes it — run against the real 1.18.4 binary in both directions.
+Hard Gate 2 turned out to aim at the wrong risk: Anthropic ships the SDK and CLI in lockstep, so the
+tuple is upstream's shape; the actual drift source was our own `^0.3.156` caret, which had ALREADY
+resolved to 0.3.159 against a bundled 2.1.156. Now pinned exactly.
+
+**Beyond the plan:** `session/cancel` is implemented in 1.18.4, so the process-kill is gone — it was
+not merely redundant but harmful, discarding a warm subprocess shared by every conversation. Proven
+with a live spike before the code change was trusted.
+
+**Durability work added mid-sprint** (Jarmo's question: what makes the next bump redo this?):
+`scripts/verify-agent-runtimes.sh` makes the evidence repeatable, the matrix moved to
+`docs/development/agent-runtime-compatibility.md` as a living document, pre-commit Check 11 blocks a
+version change without a matrix update, and `release-manager` gained it as a hard blocker + Step 2b.
+
+**NOT proven, stated plainly:** restart-after-partial-turn; parallel sessions under the NEW binaries
+(the Sprint 99 concurrency evidence was gathered on 1.15.13); anything off darwin-arm64; and a live
+Claude turn through Ritemark — the binary was smoke-tested, not driven.
 **Approval Required:** Yes
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-07-21, as part of the v1.8.5 set)
 
 **Awaiting Jarmo approval — no code until approved.**
