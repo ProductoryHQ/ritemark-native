@@ -7,7 +7,7 @@
  */
 
 import { useRef, useEffect, useState } from 'react';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, useActiveConversation } from './store';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { UserPromptBubble, AIResponseBubble } from './ChatBubbles';
@@ -19,8 +19,7 @@ import { extractPlanDisplayText } from './planText';
 import type { CodexConversationTurn, AgentProgress, CodexSidebarStatus } from './types';
 
 export function CodexView() {
-  const codexConversation = useAISidebarStore((s) => s.codexConversation);
-  const agentConversation = useAISidebarStore((s) => s.agentConversation);
+  const { agentConversation, codexConversation } = useActiveConversation();
   const isMixedRuntime = agentConversation.length > 0;
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const dismissedCodexNoticeKey = useAISidebarStore((s) => s.dismissedCodexNoticeKey);

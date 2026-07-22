@@ -23,6 +23,7 @@ import type { AcpFsBackend } from './acpFsProxy';
 const AGENT_SCRIPT = `
 const readline = require('readline');
 const rl = readline.createInterface({ input: process.stdin });
+let sessionSeq = 0;
 function send(o){ process.stdout.write(JSON.stringify(o)+'\\n'); }
 function result(id,res){ send({jsonrpc:'2.0',id,result:res}); }
 function notify(m,p){ send({jsonrpc:'2.0',method:m,params:p}); }
@@ -31,9 +32,15 @@ rl.on('line',(line)=>{
   if(msg.method==='initialize'){
     result(msg.id,{protocolVersion:1,agentCapabilities:{},authMethods:[],agentInfo:{name:'Scripted',version:'0'}});
   } else if(msg.method==='session/new'){
-    result(msg.id,{sessionId:'ses_1',configOptions:[]});
+    result(msg.id,{sessionId:'ses_'+(++sessionSeq),configOptions:[]});
   } else if(msg.method==='session/prompt'){
     const sid=msg.params.sessionId;
+    if(process.env.AGENT_SLOW==='1'){
+      // Stream one chunk, then settle late so a cancel can land mid-turn.
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'partial-'+sid}}});
+      setTimeout(()=>result(msg.id,{stopReason:'end_turn',usage:{inputTokens:1,outputTokens:1,totalTokens:2}}),300);
+      return;
+    }
     if(process.env.AGENT_EMPTY==='1'){
       // Bad-key style empty turn: no content, 0 tokens.
       result(msg.id,{stopReason:'end_turn',usage:{inputTokens:0,outputTokens:0,totalTokens:0}});
@@ -76,6 +83,47 @@ function makeManager(events: AgentProgress[], extraEnv?: Record<string, string>)
   });
 }
 
+/** Sprint 99: variant that records which ACP session each event came from. */
+function makeTaggedManager(events: Array<{ sessionId: string; p: AgentProgress }>, extraEnv?: Record<string, string>) {
+  const agentScript = writeAgentScript();
+  return new AcpManager({
+    binaryPath: process.execPath,
+    args: [agentScript],
+    workspaceRoot: os.tmpdir(),
+    byokEnv: extraEnv,
+    requestPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
+    approveWrite: async () => true,
+    onProgress: (p, sessionId) => events.push({ sessionId, p }),
+    fsBackend: fakeBackend,
+  });
+}
+
+/**
+ * Cancelling the last session kills the process, which rejects the in-flight
+ * session/prompt with the SDK's "ACP connection closed". That is the cancel
+ * working — it must not reach the user as a turn error.
+ */
+async function testSoleSessionCancelReportsCancelledNotError(): Promise<void> {
+  const events: AgentProgress[] = [];
+  const manager = makeManager(events, { AGENT_SLOW: '1' });
+  const sessionId = await manager.start();
+
+  const turn = manager.prompt(sessionId, 'count slowly');
+  await new Promise((r) => setTimeout(r, 120));   // let the turn start streaming
+  await manager.cancel(sessionId);                 // sole session → process is killed
+
+  const result = await turn;
+  assert.strictEqual(result.stopReason, 'cancelled',
+    'a user cancel must settle the turn as cancelled, not reject with a raw protocol error');
+
+  const errors = events.filter((e) => e.type === 'error');
+  assert.deepStrictEqual(errors, [],
+    'pressing Stop must not surface an error line to the user');
+
+  manager.dispose();
+  console.log('✓ sole-session cancel settles as cancelled with no user-facing error');
+}
+
 async function run() {
   // ── env: OPENCODE_PERMISSION is the mandatory permission lever (R4) ──
   {
@@ -87,8 +135,8 @@ async function run() {
   {
     const events: AgentProgress[] = [];
     const mgr = makeManager(events);
-    await mgr.start();
-    await mgr.prompt('do it');
+    const sid = await mgr.start();
+    await mgr.prompt(sid, 'do it');
 
     const byType = (t: string) => events.filter((e) => e.type === t);
     assert.ok(byType('thinking').some((e) => e.message === 'mulling'), `thought→thinking, got ${JSON.stringify(events)}`);
@@ -107,8 +155,8 @@ async function run() {
     const events: AgentProgress[] = [];
     const mgr = makeManager(events, undefined);
     (mgr as unknown as { config: { byokEnv?: Record<string, string> } }).config.byokEnv = { AGENT_EMPTY: '1' };
-    await mgr.start();
-    await mgr.prompt('use a model with no key');
+    const sid = await mgr.start();
+    await mgr.prompt(sid, 'use a model with no key');
     const errors = events.filter((e) => e.type === 'error');
     assert.strictEqual(errors.length, 1, `empty turn should emit one error, got ${JSON.stringify(events)}`);
     assert.ok(/API key/i.test(errors[0].message), 'soft error mentions API keys');
@@ -116,16 +164,77 @@ async function run() {
     mgr.dispose();
   }
 
-  // ── cancel kills the process (OpenCode session/cancel unsupported) ──
+  // ── cancel kills the process when it is the ONLY session (C3) ──
   {
     const events: AgentProgress[] = [];
     const mgr = makeManager(events);
-    await mgr.start();
+    const sid = await mgr.start();
     assert.ok(mgr.isRunning(), 'running after start');
-    await mgr.cancel();
-    assert.ok(!mgr.isRunning(), 'cancel tears down the session');
+    await mgr.cancel(sid);
+    assert.ok(!mgr.isRunning(), 'sole-session cancel still kills the process');
     assert.strictEqual(mgr.currentSessionId, null, 'session id cleared after cancel');
   }
+
+  // ── Sprint 99 C2: two sessions on ONE process get their own streams ──
+  // Previously `sessionId` was a manager scalar and handleSessionUpdate ignored
+  // params.sessionId entirely, so B's stream landed in A's progress sink.
+  {
+    const tagged: Array<{ sessionId: string; p: AgentProgress }> = [];
+    const mgr = makeTaggedManager(tagged);
+    const a = await mgr.start();
+    const b = await mgr.start();
+    assert.notStrictEqual(a, b, 'each start() opens a distinct ACP session');
+    assert.strictEqual(mgr.sessionCount, 2, 'both sessions live on one process');
+
+    await Promise.all([mgr.prompt(a, 'for A'), mgr.prompt(b, 'for B')]);
+
+    const textFor = (sid: string) =>
+      tagged.filter((e) => e.sessionId === sid && e.p.type === 'text').map((e) => e.p.message);
+    assert.ok(textFor(a).includes('Done'), 'session A received its own streamed text');
+    assert.ok(textFor(b).includes('Done'), 'session B received its own streamed text');
+    assert.strictEqual(
+      tagged.filter((e) => e.p.type === 'done').length, 2,
+      'each session completes its own turn exactly once',
+    );
+    mgr.dispose();
+  }
+
+  // ── Sprint 99 C2: an empty turn in A is not masked by B's streamed content ──
+  // sawContentThisTurn used to be a manager scalar, so B streaming text
+  // suppressed A's legitimate "no API key" soft error.
+  {
+    const tagged: Array<{ sessionId: string; p: AgentProgress }> = [];
+    const mgr = makeTaggedManager(tagged);
+    const a = await mgr.start();
+    const b = await mgr.start();
+    // Drive A through the empty-turn path by hand while B streams content.
+    const bTurn = mgr.prompt(b, 'stream something');
+    const stateA = (mgr as unknown as { sessions: Map<string, { sawContentThisTurn: boolean }> }).sessions.get(a)!;
+    await bTurn;
+    assert.strictEqual(stateA.sawContentThisTurn, false,
+      "B's streamed content must not set A's sawContentThisTurn flag");
+    mgr.dispose();
+  }
+
+  // ── Sprint 99 C3: cancel with siblings live does NOT kill the process ──
+  {
+    const tagged: Array<{ sessionId: string; p: AgentProgress }> = [];
+    const mgr = makeTaggedManager(tagged, { AGENT_SLOW: '1' });
+    const a = await mgr.start();
+    const b = await mgr.start();
+    const aTurn = mgr.prompt(a, 'slow work');
+    await mgr.cancel(a);
+    assert.ok(mgr.isRunning(), 'cancelling one of two sessions must not kill the shared process');
+    assert.ok(mgr.hasSession(b), "sibling session B survives A's cancel");
+    await aTurn; // settles late; its result is discarded
+    assert.strictEqual(
+      tagged.filter((e) => e.sessionId === a && e.p.type === 'done').length, 0,
+      'a cancelled turn does not emit a late completion',
+    );
+    mgr.dispose();
+  }
+
+  await testSoleSessionCancelReportsCancelledNotError();
 
   console.log('acpManager.test.ts: all tests passed');
 }

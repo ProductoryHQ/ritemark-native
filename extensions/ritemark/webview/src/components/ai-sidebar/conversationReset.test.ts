@@ -1,5 +1,25 @@
+/**
+ * Conversation reset / lifecycle tests.
+ *
+ * Sprint 99 (E4) CHANGED THE CONTRACT these tests encode. Before Sprint 99 a
+ * "new chat" wiped the live conversation and fired `conversation:reset` at every
+ * provider. That teardown is exactly what made parallel chats impossible, so:
+ *
+ *   - `startNewConversation()` now opens an ADDITIONAL thread and must NOT reset
+ *     any provider session (spec R10 + R5).
+ *   - `clearChat()` ("/clear") still resets — it genuinely throws a conversation
+ *     away — but it targets ONE conversation, carrying its `conversationId`.
+ *
+ * The #135 invariant (a new session must not overwrite the previous one in
+ * History) is unchanged and still asserted; it is expressed as "the id changed"
+ * rather than "the id became null", because a thread now gets its storage id at
+ * creation instead of at first save.
+ *
+ * Run with: npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts
+ */
 import assert from 'node:assert/strict';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, hydrateConversations, selectActiveConversation } from './store';
+import { createConversationState, type ConversationState } from './conversationState';
 import { vscode } from '../../lib/vscode';
 import type { CodexConversationTurn } from './types';
 
@@ -7,6 +27,31 @@ const initialState = useAISidebarStore.getState();
 
 function resetStore(): void {
   useAISidebarStore.setState(initialState, true);
+}
+
+function seedActiveConversation(partial: Partial<ConversationState> = {}): string {
+  const conversation = createConversationState('conv-1', partial);
+  hydrateConversations([conversation], conversation.id);
+  return conversation.id;
+}
+
+function capturePostedMessages(): { posted: unknown[]; restore: () => void } {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => {
+    posted.push(message);
+  };
+  return { posted, restore: () => { vscode.postMessage = originalPostMessage; } };
+}
+
+function hasResetMessage(posted: unknown[]): boolean {
+  return posted.some(
+    (message) =>
+      typeof message === 'object'
+      && message !== null
+      && 'type' in message
+      && message.type === 'conversation:reset'
+  );
 }
 
 function makeCodexTurn(): CodexConversationTurn {
@@ -25,50 +70,50 @@ function makeCodexTurn(): CodexConversationTurn {
   };
 }
 
-function testStartNewConversationResetsProviderSessions() {
-  const posted: unknown[] = [];
-  const originalPostMessage = vscode.postMessage;
-  vscode.postMessage = (message: unknown) => {
-    posted.push(message);
-  };
+// Sprint 99 E4: this assertion is INVERTED from its pre-Sprint-99 form. Starting
+// a new thread must not tear down the thread the user was on — that thread keeps
+// streaming in the background.
+function testStartNewConversationDoesNotResetProviderSessions() {
+  const { posted, restore } = capturePostedMessages();
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    const firstId = seedActiveConversation({
       selectedAgent: 'codex',
       codexConversation: [makeCodexTurn()],
-      currentConversationId: null,
     });
 
     useAISidebarStore.getState().startNewConversation();
 
-    assert.equal(useAISidebarStore.getState().codexConversation.length, 0);
+    const state = useAISidebarStore.getState();
     assert.ok(
-      posted.some(
-        (message) =>
-          typeof message === 'object'
-          && message !== null
-          && 'type' in message
-          && message.type === 'conversation:reset'
-      ),
-      'starting a new conversation must reset provider sessions in the extension'
+      !hasResetMessage(posted),
+      'starting a new conversation must NOT reset provider sessions — switching is a view change (Sprint 99 E4)'
+    );
+    assert.notEqual(state.activeConversationId, firstId, 'a new thread must become active');
+    assert.equal(
+      selectActiveConversation(state).codexConversation.length,
+      0,
+      'the newly opened thread starts empty'
+    );
+    assert.ok(state.conversations[firstId], 'the previous thread must still be open');
+    assert.equal(
+      state.conversations[firstId].codexConversation.length,
+      1,
+      'the previous thread must keep its running turn'
     );
   } finally {
-    vscode.postMessage = originalPostMessage;
+    restore();
     resetStore();
   }
 }
 
-function testClearChatResetsProviderSessions() {
-  const posted: unknown[] = [];
-  const originalPostMessage = vscode.postMessage;
-  vscode.postMessage = (message: unknown) => {
-    posted.push(message);
-  };
+// /clear is a genuine "throw this away", so it keeps the reset — but it must
+// target exactly one conversation, never every provider.
+function testClearChatResetsOnlyItsOwnProviderSession() {
+  const { posted, restore } = capturePostedMessages();
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    const clearedId = seedActiveConversation({
       selectedAgent: 'claude-code',
       agentConversation: [{
         id: 'agent-turn-1',
@@ -83,38 +128,36 @@ function testClearChatResetsProviderSessions() {
 
     useAISidebarStore.getState().clearChat();
 
-    assert.equal(useAISidebarStore.getState().agentConversation.length, 0);
-    assert.ok(
-      posted.some(
-        (message) =>
-          typeof message === 'object'
-          && message !== null
-          && 'type' in message
-          && message.type === 'conversation:reset'
-      ),
-      'clearing chat must reset provider sessions in the extension'
+    assert.equal(selectActiveConversation(useAISidebarStore.getState()).agentConversation.length, 0);
+    const resets = posted.filter(
+      (m): m is { type: string; conversationId?: string } =>
+        typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'conversation:reset'
+    );
+    assert.equal(resets.length, 1, 'clearing chat must reset exactly one conversation');
+    assert.equal(
+      resets[0].conversationId,
+      clearedId,
+      'the reset must carry the id of the conversation being cleared (Sprint 99 E4)'
     );
   } finally {
-    vscode.postMessage = originalPostMessage;
+    restore();
     resetStore();
   }
 }
 
 function testDismissedCurrentPlanKeyResetsForNewConversation() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       dismissedCurrentPlanKey: 'plan-turn-1',
       codexConversation: [makeCodexTurn()],
-      currentConversationId: 'conv-1',
     });
 
     useAISidebarStore.getState().startNewConversation();
 
     assert.equal(
-      useAISidebarStore.getState().dismissedCurrentPlanKey,
+      selectActiveConversation(useAISidebarStore.getState()).dismissedCurrentPlanKey,
       null,
-      'starting a new conversation must clear dismissed current plan state'
+      'a newly opened thread must start with no dismissed plan state'
     );
   } finally {
     resetStore();
@@ -123,19 +166,17 @@ function testDismissedCurrentPlanKeyResetsForNewConversation() {
 
 function testDismissedCurrentPlanKeyResetsForClearChatMessage() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       dismissedCurrentPlanKey: 'plan-turn-1',
       codexConversation: [makeCodexTurn()],
-      currentConversationId: 'conv-1',
     });
 
     useAISidebarStore.getState().handleExtensionMessage({ type: 'clear-chat' });
 
     assert.equal(
-      useAISidebarStore.getState().dismissedCurrentPlanKey,
+      selectActiveConversation(useAISidebarStore.getState()).dismissedCurrentPlanKey,
       null,
-      'extension-driven clear-chat must clear dismissed current plan state'
+      'extension-driven clear-chat must leave the user on a thread with no dismissed plan state'
     );
   } finally {
     resetStore();
@@ -144,15 +185,12 @@ function testDismissedCurrentPlanKeyResetsForClearChatMessage() {
 
 function testDismissCurrentPlanStoresKey() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
-      dismissedCurrentPlanKey: null,
-    });
+    seedActiveConversation({ dismissedCurrentPlanKey: null });
 
     useAISidebarStore.getState().dismissCurrentPlan('approved-plan-1');
 
     assert.equal(
-      useAISidebarStore.getState().dismissedCurrentPlanKey,
+      selectActiveConversation(useAISidebarStore.getState()).dismissedCurrentPlanKey,
       'approved-plan-1',
       'dismissing current plan should remember the specific plan key'
     );
@@ -161,14 +199,12 @@ function testDismissCurrentPlanStoresKey() {
   }
 }
 
-// #135: a "new chat" (extension-driven clear-chat) must reset currentConversationId,
-// otherwise the next session reuses the old id and overwrites the previous entry in
-// history — collapsing multiple sessions into one.
-function testNewChatResetsConversationIdSoSessionsDoNotCollapse() {
+// #135: a "new chat" (extension-driven clear-chat) must land the user on a
+// DIFFERENT conversation id, otherwise the next session reuses the old id and
+// overwrites the previous entry in history — collapsing multiple sessions into one.
+function testNewChatUsesFreshConversationIdSoSessionsDoNotCollapse() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
-      currentConversationId: 'conv-1',
+    const firstId = seedActiveConversation({
       agentConversation: [{
         id: 'agent-turn-1',
         userPrompt: 'First session',
@@ -182,23 +218,23 @@ function testNewChatResetsConversationIdSoSessionsDoNotCollapse() {
 
     useAISidebarStore.getState().handleExtensionMessage({ type: 'clear-chat' });
 
-    assert.equal(
-      useAISidebarStore.getState().currentConversationId,
-      null,
-      'new chat must reset currentConversationId so the next session gets a fresh id (#135)'
+    const { activeConversationId } = useAISidebarStore.getState();
+    assert.ok(activeConversationId, 'a thread is always active');
+    assert.notEqual(
+      activeConversationId,
+      firstId,
+      'new chat must move to a fresh conversation id so the next session does not overwrite the previous one (#135)'
     );
   } finally {
     resetStore();
   }
 }
 
-// #135: /clear must also reset the id — otherwise a new message after clearing
-// reuses the cleared conversation's id and overwrites it.
-function testClearChatResetsConversationId() {
+// #135: /clear must also move to a fresh id — otherwise a new message after
+// clearing reuses the cleared conversation's id and overwrites it.
+function testClearChatUsesFreshConversationId() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
-      currentConversationId: 'conv-1',
+    const firstId = seedActiveConversation({
       agentConversation: [{
         id: 'agent-turn-1',
         userPrompt: 'x',
@@ -212,10 +248,12 @@ function testClearChatResetsConversationId() {
 
     useAISidebarStore.getState().clearChat();
 
+    const { activeConversationId, conversations } = useAISidebarStore.getState();
+    assert.notEqual(activeConversationId, firstId, '/clear must move to a fresh conversation id (#135)');
     assert.equal(
-      useAISidebarStore.getState().currentConversationId,
-      null,
-      '/clear must reset currentConversationId (#135)'
+      conversations[firstId],
+      undefined,
+      '/clear discards the cleared thread rather than leaving it open'
     );
   } finally {
     resetStore();
@@ -223,13 +261,13 @@ function testClearChatResetsConversationId() {
 }
 
 function main() {
-  testStartNewConversationResetsProviderSessions();
-  testClearChatResetsProviderSessions();
+  testStartNewConversationDoesNotResetProviderSessions();
+  testClearChatResetsOnlyItsOwnProviderSession();
   testDismissedCurrentPlanKeyResetsForNewConversation();
   testDismissedCurrentPlanKeyResetsForClearChatMessage();
   testDismissCurrentPlanStoresKey();
-  testNewChatResetsConversationIdSoSessionsDoNotCollapse();
-  testClearChatResetsConversationId();
+  testNewChatUsesFreshConversationIdSoSessionsDoNotCollapse();
+  testClearChatUsesFreshConversationId();
   console.log('Conversation reset tests passed.');
 }
 

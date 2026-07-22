@@ -8,7 +8,7 @@
  */
 
 import { useRef, useEffect, useCallback } from 'react';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, useActiveConversation } from './store';
 import { AgentTurnBlock } from './AgentView';
 import { CodexTurn, CompatibilityNotice, getCompatibilityNotice } from './CodexView';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
@@ -18,8 +18,7 @@ type MergedTurn =
   | { runtime: 'codex'; turn: CodexConversationTurn };
 
 export function UnifiedConversationView() {
-  const agentConversation = useAISidebarStore((s) => s.agentConversation);
-  const codexConversation = useAISidebarStore((s) => s.codexConversation);
+  const { agentConversation, codexConversation } = useActiveConversation();
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const dismissedCodexNoticeKey = useAISidebarStore((s) => s.dismissedCodexNoticeKey);
   const dismissCodexNotice = useAISidebarStore((s) => s.dismissCodexNotice);

@@ -190,6 +190,12 @@ export interface InstallProgress {
 
 export interface AgentConversationTurn {
   id: string;
+  /**
+   * Sprint 99 (R5): the conversation this turn belongs to. Optional so
+   * pre-Sprint-99 saved conversations still load; the store stamps it on
+   * every turn it creates and on every turn it rehydrates from storage.
+   */
+  conversationId?: string;
   userPrompt: string;
   /** Active file path that was included as context (when not skipped) */
   activeFilePath?: string;
@@ -292,6 +298,11 @@ export interface CodexSidebarStatus {
 export interface CodexConversationTurn {
   id: string;
   /**
+   * Sprint 99 (R5): the conversation this turn belongs to. Optional so
+   * pre-Sprint-99 saved conversations still load.
+   */
+  conversationId?: string;
+  /**
    * Which runtime produced this turn. OpenCode reuses the Codex turn shape +
    * rendering path, so this marks provenance for the header label. Absent =
    * Codex (backward compatible with saved conversations).
@@ -343,12 +354,23 @@ export interface ByokModelOption {
   description: string;
 }
 
+/**
+ * Sprint 99 (R5): every host→webview message that concerns a conversation
+ * carries `conversationId` at the TOP LEVEL. It is optional in the type only
+ * because the extension host is migrating in parallel — the store warns once
+ * per message type when it is missing and falls back to the active
+ * conversation. An id the store does not know is DROPPED, never misrouted.
+ */
+export interface ConversationScopedMessage {
+  conversationId?: string;
+}
+
 export type ExtensionMessage =
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
   // Sprint 94 (#81): a comment assigned to an agent, relayed from the editor.
   | { type: 'comment:submit'; agentId: string; prompt: string }
-  | { type: 'agent:config'; agenticEnabled: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]> }
+  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]> }
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
@@ -359,11 +381,11 @@ export type ExtensionMessage =
   | { type: 'ai-error'; error: string }
   | { type: 'ai-stopped' }
   | { type: 'clear-chat' }
-  | { type: 'agent-progress'; progress: AgentProgress }
-  | { type: 'agent-question'; question: AgentQuestion }
-  | { type: 'agent-plan-approval'; request: AgentPlanApprovalRequest }
-  | { type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string }
-  | { type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string }
+  | ({ type: 'agent-progress'; progress: AgentProgress } & ConversationScopedMessage)
+  | ({ type: 'agent-question'; question: AgentQuestion } & ConversationScopedMessage)
+  | ({ type: 'agent-plan-approval'; request: AgentPlanApprovalRequest } & ConversationScopedMessage)
+  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string } & ConversationScopedMessage)
+  | ({ type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string } & ConversationScopedMessage)
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus }
   | { type: 'agent-setup:error'; error: string }
@@ -372,14 +394,14 @@ export type ExtensionMessage =
   | { type: 'files-dropped'; paths: string[] }
   // Codex messages
   | { type: 'codex:status'; status: CodexSidebarStatus }
-  | { type: 'codex-progress'; progress: AgentProgress }
-  | { type: 'codex-rpc-progress'; method: string; message: string }
-  | { type: 'codex-streaming'; delta: string }
-  | { type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> }
-  | { type: 'codex-plan-text-delta'; delta: string }
-  | { type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] }
-  | { type: 'codex-result'; status?: string; error?: string }
-  | { type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> }
+  | ({ type: 'codex-progress'; progress: AgentProgress } & ConversationScopedMessage)
+  | ({ type: 'codex-rpc-progress'; method: string; message: string } & ConversationScopedMessage)
+  | ({ type: 'codex-streaming'; delta: string } & ConversationScopedMessage)
+  | ({ type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> } & ConversationScopedMessage)
+  | ({ type: 'codex-plan-text-delta'; delta: string } & ConversationScopedMessage)
+  | ({ type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] } & ConversationScopedMessage)
+  | ({ type: 'codex-result'; status?: string; error?: string } & ConversationScopedMessage)
+  | ({ type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> } & ConversationScopedMessage)
   // Onboarding messages
   | { type: 'onboarding:status'; status: OnboardingStatus }
   | { type: 'onboarding:install-progress'; dependency: OnboardingDependency; state: OnboardingInstallState; error?: string }

@@ -3,6 +3,16 @@
  *
  * Wraps CodexAppServer + CodexAuth and maps Codex events / approvals to the
  * unified AgentRuntime interface. Does NOT rewrite CodexAppServer internals.
+ *
+ * Sprint 99: one `CodexSession` per conversation, ONE shared `codex-app-server`
+ * process for all of them. The app-server protocol is natively multi-thread
+ * (`thread/start` mints an id; `turn/start` / `turn/interrupt` take `threadId`)
+ * and `rpc()` has no mutex or in-flight guard, so the concurrency was always
+ * there — this adapter used to collapse it onto a single set of scalars.
+ *
+ * Event listeners stay registered ONCE on the shared app-server (registering per
+ * thread would multiply listeners on one emitter and trip max-listener warnings);
+ * only the destination lookup inside each callback became thread-aware.
  */
 
 import * as crypto from 'crypto';
@@ -11,7 +21,7 @@ import { CodexAuth } from './codexAuth';
 import { CodexManager } from './codexManager';
 import type { CodexCompatibilityStatus } from './codexManager';
 import type { ToolRequestUserInputAnswer } from './codexProtocol';
-import { routeApprovalRequest } from './codexApproval';
+import { routeApprovalRequest, threadIdOf } from './codexApproval';
 import { traceCodex } from './codexTrace';
 import { emitCodexStatusInvalidated } from './codexStatusEvents';
 import { buildCodexBrowserDynamicTools } from '../browser/codexBrowserTools';
@@ -19,6 +29,7 @@ import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
 import type {
   AgentRuntime,
+  RuntimeSession,
   RuntimeSessionConfig,
   RuntimeTurnConfig,
   RuntimeStatus,
@@ -85,52 +96,315 @@ export type CodexSidebarStatus = {
   compatibility: CodexCompatibilityStatus | null;
 };
 
+/**
+ * One conversation's Codex thread.
+ *
+ * Everything that used to be a scalar on the adapter lives here. That is the
+ * whole point of the class: with N conversations sharing one adapter, a scalar
+ * `_threadId` / `_threadApprovalKey` / `_browserToolsEnabledForThread` meant
+ * chat B toggling browser control (or switching Auto↔Ask) nulled chat A's
+ * thread id and silently destroyed A's entire context.
+ */
+export class CodexSession implements RuntimeSession {
+  readonly agentId: AgentId = 'codex';
+
+  private _config: RuntimeSessionConfig;
+  private _threadId: string | null = null;
+  private _turnId: string | null = null;
+
+  /**
+   * Whether browser tools were wired into THIS conversation's thread, so a
+   * thread reset is triggered when its browser-control state changes between
+   * turns. Per-conversation since Sprint 99 (B1).
+   */
+  private _browserToolsEnabledForThread = false;
+
+  /**
+   * Approval policy + sandbox THIS conversation's thread was started with
+   * ("<policy>:<sandbox>"). A change (e.g. Auto↔Ask) forces a reset of this
+   * thread only, since both are fixed at threadStart. Per-conversation since
+   * Sprint 99 (B1).
+   */
+  private _threadApprovalKey = '';
+
+  /** Approval/question request ids raised by this conversation and still open. */
+  private readonly _openRequestIds = new Set<string>();
+
+  constructor(
+    readonly conversationId: string,
+    config: RuntimeSessionConfig,
+    private readonly _runtime: CodexRuntime,
+  ) {
+    this._config = config;
+  }
+
+  get config(): RuntimeSessionConfig { return this._config; }
+  get threadId(): string | null { return this._threadId; }
+  get turnId(): string | null { return this._turnId; }
+
+  /** Re-apply per-turn config to THIS conversation. Never touches siblings. */
+  applyConfig(config: RuntimeSessionConfig): void {
+    this._config = config;
+  }
+
+  /** True when browser dynamic tools are wired into this conversation's thread. */
+  getBrowserToolsEnabled(): boolean { return this._browserToolsEnabledForThread; }
+
+  /** Drop this conversation's thread (e.g. after logout). Siblings keep theirs. */
+  resetThread(): void {
+    this._clearThread();
+    this._threadApprovalKey = '';
+    this._runtime._clearRequestsFor(this.conversationId, this._openRequestIds, false);
+  }
+
+  async prompt(turn: RuntimeTurnConfig): Promise<void> {
+    const appServer = this._runtime.getAppServer();
+    if (!appServer) {
+      throw new Error('CodexRuntime: createSession() must succeed before prompt()');
+    }
+    const config = this._config;
+    const resolvedModel = turn.model ?? config.model ?? null;
+    const shouldUsePlanMode = turn.mode === 'plan'
+      || (turn.mode !== 'execute' && shouldStartCodexInPlanMode(turn.prompt));
+
+    const approvalPolicy = (config.codexApprovalPolicy ?? 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
+    const sandbox = (config.codexSandboxMode ?? 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
+    const approvalKey = `${approvalPolicy}:${sandbox}`;
+
+    // Reset THIS conversation's thread when its browser-tools state OR its
+    // approval policy/sandbox would change — both are fixed at threadStart, so a
+    // live thread must be recreated for a new unified approval mode (Auto↔Ask)
+    // to take effect. Sibling conversations are untouched.
+    const browserToolsNeeded = Boolean(config.onBrowserToolCall);
+    if (this._threadId && browserToolsNeeded !== this._browserToolsEnabledForThread) {
+      traceCodex('execution', 'resetting thread: browser-tools state changed', {
+        conversationId: this.conversationId,
+        was: this._browserToolsEnabledForThread,
+        now: browserToolsNeeded,
+      });
+      this._clearThread();
+    }
+    if (this._threadId && approvalKey !== this._threadApprovalKey) {
+      traceCodex('execution', 'resetting thread: approval config changed', {
+        conversationId: this.conversationId,
+        was: this._threadApprovalKey,
+        now: approvalKey,
+      });
+      this._clearThread();
+    }
+
+    // Create thread on first turn or after reset
+    if (!this._threadId) {
+      const dynamicTools = browserToolsNeeded ? buildCodexBrowserDynamicTools() : undefined;
+      const planDevInstructions = config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS;
+
+      const result = await appServer.threadStart({
+        cwd: config.workspacePath || null,
+        model: resolvedModel,
+        approvalPolicy,
+        sandbox,
+        baseInstructions: config.extraSystemPrompt ?? CODEX_BASE_INSTRUCTIONS,
+        developerInstructions: shouldUsePlanMode ? planDevInstructions : null,
+        ...(dynamicTools ? { dynamicTools } : {}),
+      }, this.conversationId);
+      this._threadId = result.thread.id;
+      this._runtime._bindThread(result.thread.id, this);
+      this._browserToolsEnabledForThread = Boolean(dynamicTools?.length);
+      this._threadApprovalKey = approvalKey;
+      traceCodex('execution', 'thread started', {
+        conversationId: this.conversationId,
+        threadId: result.thread.id,
+        approvalPolicy,
+        sandbox,
+        browserTools: this._browserToolsEnabledForThread,
+      });
+    }
+
+    config.onProgress({ type: 'init', message: 'Starting Codex…', timestamp: Date.now() });
+
+    // Convert image attachments to data URLs (Codex image input format)
+    const imageDataUrls = turn.attachments
+      ?.filter(a => a.kind === 'image')
+      .map(a => `data:${a.mediaType};base64,${a.data}`) ?? [];
+
+    // Inject active file context into prompt (mirrors Claude Code pattern)
+    let enrichedPrompt = turn.prompt;
+    if (turn.activeFile) {
+      enrichedPrompt = `[Currently editing: ${turn.activeFile.path}]\n\n${enrichedPrompt}`;
+    }
+    // Inject plan reminder for plan mode turns
+    if (shouldUsePlanMode) {
+      enrichedPrompt = `${CODEX_PLAN_TURN_REMINDER}\n\n${enrichedPrompt}`;
+    }
+
+    const collaborationMode = shouldUsePlanMode
+      ? {
+          mode: 'plan' as const,
+          settings: {
+            model: resolvedModel ?? 'gpt-5.6-sol',
+            reasoning_effort: null,
+            developer_instructions: config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
+          },
+        }
+      : null;
+
+    traceCodex('execution', 'prepared turn start', {
+      conversationId: this.conversationId,
+      threadId: this._threadId,
+      model: resolvedModel,
+      mode: turn.mode ?? (shouldUsePlanMode ? 'plan' : 'execute'),
+      collaborationMode,
+      hasImages: imageDataUrls.length > 0,
+    });
+
+    const turnResult = await appServer.turnStart(
+      this._threadId,
+      enrichedPrompt,
+      resolvedModel ?? undefined,
+      imageDataUrls.length > 0 ? imageDataUrls : undefined,
+      collaborationMode,
+    );
+    this._turnId = turnResult.turn.id;
+    traceCodex('execution', 'turn start acknowledged', {
+      conversationId: this.conversationId,
+      threadId: this._threadId,
+      turnId: turnResult.turn.id,
+      status: turnResult.turn.status,
+    });
+  }
+
+  async cancel(): Promise<void> {
+    const appServer = this._runtime.getAppServer();
+    if (appServer && this._threadId && this._turnId) {
+      await appServer.turnInterrupt(this._threadId, this._turnId).catch(() => {});
+    }
+    // Decline anything this conversation had outstanding. Interrupting the turn
+    // does not answer an approval the app-server is already blocked on, so
+    // pressing Stop while an approval card was up used to leave that request
+    // dangling for the rest of the process's life. dispose() and resetThread()
+    // already did this; cancel() did not.
+    this._runtime._clearRequestsFor(this.conversationId, this._openRequestIds, true);
+  }
+
+  respondToApproval(requestId: string, approved: boolean, _alwaysAllow: boolean): void {
+    const appServer = this._runtime.getAppServer();
+    if (!appServer) return;
+    this._openRequestIds.delete(requestId);
+    // Translate the string requestId back to the original server request id
+    const origId = this._runtime._takeServerRequestId(requestId) ?? requestId;
+    appServer.sendApprovalResponse(origId, approved ? 'accept' : 'decline');
+  }
+
+  /** Answer a Codex request_user_input question raised by this conversation. */
+  answerQuestion(requestId: string | number, answers: Record<string, unknown>): void {
+    this._openRequestIds.delete(`codex-${String(requestId)}`);
+    this._runtime.getAppServer()?.sendToolRequestUserInputResponse(
+      requestId,
+      answers as Record<string, ToolRequestUserInputAnswer>,
+    );
+  }
+
+  dispose(): void {
+    // Outstanding approvals this conversation raised must be declined, not left
+    // dangling on the shared app-server.
+    this._runtime._clearRequestsFor(this.conversationId, this._openRequestIds, true);
+    this._clearThread();
+    this._threadApprovalKey = '';
+  }
+
+  // ── Internal (adapter-facing) ──────────────────────────────────────────────
+
+  /** @internal — event listeners on the shared app-server call these. */
+  _onTurnCompleted(): void { this._turnId = null; }
+  /** @internal */
+  _trackRequest(requestId: string): void { this._openRequestIds.add(requestId); }
+  /** @internal — the app-server died; drop this conversation's thread state. */
+  _onServerExit(): void {
+    this._clearThread();
+    this._threadApprovalKey = '';
+    this._openRequestIds.clear();
+  }
+
+  private _clearThread(): void {
+    if (this._threadId) this._runtime._unbindThread(this._threadId);
+    this._threadId = null;
+    this._turnId = null;
+  }
+}
+
 export class CodexRuntime implements AgentRuntime {
   readonly id: AgentId = 'codex';
 
   private _appServer: CodexAppServer | null = null;
   private _auth: CodexAuth | null = null;
-  private _sessionConfig: RuntimeSessionConfig | null = null;
-  private _threadId: string | null = null;
-  private _turnId: string | null = null;
   private _loginInProgress = false;
   private _loginPoll: ReturnType<typeof setInterval> | null = null;
 
-  /**
-   * Migrated from UnifiedViewProvider._codexBrowserToolsEnabledForThread.
-   * Tracks whether browser tools were wired into the current thread so a thread
-   * reset is triggered when the browser-control state changes between turns.
-   */
-  private _browserToolsEnabledForThread = false;
-
-  /**
-   * Approval policy + sandbox the current thread was started with
-   * ("<policy>:<sandbox>"). A change (e.g. Auto↔Ask) forces a thread reset
-   * since both are fixed at threadStart.
-   */
-  private _threadApprovalKey = '';
+  /** One session per conversation, all sharing the single app-server process. */
+  private readonly _sessions = new Map<string, CodexSession>();
+  /** Reverse index for routing wire events, which carry `threadId`, not ours. */
+  private readonly _sessionsByThread = new Map<string, CodexSession>();
 
   /**
    * Maps the string requestId we expose externally (e.g. "codex-42") back to
    * the original server request id for response routing via sendApprovalResponse().
+   *
+   * Needs no re-keying for multi-thread: `codex-${request.id}` uses the
+   * app-server's connection-wide JSON-RPC id, which is unique across threads.
    */
   private readonly _requestIdMap = new Map<string, string | number>();
+  /** Parallel index: which conversation raised each outstanding request. */
+  private readonly _requestConversation = new Map<string, string>();
 
   /** Expose the underlying app server for auth operations in UnifiedViewProvider. */
   getAppServer(): CodexAppServer | null { return this._appServer; }
   /** Expose the auth object for login/logout/status in UnifiedViewProvider. */
   getAuth(): CodexAuth | null { return this._auth; }
-  /** Reset the codex thread (e.g. after logout or conversation reset). */
-  resetSession(): void { this._threadId = null; this._turnId = null; this._threadApprovalKey = ''; this._requestIdMap.clear(); }
 
-  async start(config: RuntimeSessionConfig): Promise<void> {
-    this._sessionConfig = config;
-    this._ensureAppServer();
-    await this._appServer!.ensureInitialized();
+  /**
+   * Reset EVERY conversation's thread (e.g. after logout or de-auth).
+   * Sprint 99: this used to be the only reset path and it nulled one scalar;
+   * with N threads live it must fan out.
+   */
+  resetSession(): void {
+    for (const session of this._sessions.values()) session.resetThread();
   }
 
-  /** Returns true if browser dynamic tools are wired into the current thread. */
-  getBrowserToolsEnabled(): boolean { return this._browserToolsEnabledForThread; }
+  /** Reset one conversation's thread. */
+  resetConversation(conversationId: string): void {
+    this._sessions.get(conversationId)?.resetThread();
+  }
+
+  async createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession> {
+    this._ensureAppServer();
+    await this._appServer!.ensureInitialized();
+
+    const existing = this._sessions.get(conversationId);
+    if (existing) {
+      existing.applyConfig(config);
+      return existing;
+    }
+    const session = new CodexSession(conversationId, config, this);
+    this._sessions.set(conversationId, session);
+    return session;
+  }
+
+  /** Live session for a conversation, if one is open. */
+  getSession(conversationId: string): CodexSession | undefined {
+    return this._sessions.get(conversationId);
+  }
+
+  disposeSession(conversationId: string): void {
+    const session = this._sessions.get(conversationId);
+    if (!session) return;
+    session.dispose();
+    this._sessions.delete(conversationId);
+  }
+
+  /** Whether browser dynamic tools are wired into a conversation's thread. */
+  getBrowserToolsEnabled(conversationId: string): boolean {
+    return this._sessions.get(conversationId)?.getBrowserToolsEnabled() ?? false;
+  }
 
   setLoginInProgress(v: boolean): void { this._loginInProgress = v; }
 
@@ -163,13 +437,6 @@ export class CodexRuntime implements AgentRuntime {
         }
       })();
     }, 2000);
-  }
-
-  answerQuestion(requestId: string | number, answers: Record<string, unknown>): void {
-    this._appServer?.sendToolRequestUserInputResponse(
-      requestId,
-      answers as Record<string, ToolRequestUserInputAnswer>,
-    );
   }
 
   async beginLogin(): Promise<string> {
@@ -217,130 +484,6 @@ export class CodexRuntime implements AgentRuntime {
     }
   }
 
-  async prompt(turn: RuntimeTurnConfig): Promise<void> {
-    if (!this._appServer || !this._sessionConfig) {
-      throw new Error('CodexRuntime: call start() before prompt()');
-    }
-    const config = this._sessionConfig;
-    const resolvedModel = turn.model ?? config.model ?? null;
-    const shouldUsePlanMode = turn.mode === 'plan'
-      || (turn.mode !== 'execute' && shouldStartCodexInPlanMode(turn.prompt));
-
-    const approvalPolicy = (config.codexApprovalPolicy ?? 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
-    const sandbox = (config.codexSandboxMode ?? 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
-    const approvalKey = `${approvalPolicy}:${sandbox}`;
-
-    // Reset thread when browser-tools state OR the approval policy/sandbox would
-    // change — both are fixed at threadStart, so a live thread must be recreated
-    // for a new unified approval mode (Auto↔Ask) to take effect.
-    const browserToolsNeeded = Boolean(config.onBrowserToolCall);
-    if (this._threadId && browserToolsNeeded !== this._browserToolsEnabledForThread) {
-      traceCodex('execution', 'resetting thread: browser-tools state changed', {
-        was: this._browserToolsEnabledForThread,
-        now: browserToolsNeeded,
-      });
-      this._threadId = null;
-      this._turnId = null;
-    }
-    if (this._threadId && approvalKey !== this._threadApprovalKey) {
-      traceCodex('execution', 'resetting thread: approval config changed', {
-        was: this._threadApprovalKey,
-        now: approvalKey,
-      });
-      this._threadId = null;
-      this._turnId = null;
-    }
-
-    // Create thread on first turn or after reset
-    if (!this._threadId) {
-      const dynamicTools = browserToolsNeeded ? buildCodexBrowserDynamicTools() : undefined;
-      const planDevInstructions = config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS;
-
-      const result = await this._appServer.threadStart({
-        cwd: config.workspacePath || null,
-        model: resolvedModel,
-        approvalPolicy,
-        sandbox,
-        baseInstructions: config.extraSystemPrompt ?? CODEX_BASE_INSTRUCTIONS,
-        developerInstructions: shouldUsePlanMode ? planDevInstructions : null,
-        ...(dynamicTools ? { dynamicTools } : {}),
-      });
-      this._threadId = result.thread.id;
-      this._browserToolsEnabledForThread = Boolean(dynamicTools?.length);
-      this._threadApprovalKey = approvalKey;
-      traceCodex('execution', 'thread started', {
-        threadId: result.thread.id,
-        approvalPolicy,
-        sandbox,
-        browserTools: this._browserToolsEnabledForThread,
-      });
-    }
-
-    config.onProgress({ type: 'init', message: 'Starting Codex…', timestamp: Date.now() });
-
-    // Convert image attachments to data URLs (Codex image input format)
-    const imageDataUrls = turn.attachments
-      ?.filter(a => a.kind === 'image')
-      .map(a => `data:${a.mediaType};base64,${a.data}`) ?? [];
-
-    // Inject active file context into prompt (mirrors Claude Code pattern)
-    let enrichedPrompt = turn.prompt;
-    if (turn.activeFile) {
-      enrichedPrompt = `[Currently editing: ${turn.activeFile.path}]\n\n${enrichedPrompt}`;
-    }
-    // Inject plan reminder for plan mode turns
-    if (shouldUsePlanMode) {
-      enrichedPrompt = `${CODEX_PLAN_TURN_REMINDER}\n\n${enrichedPrompt}`;
-    }
-
-    const collaborationMode = shouldUsePlanMode
-      ? {
-          mode: 'plan' as const,
-          settings: {
-            model: resolvedModel ?? 'gpt-5.6-sol',
-            reasoning_effort: null,
-            developer_instructions: config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
-          },
-        }
-      : null;
-
-    traceCodex('execution', 'prepared turn start', {
-      threadId: this._threadId,
-      model: resolvedModel,
-      mode: turn.mode ?? (shouldUsePlanMode ? 'plan' : 'execute'),
-      collaborationMode,
-      hasImages: imageDataUrls.length > 0,
-    });
-
-    const turnResult = await this._appServer.turnStart(
-      this._threadId,
-      enrichedPrompt,
-      resolvedModel ?? undefined,
-      imageDataUrls.length > 0 ? imageDataUrls : undefined,
-      collaborationMode,
-    );
-    this._turnId = turnResult.turn.id;
-    traceCodex('execution', 'turn start acknowledged', {
-      threadId: this._threadId,
-      turnId: turnResult.turn.id,
-      status: turnResult.turn.status,
-    });
-  }
-
-  async cancel(): Promise<void> {
-    if (this._appServer && this._threadId && this._turnId) {
-      await this._appServer.turnInterrupt(this._threadId, this._turnId).catch(() => {});
-    }
-  }
-
-  respondToApproval(requestId: string, approved: boolean, _alwaysAllow: boolean): void {
-    if (!this._appServer) return;
-    // Translate the string requestId back to the original server request id
-    const origId = this._requestIdMap.get(requestId) ?? requestId;
-    this._requestIdMap.delete(requestId);
-    this._appServer.sendApprovalResponse(origId, approved ? 'accept' : 'decline');
-  }
-
   async getStatus(): Promise<RuntimeStatus> {
     try {
       const manager = new CodexManager();
@@ -368,22 +511,86 @@ export class CodexRuntime implements AgentRuntime {
 
   dispose(): void {
     this.stopLoginPolling();
-    this._threadId = null;
-    this._turnId = null;
+    for (const session of this._sessions.values()) session.dispose();
+    this._sessions.clear();
+    this._sessionsByThread.clear();
     this._requestIdMap.clear();
+    this._requestConversation.clear();
     this._appServer?.dispose();
     this._appServer = null;
     this._auth = null;
-    this._sessionConfig = null;
+  }
+
+  // ── Internal wiring used by CodexSession ───────────────────────────────────
+
+  /** @internal */
+  _bindThread(threadId: string, session: CodexSession): void {
+    this._sessionsByThread.set(threadId, session);
+  }
+
+  /** @internal */
+  _unbindThread(threadId: string): void {
+    this._sessionsByThread.delete(threadId);
+  }
+
+  /** @internal Consume the server request id for an exposed requestId. */
+  _takeServerRequestId(requestId: string): string | number | undefined {
+    const id = this._requestIdMap.get(requestId);
+    this._requestIdMap.delete(requestId);
+    this._requestConversation.delete(requestId);
+    return id;
+  }
+
+  /**
+   * @internal Drop one conversation's outstanding request ids, optionally
+   * declining them upstream first so the agent is not left waiting forever.
+   */
+  _clearRequestsFor(conversationId: string, ids: Set<string>, decline: boolean): void {
+    for (const requestId of ids) {
+      const origId = this._requestIdMap.get(requestId);
+      this._requestIdMap.delete(requestId);
+      this._requestConversation.delete(requestId);
+      if (decline && origId !== undefined) {
+        this._appServer?.sendApprovalResponse(origId, 'decline');
+      }
+    }
+    ids.clear();
+    // Defensive: anything else still attributed to this conversation.
+    for (const [requestId, owner] of this._requestConversation) {
+      if (owner !== conversationId) continue;
+      this._requestIdMap.delete(requestId);
+      this._requestConversation.delete(requestId);
+    }
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Resolve the conversation an event belongs to from its `threadId`.
+   *
+   * When the id is missing or unknown we fall back to the sole live session if
+   * there is exactly one — that is unambiguous. With several live sessions an
+   * unattributable event is DROPPED rather than misrouted into whichever chat
+   * happens to be first (R5).
+   */
+  private _sessionForThread(threadId: string | undefined, what: string): CodexSession | undefined {
+    if (threadId) {
+      const hit = this._sessionsByThread.get(threadId);
+      if (hit) return hit;
+    }
+    if (this._sessions.size === 1) {
+      return this._sessions.values().next().value;
+    }
+    traceCodex('event', 'dropped unattributable event', { event: what, threadId, liveSessions: this._sessions.size });
+    return undefined;
+  }
 
   private _ensureAppServer(): void {
     if (this._appServer) return;
     this._appServer = new CodexAppServer({ trace: traceCodex });
     this._auth = new CodexAuth(this._appServer);
     this._auth.on('statusChanged', (status: { authenticated: boolean }) => {
+      // De-auth invalidates every thread, not just one.
       if (!status.authenticated) this.resetSession();
       emitCodexStatusInvalidated('status-refresh');
     });
@@ -395,13 +602,18 @@ export class CodexRuntime implements AgentRuntime {
     this._setupEventListeners();
   }
 
+  /**
+   * Registered ONCE on the shared app-server. Each callback resolves its
+   * destination from `params.threadId`; nothing here may reach for "the"
+   * session config.
+   */
   private _setupEventListeners(): void {
     if (!this._appServer) return;
 
     this._appServer.on(
       'item/started',
       (params: { item: { type: string; id: string }; threadId: string; turnId: string }) => {
-        const config = this._sessionConfig;
+        const config = this._sessionForThread(params.threadId, 'item/started')?.config;
         if (!config) return;
         const itemType = params.item?.type;
         if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning') {
@@ -411,12 +623,16 @@ export class CodexRuntime implements AgentRuntime {
       },
     );
 
-    this._appServer.on('item/agentMessage/delta', (params: { delta: string }) => {
-      this._sessionConfig?.onProgress({ type: 'text', message: params.delta, timestamp: Date.now() });
+    // The main streaming path. Before Sprint 99 this did not even destructure
+    // threadId, so every chat's text landed in whichever config was last set.
+    this._appServer.on('item/agentMessage/delta', (params: { delta: string; threadId?: string }) => {
+      const config = this._sessionForThread(params.threadId, 'item/agentMessage/delta')?.config;
+      config?.onProgress({ type: 'text', message: params.delta, timestamp: Date.now() });
     });
 
-    this._appServer.on('item/plan/delta', (params: { delta: string }) => {
-      this._sessionConfig?.onCodexPlanDelta?.(params.delta);
+    this._appServer.on('item/plan/delta', (params: { delta: string; threadId?: string }) => {
+      const config = this._sessionForThread(params.threadId, 'item/plan/delta')?.config;
+      config?.onCodexPlanDelta?.(params.delta);
     });
 
     this._appServer.on('turn/plan/updated', (params: {
@@ -425,11 +641,12 @@ export class CodexRuntime implements AgentRuntime {
       plan: Array<{ step: string; status: string }>;
     }) => {
       traceCodex('event', 'turn/plan/updated', params);
-      this._sessionConfig?.onCodexPlanUpdate?.(params.explanation, params.plan);
+      const config = this._sessionForThread(params.threadId, 'turn/plan/updated')?.config;
+      config?.onCodexPlanUpdate?.(params.explanation, params.plan);
     });
 
-    this._appServer.on('item/completed', (params: { item: { type: string; id: string } }) => {
-      const config = this._sessionConfig;
+    this._appServer.on('item/completed', (params: { item: { type: string; id: string }; threadId?: string }) => {
+      const config = this._sessionForThread(params.threadId, 'item/completed')?.config;
       if (!config) return;
       const itemType = params.item?.type;
       if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage') {
@@ -440,38 +657,53 @@ export class CodexRuntime implements AgentRuntime {
     this._appServer.on(
       'turn/completed',
       (params: { threadId: string; turn: { id: string; status: string; error: unknown } }) => {
-        this._turnId = null;
-        const config = this._sessionConfig;
-        if (!config) return;
+        // Clear ONLY the completing thread's turn id. This used to clear a shared
+        // scalar, so thread B completing wiped thread A's turn id and made A's
+        // later cancel() a silent no-op.
+        const session = this._sessionForThread(params.threadId, 'turn/completed');
+        if (!session) return;
+        session._onTurnCompleted();
+        const config = session.config;
         const errorMsg = formatCodexTurnError(params.turn.error);
         config.onCodexComplete?.({ status: params.turn.status, error: errorMsg });
         config.onProgress({ type: 'done', message: '', timestamp: Date.now() });
       },
     );
 
-    this._appServer.on('progress', (event: { method: string; message: string }) => {
-      this._sessionConfig?.onRpcProgress?.(event.method, event.message);
+    // Synthetic, client-side, and the ONE event with no threadId on the wire —
+    // it is fired by rpc()'s progressAfterMs timer. The conversation id is
+    // threaded through threadStart() instead (B4).
+    this._appServer.on('progress', (event: { method: string; message: string; conversationId?: string }) => {
+      if (event.conversationId) {
+        this._sessions.get(event.conversationId)?.config.onRpcProgress?.(event.method, event.message);
+        return;
+      }
+      if (this._sessions.size === 1) {
+        this._sessions.values().next().value?.config.onRpcProgress?.(event.method, event.message);
+      }
     });
 
+    // Correctly global — but it must reach EVERY conversation, not just one.
     this._appServer.on('exit', () => {
-      this._threadId = null;
-      this._turnId = null;
       this._auth = null;
       this._appServer = null;
+      this._sessionsByThread.clear();
       this._requestIdMap.clear();
-      this._sessionConfig?.onExit?.();
+      this._requestConversation.clear();
+      for (const session of this._sessions.values()) {
+        session._onServerExit();
+        session.config.onExit?.();
+      }
     });
 
     // Server-initiated requests (approvals + questions + browser tools).
     this._appServer.on(
       'server-request',
       (request: { id: string | number; method: string; params: Record<string, unknown> }) => {
-        const config = this._sessionConfig;
-        if (!config) return;
-
         // Browser dynamic tool calls
         if (request.method === 'item/tool/call') {
           const params = request.params as Record<string, unknown>;
+          const config = this._sessionForThread(threadIdOf(params), 'item/tool/call')?.config;
           const toolName = typeof params.tool === 'string' ? params.tool : '';
           let toolArgs: Record<string, unknown> = {};
           if (params.arguments && typeof params.arguments === 'object') {
@@ -479,7 +711,7 @@ export class CodexRuntime implements AgentRuntime {
           } else if (typeof params.arguments === 'string') {
             try { toolArgs = JSON.parse(params.arguments) as Record<string, unknown>; } catch { toolArgs = {}; }
           }
-          if (config.onBrowserToolCall) {
+          if (config?.onBrowserToolCall) {
             void config.onBrowserToolCall(toolName, toolArgs, request.id).then(
               (reply) => this._appServer?.sendToolCallResponse(request.id, reply.text, reply.success),
               () => this._appServer?.sendToolCallResponse(request.id, `Browser tool error: ${toolName}`, false),
@@ -493,6 +725,8 @@ export class CodexRuntime implements AgentRuntime {
         // Codex question (requestUserInput)
         if (request.method === 'item/tool/requestUserInput') {
           const params = request.params as Record<string, unknown>;
+          const session = this._sessionForThread(threadIdOf(params), 'item/tool/requestUserInput');
+          if (!session) return;
           const questions = Array.isArray(params.questions)
             ? (params.questions as Array<Record<string, unknown>>)
                 .filter(Boolean)
@@ -510,7 +744,8 @@ export class CodexRuntime implements AgentRuntime {
                 }))
                 .filter((q) => q.question.trim())
             : [];
-          config.onCodexQuestion?.(request.id, questions);
+          session._trackRequest(`codex-${String(request.id)}`);
+          session.config.onCodexQuestion?.(request.id, questions);
           return;
         }
 
@@ -522,8 +757,17 @@ export class CodexRuntime implements AgentRuntime {
           return;
         }
 
+        const session = this._sessionForThread(routed.threadId, request.method);
+        if (!session) {
+          // Never approve on behalf of an unknown conversation.
+          this._appServer?.sendApprovalResponse(routed.requestId, 'decline');
+          return;
+        }
+
         const requestId = `codex-${String(request.id)}`;
         this._requestIdMap.set(requestId, request.id);
+        this._requestConversation.set(requestId, session.conversationId);
+        session._trackRequest(requestId);
 
         let req: UnifiedApprovalRequest;
         if (routed.type === 'command') {
@@ -531,7 +775,7 @@ export class CodexRuntime implements AgentRuntime {
         } else {
           req = { requestId, agentId: 'codex', kind: 'file-write', diff: JSON.stringify(routed.fileChanges, null, 2) };
         }
-        config.onApprovalRequest(req);
+        session.config.onApprovalRequest(req);
       },
     );
   }

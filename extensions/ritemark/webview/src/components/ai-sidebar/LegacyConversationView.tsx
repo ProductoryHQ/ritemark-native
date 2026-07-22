@@ -12,12 +12,12 @@
  */
 
 import { useRef, useEffect } from 'react';
-import { useAISidebarStore } from './store';
+import { useActiveConversation } from './store';
 import { ChatMessage } from './ChatMessage';
 import { Icon } from '../ui/Icon';
 
 export function LegacyConversationView() {
-  const legacyConversation = useAISidebarStore((s) => s.legacyConversation);
+  const { legacyConversation } = useActiveConversation();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

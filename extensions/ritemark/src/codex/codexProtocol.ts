@@ -243,11 +243,20 @@ export interface TurnInterruptParams {
 
 export type ReviewDecision = 'accept' | 'acceptForSession' | 'decline' | 'cancel';
 
-/** Server asks client to approve a shell command */
+/**
+ * Server asks client to approve a shell command.
+ *
+ * Sprint 99 (B6): this used to declare `conversationId`, which the wire never
+ * sends. The real payload is `threadId`/`turnId` + `itemId` — see the recorded
+ * fixtures in codexApproval.test.ts. The old field misattributed approvals once
+ * more than one thread was live.
+ */
 export interface ExecCommandApprovalParams {
-  conversationId: string;
-  callId: string;
-  approvalId: string | null;
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  callId?: string;
+  approvalId?: string | null;
   command: string[];
   cwd: string;
   reason: string | null;
@@ -257,13 +266,20 @@ export interface ExecCommandApprovalResponse {
   decision: ReviewDecision;
 }
 
-/** Server asks client to approve a file change (apply_patch) */
+/**
+ * Server asks client to approve a file change (apply_patch).
+ *
+ * Sprint 99 (B6): `conversationId` corrected to `threadId`/`turnId` — see the
+ * note on ExecCommandApprovalParams.
+ */
 export interface ApplyPatchApprovalParams {
-  conversationId: string;
-  callId: string;
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  callId?: string;
   fileChanges: Record<string, FileChange>;
   reason: string | null;
-  grantRoot: string | null;
+  grantRoot?: string | null;
 }
 
 export interface ApplyPatchApprovalResponse {

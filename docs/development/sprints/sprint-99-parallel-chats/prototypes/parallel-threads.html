@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sprint 99 · Parallel Threads — terminal-tabs pattern</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --r-surface: #FFFFFF;
+      --r-surface-muted: #F8FAFC;
+      --r-surface-soft: #F1F5F9;
+      --r-hairline: #E2E8F0;
+      --r-hairline-strong: #CBD5E1;
+      --r-ink-strong: #1E1B4B;
+      --r-ink-body: #475569;
+      --r-ink-muted: #64748B;
+      --r-ink-faint: #94A3B8;
+      --r-accent: #4338CA;
+      --r-accent-deep: #3730A3;
+      --r-accent-soft: #E0E7FF;
+      --r-accent-fainter: #C7D2FE;
+      --r-warning: #F59E0B;
+      --r-warning-soft: #FEF3C7;
+      --r-error: #EF4444;
+      --r-error-soft: #FEE2E2;
+      --r-success: #22C55E;
+      --r-shadow-sm: 0 1px 2px rgba(30,27,75,0.06), 0 1px 3px rgba(30,27,75,0.04);
+      --r-shadow-indigo: 0 4px 6px -1px rgba(67,56,202,0.25);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      background: #D6DCE4;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+      gap: 36px;
+      flex-wrap: wrap;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .col { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    .tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase;
+      display: inline-block; padding: 3px 10px; border-radius: 4px;
+      background:#E0E7FF; color:#3730A3;
+    }
+    .tag.dark-tag { background:#1E1B4B; color:#C7D2FE; }
+
+    /* ── panel shell ── */
+    .panel {
+      background: var(--r-surface-muted);
+      border-radius: 8px; overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: 0 8px 40px rgba(30,27,75,0.18);
+      border: 1px solid #C8D0DA;
+      height: 500px;
+    }
+    .panel-bar {
+      height: 35px; background: #E2E8F0;
+      border-bottom: 1px solid var(--r-hairline);
+      display: flex; align-items: center;
+      padding: 0 10px; flex-shrink: 0; gap: 4px;
+    }
+    .panel-bar-title { font-size:10.5px; font-weight:700; color:var(--r-ink-body); text-transform:uppercase; letter-spacing:0.6px; flex:1; }
+    .pib { width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:4px;color:var(--r-ink-muted);cursor:pointer;position:relative; }
+    .pib:hover { background:var(--r-hairline); }
+    .pib::after {
+      content: attr(data-tip);
+      position: absolute; top: calc(100% + 4px);
+      left: 50%; transform: translateX(-50%);
+      background: #1E1B4B; color: #F8FAFC;
+      font-size: 9.5px; padding: 3px 7px; border-radius: 3px;
+      white-space: nowrap; z-index: 30;
+      opacity: 0; pointer-events: none; transition: opacity 120ms;
+    }
+    .pib:hover::after { opacity: 1; }
+
+    /* ── body split: chat + rail ── */
+    .split { flex: 1; display: flex; min-height: 0; }
+    .chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    /* ── messages ── */
+    .messages { flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:12px; }
+    .msg-u { display:flex;justify-content:flex-end; }
+    .msg-u-b {
+      max-width:88%;padding:7px 11px;
+      background:var(--r-accent-soft);border:1px solid var(--r-accent-fainter);
+      border-radius:10px 10px 3px 10px;
+      font-size:12px;color:var(--r-accent-deep);line-height:1.55;
+    }
+    .msg-a { display:flex;flex-direction:column;gap:5px; }
+    .msg-a-meta { display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--r-ink-faint);text-transform:uppercase;letter-spacing:0.5px; }
+    .msg-a-body { font-size:12px;color:var(--r-ink-body);line-height:1.6; }
+
+    .run-status {
+      display:flex;align-items:center;gap:6px;
+      padding:5px 8px;font-size:11px;color:var(--r-accent);
+      background:var(--r-accent-soft);border:1px solid var(--r-accent-fainter);border-radius:5px;
+    }
+    .tool-row {
+      display:flex;align-items:center;gap:5px;
+      padding:3px 8px;font-size:10.5px;color:var(--r-ink-muted);
+      background:var(--r-surface-soft);border:1px solid var(--r-hairline);border-radius:5px;
+      font-family:'SF Mono',Menlo,Consolas,monospace;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .spin { animation:spin .8s linear infinite;display:inline-block; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+    .dot { width:6px;height:6px;border-radius:50%;background:var(--r-accent);animation:pulse 1.4s ease-in-out infinite; }
+
+    /* ── approval card ── */
+    .approval {
+      border:1px solid var(--r-warning);
+      background:var(--r-surface);
+      border-radius:8px; overflow:hidden;
+      box-shadow: var(--r-shadow-sm);
+    }
+    .approval-head {
+      display:flex;align-items:center;gap:6px;
+      padding:6px 10px; font-size:11px; font-weight:700;
+      background:var(--r-warning-soft); color:#92400E;
+    }
+    .approval-body { padding:8px 10px; display:flex; flex-direction:column; gap:8px; }
+    .approval-cmd {
+      font-family:'SF Mono',Menlo,Consolas,monospace;
+      font-size:10.5px; color:var(--r-ink-strong);
+      background:var(--r-surface-soft); border:1px solid var(--r-hairline);
+      border-radius:5px; padding:5px 8px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .approval-actions { display:flex; gap:6px; }
+    .btn {
+      font-family:inherit; font-size:11.5px; font-weight:600;
+      padding:4px 12px; border-radius:6px; cursor:pointer;
+      border:1px solid transparent;
+      transition: background 120ms;
+    }
+    .btn-primary {
+      background:var(--r-accent); color:#FFF;
+      box-shadow: var(--r-shadow-indigo);
+    }
+    .btn-primary:hover { background:var(--r-accent-deep); }
+    .btn-secondary {
+      background:var(--r-surface-soft); color:var(--r-ink-body);
+      border-color:var(--r-hairline-strong);
+    }
+    .btn-secondary:hover { background:var(--r-hairline); }
+
+    /* ── input ── */
+    .input-wrap { flex-shrink:0;padding:8px 10px;border-top:1px solid var(--r-hairline); }
+    .input-box {
+      border:1px solid var(--r-hairline);border-radius:8px;
+      background:var(--r-surface);box-shadow:var(--r-shadow-sm);overflow:hidden;
+    }
+    textarea {
+      display:block;width:100%;padding:8px 10px 4px;
+      font-size:12px;font-family:inherit;
+      background:transparent;border:none;outline:none;resize:none;line-height:1.5;
+      color:var(--r-ink-strong);
+    }
+    textarea::placeholder { color:var(--r-ink-faint); }
+    .input-footer { display:flex;align-items:center;padding:4px 6px 6px;gap:4px; }
+    .rtl { flex:1;font-size:11px;font-weight:500;color:var(--r-ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .ib {
+      width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+      border-radius:5px;border:1px solid var(--r-hairline);
+      background:var(--r-surface-soft);color:var(--r-ink-body);cursor:pointer;
+      flex-shrink:0;
+    }
+    .ib:hover { background:var(--r-surface-muted); }
+    .ib.stop { background:var(--r-ink-strong);color:#FFF;border-color:var(--r-ink-strong); }
+    .ib.stop:hover { background:#312E81; }
+    .ib.send { background:var(--r-accent);color:#FFF;border-color:var(--r-accent);box-shadow:var(--r-shadow-indigo); }
+    .ib.send:hover { background:var(--r-accent-deep); }
+
+    /* ══════════════════════════════════════════════════
+       THREAD RAIL — terminal-tabs pattern, right edge
+       ══════════════════════════════════════════════════ */
+    .rail {
+      flex-shrink: 0;
+      border-left: 1px solid var(--r-hairline);
+      background: var(--r-surface-muted);
+      display: flex; flex-direction: column;
+      padding: 6px 0;
+      overflow-y: auto;
+    }
+
+    /* — variant A: icon-only rail (like VS Code terminal tabs, narrow) — */
+    .rail.icons { width: 38px; align-items: center; gap: 3px; }
+
+    .rt-icon {
+      position: relative;
+      width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px;
+      color: var(--r-ink-muted);
+      cursor: pointer;
+      border: none; background: transparent;
+      transition: background 100ms, color 100ms;
+    }
+    .rt-icon:hover { background: var(--r-surface-soft); color: var(--r-ink-body); }
+    /* active thread: indigo-soft bg + 2px indigo bar hugging the rail's left edge */
+    .rail.icons { position: relative; }
+    .rt-icon.active {
+      background: var(--r-accent-soft);
+      color: var(--r-accent-deep);
+    }
+    /* ONE status slot per icon: inside the button, bottom-right.
+       Running spinner and approval dot share the slot — a thread shows
+       at most one signal, and adjacent icons can never collide. */
+    .rt-badge {
+      position:absolute; right:1px; bottom:1px;
+      width:10px; height:10px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      background: var(--r-surface-muted);
+      box-shadow: 0 0 0 1.5px var(--r-surface-muted);
+    }
+    .rt-icon.active .rt-badge { background: var(--r-accent-soft); box-shadow: 0 0 0 1.5px var(--r-accent-soft); }
+    .rt-badge svg { display:block; }
+    .rt-badge.attn {
+      background: var(--r-warning);
+      box-shadow: 0 0 0 1.5px var(--r-surface-muted);
+      width:8px; height:8px; margin:1px;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .rt-tip { position: relative; }
+    .rt-icon::after {
+      content: attr(data-tip);
+      position: absolute; right: calc(100% + 6px); top: 50%;
+      transform: translateY(-50%);
+      background: #1E1B4B; color: #F8FAFC;
+      font-size: 9.5px; padding: 3px 7px; border-radius: 3px;
+      white-space: nowrap; z-index: 20;
+      opacity: 0; pointer-events: none; transition: opacity 120ms;
+    }
+    .rt-icon:hover::after { opacity: 1; }
+
+    .rail-divider { width: 22px; height:1px; background: var(--r-hairline); margin: 4px 0; flex-shrink:0; }
+    .rail-spacer { flex: 1; }
+
+    /* rail-owned actions: + pinned top, history pinned bottom */
+    .rail-btn {
+      position: relative;
+      width: 30px; height: 30px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px; border: none; background: transparent;
+      color: var(--r-ink-muted); cursor: pointer;
+      transition: background 100ms, color 100ms;
+    }
+    .rail-btn:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+    .rail-btn::after {
+      content: attr(data-tip);
+      position: absolute; right: calc(100% + 6px); top: 50%;
+      transform: translateY(-50%);
+      background: #1E1B4B; color: #F8FAFC;
+      font-size: 9.5px; padding: 3px 7px; border-radius: 3px;
+      white-space: nowrap; z-index: 20;
+      opacity: 0; pointer-events: none; transition: opacity 120ms;
+    }
+    .rail-btn:hover::after { opacity: 1; }
+
+    /* hover × on idle icons — closes the thread (running/attention threads have no ×) */
+    .rt-x {
+      display:none; position:absolute; top:0; right:0;
+      width:14px; height:14px; border-radius:50%;
+      align-items:center; justify-content:center;
+      background:var(--r-surface); border:1px solid var(--r-hairline-strong);
+      color:var(--r-ink-muted); cursor:pointer; z-index:5;
+    }
+    .rt-x:hover { color:var(--r-ink-strong); background:var(--r-surface-soft); }
+    .rt-icon:hover .rt-x { display:flex; }
+
+
+    /* ══════════════════════════════════════════════════
+       DARK THEME (Deep Space)
+       ══════════════════════════════════════════════════ */
+    .dark {
+      --r-surface: #1E1B4B;
+      --r-surface-muted: #191635;
+      --r-surface-soft: #251F5C;
+      --r-hairline: #3730A3;
+      --r-hairline-strong: #4338CA;
+      --r-ink-strong: #F8FAFC;
+      --r-ink-body: #C7D2FE;
+      --r-ink-muted: #94A3B8;
+      --r-ink-faint: #64748B;
+      --r-accent: #818CF8;
+      --r-accent-deep: #A5B4FC;
+      --r-accent-soft: rgba(129, 140, 248, 0.16);
+      --r-accent-fainter: rgba(129, 140, 248, 0.28);
+      --r-warning: #FBBF24;
+      --r-warning-soft: rgba(245, 158, 11, 0.18);
+      --r-shadow-indigo: 0 4px 6px -1px rgba(129,140,248,0.28);
+      border-color: #14112B;
+    }
+    .dark .panel-bar { background: #14112B; border-bottom-color: #2A2560; }
+    .dark .panel-bar-title { color: var(--r-ink-body); }
+    .dark .pib:hover { background: #251F5C; }
+    .dark .msg-u-b { color: var(--r-ink-strong); }
+    .dark .approval-head { color: #FDE68A; }
+    .dark .approval { border-color: rgba(251,191,36,0.5); }
+    .dark .approval-cmd { color: var(--r-ink-body); }
+    .dark .btn-primary { background:#6366F1; color:#FFF; }
+    .dark .btn-primary:hover { background:#818CF8; }
+    .dark .btn-secondary { background:var(--r-surface-soft); color:var(--r-ink-body); border-color:var(--r-hairline); }
+    .dark .ib { color: var(--r-ink-body); }
+    .dark .ib.stop { background:#F8FAFC; color:#1E1B4B; border-color:#F8FAFC; }
+    .dark .ib.send { background:#6366F1; border-color:#6366F1; }
+    .dark .rt-badge { background: var(--r-surface-muted); }
+    .dark .rt-badge.attn { border-color: var(--r-surface-muted); }
+    .dark textarea { color: var(--r-ink-strong); }
+
+    /* desc */
+    .desc { font-size:11px;color:#64748B;line-height:1.6;text-align:center; }
+    .desc strong { color:#475569; }
+    code { font-size:10px;background:#F1F5F9;padding:1px 4px;border-radius:3px; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     COL A — narrow sidebar: icon-only thread rail
+     ══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="tag">A · Icon rail (sidebar &lt; 360px)</div>
+  <div class="panel" style="width:310px">
+    <div class="panel-bar">
+      <span class="panel-bar-title">AI Chat</span>
+    </div>
+    <div class="split">
+      <div class="chat-col">
+        <div class="messages" id="msgs-a"></div>
+      </div>
+      <div class="rail icons" id="rail-a"></div>
+    </div>
+    <div class="input-wrap" id="input-a"></div>
+  </div>
+  <div class="desc" style="width:310px">
+    <strong>Chosen direction (option A).</strong> One thread per row, top-down on the right edge; the rail ends at the composer boundary — the composer spans full width below it. Same Phosphor <code>robot</code> icon for every thread, color-coded by runtime: <span style="color:#D97757;font-weight:700">Claude</span> · <span style="color:#10A37F;font-weight:700">Codex</span> · <span style="color:#0EA5E9;font-weight:700">OpenCode</span>. Active = indigo pill, nothing else. One status slot per icon (inside, bottom-right): spinner = running in background, amber dot = waiting for approval — a thread shows at most one signal. The rail owns thread management: <strong>+ (new thread) pinned top, History pinned bottom</strong> — no dividers, no extra chrome, nothing in the title bar.
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     COL C — dark mode (named list)
+     ══════════════════════════════════════════════════════ -->
+<div class="col">
+  <div class="tag dark-tag">B · Dark (Deep Space)</div>
+  <div class="panel dark" style="width:310px">
+    <div class="panel-bar">
+      <span class="panel-bar-title">AI Chat</span>
+    </div>
+    <div class="split">
+      <div class="chat-col">
+        <div class="messages" id="msgs-c"></div>
+      </div>
+      <div class="rail icons" id="rail-c"></div>
+    </div>
+    <div class="input-wrap" id="input-c"></div>
+  </div>
+  <div class="desc" style="width:310px">
+    <strong>Dark = same structure, Deep Space surface.</strong> Indigo-400 accent, indigo-fainter body ink (no grey-on-dark). Approval card keeps the amber signal; active icon keeps the pill. Hover an idle icon → close (×).
+  </div>
+</div>
+
+<script>
+  /* ─────────────────────────────────────────────────────
+     runtime icon — ONE icon (Phosphor `robot`, regular 400,
+     verbatim from @phosphor-icons/react — the app's icon set),
+     COLOR-CODED per runtime. No per-runtime glyph shapes.
+     ───────────────────────────────────────────────────── */
+  const ROBOT_PATH = 'M200,48H136V16a8,8,0,0,0-16,0V48H56A32,32,0,0,0,24,80V192a32,32,0,0,0,32,32H200a32,32,0,0,0,32-32V80A32,32,0,0,0,200,48Zm16,144a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V80A16,16,0,0,1,56,64H200a16,16,0,0,1,16,16Zm-52-56H92a28,28,0,0,0,0,56h72a28,28,0,0,0,0-56Zm-24,16v24H116V152ZM80,164a12,12,0,0,1,12-12h8v24H92A12,12,0,0,1,80,164Zm84,12h-8V152h8a12,12,0,0,1,0,24ZM72,108a12,12,0,1,1,12,12A12,12,0,0,1,72,108Zm88,0a12,12,0,1,1,12,12A12,12,0,0,1,160,108Z';
+  function robot(size) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 256 256" fill="currentColor"><path d="${ROBOT_PATH}"/></svg>`;
+  }
+  const RUNTIME_COLOR = { claude: '#D97757', codex: '#10A37F', opencode: '#0EA5E9' };
+  const GLYPHS = {
+    claude:   `<span style="display:flex;color:${RUNTIME_COLOR.claude}">${robot(14)}</span>`,
+    codex:    `<span style="display:flex;color:${RUNTIME_COLOR.codex}">${robot(14)}</span>`,
+    opencode: `<span style="display:flex;color:${RUNTIME_COLOR.opencode}">${robot(14)}</span>`,
+  };
+  const RUNTIME_LABEL = { claude: 'Claude · Sonnet 5', codex: 'Codex · GPT-5.6', opencode: 'OpenCode · Big Pickle' };
+
+  const SPINNER = '<svg class="spin" width="11" height="11" viewBox="0 0 256 256" fill="currentColor"><path d="M136,32V16a8,8,0,0,0-16,0V32a8,8,0,0,0,16,0Zm37.25,13.07a8,8,0,0,0-11.32,11.31l11.31,11.32a8,8,0,0,0,11.32-11.32Zm36.68,74.86H192a8,8,0,0,0,0,16h18a8,8,0,0,0,0-16Zm-18.69,61.94-11.31,11.31a8,8,0,0,0,11.32,11.32l11.31-11.31a8,8,0,0,0-11.32-11.32ZM128,192a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V200A8,8,0,0,0,128,192ZM82.75,182.56,71.44,193.88a8,8,0,0,0,11.31,11.31l11.31-11.31a8,8,0,0,0-11.31-11.32ZM64,120H46a8,8,0,0,0,0,16H64a8,8,0,0,0,0-16ZM82.75,57.38,71.44,46.07A8,8,0,1,0,60.12,57.38L71.44,68.69A8,8,0,0,0,82.75,57.38Z"/></svg>';
+  const SPINNER9 = SPINNER.replace(/width="11" height="11"/, 'width="9" height="9"');
+  const CHECK = '<svg width="9" height="9" viewBox="0 0 256 256" fill="#22C55E"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>';
+  const X_ICON = '<svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>';
+
+  /* ─────────────────────────────────────────────────────
+     thread fixtures — one shared story, three statuses
+     ───────────────────────────────────────────────────── */
+  function makeThreads() {
+    return [
+      { id: 1, runtime: 'claude', title: 'Review open issues', status: 'running',
+        messages: `
+          <div class="msg-u"><div class="msg-u-b">pls review open issues and suggest a sprint</div></div>
+          <div class="msg-a">
+            <div class="msg-a-meta">${GLYPHS.claude} Claude · <span class="dot"></span></div>
+            <div class="run-status">${SPINNER} Fetching issues…</div>
+            <div class="tool-row">mcp__github__list_issues(…)</div>
+          </div>` },
+      { id: 2, runtime: 'codex', title: 'Translate memo to ET', status: 'attention',
+        messages: `
+          <div class="msg-u"><div class="msg-u-b">translate the ERGO memo to Estonian, keep comments intact</div></div>
+          <div class="msg-a">
+            <div class="msg-a-meta">${GLYPHS.codex} Codex</div>
+            <div class="msg-a-body">I'll apply the translation directly to the file. One command needs your approval first:</div>
+            <div class="approval">
+              <div class="approval-head">
+                <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor"><path d="M236.8,188.09,149.35,36.22a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></svg>
+                Approval needed — edit file
+              </div>
+              <div class="approval-body">
+                <div class="approval-cmd">apply_patch memo-ergo-baltic.md (+142 −138)</div>
+                <div class="approval-actions">
+                  <button class="btn btn-primary" onclick="resolveApproval(this)">Allow</button>
+                  <button class="btn btn-secondary" onclick="resolveApproval(this)">Deny</button>
+                </div>
+              </div>
+            </div>
+          </div>` },
+      { id: 3, runtime: 'opencode', title: 'Outline Q3 plan', status: 'idle',
+        messages: `
+          <div class="msg-u"><div class="msg-u-b">draft an outline for the Q3 plan doc</div></div>
+          <div class="msg-a">
+            <div class="msg-a-meta">${GLYPHS.opencode} OpenCode</div>
+            <div class="msg-a-body">Done — I created <strong>q3-plan.md</strong> with a 6-section outline: goals, headcount, roadmap, risks, budget, checkpoints. Want me to expand any section?</div>
+          </div>` },
+    ];
+  }
+
+  const panels = {
+    a: { threads: makeThreads(), active: 1, mode: 'icons' },
+        c: { threads: makeThreads(), active: 2, mode: 'icons' },
+  };
+  let nextThreadId = 100;
+
+  /* ─────────────────────────────────────────────────────
+     render
+     ───────────────────────────────────────────────────── */
+  function statusBadgeIcon(t) {
+    if (t.status === 'running') return `<span class="rt-badge" style="color:var(--r-accent)">${SPINNER9}</span>`;
+    if (t.status === 'attention') return '<span class="rt-badge attn"></span>';
+    return '';
+  }
+  function tipFor(t) {
+    const s = t.status === 'running' ? 'running' : t.status === 'attention' ? 'needs approval' : 'idle';
+    return `${t.title} — ${s}`;
+  }
+
+  function render(p) {
+    const panel = panels[p];
+    const rail = document.getElementById('rail-' + p);
+    const active = panel.threads.find(t => t.id === panel.active);
+
+    /* rail */
+      rail.innerHTML = `
+        <button class="rail-btn" data-tip="New thread" onclick="addThread('${p}')" style="margin-bottom:6px">
+          <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg>
+        </button>` +
+        panel.threads.map(t => `
+        <button class="rt-icon ${t.id === panel.active ? 'active' : ''}" data-tip="${tipFor(t)}"
+          onclick="switchThread('${p}', ${t.id})">
+          ${GLYPHS[t.runtime]}
+          ${statusBadgeIcon(t)}
+          ${t.status === 'idle' ? `<span class="rt-x" title="Close thread" onclick="event.stopPropagation(); closeThread('${p}', ${t.id})">${X_ICON.replace('width="10" height="10"','width="8" height="8"')}</span>` : ''}
+        </button>`).join('') + `
+        <div class="rail-spacer"></div>
+        <button class="rail-btn" data-tip="History">
+          <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></svg>
+        </button>`;
+
+    /* messages */
+    document.getElementById('msgs-' + p).innerHTML = active ? active.messages : '';
+
+    /* input */
+    const running = active && active.status === 'running';
+    document.getElementById('input-' + p).innerHTML = `
+      <div class="input-box">
+        <textarea rows="2" placeholder="${running ? 'Add a follow-up…' : 'Ask anything…'}"></textarea>
+        <div class="input-footer">
+          <span class="rtl">${active ? RUNTIME_LABEL[active.runtime] : ''}</span>
+          <div class="ib" title="Attach"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34l-82.05,82.05a56,56,0,0,1-79.19-79.2L148.42,24.47a40,40,0,0,1,56.56,56.56L104.16,182.1a24,24,0,0,1-33.94-33.94L178.5,40a8,8,0,0,1,11.32,11.31L81.55,159.47A8,8,0,0,0,92.84,170.78L193.67,69.72a24,24,0,0,0-33.94-33.94L59.73,136.5A40,40,0,0,0,116,193.07l82.06-82.06a8,8,0,0,1,11.6,11Z"/></svg></div>
+          ${running
+            ? '<div class="ib stop" title="Stop this thread"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><rect x="52" y="52" width="152" height="152" rx="4"/></svg></div>'
+            : '<div class="ib send" title="Send"><svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M231.87,114l-168-95.89A16,16,0,0,0,40.92,37.34L71.55,128,40.92,218.67A16,16,0,0,0,56,240a16.15,16.15,0,0,0,7.93-2.1l167.92-96.05a16,16,0,0,0,.05-27.89ZM56,224a.56.56,0,0,0,0-.12L85.74,136H144a8,8,0,0,0,0-16H85.74L56.06,32.16A.46.46,0,0,0,56,32l168,95.83Z"/></svg></div>'}
+        </div>
+      </div>`;
+  }
+
+  /* ─────────────────────────────────────────────────────
+     interactions
+     ───────────────────────────────────────────────────── */
+  function switchThread(p, id) {
+    panels[p].active = id;
+    render(p);
+  }
+  function closeThread(p, id) {
+    const panel = panels[p];
+    panel.threads = panel.threads.filter(t => t.id !== id);
+    if (panel.active === id && panel.threads.length) panel.active = panel.threads[0].id;
+    render(p);
+  }
+  function addThread(p) {
+    const panel = panels[p];
+    const id = nextThreadId++;
+    panel.threads.push({
+      id, runtime: 'claude', title: 'New thread', status: 'idle',
+      messages: `
+        <div class="msg-a">
+          <div class="msg-a-meta">${GLYPHS.claude} Claude</div>
+          <div class="msg-a-body" style="color:var(--r-ink-faint)">New thread — other threads keep running in the background.</div>
+        </div>`
+    });
+    panel.active = id;
+    render(p);
+  }
+  function resolveApproval(btn) {
+    /* demo: approving flips the Codex thread to running in every panel */
+    for (const p of Object.keys(panels)) {
+      const t = panels[p].threads.find(t => t.status === 'attention');
+      if (t) {
+        t.status = 'running';
+        t.messages = t.messages
+          .replace(/<div class="approval">[\s\S]*<\/div>\s*<\/div>\s*<\/div>/,
+            `<div class="run-status">${SPINNER} Applying translation…</div><div class="tool-row">apply_patch memo-ergo-baltic.md</div></div></div>`);
+        render(p);
+      }
+    }
+  }
+
+  render('a'); render('c');
+</script>
+</body>
+</html>

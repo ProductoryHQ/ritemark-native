@@ -232,6 +232,24 @@ async function run() {
     assert.ok(!client.isRunning(), 'cancel kills the process even when session/cancel is unsupported');
   }
 
+  // ── Sprint 99 C3: killProcess:false leaves the shared process alive ──
+  // Under multi-session the kill would take every other chat down with it, so
+  // the caller (AcpManager) suppresses it when siblings are live.
+  {
+    const client = new AcpClient({
+      command: nodeBin,
+      args: [agentScript],
+      cwd: os.tmpdir(),
+      handlers: noopHandlers(),
+    });
+    await client.initialize();
+    const session = await client.newSession(os.tmpdir());
+    await client.cancel(session.sessionId, { killProcess: false });
+    assert.ok(client.isRunning(), 'cancel with killProcess:false must not kill the process');
+    client.dispose();
+    assert.ok(!client.isRunning(), 'dispose still kills the process');
+  }
+
   console.log('acpClient.test.ts: all tests passed');
 }
 
