@@ -241,31 +241,27 @@ export class AcpManager {
   /**
    * Cancel the in-flight turn for ONE session.
    *
-   * OpenCode 1.15.13 does not implement session/cancel (audit T9/R-2), so the
-   * only thing that truly stops the work is killing the process — which is
-   * acceptable only when this is the last session standing. With siblings live
-   * the session is marked cancel-requested instead and its updates are dropped
-   * until the turn settles (C3).
+   * OpenCode implements session/cancel as of 1.18.4, so this is now a plain
+   * per-session cancel: the turn settles `cancelled` and the subprocess — shared
+   * with every other conversation — is left alone. Before that the only thing
+   * that actually stopped the work was killing the process, which is why this
+   * used to special-case being the last session standing.
    *
-   * // Sprint 100: re-check against 1.18.1 — a real session/cancel collapses
-   * // this back into a plain per-session cancel.
+   * `cancelRequested` stays: the turn still settles asynchronously, and its
+   * trailing updates must be discarded rather than resurrecting a chat the user
+   * has already seen go idle.
    */
   async cancel(sessionId: string): Promise<void> {
     const state = this.sessions.get(sessionId);
     const client = this.client;
     if (!state || !client) return;
 
-    const isOnlySession = this.sessions.size <= 1;
     state.cancelRequested = true;
     state.thoughtBuffer = '';
     this.sessions.delete(sessionId);
 
-    await client.cancel(sessionId, { killProcess: isOnlySession });
-
-    if (isOnlySession) {
-      this.client = null;
-      this.sessions.clear();
-    }
+    await client.cancel(sessionId);
+    traceAcp('manager', 'session-cancelled', { sessionId, liveSessions: this.sessions.size });
   }
 
   /** Close ONE session. Siblings and the subprocess keep running. */
