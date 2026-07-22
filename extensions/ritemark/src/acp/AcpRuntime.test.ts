@@ -113,6 +113,33 @@ async function testDisposeCancelsUpstreamTurn(): Promise<void> {
   console.log('✓ Test 9: dispose() cancels the upstream turn before forgetting the session');
 }
 
+/**
+ * Sprint 100: OpenCode 1.18.4 throws "No provider available" when no model is
+ * selected (1.15.13 returned a silent zero-token turn instead). The raw message
+ * tells a user nothing, so it must be translated.
+ */
+async function testNoProviderErrorIsActionable(): Promise<void> {
+  const runtime = new AcpRuntime();
+  let reported: string | undefined;
+  const config: RuntimeSessionConfig = {
+    ...dummyConfig,
+    onCodexComplete: (r) => { reported = r.error; },
+  };
+  const session = addSession(runtime, 'conv-nomodel', config);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (runtime as any)._manager = {
+    ...mockManager,
+    prompt: async () => { throw new Error('Internal error: No provider available'); },
+  };
+
+  await session.prompt({ prompt: 'hi' });
+
+  assert.ok(reported, 'the turn must report an error');
+  assert.ok(!/no provider available/i.test(reported!), 'the raw protocol message must not reach the user');
+  assert.match(reported!, /model is selected/i, 'the message must say what to do about it');
+  console.log('✓ Test 10: "No provider available" becomes an actionable message');
+}
+
 async function run() {
   // Test 1: AcpRuntime structurally satisfies AgentRuntime
   {
@@ -266,7 +293,9 @@ async function run() {
 
   await testDisposeCancelsUpstreamTurn();
 
-  console.log('\nAll 9 AcpRuntime tests passed!');
+  await testNoProviderErrorIsActionable();
+
+  console.log('\nAll 10 AcpRuntime tests passed!');
 }
 
 run().then(

@@ -125,7 +125,8 @@ export class AcpSession implements RuntimeSession {
       const result = await manager.prompt(this.acpSessionId, promptText);
       config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
     } catch (err) {
-      config.onCodexComplete?.({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+      const raw = err instanceof Error ? err.message : String(err);
+      config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw) });
     }
   }
 
@@ -170,6 +171,23 @@ export class AcpSession implements RuntimeSession {
     }
     this.pendingApprovals.clear();
   }
+}
+
+/**
+ * Turn an ACP turn failure into something a user can act on.
+ *
+ * OpenCode 1.18.4 has no default model — `configOptions.model.current` is
+ * undefined — so prompting before one is selected throws "No provider
+ * available". Sprint 100 verified 1.15.13 had no default either, but it failed
+ * differently: a silent `end_turn` with zero tokens, which Ritemark reported via
+ * its empty-turn soft error. The bump turned a silent failure into a loud one,
+ * which is an improvement — but the raw message says nothing about what to do.
+ */
+function describeAcpTurnError(raw: string): string {
+  if (/no provider available/i.test(raw)) {
+    return 'No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.';
+  }
+  return raw;
 }
 
 export class AcpRuntime implements AgentRuntime {
