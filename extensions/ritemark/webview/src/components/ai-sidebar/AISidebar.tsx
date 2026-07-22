@@ -6,7 +6,8 @@
  */
 
 import { useEffect } from 'react';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, selectActiveConversation, useActiveConversation } from './store';
+import type { ConversationState } from './conversationState';
 import { vscode } from '../../lib/vscode';
 import { OfflineBanner } from './OfflineBanner';
 import { OnboardingWizard } from './OnboardingWizard';
@@ -31,9 +32,14 @@ export function AISidebar() {
   const handleMessage = useAISidebarStore((s) => s.handleExtensionMessage);
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const ready = useAISidebarStore((s) => s.ready);
-  const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
   const dismissCurrentPlan = useAISidebarStore((s) => s.dismissCurrentPlan);
-  const dismissedCurrentPlanKey = useAISidebarStore((s) => s.dismissedCurrentPlanKey);
+  const {
+    selectedAgent,
+    dismissedCurrentPlanKey,
+    agentConversation,
+    codexConversation,
+    legacyConversation,
+  } = useActiveConversation();
 
   // Set up message listener + handshake
   useEffect(() => {
@@ -49,16 +55,16 @@ export function AISidebar() {
       // Sprint 99: this restores one thread (the one that was on screen). The
       // full open-thread set persists per workspace in Phase 5 (R13).
       const store = useAISidebarStore.getState();
-      const restored: Parameters<typeof store.restoreActiveConversation>[0] = {};
+      const restored: Partial<ConversationState> = {};
       if (savedState.chatMessages) {
-        restored.chatMessages = savedState.chatMessages as typeof store.chatMessages;
-        restored.conversationHistory = (savedState.conversationHistory || []) as typeof store.conversationHistory;
+        restored.chatMessages = savedState.chatMessages as ConversationState['chatMessages'];
+        restored.conversationHistory = (savedState.conversationHistory || []) as ConversationState['conversationHistory'];
       }
       if (savedState.agentConversation) {
-        restored.agentConversation = savedState.agentConversation as typeof store.agentConversation;
+        restored.agentConversation = savedState.agentConversation as ConversationState['agentConversation'];
       }
       if (savedState.codexConversation) {
-        restored.codexConversation = savedState.codexConversation as typeof store.codexConversation;
+        restored.codexConversation = savedState.codexConversation as ConversationState['codexConversation'];
       }
       if ('dismissedCurrentPlanKey' in savedState) {
         restored.dismissedCurrentPlanKey = (savedState.dismissedCurrentPlanKey as string | null) ?? null;
@@ -77,13 +83,14 @@ export function AISidebar() {
   // Persist state across hide/show
   useEffect(() => {
     return useAISidebarStore.subscribe((state) => {
+      const active = selectActiveConversation(state);
       vscode.setState({
-        chatMessages: state.chatMessages,
-        conversationHistory: state.conversationHistory,
-        agentConversation: state.agentConversation,
-        codexConversation: state.codexConversation,
-        currentConversationId: state.currentConversationId,
-        dismissedCurrentPlanKey: state.dismissedCurrentPlanKey,
+        chatMessages: active.chatMessages,
+        conversationHistory: active.conversationHistory,
+        agentConversation: active.agentConversation,
+        codexConversation: active.codexConversation,
+        currentConversationId: state.activeConversationId,
+        dismissedCurrentPlanKey: active.dismissedCurrentPlanKey,
       });
     });
   }, []);
@@ -96,9 +103,6 @@ export function AISidebar() {
   const showHistoryPanel = useAISidebarStore((s) => s.showHistoryPanel);
   const loadConversationList = useAISidebarStore((s) => s.loadConversationList);
   const chatFontSize = useAISidebarStore((s) => s.chatFontSize);
-  const agentConversation = useAISidebarStore((s) => s.agentConversation);
-  const codexConversation = useAISidebarStore((s) => s.codexConversation);
-  const legacyConversation = useAISidebarStore((s) => s.legacyConversation);
 
   // Initialize chat font size CSS variable
   useEffect(() => {

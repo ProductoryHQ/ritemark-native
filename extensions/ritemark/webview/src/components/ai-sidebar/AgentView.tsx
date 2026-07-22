@@ -4,7 +4,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { Icon } from '../ui/Icon';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, useActiveConversation } from './store';
 import { EmptyState } from './EmptyState';
 import { RunningIndicator } from './RunningIndicator';
 import { AgentResponse } from './AgentResponse';
@@ -104,8 +104,7 @@ export function AgentTurnBlock({
 // ── View (empty state + scroll container) ──────────────────────────────────────
 
 export function AgentView() {
-  const agentConversation = useAISidebarStore((s) => s.agentConversation);
-  const codexConversation = useAISidebarStore((s) => s.codexConversation);
+  const { agentConversation, codexConversation } = useActiveConversation();
   const isMixedRuntime = codexConversation.length > 0;
   const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
   const answerAgentQuestion = useAISidebarStore((s) => s.answerAgentQuestion);

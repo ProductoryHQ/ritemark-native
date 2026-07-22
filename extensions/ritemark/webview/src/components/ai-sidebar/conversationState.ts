@@ -70,37 +70,6 @@ export interface ConversationState {
   showContextWarning: boolean;
 }
 
-/**
- * The `ConversationState` fields the store also exposes at its top level, as a
- * projection of the ACTIVE conversation.
- *
- * Sprint 99 Phase 1: the rail (E6) does not exist yet, so every existing view
- * still reads these flat fields. Keeping them as a derived mirror is what lets
- * the store reshape land without rewriting six components in the same change.
- * Phase 5 points the views at `conversations[activeConversationId]` directly and
- * this projection goes away.
- */
-export type MirroredConversationKey = Exclude<keyof ConversationState, 'id' | 'createdAt'>;
-
-export const MIRRORED_CONVERSATION_KEYS: MirroredConversationKey[] = [
-  'agentConversation',
-  'codexConversation',
-  'chatMessages',
-  'conversationHistory',
-  'streamingContent',
-  'isStreaming',
-  'legacyConversation',
-  'selectedAgent',
-  'selectedModel',
-  'codexSelectedModel',
-  'opencodeSelectedModel',
-  'pendingRuntime',
-  'dismissedCurrentPlanKey',
-  'estimatedTokens',
-  'contextUsagePercent',
-  'showContextWarning',
-];
-
 export function createConversationState(
   id: string,
   overrides: Partial<ConversationState> = {},

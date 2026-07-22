@@ -9,7 +9,7 @@
  * Run with: npx tsx webview/src/components/ai-sidebar/conversationRouting.test.ts
  */
 import assert from 'node:assert/strict';
-import { useAISidebarStore, hydrateConversations } from './store';
+import { useAISidebarStore, hydrateConversations, selectActiveConversation } from './store';
 import { createConversationState, type ConversationState } from './conversationState';
 import { resetConversationRoutingWarnings } from './conversationRouting';
 import { vscode } from '../../lib/vscode';
@@ -91,7 +91,11 @@ function testTwoConversationsHoldIndependentRunningState() {
     assert.equal(state.conversations['conv-a'].agentConversation[0].isRunning, true);
     assert.equal(state.conversations['conv-b'].agentConversation[0].isRunning, false);
     // The flat mirror shows the ACTIVE thread only.
-    assert.equal(state.agentConversation[0].id, 'a-1', 'the mirror projects the active thread');
+    assert.equal(
+      selectActiveConversation(state).agentConversation[0].id,
+      'a-1',
+      'the active-conversation selector reads the active thread',
+    );
   } finally {
     resetStore();
   }
@@ -109,7 +113,11 @@ function testSwitchingIsNonDestructiveAndDoesNotResetSessions() {
 
     const state = useAISidebarStore.getState();
     assert.equal(state.activeConversationId, 'conv-b');
-    assert.equal(state.agentConversation[0].id, 'b-1', 'the mirror follows the newly active thread');
+    assert.equal(
+      selectActiveConversation(state).agentConversation[0].id,
+      'b-1',
+      'the active-conversation selector follows the newly active thread',
+    );
     assert.equal(
       state.conversations['conv-a'].agentConversation[0].isRunning,
       true,

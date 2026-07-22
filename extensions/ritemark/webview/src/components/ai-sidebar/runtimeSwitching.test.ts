@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { useAISidebarStore, hydrateConversations } from './store';
+import { useAISidebarStore, hydrateConversations, selectActiveConversation } from './store';
 import { createConversationState, type ConversationState } from './conversationState';
 import { vscode } from '../../lib/vscode';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
@@ -61,7 +61,7 @@ function testSetPendingRuntimeMergesPartialUpdate() {
 
     useAISidebarStore.getState().setPendingRuntime({ runtimeId: 'codex' });
 
-    const { pendingRuntime } = useAISidebarStore.getState();
+    const { pendingRuntime } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(pendingRuntime.runtimeId, 'codex', 'runtimeId should update');
     assert.equal(pendingRuntime.modelId, 'claude-sonnet-4-5', 'modelId should be preserved');
     assert.equal(pendingRuntime.mode, 'ask', 'mode should be preserved');
@@ -78,7 +78,7 @@ function testSetPendingRuntimeModeOnly() {
 
     useAISidebarStore.getState().setPendingRuntime({ mode: 'plan' });
 
-    const { pendingRuntime } = useAISidebarStore.getState();
+    const { pendingRuntime } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(pendingRuntime.runtimeId, 'codex', 'runtimeId should be preserved');
     assert.equal(pendingRuntime.modelId, 'o4-mini', 'modelId should be preserved');
     assert.equal(pendingRuntime.mode, 'plan', 'mode should update');
@@ -111,7 +111,7 @@ function testCancelRequestRoutesToCodexWhenCodexIsRunning() {
       !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'claude-code'),
       'cancelRequest must not send agent-cancel with agentId=claude-code when only Codex is running'
     );
-    const { codexConversation } = useAISidebarStore.getState();
+    const { codexConversation } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(codexConversation[0].isRunning, false, 'cancelled Codex turn must be marked not running');
     assert.equal(codexConversation[0].result?.error, 'Cancelled by user');
   } finally {
@@ -141,7 +141,7 @@ function testCancelRequestRoutesToClaudeWhenClaudeIsRunning() {
       !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'codex'),
       'cancelRequest must not send agent-cancel with agentId=codex when only Claude is running'
     );
-    const { agentConversation } = useAISidebarStore.getState();
+    const { agentConversation } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(agentConversation[0].isRunning, false, 'cancelled Claude turn must be marked not running');
     assert.equal(agentConversation[0].result?.error, 'Cancelled by user');
   } finally {

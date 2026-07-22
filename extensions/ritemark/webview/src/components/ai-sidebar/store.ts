@@ -6,10 +6,9 @@
  *
  * Sprint 99 (R5): the store holds N conversations, not one. `conversations` is
  * the source of truth; `activeConversationId` says which one the user is looking
- * at. The flat conversation fields (`agentConversation`, `codexConversation`,
- * `isStreaming`, …) are a READ-ONLY PROJECTION of the active conversation kept so
- * the existing views keep working — see `conversationState.ts`. Write through the
- * conversation helpers below, never by `set({ agentConversation })`.
+ * at. There are NO flat conversation fields — anything that belongs to a thread
+ * lives in `ConversationState` and is written through the conversation helpers
+ * below. Views read the visible thread with `useActiveConversation()`.
  */
 
 import { create } from 'zustand';
@@ -29,7 +28,6 @@ import {
 import type { LegacyRitemarkConversationRun } from './conversationModel';
 import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult, shouldRequestPlanMode } from './lifecycle';
 import {
-  MIRRORED_CONVERSATION_KEYS,
   createConversationState,
   isConversationEmpty,
   markConversationInterrupted,
@@ -52,7 +50,6 @@ import type {
   AgentInfo,
   ModelOption,
   ChatMessage,
-  ConversationEntry,
   EditorSelection,
   WidgetData,
   AgentConversationTurn,
@@ -194,20 +191,6 @@ function stampConversationId<T extends { conversationId?: string }>(turns: T[], 
   return turns.map((t) => (t.conversationId === conversationId ? t : { ...t, conversationId }));
 }
 
-/** The active conversation's fields, projected onto the store's top level. */
-type ConversationMirror = Pick<AISidebarState, (typeof MIRRORED_CONVERSATION_KEYS)[number]>
-  & { currentConversationId: string };
-
-function projectActiveConversation(conversation: ConversationState): ConversationMirror {
-  const mirror = { currentConversationId: conversation.id } as ConversationMirror;
-  for (const key of MIRRORED_CONVERSATION_KEYS) {
-    // Safe by construction: MIRRORED_CONVERSATION_KEYS is derived from ConversationState
-    // and every entry also exists on AISidebarState with the same type.
-    (mirror as Record<string, unknown>)[key] = conversation[key];
-  }
-  return mirror;
-}
-
 /**
  * A thread open on the rail, as the rail and History need to see it. Derived —
  * never stored — so it cannot drift from `conversations`.
@@ -247,29 +230,6 @@ interface AISidebarState {
   conversations: Record<string, ConversationState>;
   /** Which conversation the sidebar is currently showing. */
   activeConversationId: string | null;
-
-  // ── Active-conversation projection (read-only mirror; see conversationState.ts) ──
-  chatMessages: ChatMessage[];
-  conversationHistory: ConversationEntry[];
-  streamingContent: string;
-  isStreaming: boolean;
-  /** Populated when a saved legacy-ritemark conversation is loaded. Read-only — no send path. */
-  legacyConversation: LegacyRitemarkConversationRun | null;
-  agentConversation: AgentConversationTurn[];
-  codexConversation: CodexConversationTurn[];
-  selectedAgent: AgentId;
-  selectedModel: string;
-  codexSelectedModel: string;
-  /** Full composite value: "opencode:<provider>/<model>" */
-  opencodeSelectedModel: string;
-  // mode = unified approval policy: 'auto' (no prompts) | 'ask' (approve writes/commands) | 'plan'
-  pendingRuntime: PendingRuntimeSelection;
-  dismissedCurrentPlanKey: string | null;
-  estimatedTokens: number;
-  contextUsagePercent: number;
-  showContextWarning: boolean;
-  /** Mirror of `activeConversationId` under its pre-Sprint-99 name. */
-  currentConversationId: string | null;
 
   // ── Codex runtime status (APP-GLOBAL — one binary, one auth) ──
   codexEnabled: boolean;
@@ -455,10 +415,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
   /** Commit a whole conversation object, refreshing the mirror when it is active. */
   function commitConversation(next: ConversationState): void {
     const state = get();
-    set({
-      conversations: { ...state.conversations, [next.id]: next },
-      ...(next.id === state.activeConversationId ? projectActiveConversation(next) : {}),
-    });
+    set({ conversations: { ...state.conversations, [next.id]: next } });
   }
 
   /**
@@ -692,11 +649,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     const nextActive = activeId ? conversations[activeId] : null;
     if (!nextActive) return;
-    set({
-      conversations,
-      activeConversationId: nextActive.id,
-      ...projectActiveConversation(nextActive),
-    });
+    set({ conversations, activeConversationId: nextActive.id });
     syncOpenThreads();
   }
 
@@ -716,7 +669,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     conversations: { [initialConversation.id]: initialConversation },
     activeConversationId: initialConversation.id,
-    ...projectActiveConversation(initialConversation),
 
     codexEnabled: false,
     codexModels: [],
@@ -794,7 +746,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({
         conversations: { ...state.conversations, [conversation.id]: conversation },
         activeConversationId: conversation.id,
-        ...projectActiveConversation(conversation),
       });
       syncOpenThreads();
       return conversation.id;
@@ -811,7 +762,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({
         ...(pruned ? { conversations: pruned } : {}),
         activeConversationId: id,
-        ...projectActiveConversation(target),
         showHistoryPanel: false,
       });
       if (pruned) syncOpenThreads();
@@ -846,7 +796,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       const nextId = Object.values(remaining).sort((a, b) => a.createdAt - b.createdAt)[0];
       if (nextId) {
-        set({ conversations: remaining, activeConversationId: nextId.id, ...projectActiveConversation(nextId) });
+        set({ conversations: remaining, activeConversationId: nextId.id });
         syncOpenThreads();
         return;
       }
@@ -860,7 +810,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({
         conversations: { [fresh.id]: fresh },
         activeConversationId: fresh.id,
-        ...projectActiveConversation(fresh),
       });
       syncOpenThreads();
     },
@@ -1076,8 +1025,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
      */
     buildSelectionContextBlock: () => {
       const state = get();
-      const { selection, activeFilePath, pendingRuntime } = state;
+      const { selection, activeFilePath } = state;
       if (selection.isEmpty || !selection.text) return undefined;
+      // The approval mode is per-thread: frame the block for the thread the
+      // composer is bound to (the active one).
+      const approvalMode = activeConversation()?.pendingRuntime.mode ?? 'auto';
 
       const fileLine = activeFilePath ? `File: ${activeFilePath}\n` : '';
 
@@ -1098,7 +1050,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       // chat suggestions instead of apply_patch calls; strong directive
       // language fixes the mode but earlier line-number disambiguation
       // pointed at the wrong occurrence — replaced with a context window.
-      const isEditMode = pendingRuntime.mode !== 'plan';
+      const isEditMode = approvalMode !== 'plan';
       const header = isEditMode
         ? '[Selection context — Edit mode]'
         : '[Selection context — Plan mode]';
@@ -1662,7 +1614,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({
         conversations: { ...pruned, [id]: restored },
         activeConversationId: id,
-        ...projectActiveConversation(restored),
         showHistoryPanel: false,
       });
       syncOpenThreads();
@@ -1734,11 +1685,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       delete conversations[previousId];
       conversations[fresh.id] = fresh;
 
-      set({
-        conversations,
-        activeConversationId: fresh.id,
-        ...projectActiveConversation(fresh),
-      });
+      set({ conversations, activeConversationId: fresh.id });
       syncOpenThreads();
     },
 
@@ -1839,7 +1786,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             };
           }
 
-          const nextActive = activeId ? conversations[activeId] : null;
           set({
             agenticEnabled: message.agenticEnabled,
             codexEnabled: message.codexEnabled ?? false,
@@ -1861,7 +1807,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             acpProviders,
             byokProviderModels,
             conversations,
-            ...(nextActive ? projectActiveConversation(nextActive) : {}),
           });
           break;
         }
@@ -1878,13 +1823,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               ),
             };
           }
-          const activeId = get().activeConversationId;
-          const nextActive = activeId ? conversations[activeId] : null;
           set({
             opencodeEnabled: message.enabled,
             acpProviders: message.providers,
             conversations,
-            ...(nextActive ? projectActiveConversation(nextActive) : {}),
           });
           break;
         }
@@ -2386,6 +2328,43 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
   };
 });
 
+// ── Reading the active thread ────────────────────────────────────────────────
+
+/**
+ * Placeholder returned when there is no active thread.
+ *
+ * A module-level constant, not a fresh object: `selectActiveConversation` runs
+ * inside `useSyncExternalStore`, which compares the snapshot it gets back by
+ * identity and loops forever ("The result of getSnapshot should be cached") if
+ * the selector mints a new object each call. Everything else the selector can
+ * return is an object the store already owns, so it is stable by construction.
+ *
+ * In practice this is unreachable — the store always keeps at least one open
+ * conversation (`closeConversation` and `clearChat` both create a replacement) —
+ * it exists so callers get a `ConversationState` rather than a nullable.
+ */
+const NO_ACTIVE_CONVERSATION: ConversationState = createConversationState('__no-active-conversation__');
+
+type ActiveConversationSlice = Pick<AISidebarState, 'conversations' | 'activeConversationId'>;
+
+/** The conversation the sidebar is currently showing. Stable reference. */
+export function selectActiveConversation(state: ActiveConversationSlice): ConversationState {
+  const id = state.activeConversationId;
+  return (id ? state.conversations[id] : undefined) ?? NO_ACTIVE_CONVERSATION;
+}
+
+/**
+ * Subscribe to the active thread's state.
+ *
+ * This is THE way a view reads conversation-scoped state — transcripts, runtime
+ * and model selection, per-thread UI flags. Anything genuinely app-global
+ * (connectivity, catalogs, setup status, appearance) stays on the store itself
+ * and is read with `useAISidebarStore` as before.
+ */
+export function useActiveConversation(): ConversationState {
+  return useAISidebarStore(selectActiveConversation);
+}
+
 /**
  * Replace the whole open-thread set. Used by tests and (from Phase 5) by the
  * per-workspace open-thread restore (R13).
@@ -2395,9 +2374,5 @@ export function hydrateConversations(conversations: ConversationState[], activeI
   for (const conversation of conversations) map[conversation.id] = conversation;
   const active = map[activeId];
   if (!active) throw new Error(`hydrateConversations: active id "${activeId}" is not in the provided set`);
-  useAISidebarStore.setState({
-    conversations: map,
-    activeConversationId: activeId,
-    ...projectActiveConversation(active),
-  });
+  useAISidebarStore.setState({ conversations: map, activeConversationId: activeId });
 }

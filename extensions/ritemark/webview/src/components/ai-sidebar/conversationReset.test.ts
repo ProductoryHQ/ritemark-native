@@ -18,7 +18,7 @@
  * Run with: npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts
  */
 import assert from 'node:assert/strict';
-import { useAISidebarStore, hydrateConversations } from './store';
+import { useAISidebarStore, hydrateConversations, selectActiveConversation } from './store';
 import { createConversationState, type ConversationState } from './conversationState';
 import { vscode } from '../../lib/vscode';
 import type { CodexConversationTurn } from './types';
@@ -91,7 +91,7 @@ function testStartNewConversationDoesNotResetProviderSessions() {
     );
     assert.notEqual(state.activeConversationId, firstId, 'a new thread must become active');
     assert.equal(
-      state.codexConversation.length,
+      selectActiveConversation(state).codexConversation.length,
       0,
       'the newly opened thread starts empty'
     );
@@ -128,7 +128,7 @@ function testClearChatResetsOnlyItsOwnProviderSession() {
 
     useAISidebarStore.getState().clearChat();
 
-    assert.equal(useAISidebarStore.getState().agentConversation.length, 0);
+    assert.equal(selectActiveConversation(useAISidebarStore.getState()).agentConversation.length, 0);
     const resets = posted.filter(
       (m): m is { type: string; conversationId?: string } =>
         typeof m === 'object' && m !== null && 'type' in m && (m as { type: string }).type === 'conversation:reset'
@@ -155,7 +155,7 @@ function testDismissedCurrentPlanKeyResetsForNewConversation() {
     useAISidebarStore.getState().startNewConversation();
 
     assert.equal(
-      useAISidebarStore.getState().dismissedCurrentPlanKey,
+      selectActiveConversation(useAISidebarStore.getState()).dismissedCurrentPlanKey,
       null,
       'a newly opened thread must start with no dismissed plan state'
     );
@@ -174,7 +174,7 @@ function testDismissedCurrentPlanKeyResetsForClearChatMessage() {
     useAISidebarStore.getState().handleExtensionMessage({ type: 'clear-chat' });
 
     assert.equal(
-      useAISidebarStore.getState().dismissedCurrentPlanKey,
+      selectActiveConversation(useAISidebarStore.getState()).dismissedCurrentPlanKey,
       null,
       'extension-driven clear-chat must leave the user on a thread with no dismissed plan state'
     );
@@ -190,7 +190,7 @@ function testDismissCurrentPlanStoresKey() {
     useAISidebarStore.getState().dismissCurrentPlan('approved-plan-1');
 
     assert.equal(
-      useAISidebarStore.getState().dismissedCurrentPlanKey,
+      selectActiveConversation(useAISidebarStore.getState()).dismissedCurrentPlanKey,
       'approved-plan-1',
       'dismissing current plan should remember the specific plan key'
     );
@@ -218,10 +218,10 @@ function testNewChatUsesFreshConversationIdSoSessionsDoNotCollapse() {
 
     useAISidebarStore.getState().handleExtensionMessage({ type: 'clear-chat' });
 
-    const { currentConversationId } = useAISidebarStore.getState();
-    assert.ok(currentConversationId, 'a thread is always active');
+    const { activeConversationId } = useAISidebarStore.getState();
+    assert.ok(activeConversationId, 'a thread is always active');
     assert.notEqual(
-      currentConversationId,
+      activeConversationId,
       firstId,
       'new chat must move to a fresh conversation id so the next session does not overwrite the previous one (#135)'
     );
@@ -248,8 +248,8 @@ function testClearChatUsesFreshConversationId() {
 
     useAISidebarStore.getState().clearChat();
 
-    const { currentConversationId, conversations } = useAISidebarStore.getState();
-    assert.notEqual(currentConversationId, firstId, '/clear must move to a fresh conversation id (#135)');
+    const { activeConversationId, conversations } = useAISidebarStore.getState();
+    assert.notEqual(activeConversationId, firstId, '/clear must move to a fresh conversation id (#135)');
     assert.equal(
       conversations[firstId],
       undefined,

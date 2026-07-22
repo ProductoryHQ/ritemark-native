@@ -15,7 +15,7 @@ import {
   SelectSeparator,
   SelectTrigger,
 } from '../ui/select';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, useActiveConversation } from './store';
 import { SelectedContextTab } from './SelectedContextTab';
 import { shouldQueueInsteadOfSend, shouldAutoSendQueuedPrompt, slotFor } from './composerQueue';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
@@ -182,13 +182,17 @@ export function ChatInput() {
   const mentionPopupRef = useRef<AgentMentionPopupHandle>(null);
   const commandPopupRef = useRef<SlashCommandPopupHandle>(null);
 
-  const pendingRuntime = useAISidebarStore((s) => s.pendingRuntime);
-  const isStreaming = useAISidebarStore((s) => s.isStreaming);
-  const agentConversation = useAISidebarStore((s) => s.agentConversation);
+  const {
+    pendingRuntime,
+    isStreaming,
+    agentConversation,
+    codexConversation,
+    selectedAgent,
+    selectedModel,
+    codexSelectedModel,
+    opencodeSelectedModel,
+  } = useActiveConversation();
   const isOnline = useAISidebarStore((s) => s.isOnline);
-  const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
-  const selectedModel = useAISidebarStore((s) => s.selectedModel);
-  const codexSelectedModel = useAISidebarStore((s) => s.codexSelectedModel);
   const agents = useAISidebarStore((s) => s.agents);
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
@@ -219,12 +223,10 @@ export function ChatInput() {
 
   const sendCodexMessage = useAISidebarStore((s) => s.sendCodexMessage);
   const sendOpenCodeMessage = useAISidebarStore((s) => s.sendOpenCodeMessage);
-  const codexConversation = useAISidebarStore((s) => s.codexConversation);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const acpProviders = useAISidebarStore((s) => s.acpProviders);
   const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
   const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
-  const opencodeSelectedModel = useAISidebarStore((s) => s.opencodeSelectedModel);
   const selectOpenCodeModel = useAISidebarStore((s) => s.selectOpenCodeModel);
   const openAgentSettings = useAISidebarStore((s) => s.openAgentSettings);
 
