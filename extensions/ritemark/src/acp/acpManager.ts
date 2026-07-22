@@ -81,9 +81,9 @@ interface AcpSessionState {
    */
   thoughtBuffer: string;
   /**
-   * Set by cancel() when the process could not be killed (siblings live). The
-   * turn keeps running upstream; we drop its updates until it settles so the
-   * user sees an immediate, honest idle state.
+   * Set by cancel(). The turn settles asynchronously even when OpenCode honours
+   * the cancel, so its trailing updates are dropped until it does — otherwise a
+   * chat the user already saw go idle would come back to life.
    */
   cancelRequested: boolean;
 }
@@ -194,10 +194,11 @@ export class AcpManager {
     try {
       result = await client.prompt(sessionId, text);
     } catch (err) {
-      // Cancelling the last session kills the process, which rejects the
-      // in-flight prompt with the SDK's "ACP connection closed". That is the
-      // cancel working, not a failure — surfacing it showed the user a raw
-      // protocol error every time they pressed Stop.
+      // A cancelled turn can reject rather than resolve — historically because
+      // cancelling killed the process ("ACP connection closed"), and still
+      // possible if the connection drops mid-turn. Either way it is the cancel
+      // working, not a failure: surfacing it showed the user a raw protocol
+      // error every time they pressed Stop.
       if (state.cancelRequested) {
         state.cancelRequested = false;
         this.flushThoughts(state);

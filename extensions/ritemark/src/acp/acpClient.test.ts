@@ -233,7 +233,13 @@ async function run() {
     // kills the process. The subprocess is shared by every conversation, and
     // discarding a warm one would force a cold start on the next prompt.
     assert.ok(client.isRunning(), 'cancel must leave the shared process running');
+
+    // ...but dispose() still must. Removing the kill from cancel() left nothing
+    // asserting that teardown actually tears down; without this, a later edit
+    // could drop it from dispose() too and no test would notice.
     client.dispose();
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(!client.isRunning(), 'dispose() must kill the process');
   }
 
 

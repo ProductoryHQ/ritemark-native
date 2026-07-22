@@ -22,10 +22,13 @@
 #   ./scripts/verify-agent-runtimes.sh              # all checks
 #   ./scripts/verify-agent-runtimes.sh --versions   # version discovery only (fast)
 #
-# Exit non-zero if any check FAILS. Checks that cannot run (missing binary,
-# no network, no model available) report SKIP and do NOT fail the run — a skip
-# is an honest "not proven", and must be carried into the matrix as such rather
-# than quietly counted as a pass.
+# Exit non-zero if any check FAILS. Most checks that cannot run (missing binary,
+# SDK not installed) report SKIP rather than failing — a skip is an honest "not
+# proven" and must reach the matrix as such rather than being counted as a pass.
+#
+# The permission gate is the deliberate exception: if it cannot be exercised it
+# reports FAIL, not SKIP. It is the entire safety boundary for that runtime, so
+# "we could not check it" and "it is broken" deserve the same answer here.
 #
 set -u
 

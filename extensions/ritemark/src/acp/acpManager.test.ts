@@ -107,9 +107,9 @@ function makeTaggedManager(events: Array<{ sessionId: string; p: AgentProgress }
 }
 
 /**
- * Cancelling the last session kills the process, which rejects the in-flight
- * session/prompt with the SDK's "ACP connection closed". That is the cancel
- * working — it must not reach the user as a turn error.
+ * A cancelled turn can reject rather than resolve — it used to, because
+ * cancelling killed the process. Either way that is the cancel working and must
+ * not reach the user as a turn error.
  */
 async function testSoleSessionCancelReportsCancelledNotError(): Promise<void> {
   const events: AgentProgress[] = [];

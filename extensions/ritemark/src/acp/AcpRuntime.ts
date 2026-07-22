@@ -135,7 +135,7 @@ export class AcpSession implements RuntimeSession {
     try {
       await this._runtime.getManager()?.cancel(this.acpSessionId);
     } catch {
-      // Process may already be gone if this was the last session and it was killed.
+      // Best-effort: the session may already have settled or the connection dropped.
     }
     this._runtime._forgetSession(this);
   }

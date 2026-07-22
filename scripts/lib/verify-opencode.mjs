@@ -114,8 +114,18 @@ async function runCancel() {
       sessionId: s.sessionId,
       prompt: [{ type: 'text', text: 'Count slowly from 1 to 100, one number per line, with a short comment after each.' }],
     });
-    await new Promise((r) => setTimeout(r, 4000));
+    // Wait for streaming to actually START before cancelling. A fixed sleep can
+    // expire before the first chunk, and then `chunks 0->0` proves only that an
+    // idle turn settles — not that an in-flight one stops.
+    const deadline = Date.now() + 30000;
+    while (state.chunks === 0 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
     const atCancel = state.chunks;
+    if (atCancel === 0) {
+      proc.kill('SIGTERM');
+      return { skipped: true, error: 'no streaming started within 30s — cancel not exercised mid-flight' };
+    }
     conn.cancel({ sessionId: s.sessionId });
     const settled = await Promise.race([
       turn.then((r) => ({ ok: true, r })),
