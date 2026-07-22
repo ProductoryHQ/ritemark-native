@@ -145,7 +145,7 @@ Practical rule for this sprint: any code comment, test fixture, or workaround th
 - [ ] Author `spec.md` (R1-R7, acceptance criteria)
 - [ ] Author `scenarios.md` (BDD examples incl. negative cases)
 - [ ] Author `technical-plan.md` (workstreams, message shapes, ACP decision)
-- [ ] Jarmo approves the completed SDD artifact set (in addition to this sprint-plan.md)
+- [x] Jarmo approves the completed SDD artifact set (in addition to this sprint-plan.md)
 
 ### Phase 1: Foundation — interface + webview store reshape (R1, R5)
 - [ ] `AgentRuntime.ts` interface: add session-handle parameter to all methods
@@ -219,7 +219,25 @@ This step sits BEFORE `qa-validator` sign-off and before any release gate. It is
 ## Status
 
 **Track:** SDD
-**Current Phase:** 3 (BUILD) — Phase 2 complete: [`spec.md`](spec.md) (R1–R15), [`scenarios.md`](scenarios.md) (75 scenarios), [`technical-plan.md`](technical-plan.md) all authored; singleton audit done
+**Current Phase:** 6 (COMPLETE) — all requirements implemented, dev-validated by both Claude and Jarmo, architecture gate met.
+
+**Delivered:** session-per-conversation `AgentRuntime` across all three runtimes; conversation-scoped
+webview store and message routing; the thread rail; per-thread composer queues and persistence;
+browser-tool serialization; a working `parallelChats` kill-switch.
+
+**Latent defects found and fixed along the way** (none were in scope; all were pre-existing or would
+have shipped): Codex scalars silently destroying a sibling conversation's thread context; a
+cross-chat write-approval bypass in ACP; `AgentSession` single-slot pending approvals hanging a tool
+call on ONE conversation; New Chat disposing every conversation's session; OpenCode surfacing a raw
+protocol error on Stop; Codex cancel stranding outstanding approvals.
+
+**Verified by Jarmo in dev:** plan-mode question cards (Claude + Codex), dark theme, rail geometry
+and colour harmony. **Verified by automation:** approvals both directions, cancel on all three
+runtimes, conversation switching without teardown, two threads streaming at once.
+
+**Known limitations, recorded not hidden:** one shared browser (per-chat browsers are shell-tier);
+Codex's slow first turn after a cancel is observed but NOT diagnosed — no reproducer, so no fix
+attempted; most of `scenarios.md` is covered by unit tests rather than end-to-end runs.
 **Approval Required:** Plan approved by Jarmo 2026-07-21 ("approved", then "proceed")
 
 ## Approval
