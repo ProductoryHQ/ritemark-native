@@ -183,7 +183,7 @@ export function AISidebar() {
             and the rail stops at the composer boundary. Do not nest ChatInput
             inside this flex row — that was the explicit correction from Jarmo.
           */}
-          <div className="flex-1 min-h-0 flex overflow-hidden">
+          <div className="flex-1 min-h-0 flex overflow-hidden border-t border-[var(--r-hairline)]">
             <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
               {agentConversation.length > 0 || codexConversation.length > 0
                 ? <UnifiedConversationView />

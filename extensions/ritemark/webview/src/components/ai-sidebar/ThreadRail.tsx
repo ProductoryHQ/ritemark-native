@@ -42,7 +42,7 @@ import type { OpenThreadSummary } from './store';
 function StatusBadge({ status, isActive }: { status: OpenThreadSummary['status']; isActive: boolean }) {
   // The badge sits on a ring of the icon's own background so it reads as a
   // separate mark rather than smudging into the glyph underneath.
-  const ringColor = isActive ? 'var(--r-accent-soft)' : 'var(--r-surface-muted)';
+  const ringColor = isActive ? 'var(--r-rail-active)' : 'var(--r-surface-muted)';
 
   if (status === 'attention') {
     return (
@@ -91,9 +91,9 @@ function ThreadIcon({ thread, onSelect, onClose, registerRef }: ThreadIconProps)
       aria-current={thread.isActive ? 'true' : undefined}
       data-thread-id={thread.id}
       data-thread-status={thread.status}
-      className={`group relative w-[30px] h-[30px] shrink-0 flex items-center justify-center rounded-[5px] transition-colors ${
+      className={`group relative w-[28px] h-[28px] shrink-0 flex items-center justify-center rounded-[8px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--r-surface-muted)] ${
         thread.isActive
-          ? 'bg-[var(--r-accent-soft)]'
+          ? 'bg-[var(--r-rail-active)]'
           : 'hover:bg-[var(--r-surface-soft)]'
       }`}
     >
@@ -115,7 +115,7 @@ function ThreadIcon({ thread, onSelect, onClose, registerRef }: ThreadIconProps)
           aria-label={`Close ${thread.title}`}
           title="Close thread (stays in History)"
           onClick={(e) => { e.stopPropagation(); onClose(thread.id); }}
-          className="hidden group-hover:flex absolute -top-[1px] -right-[1px] w-[14px] h-[14px] rounded-full items-center justify-center z-[5] cursor-pointer bg-[var(--r-surface)] border border-[var(--r-hairline-strong)] text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]"
+          className="hidden group-hover:flex absolute -top-[4px] -right-[1px] w-[14px] h-[14px] rounded-full items-center justify-center z-[5] cursor-pointer bg-[var(--r-surface)] border border-[var(--r-hairline-strong)] text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]"
         >
           <Icon name="x" size={12} tone="inherit" className="scale-[0.7]" />
         </span>
@@ -133,7 +133,7 @@ function RailButton({ icon, label, onClick }: { icon: 'plus' | 'clock-counter-cl
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="relative w-[30px] h-[30px] shrink-0 flex items-center justify-center rounded-[5px] text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)] transition-colors"
+      className="relative w-[28px] h-[28px] shrink-0 flex items-center justify-center rounded-[8px] text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--r-surface-muted)]"
     >
       <Icon name={icon} size={16} tone="inherit" />
     </button>
