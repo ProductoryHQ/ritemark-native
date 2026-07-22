@@ -71,6 +71,21 @@ The load-bearing boundary. The TipTap editor cannot read files, make AI calls, o
 
 ---
 
+### Conversation scoping (Sprint 99)
+
+Every message that concerns a conversation carries `conversationId` at the top level — inbound
+(`agent-execute`, `agent-cancel`, `agent-approve`, `agent-answer-question`, `codex-answer-question`,
+`conversation:reset`) and outbound (`agent-progress`, `agent-result`, `agent-question`,
+`agent-approval-request`, `codex-streaming`, `codex-progress`, `codex-result`, `codex-question`,
+`codex-plan-text-delta`, `codex-plan-update`, `codex-rpc-progress`).
+
+**An inbound message with an unknown `conversationId` is dropped with a warning, never delivered to
+the active conversation.** Falling back to "whatever is on screen" is the bug class parallel chats
+exist to remove.
+
+`UnifiedApprovalRequest` gained `conversationId`; adapters do not set it, the view provider stamps
+it where the callback already closes over the conversation.
+
 ## Subsystem Map (current, post-Sprint 78)
 
 ```
@@ -98,6 +113,53 @@ Entry point `extension.ts` registers all providers, commands, and views.
 ---
 
 ## Agent Runtime Architecture
+
+### Sessions (Sprint 99)
+
+`AgentRuntime` is an adapter — **one instance per runtime KIND**, held by `RuntimeRegistry`. It
+mints **one `RuntimeSession` per conversation**:
+
+```ts
+interface AgentRuntime {
+  createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession>;
+  getStatus(): Promise<RuntimeStatus>;   // adapter-level: binary + auth, NOT per-conversation
+  dispose(): void;                        // every session
+}
+interface RuntimeSession {
+  readonly conversationId: string;
+  prompt(turn); cancel(); respondToApproval(...); dispose();   // this conversation only
+}
+```
+
+Before Sprint 99, `start()`/`prompt()`/`cancel()` lived on the adapter and `start()` ran on EVERY
+turn against the shared instance — so a second conversation overwrote the first one's callbacks. A
+session OBJECT rather than an id parameter, because `RuntimeSessionConfig` already carries the
+per-turn callbacks: letting them close over the conversation means a callback *cannot* fire against
+another one, instead of merely being told not to.
+
+`getStatus()` stays adapter-level deliberately — per-conversation status would imply a
+per-conversation binary.
+
+Per-runtime session mapping, and the shared thing each keeps:
+
+| Runtime | Session is | Shared across sessions |
+|---|---|---|
+| Claude Code | one `AgentSession` (`AgentRunner.ts`) | nothing — the SDK is per-session |
+| Codex | one app-server **thread** | ONE `codex-app-server` process, one listener registration; events route by `params.threadId` |
+| OpenCode / ACP | one ACP **session** | ONE subprocess (measured: 339 MB for 5 sessions vs 1291 MB for 5 processes) |
+
+Sprint 99 fixed three concurrency defects that the single-conversation shape had hidden:
+`CodexRuntime` held `_threadApprovalKey`/`_browserToolsEnabledForThread` as scalars whose mismatch
+nulled `_threadId`, so one conversation switching Auto↔Ask would have silently destroyed another's
+thread context; `AcpRuntime._recentlyPermissionedWrites` was a process-wide `Set<filePath>`, a
+cross-chat approval bypass; and `AgentSession` held single-slot pending-approval fields that
+overwrote each other when the model emitted two `tool_use` blocks in one message — a live bug on one
+conversation, not just a concurrency risk.
+
+**Browser tools are serialized across conversations** (`BrowserActionTools.callBrowserAction`). There
+is one integrated browser and one active tab, so tool calls are commands against shared state.
+Per-chat browsers would need per-chat tab ownership in the workbench — shell-tier, out of scope.
+
 
 ### AS IS (Sprints 1–78) — Three Parallel Worlds
 
@@ -436,6 +498,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-07-22 | Sprint 99 | **Parallel agent chats, v1.8.5.** `AgentRuntime.start()/prompt()/cancel()` replaced by `createSession(conversationId, config)` → `RuntimeSession`; one adapter per runtime KIND minting one session per conversation. `getStatus()` stays adapter-level. All three adapters hold session maps: Codex keeps one shared app-server process and one listener registration, routing by `params.threadId`; OpenCode runs N ACP sessions in ONE subprocess (spike-measured 339 MB for 5 sessions vs 1291 MB for 5 processes); Claude holds one `AgentSession` each — the audit found `AgentRunner` has no module-level singleton, so it was already a clean per-conversation unit. Webview store keyed by conversation with routing by `conversationId` and unknown ids DROPPED rather than misrouted. New thread rail (right edge, "+"/History pinned, one shared Phosphor `robot` tinted per runtime, one status slot where amber attention overrides the running spinner). Browser tools serialized across conversations — one browser, one active tab; per-chat browsers are shell-tier and out of scope. Three latent defects fixed: Codex scalar `_threadApprovalKey`/`_browserToolsEnabledForThread` silently destroying a sibling's thread context, `AcpRuntime._recentlyPermissionedWrites` as a cross-chat approval bypass, and `AgentSession`'s single-slot pending approvals overwriting each other (a live bug on ONE conversation). Also fixed in dev-validation: New Chat disposed every conversation's session, leaving a visible transcript whose agent had forgotten it. Touches #95/#97/#140 without resolving them. |
 | 2026-07-21 | Sprint 98 | **Safe extension-update lane (GH #142), v1.8.5.** Two structural changes after the 1.8.3-ext.1 incident, where an update shipped a delta-only package and the extension died at module load (`require('pdfkit')`) before `activate()` — taking every extension-side recovery path down with it. (1) **Patch 012 (shell watchdog)** hooks `mainThreadExtensionService.$onExtensionActivationError` — verified to receive module-load throws — and renames the failing USER-dir copy of `ritemark.ritemark` so the scanner marks it invalid and filters it out, then prompts a reload onto the bundled built-in. Scoped by extension id + `extensionLocation` matching an `ExtensionType.User` install; gating on `isBuiltin` would be wrong because `dedupExtensions` rewrites it to `true` on a winning user copy. Inserted before the `isDev` early-return, which would otherwise skip it in production. (2) **`applyUpdate` is now clone-then-overlay**: it clones the bundled built-in extension (resolved from `vscode.env.appRoot`, never `getExtension().extensionPath` — that returns the user copy and would perpetuate corruption) and overlays the manifest delta, so an incomplete manifest degrades to stale files instead of an unloadable extension. Adds installer-layer `minimumAppVersion` enforcement, manifest path containment at both validation and write time, `UpdateFile.op: 'write' \| 'delete'` (deletions only became expressible once absent started meaning "inherited"), a validity probe so a broken install no longer short-circuits a corrected re-release, and `applyUpdate.test.ts` closing that function's previous zero coverage. Also: publish-side completeness + install-and-activate guards, and a `ritemark.updates.channel` canary ring. **Lane stays CLOSED until the watchdog ships and one trivial ext update passes end-to-end.** |
 | 2026-07-12 | Sprint 93 | `src/update/` gains two modules: `updateStatusBar.ts` ("Relaunch to update" status-bar affordance) and `activationIntegrity.ts` (N-1 rollback + activation-crash quarantine). New `ritemark.updates.mode` setting (`auto`/`prompt`) governs silent vs. prompted extension-tier updates; full-app updates unaffected. `release-extension.sh` (renamed from `create-extension-release.sh`) + new `release-extension-preflight.sh` are the one-command extension-release path, gated by the new shell/extension release-tier rule (`CLAUDE.md` "Release Tiers"). |
 | 2026-06-06 | Baseline | Initial document (agent runtime scope). Captures AS IS post-Sprint 78: 3 runtimes, 2 browser integration patterns, 3 model config locations. Defines TO BE for Sprint 79 (runtime adapter unification). |
