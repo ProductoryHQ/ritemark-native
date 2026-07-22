@@ -125,7 +125,8 @@ export function resolveUpdate(input: ResolveUpdateInput): ResolvedUpdateResult {
   );
   if (bestExtensionRelease) {
     const manifest = toExtensionManifest(bestExtensionRelease);
-    const totalSize = bestExtensionRelease.files.reduce((sum, file) => sum + file.size, 0);
+    // Delete entries carry no size — they contribute nothing to the download.
+    const totalSize = bestExtensionRelease.files.reduce((sum, file) => sum + (file.size ?? 0), 0);
 
     return {
       action: 'extension',
