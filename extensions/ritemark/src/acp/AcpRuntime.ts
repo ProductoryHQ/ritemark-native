@@ -149,7 +149,17 @@ export class AcpSession implements RuntimeSession {
   dispose(): void {
     this.rejectPendingApprovals();
     this.recentlyPermissionedWrites.clear();
-    this._runtime.getManager()?.closeSession(this.acpSessionId);
+
+    // Cancel BEFORE forgetting the session. closeSession() only drops local
+    // state, so without this the upstream turn keeps running against a
+    // conversation nobody is watching. The approval gate does hold — an
+    // unroutable permission is cancelled and an unroutable write denied
+    // (see _handlePermission / _handleWriteApproval) — but leaving a turn
+    // executing after the user discarded its conversation is wrong on its own,
+    // and burns tokens with no way to observe or stop it.
+    const manager = this._runtime.getManager();
+    void manager?.cancel(this.acpSessionId).catch(() => { /* disposing anyway */ });
+    manager?.closeSession(this.acpSessionId);
     this._runtime._forgetSession(this);
   }
 

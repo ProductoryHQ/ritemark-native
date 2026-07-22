@@ -88,6 +88,31 @@ function addSession(runtime: AcpRuntime, conversationId: string, config?: Runtim
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+/**
+ * Codex review (PR #158): disposing a session must cancel the upstream turn.
+ *
+ * closeSession() only drops local state, so without a cancel the remote turn
+ * keeps running against a conversation nobody is watching. The approval gate
+ * does hold — unroutable permissions are cancelled and unroutable writes denied
+ * — but a turn executing after the user discarded its conversation is wrong on
+ * its own, and burns tokens with no way to observe or stop it.
+ */
+async function testDisposeCancelsUpstreamTurn(): Promise<void> {
+  const runtime = new AcpRuntime();
+  const session = addSession(runtime, 'conv-dispose');
+
+  calls.length = 0;
+  session.dispose();
+  await new Promise((r) => setImmediate(r));   // dispose fires cancel without awaiting
+
+  assert.ok(calls.includes('cancel'), 'dispose() must cancel the session, not just forget it');
+  assert.ok(
+    calls.indexOf('cancel') < calls.indexOf('closeSession') || !calls.includes('closeSession'),
+    'the cancel must be issued before the session is dropped',
+  );
+  console.log('✓ Test 9: dispose() cancels the upstream turn before forgetting the session');
+}
+
 async function run() {
   // Test 1: AcpRuntime structurally satisfies AgentRuntime
   {
@@ -239,7 +264,9 @@ async function run() {
     console.log('✓ Test 8: unroutable write is denied');
   }
 
-  console.log('\nAll 8 AcpRuntime tests passed!');
+  await testDisposeCancelsUpstreamTurn();
+
+  console.log('\nAll 9 AcpRuntime tests passed!');
 }
 
 run().then(

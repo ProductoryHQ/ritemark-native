@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-07-15 (Sprint 94 — comment callouts)
+**Last updated:** 2026-07-22 (Sprint 99 — parallel agent chats: runtime sessions + conversation-scoped protocol)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
