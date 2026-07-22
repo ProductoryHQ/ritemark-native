@@ -257,6 +257,20 @@ else
 fi
 echo ""
 
+# Sprint 98 (#142): the bundled extension is the base layer every future
+# over-the-air ext update is cloned from (copy-then-overlay installer). If it is
+# missing a runtime dependency or an asset family, the incomplete copy is baked
+# into the shell release AND into every ext update built on top of it. Blocking,
+# never a warning. Also asserts the version floor above actually took effect.
+echo "Verifying bundled extension completeness..."
+if "$PROJECT_DIR/scripts/check-bundled-extension-complete.sh" "$EXT_DEST"; then
+  echo -e "${GREEN}Bundled extension is runtime-complete${NC}"
+else
+  echo -e "${RED}ERROR: Bundled extension is incomplete — refusing to ship this build${NC}"
+  exit 1
+fi
+echo ""
+
 # =============================================================================
 # Step 4.5: Remove unwanted built-in extensions (VS Code 1.117+)
 # Microsoft started bundling GitHub Copilot Chat + Mermaid Chat Features as

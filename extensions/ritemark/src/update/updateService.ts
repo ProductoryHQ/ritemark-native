@@ -19,6 +19,8 @@ import { UserExtensionInstaller } from './userExtensionInstaller';
 import { UpdateManifest, getTotalDownloadSize } from './updateManifest';
 import {
   fetchUpdateFeed,
+  feedUrlForChannel,
+  STABLE_UPDATE_FEED_URL,
 } from './updateFeed';
 import { resolveUpdate, ResolvedUpdateResult } from './updateResolver';
 import {
@@ -253,7 +255,25 @@ export class UpdateService {
   private async resolveLatestUpdate(): Promise<ResolvedUpdateResult> {
     const currentAppVersion = getCurrentAppVersion();
     const currentExtensionVersion = getCurrentVersion();
-    const feed = await fetchUpdateFeed();
+    // Sprint 98: `canary` points at the pre-release verification ring so an ext
+    // release can be proven on one machine before it reaches the public feed.
+    const channel = vscode.workspace
+      .getConfiguration('ritemark.updates')
+      .get<string>('channel', 'stable');
+    let feed = await fetchUpdateFeed(feedUrlForChannel(channel));
+
+    // The canary ring is for EXTENSION pre-release verification only — full app
+    // releases are the same for everyone. The canary feed's fullReleases are a
+    // snapshot taken when it was seeded, and a later shell release only updates
+    // stable, so trusting them would quietly stop offering app updates to the
+    // very people testing pre-release builds. Take extensionReleases from the
+    // chosen channel and fullReleases from stable, always.
+    if (feed && channel === 'canary') {
+      const stable = await fetchUpdateFeed(STABLE_UPDATE_FEED_URL);
+      if (stable) {
+        feed = { ...feed, fullReleases: stable.fullReleases };
+      }
+    }
 
     if (feed) {
       this.lastKnownFeedSource = 'feed';

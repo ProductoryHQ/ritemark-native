@@ -9,8 +9,34 @@ import { UpdateManifest, UpdateFile } from './updateManifest';
 
 const REPO_OWNER = 'jarmo-productory';
 const REPO_NAME = 'ritemark-public';
-export const DEFAULT_UPDATE_FEED_URL =
+
+/** Public ring. Always the CURRENT `latest` GitHub release, so prereleases never reach it. */
+export const STABLE_UPDATE_FEED_URL =
   `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/update-feed.json`;
+
+/**
+ * Pre-release verification ring (Sprint 98). A fixed `canary` tag release whose
+ * `update-feed.json` asset is republished (`gh release upload --clobber`) on every
+ * ext publish. An ext release lands here first; `scripts/promote-extension-release.sh`
+ * merges it into the stable feed only after it has been verified.
+ */
+export const CANARY_UPDATE_FEED_URL =
+  `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/canary/update-feed.json`;
+
+export const DEFAULT_UPDATE_FEED_URL = STABLE_UPDATE_FEED_URL;
+
+export type UpdateChannel = 'stable' | 'canary';
+
+/**
+ * Resolve the feed URL for a channel. Anything unrecognised (including a typo in
+ * the user's settings) falls back to stable — a broken channel value must never
+ * silently opt someone OUT of stable updates.
+ *
+ * Mirror of `CHANNELS` in scripts/generate-update-feed.mjs — keep both in sync.
+ */
+export function feedUrlForChannel(channel: string | undefined): string {
+  return channel === 'canary' ? CANARY_UPDATE_FEED_URL : STABLE_UPDATE_FEED_URL;
+}
 
 export interface UpdateFeedPlatformAsset {
   platform: string;
@@ -31,9 +57,12 @@ export interface UpdateFeedFullRelease {
 
 export interface UpdateFeedExtensionFile {
   path: string;
-  downloadUrl: string;
-  size: number;
-  sha256: string;
+  /** 'delete' removes an inherited file; absent means write (the default). */
+  op?: 'write' | 'delete';
+  /** Required for writes, absent for deletes. */
+  downloadUrl?: string;
+  size?: number;
+  sha256?: string;
 }
 
 export interface UpdateFeedExtensionRelease {
@@ -51,7 +80,7 @@ export interface UpdateFeedExtensionRelease {
 export interface UpdateFeed {
   schemaVersion: number;
   generatedAt: string;
-  channel: 'stable';
+  channel: UpdateChannel;
   fullReleases: UpdateFeedFullRelease[];
   extensionReleases: UpdateFeedExtensionRelease[];
 }
@@ -89,8 +118,20 @@ function parseExtensionFile(value: unknown): UpdateFeedExtensionFile | null {
     return null;
   }
 
-  const { path, downloadUrl, size, sha256 } = value;
-  if (!isString(path) || !isString(downloadUrl) || !isString(sha256) || !isNumber(size)) {
+  const { path, op, downloadUrl, size, sha256 } = value;
+  if (!isString(path)) {
+    return null;
+  }
+
+  // A delete entry names a path to remove and carries no download metadata.
+  // Requiring downloadUrl/size/sha256 for every entry silently DROPPED deletes,
+  // so a release that removed a file inherited from the bundled base left the
+  // stale file installed.
+  if (op === 'delete') {
+    return { path, op: 'delete' };
+  }
+
+  if (!isString(downloadUrl) || !isString(sha256) || !isNumber(size)) {
     return null;
   }
 
@@ -180,7 +221,9 @@ export function parseUpdateFeed(json: string): UpdateFeed | null {
     return {
       schemaVersion: 1,
       generatedAt: parsed.generatedAt,
-      channel: parsed.channel === 'stable' ? 'stable' : 'stable',
+      // A feed that declares no (or an unknown) channel is treated as stable —
+      // that is what every feed generated before Sprint 98 looks like.
+      channel: parsed.channel === 'canary' ? 'canary' : 'stable',
       fullReleases,
       extensionReleases
     };
@@ -226,12 +269,18 @@ export function findPlatformAsset(
 }
 
 export function toExtensionManifest(release: UpdateFeedExtensionRelease): UpdateManifest {
-  const files: UpdateFile[] = release.files.map(file => ({
-    path: file.path,
-    url: file.downloadUrl,
-    size: file.size,
-    sha256: file.sha256
-  }));
+  const files: UpdateFile[] = release.files.map(file => (
+    file.op === 'delete'
+      // Without this the entry would fall through as a write with no url, and
+      // the installer would refuse the whole update.
+      ? { path: file.path, op: 'delete' as const }
+      : {
+          path: file.path,
+          url: file.downloadUrl,
+          size: file.size,
+          sha256: file.sha256
+        }
+  ));
 
   return {
     version: release.version,
