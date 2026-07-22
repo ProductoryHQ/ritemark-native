@@ -317,7 +317,7 @@ function testKillSwitchCollapsesToOneConversation(): void {
   const store = useAISidebarStore;
 
   // Flag OFF: "new chat" replaces rather than adds.
-  seedThreads([{ prompt: 'seeded work' }]);
+  seedThreads([{ userPrompt: 'seeded work' }]);
   store.setState({ parallelChatsEnabled: false });
   store.getState().requestNewThread();
   assert.strictEqual(
@@ -327,7 +327,7 @@ function testKillSwitchCollapsesToOneConversation(): void {
 
   // Flag ON: the same action opens an ADDITIONAL thread. Seeded non-empty,
   // because R10 would otherwise correctly refocus the blank left by the step above.
-  seedThreads([{ prompt: 'seeded work' }]);
+  seedThreads([{ userPrompt: 'seeded work' }]);
   store.setState({ parallelChatsEnabled: true });
   store.getState().requestNewThread();
   assert.strictEqual(
