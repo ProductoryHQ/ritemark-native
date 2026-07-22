@@ -341,26 +341,17 @@ give is the scenario suite in `scenarios.md`, most of which needs UI that does n
 [[project_feature_flags_no_ui]]). Flag OFF collapses to the most-recently-active conversation; the
 others stay in History (spec §6).
 
-**Phase-1 finding — the flag does not yet gate anything user-visible.** There is no generic flag
-channel to the AI-sidebar webview. Individual flags reach it as bespoke booleans inside the
-`agent:config` message (`agenticEnabled`, `codexEnabled`, `opencodeEnabled`); Flows has its own
-separate `flow:featureFlags` message. `parallelChats` is registered and readable host-side, but the
-webview cannot currently read it, and the Phase-1 agent correctly declined to invent plumbing for it.
+**Closed (2026-07-22): option A shipped.** The host now sends `parallelChatsEnabled` in
+`agent:config` alongside the three flags already carried there, and the webview gates on it:
+the rail is not rendered, "new chat" reverts to replacing the current conversation (`clearChat`
+still saves the outgoing thread to History, so nothing is lost), and History goes back to
+load-in-place since there is no rail to reopen onto. The webview default is `true` and an absent
+field is treated as enabled, so a config message that never arrives cannot silently disable a
+shipped feature — turning it off has to be deliberate.
 
-Since parallel chats are overwhelmingly a webview-side behaviour, the kill-switch is not real until
-this is closed. **Decision needed before Phase 5** (recorded here so it is not discovered at sprint
-end): either add a `parallelChats` boolean to `agent:config` — cheapest, consistent with the three
-flags already carried there — or introduce a general flags message for the sidebar, which is the
-better shape but is scope this sprint did not plan for. Default recommendation: the `agent:config`
-boolean, and note the general channel as follow-up debt in `architecture.md`.
-
-## 10. Sprint 100 coordination
-
-Every version-keyed workaround carries a grep-able `// Sprint 100: re-check against <version>`
-marker. Known at plan time: ACP `session/cancel` `-32601` (C3), ACP model selection via
-`setSessionConfigOption`, and Claude's `Map<conversationId, AgentSession>` design, which must be
-re-verified against the 2.1.210 + bumped-SDK tuple. Sprint 100's compatibility matrix gains a
-parallel-sessions row per runtime.
+Option B — a general flag channel to the sidebar — remains the better shape and is now the fourth
+hand-plumbed boolean's worth of evidence for it. Recorded as debt rather than done: it is a
+refactor of the whole webview flag surface, which this sprint did not plan for.
 
 ---
 

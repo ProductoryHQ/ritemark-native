@@ -307,3 +307,35 @@ function seedThreads(specs: Array<Partial<AgentConversationTurn>>): string[] {
 }
 
 console.log('threadRail.test.ts: all assertions passed');
+
+/**
+ * R15 kill-switch. Parallel chats are almost entirely webview behaviour, so the
+ * flag has to actually change what the store does — otherwise it is decorative
+ * and the feature ships with no way to turn it off.
+ */
+function testKillSwitchCollapsesToOneConversation(): void {
+  const store = useAISidebarStore;
+
+  // Flag OFF: "new chat" replaces rather than adds.
+  seedThreads([{ prompt: 'seeded work' }]);
+  store.setState({ parallelChatsEnabled: false });
+  store.getState().requestNewThread();
+  assert.strictEqual(
+    Object.keys(store.getState().conversations).length, 1,
+    'with the flag off, a new chat must replace the current thread, not open an additional one',
+  );
+
+  // Flag ON: the same action opens an ADDITIONAL thread. Seeded non-empty,
+  // because R10 would otherwise correctly refocus the blank left by the step above.
+  seedThreads([{ prompt: 'seeded work' }]);
+  store.setState({ parallelChatsEnabled: true });
+  store.getState().requestNewThread();
+  assert.strictEqual(
+    Object.keys(store.getState().conversations).length, 2,
+    'with the flag on, a new chat opens an additional thread',
+  );
+
+  console.log('✓ kill-switch: flag off collapses to one conversation');
+}
+
+testKillSwitchCollapsesToOneConversation();

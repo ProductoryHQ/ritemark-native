@@ -217,6 +217,13 @@ interface AISidebarState {
 
   // ── Agent config: catalogs + availability (APP-GLOBAL) ──
   agenticEnabled: boolean;
+  /**
+   * Sprint 99 kill-switch (R15). When false the sidebar behaves as it did before
+   * parallel chats: no rail, one conversation at a time, and "new chat" replaces
+   * rather than adds. Defaults to TRUE so a config message that never arrives
+   * cannot silently disable a shipped feature — the host turns it off explicitly.
+   */
+  parallelChatsEnabled: boolean;
   agents: AgentInfo[];
   models: ModelOption[];
 
@@ -660,6 +667,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     ready: false,
 
     agenticEnabled: false,
+    parallelChatsEnabled: true,
     agents: [],
     models: [],
 
@@ -822,10 +830,20 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     },
 
     requestNewThread: () => {
+      const state = get();
+
+      // Kill-switch (R15): with parallel chats off, "new chat" means what it used
+      // to — replace the current conversation rather than open an additional one.
+      // clearChat saves the outgoing thread to History, so nothing is lost.
+      if (!state.parallelChatsEnabled) {
+        get().clearChat();
+        set({ showHistoryPanel: false });
+        return;
+      }
+
       // R10: one empty thread at a time — "+" refocuses the blank that exists
       // rather than stacking another. Checked across the whole open set, not
       // just the active thread, so a blank parked in the background is reused.
-      const state = get();
       const existingEmpty = Object.values(state.conversations)
         .sort((a, b) => a.createdAt - b.createdAt)
         .find(isConversationEmpty);
@@ -848,6 +866,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       // Already on the rail → this is just a switch, and the cap is irrelevant.
       if (state.conversations[id]) {
         get().switchConversation(id);
+        return;
+      }
+
+      // Kill-switch: without parallel chats there is no rail to reopen ONTO, so
+      // History goes back to load-in-place.
+      if (!state.parallelChatsEnabled) {
+        get().loadSavedConversation(id);
         return;
       }
       // Resolved Gap 3: a reopened thread is an open thread, so it obeys the
@@ -1788,6 +1813,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
           set({
             agenticEnabled: message.agenticEnabled,
+            parallelChatsEnabled: message.parallelChatsEnabled !== false,
             codexEnabled: message.codexEnabled ?? false,
             agents: message.agents,
             models: newClaudeModels,

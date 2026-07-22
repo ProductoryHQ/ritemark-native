@@ -32,6 +32,7 @@ export function AISidebar() {
   const handleMessage = useAISidebarStore((s) => s.handleExtensionMessage);
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const ready = useAISidebarStore((s) => s.ready);
+  const parallelChatsEnabled = useAISidebarStore((s) => s.parallelChatsEnabled);
   const dismissCurrentPlan = useAISidebarStore((s) => s.dismissCurrentPlan);
   const {
     selectedAgent,
@@ -196,7 +197,7 @@ export function AISidebar() {
                 : isCodex ? <CodexView />
                 : <AgentView />}
             </div>
-            <ThreadRail />
+            {parallelChatsEnabled && <ThreadRail />}
           </div>
 
           {/* Shared input */}

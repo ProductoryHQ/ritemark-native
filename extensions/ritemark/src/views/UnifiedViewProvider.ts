@@ -732,6 +732,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   private async _sendAgentConfig() {
     const agenticEnabled = isEnabled('agentic-assistant');
+    // Sprint 99 kill-switch. Parallel chats are almost entirely webview behaviour,
+    // so the flag has to cross the boundary or it cannot switch anything off.
+    const parallelChatsEnabled = isEnabled('parallelChats');
     const codexEnabled = isEnabled('codex-integration');
     const config = vscode.workspace.getConfiguration('ritemark.ai');
     const selectedAgent = config.get<string>('selectedAgent', 'claude-code');
@@ -784,6 +787,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({
       type: 'agent:config',
       agenticEnabled,
+      parallelChatsEnabled,
       codexEnabled,
       selectedAgent,
       selectedModel: reconciledModel,
