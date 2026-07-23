@@ -62,6 +62,24 @@ async function run() {
     console.log('✓ Test 1: cleanupOldVersions keeps exactly the N versions passed');
   }
 
+  // Test 1b (#142 bug B): cleanup must NOT delete a staged version newer than
+  // everything in the keep list. The built-in floor's own activation passes
+  // keepVersions = ['1.8.2-0']; the freshly-staged '1.8.2-ext.1' must survive
+  // so a pending restart can load it.
+  {
+    rmSync(tempRoot, { recursive: true, force: true });
+    const extDir = join(tempRoot, 'extensions');
+    mkdirSync(join(extDir, 'ritemark-1.8.2-ext.1'), { recursive: true });
+    mkdirSync(join(extDir, 'ritemark-1.8.1'), { recursive: true });
+
+    const installer = new UserExtensionInstaller(tempRoot);
+    await installer.cleanupOldVersions(['1.8.2-0']);
+
+    assert.strictEqual(existsSync(join(extDir, 'ritemark-1.8.2-ext.1')), true, 'staged newer version must be preserved (not deleted by the floor cleanup)');
+    assert.strictEqual(existsSync(join(extDir, 'ritemark-1.8.1')), false, 'a genuinely older version must still be removed');
+    console.log('✓ Test 1b: cleanupOldVersions preserves a staged version newer than all keeps (#142 bug B)');
+  }
+
   // Test 2: removeInstalledVersion quarantines a single specific version.
   {
     rmSync(tempRoot, { recursive: true, force: true });
@@ -114,7 +132,7 @@ async function run() {
     console.log('✓ Test 6: a dangling attempt for a different version does not false-positive');
   }
 
-  console.log('\nAll 6 tests passed!');
+  console.log('\nAll 7 tests passed!');
 }
 
 run()

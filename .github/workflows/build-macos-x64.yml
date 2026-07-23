@@ -199,6 +199,24 @@ jobs:
           fi
 
       # =========================================================================
+      # Step 9b: Floor bundled extension version (GH #142)
+      # The built-in must sort below any X.Y.Z-ext.N OTA patch so VS Code's
+      # extension scanner prefers a user-installed update. Shared logic with
+      # build-prod.sh via scripts/floor-bundled-extension.sh.
+      # =========================================================================
+      - name: Floor bundled extension version
+        working-directory: r
+        run: |
+          RITEMARK_VERSION=$(python3 -c "import json; print(json.load(open('branding/product.json')).get('ritemarkVersion', ''))")
+          if [ -z "$RITEMARK_VERSION" ]; then
+            echo "ERROR: ritemarkVersion not found in branding/product.json"
+            exit 1
+          fi
+          ./scripts/floor-bundled-extension.sh \
+            "VSCode-darwin-x64/Ritemark.app/Contents/Resources/app/extensions/ritemark" \
+            "$RITEMARK_VERSION"
+
+      # =========================================================================
       # Step 10: Validate build
       # =========================================================================
       - name: Validate build

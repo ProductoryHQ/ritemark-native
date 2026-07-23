@@ -12,7 +12,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExtension'
 import { CustomLink } from '../extensions/CustomLink'
 import { createLowlight, common } from 'lowlight'
-import { marked } from 'marked'
+import { Marked } from 'marked'
 import { createTurndownService } from '../utils/turndownService'
 import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
@@ -23,16 +23,39 @@ import { SearchExtension } from '../extensions/SearchExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
+import { MarginCommentRail } from './MarginCommentRail'
 import { TableOverlayControls } from './TableOverlayControls'
 import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
 import { classifyLinkTarget } from '../lib/linkTargets'
+import { CommentMark } from '../extensions/comment/CommentMark'
+import { CommentNode } from '../extensions/comment/CommentNode'
+import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
+import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
 
 // Initialize Turndown for HTML to Markdown conversion.
 // Base config + GFM plugins + pipe-escape rule live in utils/turndownService;
 // TipTap-specific rules (taskItem, taskList, imageWithRelativePath) are layered
 // on top below.
 export const turndownService = createTurndownService()
+
+// Sprint 94 (#81): use a SCOPED `marked` instance for the editor's load path so
+// registering the comment tokenizer never mutates the global `marked` singleton
+// — the AI sidebar's RenderedMarkdown uses that global, and a comment tokenizer
+// on it would turn chat `<!-- ... -->` into visible `<ritemark-comment>` (audit
+// M2). Turndown rules are harmless when no comment nodes exist, so they register
+// unconditionally. The tokenizer registers lazily, gated on the flag, once —
+// otherwise a flag-off document's `<!-- -->` would become a `<ritemark-comment>`
+// the (unregistered) TipTap node then drops, losing the comment.
+addCommentTurndownRules(turndownService)
+
+const editorMarked = new Marked({ breaks: true, gfm: true })
+let commentMarkedRegistered = false
+function ensureCommentMarkedPipeline(): void {
+  if (commentMarkedRegistered) return
+  commentMarkedRegistered = true
+  editorMarked.use(commentMarkedExtension as Parameters<typeof editorMarked.use>[0])
+}
 
 /**
  * Preprocess HTML to convert GFM task lists to TipTap format
@@ -307,6 +330,8 @@ interface EditorProps {
   onEditorReady?: (editor: TipTapEditor) => void
   onSelectionChange?: (selection: EditorSelection) => void
   imageMappings?: Record<string, string>
+  /** Sprint 94 (#81): gate the comment-callout extensions (kill-switch flag). */
+  commentCallouts?: boolean
 }
 
 export function Editor({
@@ -317,7 +342,15 @@ export function Editor({
   onEditorReady,
   onSelectionChange,
   imageMappings = {},
+  commentCallouts = false,
 }: EditorProps) {
+  // Register the comment `marked` tokenizer before initialContent is parsed on
+  // mount — only when the flag is on (see ensureCommentMarkedPipeline above).
+  if (commentCallouts) ensureCommentMarkedPipeline()
+
+  // Scroll container element for the margin comment rail (Sprint 94 #81).
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null)
+
   const isInitialMount = useRef(true)
   const lastExternalValue = useRef(value)
   const lastOnChangeValue = useRef<string>('')
@@ -343,7 +376,7 @@ export function Editor({
     } else {
       // Convert markdown to HTML
       try {
-        const html = marked(value, { breaks: true, gfm: true }) as string
+        const html = editorMarked.parse(value) as string
         // Preprocess: task lists and unwrap standalone images from paragraphs
         let processed = preprocessTaskListHTML(html)
         processed = preprocessImageHTML(processed)
@@ -450,6 +483,10 @@ export function Editor({
       AutoJoiner.configure({
         elementsToJoin: ['bulletList', 'orderedList', 'taskList'],
       }),
+      // Sprint 94 (#81): comment callouts, gated on the kill-switch flag.
+      // Registered at the highest level — when off, the extensions don't exist,
+      // so a document's comments fall back to the plain load/save path.
+      ...(commentCallouts ? [CommentMark, CommentNode] : []),
     ],
     content: initialContent,
     onCreate: ({ editor }) => {
@@ -769,10 +806,7 @@ export function Editor({
         // Treat all non-HTML text as markdown (including plain text)
         // marked.js will handle plain text gracefully, converting line breaks to <p> tags
         try {
-          const html = marked(value, {
-            breaks: true,
-            gfm: true
-          }) as string
+          const html = editorMarked.parse(value) as string
           // Convert GFM task list HTML to TipTap format
           let processedHtml = preprocessTaskListHTML(html)
           // Unwrap standalone images from paragraphs
@@ -949,7 +983,10 @@ export function Editor({
   }, [showBlockMenu])
 
   return (
-    <div className={`wysiwyg-editor h-full overflow-y-auto ${className}`}>
+    <div
+      ref={setScrollContainer}
+      className={`wysiwyg-editor h-full overflow-y-auto relative ${className}`}
+    >
       <EditorContent editor={editor} />
 
       {editor ? (
@@ -958,7 +995,11 @@ export function Editor({
             editor={editor}
             externalLinkEdit={externalLinkEdit}
             onExternalLinkEditDone={() => setExternalLinkEdit(null)}
+            commentCallouts={commentCallouts}
           />
+          {commentCallouts && (
+            <MarginCommentRail editor={editor} container={scrollContainer} />
+          )}
           <TableOverlayControls editor={editor} />
           {/* Block insertion menu (triggered by + button) */}
           {showBlockMenu && (

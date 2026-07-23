@@ -1,6 +1,7 @@
 export type {
   AgentId,
   AgentRuntime,
+  RuntimeSession,
   RuntimeSessionConfig,
   RuntimeTurnConfig,
   UnifiedAttachment,

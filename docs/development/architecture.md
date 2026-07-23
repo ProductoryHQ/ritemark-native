@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-07-12 (Sprint 93 — seamless extension delivery)
+**Last updated:** 2026-07-22 (Sprint 99 — parallel agent chats: runtime sessions + conversation-scoped protocol)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -67,7 +67,24 @@ The load-bearing boundary. The TipTap editor cannot read files, make AI calls, o
 
 **Protocol type safety (AS IS):** `sendToExtension(type: string, data: Record<string, unknown>)` is stringly-typed. The host and webview agree on message names and payload shapes only by convention. A renamed `type` or changed payload field fails silently at runtime in a sandboxed context where it is hard to observe. See ARCH-9.
 
+**Comment callouts (Sprint 94, #81).** Editor-only comments live entirely in the editor webview (TipTap `CommentMark` for anchored highlights, an atom `CommentNode` for `///` notes, and a DOM-scanning `MarginCommentRail`); they round-trip through a scoped `marked` tokenizer + Turndown rules and are stripped at the shared export chokepoint (`export/v2/htmlPipeline.ts`). The one cross-subsystem seam is **Send-to-AI**: the editor and the AI sidebar are separate webviews, so an assigned comment relays across two new host messages — `comment:send-to-ai` (editor → `RitemarkEditorProvider`) and `comment:submit` (`UnifiedViewProvider` → sidebar, then the store's existing `sendAgentMessage`/`sendCodexMessage`/`sendOpenCodeMessage` → `agent-execute`). No `AgentRuntime` change. Gated by the `comment-callouts` experimental flag (default on). The comment webview.js bundle is now cache-busted via `?v=<mtime>` (was silently serving stale bundles across reloads).
+
 ---
+
+### Conversation scoping (Sprint 99)
+
+Every message that concerns a conversation carries `conversationId` at the top level — inbound
+(`agent-execute`, `agent-cancel`, `agent-approve`, `agent-answer-question`, `codex-answer-question`,
+`conversation:reset`) and outbound (`agent-progress`, `agent-result`, `agent-question`,
+`agent-approval-request`, `codex-streaming`, `codex-progress`, `codex-result`, `codex-question`,
+`codex-plan-text-delta`, `codex-plan-update`, `codex-rpc-progress`).
+
+**An inbound message with an unknown `conversationId` is dropped with a warning, never delivered to
+the active conversation.** Falling back to "whatever is on screen" is the bug class parallel chats
+exist to remove.
+
+`UnifiedApprovalRequest` gained `conversationId`; adapters do not set it, the view provider stamps
+it where the callback already closes over the conversation.
 
 ## Subsystem Map (current, post-Sprint 78)
 
@@ -85,6 +102,7 @@ extensions/ritemark/src/
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime
 ├── voiceDictation/  Whisper-based STT (macOS only)
 ├── export/          PDF/DOCX export
+├── update/          Seamless updates — feed, resolver, installer, integrity, status bar
 └── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts, drawioEditorProvider.ts
 ```
 
@@ -95,6 +113,75 @@ Entry point `extension.ts` registers all providers, commands, and views.
 ---
 
 ## Agent Runtime Architecture
+
+### Sessions (Sprint 99)
+
+`AgentRuntime` is an adapter — **one instance per runtime KIND**, held by `RuntimeRegistry`. It
+mints **one `RuntimeSession` per conversation**:
+
+```ts
+interface AgentRuntime {
+  createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession>;
+  getStatus(): Promise<RuntimeStatus>;   // adapter-level: binary + auth, NOT per-conversation
+  dispose(): void;                        // every session
+}
+interface RuntimeSession {
+  readonly conversationId: string;
+  prompt(turn); cancel(); respondToApproval(...); dispose();   // this conversation only
+}
+```
+
+Before Sprint 99, `start()`/`prompt()`/`cancel()` lived on the adapter and `start()` ran on EVERY
+turn against the shared instance — so a second conversation overwrote the first one's callbacks. A
+session OBJECT rather than an id parameter, because `RuntimeSessionConfig` already carries the
+per-turn callbacks: letting them close over the conversation means a callback *cannot* fire against
+another one, instead of merely being told not to.
+
+`getStatus()` stays adapter-level deliberately — per-conversation status would imply a
+per-conversation binary.
+
+Per-runtime session mapping, and the shared thing each keeps:
+
+| Runtime | Session is | Shared across sessions |
+|---|---|---|
+| Claude Code | one `AgentSession` (`AgentRunner.ts`) | nothing — the SDK is per-session |
+| Codex | one app-server **thread** | ONE `codex-app-server` process, one listener registration; events route by `params.threadId` |
+| OpenCode / ACP | one ACP **session** | ONE subprocess (measured: 339 MB for 5 sessions vs 1291 MB for 5 processes) |
+
+Sprint 99 fixed three concurrency defects that the single-conversation shape had hidden:
+`CodexRuntime` held `_threadApprovalKey`/`_browserToolsEnabledForThread` as scalars whose mismatch
+nulled `_threadId`, so one conversation switching Auto↔Ask would have silently destroyed another's
+thread context; `AcpRuntime._recentlyPermissionedWrites` was a process-wide `Set<filePath>`, a
+cross-chat approval bypass; and `AgentSession` held single-slot pending-approval fields that
+overwrote each other when the model emitted two `tool_use` blocks in one message — a live bug on one
+conversation, not just a concurrency risk.
+
+**Browser tools are serialized across conversations** (`BrowserActionTools.callBrowserAction`). There
+is one integrated browser and one active tab, so tool calls are commands against shared state.
+Per-chat browsers would need per-chat tab ownership in the workbench — shell-tier, out of scope.
+
+### Capability Context (Sprint 101, #154)
+
+The standing "what Ritemark is and how you act inside it" guidance every runtime receives lives in
+**exactly one module**, `src/ai/capabilityContext.ts` (`renderCapabilityContext(descriptor)`). It
+describes the real capability surface: an agent's only way to change a document is its file-editing
+tool writing the markdown file on disk; comments are `<!-- … -->` / `<mark data-comment>` (not
+footnotes, not `///`); internal links are relative Markdown links; slash-menu / `/image` / `/diagram`
+/ export / voice are USER-ONLY; prefer the integrated browser over `open`/`xdg-open`. Adding a
+Ritemark capability = editing this one module.
+
+Each runtime delivers the same context through its own native mechanism — `UnifiedViewProvider` is
+the single injection point, rendering the per-runtime descriptor into `RuntimeSessionConfig.extraSystemPrompt`:
+
+| Runtime | Mechanism | Notes |
+|---|---|---|
+| Claude Code | `systemPrompt.append` (after the safety prefix) | `extraSystemPrompt` → `extraSystemPromptAppend` (`ClaudeCodeRuntime.ts`) |
+| Codex | `baseInstructions` (`buildCodexBaseInstructions`) | context IS the base; the legacy `CODEX_BASE_INSTRUCTIONS` survives only as a defensive fallback |
+| OpenCode / ACP | per-turn prompt prefix, **once per session** | ACP has no system-prompt concept; `buildAcpPromptText` prepends the context on the first turn only |
+
+This replaced a documented asymmetry where `extraSystemPrompt` was APPENDED by Claude but REPLACED
+Codex's base — so only Claude received the browser hint. The browser guidance is now included for any
+runtime whose integrated browser is actually available (`descriptor.hasBrowserTools`).
 
 ### AS IS (Sprints 1–78) — Three Parallel Worlds
 
@@ -433,6 +520,8 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-07-22 | Sprint 99 | **Parallel agent chats, v1.8.5.** `AgentRuntime.start()/prompt()/cancel()` replaced by `createSession(conversationId, config)` → `RuntimeSession`; one adapter per runtime KIND minting one session per conversation. `getStatus()` stays adapter-level. All three adapters hold session maps: Codex keeps one shared app-server process and one listener registration, routing by `params.threadId`; OpenCode runs N ACP sessions in ONE subprocess (spike-measured 339 MB for 5 sessions vs 1291 MB for 5 processes); Claude holds one `AgentSession` each — the audit found `AgentRunner` has no module-level singleton, so it was already a clean per-conversation unit. Webview store keyed by conversation with routing by `conversationId` and unknown ids DROPPED rather than misrouted. New thread rail (right edge, "+"/History pinned, one shared Phosphor `robot` tinted per runtime, one status slot where amber attention overrides the running spinner). Browser tools serialized across conversations — one browser, one active tab; per-chat browsers are shell-tier and out of scope. Three latent defects fixed: Codex scalar `_threadApprovalKey`/`_browserToolsEnabledForThread` silently destroying a sibling's thread context, `AcpRuntime._recentlyPermissionedWrites` as a cross-chat approval bypass, and `AgentSession`'s single-slot pending approvals overwriting each other (a live bug on ONE conversation). Also fixed in dev-validation: New Chat disposed every conversation's session, leaving a visible transcript whose agent had forgotten it. Touches #95/#97/#140 without resolving them. |
+| 2026-07-21 | Sprint 98 | **Safe extension-update lane (GH #142), v1.8.5.** Two structural changes after the 1.8.3-ext.1 incident, where an update shipped a delta-only package and the extension died at module load (`require('pdfkit')`) before `activate()` — taking every extension-side recovery path down with it. (1) **Patch 012 (shell watchdog)** hooks `mainThreadExtensionService.$onExtensionActivationError` — verified to receive module-load throws — and renames the failing USER-dir copy of `ritemark.ritemark` so the scanner marks it invalid and filters it out, then prompts a reload onto the bundled built-in. Scoped by extension id + `extensionLocation` matching an `ExtensionType.User` install; gating on `isBuiltin` would be wrong because `dedupExtensions` rewrites it to `true` on a winning user copy. Inserted before the `isDev` early-return, which would otherwise skip it in production. (2) **`applyUpdate` is now clone-then-overlay**: it clones the bundled built-in extension (resolved from `vscode.env.appRoot`, never `getExtension().extensionPath` — that returns the user copy and would perpetuate corruption) and overlays the manifest delta, so an incomplete manifest degrades to stale files instead of an unloadable extension. Adds installer-layer `minimumAppVersion` enforcement, manifest path containment at both validation and write time, `UpdateFile.op: 'write' \| 'delete'` (deletions only became expressible once absent started meaning "inherited"), a validity probe so a broken install no longer short-circuits a corrected re-release, and `applyUpdate.test.ts` closing that function's previous zero coverage. Also: publish-side completeness + install-and-activate guards, and a `ritemark.updates.channel` canary ring. **Lane stays CLOSED until the watchdog ships and one trivial ext update passes end-to-end.** |
 | 2026-07-12 | Sprint 93 | `src/update/` gains two modules: `updateStatusBar.ts` ("Relaunch to update" status-bar affordance) and `activationIntegrity.ts` (N-1 rollback + activation-crash quarantine). New `ritemark.updates.mode` setting (`auto`/`prompt`) governs silent vs. prompted extension-tier updates; full-app updates unaffected. `release-extension.sh` (renamed from `create-extension-release.sh`) + new `release-extension-preflight.sh` are the one-command extension-release path, gated by the new shell/extension release-tier rule (`CLAUDE.md` "Release Tiers"). |
 | 2026-06-06 | Baseline | Initial document (agent runtime scope). Captures AS IS post-Sprint 78: 3 runtimes, 2 browser integration patterns, 3 model config locations. Defines TO BE for Sprint 79 (runtime adapter unification). |
 | 2026-06-06 | Pre-Sprint 79 | Expanded to full system scope. Added: system layers overview, webview↔host protocol, flows architecture, build pipeline (with ARCH-8 and ARCH-10 observations), broader TO BE roadmap (ARCH-8 through ARCH-13), locked decisions. Reconciled with `docs-internal/architecture/` (high-level-architecture.md + to-be-proposal.md). |

@@ -65,7 +65,35 @@ function isBrowserActionResult(value: unknown): value is BrowserActionResult {
   return Boolean(value && typeof value === 'object');
 }
 
+/**
+ * Serializes browser tool calls across ALL conversations (Sprint 99, decision D2).
+ *
+ * There is one integrated browser and one active tab, so every browser tool is a
+ * command against shared state. With parallel chats, chat A's navigate could land
+ * between chat B's navigate and its snapshot, and B would then reason about A's
+ * page — silently, and non-deterministically. Serializing here, at the single
+ * chokepoint every action funnels through, makes each action atomic with respect
+ * to the others.
+ *
+ * This does NOT give each chat its own browser: B may still snapshot a page A
+ * navigated to, it just cannot happen mid-action. Per-chat browsers would need
+ * per-chat tab ownership in the workbench, which is shell-tier and out of scope
+ * — recorded as a known limitation in the sprint's scenarios.
+ */
+let browserActionChain: Promise<unknown> = Promise.resolve();
+
 async function callBrowserAction(command: string, args?: Record<string, unknown>): Promise<BrowserActionResult> {
+  // Queue behind whatever is in flight. The chain is kept un-rejectable so one
+  // failed action cannot wedge every later one.
+  const run = browserActionChain.then(
+    () => runBrowserAction(command, args),
+    () => runBrowserAction(command, args),
+  );
+  browserActionChain = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+async function runBrowserAction(command: string, args?: Record<string, unknown>): Promise<BrowserActionResult> {
   try {
     const result = args === undefined
       ? await vscode.commands.executeCommand<unknown>(command)

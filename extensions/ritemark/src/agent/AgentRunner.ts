@@ -430,21 +430,29 @@ export class AgentSession {
   private _turnTimeout: ReturnType<typeof setTimeout> | null = null;
   private _turnTimeoutMs = 0;  // Stored so we can reset on activity
   private _planModeActive = false;
-  private _pendingQuestion: {
-    toolUseId: string;
+  // Pending user decisions, keyed by toolUseId.
+  //
+  // These MUST be maps, not single slots. The SDK calls canUseTool once per
+  // tool_use block, and the model can emit several in one assistant message
+  // (e.g. two Writes in Ask mode). With a single slot the second request
+  // overwrote the first, whose promise then had no resolver left — that tool
+  // call hung until the inactivity timeout fired.
+  //
+  // toolUseId is Anthropic's server-minted `toolu_...`, unique across sessions
+  // and processes, so it is safe as a key even once one process hosts several
+  // concurrent conversations.
+  private _pendingQuestions = new Map<string, {
     resolve: (answers: Record<string, string>) => void;
     reject: (error: Error) => void;
-  } | null = null;
-  private _pendingPlanApproval: {
-    toolUseId: string;
+  }>();
+  private _pendingPlanApprovals = new Map<string, {
     resolve: (decision: { approved: boolean; feedback?: string }) => void;
     reject: (error: Error) => void;
-  } | null = null;
-  private _pendingToolApproval: {
-    toolUseId: string;
+  }>();
+  private _pendingToolApprovals = new Map<string, {
     resolve: (approved: boolean) => void;
     reject: (error: Error) => void;
-  } | null = null;
+  }>();
 
   // Config
   private readonly _workspacePath: string;
@@ -729,14 +737,14 @@ export class AgentSession {
       toolUseId,
       answerKeys: Object.keys(answers),
     });
-    if (!this._pendingQuestion || this._pendingQuestion.toolUseId !== toolUseId) {
+    const pending = this._pendingQuestions.get(toolUseId);
+    if (!pending) {
       traceClaude('lifecycle', 'answerQuestion missed pending state', { toolUseId });
       return false;
     }
 
-    const { resolve } = this._pendingQuestion;
-    this._pendingQuestion = null;
-    resolve(answers);
+    this._pendingQuestions.delete(toolUseId);
+    pending.resolve(answers);
     return true;
   }
 
@@ -746,27 +754,27 @@ export class AgentSession {
       approved,
       hasFeedback: Boolean(feedback?.trim()),
     });
-    if (!this._pendingPlanApproval || this._pendingPlanApproval.toolUseId !== toolUseId) {
+    const pending = this._pendingPlanApprovals.get(toolUseId);
+    if (!pending) {
       traceClaude('lifecycle', 'answerPlanApproval missed pending state', { toolUseId });
       return false;
     }
 
-    const { resolve } = this._pendingPlanApproval;
-    this._pendingPlanApproval = null;
-    resolve({ approved, feedback });
+    this._pendingPlanApprovals.delete(toolUseId);
+    pending.resolve({ approved, feedback });
     return true;
   }
 
   /** Answer a mutating-tool approval (Write/Edit/Bash) emitted in 'ask' mode. */
   answerToolApproval(toolUseId: string, approved: boolean): boolean {
     traceClaude('lifecycle', 'answerToolApproval', { toolUseId, approved });
-    if (!this._pendingToolApproval || this._pendingToolApproval.toolUseId !== toolUseId) {
+    const pending = this._pendingToolApprovals.get(toolUseId);
+    if (!pending) {
       traceClaude('lifecycle', 'answerToolApproval missed pending state', { toolUseId });
       return false;
     }
-    const { resolve } = this._pendingToolApproval;
-    this._pendingToolApproval = null;
-    resolve(approved);
+    this._pendingToolApprovals.delete(toolUseId);
+    pending.resolve(approved);
     return true;
   }
 
@@ -1002,11 +1010,7 @@ export class AgentSession {
 
       try {
         const decision = await new Promise<{ approved: boolean; feedback?: string }>((resolve, reject) => {
-          this._pendingPlanApproval = {
-            toolUseId: options.toolUseID,
-            resolve,
-            reject,
-          };
+          this._pendingPlanApprovals.set(options.toolUseID, { resolve, reject });
 
           this._emitPlanApproval?.({
             toolUseId: options.toolUseID,
@@ -1018,9 +1022,7 @@ export class AgentSession {
           });
 
           options.signal.addEventListener('abort', () => {
-            if (this._pendingPlanApproval?.toolUseId === options.toolUseID) {
-              this._pendingPlanApproval = null;
-            }
+            this._pendingPlanApprovals.delete(options.toolUseID);
             reject(new Error('Plan approval cancelled'));
           }, { once: true });
         });
@@ -1062,12 +1064,10 @@ export class AgentSession {
       const command = typeof input.command === 'string' ? input.command : undefined;
       try {
         const approved = await new Promise<boolean>((resolve, reject) => {
-          this._pendingToolApproval = { toolUseId: options.toolUseID, resolve, reject };
+          this._pendingToolApprovals.set(options.toolUseID, { resolve, reject });
           this._emitToolApproval?.({ toolUseId: options.toolUseID, kind, filePath, command });
           options.signal.addEventListener('abort', () => {
-            if (this._pendingToolApproval?.toolUseId === options.toolUseID) {
-              this._pendingToolApproval = null;
-            }
+            this._pendingToolApprovals.delete(options.toolUseID);
             reject(new Error('Tool approval cancelled'));
           }, { once: true });
         });
@@ -1108,11 +1108,7 @@ export class AgentSession {
 
     try {
       const answers = await new Promise<Record<string, string>>((resolve, reject) => {
-        this._pendingQuestion = {
-          toolUseId: options.toolUseID,
-          resolve,
-          reject,
-        };
+        this._pendingQuestions.set(options.toolUseID, { resolve, reject });
 
         this._emitQuestion?.(question);
         traceClaude('tool', 'AskUserQuestion emitted question', {
@@ -1121,9 +1117,7 @@ export class AgentSession {
         });
 
         options.signal.addEventListener('abort', () => {
-          if (this._pendingQuestion?.toolUseId === options.toolUseID) {
-            this._pendingQuestion = null;
-          }
+          this._pendingQuestions.delete(options.toolUseID);
           reject(new Error('AskUserQuestion cancelled'));
         }, { once: true });
       });
@@ -1149,32 +1143,27 @@ export class AgentSession {
   }
 
   private _clearPendingQuestion(message = 'Question cancelled') {
-    if (!this._pendingQuestion) {
-      return;
+    const pending = Array.from(this._pendingQuestions.values());
+    this._pendingQuestions.clear();
+    for (const { reject } of pending) {
+      reject(new Error(message));
     }
-
-    const { reject } = this._pendingQuestion;
-    this._pendingQuestion = null;
-    reject(new Error(message));
   }
 
   private _clearPendingPlanApproval(message = 'Plan approval cancelled') {
-    if (!this._pendingPlanApproval) {
-      return;
+    const pending = Array.from(this._pendingPlanApprovals.values());
+    this._pendingPlanApprovals.clear();
+    for (const { reject } of pending) {
+      reject(new Error(message));
     }
-
-    const { reject } = this._pendingPlanApproval;
-    this._pendingPlanApproval = null;
-    reject(new Error(message));
   }
 
   private _clearPendingToolApproval(message = 'Tool approval cancelled') {
-    if (!this._pendingToolApproval) {
-      return;
+    const pending = Array.from(this._pendingToolApprovals.values());
+    this._pendingToolApprovals.clear();
+    for (const { reject } of pending) {
+      reject(new Error(message));
     }
-    const { reject } = this._pendingToolApproval;
-    this._pendingToolApproval = null;
-    reject(new Error(message));
   }
 }
 

@@ -15,9 +15,9 @@ import {
   SelectSeparator,
   SelectTrigger,
 } from '../ui/select';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, useActiveConversation } from './store';
 import { SelectedContextTab } from './SelectedContextTab';
-import { shouldQueueInsteadOfSend, shouldAutoSendQueuedPrompt } from './composerQueue';
+import { shouldQueueInsteadOfSend, shouldAutoSendQueuedPrompt, slotFor } from './composerQueue';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
@@ -143,8 +143,27 @@ function getDisplayPath(fullPath: string): string {
 
 export function ChatInput() {
   const [value, setValue] = useState('');
-  // Sprint 74 R2 (#82): prompt parked while the agent runs; auto-sends on completion
-  const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
+
+  // ── Sprint 99 (E5 / R14): the composer belongs to the ACTIVE thread ──
+  //
+  // There is one ChatInput for N threads, so its two pieces of unsent user
+  // content — the queued follow-up (Sprint 74 R2, #82) and the draft text — are
+  // keyed by conversation id in the store rather than held as plain component
+  // state. Queue SEMANTICS are unchanged (#95 owns redesigning them); what
+  // changed is that a prompt queued in thread A can never fire in thread B.
+  const activeConversationId = useAISidebarStore((s) => s.activeConversationId);
+  const composerQueues = useAISidebarStore((s) => s.composerQueues);
+  const composerDrafts = useAISidebarStore((s) => s.composerDrafts);
+  const setComposerQueue = useAISidebarStore((s) => s.setComposerQueue);
+  const clearComposerQueue = useAISidebarStore((s) => s.clearComposerQueue);
+  const setComposerDraft = useAISidebarStore((s) => s.setComposerDraft);
+
+  const queuedPrompt = slotFor(composerQueues, activeConversationId);
+  const setQueuedPrompt = useCallback((prompt: string | null) => {
+    if (!activeConversationId) return;
+    if (prompt === null) clearComposerQueue(activeConversationId);
+    else setComposerQueue(activeConversationId, prompt);
+  }, [activeConversationId, setComposerQueue, clearComposerQueue]);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [pathChips, setPathChips] = useState<PathChip[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -163,13 +182,17 @@ export function ChatInput() {
   const mentionPopupRef = useRef<AgentMentionPopupHandle>(null);
   const commandPopupRef = useRef<SlashCommandPopupHandle>(null);
 
-  const pendingRuntime = useAISidebarStore((s) => s.pendingRuntime);
-  const isStreaming = useAISidebarStore((s) => s.isStreaming);
-  const agentConversation = useAISidebarStore((s) => s.agentConversation);
+  const {
+    pendingRuntime,
+    isStreaming,
+    agentConversation,
+    codexConversation,
+    selectedAgent,
+    selectedModel,
+    codexSelectedModel,
+    opencodeSelectedModel,
+  } = useActiveConversation();
   const isOnline = useAISidebarStore((s) => s.isOnline);
-  const selectedAgent = useAISidebarStore((s) => s.selectedAgent);
-  const selectedModel = useAISidebarStore((s) => s.selectedModel);
-  const codexSelectedModel = useAISidebarStore((s) => s.codexSelectedModel);
   const agents = useAISidebarStore((s) => s.agents);
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
@@ -200,12 +223,10 @@ export function ChatInput() {
 
   const sendCodexMessage = useAISidebarStore((s) => s.sendCodexMessage);
   const sendOpenCodeMessage = useAISidebarStore((s) => s.sendOpenCodeMessage);
-  const codexConversation = useAISidebarStore((s) => s.codexConversation);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const acpProviders = useAISidebarStore((s) => s.acpProviders);
   const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
   const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
-  const opencodeSelectedModel = useAISidebarStore((s) => s.opencodeSelectedModel);
   const selectOpenCodeModel = useAISidebarStore((s) => s.selectOpenCodeModel);
   const openAgentSettings = useAISidebarStore((s) => s.openAgentSettings);
 
@@ -219,7 +240,12 @@ export function ChatInput() {
     && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
   const lastTurn = agentConversation[agentConversation.length - 1];
   const lastCodexTurn = codexConversation[codexConversation.length - 1];
-  // Check both arrays — cancel routes by active turn, not by selected agent
+  // Check both arrays — cancel routes by active turn, not by selected agent.
+  //
+  // Sprint 99 (E3): `agentConversation` / `codexConversation` / `isStreaming` are
+  // the store's projection of the ACTIVE conversation, so Send/Stop and the queue
+  // already reflect that thread alone — a background thread running does not lock
+  // this composer. Do NOT "fix" this by scanning every open conversation.
   const agentRunning = (lastTurn?.isRunning ?? false) || (lastCodexTurn?.isRunning ?? false);
   const isLoading = isAgentMode ? agentRunning : isStreaming;
   // Sprint 74 R2 (#82): while an agent runs, the composer stays unlocked and
@@ -323,19 +349,45 @@ export function ChatInput() {
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on
   // unrelated re-renders while idle.
-  const prevAgentRunningRef = useRef(agentRunning);
+  //
+  // Sprint 99 (R14): the "was running" memory is now PER THREAD. Without that,
+  // leaving thread A while it runs and arriving at idle thread B would read as
+  // A's running → idle transition and fire A's queued prompt into B. Keying the
+  // memory by conversation id makes that structurally impossible, and it also
+  // gives the switch-back case for free: a thread that finished in the
+  // background is remembered as "was running", so returning to it sends its
+  // queued prompt into that thread — where it was typed.
+  const prevRunningByThreadRef = useRef(new Map<string, boolean>());
   useEffect(() => {
-    const wasRunning = prevAgentRunningRef.current;
-    prevAgentRunningRef.current = agentRunning;
+    if (!activeConversationId) return;
+    const memory = prevRunningByThreadRef.current;
+    const wasRunning = memory.get(activeConversationId) ?? agentRunning;
+    memory.set(activeConversationId, agentRunning);
     if (shouldAutoSendQueuedPrompt({ wasRunning, isRunning: agentRunning, queuedPrompt })) {
       const prompt = queuedPrompt as string;
       setQueuedPrompt(null);
       handleSend(prompt);
     }
-  }, [agentRunning, queuedPrompt, handleSend]);
+  }, [activeConversationId, agentRunning, queuedPrompt, setQueuedPrompt, handleSend]);
+
+  // R14: switching threads swaps the draft too — the text you were typing stays
+  // with the thread you were typing it in.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const draftsRef = useRef(composerDrafts);
+  draftsRef.current = composerDrafts;
+  const prevConversationIdRef = useRef(activeConversationId);
+  useEffect(() => {
+    const previousId = prevConversationIdRef.current;
+    if (previousId === activeConversationId) return;
+    prevConversationIdRef.current = activeConversationId;
+    if (previousId) setComposerDraft(previousId, valueRef.current);
+    setValue(activeConversationId ? (draftsRef.current[activeConversationId] ?? '') : '');
+  }, [activeConversationId, setComposerDraft]);
 
   const clearChat = useAISidebarStore((s) => s.clearChat);
-  const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
+  // Sprint 99 (R11): '/new' goes through the same cap gate as the rail's '+'.
+  const requestNewThread = useAISidebarStore((s) => s.requestNewThread);
   const toggleHistoryPanel = useAISidebarStore((s) => s.toggleHistoryPanel);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
 
@@ -347,7 +399,7 @@ export function ChatInput() {
           clearChat();
           break;
         case 'new':
-          startNewConversation();
+          requestNewThread();
           break;
         case 'history':
           toggleHistoryPanel();
@@ -395,7 +447,7 @@ export function ChatInput() {
       setValue('');
       setShowCommandPopup(false);
     },
-    [clearChat, startNewConversation, toggleHistoryPanel, openApiKeySettings, cancelRequest, agentConversation, isClaudeCode, sendAgentMessage]
+    [clearChat, requestNewThread, toggleHistoryPanel, openApiKeySettings, cancelRequest, agentConversation, isClaudeCode, sendAgentMessage]
   );
 
   const handleKeyDown = useCallback(
@@ -1061,14 +1113,16 @@ export function ChatInput() {
                     />
                   </div>
                 ) : (
-                  <div className="flex h-7 items-center gap-1.5 px-2 max-w-[160px]">
-                    {att.kind === 'pdf' ? (
-                      <Icon name="file-text" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
-                    ) : (
-                      <Icon name="file-image" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
-                    )}
-                    <span className="text-[10px] text-[var(--r-ink-muted)] truncate">
-                      {att.name}
+                  /* #103: non-image files get a card the same size as an image
+                     thumbnail (w-14 h-14) so an attached .md/.txt/.json is
+                     obvious, with the extension shown as a label. */
+                  <div
+                    className="w-14 h-14 flex flex-col items-center justify-center gap-1 px-1"
+                    title={att.name}
+                  >
+                    <Icon name="file-text" size={20} className="shrink-0 text-[var(--r-ink-muted)]" />
+                    <span className="max-w-full truncate text-[9px] font-semibold uppercase tracking-wide text-[var(--r-ink-muted)]">
+                      {att.name.includes('.') ? att.name.split('.').pop() : 'file'}
                     </span>
                   </div>
                 )}

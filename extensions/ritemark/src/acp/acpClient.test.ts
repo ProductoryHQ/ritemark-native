@@ -229,8 +229,19 @@ async function run() {
     const session = await client.newSession(os.tmpdir());
     assert.ok(client.isRunning(), 'agent running before cancel');
     await client.cancel(session.sessionId);
-    assert.ok(!client.isRunning(), 'cancel kills the process even when session/cancel is unsupported');
+    // Sprint 100: OpenCode 1.18.4 implements session/cancel, so cancel no longer
+    // kills the process. The subprocess is shared by every conversation, and
+    // discarding a warm one would force a cold start on the next prompt.
+    assert.ok(client.isRunning(), 'cancel must leave the shared process running');
+
+    // ...but dispose() still must. Removing the kill from cancel() left nothing
+    // asserting that teardown actually tears down; without this, a later edit
+    // could drop it from dispose() too and no test would notice.
+    client.dispose();
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(!client.isRunning(), 'dispose() must kill the process');
   }
+
 
   console.log('acpClient.test.ts: all tests passed');
 }

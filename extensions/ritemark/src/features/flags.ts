@@ -39,12 +39,39 @@ export type FlagId =
   // Sprint 82: draw.io diagram embedding
   | 'drawio-diagrams'
   // Sprint 89: remote model catalog (GH #109) — fetch model lists from ritemark-public
-  | 'remote-model-catalog';
+  | 'remote-model-catalog'
+  // Sprint 94: comment callouts (#81) — editor-only comments + AI assignment
+  | 'comment-callouts'
+  // Sprint 99 (R15): parallel agent chats — multi-conversation store + rail
+  | 'parallelChats';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  // Sprint 99 (R15): parallel agent chats. Default ON per HARD RULE #2. This is a
+  // CODE-LEVEL KILL-SWITCH ONLY — Settings has no flag-toggle UI, so flipping it
+  // requires an emergency follow-up release, not a user action. With the flag off
+  // the sidebar collapses to the most-recently-active conversation; every other
+  // thread is closed (not deleted) and stays reachable in History.
+  'parallelChats': {
+    id: 'parallelChats',
+    label: 'Parallel Agent Chats',
+    description: 'Run several agent conversations at once, each with its own session, streaming output, and approvals. Code-level kill-switch only — there is no Settings UI for this flag.',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  // Sprint 94 (#81): editor-only comments (anchored highlights + `///` notes,
+  // assignable to an AI agent). Experimental so it is a real runtime kill-switch
+  // (a `stable` flag is hardcoded true and needs a rebuild to disable); the
+  // package.json setting defaults it ON. Disabling stops the comment round-trip.
+  'comment-callouts': {
+    id: 'comment-callouts',
+    label: 'Comment Callouts',
+    description: 'Editor-only comments: anchored highlights and /// notes, assignable to an AI agent (#81).',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   // Sprint 89 (GH #109): when disabled, the model-catalog resolver skips live
   // provider probes + the remote fetch and serves the bundled/cached floor only.
   'remote-model-catalog': {

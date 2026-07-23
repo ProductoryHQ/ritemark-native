@@ -12,7 +12,14 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import * as os from 'os';
-import { UpdateManifest, UpdateFile } from './updateManifest';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { UpdateManifest, UpdateFile, isContainedRelativePath } from './updateManifest';
+import { compareVersions } from './versionComparison';
+import { getCurrentAppVersion } from './versionService';
+import { findBundledExtensionDir } from './bundledExtensionPath';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Progress callback for download operations
@@ -107,30 +114,62 @@ export class UserExtensionInstaller {
       };
     }
 
+    // The resolver already refuses incompatible releases, but the installer is the
+    // last gate before anything touches disk and must not trust its caller.
+    if (manifest.minimumAppVersion) {
+      const appVersion = getCurrentAppVersion();
+      if (compareVersions(appVersion, manifest.minimumAppVersion) < 0) {
+        return {
+          success: false,
+          error: `Update requires app version ${manifest.minimumAppVersion}, but this app is ${appVersion}`
+        };
+      }
+    }
+
+    // The bundled copy is the base layer for every install. Without it we would be
+    // installing a bare delta — the exact shape of incident v1.8.3-ext.1 — so this
+    // fails closed rather than falling back to a partial directory.
+    const bundledDir = findBundledExtensionDir();
+    if (!bundledDir) {
+      return {
+        success: false,
+        error: 'Could not locate the bundled extension to update from'
+      };
+    }
+
     const targetDir = path.join(this.extensionsDir, manifest.extensionDirName);
     const stagingTarget = path.join(this.stagingDir, manifest.extensionDirName);
 
     try {
-      // Check if already installed
+      // Already installed AND loadable — nothing to do. A previously installed but
+      // broken directory must NOT short-circuit here, or a corrected re-release of
+      // the same version would silently no-op for exactly the users who need it.
       if (await this.exists(targetDir)) {
-        return {
-          success: true,
-          version: manifest.version,
-          error: 'Already installed'
-        };
+        if (await this.looksInstallable(targetDir)) {
+          return {
+            success: true,
+            version: manifest.version,
+            error: 'Already installed'
+          };
+        }
+        await this.removeDir(targetDir);
       }
 
-      // Step 1: Ensure directories exist
+      // Step 1: Ensure directories exist, and clear any staging left by a crash
       await this.ensureDir(this.stagingDir);
       await this.ensureDir(this.extensionsDir);
+      await this.removeDir(stagingTarget);
 
-      // Step 2: Download all files to staging
+      // Step 2: Clone the bundled extension as the base layer
+      await this.cloneDir(bundledDir, stagingTarget);
+
+      // Step 3: Overlay the downloaded delta on top of the clone
       await this.downloadFilesToStaging(manifest.files, stagingTarget, onProgress);
 
-      // Step 3: Verify all checksums
+      // Step 4: Verify all checksums
       await this.verifyAllChecksums(manifest.files, stagingTarget);
 
-      // Step 4: Atomic move from staging to extensions
+      // Step 5: Atomic move from staging to extensions
       await fs.promises.rename(stagingTarget, targetDir);
 
       return {
@@ -148,6 +187,34 @@ export class UserExtensionInstaller {
         error: errorMessage
       };
     }
+  }
+
+  /**
+   * Cheap structural check that an extension directory is worth keeping.
+   *
+   * Deliberately not a full integrity check — it exists to catch the incident
+   * shape (a delta-only tree with no dependencies) so a repaired re-release of the
+   * same version can replace it.
+   */
+  private async looksInstallable(dirPath: string): Promise<boolean> {
+    return await this.exists(path.join(dirPath, 'package.json'))
+      && await this.exists(path.join(dirPath, 'node_modules'));
+  }
+
+  /**
+   * Copy a directory tree.
+   *
+   * macOS: `cp -c -R` uses clonefile(2), which shares blocks with the source and so
+   * costs near-zero time and disk. It falls back to copyfile(2) on its own when the
+   * target filesystem cannot clone, so no explicit fallback branch is needed.
+   * Elsewhere: a plain recursive copy.
+   */
+  private async cloneDir(sourceDir: string, targetDir: string): Promise<void> {
+    if (process.platform === 'darwin') {
+      await execFileAsync('/bin/cp', ['-c', '-R', sourceDir, targetDir]);
+      return;
+    }
+    await fs.promises.cp(sourceDir, targetDir, { recursive: true });
   }
 
   /**
@@ -171,6 +238,12 @@ export class UserExtensionInstaller {
    * update can keep N-1 alongside current — a rollback target stays on disk
    * instead of every prior version being deleted the moment a new one
    * activates.
+   *
+   * #142 guard (bug B): never delete a version NEWER than everything in the
+   * keep list. Such a version is a staged update waiting for a restart, not
+   * stale garbage. Without this, the built-in floor's own activation
+   * (keepVersions = ['X.Y.Z-0']) would delete the freshly-staged
+   * 'X.Y.Z-ext.N' before it ever gets a chance to load.
    */
   async cleanupOldVersions(keepVersions: string[]): Promise<void> {
     try {
@@ -179,16 +252,30 @@ export class UserExtensionInstaller {
       }
 
       const keepDirNames = new Set(keepVersions.map(v => `ritemark-${v}`));
+      const newestKeep = keepVersions.reduce<string | null>(
+        (max, v) => (max === null || compareVersions(v, max) > 0 ? v : max),
+        null
+      );
       const entries = await fs.promises.readdir(this.extensionsDir, { withFileTypes: true });
 
       for (const entry of entries) {
-        if (entry.isDirectory() &&
-            entry.name.startsWith('ritemark-') &&
-            !keepDirNames.has(entry.name)) {
-          const dirPath = path.join(this.extensionsDir, entry.name);
-          console.log(`Cleaning up old extension version: ${entry.name}`);
-          await this.removeDir(dirPath);
+        if (!entry.isDirectory() ||
+            !entry.name.startsWith('ritemark-') ||
+            keepDirNames.has(entry.name)) {
+          continue;
         }
+
+        const version = entry.name.replace('ritemark-', '');
+        if (newestKeep !== null && compareVersions(version, newestKeep) > 0) {
+          // Staged update newer than anything we keep — preserve it so a
+          // pending restart can load it (#142 bug B).
+          console.log(`Preserving staged newer extension version: ${entry.name}`);
+          continue;
+        }
+
+        const dirPath = path.join(this.extensionsDir, entry.name);
+        console.log(`Cleaning up old extension version: ${entry.name}`);
+        await this.removeDir(dirPath);
       }
     } catch (error) {
       console.error('Failed to cleanup old versions:', error);
@@ -255,18 +342,49 @@ export class UserExtensionInstaller {
     await this.ensureDir(stagingTarget);
 
     let downloadedBytes = 0;
-    const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    const totalBytes = files.reduce((sum, f) => sum + (f.size ?? 0), 0);
 
     for (const file of files) {
-      const targetPath = path.join(stagingTarget, file.path);
+      const targetPath = this.resolveInStaging(stagingTarget, file.path);
+
+      if (file.op === 'delete') {
+        await fs.promises.rm(targetPath, { recursive: true, force: true });
+        continue;
+      }
+
+      if (!file.url) {
+        throw new Error(`Manifest entry ${file.path} has no url`);
+      }
+
       await this.ensureDir(path.dirname(targetPath));
 
       const buffer = await this.downloadFile(file.url);
       await fs.promises.writeFile(targetPath, buffer);
 
-      downloadedBytes += file.size;
+      downloadedBytes += file.size ?? buffer.length;
       onProgress?.(downloadedBytes, totalBytes);
     }
+  }
+
+  /**
+   * Resolve a manifest path inside staging, refusing anything that escapes it.
+   *
+   * `validateManifest` performs the same check, but a manifest can reach the
+   * installer without having gone through it, and the checksums are no help here —
+   * they live in the same manifest they would be protecting against.
+   */
+  private resolveInStaging(stagingTarget: string, relativePath: string): string {
+    if (!isContainedRelativePath(relativePath)) {
+      throw new Error(`Refusing path outside the extension directory: ${relativePath}`);
+    }
+
+    const resolved = path.resolve(stagingTarget, relativePath);
+    const root = path.resolve(stagingTarget) + path.sep;
+    if (!resolved.startsWith(root)) {
+      throw new Error(`Refusing path outside the extension directory: ${relativePath}`);
+    }
+
+    return resolved;
   }
 
   private async downloadFile(url: string): Promise<Buffer> {
@@ -289,7 +407,14 @@ export class UserExtensionInstaller {
     stagingTarget: string
   ): Promise<void> {
     for (const file of files) {
-      const filePath = path.join(stagingTarget, file.path);
+      if (file.op === 'delete') {
+        if (await this.exists(path.join(stagingTarget, file.path))) {
+          throw new Error(`Failed to delete ${file.path}`);
+        }
+        continue;
+      }
+
+      const filePath = this.resolveInStaging(stagingTarget, file.path);
       const buffer = await fs.promises.readFile(filePath);
       const hash = crypto.createHash('sha256').update(buffer).digest('hex');
 

@@ -111,6 +111,16 @@ fi
 # Copy extension source
 cp -r "$EXTENSION_DIR" "extensions/ritemark"
 echo "  Copied extension from $EXTENSION_DIR"
+
+# Floor the BUNDLED extension's version to X.Y.Z-0 so over-the-air X.Y.Z-ext.N
+# patches win VS Code's extension scanner (GH #142). gulp bundles this copy into
+# the app. Shared with the CI workflows via scripts/floor-bundled-extension.sh.
+FLOOR_BASE=$(grep '"ritemarkVersion"' "$ROOT_DIR/branding/product.json" | sed 's/.*"ritemarkVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+if [ -z "$FLOOR_BASE" ]; then
+    echo -e "${RED}ERROR: could not read ritemarkVersion from branding/product.json to floor bundled extension${NC}"
+    exit 1
+fi
+"$ROOT_DIR/scripts/floor-bundled-extension.sh" "extensions/ritemark" "$FLOOR_BASE"
 echo ""
 
 # Step 4: Compile extension

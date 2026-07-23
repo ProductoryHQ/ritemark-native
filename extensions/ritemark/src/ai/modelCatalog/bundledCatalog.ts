@@ -51,11 +51,11 @@ export const BUNDLED_CATALOG: ModelCatalog = {
       ],
     },
     codex: {
-      defaults: { codex: 'gpt-5.3-codex' },
+      defaults: { codex: 'gpt-5.6-sol' },
       models: [
-        { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', description: 'Latest frontier agentic coding model', tier: 'high', deprecated: false, order: 0 },
-        { id: 'codex-spark', label: 'Codex Spark', description: 'Fast & light', tier: 'low', deprecated: false, order: 1 },
-        { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex', description: 'Balanced', tier: 'medium', deprecated: false, order: 2 },
+        { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Latest flagship agentic coding model', tier: 'high', deprecated: false, order: 0 },
+        { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', description: 'Balanced', tier: 'medium', deprecated: false, order: 1 },
+        { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', description: 'Fast & light', tier: 'low', deprecated: false, order: 2 },
       ],
     },
     // opencode is BYOK/multi-vendor: ids are composite `<vendor>/<model>`; consumers

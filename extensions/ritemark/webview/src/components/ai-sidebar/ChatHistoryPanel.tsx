@@ -1,15 +1,29 @@
 /**
- * ChatHistoryPanel — Slide-out panel showing saved conversations.
+ * ChatHistoryPanel — the permanent archive, and the way back to a closed thread.
  *
- * Features:
- * - Date grouping (Today, Yesterday, This Week, Older)
- * - Click to resume conversation
- * - Delete button with confirmation
+ * Sprint 99 (R12) changed what this panel IS. It used to be a
+ * load-one-destroy-current picker: opening an entry replaced whatever
+ * conversation was live. Now the rail is the working set and History is the
+ * archive behind it:
+ *
+ * - it lists ALL conversations, open and closed
+ * - conversations currently on the rail carry an "open" badge
+ * - clicking an OPEN one switches to it
+ * - clicking a CLOSED one reopens it onto the rail (under the soft cap, Gap 3)
+ * - opening anything here NEVER resets, cancels, or destroys another thread
+ *
+ * Deletion is the one destructive action left, and it is still explicit and
+ * confirmed. Closing a thread is not deletion — closed conversations live here
+ * in full.
+ *
+ * Features kept from before: date grouping (Today / Yesterday / This Week /
+ * Older) and delete-with-confirmation.
  */
 
 import { useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
+import { RUNTIME_COLOR, deriveThreadTitle, runtimeOfConversation, type ThreadRuntime } from './threadStatus';
 import type { SavedConversationV2 } from './chatHistoryStorage';
 
 // ── Date Grouping ──────────────────────────────────────────────────────
@@ -65,11 +79,15 @@ const groupLabels: Record<DateGroup, string> = {
 interface ConversationItemProps {
   conversation: SavedConversationV2;
   isActive: boolean;
+  /** On the rail right now — gets the "open" badge (R12). */
+  isOpen: boolean;
+  /** Runtime tint, only known for threads that are open. */
+  runtime: ThreadRuntime | null;
   onSelect: () => void;
   onDelete: () => void;
 }
 
-function ConversationItem({ conversation, isActive, onSelect, onDelete }: ConversationItemProps) {
+function ConversationItem({ conversation, isActive, isOpen, runtime, onSelect, onDelete }: ConversationItemProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -101,13 +119,26 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: Conver
           : ''
       }`}
     >
-      <Icon
-        name="clock-counter-clockwise"
-        size={16}
-        className="mt-0.5 shrink-0"
-      />
+      {isOpen && runtime ? (
+        <span className="mt-0.5 shrink-0 flex" style={{ color: RUNTIME_COLOR[runtime] }}>
+          <Icon name="robot" size={16} tone="inherit" />
+        </span>
+      ) : (
+        <Icon
+          name="clock-counter-clockwise"
+          size={16}
+          className="mt-0.5 shrink-0"
+        />
+      )}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate">{conversation.title}</div>
+        <div className="flex items-center gap-1.5">
+          <div className="text-sm font-medium truncate">{conversation.title}</div>
+          {isOpen && (
+            <span className="shrink-0 px-1.5 py-px rounded text-[10px] font-medium uppercase tracking-wide bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)]">
+              open
+            </span>
+          )}
+        </div>
         <div className="text-xs text-[var(--r-ink-muted)] truncate">
           {formatTime(conversation.updatedAt)}
         </div>
@@ -149,13 +180,31 @@ function EmptyState() {
 
 export function ChatHistoryPanel() {
   const savedConversations = useAISidebarStore((s) => s.savedConversations);
-  const currentConversationId = useAISidebarStore((s) => s.currentConversationId);
-  const loadSavedConversation = useAISidebarStore((s) => s.loadSavedConversation);
+  const conversations = useAISidebarStore((s) => s.conversations);
+  const activeConversationId = useAISidebarStore((s) => s.activeConversationId);
+  const requestOpenConversation = useAISidebarStore((s) => s.requestOpenConversation);
   const deleteSavedConversation = useAISidebarStore((s) => s.deleteSavedConversation);
   const toggleHistoryPanel = useAISidebarStore((s) => s.toggleHistoryPanel);
 
-  const grouped = groupConversations(savedConversations);
-  const hasConversations = savedConversations.length > 0;
+  // R12: History lists ALL conversations. Saved records are the archive; open
+  // threads are merged in on top of them so a thread that has not been written
+  // to storage yet (it autosaves on close / new / save) is still listed and
+  // still reachable — History must never be missing a thread that exists.
+  const savedIds = new Set(savedConversations.map((c) => c.id));
+  const unsavedOpen: SavedConversationV2[] = Object.values(conversations)
+    .filter((c) => !savedIds.has(c.id))
+    .map((c) => ({
+      id: c.id,
+      title: deriveThreadTitle(c),
+      agentId: c.selectedAgent,
+      runtimeSummary: [],
+      createdAt: c.createdAt,
+      updatedAt: c.createdAt,
+    }));
+
+  const allConversations = [...savedConversations, ...unsavedOpen];
+  const grouped = groupConversations(allConversations);
+  const hasConversations = allConversations.length > 0;
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-[var(--vscode-sideBar-background)] animate-in slide-in-from-left duration-200">
@@ -187,15 +236,22 @@ export function ChatHistoryPanel() {
                   <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--r-ink-muted)]">
                     {groupLabels[group]}
                   </div>
-                  {grouped[group].map((conv) => (
-                    <ConversationItem
-                      key={conv.id}
-                      conversation={conv}
-                      isActive={conv.id === currentConversationId}
-                      onSelect={() => loadSavedConversation(conv.id)}
-                      onDelete={() => deleteSavedConversation(conv.id)}
-                    />
-                  ))}
+                  {grouped[group].map((conv) => {
+                    const open = conversations[conv.id];
+                    return (
+                      <ConversationItem
+                        key={conv.id}
+                        conversation={conv}
+                        isActive={conv.id === activeConversationId}
+                        isOpen={!!open}
+                        runtime={open ? runtimeOfConversation(open) : null}
+                        // Open → switch. Closed → reopen onto the rail. Either
+                        // way no other thread is reset, cancelled or destroyed.
+                        onSelect={() => requestOpenConversation(conv.id)}
+                        onDelete={() => deleteSavedConversation(conv.id)}
+                      />
+                    );
+                  })}
                 </div>
               );
             })}

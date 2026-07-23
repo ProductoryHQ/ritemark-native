@@ -180,26 +180,28 @@ export class AcpClient {
   /**
    * Cancel an in-flight turn.
    *
-   * Sprint 76 R1/R5: OpenCode 1.15.13 returns -32601 ("Method not found") for
-   * session/cancel (audit T9), so ACP cancellation cannot be relied upon. We
-   * fall back to killing the agent process — the session is abandoned but the
-   * UI can return to idle. We still attempt the protocol cancel first in case a
-   * future/other ACP agent implements it; failures are swallowed to the trace.
+   * OpenCode implements `session/cancel` as of 1.18.4 (upstream commit 50b4ad89b,
+   * "honor session/cancel by aborting the running turn"): the backing session is
+   * aborted and the turn settles `stopReason: "cancelled"`. Before that it
+   * answered -32601 and kept streaming to `end_turn`, which is why Ritemark used
+   * to kill the process to make cancel mean anything.
+   *
+   * That kill is gone. Under Sprint 99 several conversations share one
+   * subprocess, so killing it would take every other chat down — and on 1.18.4
+   * it is not merely unnecessary but harmful, discarding a warm subprocess that
+   * a working protocol cancel preserves and forcing a cold start on the next
+   * prompt.
+   *
+   * Still sent as a notification (`Connection.cancel` is `sendNotification` in
+   * @agentclientprotocol/sdk 0.22.1), so there is no response to await; the
+   * outcome is observed as the turn settling `cancelled`.
    */
   async cancel(sessionId: string): Promise<void> {
-    if (this.connection) {
-      try {
-        await this.connection.cancel({ sessionId });
-        this.trace?.('client', 'cancel:protocol', { sessionId });
-      } catch (error) {
-        // Expected on OpenCode 1.15.13 (-32601). Fall through to process kill.
-        this.trace?.('client', 'cancel:protocol-unsupported', {
-          sessionId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+    if (!this.connection) {
+      return;
     }
-    this.killProcess('SIGTERM');
+    this.connection.cancel({ sessionId });
+    this.trace?.('client', 'cancel:sent', { sessionId });
   }
 
   /** Tear down the connection and kill the agent process. */

@@ -6,7 +6,11 @@
  *
  * BYOK provider keys arrive via `RuntimeSessionConfig.byokEnv` (built from
  * SecretStorage in UnifiedViewProvider) and are forwarded to the OpenCode
- * subprocess in start().
+ * subprocess when it is first spawned.
+ *
+ * Sprint 99 (decision D1): one `AcpSession` per conversation, all sharing ONE
+ * OpenCode subprocess and ONE AcpManager. The safety-critical part of that
+ * change is the write-approval set (C1) — see `_recentlyPermissionedWrites`.
  */
 
 import * as crypto from 'crypto';
@@ -34,6 +38,7 @@ import type {
 import type { BrowserIpcRequest } from '../browser/BrowserIpcServer';
 import type {
   AgentRuntime,
+  RuntimeSession,
   RuntimeSessionConfig,
   RuntimeTurnConfig,
   RuntimeStatus,
@@ -44,87 +49,114 @@ type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => 
 
 const _browserToolsInjector = new BrowserToolsInjector();
 
-export class AcpRuntime implements AgentRuntime {
-  readonly id: AgentId = 'opencode';
+/**
+ * Ceiling for a single OpenCode turn. Matches Claude's 15-minute inactivity
+ * timeout in spirit — long enough for a real slow turn, short enough that a hung
+ * provider does not strand the UI forever. Overridable per turn via
+ * RuntimeTurnConfig.timeoutMinutes.
+ */
+const DEFAULT_ACP_TIMEOUT_MINUTES = 15;
 
-  private _manager: AcpManager | null = null;
-  private _sessionConfig: RuntimeSessionConfig | null = null;
-  private _approvalSeq = 0;
-  private _ipcServer: BrowserIpcServer | null = null;
+/**
+ * Compose the text sent to OpenCode for one turn. Pure — no I/O — so the
+ * injection order and once-per-session capability-context behaviour are
+ * unit-testable without a live process (Sprint 101 S6.2).
+ *
+ * Order (top → bottom): capability context (first turn only) · attachments ·
+ * `[Currently editing: …]` · the user's prompt.
+ */
+export function buildAcpPromptText(
+  turn: RuntimeTurnConfig,
+  opts: { capabilityContext?: string } = {},
+): { text: string; imageAttachmentCount: number } {
+  let promptText = turn.prompt;
+  // Active file context — same `[Currently editing: …]` preamble Claude Code and
+  // Codex inject, so "edit this file" prompts know the target.
+  if (turn.activeFile) {
+    promptText = `[Currently editing: ${turn.activeFile.path}]\n\n${promptText}`;
+  }
+  let imageAttachmentCount = 0;
+  if (turn.attachments && turn.attachments.length > 0) {
+    const blocks = turn.attachments.map(a => `**Attachment: ${a.name}**\n\`\`\`\n${a.data}\n\`\`\``);
+    promptText = `${blocks.join('\n\n')}\n\n${promptText}`;
+    imageAttachmentCount = turn.attachments.filter(a => a.kind === 'image').length;
+  }
+  // Capability context (Sprint 101 #154): ACP has no system prompt, so the shared
+  // context rides in as a standing preamble on the first turn of the session.
+  if (opts.capabilityContext && opts.capabilityContext.trim()) {
+    promptText = `${opts.capabilityContext}\n\n${promptText}`;
+  }
+  return { text: promptText, imageAttachmentCount };
+}
+
+/**
+ * One conversation's OpenCode session (an ACP `ses_…` on the shared connection).
+ */
+export class AcpSession implements RuntimeSession {
+  readonly agentId: AgentId = 'opencode';
+
+  private _config: RuntimeSessionConfig;
 
   /** Pending approval promises keyed by requestId. Resolved by respondToApproval(). */
-  private readonly _pendingApprovals = new Map<string, PendingApproval>();
+  readonly pendingApprovals = new Map<string, PendingApproval>();
 
   /**
-   * Files whose `edit` was approved via session/request_permission. The follow-up
-   * fs/write_text_file for the same path is auto-allowed to avoid a double prompt
-   * (mirrors UnifiedViewProvider._acpRecentlyPermissionedWrites).
+   * Files whose `edit` was approved via session/request_permission, so the
+   * follow-up fs/write_text_file for the same path is auto-allowed instead of
+   * double-prompting.
+   *
+   * SAFETY (Sprint 99 C1): this set is PER SESSION. It used to be a
+   * process-wide `Set<filePath>` on the runtime, which under multi-session is a
+   * cross-chat approval bypass — chat A approving a write to `foo.md` would
+   * silently auto-allow chat B's write to the same path. Any regression here
+   * breaks the OpenCode permission-gate invariant and is a release blocker.
    */
-  private readonly _recentlyPermissionedWrites = new Set<string>();
+  readonly recentlyPermissionedWrites = new Set<string>();
 
-  async start(config: RuntimeSessionConfig): Promise<void> {
-    if (this._manager?.isRunning()) {
-      // Live session — just update the config reference (model may change per turn)
-      this._sessionConfig = config;
-      return;
-    }
-    this._disposeManager();
-    this._sessionConfig = config;
+  /**
+   * Whether this session has already injected the shared capability context
+   * (`config.extraSystemPrompt`). ACP has no system-prompt mechanism, so the
+   * context is prepended to the FIRST turn only — OpenCode retains earlier turn
+   * text in the session, so once is enough and per-turn injection would bloat
+   * every prompt. See Sprint 101 technical-plan §4.
+   */
+  private _capabilityContextInjected = false;
 
-    const runtime = findBundledAgentRuntime('opencode');
-    if (!runtime) {
-      throw new Error(
-        'OpenCode runtime not found. Reinstall Ritemark to restore the bundled agent.',
-      );
-    }
+  constructor(
+    readonly conversationId: string,
+    /** The ACP session id on the shared connection. */
+    readonly acpSessionId: string,
+    config: RuntimeSessionConfig,
+    private readonly _runtime: AcpRuntime,
+  ) {
+    this._config = config;
+  }
 
-    // Start the browser IPC server when the feature flag is on so OpenCode can
-    // reach the integrated browser through the browserMcpAdapter subprocess.
-    let mcpServers: unknown[] = [];
-    const browserEnabled = isEnabled('browser-agent-control');
-    if (browserEnabled) {
-      const sessionId = crypto.randomUUID();
-      const ipcServer = new BrowserIpcServer(sessionId);
-      await ipcServer.start((req) => this._handleBrowserIpcRequest(req));
-      this._ipcServer = ipcServer;
-      mcpServers = _browserToolsInjector.getAcpMcpServers(true, ipcServer.socketPath);
-      traceAcp('runtime', 'ipc-started', { socketPath: ipcServer.socketPath });
-    }
+  get config(): RuntimeSessionConfig { return this._config; }
 
-    this._manager = new AcpManager({
-      binaryPath: runtime.path,
-      workspaceRoot: config.workspacePath,
-      byokEnv: config.byokEnv ?? {},
-      mcpServers,
-      requestPermission: (params) => this._handlePermission(params),
-      approveWrite: (request) => this._handleWriteApproval(request),
-      onProgress: config.onProgress,
-    });
-
-    await this._manager.start();
+  applyConfig(config: RuntimeSessionConfig): void {
+    this._config = config;
   }
 
   async prompt(turn: RuntimeTurnConfig): Promise<void> {
-    if (!this._manager || !this._sessionConfig) {
-      throw new Error('AcpRuntime: call start() before prompt()');
+    const manager = this._runtime.getManager();
+    if (!manager) {
+      throw new Error('AcpRuntime: createSession() must succeed before prompt()');
     }
-    const config = this._sessionConfig;
+    const config = this._config;
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
-    let promptText = turn.prompt;
-    // Active file context — same `[Currently editing: …]` preamble Claude Code
-    // and Codex inject, so "edit this file" prompts know the target.
-    if (turn.activeFile) {
-      promptText = `[Currently editing: ${turn.activeFile.path}]\n\n${promptText}`;
+    // Inject the shared capability context once per session (ACP has no system
+    // prompt). config.extraSystemPrompt is set by UnifiedViewProvider to the
+    // ACP-flavoured render of src/ai/capabilityContext.ts.
+    const capabilityContext = this._capabilityContextInjected ? undefined : config.extraSystemPrompt;
+    const { text: promptText, imageAttachmentCount } = buildAcpPromptText(turn, { capabilityContext });
+    if (capabilityContext && capabilityContext.trim()) {
+      this._capabilityContextInjected = true;
     }
-    if (turn.attachments && turn.attachments.length > 0) {
-      const blocks = turn.attachments.map(a => `**Attachment: ${a.name}**\n\`\`\`\n${a.data}\n\`\`\``);
-      promptText = `${blocks.join('\n\n')}\n\n${promptText}`;
-      const imageCount = turn.attachments.filter(a => a.kind === 'image').length;
-      if (imageCount > 0) {
-        config.onProgress({ type: 'text', message: `Note: ${imageCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
-      }
+    if (imageAttachmentCount > 0) {
+      config.onProgress({ type: 'text', message: `Note: ${imageAttachmentCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
     }
 
     try {
@@ -134,32 +166,142 @@ export class AcpRuntime implements AgentRuntime {
         const providerModel = config.model.startsWith('opencode:')
           ? config.model.slice('opencode:'.length)
           : config.model;
-        await this._manager.setModel(providerModel);
+        await manager.setModel(this.acpSessionId, providerModel);
       }
-      const result = await this._manager.prompt(promptText);
-      config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
+
+      // A BYOK provider can hang a turn indefinitely — no response, no error —
+      // and the ACP path had no timeout of its own, unlike Claude (15-min
+      // inactivity) and Codex (slow-RPC handling). The turn then sat at
+      // "Starting OpenCode…" forever with no way out but Stop. Bound it here and
+      // cancel the hung session so it settles as an actionable error.
+      const timeoutMs = (turn.timeoutMinutes ?? DEFAULT_ACP_TIMEOUT_MINUTES) * 60_000;
+      let timedOut = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const result = await Promise.race([
+          manager.prompt(this.acpSessionId, promptText),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              timedOut = true;
+              reject(new Error(`OpenCode did not respond within ${Math.round(timeoutMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
+            }, timeoutMs);
+          }),
+        ]);
+        config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
+      } catch (err) {
+        // On timeout, stop the abandoned turn upstream so it does not keep
+        // running against a session the user has already been told failed.
+        if (timedOut) {
+          void manager.cancel(this.acpSessionId).catch(() => { /* already failing */ });
+        }
+        throw err;
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     } catch (err) {
-      config.onCodexComplete?.({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+      const raw = err instanceof Error ? err.message : String(err);
+      config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw) });
     }
   }
 
   async cancel(): Promise<void> {
-    const manager = this._manager;
-    this._manager = null;
-    this._rejectPendingApprovals();
+    this.rejectPendingApprovals();
     try {
-      await manager?.cancel();
+      await this._runtime.getManager()?.cancel(this.acpSessionId);
     } catch {
-      // Process may already be gone after cancel kills it
+      // Best-effort: the session may already have settled or the connection dropped.
     }
+    this._runtime._forgetSession(this);
   }
 
   respondToApproval(requestId: string, approved: boolean, alwaysAllow: boolean, _feedback?: string): void {
-    const resolve = this._pendingApprovals.get(requestId);
+    const resolve = this.pendingApprovals.get(requestId);
     if (!resolve) return;
-    this._pendingApprovals.delete(requestId);
+    this.pendingApprovals.delete(requestId);
     resolve({ approved, alwaysAllow });
   }
+
+  dispose(): void {
+    this.rejectPendingApprovals();
+    this.recentlyPermissionedWrites.clear();
+
+    // Cancel BEFORE forgetting the session. closeSession() only drops local
+    // state, so without this the upstream turn keeps running against a
+    // conversation nobody is watching. The approval gate does hold — an
+    // unroutable permission is cancelled and an unroutable write denied
+    // (see _handlePermission / _handleWriteApproval) — but leaving a turn
+    // executing after the user discarded its conversation is wrong on its own,
+    // and burns tokens with no way to observe or stop it.
+    const manager = this._runtime.getManager();
+    void manager?.cancel(this.acpSessionId).catch(() => { /* disposing anyway */ });
+    manager?.closeSession(this.acpSessionId);
+    this._runtime._forgetSession(this);
+  }
+
+  /** @internal */
+  rejectPendingApprovals(): void {
+    for (const resolve of this.pendingApprovals.values()) {
+      resolve({ approved: false, alwaysAllow: false });
+    }
+    this.pendingApprovals.clear();
+  }
+}
+
+/**
+ * Turn an ACP turn failure into something a user can act on.
+ *
+ * OpenCode 1.18.4 has no default model — `configOptions.model.current` is
+ * undefined — so prompting before one is selected throws "No provider
+ * available". Sprint 100 verified 1.15.13 had no default either, but it failed
+ * differently: a silent `end_turn` with zero tokens, which Ritemark reported via
+ * its empty-turn soft error. The bump turned a silent failure into a loud one,
+ * which is an improvement — but the raw message says nothing about what to do.
+ */
+function describeAcpTurnError(raw: string): string {
+  if (/no provider available/i.test(raw)) {
+    return 'No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.';
+  }
+  return raw;
+}
+
+export class AcpRuntime implements AgentRuntime {
+  readonly id: AgentId = 'opencode';
+
+  /** ONE manager / ONE OpenCode subprocess shared by every conversation (D1). */
+  private _manager: AcpManager | null = null;
+  private _approvalSeq = 0;
+  private _ipcServer: BrowserIpcServer | null = null;
+
+  private readonly _sessions = new Map<string, AcpSession>();
+  /** Reverse index — ACP notifications and fs requests carry `sessionId`. */
+  private readonly _sessionsByAcpId = new Map<string, AcpSession>();
+
+  async createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession> {
+    const existing = this._sessions.get(conversationId);
+    if (existing) {
+      existing.applyConfig(config);
+      return existing;
+    }
+
+    await this._ensureManager(config);
+    const acpSessionId = await this._manager!.start();
+    const session = new AcpSession(conversationId, acpSessionId, config, this);
+    this._sessions.set(conversationId, session);
+    this._sessionsByAcpId.set(acpSessionId, session);
+    traceAcp('runtime', 'session-created', { conversationId, acpSessionId, liveSessions: this._sessions.size });
+    return session;
+  }
+
+  getSession(conversationId: string): AcpSession | undefined {
+    return this._sessions.get(conversationId);
+  }
+
+  disposeSession(conversationId: string): void {
+    this._sessions.get(conversationId)?.dispose();
+  }
+
+  /** @internal — the shared manager, or null before the first session. */
+  getManager(): AcpManager | null { return this._manager; }
 
   async getStatus(): Promise<RuntimeStatus> {
     const runtime = findBundledAgentRuntime('opencode');
@@ -180,19 +322,79 @@ export class AcpRuntime implements AgentRuntime {
   }
 
   dispose(): void {
-    this._disposeManager();
-    this._sessionConfig = null;
+    for (const session of [...this._sessions.values()]) {
+      session.rejectPendingApprovals();
+      session.recentlyPermissionedWrites.clear();
+    }
+    this._sessions.clear();
+    this._sessionsByAcpId.clear();
+    this._manager?.dispose();
+    this._manager = null;
+    this._stopIpcServer();
   }
 
   // ── Internals ────────────────────────────────────────────────────────────────
 
-  private _disposeManager(): void {
-    this._rejectPendingApprovals();
-    this._recentlyPermissionedWrites.clear();
-    this._manager?.dispose();
-    this._manager = null;
+  /**
+   * @internal Drop one session from the indexes. The shared subprocess and the
+   * browser IPC server stay up while siblings still need them (C4); they are
+   * torn down only when the last session goes.
+   */
+  _forgetSession(session: AcpSession): void {
+    this._sessions.delete(session.conversationId);
+    this._sessionsByAcpId.delete(session.acpSessionId);
+    if (this._sessions.size === 0) {
+      this._manager?.dispose();
+      this._manager = null;
+      this._stopIpcServer();
+    }
+  }
+
+  private _stopIpcServer(): void {
     this._ipcServer?.stop();
     this._ipcServer = null;
+  }
+
+  /**
+   * Spawn the subprocess + browser IPC server once, on the first conversation.
+   * Subsequent conversations open another ACP session on the same connection.
+   */
+  private async _ensureManager(config: RuntimeSessionConfig): Promise<void> {
+    if (this._manager) return;
+
+    const runtime = findBundledAgentRuntime('opencode');
+    if (!runtime) {
+      throw new Error(
+        'OpenCode runtime not found. Reinstall Ritemark to restore the bundled agent.',
+      );
+    }
+
+    // Start the browser IPC server when the feature flag is on so OpenCode can
+    // reach the integrated browser through the browserMcpAdapter subprocess.
+    // Under D1 all sessions share one subprocess and therefore one socket and
+    // one browser-tool channel — consistent with decision D2 (one shared
+    // browser). Disposing a single conversation must NOT stop it (C4).
+    let mcpServers: unknown[] = [];
+    if (isEnabled('browser-agent-control')) {
+      const ipcSessionId = crypto.randomUUID();
+      const ipcServer = new BrowserIpcServer(ipcSessionId);
+      await ipcServer.start((req) => this._handleBrowserIpcRequest(req));
+      this._ipcServer = ipcServer;
+      mcpServers = _browserToolsInjector.getAcpMcpServers(true, ipcServer.socketPath);
+      traceAcp('runtime', 'ipc-started', { socketPath: ipcServer.socketPath });
+    }
+
+    this._manager = new AcpManager({
+      binaryPath: runtime.path,
+      workspaceRoot: config.workspacePath,
+      byokEnv: config.byokEnv ?? {},
+      mcpServers,
+      requestPermission: (params) => this._handlePermission(params),
+      approveWrite: (request) => this._handleWriteApproval(request),
+      onProgress: (progress, sessionId) => {
+        this._sessionsByAcpId.get(sessionId)?.config.onProgress(progress);
+      },
+    });
   }
 
   /**
@@ -222,18 +424,16 @@ export class AcpRuntime implements AgentRuntime {
     }
   }
 
-  private _rejectPendingApprovals(): void {
-    for (const resolve of this._pendingApprovals.values()) {
-      resolve({ approved: false, alwaysAllow: false });
-    }
-    this._pendingApprovals.clear();
-  }
-
   private async _handlePermission(
     params: RequestPermissionRequest,
   ): Promise<RequestPermissionResponse> {
-    const config = this._sessionConfig;
-    if (!config) return { outcome: { outcome: 'cancelled' } };
+    const session = this._sessionsByAcpId.get(params.sessionId as string);
+    // An unroutable permission request is CANCELLED, never approved.
+    if (!session) {
+      traceAcp('approval', 'permission for unknown session — cancelled', { sessionId: params.sessionId });
+      return { outcome: { outcome: 'cancelled' } };
+    }
+    const config = session.config;
 
     // Unified 'auto' approval mode — allow without prompting the user.
     if (config.approvalMode === 'auto') {
@@ -244,41 +444,52 @@ export class AcpRuntime implements AgentRuntime {
     const file = params.toolCall?.locations?.[0]?.path;
     const isFileEdit = params.toolCall?.kind === 'edit' && !!file;
     const requestId = `acp-${++this._approvalSeq}`;
-    traceAcp('approval', 'permission-requested', { tool, file, kind: params.toolCall?.kind });
+    traceAcp('approval', 'permission-requested', {
+      conversationId: session.conversationId, tool, file, kind: params.toolCall?.kind,
+    });
 
     const req: UnifiedApprovalRequest = isFileEdit && file
       ? { requestId, agentId: 'opencode', kind: 'file-write', filePath: file }
       : { requestId, agentId: 'opencode', kind: 'shell-command', command: tool, workingDir: file ?? '' };
 
-    const { approved, alwaysAllow } = await new Promise<{ approved: boolean; alwaysAllow: boolean }>(
+    const { approved } = await new Promise<{ approved: boolean; alwaysAllow: boolean }>(
       (resolve) => {
-        this._pendingApprovals.set(requestId, resolve);
+        session.pendingApprovals.set(requestId, resolve);
         config.onApprovalRequest(req);
       },
     );
 
+    // C1: recorded on THIS session only. Another chat writing the same path
+    // still has to ask.
     if (approved && isFileEdit && file) {
-      this._recentlyPermissionedWrites.add(file);
+      session.recentlyPermissionedWrites.add(file);
     }
 
     return this._selectOutcome(params, approved);
   }
 
   private async _handleWriteApproval(request: WriteTextFileRequest): Promise<boolean> {
-    // Auto-allow the write when the file was already approved via request_permission
-    if (this._recentlyPermissionedWrites.has(request.path)) {
-      this._recentlyPermissionedWrites.delete(request.path);
+    const session = this._sessionsByAcpId.get(request.sessionId as string);
+    // An unroutable write is DENIED, never silently allowed (R4).
+    if (!session) {
+      traceAcp('approval', 'write for unknown session — denied', { sessionId: request.sessionId, path: request.path });
+      return false;
+    }
+
+    // Auto-allow the write when THIS session already approved the file via
+    // request_permission (C1 — never another session's approval).
+    if (session.recentlyPermissionedWrites.has(request.path)) {
+      session.recentlyPermissionedWrites.delete(request.path);
       return true;
     }
 
-    const config = this._sessionConfig;
-    if (!config) return false;
+    const config = session.config;
 
     // Unified 'auto' approval mode — allow writes without prompting.
     if (config.approvalMode === 'auto') return true;
 
     const requestId = `acp-write-${++this._approvalSeq}`;
-    traceAcp('approval', 'write-requested', { path: request.path });
+    traceAcp('approval', 'write-requested', { conversationId: session.conversationId, path: request.path });
 
     const req: UnifiedApprovalRequest = {
       requestId,
@@ -289,7 +500,7 @@ export class AcpRuntime implements AgentRuntime {
 
     const { approved } = await new Promise<{ approved: boolean; alwaysAllow: boolean }>(
       (resolve) => {
-        this._pendingApprovals.set(requestId, resolve);
+        session.pendingApprovals.set(requestId, resolve);
         config.onApprovalRequest(req);
       },
     );

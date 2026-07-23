@@ -1,0 +1,9 @@
+# Ritemark v1.8.3 — now with Comments
+
+Writing is rarely one clean pass. You leave yourself notes, flag a paragraph to rework, ask a question about a sentence you'll come back to. Until now, Ritemark had no way to do any of that without cluttering the prose itself. v1.8.3 changes that: **Comments** are here. Select any text, click **Comment**, and Ritemark highlights the passage and opens a note in the margin — the familiar Google-Docs-style model. Want a quick standalone note? Type `///` and drop one straight into the right margin. And because comments save into the Markdown file itself, they're still there when you reopen the document.
+
+Comments also become the shortest path to Ritemark's AI. Mention `@claude`, `@codex`, or `@opencode` inside a comment and a **Send to AI** button appears — one click relays that exact passage, plus your note, into the AI sidebar. No copying paragraphs, no re-explaining what you meant. You comment where you're already looking, and the agent gets the full context.
+
+This release also clears out some friction. The bundled Codex runtime was old enough that the newest models didn't show up — now **GPT-5.6** (`gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`) appears in the Codex model picker. New chats stay as separate History sessions again instead of merging into one, and attaching a text or Markdown file to an AI message now shows a proper file chip so you can see what you attached.
+
+v1.8.3 is live on every platform right now — **macOS** (Apple Silicon and Intel) and **Windows** (x64). The Mac builds are signed and notarized by Apple, and the Windows installer is code-signed via Azure Trusted Signing, so there are no unsigned-app warnings on either side. Existing users get it through the in-app updater; new users can grab it from the releases page — and everyone should give the new margin a try.

@@ -346,4 +346,8 @@ A tinted-background toast (e.g., full green `--ritemark-success-soft`) is too lo
 
 When Jarmo approves a component that violates a rule above, document it here with the date and rationale. No backfill — just forward-looking exceptions.
 
-*(none yet)*
+### Comment-callout yellow (2026-07-15, Sprint 94, #81)
+
+**Rule broken:** "indigo is the only chromatic signal; semantic colour only for genuinely semantic states."
+
+**Exception:** editor-only comments use a functional **soft-yellow** — highlight `#FEF3C7` (light) / `rgba(251,191,36,0.20)` (dark) on the anchored text, marker accent `#F59E0B`. Indigo is reserved for the accent (mentions, Send-to-AI, focus), so comments needed a distinct, non-alarming signal that reads as "annotation" rather than "warning" (amber's usual semantic). Jarmo-requested during the Sprint 94 UI review. The `@agent` mention chip inside a comment stays indigo (`--ritemark-indigo-soft`) — that IS the accent. Scope: the comment highlight + gutter marker only; no other surface adopts yellow.
