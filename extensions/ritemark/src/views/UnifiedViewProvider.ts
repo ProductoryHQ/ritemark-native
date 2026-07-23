@@ -64,6 +64,13 @@ import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { createRuntime } from '../runtime/runtimeFactory';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
 import * as modelCatalog from '../ai/modelCatalog';
+import {
+  renderCapabilityContext,
+  CLAUDE_DESCRIPTOR,
+  CODEX_DESCRIPTOR,
+  ACP_DESCRIPTOR,
+  type CapabilityDescriptor,
+} from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 
@@ -72,8 +79,6 @@ import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runt
  * // Sprint 99 Phase 1: remove once every webview path sends conversationId.
  */
 const DEFAULT_CONVERSATION_ID = 'default';
-
-const BROWSER_ROUTING_HINT = 'Ritemark has an integrated browser. When opening URLs or browsing the web, prefer the mcp__ritemark_browser__* tools over Bash open/xdg-open commands.';
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -296,9 +301,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             approvalMode,
             codexApprovalPolicy,
             codexSandboxMode,
-            // extraSystemPrompt is APPENDED by Claude Code but REPLACES Codex's
-            // base instructions — so only set it for Claude Code's browser hint.
-            extraSystemPrompt: isClaudeCode && browserEnabled ? BROWSER_ROUTING_HINT : undefined,
+            // Unified capability context (Sprint 101 #154): ONE source
+            // (src/ai/capabilityContext.ts), delivered through each runtime's own
+            // mechanism — Claude appends it, Codex uses it as base instructions,
+            // ACP injects it once per session. The old append/replace asymmetry
+            // (browser hint reached Claude only) is gone; every runtime now gets
+            // materially the same capability awareness, and the browser guidance
+            // is included whenever the integrated browser is actually available.
+            extraSystemPrompt: renderCapabilityContext(
+              (isClaudeCode
+                ? { ...CLAUDE_DESCRIPTOR, hasBrowserTools: browserEnabled }
+                : isCodex
+                  ? { ...CODEX_DESCRIPTOR, hasBrowserTools: browserEnabled }
+                  : ACP_DESCRIPTOR) as CapabilityDescriptor
+            ),
             mcpServers,
             allowedTools: isClaudeCode && browserEnabled
               ? [...DEFAULT_TOOLS, ...BROWSER_TOOL_ALLOW_NAMES]

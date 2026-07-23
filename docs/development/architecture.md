@@ -160,6 +160,28 @@ conversation, not just a concurrency risk.
 is one integrated browser and one active tab, so tool calls are commands against shared state.
 Per-chat browsers would need per-chat tab ownership in the workbench — shell-tier, out of scope.
 
+### Capability Context (Sprint 101, #154)
+
+The standing "what Ritemark is and how you act inside it" guidance every runtime receives lives in
+**exactly one module**, `src/ai/capabilityContext.ts` (`renderCapabilityContext(descriptor)`). It
+describes the real capability surface: an agent's only way to change a document is its file-editing
+tool writing the markdown file on disk; comments are `<!-- … -->` / `<mark data-comment>` (not
+footnotes, not `///`); internal links are relative Markdown links; slash-menu / `/image` / `/diagram`
+/ export / voice are USER-ONLY; prefer the integrated browser over `open`/`xdg-open`. Adding a
+Ritemark capability = editing this one module.
+
+Each runtime delivers the same context through its own native mechanism — `UnifiedViewProvider` is
+the single injection point, rendering the per-runtime descriptor into `RuntimeSessionConfig.extraSystemPrompt`:
+
+| Runtime | Mechanism | Notes |
+|---|---|---|
+| Claude Code | `systemPrompt.append` (after the safety prefix) | `extraSystemPrompt` → `extraSystemPromptAppend` (`ClaudeCodeRuntime.ts`) |
+| Codex | `baseInstructions` (`buildCodexBaseInstructions`) | context IS the base; the legacy `CODEX_BASE_INSTRUCTIONS` survives only as a defensive fallback |
+| OpenCode / ACP | per-turn prompt prefix, **once per session** | ACP has no system-prompt concept; `buildAcpPromptText` prepends the context on the first turn only |
+
+This replaced a documented asymmetry where `extraSystemPrompt` was APPENDED by Claude but REPLACED
+Codex's base — so only Claude received the browser hint. The browser guidance is now included for any
+runtime whose integrated browser is actually available (`descriptor.hasBrowserTools`).
 
 ### AS IS (Sprints 1–78) — Three Parallel Worlds
 

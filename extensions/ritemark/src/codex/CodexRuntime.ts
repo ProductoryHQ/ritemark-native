@@ -38,6 +38,12 @@ import type {
 
 // ── Codex-specific constants ────────────────────────────────────────────────
 
+/**
+ * Defensive fallback base instructions. In normal operation Codex receives the
+ * shared capability context (a superset of this) via `config.extraSystemPrompt`
+ * — see `buildCodexBaseInstructions`. This const only applies if that context is
+ * somehow absent, so it keeps the minimum markdown-editor framing.
+ */
 const CODEX_BASE_INSTRUCTIONS = [
   'You are running inside Ritemark — a markdown editor, not a code IDE.',
   'When the user asks you to modify, edit, simplify, rewrite, translate, or change text in the active file, use your file editing tools (apply_patch) to make the change directly in the file.',
@@ -45,6 +51,25 @@ const CODEX_BASE_INSTRUCTIONS = [
   'Reply text after a file edit should briefly confirm what changed, not restate the new text.',
   'Prefer structured protocol features over free-form text when the protocol supports them.',
 ].join(' ');
+
+/**
+ * Choose Codex's `baseInstructions`. Sprint 101 (#154): the shared capability
+ * context (`src/ai/capabilityContext.ts`, rendered for the Codex descriptor) is
+ * passed in via `extraSystemPrompt` and IS the base — it subsumes
+ * `CODEX_BASE_INSTRUCTIONS` (same markdown-editor framing, plus comments/links/
+ * user-only/browser/fallback awareness).
+ *
+ * This replaces the previous `config.extraSystemPrompt ?? CODEX_BASE_INSTRUCTIONS`
+ * where `extraSystemPrompt` carried ONLY the browser hint and thus silently wiped
+ * Codex's Ritemark-aware base. It no longer can: the only thing placed in
+ * `extraSystemPrompt` now is the full capability context. `CODEX_BASE_INSTRUCTIONS`
+ * survives purely as a defensive fallback when the context is absent.
+ */
+export function buildCodexBaseInstructions(extraSystemPrompt: string | undefined): string {
+  return extraSystemPrompt && extraSystemPrompt.trim()
+    ? extraSystemPrompt
+    : CODEX_BASE_INSTRUCTIONS;
+}
 
 const CODEX_PLAN_DEVELOPER_INSTRUCTIONS = [
   'When you need the user to choose between options or provide required clarifications before continuing, you must use the request_user_input tool instead of asking in plain assistant text.',
@@ -203,7 +228,7 @@ export class CodexSession implements RuntimeSession {
         model: resolvedModel,
         approvalPolicy,
         sandbox,
-        baseInstructions: config.extraSystemPrompt ?? CODEX_BASE_INSTRUCTIONS,
+        baseInstructions: buildCodexBaseInstructions(config.extraSystemPrompt),
         developerInstructions: shouldUsePlanMode ? planDevInstructions : null,
         ...(dynamicTools ? { dynamicTools } : {}),
       }, this.conversationId);
