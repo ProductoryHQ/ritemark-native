@@ -79,7 +79,7 @@ release_date: "2025-01-14"
 If not provided, gather from:
 1. Release plan: `docs/development/releases/vX.Y.Z/release-plan.md` (release thesis, headlines, sprint tracker, feature-complete state)
 2. Sprint docs under `docs/development/releases/vX.Y.Z/sprint-N/`
-3. Merged agent-fix issues since the last release: `is:issue is:closed label:agent-pr-open closed:>=<date-of-last-release>` against `ProductoryHQ/ritemark-native` — the scheduled issue-triage routine ships these as standalone PRs outside any sprint, so they're absent from sources 1 and 2 above. Do not skip this source; it's the only place these fixes are discoverable.
+3. Merged agent-fix issues since the last release: `gh issue list --repo ProductoryHQ/ritemark-native --state closed --search "label:agent-pr-open closed:>=<date-of-last-release>"` — the scheduled issue-triage routine ships these as standalone PRs outside any sprint, so they're absent from sources 1 and 2 above. Do not skip this source; it's the only place these fixes are discoverable. (Use this exact `gh issue list --search` form — `gh search issues` with the compound query string silently returns 0 results.)
 4. Git log: Recent commits since last release
 5. Extension package.json: `/extensions/ritemark/package.json`
 

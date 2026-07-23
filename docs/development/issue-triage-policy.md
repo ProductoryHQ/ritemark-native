@@ -63,11 +63,12 @@ Do not design solutions in the comment. It is pre-analysis for sprint planning, 
 
 Merged `agent-fix` PRs are not tied to any sprint, so they are invisible to `release-manager`/`product-marketer`'s default release-notes sources (release plan + sprint docs). The `agent-pr-open` label survives issue closure, so it's the durable pointer: when compiling release notes, the query
 
-```
-is:issue is:closed label:agent-pr-open closed:>=<date-of-last-release>
+```bash
+gh issue list --repo ProductoryHQ/ritemark-native --state closed \
+  --search "label:agent-pr-open closed:>=<date-of-last-release>"
 ```
 
-against `ProductoryHQ/ritemark-native` returns every triage-workflow fix shipped since the last release. `release-manager`'s Pre-Release Audit and `product-marketer`'s Phase 1 information-gathering both include this check — see those docs for where it slots in. This routine's only obligation is to keep applying `agent-pr-open` correctly (see Agent-fix procedure above); it does not need to do anything extra at triage time for this to work.
+returns every triage-workflow fix shipped since the last release. (Use this `gh issue list --search` form — `gh search issues` with the compound query string silently returns 0 results.) `release-manager`'s Step 0b and `product-marketer`'s information-gathering fallback list (the "If not provided, gather from" sources) both include this check — see those docs for where it slots in. This routine's only obligation is to keep applying `agent-pr-open` correctly (see Agent-fix procedure above); it does not need to do anything extra at triage time for this to work.
 
 ## Run report
 
