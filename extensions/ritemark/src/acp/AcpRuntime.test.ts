@@ -140,6 +140,39 @@ async function testNoProviderErrorIsActionable(): Promise<void> {
   console.log('✓ Test 10: "No provider available" becomes an actionable message');
 }
 
+/**
+ * A hung provider must not strand the turn forever. The ACP path had no timeout
+ * of its own (Claude and Codex both do), so a non-responding model left the UI
+ * at "Starting OpenCode…" with no way out but Stop. The turn must now settle as
+ * an actionable error and cancel the abandoned session.
+ */
+async function testHungTurnTimesOut(): Promise<void> {
+  const runtime = new AcpRuntime();
+  let reported: { status: string; error?: string } | undefined;
+  const config: RuntimeSessionConfig = {
+    ...dummyConfig,
+    onCodexComplete: (r) => { reported = r; },
+  };
+  const session = addSession(runtime, 'conv-hang', config);
+
+  const cancelled: string[] = [];
+  // A prompt that never resolves, and a cancel we can observe.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (runtime as any)._manager = {
+    ...mockManager,
+    prompt: () => new Promise(() => { /* hangs forever */ }),
+    cancel: async (sid: string) => { cancelled.push(sid); },
+  };
+
+  // timeoutMinutes is minutes; 1/60000 min = 1ms so the test does not wait 15m.
+  await session.prompt({ prompt: 'hi', timeoutMinutes: 1 / 60000 });
+
+  assert.equal(reported?.status, 'error', 'a hung turn must settle as an error, not hang');
+  assert.match(reported?.error ?? '', /did not respond/i, 'the error must be actionable, not a raw hang');
+  assert.equal(cancelled.length, 1, 'the abandoned upstream session must be cancelled');
+  console.log('✓ Test 11: a hung OpenCode turn times out and cancels the session');
+}
+
 async function run() {
   // Test 1: AcpRuntime structurally satisfies AgentRuntime
   {
@@ -295,7 +328,9 @@ async function run() {
 
   await testNoProviderErrorIsActionable();
 
-  console.log('\nAll 10 AcpRuntime tests passed!');
+  await testHungTurnTimesOut();
+
+  console.log('\nAll 11 AcpRuntime tests passed!');
 }
 
 run().then(

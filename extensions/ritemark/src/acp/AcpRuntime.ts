@@ -50,6 +50,14 @@ type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => 
 const _browserToolsInjector = new BrowserToolsInjector();
 
 /**
+ * Ceiling for a single OpenCode turn. Matches Claude's 15-minute inactivity
+ * timeout in spirit — long enough for a real slow turn, short enough that a hung
+ * provider does not strand the UI forever. Overridable per turn via
+ * RuntimeTurnConfig.timeoutMinutes.
+ */
+const DEFAULT_ACP_TIMEOUT_MINUTES = 15;
+
+/**
  * One conversation's OpenCode session (an ACP `ses_…` on the shared connection).
  */
 export class AcpSession implements RuntimeSession {
@@ -122,8 +130,36 @@ export class AcpSession implements RuntimeSession {
           : config.model;
         await manager.setModel(this.acpSessionId, providerModel);
       }
-      const result = await manager.prompt(this.acpSessionId, promptText);
-      config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
+
+      // A BYOK provider can hang a turn indefinitely — no response, no error —
+      // and the ACP path had no timeout of its own, unlike Claude (15-min
+      // inactivity) and Codex (slow-RPC handling). The turn then sat at
+      // "Starting OpenCode…" forever with no way out but Stop. Bound it here and
+      // cancel the hung session so it settles as an actionable error.
+      const timeoutMs = (turn.timeoutMinutes ?? DEFAULT_ACP_TIMEOUT_MINUTES) * 60_000;
+      let timedOut = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const result = await Promise.race([
+          manager.prompt(this.acpSessionId, promptText),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              timedOut = true;
+              reject(new Error(`OpenCode did not respond within ${Math.round(timeoutMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
+            }, timeoutMs);
+          }),
+        ]);
+        config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
+      } catch (err) {
+        // On timeout, stop the abandoned turn upstream so it does not keep
+        // running against a session the user has already been told failed.
+        if (timedOut) {
+          void manager.cancel(this.acpSessionId).catch(() => { /* already failing */ });
+        }
+        throw err;
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw) });
