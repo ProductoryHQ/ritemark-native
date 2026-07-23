@@ -58,6 +58,38 @@ const _browserToolsInjector = new BrowserToolsInjector();
 const DEFAULT_ACP_TIMEOUT_MINUTES = 15;
 
 /**
+ * Compose the text sent to OpenCode for one turn. Pure — no I/O — so the
+ * injection order and once-per-session capability-context behaviour are
+ * unit-testable without a live process (Sprint 101 S6.2).
+ *
+ * Order (top → bottom): capability context (first turn only) · attachments ·
+ * `[Currently editing: …]` · the user's prompt.
+ */
+export function buildAcpPromptText(
+  turn: RuntimeTurnConfig,
+  opts: { capabilityContext?: string } = {},
+): { text: string; imageAttachmentCount: number } {
+  let promptText = turn.prompt;
+  // Active file context — same `[Currently editing: …]` preamble Claude Code and
+  // Codex inject, so "edit this file" prompts know the target.
+  if (turn.activeFile) {
+    promptText = `[Currently editing: ${turn.activeFile.path}]\n\n${promptText}`;
+  }
+  let imageAttachmentCount = 0;
+  if (turn.attachments && turn.attachments.length > 0) {
+    const blocks = turn.attachments.map(a => `**Attachment: ${a.name}**\n\`\`\`\n${a.data}\n\`\`\``);
+    promptText = `${blocks.join('\n\n')}\n\n${promptText}`;
+    imageAttachmentCount = turn.attachments.filter(a => a.kind === 'image').length;
+  }
+  // Capability context (Sprint 101 #154): ACP has no system prompt, so the shared
+  // context rides in as a standing preamble on the first turn of the session.
+  if (opts.capabilityContext && opts.capabilityContext.trim()) {
+    promptText = `${opts.capabilityContext}\n\n${promptText}`;
+  }
+  return { text: promptText, imageAttachmentCount };
+}
+
+/**
  * One conversation's OpenCode session (an ACP `ses_…` on the shared connection).
  */
 export class AcpSession implements RuntimeSession {
@@ -80,6 +112,15 @@ export class AcpSession implements RuntimeSession {
    * breaks the OpenCode permission-gate invariant and is a release blocker.
    */
   readonly recentlyPermissionedWrites = new Set<string>();
+
+  /**
+   * Whether this session has already injected the shared capability context
+   * (`config.extraSystemPrompt`). ACP has no system-prompt mechanism, so the
+   * context is prepended to the FIRST turn only — OpenCode retains earlier turn
+   * text in the session, so once is enough and per-turn injection would bloat
+   * every prompt. See Sprint 101 technical-plan §4.
+   */
+  private _capabilityContextInjected = false;
 
   constructor(
     readonly conversationId: string,
@@ -106,19 +147,16 @@ export class AcpSession implements RuntimeSession {
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
-    let promptText = turn.prompt;
-    // Active file context — same `[Currently editing: …]` preamble Claude Code
-    // and Codex inject, so "edit this file" prompts know the target.
-    if (turn.activeFile) {
-      promptText = `[Currently editing: ${turn.activeFile.path}]\n\n${promptText}`;
+    // Inject the shared capability context once per session (ACP has no system
+    // prompt). config.extraSystemPrompt is set by UnifiedViewProvider to the
+    // ACP-flavoured render of src/ai/capabilityContext.ts.
+    const capabilityContext = this._capabilityContextInjected ? undefined : config.extraSystemPrompt;
+    const { text: promptText, imageAttachmentCount } = buildAcpPromptText(turn, { capabilityContext });
+    if (capabilityContext && capabilityContext.trim()) {
+      this._capabilityContextInjected = true;
     }
-    if (turn.attachments && turn.attachments.length > 0) {
-      const blocks = turn.attachments.map(a => `**Attachment: ${a.name}**\n\`\`\`\n${a.data}\n\`\`\``);
-      promptText = `${blocks.join('\n\n')}\n\n${promptText}`;
-      const imageCount = turn.attachments.filter(a => a.kind === 'image').length;
-      if (imageCount > 0) {
-        config.onProgress({ type: 'text', message: `Note: ${imageCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
-      }
+    if (imageAttachmentCount > 0) {
+      config.onProgress({ type: 'text', message: `Note: ${imageAttachmentCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
     }
 
     try {

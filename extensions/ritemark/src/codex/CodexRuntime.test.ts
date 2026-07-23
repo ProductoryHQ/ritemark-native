@@ -46,7 +46,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { CodexRuntime, CodexSession } = require('./CodexRuntime') as typeof import('./CodexRuntime');
+const { CodexRuntime, CodexSession, buildCodexBaseInstructions } = require('./CodexRuntime') as typeof import('./CodexRuntime');
 type CodexRuntime = import('./CodexRuntime').CodexRuntime;
 type CodexSession = import('./CodexRuntime').CodexSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -300,7 +300,26 @@ async function run() {
 
   await testCancelDeclinesOutstandingApprovals();
 
-  console.log('\nAll 10 CodexRuntime tests passed!');
+  // ── Test 10: Sprint 101 — baseInstructions no longer REPLACED away ──
+  {
+    // When capability context is present, it IS the base (superset of the legacy
+    // fallback). The old `extraSystemPrompt ?? CODEX_BASE_INSTRUCTIONS` could let
+    // a browser-hint-only string wipe Ritemark-awareness; buildCodexBaseInstructions
+    // makes the context the base instead.
+    const context = 'RITEMARK CONTEXT\nYou are running inside Ritemark, a markdown editor.';
+    assert.strictEqual(
+      buildCodexBaseInstructions(context),
+      context,
+      'capability context becomes the base instructions',
+    );
+    // Absent/blank context falls back to the defensive default (still Ritemark-aware).
+    const fallback = buildCodexBaseInstructions(undefined);
+    assert.ok(/markdown editor/i.test(fallback), 'fallback keeps markdown-editor framing');
+    assert.strictEqual(buildCodexBaseInstructions('   '), fallback, 'blank context uses the fallback');
+    console.log('✓ Test 10: buildCodexBaseInstructions — context is the base, no silent replace');
+  }
+
+  console.log('\nAll 11 CodexRuntime tests passed!');
 }
 
 run().then(

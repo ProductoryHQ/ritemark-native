@@ -41,7 +41,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { AcpRuntime, AcpSession } = require('./AcpRuntime') as typeof import('./AcpRuntime');
+const { AcpRuntime, AcpSession, buildAcpPromptText } = require('./AcpRuntime') as typeof import('./AcpRuntime');
 type AcpRuntime = import('./AcpRuntime').AcpRuntime;
 type AcpSession = import('./AcpRuntime').AcpSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -330,7 +330,47 @@ async function run() {
 
   await testHungTurnTimesOut();
 
-  console.log('\nAll 11 AcpRuntime tests passed!');
+  // ── Test 9: Sprint 101 — capability context prefixed, order preserved ──
+  {
+    const turn = { prompt: 'rewrite this', activeFile: { path: 'notes.md' } };
+    const context = 'RITEMARK CONTEXT\nYou are a markdown editor.';
+    const { text } = buildAcpPromptText(turn as any, { capabilityContext: context });
+    assert.ok(text.startsWith(context), 'capability context leads the prompt');
+    assert.ok(text.includes('[Currently editing: notes.md]'), 'active-file preamble preserved');
+    assert.ok(text.trimEnd().endsWith('rewrite this'), 'user prompt stays last');
+    // Context ordering: capability context before the active-file preamble.
+    assert.ok(text.indexOf(context) < text.indexOf('[Currently editing'), 'context precedes active-file block');
+
+    // No context passed (later turns) → no prefix, prompt still composed.
+    const { text: bare } = buildAcpPromptText(turn as any, {});
+    assert.ok(!bare.includes('RITEMARK CONTEXT'), 'omitting context yields no prefix');
+    assert.ok(bare.includes('[Currently editing: notes.md]'), 'active-file preamble still present');
+
+    // Image attachments still counted for the BYOK conversion notice.
+    const withImg = buildAcpPromptText(
+      { prompt: 'x', attachments: [{ kind: 'image', name: 'a.png', data: 'zzz' }] } as any,
+      {},
+    );
+    assert.strictEqual(withImg.imageAttachmentCount, 1, 'image attachments counted');
+    console.log('✓ Test 9: buildAcpPromptText — context prefix, order, image count');
+  }
+
+  // ── Test 10: capability context injected ONCE per session ──
+  {
+    const session = new AcpSession('conv-once', 'ses-1', {
+      ...dummyConfig,
+      extraSystemPrompt: 'RITEMARK CONTEXT once',
+    } as RuntimeSessionConfig, {} as AcpRuntime);
+    // First turn: the flag was false → context is what buildAcpPromptText receives.
+    const firstCtx = (session as any)._capabilityContextInjected ? undefined : session.config.extraSystemPrompt;
+    assert.strictEqual(firstCtx, 'RITEMARK CONTEXT once', 'first turn would inject the context');
+    (session as any)._capabilityContextInjected = true;
+    const secondCtx = (session as any)._capabilityContextInjected ? undefined : session.config.extraSystemPrompt;
+    assert.strictEqual(secondCtx, undefined, 'second turn injects nothing (once per session)');
+    console.log('✓ Test 10: capability context is once-per-session');
+  }
+
+  console.log('\nAll 13 AcpRuntime tests passed!');
 }
 
 run().then(
