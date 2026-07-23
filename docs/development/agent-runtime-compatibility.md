@@ -47,6 +47,23 @@ Sprint 99 made all three runtimes multi-session. This checks the capability surv
 | **Claude 2.1.217** | **untested live** — one `AgentSession` per conversation with no shared state (audit found no module-level singleton); unit coverage green under the new SDK | **untested live** — pending-approval maps keyed by server-minted `toolUseId` | **untested live** | **untested live** |
 | **OpenCode 1.18.4** | **untested live under 1.18.4** — proven on 1.15.13 in the Sprint 99 spike (overlap 1795–2228 ms, 33–36 alternation blocks) | **untested live** | **improved** — cancel is now per-session by protocol, so it cannot affect a sibling; the process-kill that made this dangerous is removed | pass by construction — write-approval state is per session (Sprint 99 C1) |
 
+## Dev-instance validation (2026-07-23)
+
+Jarmo drove the new binaries in a running dev instance. Outcomes:
+
+- **Claude 2.1.217 live turn — CONFIRMED working.** The matrix previously listed this untested; a
+  live conversation through Ritemark's actual code path is now confirmed. (Note: on this machine the
+  extension resolves Claude to a separately-managed global install that is *also* 2.1.217, so this
+  proves the SDK + version pair works end to end, against a binary of the same version, not literally
+  the bundled file.)
+- **OpenCode Stop mid-turn — confirmed** returning to idle without killing the shared process.
+- **Two pre-existing OpenCode gaps surfaced and were fixed** (neither a runtime-bump regression):
+  switching a conversation to OpenCode dropped the Claude handoff, and a hung provider turn had no
+  timeout and sat at "Starting OpenCode…" forever. Both now fixed with regression tests.
+- **A Gemini-via-BYOK turn hung.** Root cause undiagnosed — could not be reproduced without the
+  provider key; all six OpenCode Zen free models handled the same large prompt in seconds. The
+  timeout fix converts the hang into an actionable error regardless of cause.
+
 ## What is NOT proven
 
 Stated plainly rather than left to look green:
