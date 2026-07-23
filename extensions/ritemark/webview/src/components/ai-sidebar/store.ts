@@ -1357,6 +1357,27 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const lastTurn = conversation.codexConversation[conversation.codexConversation.length - 1];
       if (lastTurn?.isRunning) return;
 
+      // Cross-runtime handoff. OpenCode's send path was the only one of the three
+      // that never built this, so switching to OpenCode mid-conversation dropped
+      // everything Claude had said — it would answer "I have no prior context"
+      // with that context sitting one bubble above. Mirror sendCodexMessage:
+      // prepend Claude turns since OpenCode's last turn, plus the selection block.
+      const lastOpenCodeTimestamp = lastTurn?.timestamp ?? 0;
+      const handoff = buildHandoffContext(
+        conversation.agentConversation.map((t) => ({
+          userPrompt: t.userPrompt,
+          responseText: t.result?.text || undefined,
+          timestamp: t.timestamp,
+        })),
+        'Claude',
+        lastOpenCodeTimestamp,
+      );
+      const selectionBlock = get().buildSelectionContextBlock();
+      const handoffPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
+      const fullPrompt = selectionBlock
+        ? `${selectionBlock}\n\n---\n\n${handoffPrompt}`
+        : handoffPrompt;
+
       // Strip the "opencode:" prefix — host expects bare "provider/model"
       const compositeValue = conversation.opencodeSelectedModel;
       const model = compositeValue.startsWith('opencode:')
@@ -1389,7 +1410,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         type: 'agent-execute',
         conversationId: conversation.id,
         agentId: 'opencode',
-        prompt,
+        // The chat bubble shows the raw `prompt` (turn.userPrompt); the model
+        // receives the handoff/selection-wrapped `fullPrompt`, same as Codex.
+        prompt: fullPrompt,
         model,
         approvalMode: conversation.pendingRuntime.mode,
       });
