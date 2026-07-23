@@ -202,6 +202,50 @@ function testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning() {
   }
 }
 
+// ── cross-runtime handoff (OpenCode was the odd one out) ────────────────────────
+
+function testOpenCodeReceivesClaudeHandoff() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+
+  try {
+    // A conversation where Claude answered first, then the user switches to OpenCode.
+    seedActiveConversation({
+      opencodeSelectedModel: 'opencode:openrouter/some-model',
+      pendingRuntime: { runtimeId: 'opencode', modelId: 'opencode:openrouter/some-model', mode: 'auto' },
+      agentConversation: [makeAgentTurn({
+        userPrompt: 'Summarise the README',
+        result: { text: 'The README describes a markdown editor.', filesModified: [], metrics: { durationMs: 0, costUsd: null, model: null } },
+        timestamp: 1,
+      })],
+      codexConversation: [],
+    });
+
+    useAISidebarStore.getState().sendOpenCodeMessage('and what would you do?');
+
+    const exec = posted.find((m): m is { type: string; agentId: string; prompt: string } =>
+      typeof m === 'object' && m !== null && (m as { type?: string }).type === 'agent-execute'
+      && (m as { agentId?: string }).agentId === 'opencode');
+    assert.ok(exec, 'sendOpenCodeMessage must post an agent-execute for opencode');
+    assert.match(exec!.prompt, /handled by Claude/i,
+      'OpenCode must receive the Claude handoff preamble — the bug was that it did not');
+    assert.match(exec!.prompt, /markdown editor/,
+      'the handoff must carry what Claude actually said');
+    assert.match(exec!.prompt, /and what would you do\?/,
+      'the user request must still be present after the handoff');
+
+    // The chat bubble shows the raw prompt, not the wrapped one.
+    const { codexConversation } = selectActiveConversation(useAISidebarStore.getState());
+    assert.equal(codexConversation[codexConversation.length - 1].userPrompt, 'and what would you do?',
+      'the visible bubble must show the raw prompt, not the handoff wrapper');
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
   testSetPendingRuntimeModeOnly();
@@ -209,6 +253,7 @@ function main() {
   testCancelRequestRoutesToClaudeWhenClaudeIsRunning();
   testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns();
   testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning();
+  testOpenCodeReceivesClaudeHandoff();
   console.log('Runtime switching tests passed.');
 }
 

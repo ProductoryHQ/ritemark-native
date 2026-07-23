@@ -113,6 +113,66 @@ async function testDisposeCancelsUpstreamTurn(): Promise<void> {
   console.log('✓ Test 9: dispose() cancels the upstream turn before forgetting the session');
 }
 
+/**
+ * Sprint 100: OpenCode 1.18.4 throws "No provider available" when no model is
+ * selected (1.15.13 returned a silent zero-token turn instead). The raw message
+ * tells a user nothing, so it must be translated.
+ */
+async function testNoProviderErrorIsActionable(): Promise<void> {
+  const runtime = new AcpRuntime();
+  let reported: string | undefined;
+  const config: RuntimeSessionConfig = {
+    ...dummyConfig,
+    onCodexComplete: (r) => { reported = r.error; },
+  };
+  const session = addSession(runtime, 'conv-nomodel', config);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (runtime as any)._manager = {
+    ...mockManager,
+    prompt: async () => { throw new Error('Internal error: No provider available'); },
+  };
+
+  await session.prompt({ prompt: 'hi' });
+
+  assert.ok(reported, 'the turn must report an error');
+  assert.ok(!/no provider available/i.test(reported!), 'the raw protocol message must not reach the user');
+  assert.match(reported!, /model is selected/i, 'the message must say what to do about it');
+  console.log('✓ Test 10: "No provider available" becomes an actionable message');
+}
+
+/**
+ * A hung provider must not strand the turn forever. The ACP path had no timeout
+ * of its own (Claude and Codex both do), so a non-responding model left the UI
+ * at "Starting OpenCode…" with no way out but Stop. The turn must now settle as
+ * an actionable error and cancel the abandoned session.
+ */
+async function testHungTurnTimesOut(): Promise<void> {
+  const runtime = new AcpRuntime();
+  let reported: { status: string; error?: string } | undefined;
+  const config: RuntimeSessionConfig = {
+    ...dummyConfig,
+    onCodexComplete: (r) => { reported = r; },
+  };
+  const session = addSession(runtime, 'conv-hang', config);
+
+  const cancelled: string[] = [];
+  // A prompt that never resolves, and a cancel we can observe.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (runtime as any)._manager = {
+    ...mockManager,
+    prompt: () => new Promise(() => { /* hangs forever */ }),
+    cancel: async (sid: string) => { cancelled.push(sid); },
+  };
+
+  // timeoutMinutes is minutes; 1/60000 min = 1ms so the test does not wait 15m.
+  await session.prompt({ prompt: 'hi', timeoutMinutes: 1 / 60000 });
+
+  assert.equal(reported?.status, 'error', 'a hung turn must settle as an error, not hang');
+  assert.match(reported?.error ?? '', /did not respond/i, 'the error must be actionable, not a raw hang');
+  assert.equal(cancelled.length, 1, 'the abandoned upstream session must be cancelled');
+  console.log('✓ Test 11: a hung OpenCode turn times out and cancels the session');
+}
+
 async function run() {
   // Test 1: AcpRuntime structurally satisfies AgentRuntime
   {
@@ -266,7 +326,11 @@ async function run() {
 
   await testDisposeCancelsUpstreamTurn();
 
-  console.log('\nAll 9 AcpRuntime tests passed!');
+  await testNoProviderErrorIsActionable();
+
+  await testHungTurnTimesOut();
+
+  console.log('\nAll 11 AcpRuntime tests passed!');
 }
 
 run().then(

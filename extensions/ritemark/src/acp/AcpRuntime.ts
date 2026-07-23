@@ -50,6 +50,14 @@ type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => 
 const _browserToolsInjector = new BrowserToolsInjector();
 
 /**
+ * Ceiling for a single OpenCode turn. Matches Claude's 15-minute inactivity
+ * timeout in spirit — long enough for a real slow turn, short enough that a hung
+ * provider does not strand the UI forever. Overridable per turn via
+ * RuntimeTurnConfig.timeoutMinutes.
+ */
+const DEFAULT_ACP_TIMEOUT_MINUTES = 15;
+
+/**
  * One conversation's OpenCode session (an ACP `ses_…` on the shared connection).
  */
 export class AcpSession implements RuntimeSession {
@@ -122,10 +130,39 @@ export class AcpSession implements RuntimeSession {
           : config.model;
         await manager.setModel(this.acpSessionId, providerModel);
       }
-      const result = await manager.prompt(this.acpSessionId, promptText);
-      config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
+
+      // A BYOK provider can hang a turn indefinitely — no response, no error —
+      // and the ACP path had no timeout of its own, unlike Claude (15-min
+      // inactivity) and Codex (slow-RPC handling). The turn then sat at
+      // "Starting OpenCode…" forever with no way out but Stop. Bound it here and
+      // cancel the hung session so it settles as an actionable error.
+      const timeoutMs = (turn.timeoutMinutes ?? DEFAULT_ACP_TIMEOUT_MINUTES) * 60_000;
+      let timedOut = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const result = await Promise.race([
+          manager.prompt(this.acpSessionId, promptText),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              timedOut = true;
+              reject(new Error(`OpenCode did not respond within ${Math.round(timeoutMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
+            }, timeoutMs);
+          }),
+        ]);
+        config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
+      } catch (err) {
+        // On timeout, stop the abandoned turn upstream so it does not keep
+        // running against a session the user has already been told failed.
+        if (timedOut) {
+          void manager.cancel(this.acpSessionId).catch(() => { /* already failing */ });
+        }
+        throw err;
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     } catch (err) {
-      config.onCodexComplete?.({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+      const raw = err instanceof Error ? err.message : String(err);
+      config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw) });
     }
   }
 
@@ -134,7 +171,7 @@ export class AcpSession implements RuntimeSession {
     try {
       await this._runtime.getManager()?.cancel(this.acpSessionId);
     } catch {
-      // Process may already be gone if this was the last session and it was killed.
+      // Best-effort: the session may already have settled or the connection dropped.
     }
     this._runtime._forgetSession(this);
   }
@@ -170,6 +207,23 @@ export class AcpSession implements RuntimeSession {
     }
     this.pendingApprovals.clear();
   }
+}
+
+/**
+ * Turn an ACP turn failure into something a user can act on.
+ *
+ * OpenCode 1.18.4 has no default model — `configOptions.model.current` is
+ * undefined — so prompting before one is selected throws "No provider
+ * available". Sprint 100 verified 1.15.13 had no default either, but it failed
+ * differently: a silent `end_turn` with zero tokens, which Ritemark reported via
+ * its empty-turn soft error. The bump turned a silent failure into a loud one,
+ * which is an improvement — but the raw message says nothing about what to do.
+ */
+function describeAcpTurnError(raw: string): string {
+  if (/no provider available/i.test(raw)) {
+    return 'No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.';
+  }
+  return raw;
 }
 
 export class AcpRuntime implements AgentRuntime {

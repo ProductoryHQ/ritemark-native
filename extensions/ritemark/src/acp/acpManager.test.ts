@@ -27,6 +27,7 @@ let sessionSeq = 0;
 function send(o){ process.stdout.write(JSON.stringify(o)+'\\n'); }
 function result(id,res){ send({jsonrpc:'2.0',id,result:res}); }
 function notify(m,p){ send({jsonrpc:'2.0',method:m,params:p}); }
+const pending=new Map();
 rl.on('line',(line)=>{
   let msg; try{ msg=JSON.parse(line);}catch{return;}
   if(msg.method==='initialize'){
@@ -38,7 +39,8 @@ rl.on('line',(line)=>{
     if(process.env.AGENT_SLOW==='1'){
       // Stream one chunk, then settle late so a cancel can land mid-turn.
       notify('session/update',{sessionId:sid,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'partial-'+sid}}});
-      setTimeout(()=>result(msg.id,{stopReason:'end_turn',usage:{inputTokens:1,outputTokens:1,totalTokens:2}}),300);
+      const t=setTimeout(()=>{ pending.delete(sid); result(msg.id,{stopReason:'end_turn',usage:{inputTokens:1,outputTokens:1,totalTokens:2}}); },300);
+      pending.set(sid,{id:msg.id,timer:t});
       return;
     }
     if(process.env.AGENT_EMPTY==='1'){
@@ -53,7 +55,13 @@ rl.on('line',(line)=>{
     notify('session/update',{sessionId:sid,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Done'}}});
     result(msg.id,{stopReason:'end_turn',usage:{inputTokens:5,outputTokens:3,totalTokens:8}});
   } else if(msg.method==='session/cancel'){
-    send({jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found'}});
+    // OpenCode 1.18.4 honours session/cancel: it aborts the running turn, which
+    // settles as stopReason 'cancelled'. Before 1.18.4 this answered -32601 and
+    // the turn ran to completion — the fixture modelled that, and kept asserting
+    // it after Ritemark stopped shipping against it.
+    const sid=msg.params&&msg.params.sessionId;
+    const p=pending.get(sid);
+    if(p){ clearTimeout(p.timer); pending.delete(sid); result(p.id,{stopReason:'cancelled'}); }
   }
 });
 `;
@@ -99,9 +107,9 @@ function makeTaggedManager(events: Array<{ sessionId: string; p: AgentProgress }
 }
 
 /**
- * Cancelling the last session kills the process, which rejects the in-flight
- * session/prompt with the SDK's "ACP connection closed". That is the cancel
- * working — it must not reach the user as a turn error.
+ * A cancelled turn can reject rather than resolve — it used to, because
+ * cancelling killed the process. Either way that is the cancel working and must
+ * not reach the user as a turn error.
  */
 async function testSoleSessionCancelReportsCancelledNotError(): Promise<void> {
   const events: AgentProgress[] = [];
@@ -164,15 +172,19 @@ async function run() {
     mgr.dispose();
   }
 
-  // ── cancel kills the process when it is the ONLY session (C3) ──
+  // ── cancel drops the session and leaves the process alone (Sprint 100) ──
+  // OpenCode 1.18.4 implements session/cancel, so cancelling is a protocol
+  // operation rather than a process kill — even when it is the only session.
+  // Killing would discard a warm subprocess a working cancel preserves.
   {
     const events: AgentProgress[] = [];
     const mgr = makeManager(events);
     const sid = await mgr.start();
     assert.ok(mgr.isRunning(), 'running after start');
     await mgr.cancel(sid);
-    assert.ok(!mgr.isRunning(), 'sole-session cancel still kills the process');
+    assert.ok(mgr.isRunning(), 'cancel must not kill the shared process');
     assert.strictEqual(mgr.currentSessionId, null, 'session id cleared after cancel');
+    mgr.dispose();
   }
 
   // ── Sprint 99 C2: two sessions on ONE process get their own streams ──

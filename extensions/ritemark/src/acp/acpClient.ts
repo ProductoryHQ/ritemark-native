@@ -180,43 +180,28 @@ export class AcpClient {
   /**
    * Cancel an in-flight turn.
    *
-   * OpenCode 1.15.13 does not implement `session/cancel` — it answers -32601 and
-   * the turn keeps streaming to `end_turn` rather than `cancelled` (verified in
-   * the Sprint 99 Phase-0 spike). So the protocol cancel is best-effort and the
-   * process kill is what actually stops the work.
+   * OpenCode implements `session/cancel` as of 1.18.4 (upstream commit 50b4ad89b,
+   * "honor session/cancel by aborting the running turn"): the backing session is
+   * aborted and the turn settles `stopReason: "cancelled"`. Before that it
+   * answered -32601 and kept streaming to `end_turn`, which is why Ritemark used
+   * to kill the process to make cancel mean anything.
    *
-   * The kill is NOT conditional on the protocol call failing, and cannot be:
-   * `Connection.cancel` is a JSON-RPC *notification* in @agentclientprotocol/sdk
-   * 0.22.1 (`dist/acp.js:838`), so it never resolves to an error — the -32601
-   * only ever appears on the agent's stderr. An earlier version of this method
-   * wrapped it in try/catch as though the error were observable; it was not.
+   * That kill is gone. Under Sprint 99 several conversations share one
+   * subprocess, so killing it would take every other chat down — and on 1.18.4
+   * it is not merely unnecessary but harmful, discarding a warm subprocess that
+   * a working protocol cancel preserves and forcing a cold start on the next
+   * prompt.
    *
-   * Sprint 99 (C3): several conversations now share one subprocess, so the kill
-   * can no longer be unconditional — it would take every other chat down with
-   * it. The caller decides via `options.killProcess`:
-   *
-   *  - only live session → kill, exactly as before (nothing else is harmed and
-   *    the user gets a real cancel);
-   *  - siblings live      → do NOT kill. AcpManager marks the session
-   *    cancel-requested and discards its updates until the turn settles, so the
-   *    chat goes idle immediately and the wasted upstream work stays invisible.
-   *
-   * Defaults to true so a single-session embedder keeps today's behaviour.
-   *
-   * // Sprint 100: re-check against 1.18.1 — if it implements session/cancel,
-   * // this becomes a real per-session cancel and the kill goes away entirely.
+   * Still sent as a notification (`Connection.cancel` is `sendNotification` in
+   * @agentclientprotocol/sdk 0.22.1), so there is no response to await; the
+   * outcome is observed as the turn settling `cancelled`.
    */
-  async cancel(sessionId: string, options?: { killProcess?: boolean }): Promise<void> {
-    if (this.connection) {
-      // Fire-and-forget: correct for any agent that implements it, no-op otherwise.
-      this.connection.cancel({ sessionId });
-      this.trace?.('client', 'cancel:protocol-notification-sent', { sessionId });
+  async cancel(sessionId: string): Promise<void> {
+    if (!this.connection) {
+      return;
     }
-    if (options?.killProcess ?? true) {
-      this.killProcess('SIGTERM');
-    } else {
-      this.trace?.('client', 'cancel:kill-suppressed-siblings-live', { sessionId });
-    }
+    this.connection.cancel({ sessionId });
+    this.trace?.('client', 'cancel:sent', { sessionId });
   }
 
   /** Tear down the connection and kill the agent process. */
