@@ -26,10 +26,17 @@ The platform subdirectories are populated by `scripts/fetch-agent-runtimes.sh` (
 | Agent | Vendor | Version | Source | License |
 |---|---|---|---|---|
 | Codex | OpenAI | 0.144.4 (`rust-v0.144.4`) | GitHub Releases — `codex-app-server-*` archives | Apache-2.0 |
-| Claude | Anthropic | 2.1.156 | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
-| OpenCode | sst | 1.15.13 | npm optional packages — `opencode-<platform>-<arch>` | MIT |
+| Claude | Anthropic | 2.1.217 (SDK pinned `0.3.217`) | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
+| OpenCode | sst | 1.18.4 | npm optional packages — `opencode-<platform>-<arch>` | MIT |
 
 Versions are pinned in `manifest.json`. Updates ship inside Ritemark releases (Sprint 64, Q4 decision). A separate runtime update channel is not in scope for this sprint.
+
+**Claude is a two-part pin.** The bundled binary and `@anthropic-ai/claude-agent-sdk` must move
+together: Anthropic publishes them in lockstep (same patch number, same day — `2.1.217` ↔ `0.3.217`),
+and Ritemark runs the bundled binary *through* the SDK. The SDK is therefore declared as an exact
+version in `extensions/ritemark/package.json`, not a caret range. A caret let them drift once
+already: `^0.3.156` resolved to `0.3.159` against a bundled `2.1.156`. When bumping the binary, bump
+the SDK to the matching patch in the same commit.
 
 ### Claude redistribution paper trail
 

@@ -111,12 +111,20 @@ import {
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
-export type IconTone = 'muted' | 'active' | 'disabled'
+/**
+ * `inherit` (Sprint 99) takes the colour from the wrapping element instead of a
+ * role token. It exists for the thread rail, where the glyph is tinted by
+ * RUNTIME (Claude clay / Codex green / OpenCode sky) — brand marks, not theme
+ * roles, so they have no `--r-*` token to come from. Prefer a role tone
+ * everywhere else; `inherit` is not a licence to hardcode colours at call sites.
+ */
+export type IconTone = 'muted' | 'active' | 'disabled' | 'inherit'
 
 const toneToColor: Record<IconTone, string> = {
   muted: 'var(--r-ink-muted)',
   active: 'var(--r-accent)',
   disabled: 'var(--r-ink-disabled)',
+  inherit: 'currentColor',
 }
 
 const iconMap = {

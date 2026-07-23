@@ -9,10 +9,45 @@ export interface RuntimeTurnResult {
   error?: string;
 }
 
+/**
+ * A runtime adapter. One instance per runtime KIND (see RuntimeRegistry), which
+ * mints one session per conversation.
+ *
+ * Sprint 99: `start()`/`prompt()`/`cancel()` used to live here and were called
+ * against the shared adapter on every turn, so a second chat overwrote the first
+ * chat's callbacks. Turn-scoped operations now belong to `RuntimeSession`.
+ */
 export interface AgentRuntime {
   readonly id: AgentId;
 
-  start(config: RuntimeSessionConfig): Promise<void>;
+  /**
+   * Open a session for one conversation. Sessions are independent: a call on
+   * session A must never mutate session B's state.
+   */
+  createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession>;
+
+  /**
+   * Adapter-level, deliberately NOT per-conversation: this reports on the
+   * installed binary and auth, which are properties of the runtime rather than
+   * of any one conversation.
+   */
+  getStatus(): Promise<RuntimeStatus>;
+
+  /** Tear down every session and any shared process. */
+  dispose(): void;
+}
+
+/**
+ * One conversation's live session with a runtime.
+ *
+ * Maps onto each runtime's own concept: a Codex thread, a Claude `AgentSession`,
+ * an ACP session. The callbacks in `RuntimeSessionConfig` are captured when the
+ * session is created, so they can close over the conversation and cannot fire
+ * against a different one.
+ */
+export interface RuntimeSession {
+  readonly conversationId: string;
+  readonly agentId: AgentId;
 
   prompt(turn: RuntimeTurnConfig): Promise<void>;
 
@@ -20,8 +55,7 @@ export interface AgentRuntime {
 
   respondToApproval(requestId: string, approved: boolean, alwaysAllow: boolean, feedback?: string): void;
 
-  getStatus(): Promise<RuntimeStatus>;
-
+  /** Tear down only this conversation's session; siblings keep running. */
   dispose(): void;
 }
 
@@ -93,6 +127,12 @@ export interface UnifiedAttachment {
 export interface UnifiedApprovalRequest {
   requestId: string;
   agentId: AgentId;
+  /**
+   * Which conversation raised this. Adapters do not set it — the view provider
+   * stamps it on the way to the gate, where it already closes over the
+   * conversation. Without it the webview cannot tell which chat's card to show.
+   */
+  conversationId?: string;
   kind: 'file-write' | 'shell-command' | 'permission' | 'plan';
   filePath?: string;
   diff?: string;

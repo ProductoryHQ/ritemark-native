@@ -3,6 +3,12 @@
  *
  * Wraps AgentSession (AgentRunner.ts) and maps its progress/approval callbacks
  * to the unified AgentRuntime interface. Does NOT rewrite AgentSession internals.
+ *
+ * Sprint 99: one `ClaudeCodeSession` per conversation. The Phase-2 audit
+ * established that `AgentSession` is already a clean per-conversation unit — every
+ * turn field is an instance field and there is no module-level singleton — so
+ * concurrency here is a matter of holding several instances rather than one, and
+ * of never handing one conversation's session to another.
  */
 
 import { AgentSession } from './AgentRunner';
@@ -15,6 +21,7 @@ import type {
 } from './types';
 import type {
   AgentRuntime,
+  RuntimeSession,
   RuntimeSessionConfig,
   RuntimeTurnConfig,
   RuntimeStatus,
@@ -31,18 +38,19 @@ const CLAUDE_PLAN_TURN_REMINDER = [
   '- Do NOT edit files or run commands until the plan is approved.',
 ].join('\n');
 
-export class ClaudeCodeRuntime implements AgentRuntime {
-  readonly id: AgentId = 'claude-code';
+/** One conversation's Claude Code session. */
+export class ClaudeCodeSession implements RuntimeSession {
+  readonly agentId: AgentId = 'claude-code';
 
-  private _session: AgentSession | null = null;
-  private _sessionConfig: RuntimeSessionConfig | null = null;
+  private _session: AgentSession;
+  private _config: RuntimeSessionConfig;
   /** Model of the live session — used to decide reuse vs recreate. */
   private _activeModel: string | undefined;
   /** Whether the live session was started in Ask permission mode (SDK 'default'). */
-  private _activeAskMode = false;
+  private _activeAskMode: boolean;
 
   /**
-   * Pending question requests — stored so respondToApproval() can look them up.
+   * Pending question requests, so respondToApproval() can look them up.
    * Key = toolUseId from AgentQuestion.
    *
    * Note (W2): the unified respondToApproval interface only carries `approved: boolean`,
@@ -52,56 +60,58 @@ export class ClaudeCodeRuntime implements AgentRuntime {
    */
   private readonly _pendingQuestions = new Map<string, AgentQuestion>();
 
-  async start(config: RuntimeSessionConfig): Promise<void> {
-    // Verify Claude Code is ready before creating a session
-    const status = await getSetupStatus();
-    if (status.state !== 'ready') {
-      throw new Error(
-        status.error ??
-          (status.state === 'broken-install'
-            ? 'Claude is installed but not ready. Repair it first.'
-            : status.state === 'needs-auth' || status.state === 'auth-in-progress'
-              ? 'Claude is not signed in yet. Finish Claude.ai sign-in first.'
-              : 'Claude is not installed yet. Complete setup first.'),
-      );
-    }
-
-    this._sessionConfig = config;
-    const approvalMode = config.approvalMode ?? 'auto';
-    const needsAsk = approvalMode === 'ask';
-
-    // Reuse the warm session across turns to preserve conversation context
-    // (start() is called every turn). Recreate when there's no live session,
-    // the model changed, or we cross the Ask boundary (Ask uses a different SDK
-    // permission mode fixed at session start). Mirrors Codex/ACP session reuse.
-    if (this._session?.isActive && this._activeModel === config.model && this._activeAskMode === needsAsk) {
-      this._session.setApprovalMode(approvalMode);
-      return;
-    }
-
-    // Close any stale session before creating a new one
-    this._session?.close();
-    this._pendingQuestions.clear();
+  constructor(
+    readonly conversationId: string,
+    config: RuntimeSessionConfig,
+    binaryPath: string | undefined,
+  ) {
+    this._config = config;
     this._activeModel = config.model;
-    this._activeAskMode = needsAsk;
-    this._session = new AgentSession({
+    this._activeAskMode = (config.approvalMode ?? 'auto') === 'ask';
+    this._session = ClaudeCodeSession._build(config, binaryPath);
+  }
+
+  private static _build(config: RuntimeSessionConfig, binaryPath: string | undefined): AgentSession {
+    return new AgentSession({
       workspacePath: config.workspacePath,
       model: config.model,
-      pathToClaudeCodeExecutable: status.binaryPath,
+      pathToClaudeCodeExecutable: binaryPath,
       excludedFolders: config.excludedFolders,
       extraSystemPromptAppend: config.extraSystemPrompt,
       mcpServers: config.mcpServers,
       allowedTools: config.allowedTools,
-      approvalMode,
+      approvalMode: config.approvalMode ?? 'auto',
       ...(config.anthropicApiKey ? { anthropicApiKey: config.anthropicApiKey } : {}),
     });
   }
 
-  async prompt(turn: RuntimeTurnConfig): Promise<void> {
-    if (!this._session || !this._sessionConfig) {
-      throw new Error('ClaudeCodeRuntime: call start() before prompt()');
+  /**
+   * Re-apply per-turn config to THIS conversation's session.
+   *
+   * The warm session is kept across turns so conversation context survives. It is
+   * recreated only when the model changes or the Ask boundary is crossed (Ask
+   * uses a different SDK permission mode, fixed at session start). Recreating
+   * affects this conversation alone.
+   */
+  applyConfig(config: RuntimeSessionConfig, binaryPath: string | undefined): void {
+    this._config = config;
+    const approvalMode = config.approvalMode ?? 'auto';
+    const needsAsk = approvalMode === 'ask';
+
+    if (this._session.isActive && this._activeModel === config.model && this._activeAskMode === needsAsk) {
+      this._session.setApprovalMode(approvalMode);
+      return;
     }
-    const config = this._sessionConfig;
+
+    this._session.close();
+    this._pendingQuestions.clear();
+    this._activeModel = config.model;
+    this._activeAskMode = needsAsk;
+    this._session = ClaudeCodeSession._build(config, binaryPath);
+  }
+
+  async prompt(turn: RuntimeTurnConfig): Promise<void> {
+    const config = this._config;
 
     // UnifiedAttachment is structurally identical to FileAttachment — safe cast
     const attachments = turn.attachments as FileAttachment[] | undefined;
@@ -159,23 +169,74 @@ export class ClaudeCodeRuntime implements AgentRuntime {
 
   /** Answer a multi-choice question from the agent. Called when the webview posts agent-answer-question. */
   answerQuestion(toolUseId: string, answers: Record<string, string>): void {
-    if (!this._session) return;
-    const answered = this._session.answerQuestion(toolUseId, answers);
-    if (!answered) {
-      // State was lost — the question may have timed out or been interrupted.
-    }
+    this._session.answerQuestion(toolUseId, answers);
+  }
+
+  /** True when this session raised the given approval/question id. */
+  owns(requestId: string): boolean {
+    return this._pendingQuestions.has(requestId);
   }
 
   async cancel(): Promise<void> {
-    this._session?.interrupt();
+    this._session.interrupt();
   }
 
   respondToApproval(requestId: string, approved: boolean, _alwaysAllow: boolean, feedback?: string): void {
-    if (!this._session) return;
     // Both tool ('ask') and plan approvals key on toolUseId. Try the tool gate
     // first; if it didn't match, route to plan approval.
     if (this._session.answerToolApproval(requestId, approved)) return;
     this._session.answerPlanApproval(requestId, approved, feedback);
+  }
+
+  dispose(): void {
+    this._session.close();
+    this._pendingQuestions.clear();
+  }
+}
+
+export class ClaudeCodeRuntime implements AgentRuntime {
+  readonly id: AgentId = 'claude-code';
+
+  private readonly _sessions = new Map<string, ClaudeCodeSession>();
+
+  async createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession> {
+    // Verify Claude Code is ready before creating a session
+    const status = await getSetupStatus();
+    if (status.state !== 'ready') {
+      throw new Error(
+        status.error ??
+          (status.state === 'broken-install'
+            ? 'Claude is installed but not ready. Repair it first.'
+            : status.state === 'needs-auth' || status.state === 'auth-in-progress'
+              ? 'Claude is not signed in yet. Finish Claude.ai sign-in first.'
+              : 'Claude is not installed yet. Complete setup first.'),
+      );
+    }
+
+    // Reuse strictly per conversation. There is deliberately no "reuse if the
+    // model matches" shortcut across conversations — that would hand one chat the
+    // session, and therefore the context, belonging to another.
+    const existing = this._sessions.get(conversationId);
+    if (existing) {
+      existing.applyConfig(config, status.binaryPath);
+      return existing;
+    }
+
+    const session = new ClaudeCodeSession(conversationId, config, status.binaryPath);
+    this._sessions.set(conversationId, session);
+    return session;
+  }
+
+  /** Live session for a conversation, if one is open. */
+  getSession(conversationId: string): ClaudeCodeSession | undefined {
+    return this._sessions.get(conversationId);
+  }
+
+  disposeSession(conversationId: string): void {
+    const session = this._sessions.get(conversationId);
+    if (!session) return;
+    session.dispose();
+    this._sessions.delete(conversationId);
   }
 
   async getStatus(): Promise<RuntimeStatus> {
@@ -202,10 +263,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   }
 
   dispose(): void {
-    this._session?.close();
-    this._session = null;
-    this._sessionConfig = null;
-    this._activeModel = undefined;
-    this._pendingQuestions.clear();
+    for (const session of this._sessions.values()) {
+      session.dispose();
+    }
+    this._sessions.clear();
   }
 }

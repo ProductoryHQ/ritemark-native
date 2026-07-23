@@ -7,6 +7,7 @@
 
 import type { AgentId, AgentConversationTurn, CodexConversationTurn, ChatMessage, ConversationEntry } from './types';
 import type { RuntimeId, ConversationRun } from './conversationModel';
+import { truncateThreadTitle } from './threadStatus';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -352,27 +353,26 @@ export function generateTitle(
   chatMessages: ChatMessage[],
   codexConversation?: CodexConversationTurn[]
 ): string {
+  // Sprint 99 (R6 / Resolved Gap 1): the rail tooltip and History must agree,
+  // so both go through `truncateThreadTitle`. The old rule here was a raw
+  // 50-character cut with a literal "..." appended, which broke mid-word and
+  // produced doubled ellipses on prompts that already ended in one.
+
   // For agent conversations, use first user prompt
   if (agentConversation.length > 0) {
     const firstPrompt = agentConversation[0].userPrompt;
-    if (firstPrompt) {
-      return firstPrompt.substring(0, 50) + (firstPrompt.length > 50 ? '...' : '');
-    }
+    if (firstPrompt) return truncateThreadTitle(firstPrompt);
   }
 
   // For Codex conversations, use first user prompt
   if (codexConversation && codexConversation.length > 0) {
     const firstPrompt = codexConversation[0].userPrompt;
-    if (firstPrompt) {
-      return firstPrompt.substring(0, 50) + (firstPrompt.length > 50 ? '...' : '');
-    }
+    if (firstPrompt) return truncateThreadTitle(firstPrompt);
   }
 
   // For chat messages, use first user message
   const firstUserMsg = chatMessages.find((m) => m.role === 'user');
-  if (firstUserMsg) {
-    return firstUserMsg.content.substring(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '');
-  }
+  if (firstUserMsg) return truncateThreadTitle(firstUserMsg.content);
 
   return 'New conversation';
 }
@@ -382,6 +382,41 @@ export function generateTitle(
  */
 export function hasHistory(): boolean {
   return loadMetadata().length > 0;
+}
+
+// ── Open-thread set (Sprint 99 R13 / E7) ──────────────────────────────
+
+/**
+ * Which conversations were on the rail, per workspace.
+ *
+ * Transcripts already persist per conversation id under this same prefix; the
+ * only thing missing for R13 was *which* of them were open. This is deliberately
+ * a list of ids and nothing else — titles, runtime bindings and turns all come
+ * back from the conversation records themselves, so the two can never disagree.
+ */
+function getOpenThreadsKey(): string {
+  return `${getStoragePrefix()}open-threads`;
+}
+
+export function saveOpenThreadIds(ids: readonly string[]): void {
+  try {
+    localStorage.setItem(getOpenThreadsKey(), JSON.stringify(ids));
+  } catch (err) {
+    console.warn('[chatHistoryStorage] Failed to save open threads:', err);
+  }
+}
+
+export function loadOpenThreadIds(): string[] {
+  try {
+    const raw = localStorage.getItem(getOpenThreadsKey());
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === 'string');
+  } catch (err) {
+    console.warn('[chatHistoryStorage] Failed to load open threads:', err);
+    return [];
+  }
 }
 
 /**

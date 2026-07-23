@@ -38,7 +38,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   const { result, activities } = turn;
   const approvePlan = useAISidebarStore((s) => s.approvePlan);
   const rejectPlan = useAISidebarStore((s) => s.rejectPlan);
-  const startNewConversation = useAISidebarStore((s) => s.startNewConversation);
+  const requestNewThread = useAISidebarStore((s) => s.requestNewThread);
   const [rejectInput, setRejectInput] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
@@ -60,7 +60,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           </div>
           <div className="flex gap-2 ml-[22px]">
             <button
-              onClick={() => startNewConversation()}
+              onClick={() => requestNewThread()}
               className="flex items-center gap-1.5 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)]"
             >
               <Icon name="arrow-counter-clockwise" size={12} />

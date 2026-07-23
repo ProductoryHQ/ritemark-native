@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { useAISidebarStore } from './store';
+import { useAISidebarStore, hydrateConversations, selectActiveConversation } from './store';
+import { createConversationState, type ConversationState } from './conversationState';
 import { vscode } from '../../lib/vscode';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
 
@@ -7,6 +8,17 @@ const initialState = useAISidebarStore.getState();
 
 function resetStore(): void {
   useAISidebarStore.setState(initialState, true);
+}
+
+/**
+ * Sprint 99: conversation state lives in `conversations[id]`, not in top-level
+ * store fields. Seed through the conversation map — writing the flat mirror
+ * fields directly no longer reaches the source of truth.
+ */
+function seedActiveConversation(partial: Partial<ConversationState> = {}): string {
+  const conversation = createConversationState('conv-active', partial);
+  hydrateConversations([conversation], conversation.id);
+  return conversation.id;
 }
 
 function makeCodexTurn(overrides: Partial<CodexConversationTurn> = {}): CodexConversationTurn {
@@ -43,14 +55,13 @@ function makeAgentTurn(overrides: Partial<AgentConversationTurn> = {}): AgentCon
 
 function testSetPendingRuntimeMergesPartialUpdate() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-sonnet-4-5', mode: 'ask' },
     });
 
     useAISidebarStore.getState().setPendingRuntime({ runtimeId: 'codex' });
 
-    const { pendingRuntime } = useAISidebarStore.getState();
+    const { pendingRuntime } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(pendingRuntime.runtimeId, 'codex', 'runtimeId should update');
     assert.equal(pendingRuntime.modelId, 'claude-sonnet-4-5', 'modelId should be preserved');
     assert.equal(pendingRuntime.mode, 'ask', 'mode should be preserved');
@@ -61,14 +72,13 @@ function testSetPendingRuntimeMergesPartialUpdate() {
 
 function testSetPendingRuntimeModeOnly() {
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       pendingRuntime: { runtimeId: 'codex', modelId: 'o4-mini', mode: 'auto' },
     });
 
     useAISidebarStore.getState().setPendingRuntime({ mode: 'plan' });
 
-    const { pendingRuntime } = useAISidebarStore.getState();
+    const { pendingRuntime } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(pendingRuntime.runtimeId, 'codex', 'runtimeId should be preserved');
     assert.equal(pendingRuntime.modelId, 'o4-mini', 'modelId should be preserved');
     assert.equal(pendingRuntime.mode, 'plan', 'mode should update');
@@ -85,8 +95,7 @@ function testCancelRequestRoutesToCodexWhenCodexIsRunning() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       selectedAgent: 'codex',
       codexConversation: [makeCodexTurn({ isRunning: true })],
       agentConversation: [],
@@ -102,7 +111,7 @@ function testCancelRequestRoutesToCodexWhenCodexIsRunning() {
       !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'claude-code'),
       'cancelRequest must not send agent-cancel with agentId=claude-code when only Codex is running'
     );
-    const { codexConversation } = useAISidebarStore.getState();
+    const { codexConversation } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(codexConversation[0].isRunning, false, 'cancelled Codex turn must be marked not running');
     assert.equal(codexConversation[0].result?.error, 'Cancelled by user');
   } finally {
@@ -117,8 +126,7 @@ function testCancelRequestRoutesToClaudeWhenClaudeIsRunning() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       agentConversation: [makeAgentTurn({ isRunning: true })],
       codexConversation: [],
     });
@@ -133,7 +141,7 @@ function testCancelRequestRoutesToClaudeWhenClaudeIsRunning() {
       !posted.some((m) => typeof m === 'object' && m !== null && 'type' in m && (m as { type: string; agentId?: string }).type === 'agent-cancel' && (m as { type: string; agentId?: string }).agentId === 'codex'),
       'cancelRequest must not send agent-cancel with agentId=codex when only Claude is running'
     );
-    const { agentConversation } = useAISidebarStore.getState();
+    const { agentConversation } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(agentConversation[0].isRunning, false, 'cancelled Claude turn must be marked not running');
     assert.equal(agentConversation[0].result?.error, 'Cancelled by user');
   } finally {
@@ -148,8 +156,7 @@ function testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       selectedAgent: 'codex',
       codexConversation: [makeCodexTurn({ isRunning: true })],
       agentConversation: [makeAgentTurn({ isRunning: true })],
@@ -177,8 +184,7 @@ function testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
 
   try {
-    useAISidebarStore.setState({
-      ...useAISidebarStore.getState(),
+    seedActiveConversation({
       codexConversation: [makeCodexTurn({ isRunning: false })],
       agentConversation: [makeAgentTurn({ isRunning: false })],
     });
@@ -196,6 +202,50 @@ function testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning() {
   }
 }
 
+// ── cross-runtime handoff (OpenCode was the odd one out) ────────────────────────
+
+function testOpenCodeReceivesClaudeHandoff() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+
+  try {
+    // A conversation where Claude answered first, then the user switches to OpenCode.
+    seedActiveConversation({
+      opencodeSelectedModel: 'opencode:openrouter/some-model',
+      pendingRuntime: { runtimeId: 'opencode', modelId: 'opencode:openrouter/some-model', mode: 'auto' },
+      agentConversation: [makeAgentTurn({
+        userPrompt: 'Summarise the README',
+        result: { text: 'The README describes a markdown editor.', filesModified: [], metrics: { durationMs: 0, costUsd: null, model: null } },
+        timestamp: 1,
+      })],
+      codexConversation: [],
+    });
+
+    useAISidebarStore.getState().sendOpenCodeMessage('and what would you do?');
+
+    const exec = posted.find((m): m is { type: string; agentId: string; prompt: string } =>
+      typeof m === 'object' && m !== null && (m as { type?: string }).type === 'agent-execute'
+      && (m as { agentId?: string }).agentId === 'opencode');
+    assert.ok(exec, 'sendOpenCodeMessage must post an agent-execute for opencode');
+    assert.match(exec!.prompt, /handled by Claude/i,
+      'OpenCode must receive the Claude handoff preamble — the bug was that it did not');
+    assert.match(exec!.prompt, /markdown editor/,
+      'the handoff must carry what Claude actually said');
+    assert.match(exec!.prompt, /and what would you do\?/,
+      'the user request must still be present after the handoff');
+
+    // The chat bubble shows the raw prompt, not the wrapped one.
+    const { codexConversation } = selectActiveConversation(useAISidebarStore.getState());
+    assert.equal(codexConversation[codexConversation.length - 1].userPrompt, 'and what would you do?',
+      'the visible bubble must show the raw prompt, not the handoff wrapper');
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
   testSetPendingRuntimeModeOnly();
@@ -203,6 +253,7 @@ function main() {
   testCancelRequestRoutesToClaudeWhenClaudeIsRunning();
   testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns();
   testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning();
+  testOpenCodeReceivesClaudeHandoff();
   console.log('Runtime switching tests passed.');
 }
 

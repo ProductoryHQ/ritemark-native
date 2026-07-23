@@ -21,7 +21,7 @@ export interface DictationSettings {
 export const DICTATION_SETTINGS_KEY = 'ritemark:dictation-settings'
 
 export const DEFAULT_DICTATION_SETTINGS: DictationSettings = {
-  chunkDuration: 3000,
+  chunkDuration: 5000,
   vadEnabled: false,
   noiseReductionEnabled: false
 }

@@ -93,6 +93,11 @@
   --r-accent-deep: var(--ritemark-indigo-deep);
   --r-accent-darker: var(--ritemark-indigo-darker);
   --r-accent-soft: var(--ritemark-indigo-soft);
+  /* Thread-rail active pill. Deliberately NOT --r-accent-soft: it must match the
+     activity bar's active-item indicator, which patch 002 fills with
+     activityBar.activeBackground (10% indigo), so the left and right rails read
+     as one system rather than two near-misses. */
+  --r-rail-active: var(--vscode-activityBar-activeBackground, rgba(67, 56, 202, 0.1));
   --r-accent-fainter: var(--ritemark-indigo-fainter);
   --r-success: var(--ritemark-success);
   --r-success-soft: var(--ritemark-success-soft);
@@ -138,6 +143,7 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-accent-deep: var(--ritemark-dark-indigo-deep);
   --r-accent-darker: var(--ritemark-dark-indigo-darker);
   --r-accent-soft: var(--ritemark-dark-indigo-soft);
+  --r-rail-active: var(--vscode-activityBar-activeBackground, var(--ritemark-dark-indigo-soft));
   --r-accent-fainter: var(--ritemark-dark-indigo-fainter);
   --r-success: var(--ritemark-dark-success);
   --r-success-soft: var(--ritemark-dark-success-soft);

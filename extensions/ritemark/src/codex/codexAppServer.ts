@@ -139,7 +139,16 @@ export class CodexAppServer extends EventEmitter {
    * the user sees actionable info (binary path, source, arch, last
    * stderr).
    */
-  async threadStart(params: Partial<ThreadStartParams> & { cwd?: string | null }): Promise<ThreadStartResponse> {
+  async threadStart(
+    params: Partial<ThreadStartParams> & { cwd?: string | null },
+    /**
+     * Sprint 99 (B4): thread/start has no thread id yet, so the synthetic
+     * 'progress' event it emits is the one wire-less event that cannot be routed
+     * by threadId. The caller passes the conversation it is starting the thread
+     * for, and the event carries it back.
+     */
+    conversationId?: string,
+  ): Promise<ThreadStartResponse> {
     await this.ensureInitialized();
     return this.rpc<ThreadStartParams, ThreadStartResponse>('thread/start', {
       experimentalRawEvents: false,
@@ -148,6 +157,7 @@ export class CodexAppServer extends EventEmitter {
     }, 120_000, {
       progressAfterMs: 10_000,
       progressMessage: 'Starting Codex session, this may take a moment…',
+      progressConversationId: conversationId,
       diagnosticsOnTimeout: () => this.buildThreadStartDiagnostics(),
     });
   }
@@ -282,6 +292,8 @@ export class CodexAppServer extends EventEmitter {
     options?: {
       progressAfterMs?: number;
       progressMessage?: string;
+      /** Conversation the 'progress' event should be attributed to (Sprint 99 B4). */
+      progressConversationId?: string;
       diagnosticsOnTimeout?: () => Promise<string[]>;
     },
   ): Promise<TResult> {
@@ -297,10 +309,11 @@ export class CodexAppServer extends EventEmitter {
       let progressTimer: ReturnType<typeof setTimeout> | null = null;
       if (options?.progressAfterMs && options.progressMessage) {
         const progressMessage = options.progressMessage;
+        const progressConversationId = options.progressConversationId;
         progressTimer = setTimeout(() => {
           if (this.pendingRequests.has(id)) {
-            this.trace?.('rpc:progress', method, { id, message: progressMessage });
-            this.emit('progress', { method, message: progressMessage });
+            this.trace?.('rpc:progress', method, { id, message: progressMessage, conversationId: progressConversationId });
+            this.emit('progress', { method, message: progressMessage, conversationId: progressConversationId });
           }
         }, options.progressAfterMs);
       }

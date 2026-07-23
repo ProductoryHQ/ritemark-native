@@ -35,6 +35,44 @@ interface RailMarker {
   to?: number
   /** Standalone note: the document position of the atom node. */
   nodePos?: number
+  /**
+   * Anchored mark with a shared id (#150): the comment may span multiple block
+   * ranges. When set, remove/edit/send operate on ALL ranges carrying this id,
+   * not just the representative from/to above (which is the topmost fragment).
+   */
+  commentId?: string
+}
+
+/**
+ * All document ranges of a commentMark carrying the given shared id (#150).
+ * A multi-block comment is several mark ranges (one per block) sharing one id;
+ * returns a per-inline-node range list, safe to unset/re-set (marks don't
+ * change doc size, so positions stay stable across the chained ops).
+ */
+function rangesByCommentId(editor: TipTapEditor, id: string): { from: number; to: number }[] {
+  const markType = editor.schema.marks.commentMark
+  if (!markType) return []
+  const ranges: { from: number; to: number }[] = []
+  editor.state.doc.descendants((node, pos) => {
+    if (!node.isInline) return
+    if (node.marks.some((mk) => mk.type === markType && mk.attrs.id === id)) {
+      ranges.push({ from: pos, to: pos + node.nodeSize })
+    }
+  })
+  return ranges
+}
+
+/**
+ * The document range(s) a rail marker operates on. A shared-id comment (#150)
+ * resolves to every fragment; a legacy id-less comment (or one still being
+ * measured) uses its single representative range.
+ */
+function markerRanges(editor: TipTapEditor, m: RailMarker): { from: number; to: number }[] {
+  if (m.commentId) {
+    const ranges = rangesByCommentId(editor, m.commentId)
+    if (ranges.length) return ranges
+  }
+  return m.from != null && m.to != null ? [{ from: m.from, to: m.to }] : []
 }
 
 const MARKER_MIN_GAP = 8
@@ -92,12 +130,20 @@ function scan(editor: TipTapEditor, container: HTMLElement): RailMarker[] {
     let from: number | undefined
     let to: number | undefined
     let nodePos: number | undefined
+    let commentId: string | undefined
     if (isMark) {
       const range = commentMarkRange(editor, el)
       if (!range) return
       from = range.from
       to = range.to
-      identity = `m:${from}-${to}`
+      // Group by shared id (#150): all fragments of a multi-block comment carry
+      // the same data-comment-id, so they collapse to ONE marker. The first
+      // `<mark>` in DOM order (topmost block) wins position + from/to. Comments
+      // without an id (older docs) keep the positional identity — a single-block
+      // comment still yields one marker.
+      const cid = el.getAttribute('data-comment-id') || undefined
+      commentId = cid
+      identity = cid ? `c:${cid}` : `m:${from}-${to}`
     } else {
       const np = commentNodePos(editor, el)
       if (np == null) return
@@ -118,6 +164,7 @@ function scan(editor: TipTapEditor, container: HTMLElement): RailMarker[] {
       from,
       to,
       nodePos,
+      commentId,
     })
   })
   // collision resolve — never overlap markers
@@ -266,16 +313,14 @@ export function MarginCommentRail({
     (m: RailMarker) => {
       if (!editor) return
       if (m.kind === 'mark') {
-        // Use the FULL mark range (audit H-A) — a comment split across a link
-        // renders as several <mark> fragments; the range covers them all.
-        if (m.from == null || m.to == null) return
-        editor
-          .chain()
-          .focus()
-          .setTextSelection({ from: m.from, to: m.to })
-          .unsetMark('commentMark')
-          .setTextSelection(m.to)
-          .run()
+        // Clear the mark on EVERY range of the comment: the FULL mark range
+        // (audit H-A) for a link-split fragment, and — for a multi-block
+        // comment (#150) — every block's range sharing the id.
+        const ranges = markerRanges(editor, m)
+        if (!ranges.length) return
+        let chain = editor.chain().focus()
+        for (const r of ranges) chain = chain.setTextSelection(r).unsetMark('commentMark')
+        chain.setTextSelection(ranges[ranges.length - 1].to).run()
       } else if (m.nodePos != null) {
         // standalone atom node — delete it whole
         const node = editor.state.doc.nodeAt(m.nodePos)
@@ -294,16 +339,20 @@ export function MarginCommentRail({
       const note = text.trim()
       const alias = note ? detectAgentAlias(note) : null
       if (m.kind === 'mark') {
-        // Full mark range (audit H-A) so a link-spanning comment fills/clears
-        // all its fragments, not just the first.
-        if (m.from == null || m.to == null) return
-        const { from, to } = m
+        // Apply to EVERY range (audit H-A for link splits; #150 for multi-block)
+        // so a comment fills/clears all its fragments, not just the first. The
+        // shared id is preserved so the fragments stay one comment.
+        const ranges = markerRanges(editor, m)
+        if (!ranges.length) return
+        const last = ranges[ranges.length - 1].to
+        let chain = editor.chain().focus()
         if (!note) {
           // empty → discard the placeholder mark, keep the text
-          editor.chain().focus().setTextSelection({ from, to }).unsetMark('commentMark').setTextSelection(to).run()
+          for (const r of ranges) chain = chain.setTextSelection(r).unsetMark('commentMark')
         } else {
-          editor.chain().focus().setTextSelection({ from, to }).setCommentMark({ note, agentAlias: alias }).setTextSelection(to).run()
+          for (const r of ranges) chain = chain.setTextSelection(r).setCommentMark({ id: m.commentId ?? null, note, agentAlias: alias })
         }
+        chain.setTextSelection(last).run()
       } else if (m.nodePos != null) {
         if (!note) {
           // empty → remove the placeholder standalone note
@@ -326,8 +375,13 @@ export function MarginCommentRail({
       if (!agentId) return
       const instruction = stripAgentMentions(m.note) || m.note
       let prompt = instruction
-      if (m.kind === 'mark' && m.from != null && m.to != null) {
-        const anchored = editor.state.doc.textBetween(m.from, m.to, ' ')
+      if (m.kind === 'mark') {
+        // Gather the anchored text across every fragment (#150: a multi-block
+        // comment spans several ranges) so the AI sees the whole passage.
+        const anchored = markerRanges(editor, m)
+          .map((r) => editor.state.doc.textBetween(r.from, r.to, ' '))
+          .filter(Boolean)
+          .join(' ')
         if (anchored) {
           prompt = `${instruction}\n\n---\nThis comment refers to the following text:\n"${anchored}"`
         }

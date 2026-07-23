@@ -4,7 +4,7 @@ import type { ScheduledTask, TaskContext, TaskResult, TaskRunOptions, ScheduleCo
 import { DEFAULT_HEADLESS_POLICY } from '../ScheduledTask';
 import type { AgentId } from '../../agent/types';
 import { createRuntime } from '../../runtime/runtimeFactory';
-import type { UnifiedApprovalRequest, RuntimeTurnResult } from '../../runtime/AgentRuntime';
+import type { UnifiedApprovalRequest, RuntimeTurnResult, RuntimeSession } from '../../runtime/AgentRuntime';
 
 /**
  * AgentTaskHandler — runs an agent .md file headlessly via a fresh AgentRuntime.
@@ -60,9 +60,13 @@ export class AgentTaskHandler implements ScheduledTask {
     let blockedAction: BlockedActionDetail | undefined;
     let turnResult: RuntimeTurnResult | undefined;
 
+    // Assigned before any approval can arrive — approvals only fire during
+    // prompt(), which runs after createSession() has resolved.
+    let session: RuntimeSession | undefined;
+
     try {
       try {
-        await runtime.start({
+        session = await runtime.createSession(runId, {
           workspacePath: ctx.workspacePath,
           // 'ask' is required: 'auto' uses bypassPermissions and the SDK would
           // silently auto-approve writes/shell, defeating the headless policy.
@@ -70,13 +74,13 @@ export class AgentTaskHandler implements ScheduledTask {
           onProgress: () => { /* headless — discard progress */ },
           onApprovalRequest: (req: UnifiedApprovalRequest) => {
             if (this.isAllowed(req, oneTimeAllowList)) {
-              runtime.respondToApproval(req.requestId, true, false);
+              session?.respondToApproval(req.requestId, true, false);
               return;
             }
             if (!blockedAction) {
               blockedAction = this.toBlockedDetail(req);
             }
-            runtime.respondToApproval(req.requestId, false, false);
+            session?.respondToApproval(req.requestId, false, false);
           },
           // prompt() never throws — turn errors arrive here with an `error` field.
           onComplete: (result: RuntimeTurnResult) => {
@@ -84,13 +88,15 @@ export class AgentTaskHandler implements ScheduledTask {
           },
         });
       } catch (err) {
-        // start() throws only when Claude Code isn't installed / signed in.
+        // createSession() throws only when Claude Code isn't installed / signed in.
         return this.skipped(runId, startedAt, 'agent-runtime-unavailable',
           err instanceof Error ? err.message : String(err));
       }
 
-      await runtime.prompt({ prompt, timeoutMinutes: 10 });
+      await session.prompt({ prompt, timeoutMinutes: 10 });
     } finally {
+      // The daemon builds a fresh runtime per run, so disposing the runtime
+      // disposes its only session too.
       runtime.dispose();
     }
 
