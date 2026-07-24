@@ -59,6 +59,17 @@ For each `triage:product` issue, post ONE concise triage comment containing:
 
 Do not design solutions in the comment. It is pre-analysis for sprint planning, not a spec.
 
+## Release visibility
+
+Merged `agent-fix` PRs are not tied to any sprint, so they are invisible to `release-manager`/`product-marketer`'s default release-notes sources (release plan + sprint docs). The `agent-pr-open` label survives issue closure, so it's the durable pointer: when compiling release notes, the query
+
+```bash
+gh issue list --repo ProductoryHQ/ritemark-native --state closed \
+  --search "label:agent-pr-open closed:>=<date-of-last-release>"
+```
+
+returns every triage-workflow fix shipped since the last release. (Use this `gh issue list --search` form — `gh search issues` with the compound query string silently returns 0 results.) `release-manager`'s Step 0b and `product-marketer`'s information-gathering fallback list (the "If not provided, gather from" sources) both include this check — see those docs for where it slots in. This routine's only obligation is to keep applying `agent-pr-open` correctly (see Agent-fix procedure above); it does not need to do anything extra at triage time for this to work.
+
 ## Run report
 
 At the end of every run that did anything, post a summary as a comment on the tracking issue for the routine (or, if none exists, in the run's completion notification): issues triaged per bucket, PRs opened, WIP cap state, anything skipped and why. Silent runs (nothing new) produce no notifications.

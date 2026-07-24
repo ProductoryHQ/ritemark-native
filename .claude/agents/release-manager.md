@@ -139,6 +139,19 @@ gh release list --repo jarmo-productory/ritemark-public --limit 10
 
 Report the latest version and determine the NEXT valid version. NEVER suggest a version that already exists.
 
+### Step 0b — Merged agent-fix issues since last release
+
+The scheduled issue-triage routine (`docs/development/issue-triage-policy.md`) ships small fixes as standalone PRs outside any sprint — they will not show up in sprint docs or a release plan. Find them with (use the previous version's publish date from Step 0's `gh release list` output as the date):
+
+```bash
+gh issue list --repo ProductoryHQ/ritemark-native --state closed \
+  --search "label:agent-pr-open closed:>=<date-of-last-release>"
+```
+
+Do NOT use `gh search issues "<compound query string>"` — gh mis-tokenizes the quoted compound string and silently returns 0 results (no error). Only the `gh issue list --search` form above (or fully flag-based `gh search issues --label agent-pr-open --state closed --closed ">=DATE"`) is reliable.
+
+The `agent-pr-open` label survives issue closure, so this is reliable after merge. Fold any results into the release's feature/fix list before handing off to `product-marketer` — otherwise these fixes ship silently with no release-note credit.
+
 ### Step 1 — Build state verification
 
 Verify the local build:
