@@ -213,6 +213,7 @@ interface AISidebarState {
   // ── Connection state (APP-GLOBAL) ──
   hasApiKey: boolean;
   isOnline: boolean;
+  isCheckingConnectivity: boolean;
   ready: boolean;
 
   // ── Agent config: catalogs + availability (APP-GLOBAL) ──
@@ -380,6 +381,7 @@ interface AISidebarState {
   dismissCurrentPlan: (key: string) => void;
   reloadWindow: () => void;
   openAgentSettings: () => void;
+  recheckConnectivity: () => void;
 
   // ── Onboarding actions ──
   installDependency: (dep: OnboardingDependency) => void;
@@ -664,6 +666,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     // ── Initial state ──
     hasApiKey: false,
     isOnline: true,
+    isCheckingConnectivity: false,
     ready: false,
 
     agenticEnabled: false,
@@ -1535,6 +1538,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({ type: 'codex:openSettings' });
     },
 
+    recheckConnectivity: () => {
+      set({ isCheckingConnectivity: true });
+      vscode.postMessage({ type: 'connectivity:recheck' });
+    },
+
     // ── Onboarding actions ──
 
     installDependency: (dep) => {
@@ -1748,7 +1756,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
 
         case 'connectivity-status':
-          set({ isOnline: message.isOnline });
+          set({ isOnline: message.isOnline, isCheckingConnectivity: false });
           break;
 
         case 'comment:submit': {
