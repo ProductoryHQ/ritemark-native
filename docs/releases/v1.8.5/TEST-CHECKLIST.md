@@ -18,6 +18,9 @@
 **DMG:** `dist/Ritemark-1.8.5-darwin-arm64.dmg` (signed Developer ID, **un-notarized** — right-click → **Open** to bypass Gatekeeper, or `xattr -dr com.apple.quarantine '/Applications/Ritemark.app'`)
 **SHA256:** `069135c31cb46385aebe15e6bad30b9dc6aded3347f5ef2925f480b242f5422c` (rebuild 3 — indigo rail fix `0fec43f` + Opus 5 catalog `612ce49`; supersedes `4fe9cc55…` and `613d4847…`)
 
+> **GATE 1 PASSED** (Jarmo, 2026-07-25 ~22:05) on rebuild-3. Notarized + stapled same evening;
+> final distributable SHA256 after stapling: `21379aacfe0b1f36d7c1060d6104c5993083ac09399d2951158f081145d0b3de`.
+
 ### Installation
 
 - [ ] DMG mounts; app copies to `/Applications` cleanly
