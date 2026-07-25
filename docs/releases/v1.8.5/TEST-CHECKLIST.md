@@ -16,7 +16,7 @@
 ## macOS Apple Silicon (darwin-arm64) — GATE 1
 
 **DMG:** `dist/Ritemark-1.8.5-darwin-arm64.dmg` (signed Developer ID, **un-notarized** — right-click → **Open** to bypass Gatekeeper, or `xattr -dr com.apple.quarantine '/Applications/Ritemark.app'`)
-**SHA256:** `4fe9cc553865353062e90ad99bda8af7979fa8ad95bf8b3ed82587f27ac0ff40` (rebuild 2 — indigo thread-rail fix `0fec43f`; supersedes `613d4847…`)
+**SHA256:** `069135c31cb46385aebe15e6bad30b9dc6aded3347f5ef2925f480b242f5422c` (rebuild 3 — indigo rail fix `0fec43f` + Opus 5 catalog `612ce49`; supersedes `4fe9cc55…` and `613d4847…`)
 
 ### Installation
 
@@ -51,6 +51,11 @@
 - [ ] App starts normally with no user-dir extension copy present (watchdog dormant — no visible effect)
 - [ ] `ritemark.updates.channel` setting exists and defaults to `stable`
 - [ ] (Deep test intentionally deferred: real `-ext.N` E2E happens post-release per #142 criterion)
+
+### Model catalog (Gate 1 rebuild fix)
+
+- [ ] AI sidebar model picker shows **Opus 5** in the Claude section (between Sonnet 5 and Opus 4.8)
+- [ ] Selecting Opus 5 and sending a chat message works end-to-end
 
 ### Agent-fix PRs
 
