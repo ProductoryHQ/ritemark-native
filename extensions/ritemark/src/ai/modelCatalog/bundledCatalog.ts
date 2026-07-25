@@ -18,15 +18,16 @@ import type { ModelCatalog } from './schema';
 
 export const BUNDLED_CATALOG: ModelCatalog = {
   schemaVersion: 1,
-  updatedAt: '2026-07-01T00:00:00Z',
+  updatedAt: '2026-07-25T00:00:00Z',
   providers: {
     anthropic: {
       defaults: { 'claude-code': 'claude-sonnet-5' },
       models: [
         { id: 'claude-sonnet-5', label: 'Sonnet 5', description: 'Fast & capable (recommended)', tier: 'medium', deprecated: false, order: 0 },
-        { id: 'claude-opus-4-8', label: 'Opus 4.8', description: 'Most powerful Opus-tier', tier: 'high', deprecated: false, order: 1 },
-        { id: 'claude-fable-5', label: 'Fable 5', description: 'Most capable, long-horizon work', tier: 'high', deprecated: false, order: 2 },
-        { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 3 },
+        { id: 'claude-opus-5', label: 'Opus 5', description: 'Most powerful Opus-tier', tier: 'high', deprecated: false, order: 1 },
+        { id: 'claude-opus-4-8', label: 'Opus 4.8', description: 'Previous Opus generation', tier: 'high', deprecated: false, order: 2 },
+        { id: 'claude-fable-5', label: 'Fable 5', description: 'Most capable, long-horizon work', tier: 'high', deprecated: false, order: 3 },
+        { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 4 },
       ],
     },
     openai: {
@@ -69,11 +70,12 @@ export const BUNDLED_CATALOG: ModelCatalog = {
         { id: 'openai/gpt-5.2', label: 'GPT-5.2', description: 'OpenAI — latest flagship reasoning model', tier: 'high', deprecated: false, order: 3 },
         { id: 'openai/gpt-4o', label: 'GPT-4o', description: 'OpenAI — fast multimodal generalist', tier: 'medium', deprecated: false, order: 4 },
         { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', description: 'Anthropic — fast & capable', tier: 'medium', deprecated: false, order: 5 },
-        { id: 'anthropic/claude-opus-4-8', label: 'Claude Opus 4.8', description: 'Anthropic — most powerful', tier: 'high', deprecated: false, order: 6 },
-        { id: 'openrouter/anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 7 },
-        { id: 'openrouter/google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', description: 'OpenRouter — Google via OpenRouter', tier: 'high', deprecated: false, order: 8 },
-        { id: 'openrouter/openai/gpt-5.2', label: 'GPT-5.2', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 9 },
-        { id: 'openrouter/meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', description: 'OpenRouter — open-weight, low cost', tier: 'low', deprecated: false, order: 10 },
+        { id: 'anthropic/claude-opus-5', label: 'Claude Opus 5', description: 'Anthropic — most powerful', tier: 'high', deprecated: false, order: 6 },
+        { id: 'anthropic/claude-opus-4-8', label: 'Claude Opus 4.8', description: 'Anthropic — previous Opus generation', tier: 'high', deprecated: false, order: 7 },
+        { id: 'openrouter/anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 8 },
+        { id: 'openrouter/google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', description: 'OpenRouter — Google via OpenRouter', tier: 'high', deprecated: false, order: 9 },
+        { id: 'openrouter/openai/gpt-5.2', label: 'GPT-5.2', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 10 },
+        { id: 'openrouter/meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', description: 'OpenRouter — open-weight, low cost', tier: 'low', deprecated: false, order: 11 },
       ],
     },
   },
