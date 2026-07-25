@@ -16,7 +16,7 @@
 ## macOS Apple Silicon (darwin-arm64) — GATE 1
 
 **DMG:** `dist/Ritemark-1.8.5-darwin-arm64.dmg` (signed Developer ID, **un-notarized** — right-click → **Open** to bypass Gatekeeper, or `xattr -dr com.apple.quarantine '/Applications/Ritemark.app'`)
-**SHA256:** `613d4847615c6aa2e98b9d2fcd260f96582608a7beff87ee32faa15ea67be25a`
+**SHA256:** `4fe9cc553865353062e90ad99bda8af7979fa8ad95bf8b3ed82587f27ac0ff40` (rebuild 2 — indigo thread-rail fix `0fec43f`; supersedes `613d4847…`)
 
 ### Installation
 
@@ -32,6 +32,7 @@
 - [ ] Thread cap dialog appears when opening more threads than allowed
 - [ ] Chat history: closing and reopening a thread restores its conversation
 - [ ] Runtime switching (Claude ↔ Codex ↔ OpenCode) works per-thread
+- [ ] Thread-rail robot icons are brand **indigo** in both light and dark mode (Gate 1 rebuild fix)
 
 ### Runtime bumps (Sprint 100)
 
