@@ -18,18 +18,6 @@ import { isConversationRunning } from './conversationState';
 /** The three runtimes a thread can be bound to. */
 export type ThreadRuntime = 'claude' | 'codex' | 'opencode';
 
-/**
- * Runtime tint for the shared Phosphor `robot` glyph. These three hexes are the
- * ONLY raw colours in the rail — they are brand marks (Anthropic clay / OpenAI
- * green / OpenCode sky), not theme roles, so they are identical in light and
- * dark and cannot come from a `--r-*` token.
- */
-export const RUNTIME_COLOR: Record<ThreadRuntime, string> = {
-  claude: '#D97757',
-  codex: '#10A37F',
-  opencode: '#0EA5E9',
-};
-
 export const RUNTIME_LABEL: Record<ThreadRuntime, string> = {
   claude: 'Claude',
   codex: 'Codex',

@@ -23,7 +23,6 @@ import {
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import {
-  RUNTIME_COLOR,
   SOFT_THREAD_CAP,
   canCloseThread,
   deriveThreadStatus,
@@ -78,7 +77,7 @@ export function ThreadCapDialog() {
                     onClick={() => handleCloseThenOpen(thread.id)}
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-[var(--r-surface-soft)]"
                   >
-                    <span className="flex shrink-0" style={{ color: RUNTIME_COLOR[thread.runtime] }}>
+                    <span className="flex shrink-0" style={{ color: 'var(--r-accent)' }}>
                       <Icon name="robot" size={14} tone="inherit" />
                     </span>
                     <span className="flex-1 min-w-0 truncate text-[13px]">{thread.title}</span>

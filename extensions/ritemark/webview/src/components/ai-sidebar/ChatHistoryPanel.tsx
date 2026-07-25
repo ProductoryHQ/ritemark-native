@@ -23,7 +23,7 @@
 import { useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
-import { RUNTIME_COLOR, deriveThreadTitle, runtimeOfConversation, type ThreadRuntime } from './threadStatus';
+import { deriveThreadTitle, runtimeOfConversation, type ThreadRuntime } from './threadStatus';
 import type { SavedConversationV2 } from './chatHistoryStorage';
 
 // ── Date Grouping ──────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ function ConversationItem({ conversation, isActive, isOpen, runtime, onSelect, o
       }`}
     >
       {isOpen && runtime ? (
-        <span className="mt-0.5 shrink-0 flex" style={{ color: RUNTIME_COLOR[runtime] }}>
+        <span className="mt-0.5 shrink-0 flex" style={{ color: 'var(--r-accent)' }}>
           <Icon name="robot" size={16} tone="inherit" />
         </span>
       ) : (

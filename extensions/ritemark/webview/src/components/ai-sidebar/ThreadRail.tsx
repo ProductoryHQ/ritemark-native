@@ -20,7 +20,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import {
-  RUNTIME_COLOR,
   canCloseThread,
   deriveThreadStatus,
   deriveThreadTitle,
@@ -99,7 +98,7 @@ function ThreadIcon({ thread, onSelect, onClose, registerRef }: ThreadIconProps)
     >
       {/* R9: one shared Phosphor `robot` for every thread, tinted by runtime.
           Recognition comes from colour; consistency from the shared glyph. */}
-      <span className="flex" style={{ color: RUNTIME_COLOR[thread.runtime] }}>
+      <span className="flex" style={{ color: 'var(--r-accent)' }}>
         <Icon name="robot" size={14} tone="inherit" />
       </span>
 
