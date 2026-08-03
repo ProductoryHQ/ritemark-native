@@ -17,6 +17,13 @@ import {
 } from '../ui/select';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { SelectedContextTab } from './SelectedContextTab';
+import {
+  AIFirstUseDisclosure,
+  AIInformationButton,
+  AIInformationDialog,
+  useAIInformationDisclosure,
+} from './AIInformation';
+import { resolveAIIdentity } from './aiDisclosure';
 import { shouldQueueInsteadOfSend, shouldAutoSendQueuedPrompt, slotFor } from './composerQueue';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
@@ -325,9 +332,19 @@ export function ChatInput() {
       .filter((p): p is string => !!p);
 
     if (isOpenCode) {
-      sendOpenCodeMessage(prompt);
+      sendOpenCodeMessage(
+        prompt,
+        attachments.length > 0 ? attachments : undefined,
+        { skipActiveFile: hideActiveFile },
+      );
     } else if (isCodex) {
-      sendCodexMessage(prompt, attachments.length > 0 ? attachments : undefined, pendingRuntime.mode, hideBrowserContext);
+      sendCodexMessage(
+        prompt,
+        attachments.length > 0 ? attachments : undefined,
+        pendingRuntime.mode,
+        hideBrowserContext,
+        hideActiveFile,
+      );
     } else {
       sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext: hideBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
     }
@@ -793,7 +810,10 @@ export function ChatInput() {
   // Don't show if: no active file, user dismissed it, or it's already in manual path chips
   const showActiveFileChip = activeFilePath && !hideActiveFile &&
     !pathChips.some((p) => p.path === activeFilePath || p.path.endsWith('/' + activeFilePath));
-  const showBrowserContextChip = currentBrowserContext?.url && !hideBrowserContext;
+  // Browser context is currently injected for Claude Code and Codex only.
+  // Hiding the chip for OpenCode prevents the composer and disclosure from
+  // implying that ACP receives context the host deliberately does not send.
+  const showBrowserContextChip = !isOpenCode && currentBrowserContext?.url && !hideBrowserContext;
 
   // Auto-resize textarea
   useEffect(() => {
@@ -852,6 +872,17 @@ export function ChatInput() {
     contextCount > 0 ? `${contextCount} context` : null,
     mentions.length > 0 ? `${mentions.length} agent${mentions.length === 1 ? '' : 's'}` : null,
   ].filter(Boolean).join(' · ');
+  const aiIdentity = resolveAIIdentity({
+    runtimeId: pendingRuntime.runtimeId,
+    pendingModelId: pendingRuntime.modelId,
+    claudeModelId: currentClaudeModel?.id || selectedModel,
+    codexModelId: currentCodexModel?.id || codexSelectedModel,
+    openCodeModelValue: opencodeSelectedModel,
+    claudeModels: models,
+    codexModels,
+    byokProviderModels,
+  });
+  const aiInformation = useAIInformationDisclosure();
 
   function handleRuntimeChange(value: string) {
     if (value.startsWith('claude-code:')) {
@@ -892,6 +923,14 @@ export function ChatInput() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {aiInformation.showFirstUse && (
+        <AIFirstUseDisclosure
+          identity={aiIdentity}
+          onOpen={() => aiInformation.setOpen(true)}
+          onDismiss={aiInformation.acknowledge}
+        />
+      )}
+
       {/* Sprint 64 bonus track (S5): docked selected-text context tab.
           Renders only when the editor has a non-empty selection. The tab's
           rounded-t-lg + border-b-0 makes it visually connect to the input
@@ -1294,6 +1333,7 @@ export function ChatInput() {
           )}
 
           <div className="ml-auto flex items-center gap-1.5">
+            <AIInformationButton onOpen={() => aiInformation.setOpen(true)} />
             {isAgentMode && (
               <>
                 <input
@@ -1335,6 +1375,21 @@ export function ChatInput() {
           </div>
         </div>
       </div>
+      <AIInformationDialog
+        identity={aiIdentity}
+        context={{
+          hasPrompt: Boolean(value.trim()),
+          hasActiveFile: Boolean(activeFilePath && !hideActiveFile),
+          hasSelection: hasSelectedContext,
+          attachmentCount,
+          hasBrowserContext: Boolean(showBrowserContextChip),
+          hasConversationContext: agentConversation.length > 0 || codexConversation.length > 0,
+        }}
+        open={aiInformation.open}
+        showFirstUse={aiInformation.showFirstUse}
+        onOpenChange={aiInformation.setOpen}
+        onAcknowledge={aiInformation.acknowledge}
+      />
     </div>
   );
 }

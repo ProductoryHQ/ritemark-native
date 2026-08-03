@@ -245,6 +245,53 @@ function testOpenCodeReceivesClaudeHandoff() {
   }
 }
 
+function testOpenCodeTransmitsAttachmentsAndHonoursActiveFileRemoval() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+
+  try {
+    seedActiveConversation({
+      opencodeSelectedModel: 'opencode:anthropic/claude-sonnet-5',
+      pendingRuntime: { runtimeId: 'opencode', modelId: 'anthropic/claude-sonnet-5', mode: 'ask' },
+    });
+    useAISidebarStore.setState({ activeFilePath: '/workspace/private-notes.md' });
+
+    const attachment = {
+      id: 'attachment-1',
+      kind: 'text' as const,
+      name: 'brief.md',
+      data: '# Brief',
+      mediaType: 'text/markdown',
+    };
+    useAISidebarStore.getState().sendOpenCodeMessage(
+      'Review the attached brief',
+      [attachment],
+      { skipActiveFile: true },
+    );
+
+    const exec = posted.find((message): message is {
+      type: string;
+      agentId: string;
+      skipActiveFile?: boolean;
+      attachments?: typeof attachment[];
+    } => typeof message === 'object' && message !== null
+      && (message as { type?: string }).type === 'agent-execute'
+      && (message as { agentId?: string }).agentId === 'opencode');
+    assert.ok(exec, 'OpenCode must post an agent-execute message');
+    assert.equal(exec.skipActiveFile, true, 'dismissed active-file context must reach the host');
+    assert.deepEqual(exec.attachments, [attachment], 'OpenCode attachments must reach the runtime payload');
+
+    const { codexConversation } = selectActiveConversation(useAISidebarStore.getState());
+    const turn = codexConversation[codexConversation.length - 1];
+    assert.equal(turn.activeFilePath, undefined, 'dismissed active file must not appear in the visible turn metadata');
+    assert.deepEqual(turn.attachments, [attachment], 'the visible OpenCode turn must retain attachment metadata');
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
 
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
@@ -254,6 +301,7 @@ function main() {
   testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns();
   testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning();
   testOpenCodeReceivesClaudeHandoff();
+  testOpenCodeTransmitsAttachmentsAndHonoursActiveFileRemoval();
   console.log('Runtime switching tests passed.');
 }
 

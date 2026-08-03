@@ -252,7 +252,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * Handle messages from webview
    */
   private async handleMessage(
-    message: { type: string; key?: string; value?: unknown },
+    message: { type: string; key?: string; value?: unknown; url?: unknown },
     webview: vscode.Webview
   ): Promise<void> {
     const config = vscode.workspace.getConfiguration('ritemark');
@@ -261,6 +261,23 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       case 'ready':
         await this.sendCurrentSettings(webview);
         break;
+
+      case 'openExternal': {
+        const rawUrl = typeof message.url === 'string' ? message.url.trim() : '';
+        if (!rawUrl) break;
+        try {
+          const target = vscode.Uri.parse(rawUrl, true);
+          if (target.scheme === 'http' || target.scheme === 'https') {
+            const opened = await vscode.env.openExternal(target);
+            if (!opened) {
+              void vscode.window.showWarningMessage(`Could not open ${target.authority} in your browser.`);
+            }
+          }
+        } catch {
+          // Ignore malformed or unsupported external targets.
+        }
+        break;
+      }
 
       case 'setSetting':
         // Update VS Code setting
