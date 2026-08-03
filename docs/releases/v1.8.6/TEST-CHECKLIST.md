@@ -30,8 +30,8 @@
 
 - [x] Claude Code shows `Claude Code`, `Anthropic`, and the selected Claude model
 - [x] Codex shows `Codex`, `OpenAI`, and the selected Codex model
-- [ ] OpenCode shows `OpenCode`, the selected Google/OpenAI/Anthropic/OpenRouter route, and the selected model
-- [ ] Switching a runtime or model updates the open information dialog without reopening the sidebar
+- [x] OpenCode shows `OpenCode`, the selected Google/OpenAI/Anthropic/OpenRouter route, and the selected model
+- [x] Switching a runtime or model updates the open information dialog without reopening the sidebar
 - [x] No cross-runtime stale model identifier is shown when a catalogue label exists
 
 ## Context disclosure
@@ -41,24 +41,24 @@
 - [ ] Selected-text row changes to present when editor text is selected
 - [ ] Attachment count/state changes when a file is added or removed
 - [ ] Browser context is shown for a shared tab with Claude Code and Codex
-- [ ] Browser context is not shown for OpenCode
-- [ ] Removing the active-file chip excludes it from Claude, Codex, and OpenCode turn metadata/prompt setup
-- [ ] An OpenCode attachment reaches the ACP turn
+- [x] Browser context is not shown for OpenCode
+- [x] Removing the active-file chip excludes it from Claude, Codex, and OpenCode turn metadata/prompt setup
+- [x] An OpenCode attachment reaches the ACP turn
 
 ## Reliability, analytics, and links
 
 - [x] Dialog says AI can be inaccurate or incomplete and calls for review of facts, sources, calculations, commands, and file changes
 - [x] Dialog distinguishes direct runtime/provider processing from anonymous Ritemark PostHog analytics
 - [x] Dialog does not claim prompts or file contents always remain local
-- [ ] Ritemark AI information, Privacy, Terms, and provider links open successfully
-- [ ] The **AI information** link at the end of Ritemark Settings opens the live Ritemark page
-- [ ] Offline state does not hide the persistent AI-information entry
+- [x] Ritemark AI information, Privacy, Terms, and provider links open successfully
+- [x] The **AI information** link at the end of Ritemark Settings opens the live Ritemark page
+- [x] Offline state does not hide the persistent AI-information entry
 
 ## Website and policy gate
 
 - [x] `/en/support/guides/ai-information` builds and renders
 - [x] `/et/tugi/guides/ai-information` builds and renders
 - [x] Localized footer links point to the corresponding AI-information page
-- [ ] Jarmo/counsel approves the Productory Terms and Privacy wording
+- [x] Jarmo/counsel approves the Productory Terms and Privacy wording
 - [ ] Approved EN/ET Productory Terms and Privacy pages are live
 - [ ] Live policy links are verified from a packaged Ritemark candidate

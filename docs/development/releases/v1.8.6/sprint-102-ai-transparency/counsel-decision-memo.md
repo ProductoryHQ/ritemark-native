@@ -3,7 +3,9 @@
 **Prepared:** 2026-08-03  
 **Requested decision:** EU AI Act Article 50 and associated Terms/Privacy wording  
 **Product evidence:** [evidence-matrix.md](./evidence-matrix.md)  
-**Status:** Awaiting counsel; do not treat this memo as legal advice
+**Status:** Counsel approval received 2026-08-03; detailed legal advice is retained outside this repository
+
+Counsel completed the requested review and approved the Sprint 102 product and policy direction. This memo preserves the questions and engineering baseline only; it is not legal advice and does not reproduce confidential legal analysis.
 
 ## Product Flow in One Paragraph
 

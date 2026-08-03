@@ -62,10 +62,10 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 - [x] Runtime/provider/model labels match actual selected values for Claude, Codex, and OpenCode.
 - [x] Context and analytics wording matches current code and settings.
 - [x] No disclosure promises that files or prompts always remain local.
-- [ ] Counsel approves the role, marking, public-interest, Terms, and Privacy wording.
+- [x] Counsel approves the role, marking, public-interest, Terms, and Privacy wording.
 - [ ] Live Terms and Privacy pages are updated and their links are verified from the app.
 - [x] Automated tests cover disclosure state and provider/runtime value mapping.
-- [ ] Manual QA covers fresh profile, returning profile, runtime switch, model switch, offline state, and broken-link handling.
+- [x] Manual QA covers fresh profile, returning profile, runtime switch, model switch, offline state, and broken-link handling.
 - [x] User docs, `docs/CHANGELOG.md`, and v1.8.6 release assets are updated for Sprint 102.
 
 ## Validation
@@ -77,9 +77,9 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 
 ## Dependencies and Blockers
 
-- EU counsel approval is the legal blocker.
+- Counsel approval was received on 2026-08-03; detailed legal advice remains outside the repository.
 - The live Productory Terms/Privacy pages are outside the `ritemark-web` repository; their site owner must publish the approved corrections.
-- The product UI can be implemented while counsel review is in progress, but the sprint cannot close until approved policy copy is live.
+- The remaining external blocker is publication and release-candidate verification of the approved policy copy.
 
 ## Implementation and QA Evidence — 2026-08-03
 
@@ -93,20 +93,21 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 - The native implementation and documentation are in [draft PR #166](https://github.com/ProductoryHQ/ritemark-native/pull/166).
 - Follow-up polish makes the first-use persistence explicit with a **Don’t show again** action and adds an **AI information** link at the end of Settings.
 - Follow-up `npm run typecheck`, the disclosure test, webview production build, extension compile, and `./scripts/validate-qa.sh` pass. CDP verified that **Don’t show again** writes the existing acknowledgement key and hides the notice, then a clean reload restores it when the key is cleared; the Settings footer entry also renders in the dev app. The external Settings link was not clicked during automation so review would not open another browser window unexpectedly.
-- Remaining work: OpenCode/offline/broken-link manual coverage, counsel decision, approved Productory policy publication, and verification of the live policy links.
+- Jarmo confirmed the OpenCode, offline, and link-handling manual checks pass and that legal approval was received.
+- Remaining work: approved Productory policy publication and verification from the packaged release candidate.
 
 ## Decisions
 
 - No feature flag: the disclosure corrects mandatory product accuracy rather than introducing an experiment.
 - No architecture document update is required: Sprint 102 reuses the existing `agent-execute` message shape, runtime registry, shared model catalogue, and existing context fields; it adds no host↔webview message type or runtime.
-- The Ritemark website can host the stable EN/ET AI-information routes, but it cannot publish Productory's Terms/Privacy pages. Those corrections remain a counsel draft and an external publication gate.
+- The Ritemark website can host the stable EN/ET AI-information routes, but it cannot publish Productory's Terms/Privacy pages. Their approved corrections remain an external publication gate.
 - The first-use notice remains one-time and locally persisted. Use an explicit **Don’t show again** action rather than a checkbox with a temporary-dismiss state.
 - Settings provides a stable secondary route to the public AI-information page; it reuses the existing safe `openExternal` message contract.
 
 ## Risks
 
 - Static copy can drift from runtime behavior; derive dynamic identifiers from shared state and keep prose provider-neutral.
-- Legal review can delay release; send a narrow decision memo at sprint start rather than after UI implementation.
+- External Productory policy publication can delay release even though counsel review is complete.
 - An overbearing warning can damage onboarding; keep first-use disclosure concise and make detail progressively accessible.
 
 ## Approval Gate
@@ -115,3 +116,5 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 - [x] #163 is created and assigned to the v1.8.6 milestone.
 - [x] Created `sprint-102-ai-transparency` after approval; no product code changes on `main`.
 - [x] Jarmo reviewed and approved the final **Don’t show again** action and Settings footer link in the dev build on 2026-08-03.
+- [x] Jarmo confirmed OpenCode, offline, and link-handling manual QA on 2026-08-03.
+- [x] Counsel approval was received on 2026-08-03.

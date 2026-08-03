@@ -14,7 +14,7 @@ tags:
 
 # Ritemark v1.8.6 — Clear Start, Trustworthy AI
 
-**Status:** Draft — Sprint 102 implemented; remaining v1.8.6 sprints and counsel approval are not complete.  
+**Status:** Draft — Sprint 102 implemented and counsel-approved; remaining v1.8.6 sprints are not complete.  
 **Release issue:** [#163 — AI transparency and policy alignment](https://github.com/ProductoryHQ/ritemark-native/issues/163)
 
 ## AI transparency
@@ -34,7 +34,7 @@ tags:
 
 ## Public information
 
-The paired Ritemark website work is live with English and Estonian AI-information pages and corrected support claims. Productory Terms and Privacy corrections are drafted, but the release remains blocked until Jarmo/counsel approve them and the live Productory pages are updated.
+The paired Ritemark website work is live with English and Estonian AI-information pages and corrected support claims. Productory Terms and Privacy corrections are approved; publication of the updated live Productory pages remains a release gate.
 
 ## Still to come in v1.8.6
 

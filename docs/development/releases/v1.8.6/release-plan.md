@@ -358,8 +358,8 @@ Recommended Home MVP:
 ## Feature-Complete Definition
 
 - [ ] Release thesis and user-facing headline are agreed.
-- [ ] EU counsel confirms Productory’s AI Act role and the Article 50(1)/(2)/(4) measures required for Ritemark.
-- [ ] AI panel clearly identifies the AI interaction, runtime/provider/model, shared context, and reliability limitations by first interaction; the one-time notice has an explicit **Don’t show again** action and AI information remains reachable from the sidebar and Settings.
+- [x] EU counsel confirms Productory’s AI Act role and the Article 50(1)/(2)/(4) measures required for Ritemark.
+- [x] AI panel clearly identifies the AI interaction, runtime/provider/model, shared context, and reliability limitations by first interaction; the one-time notice has an explicit **Don’t show again** action and AI information remains reachable from the sidebar and Settings.
 - [ ] Live Terms and Privacy Policy match current platforms, AI providers, authentication paths, context sharing, analytics, and user controls.
 - [ ] Claude and Codex Plan flows are proven end-to-end; unsupported Plan UI is absent for OpenCode.
 - [ ] No runtime can mutate files while a genuine Plan-first review is pending.
@@ -383,7 +383,7 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 
 | Sprint | Purpose | Issues | Dependency | PR | Status |
 | --- | --- | --- | --- | --- | --- |
-| [Sprint 102 — AI Transparency and Policy Alignment](./sprint-102-ai-transparency/sprint-plan.md) | AI information UI, first-interaction disclosure, accurate Terms/Privacy, counsel decision | #163 | v1.8.5 + counsel + Productory policy publishing | [native #166](https://github.com/ProductoryHQ/ritemark-native/pull/166) draft; [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77) merged | In progress |
+| [Sprint 102 — AI Transparency and Policy Alignment](./sprint-102-ai-transparency/sprint-plan.md) | AI information UI, first-interaction disclosure, accurate Terms/Privacy, counsel decision | #163 | v1.8.5 + Productory policy publishing | [native #166](https://github.com/ProductoryHQ/ritemark-native/pull/166) ready; [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77) merged | Review ready |
 | [Sprint 103 — Truthful Agent Plans and Activity State](./sprint-103-agent-truth/sprint-plan.md) | Enforced Plan behavior, compact capability-aware control, truthful completion/background state | #132, #161 | v1.8.5 | TBD | Planned |
 | [Sprint 104 — Reliable Multi-Prompt Queue](./sprint-104-prompt-queue/sprint-plan.md) | Bounded per-chat queue shared by composer and comment prompts | #162 | Sprint 103 | TBD | Planned |
 | [Sprint 105 — Comments Command Center](./sprint-105-comments-command-center/sprint-plan.md) | Unique comment count, overview, per-agent batch dispatch, comment task status foundation | #164, #165 | Sprint 104 | TBD | Planned |
@@ -407,7 +407,7 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 
 | Sprint | Branch | PR | Issues | Merge status | QA status | Release-note status |
 | --- | --- | --- | --- | --- | --- | --- |
-| sprint-102-ai-transparency | `sprint-102-ai-transparency` | [native #166](https://github.com/ProductoryHQ/ritemark-native/pull/166); [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77) | #163 | web merged and live; native draft open | Native follow-up typecheck/build/compile/QA passed; CDP verified one-time notice persistence and Settings entry; web CI and production Playwright passed 86/86 | Sprint 102 draft complete |
+| sprint-102-ai-transparency | `sprint-102-ai-transparency` | [native #166](https://github.com/ProductoryHQ/ritemark-native/pull/166); [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77) | #163 | web merged and live; native ready for review | Automated QA passed; CDP verified notice persistence and Settings entry; Jarmo confirmed OpenCode/offline/link checks; counsel approval received; web production Playwright passed 86/86 | Sprint 102 draft complete |
 | sprint-103-agent-truth | `sprint-103-agent-truth` | TBD | #132, #161 | not started | not run | not drafted |
 | sprint-104-prompt-queue | `sprint-104-prompt-queue` | TBD | #162 | not started | not run | not drafted |
 | sprint-105-comments-command-center | `sprint-105-comments-command-center` | TBD | #164, #165 | not started | not run | not drafted |
@@ -418,7 +418,7 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 | Risk | Severity | Retirement plan | Status |
 | --- | --- | --- | --- |
 | Live Terms/Privacy copy is factually behind the product | High | Update both policies with counsel and verify every product/data-flow claim against the shipping app before release. | Open |
-| Article 50 role and machine-readable marking scope are unresolved | High | Obtain counsel’s provider/deployer analysis; document whether upstream markings are present and preserved. | Open |
+| Article 50 role and machine-readable marking scope are unresolved | High | Counsel review completed; detailed legal analysis is retained outside the repository. | Retired |
 | Claude Plan currently uses `bypassPermissions` | High | Replace prompt-only planning with a technically enforced no-write plan phase and adversarially test it. | Open |
 | Mode names imply parity that does not exist | High | Capability-map the UI and hide unsupported modes; test every visible choice against every runtime. | Open |
 | Comment badge overcounts split or multi-block anchors | Medium | Build the badge and margin rail on one ID-deduplicated comment index; test anchored, standalone, split, added, and deleted comments. | Open |
@@ -443,7 +443,7 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 - [ ] Supporting user documentation, if behavior changes
 - [ ] Live Productory Terms of Service
 - [ ] Live Productory Privacy Policy
-- [ ] In-app AI information/disclosure copy approved by counsel
+- [x] In-app AI information/disclosure copy approved by counsel
 - [x] Live EN/ET Ritemark AI-information pages and localized footer links
 - [ ] Screenshots and social/announcement assets, if needed
 
@@ -451,8 +451,8 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 
 - [x] Approve the working thesis: “Clear Start, Trustworthy AI.”
 - [x] Include the five mapped candidates and defer the unmapped backlog.
-- [ ] Does counsel classify Productory/Ritemark as provider, deployer, or both for each relevant AI flow?
-- [ ] What exact Article 50(2) marking/detectability work, if any, belongs in v1.8.6?
+- [x] Counsel review of Productory/Ritemark’s role and Article 50 treatment is complete; detailed legal analysis is retained outside the repository.
+- [x] Counsel raised no additional Article 50 implementation change for the approved Sprint 102 scope.
 - [ ] Should the user-facing safety menu say `Manual review / Work automatically`, or use another two-state vocabulary?
 - [ ] Is “Plan first” a one-turn action or a session state? Recommendation: session state that resets after approval/cancel.
 - [x] Comments badge shows the total unique-comment count; the overview shows assigned and unassigned subsets.
@@ -477,9 +477,9 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 
 ## Next Planning Actions
 
-1.  Obtain the Sprint 102 counsel decision immediately; legal review may run in parallel with engineering planning.
+1.  Publish the counsel-approved Productory Terms and Privacy corrections and verify them from the packaged release candidate.
     
-2.  Review the Sprint 102 **Don’t show again** action and Settings link, then finish OpenCode/offline/broken-link manual QA while counsel review and Productory policy publication proceed in parallel; keep the sprint open until the approved live policy pages are verified.
+2.  Review and merge native PR #166 after its ready-for-review handoff; keep Sprint 102 open until the approved live policy pages are verified.
     
 3.  Author and approve Sprint 103’s SDD artifacts before its branch/code phase.
     
@@ -515,3 +515,4 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 | 2026-08-03 | Keep the first-use disclosure one-time, expose its persistence as an explicit **Don’t show again** action, and add a stable **AI information** link at the end of Settings. | Jarmo + Sprint 102 follow-up |
 | 2026-08-03 | Approve the final **Don’t show again** action and Settings footer link after reviewing them together in the dev build. | Jarmo |
 | 2026-08-03 | Record the external publication boundary: `ritemark-web` can host the AI-information routes, but Productory Terms/Privacy live elsewhere and remain blocked on counsel + site-owner publication. | Cross-repo audit |
+| 2026-08-03 | Confirm OpenCode, offline, and link-handling manual QA; record that counsel approval was received. Productory policy publication and packaged-candidate verification remain external release gates. | Jarmo |
