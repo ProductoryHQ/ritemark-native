@@ -383,7 +383,7 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 
 | Sprint | Purpose | Issues | Dependency | PR | Status |
 | --- | --- | --- | --- | --- | --- |
-| [Sprint 102 — AI Transparency and Policy Alignment](./sprint-102-ai-transparency/sprint-plan.md) | AI information UI, first-interaction disclosure, accurate Terms/Privacy, counsel decision | #163 | v1.8.5 + counsel + Productory policy publishing | Native TBD; [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77) merged | In progress |
+| [Sprint 102 — AI Transparency and Policy Alignment](./sprint-102-ai-transparency/sprint-plan.md) | AI information UI, first-interaction disclosure, accurate Terms/Privacy, counsel decision | #163 | v1.8.5 + counsel + Productory policy publishing | [native #166](https://github.com/ProductoryHQ/ritemark-native/pull/166) draft; [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77) merged | In progress |
 | [Sprint 103 — Truthful Agent Plans and Activity State](./sprint-103-agent-truth/sprint-plan.md) | Enforced Plan behavior, compact capability-aware control, truthful completion/background state | #132, #161 | v1.8.5 | TBD | Planned |
 | [Sprint 104 — Reliable Multi-Prompt Queue](./sprint-104-prompt-queue/sprint-plan.md) | Bounded per-chat queue shared by composer and comment prompts | #162 | Sprint 103 | TBD | Planned |
 | [Sprint 105 — Comments Command Center](./sprint-105-comments-command-center/sprint-plan.md) | Unique comment count, overview, per-agent batch dispatch, comment task status foundation | #164, #165 | Sprint 104 | TBD | Planned |
@@ -407,7 +407,7 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 
 | Sprint | Branch | PR | Issues | Merge status | QA status | Release-note status |
 | --- | --- | --- | --- | --- | --- | --- |
-| sprint-102-ai-transparency | `sprint-102-ai-transparency` | Native TBD; [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77) | #163 | web merged and live; native in progress | Native follow-up typecheck/build/compile/QA passed; CDP verified one-time notice persistence and Settings entry; web CI and production Playwright passed 86/86 | Sprint 102 draft complete |
+| sprint-102-ai-transparency | `sprint-102-ai-transparency` | [native #166](https://github.com/ProductoryHQ/ritemark-native/pull/166); [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77) | #163 | web merged and live; native draft open | Native follow-up typecheck/build/compile/QA passed; CDP verified one-time notice persistence and Settings entry; web CI and production Playwright passed 86/86 | Sprint 102 draft complete |
 | sprint-103-agent-truth | `sprint-103-agent-truth` | TBD | #132, #161 | not started | not run | not drafted |
 | sprint-104-prompt-queue | `sprint-104-prompt-queue` | TBD | #162 | not started | not run | not drafted |
 | sprint-105-comments-command-center | `sprint-105-comments-command-center` | TBD | #164, #165 | not started | not run | not drafted |
