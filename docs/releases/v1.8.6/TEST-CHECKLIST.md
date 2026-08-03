@@ -60,5 +60,5 @@
 - [x] `/et/tugi/guides/ai-information` builds and renders
 - [x] Localized footer links point to the corresponding AI-information page
 - [x] Jarmo/counsel approves the Productory Terms and Privacy wording
-- [ ] Approved EN/ET Productory Terms and Privacy pages are live
-- [ ] Live policy links are verified from a packaged Ritemark candidate
+- [x] Approved EN/ET Productory Terms and Privacy pages are live
+- [ ] Live policy links are verified from a packaged Ritemark candidate — release-execution gate, not a Sprint 102 blocker

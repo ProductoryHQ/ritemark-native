@@ -1,6 +1,6 @@
 # Sprint 102 — AI Transparency and Policy Alignment
 
-**Status:** In progress — branch created 2026-08-03  
+**Status:** Complete — 2026-08-03  
 **Parent release:** [v1.8.6](../release-plan.md)  
 **GitHub milestone:** [v1.8.6](https://github.com/ProductoryHQ/ritemark-native/milestone/7)  
 **Branch:** `sprint-102-ai-transparency`  
@@ -63,7 +63,7 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 - [x] Context and analytics wording matches current code and settings.
 - [x] No disclosure promises that files or prompts always remain local.
 - [x] Counsel approves the role, marking, public-interest, Terms, and Privacy wording.
-- [ ] Live Terms and Privacy pages are updated and their links are verified from the app.
+- [x] Live Terms and Privacy pages are updated and their links are verified from the app.
 - [x] Automated tests cover disclosure state and provider/runtime value mapping.
 - [x] Manual QA covers fresh profile, returning profile, runtime switch, model switch, offline state, and broken-link handling.
 - [x] User docs, `docs/CHANGELOG.md`, and v1.8.6 release assets are updated for Sprint 102.
@@ -78,8 +78,8 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 ## Dependencies and Blockers
 
 - Counsel approval was received on 2026-08-03; detailed legal advice remains outside the repository.
-- The live Productory Terms/Privacy pages are outside the `ritemark-web` repository; their site owner must publish the approved corrections.
-- The remaining external blocker is publication and release-candidate verification of the approved policy copy.
+- Productory policy publication was completed in [productory-2026 PR #20](https://github.com/jarmo-productory/productory-2026/pull/20).
+- No Sprint 102 blockers remain. Packaged-candidate verification stays in release execution rather than blocking sprint closure.
 
 ## Implementation and QA Evidence — 2026-08-03
 
@@ -90,24 +90,25 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 - `npm run typecheck`, the two targeted Sprint 102 tests, the webview production build, and `./scripts/validate-qa.sh` pass.
 - Full extension `npm test` reaches and passes the Sprint 102 tests, then stops in the existing flow integration suite because the standalone test process cannot resolve the `vscode` module.
 - The paired `ritemark-web` work merged in [PR #77](https://github.com/jarmo-productory/ritemark-web/pull/77). CI passed, the production-mode Playwright suite passed 86/86, and both localized AI-information pages and footer links were verified live.
-- The native implementation and documentation are in [PR #166](https://github.com/ProductoryHQ/ritemark-native/pull/166), ready for review.
+- The native implementation and documentation merged in [PR #166](https://github.com/ProductoryHQ/ritemark-native/pull/166).
 - Follow-up polish makes the first-use persistence explicit with a **Don’t show again** action and adds an **AI information** link at the end of Settings.
 - Follow-up `npm run typecheck`, the disclosure test, webview production build, extension compile, and `./scripts/validate-qa.sh` pass. CDP verified that **Don’t show again** writes the existing acknowledgement key and hides the notice, then a clean reload restores it when the key is cleared; the Settings footer entry also renders in the dev app. The external Settings link was not clicked during automation so review would not open another browser window unexpectedly.
 - Jarmo confirmed the OpenCode, offline, and link-handling manual checks pass and that legal approval was received.
-- Remaining work: approved Productory policy publication and verification from the packaged release candidate.
+- The approved Productory Terms and Privacy corrections merged in [productory-2026 PR #20](https://github.com/jarmo-productory/productory-2026/pull/20). Netlify preview checks passed, all four EN/ET policy routes returned HTTP 200 in production, and live HTML contained the current 2026-08-03 copy without the retired macOS-only, OpenAI-only, or no-analytics claims.
+- Sprint 102 is complete. Rechecking the same live links from the packaged v1.8.6 candidate remains a release-execution checklist item.
 
 ## Decisions
 
 - No feature flag: the disclosure corrects mandatory product accuracy rather than introducing an experiment.
 - No architecture document update is required: Sprint 102 reuses the existing `agent-execute` message shape, runtime registry, shared model catalogue, and existing context fields; it adds no host↔webview message type or runtime.
-- The Ritemark website can host the stable EN/ET AI-information routes, but it cannot publish Productory's Terms/Privacy pages. Their approved corrections remain an external publication gate.
+- The Ritemark website hosts the stable EN/ET AI-information routes. The separate Productory Terms/Privacy pages are published from `productory-2026`; both surfaces are live.
 - The first-use notice remains one-time and locally persisted. Use an explicit **Don’t show again** action rather than a checkbox with a temporary-dismiss state.
 - Settings provides a stable secondary route to the public AI-information page; it reuses the existing safe `openExternal` message contract.
 
 ## Risks
 
 - Static copy can drift from runtime behavior; derive dynamic identifiers from shared state and keep prose provider-neutral.
-- External Productory policy publication can delay release even though counsel review is complete.
+- Policy copy can drift from product behavior; verify the live pages again during release-candidate execution.
 - An overbearing warning can damage onboarding; keep first-use disclosure concise and make detail progressively accessible.
 
 ## Approval Gate
@@ -118,3 +119,4 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 - [x] Jarmo reviewed and approved the final **Don’t show again** action and Settings footer link in the dev build on 2026-08-03.
 - [x] Jarmo confirmed OpenCode, offline, and link-handling manual QA on 2026-08-03.
 - [x] Counsel approval was received on 2026-08-03.
+- [x] Productory Terms and Privacy corrections were published and verified live on 2026-08-03.
