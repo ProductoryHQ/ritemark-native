@@ -90,7 +90,7 @@ Users can always see that they are interacting with AI, which runtime/provider/m
 - `npm run typecheck`, the two targeted Sprint 102 tests, the webview production build, and `./scripts/validate-qa.sh` pass.
 - Full extension `npm test` reaches and passes the Sprint 102 tests, then stops in the existing flow integration suite because the standalone test process cannot resolve the `vscode` module.
 - The paired `ritemark-web` work merged in [PR #77](https://github.com/jarmo-productory/ritemark-web/pull/77). CI passed, the production-mode Playwright suite passed 86/86, and both localized AI-information pages and footer links were verified live.
-- The native implementation and documentation are in [draft PR #166](https://github.com/ProductoryHQ/ritemark-native/pull/166).
+- The native implementation and documentation are in [PR #166](https://github.com/ProductoryHQ/ritemark-native/pull/166), ready for review.
 - Follow-up polish makes the first-use persistence explicit with a **Don’t show again** action and adds an **AI information** link at the end of Settings.
 - Follow-up `npm run typecheck`, the disclosure test, webview production build, extension compile, and `./scripts/validate-qa.sh` pass. CDP verified that **Don’t show again** writes the existing acknowledgement key and hides the notice, then a clean reload restores it when the key is cleared; the Settings footer entry also renders in the dev app. The external Settings link was not clicked during automation so review would not open another browser window unexpectedly.
 - Jarmo confirmed the OpenCode, offline, and link-handling manual checks pass and that legal approval was received.
