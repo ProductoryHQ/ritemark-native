@@ -361,12 +361,12 @@ interface AISidebarState {
   rejectPlan: (turnId: string, feedback?: string) => void;
   answerAgentQuestion: (turnId: string, question: AgentQuestion, answers: Record<string, string>) => void;
   dismissWelcome: () => void;
-  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'auto' | 'ask' | 'plan', skipBrowserContext?: boolean) => void;
+  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'auto' | 'ask' | 'plan', skipBrowserContext?: boolean, skipActiveFile?: boolean) => void;
   selectCodexModel: (modelId: string) => void;
   /** Select an OpenCode model. compositeValue is the full "opencode:<provider>/<model>" string. */
   selectOpenCodeModel: (compositeValue: string) => void;
   /** Send a message to the OpenCode (ACP) runtime. */
-  sendOpenCodeMessage: (prompt: string) => void;
+  sendOpenCodeMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean }) => void;
   handleCodexApproval: (requestId: string | number, approved: boolean, alwaysAllow?: boolean) => void;
   /** Respond to a Claude Ask-mode file-write/shell-command approval card. */
   handleAgentToolApproval: (requestId: string, approved: boolean) => void;
@@ -1279,7 +1279,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
     },
 
-    sendCodexMessage: (prompt, attachments?, requestedMode?, skipBrowserContext?) => {
+    sendCodexMessage: (prompt, attachments?, requestedMode?, skipBrowserContext?, skipActiveFile?) => {
       const conversation = activeConversation();
       if (!conversation) return;
 
@@ -1313,7 +1313,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         conversationId: conversation.id,
         userPrompt: prompt,
         requestedPlanMode: requestedMode === 'plan' || shouldRequestPlanMode(prompt),
-        activeFilePath: get().activeFilePath || undefined,
+        activeFilePath: skipActiveFile ? undefined : get().activeFilePath || undefined,
         attachments,
         streamingText: '',
         activities: [],
@@ -1340,6 +1340,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         // approval policy + plan collaboration mode.
         approvalMode: requestedMode ?? 'auto',
         skipBrowserContext,
+        skipActiveFile,
         attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
       });
     },
@@ -1352,7 +1353,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       patchConversation(get().activeConversationId, () => ({ opencodeSelectedModel: compositeValue }));
     },
 
-    sendOpenCodeMessage: (prompt) => {
+    sendOpenCodeMessage: (prompt, attachments?, options?) => {
       const conversation = activeConversation();
       if (!conversation) return;
 
@@ -1393,7 +1394,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         runtime: 'opencode',
         userPrompt: prompt,
         requestedPlanMode: false,
-        activeFilePath: get().activeFilePath || undefined,
+        activeFilePath: options?.skipActiveFile ? undefined : get().activeFilePath || undefined,
+        attachments,
         streamingText: '',
         activities: [],
         pendingQuestion: undefined,
@@ -1418,6 +1420,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         prompt: fullPrompt,
         model,
         approvalMode: conversation.pendingRuntime.mode,
+        skipActiveFile: options?.skipActiveFile,
+        attachments: attachments?.map((attachment) => ({
+          id: attachment.id,
+          kind: attachment.kind,
+          name: attachment.name,
+          data: attachment.data,
+          mediaType: attachment.mediaType,
+        })),
       });
     },
 

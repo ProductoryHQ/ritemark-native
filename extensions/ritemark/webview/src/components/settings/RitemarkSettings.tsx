@@ -10,6 +10,7 @@ import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
 import { vscode } from '../../lib/vscode';
 import { Slider } from '../ui/slider';
+import { AI_INFORMATION_URL } from '../ai-sidebar/aiDisclosure';
 
 interface SettingsData {
   codexIntegration: boolean;
@@ -1451,6 +1452,30 @@ export function RitemarkSettings() {
               </RuntimeStatusCard>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="mt-8 border-t border-hairline pt-5" aria-labelledby="ai-information-settings">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <Icon name="shield-check" size={16} tone="active" className="mt-0.5 shrink-0" />
+            <div>
+              <h2 id="ai-information-settings" className="text-sm font-medium text-ink-strong">
+                AI information
+              </h2>
+              <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+                Learn which AI services Ritemark uses, what context may be shared, and how to review AI output.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => vscode.postMessage({ type: 'openExternal', url: AI_INFORMATION_URL })}
+            className="inline-flex shrink-0 items-center gap-1 rounded bg-transparent px-2 py-1 text-xs font-medium text-accent-deep hover:bg-surface-soft hover:underline focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]"
+          >
+            Open AI information
+            <Icon name="arrow-square-out" size={12} tone="active" />
+          </button>
         </div>
       </section>
     </div>

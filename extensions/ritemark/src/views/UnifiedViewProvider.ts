@@ -169,6 +169,27 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._sendOnboardingStatus();
           break;
 
+        case 'openExternal': {
+          // The shared webview bridge already uses this message for editor
+          // links. The AI sidebar has its own host, so it must handle the same
+          // message explicitly rather than silently dropping policy/provider
+          // link clicks. Keep this surface restricted to web URLs.
+          const rawUrl = typeof message.url === 'string' ? message.url.trim() : '';
+          if (!rawUrl) break;
+          try {
+            const target = vscode.Uri.parse(rawUrl, true);
+            if (target.scheme === 'http' || target.scheme === 'https') {
+              const opened = await vscode.env.openExternal(target);
+              if (!opened) {
+                void vscode.window.showWarningMessage(`Could not open ${target.authority} in your browser.`);
+              }
+            }
+          } catch {
+            // Ignore malformed or unsupported external targets.
+          }
+          break;
+        }
+
         case 'ai-configure-key':
           vscode.commands.executeCommand('ritemark.configureApiKey');
           break;

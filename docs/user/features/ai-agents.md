@@ -6,6 +6,8 @@ Ritemark includes three AI agents in the sidebar, each with different capabiliti
 
 If you want to manage custom helpers, see [Agent Library](agent-library.md) for creating, launching, and organizing your own agents and skills.
 
+> **New in v1.8.6:** Ritemark now identifies AI before the first sidebar interaction and keeps an **[AI information](#ai-information-and-context-sharing)** button beside the composer. It shows the selected runtime, provider/service, and model; explains what context may leave the device; and reminds you to review AI output.
+
 > **New in v1.7.3:** **OpenCode** joins Claude and Codex as a third, bring-your-own-key runtime over the Agent Client Protocol. See [OpenCode](#opencode) below and [Set Up AI → OpenCode](../setup-ai.md#opencode-bring-your-own-key) for setup. The sidebar composer also gained a [prompt queue](#running-agents-the-composer-and-plan-approval) and a fixed plan-approval flow this release.
 
 > **Changed in v1.7.2:** The earlier "Ritemark Agent" runtime (a direct OpenAI/Gemini chat runtime, also known as the Legacy Agent) has been removed, along with the document-search (RAG) subsystem. Conversations you previously had with the Ritemark Agent still open **read-only** so your history is preserved.
@@ -239,13 +241,36 @@ After installing a prerequisite, you may need to **reload the window** for Ritem
 
 ---
 
-## Privacy
+## AI information and context sharing
+
+Before the first AI sidebar interaction, the composer states that you are interacting with AI. Choose **Don’t show again** to record the one-time acknowledgement. The information remains available afterward from the **ⓘ AI information** button beside the attachment and Send controls and from the link at the end of Ritemark Settings.
+
+The detail view uses the active conversation's shared runtime/model state. It shows:
+
+- **Runtime:** Claude Code, Codex, or OpenCode
+- **Provider/service:** Anthropic for Claude Code, OpenAI for Codex, or the selected Google/OpenAI/Anthropic/OpenRouter route for OpenCode
+- **Model:** the model currently selected in the composer
+- **Context categories:** prompt, active file, selected text, attachments, shared browser context, recent cross-runtime context, and tool results
+
+A check beside a context category means that category is present in the current composer state. It is not a guarantee that the agent can read only those items. Depending on the selected permission mode and approvals, an agent can read other workspace files or use tools while completing the task.
+
+The active-file chip can be removed before sending. Browser context is shown and sent only for Claude Code and Codex; OpenCode does not currently receive the integrated-browser context. Sprint 102 also ensures that active-file removal reaches Codex and OpenCode and that OpenCode attachment payloads reach its runtime instead of being dropped at the composer boundary.
+
+AI output can be inaccurate or incomplete. Review facts, sources, calculations, commands, and file changes before relying on, publishing, or acting on the result. Approval controls reduce unintended actions; they do not verify correctness.
+
+For the longer data-flow explanation and current provider links, open **AI information** in the app or visit [Ritemark AI Information](https://ritemark.app/en/support/guides/ai-information).
+
+---
+
+## Privacy and analytics
 
 - **Claude**: Text is sent to Anthropic's API via Claude Code
 - **Codex**: Text is sent to OpenAI's API via ChatGPT
 - **OpenCode**: Text is sent to whichever provider's API key you configured (OpenAI, Google AI, Anthropic, or OpenRouter)
 
-All API keys and credentials are stored locally on your machine. Ritemark has no servers - all communication goes directly between your machine and the AI provider.
+Credentials are stored locally using the operating system's secure storage and the installed runtime. AI sidebar requests are not proxied through a Productory server; the selected runtime connects to its provider using your account or key. Files stay on your computer as files, but prompts and relevant file, selection, attachment, browser, conversation, and tool context can be transmitted when you invoke cloud-connected AI.
+
+Separately, Ritemark sends anonymous product-usage events to PostHog when analytics is enabled (the default). Those events cover app sessions, feature/agent use, and reactions; they do not include prompt or file contents. If you explicitly submit written feedback, the feedback text you enter is sent with that event. You can disable analytics in Ritemark settings.
 
 ---
 
