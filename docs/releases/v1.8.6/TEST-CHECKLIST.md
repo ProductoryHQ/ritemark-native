@@ -1,6 +1,6 @@
 # v1.8.6 Test Checklist
 
-**Status:** Draft — Sprint 102 section only  
+**Status:** Draft — Sprint 102 complete; unchecked items carry into packaged-candidate QA  
 **Release:** Ritemark v1.8.6 — Clear Start, Trustworthy AI  
 **Sprint:** 102 — AI Transparency and Policy Alignment (#163)
 

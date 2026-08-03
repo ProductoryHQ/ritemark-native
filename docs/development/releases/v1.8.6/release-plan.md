@@ -438,11 +438,11 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 
 ## Documentation / Release Assets
 
-- [ ] `docs/CHANGELOG.md`
-- [ ] `docs/releases/v1.8.6/release-notes.md`
+- [x] `docs/CHANGELOG.md` — Sprint 102 coverage added
+- [x] `docs/releases/v1.8.6/release-notes.md` — Sprint 102 coverage added
 - [ ] `docs/releases/v1.8.6/github-release-notes.md`
-- [ ] `docs/releases/v1.8.6/TEST-CHECKLIST.md`
-- [ ] Supporting user documentation, if behavior changes
+- [x] `docs/releases/v1.8.6/TEST-CHECKLIST.md` — Sprint 102 coverage added; packaged-candidate items remain
+- [x] Supporting user documentation for Sprint 102
 - [x] Live Productory Terms of Service
 - [x] Live Productory Privacy Policy
 - [x] In-app AI information/disclosure copy approved by counsel
