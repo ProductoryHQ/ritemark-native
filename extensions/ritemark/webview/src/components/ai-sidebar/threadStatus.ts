@@ -69,16 +69,24 @@ export type ThreadStatus = 'idle' | 'running' | 'attention';
  * approval gate for all three runtimes (`approval`).
  */
 export function isConversationAwaitingUser(conversation: ConversationState): boolean {
+  // Sprint 103 R7: a Claude turn with a terminal result can no longer be
+  // waiting (a cancelled plan turn used to leave the rail amber forever).
   for (const turn of conversation.agentConversation) {
+    if (turn.result) continue;
     if (turn.approval) return true;
     if (turn.pendingQuestion) return true;
     if (turn.pendingPlanApproval) return true;
     if (turn.isPlan && !turn.planHandled) return true;
   }
   for (const turn of conversation.codexConversation) {
+    // Codex plan review outlives a SUCCESSFUL turn result by design.
+    if (turn.requiresPlanReview && !turn.planHandled
+      && (!turn.result || !turn.result.error) && turn.result?.status !== 'interrupted') {
+      return true;
+    }
+    if (turn.result) continue;
     if (turn.approval) return true;
     if (turn.pendingQuestion) return true;
-    if (turn.requiresPlanReview && !turn.planHandled) return true;
   }
   return false;
 }

@@ -23,14 +23,8 @@ export function buildCodexApprovedPlanPrompt(originalPrompt: string, planText: s
   ].join('\n');
 }
 
-export function shouldRequestPlanMode(prompt: string): boolean {
-  if (/^The user approved this plan\./i.test(prompt.trim())) {
-    return false;
-  }
-  return /\bplan mode\b/i.test(prompt)
-    || /\bwork in plan\b/i.test(prompt)
-    || /\benter plan mode\b/i.test(prompt);
-}
+// Sprint 103 R1 (D4): `shouldRequestPlanMode` prompt sniffing removed — the
+// Plan chip is the only path into plan-first; prompt text never flips modes.
 
 export function applyCodexPlanApproval(
   turns: CodexConversationTurn[],
@@ -167,13 +161,15 @@ export function getActiveApprovedPlanForClaude(turns: AgentConversationTurn[]): 
     return null;
   }
 
+  // Sprint 103 R7 (audit F11): the banner shows the APPROVED PLAN, never the
+  // turn's result text — the result already renders as the response.
   const completedResultText = approvedTurn.result && !approvedTurn.result.error
     ? approvedTurn.result.text.trim()
     : '';
 
   return {
     key: approvedTurn.id,
-    planText: completedResultText || approvedTurn.planText || '',
+    planText: approvedTurn.planText || '',
     isRunning: Boolean(approvedTurn.isRunning),
     allCompleted: Boolean(completedResultText) && !approvedTurn.isRunning,
   };

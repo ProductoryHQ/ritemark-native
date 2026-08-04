@@ -1,21 +1,32 @@
 ---
-date: '2026-08-03'
+date: '2026-08-04'
 title: 'Ritemark v1.8.6 — Clear Start, Trustworthy AI'
 author: Jarmo Tuisk
 status: Draft
 sprints:
   - sprint-102
+  - sprint-103
 tags:
   - sprint-102
+  - sprint-103
   - ai-transparency
   - privacy
   - human-review
+  - plan-mode
 ---
 
 # Ritemark v1.8.6 — Clear Start, Trustworthy AI
 
-**Status:** Draft — Sprint 102 complete; remaining v1.8.6 sprints are not complete.  
-**Release issue:** [#163 — AI transparency and policy alignment](https://github.com/ProductoryHQ/ritemark-native/issues/163)
+**Status:** Draft — Sprints 102–103 complete; remaining v1.8.6 sprints are not complete.  
+**Release issues:** [#163 — AI transparency and policy alignment](https://github.com/ProductoryHQ/ritemark-native/issues/163) · [#132 — truthful Plan controls](https://github.com/ProductoryHQ/ritemark-native/issues/132) · [#161 — truthful activity state](https://github.com/ProductoryHQ/ritemark-native/issues/161)
+
+## Plans you can actually review (Sprint 103)
+
+- **Plan mode is now enforced, not promised.** Turn on the **Plan** chip and the agent plans in a technically read-only phase — Claude runs in the SDK's native plan mode, Codex plans in a read-only sandbox. Nothing in your workspace changes until you approve the plan.
+- **The plan always shows up.** The review card appears reliably on the first attempt, shows the plan as rendered markdown with a verified *"No files changed yet."* line, and says who asked for the plan — including *"Claude chose to plan first"* when the agent decided on its own.
+- **Approve & continue, or keep planning.** Approval continues execution in the same conversation under your autonomy choice; **Keep planning** sends your feedback back for a revised plan without anything running.
+- **Simpler, honest controls.** The old `Auto / Ask / Plan` strip is now an autonomy select (**Manual** / **Auto**) plus the Plan chip; switching autonomy mid-thread keeps the agent's memory of your conversation. OpenCode shows no Plan control because it cannot enforce one — the UI no longer pretends otherwise.
+- **A status line that tells the truth.** One line under the conversation shows what is actually happening — working, waiting for you (plan review / question / approval), done, failed, or stopped. "Done" never appears while something still needs you, the headline time is agent working time, and "Modified N files" counts only your workspace files.
 
 ## AI transparency
 

@@ -28,16 +28,6 @@ import type {
   UnifiedApprovalRequest,
 } from '../runtime/AgentRuntime';
 
-/**
- * Per-turn reminder injected in 'plan' mode so Claude proposes a reviewable
- * plan (via ExitPlanMode → plan-approval card) before mutating the workspace.
- */
-const CLAUDE_PLAN_TURN_REMINDER = [
-  'Ritemark plan-mode reminder:',
-  '- Produce a short, reviewable plan and call ExitPlanMode to request approval.',
-  '- Do NOT edit files or run commands until the plan is approved.',
-].join('\n');
-
 /** One conversation's Claude Code session. */
 export class ClaudeCodeSession implements RuntimeSession {
   readonly agentId: AgentId = 'claude-code';
@@ -46,8 +36,6 @@ export class ClaudeCodeSession implements RuntimeSession {
   private _config: RuntimeSessionConfig;
   /** Model of the live session — used to decide reuse vs recreate. */
   private _activeModel: string | undefined;
-  /** Whether the live session was started in Ask permission mode (SDK 'default'). */
-  private _activeAskMode: boolean;
 
   /**
    * Pending question requests, so respondToApproval() can look them up.
@@ -67,7 +55,6 @@ export class ClaudeCodeSession implements RuntimeSession {
   ) {
     this._config = config;
     this._activeModel = config.model;
-    this._activeAskMode = (config.approvalMode ?? 'auto') === 'ask';
     this._session = ClaudeCodeSession._build(config, binaryPath);
   }
 
@@ -81,6 +68,7 @@ export class ClaudeCodeSession implements RuntimeSession {
       mcpServers: config.mcpServers,
       allowedTools: config.allowedTools,
       approvalMode: config.approvalMode ?? 'auto',
+      planFirst: config.planFirst === true,
       ...(config.anthropicApiKey ? { anthropicApiKey: config.anthropicApiKey } : {}),
     });
   }
@@ -88,26 +76,32 @@ export class ClaudeCodeSession implements RuntimeSession {
   /**
    * Re-apply per-turn config to THIS conversation's session.
    *
-   * The warm session is kept across turns so conversation context survives. It is
-   * recreated only when the model changes or the Ask boundary is crossed (Ask
-   * uses a different SDK permission mode, fixed at session start). Recreating
-   * affects this conversation alone.
+   * Sprint 103 R3 (audit F8): the warm session is kept across EVERY policy
+   * change — autonomy and plan-first switch live via the SDK's
+   * `setPermissionMode`, so conversation context survives. The session is
+   * recreated only when the model changes or the process died, and that reset
+   * is announced to the transcript instead of happening silently.
    */
   applyConfig(config: RuntimeSessionConfig, binaryPath: string | undefined): void {
     this._config = config;
-    const approvalMode = config.approvalMode ?? 'auto';
-    const needsAsk = approvalMode === 'ask';
 
-    if (this._session.isActive && this._activeModel === config.model && this._activeAskMode === needsAsk) {
-      this._session.setApprovalMode(approvalMode);
+    if (this._session.isActive && this._activeModel === config.model) {
+      this._session.setApprovalMode(config.approvalMode ?? 'auto', config.planFirst === true);
       return;
     }
 
+    const hadLiveSession = this._session.isActive;
     this._session.close();
     this._pendingQuestions.clear();
     this._activeModel = config.model;
-    this._activeAskMode = needsAsk;
     this._session = ClaudeCodeSession._build(config, binaryPath);
+    if (hadLiveSession) {
+      config.onProgress({
+        type: 'session_reset',
+        message: "New session — earlier conversation isn't carried over.",
+        timestamp: Date.now(),
+      });
+    }
   }
 
   async prompt(turn: RuntimeTurnConfig): Promise<void> {
@@ -116,10 +110,9 @@ export class ClaudeCodeSession implements RuntimeSession {
     // UnifiedAttachment is structurally identical to FileAttachment — safe cast
     const attachments = turn.attachments as FileAttachment[] | undefined;
 
-    // In 'plan' mode, nudge Claude to propose a plan (ExitPlanMode) first.
-    const promptText = config.approvalMode === 'plan'
-      ? `${CLAUDE_PLAN_TURN_REMINDER}\n\n${turn.prompt}`
-      : turn.prompt;
+    // Sprint 103 R2: no prompt-level plan reminder — plan behavior comes from
+    // the SDK's native plan mode (permissionMode 'plan' + planModeInstructions).
+    const promptText = turn.prompt;
 
     try {
       const result = await this._session.sendMessage({

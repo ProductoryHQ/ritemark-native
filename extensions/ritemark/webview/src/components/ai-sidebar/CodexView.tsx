@@ -147,7 +147,7 @@ export function CodexTurn({
   onReject: (requestId: string | number) => void;
   onAnswerQuestion: (turnId: string, question: NonNullable<CodexConversationTurn['pendingQuestion']>, answers: Record<string, string>) => void;
   onApprovePlan: (turnId: string) => void;
-  onDiscardPlan: (turnId: string) => void;
+  onDiscardPlan: (turnId: string, feedback?: string) => void;
 }) {
   const hasActivities = turn.activities.length > 0;
   const lastActivity = hasActivities ? turn.activities[turn.activities.length - 1] : null;
@@ -221,9 +221,13 @@ export function CodexTurn({
           title="Codex is waiting for plan review"
           planText={rawPlanText}
           approveLabel="Approve & continue"
-          rejectLabel="Discard"
+          rejectLabel="Keep planning"
+          rejectPlaceholder="What should change? (leave empty to discard)"
+          allowFeedback
+          provenance="Requested by you · Plan"
+          enforcementNote="No files changed yet."
           onApprove={() => onApprovePlan(turn.id)}
-          onReject={() => onDiscardPlan(turn.id)}
+          onReject={(feedback) => onDiscardPlan(turn.id, feedback)}
         />
       )}
 
@@ -254,13 +258,9 @@ export function CodexTurn({
         </div>
       )}
 
-      {/* Plan-specific status (only when plan mode was explicitly requested) */}
-      {turn.result && !turn.result.error && needsPlanReview && (
-        <div className="flex items-center gap-2 text-xs text-[var(--vscode-testing-iconPassed)] pl-2">
-          <Icon name="check" size={12} />
-          <span>Waiting for plan review</span>
-        </div>
-      )}
+      {/* Sprint 103 R7: the per-turn "Waiting for plan review" line is gone —
+          the conversation-level ActivityStatusLine is the single status point
+          (a green check here contradicted the amber waiting state below it). */}
     </div>
   );
 }

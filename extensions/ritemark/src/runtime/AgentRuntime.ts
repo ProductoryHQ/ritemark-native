@@ -71,12 +71,19 @@ export interface RuntimeSessionConfig {
   /** BYOK provider env vars for AcpRuntime */
   byokEnv?: Record<string, string>;
   /**
-   * Unified approval mode applied across all runtimes:
+   * Autonomy policy applied across all runtimes (Sprint 103 R1):
    * - 'auto'  — agents act without asking (no approval prompts)
    * - 'ask'   — file writes + shell commands require approval
-   * - 'plan'  — agent proposes a plan, executes after plan approval
+   * Legacy value 'plan' is still accepted and normalized to auto + planFirst.
    */
   approvalMode?: 'auto' | 'ask' | 'plan';
+  /**
+   * Plan-first collaboration (Sprint 103 R1/R2/R5): the runtime plans in an
+   * enforced no-write phase and presents a reviewable plan before executing.
+   * Only honored by runtimes whose capability map declares `planFirst` —
+   * see `runtime/capabilities.ts`.
+   */
+  planFirst?: boolean;
   onProgress: (p: AgentProgress) => void;
   onApprovalRequest: (req: UnifiedApprovalRequest) => void;
   /** Called when a turn completes with its final result (Claude Code) */

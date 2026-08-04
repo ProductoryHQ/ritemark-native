@@ -8,6 +8,8 @@ If you want to manage custom helpers, see [Agent Library](agent-library.md) for 
 
 > **New in v1.8.6:** Ritemark now identifies AI before the first sidebar interaction and keeps an **[AI information](#ai-information-and-context-sharing)** button beside the composer. It shows the selected runtime, provider/service, and model; explains what context may leave the device; and reminds you to review AI output.
 
+> **New in v1.8.5:** the AI sidebar now runs **[parallel agent chats](#parallel-agent-chats)** — several independent conversations at once, laid out in a thread rail on the right edge. The bundled runtimes were upgraded (Claude Code 2.1.217, OpenCode 1.18.4) and **Claude Opus 5** joined the model picker; agents also now receive a [capability context](#agents-know-their-ritemark-surroundings) describing the Ritemark environment.
+
 > **New in v1.7.3:** **OpenCode** joins Claude and Codex as a third, bring-your-own-key runtime over the Agent Client Protocol. See [OpenCode](#opencode) below and [Set Up AI → OpenCode](../setup-ai.md#opencode-bring-your-own-key) for setup. The sidebar composer also gained a [prompt queue](#running-agents-the-composer-and-plan-approval) and a fixed plan-approval flow this release.
 
 > **Changed in v1.7.2:** The earlier "Ritemark Agent" runtime (a direct OpenAI/Gemini chat runtime, also known as the Legacy Agent) has been removed, along with the document-search (RAG) subsystem. Conversations you previously had with the Ritemark Agent still open **read-only** so your history is preserved.
@@ -26,6 +28,19 @@ Agent selection is per turn inside a conversation. You can keep one thread open 
 
 ---
 
+## Parallel agent chats
+
+> New in v1.8.5.
+
+The AI sidebar is no longer a single conversation. You can run **several independent chats at once**, each with its own session — so you can keep one long-running task going while you start another, or ask a second runtime for a comparison without losing the first thread.
+
+- **The thread rail.** A slim rail down the right edge of the AI sidebar lists your open threads. Click a thread to switch to it; its full conversation history restores instantly. The rail's robot icons use Ritemark's brand indigo in both light and dark themes.
+- **Agents keep working in the background.** Start a run in one thread, switch to another, and the first agent keeps going. Responses always land in the thread that asked — threads never cross-talk.
+- **A thread cap.** To keep resource use in check there's a limit on how many threads can be open at once. Open past it and Ritemark tells you instead of silently spawning more sessions.
+- **Runtime is per thread.** Switch Claude ↔ Codex ↔ OpenCode inside any thread; the choice applies to that thread and the conversation stays continuous.
+
+---
+
 ## Claude
 
 Anthropic's autonomous coding and writing agent. Claude can read, write, and organize files in your workspace. It runs multi-turn sessions, meaning you can have a back-and-forth conversation while Claude works on your files.
@@ -40,9 +55,13 @@ Anthropic's autonomous coding and writing agent. Claude can read, write, and org
 **Models available:**
 | Model | Description |
 |-------|-------------|
-| Claude Sonnet | Fast and capable (default) |
-| Claude Opus | Most powerful |
-| Claude Haiku | Quick and light |
+| Claude Sonnet 5 | Fast and capable (default) |
+| Claude Opus 5 | Newest and most powerful (added in v1.8.5) |
+| Claude Opus 4.8 | Previous flagship |
+| Claude Haiku 4.5 | Quick and light |
+| Claude Fable 5 | Lightweight tier |
+
+The model list is served from a live catalog feed, so newly released Claude models appear automatically without a reinstall.
 
 ### Prerequisites
 
@@ -196,16 +215,42 @@ above the input. When the current run finishes, the queued prompt **auto-sends**
 - One queued prompt at a time — you can park exactly one follow-up.
 - Discard it before it sends by clicking the **×** on the Queued notch.
 
-### Plan approval
+### Modes: Manual / Auto + Plan
 
-When an agent proposes a plan and waits for your go-ahead, an approval card appears in the sidebar:
+> Redesigned in v1.8.6 (Sprint 103).
 
-- The card renders **only while the agent is genuinely blocked** waiting on plan approval.
-- It shows the **full plan text**, with **Approve** as a clear primary action and **Reject** beside it.
-- Approving lets the agent proceed; rejecting sends it back to revise.
+The composer footer has two independent controls instead of the old three-button `Auto / Ask / Plan` strip:
 
-> Before v1.7.3, the Approve/Reject buttons could render after the approval window had already closed,
-> where clicking them did nothing. That is fixed — the buttons are only present when they actually work.
+- **Autonomy select — Manual or Auto.**
+  - **Manual** — the agent asks you before each file change and shell command.
+  - **Auto** — the agent works without asking; you review the result.
+  Switching between them mid-thread keeps the conversation memory — the agent does not forget what you discussed.
+- **Plan chip.** Turn it on and the next message runs **plan-first**: the agent works in an enforced read-only phase, then presents a reviewable plan. Nothing in your workspace changes until you approve. The chip stays on until a plan is **approved** (then it turns itself off); cancelling a plan leaves it on.
+
+The Plan chip only appears for runtimes that can genuinely enforce it (Claude and Codex). OpenCode has no plan contract yet, so it shows no Plan control — by design, not omission.
+
+### Plan review
+
+When a plan is ready, a review card appears in the sidebar:
+
+- It shows **who asked for the plan** ("Requested by you · Plan" — or "Claude chose to plan first" when the agent decided to plan on its own), the **full plan as rendered markdown**, and a verified **"No files changed yet."** line.
+- **Approve & continue** — the agent executes the plan in the same conversation, under your chosen autonomy mode.
+- **Keep planning** — type feedback and the agent revises the plan without executing anything.
+- Cancelling the run at the review leaves your workspace untouched.
+
+### Truthful status
+
+Under the conversation there is one status line that always tells you what is actually happening: **Working** (with the live step), **Waiting for your review / Needs your answer / Waiting for approval** (amber — blocked on you), **Done in Xs** (agent working time; waiting-for-you time is excluded and shown on hover), **Failed**, or **Stopped**. "Modified N files" counts only files inside your workspace.
+
+---
+
+## Agents know their Ritemark surroundings
+
+> New in v1.8.5.
+
+Every agent run now starts with a short **capability context** — a system description of the environment it's running in. It tells the agent that it's inside Ritemark: a Markdown editor with an integrated browser and a specific set of tools, rather than a bare command line. The practical effect is that agents reach for Ritemark's own capabilities (the editor, the browser tools) instead of guessing at a generic terminal environment.
+
+This does not change safety behavior: agents still refuse instructions embedded inside documents you open, so opening an untrusted file can't hijack an agent.
 
 ---
 

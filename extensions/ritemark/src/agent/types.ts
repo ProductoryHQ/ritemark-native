@@ -67,7 +67,7 @@ export interface ModelOption {
 /**
  * Progress event types from agent execution
  */
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
 
 /**
  * Progress event emitted during agent execution
@@ -148,6 +148,12 @@ export interface AgentMetrics {
   durationMs: number;
   costUsd: number | null;
   model: string | null;
+  /**
+   * Sprint 103 R7: milliseconds of `durationMs` spent waiting on the user
+   * (pending plan review, question, or tool approval). UI headline duration
+   * is `durationMs - waitedMs`.
+   */
+  waitedMs?: number;
 }
 
 /**
@@ -294,8 +300,16 @@ export interface AgentSessionConfig {
    * push browser-tool routing instructions when browser control is on.
    */
   extraSystemPromptAppend?: string;
-  /** Unified approval mode: 'auto' (default), 'ask', or 'plan'. */
+  /**
+   * Autonomy policy (Sprint 103 R1): 'auto' (default) or 'ask'.
+   * Legacy value 'plan' is accepted and normalized to auto + planFirst.
+   */
   approvalMode?: 'auto' | 'ask' | 'plan';
+  /**
+   * Plan-first collaboration (Sprint 103 R1/R2): when true the session runs in
+   * the SDK's native `permissionMode: 'plan'` until a plan is approved.
+   */
+  planFirst?: boolean;
 }
 
 /**

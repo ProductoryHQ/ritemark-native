@@ -12,6 +12,7 @@ import { FilesSummary } from './FilesSummary';
 import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
 import { extractPlanDisplayText, planTurnNeedsApproval } from './planText';
+import { activeDurationMs } from './types';
 import type { AgentConversationTurn } from './types';
 
 const OVERFLOW_PATTERNS = [
@@ -174,7 +175,10 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           <span>Modified {result.filesModified.length} file{result.filesModified.length !== 1 ? 's' : ''}</span>
         )}
         {result.metrics.durationMs > 0 && (
-          <span>{(result.metrics.durationMs / 1000).toFixed(1)}s</span>
+          /* Sprint 103 R7: agent working time; hover reveals human-wait time. */
+          <span title={result.metrics.waitedMs ? `+${Math.round(result.metrics.waitedMs / 1000)}s waiting for you` : undefined}>
+            {(activeDurationMs(result.metrics) / 1000).toFixed(1)}s
+          </span>
         )}
       </div>
 

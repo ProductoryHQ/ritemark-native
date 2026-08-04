@@ -26,11 +26,12 @@ import {
   type SavedConversationV2,
 } from './chatHistoryStorage';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
-import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult, shouldRequestPlanMode } from './lifecycle';
+import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult } from './lifecycle';
 import {
   createConversationState,
   isConversationEmpty,
   markConversationInterrupted,
+  policyOf,
   type ConversationState,
   type PendingRuntimeSelection,
 } from './conversationState';
@@ -250,6 +251,9 @@ interface AISidebarState {
   acpProviders: AcpProviderFlags;
   byokProviderModels: Record<string, ByokModelOption[]> | undefined;
 
+  // ── Sprint 103 R6: per-runtime capability map (APP-GLOBAL, host-provided) ──
+  runtimeCapabilities: Record<string, { planFirst: boolean; liveModeSwitch: boolean; structuredPlanSteps: boolean }>;
+
   // ── Chat history (APP-GLOBAL) ──
   savedConversations: SavedConversationV2[];
   showHistoryPanel: boolean;
@@ -372,7 +376,8 @@ interface AISidebarState {
   handleAgentToolApproval: (requestId: string, approved: boolean) => void;
   answerCodexQuestion: (turnId: string, question: CodexQuestion, answers: Record<string, string>) => void;
   approveCodexPlan: (turnId: string) => void;
-  discardCodexPlan: (turnId: string) => void;
+  /** Sprint 103 R5: with feedback → "Keep planning" (new plan-mode turn); without → discard. */
+  discardCodexPlan: (turnId: string, feedback?: string) => void;
   startCodexLogin: () => void;
   logoutCodex: () => void;
   refreshCodexStatus: () => void;
@@ -689,6 +694,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     opencodeEnabled: false,
     acpProviders: { google: false, openai: false, anthropic: false, openrouter: false },
     byokProviderModels: undefined,
+
+    // Mirrors src/runtime/capabilities.ts until the first agent:config arrives.
+    runtimeCapabilities: {
+      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false },
+      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true },
+      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false },
+    },
 
     savedConversations: [],
     showHistoryPanel: false,
@@ -1015,13 +1027,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         data: att.data,
         mediaType: att.mediaType,
       }));
+      // Sprint 103 R1: two-axis policy on the wire (legacy 'plan' normalized).
+      const claudePolicy = policyOf(conversation.pendingRuntime);
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
         agentId: 'claude-code',
         prompt: fullPrompt,
         attachments: attachmentPayload,
-        approvalMode: conversation.pendingRuntime.mode,
+        approvalMode: claudePolicy.autonomy,
+        planFirst: claudePolicy.planFirst,
         skipActiveFile: options?.skipActiveFile,
         skipBrowserContext: options?.skipBrowserContext,
         mentionedAgentPaths: options?.mentionedAgentPaths,
@@ -1055,9 +1070,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const state = get();
       const { selection, activeFilePath } = state;
       if (selection.isEmpty || !selection.text) return undefined;
-      // The approval mode is per-thread: frame the block for the thread the
-      // composer is bound to (the active one).
-      const approvalMode = activeConversation()?.pendingRuntime.mode ?? 'auto';
+      // The policy is per-thread: frame the block for the thread the
+      // composer is bound to (the active one). Sprint 103 R1: plan framing
+      // comes from the Plan chip, not a third mode value.
+      const pending = activeConversation()?.pendingRuntime;
+      const planFraming = pending ? policyOf(pending).planFirst : false;
 
       const fileLine = activeFilePath ? `File: ${activeFilePath}\n` : '';
 
@@ -1078,7 +1095,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       // chat suggestions instead of apply_patch calls; strong directive
       // language fixes the mode but earlier line-number disambiguation
       // pointed at the wrong occurrence — replaced with a context window.
-      const isEditMode = approvalMode !== 'plan';
+      const isEditMode = !planFraming;
       const header = isEditMode
         ? '[Selection context — Edit mode]'
         : '[Selection context — Plan mode]';
@@ -1223,6 +1240,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             ? { ...t, planHandled: true, planDecision: 'approved' as const, pendingPlanApproval: undefined }
             : t
         ),
+        // Sprint 103 D2: plan approval auto-resets the Plan chip (rejection
+        // and cancel deliberately leave it on).
+        pendingRuntime: {
+          ...c.pendingRuntime,
+          mode: c.pendingRuntime.mode === 'plan' ? 'auto' : c.pendingRuntime.mode,
+          planFirst: false,
+        },
       }));
       vscode.postMessage({
         type: 'agent-approve',
@@ -1234,7 +1258,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       });
     },
 
-    rejectPlan: (turnId, _feedback?) => {
+    rejectPlan: (turnId, feedback?) => {
       const conversation = activeConversation();
       const targetTurn = conversation?.agentConversation.find((t) => t.id === turnId);
       if (!conversation || !targetTurn?.pendingPlanApproval) {
@@ -1248,6 +1272,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             : t
         ),
       }));
+      // Sprint 103 R2 "Keep planning": the feedback rides the deny message and
+      // the session stays in plan mode — a revised plan card follows.
       vscode.postMessage({
         type: 'agent-approve',
         conversationId: conversation.id,
@@ -1255,6 +1281,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         requestId: targetTurn.pendingPlanApproval.toolUseId,
         approved: false,
         alwaysAllow: false,
+        feedback: feedback?.trim() || undefined,
       });
     },
 
@@ -1308,11 +1335,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         ? `${selectionBlock}\n\n---\n\n${handoffPrompt}`
         : handoffPrompt;
 
+      // Sprint 103 R1 (D4): plan-first comes ONLY from explicit UI state —
+      // prompt-text sniffing removed.
+      const codexPolicy = policyOf(conversation.pendingRuntime);
+      const codexPlanFirst = requestedMode === 'plan' || codexPolicy.planFirst;
+      const codexAutonomy: 'auto' | 'ask' = requestedMode === 'ask' ? 'ask' : codexPolicy.autonomy;
+
       const turn: CodexConversationTurn = {
         id: nextId(),
         conversationId: conversation.id,
         userPrompt: prompt,
-        requestedPlanMode: requestedMode === 'plan' || shouldRequestPlanMode(prompt),
+        requestedPlanMode: codexPlanFirst,
         activeFilePath: skipActiveFile ? undefined : get().activeFilePath || undefined,
         attachments,
         streamingText: '',
@@ -1336,9 +1369,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         agentId: 'codex',
         prompt: fullPrompt,
         model: conversation.codexSelectedModel,
-        // Unified approval policy (Auto/Ask/Plan) — the host maps it to the Codex
-        // approval policy + plan collaboration mode.
-        approvalMode: requestedMode ?? 'auto',
+        // Sprint 103 R1: autonomy + planFirst on the wire — the host maps them
+        // to the Codex approval policy, sandbox, and plan collaboration mode.
+        approvalMode: codexAutonomy,
+        planFirst: codexPlanFirst,
         skipBrowserContext,
         skipActiveFile,
         attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
@@ -1488,17 +1522,29 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       if (!prompt) {
         return;
       }
-      patchConversation(conversation.id, () => ({ codexConversation: nextTurns }));
+      patchConversation(conversation.id, (c) => ({
+        codexConversation: nextTurns,
+        // Sprint 103 D2: plan approval auto-resets the Plan chip.
+        pendingRuntime: {
+          ...c.pendingRuntime,
+          mode: c.pendingRuntime.mode === 'plan' ? 'auto' : c.pendingRuntime.mode,
+          planFirst: false,
+        },
+      }));
+      // The continuation turn executes (planFirst off) under the thread's
+      // autonomy policy — this also flips the Codex sandbox back to writable.
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
         agentId: 'codex',
         prompt,
         model: conversation.codexSelectedModel,
+        approvalMode: policyOf(conversation.pendingRuntime).autonomy,
+        planFirst: false,
       });
     },
 
-    discardCodexPlan: (turnId) => {
+    discardCodexPlan: (turnId, feedback?) => {
       patchConversation(get().activeConversationId, (c) => ({
         codexConversation: c.codexConversation.map((turn) =>
           turn.id === turnId
@@ -1506,6 +1552,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             : turn
         ),
       }));
+      // Sprint 103 R5 "Keep planning": feedback becomes a new plan-mode turn so
+      // Codex revises the plan instead of the review dead-ending in a discard.
+      const trimmed = feedback?.trim();
+      if (trimmed) {
+        get().sendCodexMessage(
+          `The user reviewed your plan and wants it revised before anything runs:\n${trimmed}\n\nPresent an updated plan for review.`,
+          undefined,
+          'plan',
+        );
+      }
     },
 
     startCodexLogin: () => {
@@ -1873,6 +1929,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             opencodeEnabled,
             acpProviders,
             byokProviderModels,
+            // Sprint 103 R6: capability map from the host registry.
+            runtimeCapabilities: message.runtimeCapabilities ?? get().runtimeCapabilities,
             conversations,
           });
           break;

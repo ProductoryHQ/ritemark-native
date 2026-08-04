@@ -27,6 +27,7 @@ import type {
   SDKMessage,
   SubagentProgress,
 } from './types';
+import * as path from 'path';
 import { traceClaude } from './agentTrace';
 
 // Dynamic import for ES Module SDK (VS Code extensions use CommonJS)
@@ -126,20 +127,39 @@ export const DEFAULT_SETTING_SOURCES: AgentSettingSource[] = ['user', 'project',
 
 /** Tools that mutate the workspace — gated behind approval in 'ask' mode. */
 const MUTATING_TOOLS = new Set(['Bash', 'Write', 'Edit', 'NotebookEdit']);
+/**
+ * Sprint 103 R2 (audit F7): tools that must NEVER be passed to the SDK as bare
+ * `allowedTools` names — a bare allow entry auto-approves the tool and the SDK
+ * then skips `canUseTool` entirely. Mutating tools must reach the Ask gate;
+ * ExitPlanMode must reach the plan-approval card.
+ */
+const NEVER_AUTO_ALLOWED = new Set([...MUTATING_TOOLS, 'ExitPlanMode']);
 const DEFAULT_TIMEOUT_MINUTES = 15;
+// Sprint 103 R2/R4 (audit F4): no ExitPlanMode/plan-mode nudges outside plan
+// mode — the always-on reminder made Claude plan autonomously in Auto mode.
+// Plan-mode behavior now comes from the SDK's native plan mode +
+// PLAN_MODE_INSTRUCTIONS below.
 const CLAUDE_LIFECYCLE_APPEND = [
   'LIFECYCLE RULES:',
-  '- If the user asks to work in plan mode, enter plan mode before execution.',
   '- If you need clarification from the user and AskUserQuestion can represent it, use AskUserQuestion instead of asking in normal assistant text.',
   '- If the user explicitly asked for multiple-choice questions, use AskUserQuestion for them.',
-  '- When your draft plan is ready, use ExitPlanMode to request plan review instead of presenting the plan as a final answer.',
-  '- After AskUserQuestion or ExitPlanMode, wait for the user response instead of continuing as if the tool had not paused execution.',
+  '- After AskUserQuestion, wait for the user response instead of continuing as if the tool had not paused execution.',
 ].join('\n');
 const CLAUDE_TURN_REMINDER = [
   'Follow the Ritemark lifecycle contract for this turn.',
   'Use AskUserQuestion for multiple-choice clarification when needed.',
-  'Use ExitPlanMode when a reviewable draft plan is ready.',
 ].join(' ');
+/**
+ * Sprint 103 R2: Ritemark's plan-mode voice, delivered via the SDK's
+ * `planModeInstructions`. The CLI wraps this with its own read-only
+ * enforcement preamble and the ExitPlanMode protocol footer, so this text only
+ * carries the Ritemark-specific workflow flavor.
+ */
+const PLAN_MODE_INSTRUCTIONS = [
+  'You are planning a change in a Ritemark markdown workspace (a visual markdown editor, not a code IDE).',
+  'Read what you need, then produce a short, reviewable plan of the document changes.',
+  'Keep the plan concrete: which files, which sections, what new or changed content.',
+].join('\n');
 
 const DEFAULT_EXCLUDED_FOLDERS = [
   '.git',
@@ -311,8 +331,9 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
         cwd: workspacePath,
         ...(pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable } : {}),
         settingSources: resolveSettingSources(settingSources),
-        permissionMode: 'bypassPermissions',
-        allowDangerouslySkipPermissions: true,
+        // Sprint 103 R2: headless flow runs auto-approve via canUseTool below —
+        // same behavior as the old bypassPermissions without the dangerous flag.
+        permissionMode: 'acceptEdits',
         allowedTools,
         canUseTool: async (toolName: string) => {
           if (toolName === 'AskUserQuestion') {
@@ -464,8 +485,14 @@ export class AgentSession {
   private readonly _pathToClaudeCodeExecutable: string | undefined;
   private _mcpServers: Record<string, unknown> | undefined;
   private _extraSystemPromptAppend: string | undefined;
-  /** Unified approval mode (mutable per turn via setApprovalMode). */
-  private _approvalMode: 'auto' | 'ask' | 'plan' = 'auto';
+  /** Autonomy policy (Sprint 103 R1; mutable per turn via setApprovalMode). */
+  private _approvalMode: 'auto' | 'ask' = 'auto';
+  /** Plan-first collaboration state (Sprint 103 R1/R2). Cleared on plan approval. */
+  private _planFirst = false;
+  /** SDK permission mode the live session currently runs in. */
+  private _activeSdkMode: string | null = null;
+  /** Sprint 103 R7: ms of the current turn spent waiting on the user. */
+  private _turnWaitedMs = 0;
 
   /** Called when SDK reports its available models (after session init) */
   onModelsDiscovered: ((models: Array<{ id: string; label: string; description: string }>) => void) | null = null;
@@ -480,31 +507,49 @@ export class AgentSession {
     this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
     this._mcpServers = config.mcpServers;
     this._extraSystemPromptAppend = config.extraSystemPromptAppend;
-    this._approvalMode = config.approvalMode ?? 'auto';
+    // Legacy 'plan' normalizes to auto + planFirst (Sprint 103 R1).
+    const mode = config.approvalMode ?? 'auto';
+    this._approvalMode = mode === 'ask' ? 'ask' : 'auto';
+    this._planFirst = config.planFirst === true || mode === 'plan';
   }
 
   /**
-   * Update the unified approval mode. Safe to call between turns within the same
-   * permission class (auto↔plan): `_handleCanUseTool` reads `_approvalMode` live
-   * and the plan reminder reads it per turn. Crossing the Ask boundary requires a
-   * fresh session (different SDK permission mode) — ClaudeCodeRuntime handles that.
+   * Update the autonomy policy and plan-first state (Sprint 103 R1/R3).
+   * Safe to call between turns on a LIVE session: when the effective SDK
+   * permission mode changes, it is switched in place via the SDK's
+   * `setPermissionMode` — no session rebuild, no context loss (audit F8).
    */
-  setApprovalMode(mode: 'auto' | 'ask' | 'plan'): void {
-    this._approvalMode = mode;
-  }
-
-  /** True when this session must run in SDK 'default' permission mode (Ask). */
-  get needsAskPermissions(): boolean {
-    return this._approvalMode === 'ask';
+  setApprovalMode(mode: 'auto' | 'ask' | 'plan', planFirst?: boolean): void {
+    this._approvalMode = mode === 'ask' ? 'ask' : 'auto';
+    this._planFirst = planFirst === true || mode === 'plan';
+    this._syncSdkPermissionMode();
   }
 
   /**
-   * Map the unified approval mode to an SDK permission mode.
-   * - 'auto'/'plan' → bypassPermissions (known-working config; Plan gates via ExitPlanMode)
-   * - 'ask'         → default (mutating tools aren't in allowedTools, so they hit canUseTool)
+   * Map the current policy to an SDK permission mode (Sprint 103 R2/R3, audit §5):
+   * - planFirst → 'plan'        (native enforced plan mode)
+   * - 'ask'     → 'default'     (mutating tools hit canUseTool)
+   * - 'auto'    → 'acceptEdits' (edits auto-approved; the rest auto-allowed in
+   *                              canUseTool — NEVER bypassPermissions, whose mere
+   *                              availability disables plan-mode enforcement)
    */
-  private _permissionModeForApproval(): string {
-    return this._approvalMode === 'ask' ? 'default' : 'bypassPermissions';
+  private _sdkModeFor(planFirst = this._planFirst): 'plan' | 'default' | 'acceptEdits' {
+    if (planFirst) return 'plan';
+    return this._approvalMode === 'ask' ? 'default' : 'acceptEdits';
+  }
+
+  /** Push the effective SDK mode to a live session when it changed. */
+  private _syncSdkPermissionMode(): void {
+    if (!this._queryStream || this._closed) return;
+    const next = this._sdkModeFor();
+    if (next === this._activeSdkMode) return;
+    this._activeSdkMode = next;
+    traceClaude('lifecycle', 'setPermissionMode', { mode: next });
+    (this._queryStream as unknown as { setPermissionMode?: (m: string) => Promise<void> })
+      .setPermissionMode?.(next)
+      ?.catch((err: unknown) => traceClaude('lifecycle', 'setPermissionMode failed', {
+        error: err instanceof Error ? err.message : String(err),
+      }));
   }
 
   /**
@@ -575,7 +620,10 @@ export class AgentSession {
 
     // Set per-turn state BEFORE starting/enqueueing
     this._turnFilesModified = [];
-    this._planModeActive = false;
+    this._turnWaitedMs = 0;
+    // In a plan-first turn the whole phase is plan context (native plan mode);
+    // otherwise plan state only activates on a model-initiated EnterPlanMode.
+    this._planModeActive = this._planFirst;
     this._clearPendingQuestion();
     this._clearPendingPlanApproval();
     this._clearPendingToolApproval();
@@ -826,14 +874,16 @@ export class AgentSession {
       ? `${safetyAppend}\n\n${this._extraSystemPromptAppend}`
       : safetyAppend;
 
-    // Mutating tools must NOT be auto-allowed, or the SDK skips canUseTool for
-    // them (allowedTools = "auto-allowed without prompting"). Excluding them
-    // lets 'default' mode (Ask) route them through canUseTool. In 'bypassPermissions'
-    // (Auto/Plan) the SDK runs them regardless, so excluding them is harmless.
-    const sdkAllowedTools = this._allowedTools.filter((t) => !MUTATING_TOOLS.has(t));
+    // Sprint 103 R2 (audit F7): a bare allowedTools name auto-approves the tool
+    // and the SDK then NEVER calls canUseTool for it. Mutating tools must reach
+    // the Ask gate and ExitPlanMode must reach the plan-approval card, so both
+    // are excluded here. In 'acceptEdits' (Auto) file edits are auto-approved by
+    // the mode itself; everything else falls through to canUseTool, where Auto
+    // auto-allows.
+    const sdkAllowedTools = this._allowedTools.filter((t) => !NEVER_AUTO_ALLOWED.has(t));
 
-    const permissionMode = this._permissionModeForApproval();
-    const isBypass = permissionMode === 'bypassPermissions';
+    const permissionMode = this._sdkModeFor();
+    this._activeSdkMode = permissionMode;
 
     const queryOptions: Record<string, unknown> = {
       cwd: this._workspacePath,
@@ -844,10 +894,11 @@ export class AgentSession {
         append: fullAppend,
       },
       settingSources: this._settingSources,
+      // Sprint 103 R2: never 'bypassPermissions' and never
+      // allowDangerouslySkipPermissions — bypass availability alone disables
+      // native plan-mode enforcement (audit §4).
       permissionMode,
-      // Only the bypass path skips permissions; 'default' (Ask) must route
-      // mutating tools through canUseTool, so the dangerous flag stays off.
-      ...(isBypass ? { allowDangerouslySkipPermissions: true } : {}),
+      planModeInstructions: PLAN_MODE_INSTRUCTIONS,
       allowedTools: sdkAllowedTools,
       canUseTool: this._handleCanUseTool.bind(this),
       ...(this._mcpServers ? { mcpServers: this._mcpServers } : {}),
@@ -918,7 +969,8 @@ export class AgentSession {
             this._turnFilesModified,
             this._emitProgress || (() => {}),
             message.parent_tool_use_id,
-            this._planModeActive
+            this._planModeActive,
+            this._planFirst
           );
           this._planModeActive = updatePlanModeState(message, this._planModeActive);
         } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
@@ -942,14 +994,19 @@ export class AgentSession {
               durationMs: message.duration_ms || 0,
               costUsd: message.total_cost_usd ?? null,
               model: this._model,
+              waitedMs: this._turnWaitedMs,
             };
 
             if (message.subtype === 'success') {
-              const durationStr = (metrics.durationMs / 1000).toFixed(1);
+              // Sprint 103 R7: the headline number is agent working time —
+              // waiting on the user (plan review, questions, approvals) is
+              // reported separately via metrics.waitedMs.
+              const activeMs = Math.max(0, metrics.durationMs - this._turnWaitedMs);
+              const durationStr = (activeMs / 1000).toFixed(1);
               this._emitProgress?.('done', `Completed in ${durationStr}s`);
               this._forceResolveTurn(this._turnId, {
                 text: message.result || '',
-                filesModified: Array.from(new Set(this._turnFilesModified)),
+                filesModified: this._workspaceFilesModified(),
                 metrics,
               });
             } else {
@@ -994,7 +1051,10 @@ export class AgentSession {
     toolName: string,
     input: Record<string, unknown>,
     options: { signal: AbortSignal; toolUseID: string }
-  ): Promise<{ behavior: 'allow'; updatedInput?: Record<string, unknown> } | { behavior: 'deny'; message: string; interrupt?: boolean }> {
+  ): Promise<
+    { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: Array<Record<string, unknown>> }
+    | { behavior: 'deny'; message: string; interrupt?: boolean }
+  > {
     if (toolName === 'ExitPlanMode') {
       traceClaude('tool', 'ExitPlanMode requested', {
         toolUseId: options.toolUseID,
@@ -1008,6 +1068,7 @@ export class AgentSession {
         };
       }
 
+      const waitStart = Date.now();
       try {
         const decision = await new Promise<{ approved: boolean; feedback?: string }>((resolve, reject) => {
           this._pendingPlanApprovals.set(options.toolUseID, { resolve, reject });
@@ -1028,14 +1089,23 @@ export class AgentSession {
         });
 
         if (decision.approved) {
-          traceClaude('tool', 'ExitPlanMode approved', { toolUseId: options.toolUseID });
+          // Sprint 103 R2: approving the plan clears plan-first and moves the
+          // SESSION into the user's autonomy mode in the same response, so
+          // execution continues immediately (verified by the Phase 0 spike).
           this._planModeActive = false;
+          this._planFirst = false;
+          const nextMode = this._sdkModeFor(false);
+          this._activeSdkMode = nextMode;
+          traceClaude('tool', 'ExitPlanMode approved', { toolUseId: options.toolUseID, nextMode });
           return {
             behavior: 'allow',
             updatedInput: input,
+            updatedPermissions: [{ type: 'setMode', mode: nextMode, destination: 'session' }],
           };
         }
 
+        // "Keep planning": the deny message carries the user's feedback and the
+        // session stays in plan mode (R2).
         return {
           behavior: 'deny',
           message: decision.feedback?.trim() || 'Plan rejected by user.',
@@ -1050,16 +1120,31 @@ export class AgentSession {
           message: error instanceof Error ? error.message : 'Plan approval failed',
           interrupt: true,
         };
+      } finally {
+        this._turnWaitedMs += Date.now() - waitStart;
       }
     }
 
+    // Sprint 103 R2 defense-in-depth: during a plan phase (requested via the
+    // Plan chip OR entered autonomously by the model) no mutating tool may run
+    // before plan approval. The CLI already blocks these in native plan mode
+    // (spike assert B); this keeps the guarantee even if routing changes.
+    if ((this._planFirst || this._planModeActive) && MUTATING_TOOLS.has(toolName)) {
+      traceClaude('tool', 'plan-phase mutating tool denied', { toolName, toolUseId: options.toolUseID });
+      return {
+        behavior: 'deny',
+        message: 'Ritemark plan phase: file changes and commands wait for plan approval.',
+      };
+    }
+
     // Unified 'ask' approval: gate mutating tools before they run. Read/Glob/Grep
-    // and everything else stay auto-allowed. 'auto'/'plan' modes skip this gate.
+    // and everything else stay auto-allowed. 'auto' mode skips this gate.
     if (this._approvalMode === 'ask' && MUTATING_TOOLS.has(toolName)) {
       if (!this._emitToolApproval) {
         return { behavior: 'allow' }; // No approval UI wired — fail open, don't freeze the turn.
       }
       const kind: AgentToolApprovalRequest['kind'] = toolName === 'Bash' ? 'shell-command' : 'file-write';
+      const approvalWaitStart = Date.now();
       const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
       const command = typeof input.command === 'string' ? input.command : undefined;
       try {
@@ -1079,6 +1164,8 @@ export class AgentSession {
           behavior: 'deny',
           message: error instanceof Error ? error.message : 'Tool approval failed',
         };
+      } finally {
+        this._turnWaitedMs += Date.now() - approvalWaitStart;
       }
     }
 
@@ -1106,6 +1193,7 @@ export class AgentSession {
       };
     }
 
+    const questionWaitStart = Date.now();
     try {
       const answers = await new Promise<Record<string, string>>((resolve, reject) => {
         this._pendingQuestions.set(options.toolUseID, { resolve, reject });
@@ -1139,7 +1227,28 @@ export class AgentSession {
         message: error instanceof Error ? error.message : 'AskUserQuestion failed',
         interrupt: true,
       };
+    } finally {
+      this._turnWaitedMs += Date.now() - questionWaitStart;
     }
+  }
+
+  /**
+   * Sprint 103 R7 (audit F11): "Modified N files" counts only workspace files.
+   * Runtime-internal writes (e.g. `~/.claude/plans/*`) are real Write tool
+   * calls but not part of the user's document set.
+   *
+   * Both the raw and the realpath-resolved workspace roots are accepted:
+   * on macOS `/tmp` (and some user dirs) are symlinks, and the model may
+   * report either form.
+   */
+  private _workspaceFilesModified(): string[] {
+    const roots = new Set<string>([this._workspacePath]);
+    try {
+      roots.add(require('fs').realpathSync(this._workspacePath));
+    } catch { /* workspace gone — keep the raw root */ }
+    const prefixes = Array.from(roots).map((r) => (r.endsWith(path.sep) ? r : r + path.sep));
+    return Array.from(new Set(this._turnFilesModified))
+      .filter((f) => prefixes.some((p) => f.startsWith(p)));
   }
 
   private _clearPendingQuestion(message = 'Question cancelled') {
@@ -1188,7 +1297,8 @@ function processAssistantMessage(
   filesModified: string[],
   emitProgress: ExtendedProgressEmitter,
   parentToolUseId?: string | null,
-  planModeActive = false
+  planModeActive = false,
+  planFirstRequested = false
 ) {
   const content = message.message?.content;
   if (!Array.isArray(content)) return;
@@ -1216,7 +1326,13 @@ function processAssistantMessage(
         emitProgress('plan_ready', 'Plan ready for review');
         continue;
       } else if (block.name === 'EnterPlanMode') {
-        emitProgress('tool_use', 'Entering plan mode');
+        // Sprint 103 R4: a model-initiated plan phase is surfaced as a
+        // first-class labeled event, never a silent ticker line (audit F4/F5).
+        if (planFirstRequested) {
+          emitProgress('tool_use', 'Entering plan mode');
+        } else {
+          emitProgress('plan_autonomous', 'Claude chose to plan first');
+        }
         continue;
       } else if (block.name === 'Agent' || block.name === 'Task') {
         // Subagent spawned! Emit special event

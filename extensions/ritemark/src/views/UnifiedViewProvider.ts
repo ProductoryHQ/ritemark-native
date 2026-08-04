@@ -73,6 +73,7 @@ import {
   type CapabilityDescriptor,
 } from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
+import { RUNTIME_CAPABILITIES, capabilitiesFor } from '../runtime/capabilities';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 
 /**
@@ -234,13 +235,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const skipActiveFile = message.skipActiveFile === true;
           const skipBrowserContext = message.skipBrowserContext === true;
           const mentionedAgentPaths: string[] | undefined = message.mentionedAgentPaths;
-          // Unified approval policy (Auto/Ask/Plan) — applies to all runtimes.
-          const approvalMode: 'auto' | 'ask' | 'plan' =
-            message.approvalMode === 'ask' || message.approvalMode === 'plan' ? message.approvalMode : 'auto';
-          const codexTurnMode: 'plan' | 'execute' = approvalMode === 'plan' ? 'plan' : 'execute';
+          // Sprint 103 R1: two independent axes — autonomy ('auto'|'ask') and
+          // plan-first. Legacy webview payloads that still say 'plan' normalize
+          // to auto + planFirst.
+          const approvalMode: 'auto' | 'ask' = message.approvalMode === 'ask' ? 'ask' : 'auto';
           const runtime = this._runtimeRegistry.get(agentId as import('../agent/types').AgentId);
           const isClaudeCode = agentId === 'claude-code';
           const isCodex = agentId === 'codex';
+          // R6: plan-first is honored only for runtimes whose capability map
+          // declares it (OpenCode never receives planFirst).
+          const planFirst = (message.planFirst === true || message.approvalMode === 'plan')
+            && capabilitiesFor(agentId as import('../agent/types').AgentId).planFirst;
+          const codexTurnMode: 'plan' | 'execute' = planFirst ? 'plan' : 'execute';
           const browserEnabled = isEnabled('browser-agent-control');
 
           // ── Per-turn context injection (parity with the pre-Sprint-79 handlers;
@@ -321,6 +327,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             excludedFolders,
             anthropicApiKey,
             approvalMode,
+            planFirst,
             codexApprovalPolicy,
             codexSandboxMode,
             // Unified capability context (Sprint 101 #154): ONE source
@@ -443,7 +450,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._approvalGate.respond(requestId, approved === true, alwaysAllow === true);
           if (approveAgentId) {
             const session = this._findRuntimeSession(message.conversationId, approveAgentId as AgentId);
-            session?.respondToApproval(requestId, approved === true, alwaysAllow === true);
+            // Sprint 103 R2: optional feedback rides plan rejections ("Keep planning").
+            session?.respondToApproval(
+              requestId,
+              approved === true,
+              alwaysAllow === true,
+              typeof message.feedback === 'string' ? message.feedback : undefined,
+            );
           }
           break;
         }
@@ -850,6 +863,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       discoveredCommands,
       workspacePath: this._workspacePath,
       claudeSdkVersion: CLAUDE_AGENT_SDK_VERSION,
+      // Sprint 103 R6: per-runtime capability map — the webview renders mode
+      // controls from this, never from hardcoded runtime ids.
+      runtimeCapabilities: RUNTIME_CAPABILITIES,
     });
 
     // Model lists come from the model-catalog resolver (live /v1/models → remote

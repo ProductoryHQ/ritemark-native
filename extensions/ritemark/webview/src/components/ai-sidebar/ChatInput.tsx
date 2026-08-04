@@ -16,6 +16,7 @@ import {
   SelectTrigger,
 } from '../ui/select';
 import { useAISidebarStore, useActiveConversation } from './store';
+import { policyOf } from './conversationState';
 import { SelectedContextTab } from './SelectedContextTab';
 import {
   AIFirstUseDisclosure,
@@ -200,6 +201,7 @@ export function ChatInput() {
     opencodeSelectedModel,
   } = useActiveConversation();
   const isOnline = useAISidebarStore((s) => s.isOnline);
+  const runtimeCapabilities = useAISidebarStore((s) => s.runtimeCapabilities);
   const agents = useAISidebarStore((s) => s.agents);
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
@@ -242,6 +244,10 @@ export function ChatInput() {
   const isCodex = pendingRuntime.runtimeId === 'codex';
   const isOpenCode = (pendingRuntime.runtimeId as string) === 'opencode';
   const isAgentMode = isClaudeCode || isCodex || isOpenCode;
+  // Sprint 103 R8: two-axis composer policy (legacy 'plan' mode normalized).
+  const composerPolicy = policyOf(pendingRuntime);
+  // R6: the Plan chip renders only for runtimes with an enforceable plan contract.
+  const planCapable = runtimeCapabilities[pendingRuntime.runtimeId]?.planFirst === true;
   // OpenCode zero-key check: all four provider booleans are false
   const openCodeHasNoKeys = isOpenCode && acpProviders
     && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
@@ -259,13 +265,17 @@ export function ChatInput() {
   // Enter queues the next prompt instead of sending it.
   const placeholder = isLoading && isAgentMode
     ? 'Add a follow-up… (Enter queues it for when the agent finishes)'
-    : isClaudeCode
-      ? 'Ask Claude... (type @ to mention an agent, / for commands)'
-      : isCodex
-        ? 'Ask Codex... (type / for commands)'
-        : isOpenCode
-          ? 'Ask OpenCode... (type / for commands)'
-          : 'Ask anything... (type / for commands)';
+    // Sprint 103 R8: the placeholder is the cheapest honest signal that the
+    // next message runs plan-first.
+    : composerPolicy.planFirst && planCapable
+      ? 'Describe the task — the agent will plan first and wait for your approval…'
+      : isClaudeCode
+        ? 'Ask Claude... (type @ to mention an agent, / for commands)'
+        : isCodex
+          ? 'Ask Codex... (type / for commands)'
+          : isOpenCode
+            ? 'Ask OpenCode... (type / for commands)'
+            : 'Ask anything... (type / for commands)';
   const hasSelectedContext = !selection.isEmpty && !!selection.text;
 
   // Build final message with path chips and pinned agent prepended
@@ -1303,28 +1313,60 @@ export function ChatInput() {
             </SelectContent>
           </Select>
 
-          {/* Unified approval policy — applies to all runtimes. */}
-          <div className="inline-flex shrink-0 overflow-hidden rounded border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/60">
-            {(['auto', 'ask', 'plan'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setPendingRuntime({ mode })}
-                title={
-                  mode === 'auto' ? 'Auto — agent acts without asking'
-                  : mode === 'ask' ? 'Ask — approve file writes & shell commands'
-                  : 'Plan — propose a plan, then execute after approval'
-                }
-                className={[
-                  'h-5 px-2 text-[10px] font-medium transition-colors capitalize',
-                  pendingRuntime.mode === mode
-                    ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)] shadow-[inset_0_0_0_1px_var(--r-accent-fainter)]'
-                    : 'text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]',
-                ].join(' ')}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
+          {/* Sprint 103 R8: two-axis control — autonomy (Manual/Auto) + Plan chip (D1/D2). */}
+          <Select
+            value={composerPolicy.autonomy}
+            onValueChange={(v) => setPendingRuntime({ mode: v === 'ask' ? 'ask' : 'auto', planFirst: composerPolicy.planFirst })}
+          >
+            <SelectTrigger
+              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0"
+              title={composerPolicy.autonomy === 'ask'
+                ? 'Manual — approves each file change and command with you'
+                : 'Auto — makes changes without asking; you review the result'}
+            >
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <Icon name={composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'} size={12} />
+                {composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ask">
+                <div className="flex flex-col">
+                  <span className="text-[13px]">Manual</span>
+                  <span className="text-[11px] text-[var(--r-ink-muted)]">Approves each file change and command with you.</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="auto">
+                <div className="flex flex-col">
+                  <span className="text-[13px]">Auto</span>
+                  <span className="text-[11px] text-[var(--r-ink-muted)]">Makes changes without asking. You review the result.</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {planCapable ? (
+            <button
+              onClick={() => setPendingRuntime({ mode: composerPolicy.autonomy, planFirst: !composerPolicy.planFirst })}
+              title={composerPolicy.planFirst
+                ? 'Plan is on — the agent plans first and waits for your approval. Turns off when a plan is approved.'
+                : 'Ask for a reviewable plan before any changes.'}
+              className={[
+                'inline-flex h-6 shrink-0 items-center gap-1 rounded border px-2 text-[11px] font-medium transition-colors',
+                composerPolicy.planFirst
+                  ? 'border-transparent bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)] shadow-[inset_0_0_0_1px_var(--r-accent-fainter)]'
+                  : 'border-[var(--r-hairline)] bg-transparent text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]',
+              ].join(' ')}
+            >
+              <Icon name="clipboard-text" size={12} />
+              Plan
+            </button>
+          ) : composerPolicy.planFirst ? (
+            /* R6: runtime without a plan contract — deactivate visibly, never pretend. */
+            <span className="text-[10px] text-[var(--r-ink-faint)] whitespace-nowrap">
+              Plan off — not supported by this runtime
+            </span>
+          ) : null}
 
           {contextSummary && (
             <span className="min-w-0 truncate text-[10px] text-[var(--r-ink-faint)]">

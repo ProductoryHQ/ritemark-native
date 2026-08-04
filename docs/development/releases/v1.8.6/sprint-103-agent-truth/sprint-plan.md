@@ -1,11 +1,42 @@
 # Sprint 103 — Truthful Agent Plans and Activity State
 
-**Status:** Approved — SDD artifacts required before implementation  
+**Status:** SDD artifacts drafted (2026-08-03) — awaiting Jarmo's approval before branch/implementation  
 **Parent release:** [v1.8.6](../release-plan.md)  
 **GitHub milestone:** [v1.8.6](https://github.com/ProductoryHQ/ritemark-native/milestone/7)  
-**Branch:** `sprint-103-agent-truth`  
-**Track:** SDD recommended — cross-runtime safety and lifecycle behavior  
+**Branch:** `sprint-103-agent-truth` (not yet created — created on approval)  
+**Track:** SDD — cross-runtime safety and lifecycle behavior  
 **Delivery tier:** Extension
+
+## SDD Artifacts
+
+- [research/plan-truth-audit.md](./research/plan-truth-audit.md) — evidence base: code audit + docs verification + **live reproduction** with screenshots and debug traces (findings F1–F12).
+- [spec.md](./spec.md) is the product and behavior contract (R1–R9).
+- [scenarios.md](./scenarios.md) captures behavior examples and is the manual QA matrix; ★ scenarios are the automated regression set.
+- [technical-plan.md](./technical-plan.md) records the architecture (workstreams W0–W7).
+- [design.md](./design.md) — mode control, plan review card, and activity status design in the Indigo-Editorial system.
+- [tasks.md](./tasks.md) is the implementation checklist.
+
+## Key Findings (from the live audit — why this sprint matters)
+
+Reproduced on 2026-08-03 in the dev instance (full detail + evidence in the audit):
+
+1. **The Plan button does not put Claude in plan mode.** The session runs `bypassPermissions`; the model's `ExitPlanMode` fails with a harness error, the drafted plan is silently lost, and the plan card appears only if the model *accidentally recovers* by calling `EnterPlanMode` itself. This is the exact "sometimes shows a plan, sometimes doesn't respond" experience.
+2. **Auto mode plans and blocks without saying so.** Our own always-on turn reminder nudges Claude into planning; in Auto mode this produced a *blocking* plan-approval card — the inverse of "acts without asking".
+3. **Nothing blocks writes during Claude "planning"** — a `Write` executed before any approval in the repro.
+4. The bundled SDK natively provides everything needed (enforced `permissionMode: 'plan'`, live `setPermissionMode`, plan-approval mode transitions) — currently unused.
+5. Codex plan flow works but plan turns run in a writable sandbox, and structured plan events cannot be relied on (0 events in the live run).
+6. OpenCode's Plan button changes nothing (identical to Ask).
+7. "Done in 662s" counted ~5 min of waiting for the human; "Modified 6 files" counted non-workspace writes; the approved-plan banner showed the result text as the plan.
+
+## Product Decisions Needed (before implementation)
+
+| # | Decision | Recommendation | Status |
+| --- | --- | --- | --- |
+| D1 | Autonomy vocabulary in the UI | Manual review / Work automatically | **Decided 2026-08-04 (Jarmo): "Manual" / "Auto"** — shorter labels win; descriptions carry the nuance |
+| D2 | Plan chip: one-turn action or session state? | Session state; resets after approve/cancel | **Decided 2026-08-04 (Jarmo): chip is labeled "Plan"; stays on until a plan is Approved, then auto-resets.** Cancel/discard does NOT reset it (no approved plan yet); manual toggle always available |
+| D3 | OpenCode Plan control: hidden or disabled-with-tooltip? | Hidden | **Decided 2026-08-04 (Jarmo): hidden** |
+| D4 | Remove prompt-text mode sniffing ("enter plan mode" no longer flips modes)? | Yes — the Plan chip is the explicit path | **Decided 2026-08-04 (Jarmo): remove** |
+| D5 | Claude Auto backend moves from `bypassPermissions` to `acceptEdits` + auto-allow (required for enforceable Plan; behaviorally equivalent for our tool surface) | Yes | **Decided 2026-08-04 (Jarmo): switch** |
 
 ## Goal
 
@@ -89,6 +120,7 @@ Users choose a clear autonomy policy, invoke Plan first only where it is genuine
 ## Approval Gate
 
 - [x] Jarmo approved this sprint scope on 2026-08-03.
-- [ ] Author and obtain approval for the SDD artifacts before implementation.
+- [x] SDD artifacts authored (2026-08-03): audit, spec, scenarios, technical plan, design, tasks.
+- [x] Jarmo answered decisions D1–D5 (2026-08-04) and approved implementation start ("tee rundev … tõesta et kõik valmis", 2026-08-04) with dev-mode proof required before handoff.
 - [x] #132 and #161 are assigned to the v1.8.6 milestone.
-- [ ] Create the sprint branch only after approval; no product code changes on `main`.
+- [x] Sprint branch `sprint-103-agent-truth` created 2026-08-04; no product code changes on `main`.

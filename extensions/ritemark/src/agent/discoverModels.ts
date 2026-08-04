@@ -73,8 +73,9 @@ export async function discoverClaudeModels(options: DiscoverOptions): Promise<Mo
       ? { pathToClaudeCodeExecutable: options.pathToClaudeCodeExecutable }
       : {}),
     settingSources: [],
-    permissionMode: 'bypassPermissions',
-    allowDangerouslySkipPermissions: true,
+    // Sprint 103 R2: discovery never runs tools — no permission mode escalation
+    // needed, and no session in Ritemark carries the dangerous bypass flag.
+    permissionMode: 'default',
   };
 
   if (options.anthropicApiKey) {

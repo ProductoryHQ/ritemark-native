@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-07-22 (Sprint 99 — parallel agent chats: runtime sessions + conversation-scoped protocol)
+**Last updated:** 2026-08-04 (Sprint 103 — two-axis turn policy, native plan mode, capability registry, activity truth)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -277,20 +277,29 @@ One webview message contract, one approval card component, all runtimes:
 
 Each runtime adapter translates its native approval format (Codex JSON-RPC, ACP `session/request_permission`, Claude plan approval) into this shape before forwarding to the webview.
 
-### Unified approval policy (Sprint 79)
+### Two-axis turn policy (Sprint 103, supersedes the Sprint 79 three-mode strip)
 
-A single per-conversation **mode** (`approvalMode`) governs *when* the gate fires, applied uniformly across all three runtimes. Selected in the composer (Auto · Ask · Plan), default **Auto**; sent as `approvalMode` on `agent-execute`.
+Two independent per-conversation axes govern agent behavior (Sprint 103, #132):
 
-| Mode | Claude Code | Codex | OpenCode (ACP) |
+- **Autonomy** — `approvalMode: 'auto' | 'ask'` (UI labels **Auto** / **Manual**). Legacy `'plan'` in messages/storage normalizes to auto + planFirst.
+- **Plan-first** — `planFirst: boolean` (UI: the **Plan** chip; session state, auto-resets when a plan is approved — cancel leaves it on).
+
+Sent as `approvalMode` + `planFirst` on `agent-execute`; the webview derives both from `PendingRuntimeSelection` via `policyOf()` (lossless migration of stored `mode: 'plan'` threads).
+
+| Axis value | Claude Code | Codex | OpenCode (ACP) |
 |---|---|---|---|
-| **Auto** | SDK `bypassPermissions` — no prompts | `approvalPolicy: never`, `workspace-write` | auto-allow `request_permission` |
-| **Ask** | SDK `default` mode + mutating tools (Write/Edit/Bash) removed from `allowedTools` → routed through `canUseTool` → gate | `approvalPolicy: untrusted` + `sandbox: read-only` (workspace-write pre-approves edits, so read-only is required to force a prompt) | native `request_permission` prompt |
-| **Plan** | plan reminder → `ExitPlanMode` → plan card | plan collaboration mode | falls back to Ask |
+| **Auto** | SDK `acceptEdits` + canUseTool auto-allow (NEVER `bypassPermissions` — its mere availability disables native plan enforcement) | `approvalPolicy: never`, `workspace-write` | auto-allow `request_permission` |
+| **Manual (ask)** | SDK `default` + mutating tools gated via `canUseTool` | `approvalPolicy: untrusted` + `sandbox: read-only` | native `request_permission` prompt |
+| **Plan on** | SDK native `permissionMode: 'plan'` (enforced read-only) + `planModeInstructions`; `ExitPlanMode` → plan card; approve → `updatedPermissions setMode` to the autonomy mode, same turn continues | `collaborationMode: plan` on a **read-only sandbox** thread; approval sends the continuation turn on a write-sandbox thread | **not offered** — no enforceable plan contract (capability-gated) |
+
+Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`), delivered to the webview on `agent:config`; no component hardcodes runtime ids for capability checks.
 
 Mechanics & constraints:
-- `allowedTools` in the Claude SDK means *auto-allowed without prompting* — mutating tools must be excluded from it for Ask to reach `canUseTool`. `ExitPlanMode`/`AskUserQuestion` are control tools that always reach the client regardless of mode.
-- Claude's SDK permission mode and Codex's `approvalPolicy`/`sandbox` are fixed at session/thread start, so crossing the Ask boundary **recreates** the Claude session / resets the Codex thread (loses that conversation's in-runtime context). Same-mode turns reuse the warm session.
-- Claude sessions are reused across turns (model + Ask-class match) to preserve conversation memory — recreating per turn was a Sprint-79 regression, now fixed.
+- `allowedTools` in the Claude SDK means *auto-allowed without prompting* and auto-allowed tools NEVER reach `canUseTool` — mutating tools **and `ExitPlanMode`** must be excluded from it (audit F7; only `AskUserQuestion` is documented as always prompting).
+- Claude autonomy changes use the SDK's live `setPermissionMode` — no session rebuild, conversation memory survives (Sprint 103, audit F8). A genuine rebuild (model change) emits a `session_reset` progress event rendered as a transcript divider.
+- Codex `approvalPolicy`/`sandbox` remain fixed at `thread/start`; the plan boundary (read-only ↔ write sandbox) reuses the thread-reset machinery, and the approved-plan continuation prompt re-carries the task context.
+- Prompt-text mode sniffing (`"plan mode"` phrase detection) is removed on both Claude and Codex paths (D4); model-initiated planning is surfaced via the `plan_autonomous` progress event, never silently.
+- Activity truth (#161): `webview …/activityState.ts` (`deriveActivityState`) is the single status source for both the conversation status line (`ActivityStatusLine`) and the Sprint 99 thread-rail attention state; a turn with a terminal result cannot be "waiting". Metrics carry `waitedMs` (human-wait time) and `filesModified` is workspace-filtered host-side.
 - "Always allow" was removed from the approval card (it was OpenCode-only and did not actually persist); cards offer Approve / Reject only.
 
 ---
@@ -520,6 +529,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-08-04 | Sprint 103 | **Truthful agent plans + activity state (v1.8.6, #132/#161).** Three-mode `Auto·Ask·Plan` strip replaced by two axes: autonomy (`auto`/`ask`, UI Manual/Auto) + `planFirst` chip. Claude: `bypassPermissions`/`allowDangerouslySkipPermissions` removed from every session (bypass availability disabled native plan enforcement); Auto → `acceptEdits`+canUseTool auto-allow, Plan → native `permissionMode:'plan'` + `planModeInstructions`; `ExitPlanMode` excluded from `allowedTools` (bare allow-names never reach `canUseTool`); plan approval returns `updatedPermissions setMode`; autonomy switches via live `setPermissionMode` (no session rebuild; rebuilds announced via `session_reset`). Codex: plan turns on read-only sandbox threads, continuation on write sandbox. Prompt-text mode sniffing deleted (D4); model-initiated planning surfaced via `plan_autonomous`. New `runtime/capabilities.ts` registry gates the Plan chip (hidden for OpenCode). New `activityState.ts` + `ActivityStatusLine` = single status source shared with the thread rail; metrics gain `waitedMs`; `filesModified` workspace-filtered. Evidence: `docs/development/releases/v1.8.6/sprint-103-agent-truth/research/` (live audit + SDK spike + CDP matrix `scripts/qa/plan-truth-matrix.sh`). |
 | 2026-07-22 | Sprint 99 | **Parallel agent chats, v1.8.5.** `AgentRuntime.start()/prompt()/cancel()` replaced by `createSession(conversationId, config)` → `RuntimeSession`; one adapter per runtime KIND minting one session per conversation. `getStatus()` stays adapter-level. All three adapters hold session maps: Codex keeps one shared app-server process and one listener registration, routing by `params.threadId`; OpenCode runs N ACP sessions in ONE subprocess (spike-measured 339 MB for 5 sessions vs 1291 MB for 5 processes); Claude holds one `AgentSession` each — the audit found `AgentRunner` has no module-level singleton, so it was already a clean per-conversation unit. Webview store keyed by conversation with routing by `conversationId` and unknown ids DROPPED rather than misrouted. New thread rail (right edge, "+"/History pinned, one shared Phosphor `robot` tinted per runtime, one status slot where amber attention overrides the running spinner). Browser tools serialized across conversations — one browser, one active tab; per-chat browsers are shell-tier and out of scope. Three latent defects fixed: Codex scalar `_threadApprovalKey`/`_browserToolsEnabledForThread` silently destroying a sibling's thread context, `AcpRuntime._recentlyPermissionedWrites` as a cross-chat approval bypass, and `AgentSession`'s single-slot pending approvals overwriting each other (a live bug on ONE conversation). Also fixed in dev-validation: New Chat disposed every conversation's session, leaving a visible transcript whose agent had forgotten it. Touches #95/#97/#140 without resolving them. |
 | 2026-07-21 | Sprint 98 | **Safe extension-update lane (GH #142), v1.8.5.** Two structural changes after the 1.8.3-ext.1 incident, where an update shipped a delta-only package and the extension died at module load (`require('pdfkit')`) before `activate()` — taking every extension-side recovery path down with it. (1) **Patch 012 (shell watchdog)** hooks `mainThreadExtensionService.$onExtensionActivationError` — verified to receive module-load throws — and renames the failing USER-dir copy of `ritemark.ritemark` so the scanner marks it invalid and filters it out, then prompts a reload onto the bundled built-in. Scoped by extension id + `extensionLocation` matching an `ExtensionType.User` install; gating on `isBuiltin` would be wrong because `dedupExtensions` rewrites it to `true` on a winning user copy. Inserted before the `isDev` early-return, which would otherwise skip it in production. (2) **`applyUpdate` is now clone-then-overlay**: it clones the bundled built-in extension (resolved from `vscode.env.appRoot`, never `getExtension().extensionPath` — that returns the user copy and would perpetuate corruption) and overlays the manifest delta, so an incomplete manifest degrades to stale files instead of an unloadable extension. Adds installer-layer `minimumAppVersion` enforcement, manifest path containment at both validation and write time, `UpdateFile.op: 'write' \| 'delete'` (deletions only became expressible once absent started meaning "inherited"), a validity probe so a broken install no longer short-circuits a corrected re-release, and `applyUpdate.test.ts` closing that function's previous zero coverage. Also: publish-side completeness + install-and-activate guards, and a `ritemark.updates.channel` canary ring. **Lane stays CLOSED until the watchdog ships and one trivial ext update passes end-to-end.** |
 | 2026-07-12 | Sprint 93 | `src/update/` gains two modules: `updateStatusBar.ts` ("Relaunch to update" status-bar affordance) and `activationIntegrity.ts` (N-1 rollback + activation-crash quarantine). New `ritemark.updates.mode` setting (`auto`/`prompt`) governs silent vs. prompted extension-tier updates; full-app updates unaffected. `release-extension.sh` (renamed from `create-extension-release.sh`) + new `release-extension-preflight.sh` are the one-command extension-release path, gated by the new shell/extension release-tier rule (`CLAUDE.md` "Release Tiers"). |

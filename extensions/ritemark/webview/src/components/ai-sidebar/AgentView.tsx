@@ -33,9 +33,22 @@ export function AgentTurnBlock({
   handleToolApproval: (requestId: string, approved: boolean) => void;
 }) {
   const compactedEvent = turn.activities.find((a: AgentProgress) => a.type === 'compacted');
+  // Sprint 103 R4: model-initiated planning is a first-class labeled event.
+  const autonomousPlanEvent = turn.activities.find((a: AgentProgress) => a.type === 'plan_autonomous');
+  // Sprint 103 R3: a genuine session rebuild is announced, never silent.
+  const sessionResetEvent = turn.activities.find((a: AgentProgress) => a.type === 'session_reset');
 
   return (
     <div className="space-y-2">
+      {/* Session reset divider (R3) */}
+      {sessionResetEvent && (
+        <div className="flex items-center gap-2 select-none text-[11px] text-[var(--r-ink-faint)]">
+          <span className="h-px flex-1 bg-[var(--r-hairline)]" />
+          <span>{sessionResetEvent.message}</span>
+          <span className="h-px flex-1 bg-[var(--r-hairline)]" />
+        </div>
+      )}
+
       {/* Compaction banner — shown above the turn where compaction happened */}
       {compactedEvent && (
         <div className="flex items-start gap-2 px-2.5 py-2 rounded border border-[var(--r-hairline)] bg-[var(--vscode-editorWidget-background)]" style={{ fontSize: 'var(--chat-font-size, 13px)' }}>
@@ -73,10 +86,20 @@ export function AgentTurnBlock({
         <AgentQuestion turnId={turn.id} question={turn.pendingQuestion} onAnswer={answerAgentQuestion} />
       )}
 
+      {/* Autonomous-plan attribution chip (R4) — precedes the plan card */}
+      {autonomousPlanEvent && (turn.pendingPlanApproval || turn.isPlan) && (
+        <div className="flex items-center gap-1 text-[11px] text-[var(--r-ink-muted)] select-none">
+          <Icon name="clipboard-text" size={12} />
+          <span>Claude chose to plan first</span>
+        </div>
+      )}
+
       {turn.pendingPlanApproval && (
         <AgentPlanApproval
           turnId={turn.id}
           planText={turn.planText || ''}
+          provenance={autonomousPlanEvent ? 'Claude chose to plan first' : 'Requested by you · Plan'}
+          enforcementNote="No files changed yet."
           onApprove={approvePlan}
           onReject={rejectPlan}
         />

@@ -62,3 +62,18 @@
 - [x] Jarmo/counsel approves the Productory Terms and Privacy wording
 - [x] Approved EN/ET Productory Terms and Privacy pages are live
 - [ ] Live policy links are verified from a packaged Ritemark candidate — release-execution gate, not a Sprint 102 blocker
+
+## Sprint 103 — Truthful plans and activity state (dev-validated 2026-08-04; re-test on packaged candidate)
+
+- [x] Composer shows Manual/Auto select + Plan chip; no Auto/Ask/Plan strip *(dev)*
+- [x] Claude + Plan: plan card appears on the FIRST attempt; no "not in plan mode" recovery; workspace untouched before approval *(dev, trace-asserted)*
+- [x] Plan card shows provenance, rendered markdown, "No files changed yet.", Approve & continue / Keep planning *(dev)*
+- [x] Keep planning feedback produces a revised plan that honors the feedback (README.md untouched in repro) *(dev)*
+- [x] Approve & continue executes in the same conversation; Plan chip auto-resets *(dev)*
+- [x] Codex + Plan: plan thread `read-only` sandbox, continuation `workspace-write`; blocked plan-phase edit attempt does not change files *(dev, trace-asserted)*
+- [x] Status line: "Needs your answer" / "Waiting for your review" while blocked; "Done in Xs" uses agent working time; "Modified N files" workspace-only *(dev)*
+- [x] Autonomy switch Auto↔Manual keeps conversation memory *(dev)*
+- [x] Cancel at plan review: card cleared, chip stays on, status not stuck in review *(dev + unit)*
+- [ ] OpenCode selected: no Plan chip (needs BYOK-keyed profile — Jarmo)
+- [ ] Dark + light pass on packaged candidate (dev pass done; note: ritemark-dark theme itself is near-black — separate task filed)
+- [ ] Old thread saved with mode "plan" opens as Auto + Plan chip on
