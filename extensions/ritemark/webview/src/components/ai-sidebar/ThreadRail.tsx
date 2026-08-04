@@ -147,7 +147,7 @@ export function ThreadRail() {
   // trip its "snapshot is not cached" loop.
   const conversations = useAISidebarStore((s) => s.conversations);
   const activeConversationId = useAISidebarStore((s) => s.activeConversationId);
-  const composerQueues = useAISidebarStore((s) => s.composerQueues);
+  const promptQueues = useAISidebarStore((s) => s.promptQueues);
   const threads = useMemo<OpenThreadSummary[]>(
     () => Object.values(conversations)
       .sort((a, b) => a.createdAt - b.createdAt)
@@ -156,10 +156,10 @@ export function ThreadRail() {
         title: deriveThreadTitle(c),
         runtime: runtimeOfConversation(c),
         status: deriveThreadStatus(c),
-        hasQueuedPrompt: !!composerQueues[c.id]?.trim(),
+        hasQueuedPrompt: (promptQueues[c.id]?.length ?? 0) > 0,
         isActive: c.id === activeConversationId,
       })),
-    [conversations, activeConversationId, composerQueues],
+    [conversations, activeConversationId, promptQueues],
   );
   const switchConversation = useAISidebarStore((s) => s.switchConversation);
   const closeConversation = useAISidebarStore((s) => s.closeConversation);

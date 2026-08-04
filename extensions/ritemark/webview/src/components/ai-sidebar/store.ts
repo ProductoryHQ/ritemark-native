@@ -45,6 +45,21 @@ import {
   type ThreadStatus,
 } from './threadStatus';
 import { clearSlot, pruneSlots, setSlot, type ComposerSlots } from './composerQueue';
+import {
+  enqueueItem,
+  removeItem as removeQueueItem,
+  updateItemPrompt,
+  moveItem as moveQueueItem,
+  markStatus as markQueueStatus,
+  requeueFailed,
+  pruneQueues,
+  queueFor,
+  nextDispatchable,
+  isReadyToDrain,
+  type PromptQueues,
+  type QueueItem,
+} from './promptQueue';
+import { deriveActivityState } from './activityState';
 import { resolveInboundConversationId } from './conversationRouting';
 import type {
   AgentId,
@@ -264,11 +279,22 @@ interface AISidebarState {
    * `ChatInput` state because the rail needs it too: a thread with a queued
    * prompt is NOT idle and must not offer a close × (Resolved Gap 4).
    */
-  composerQueues: ComposerSlots;
+  promptQueues: PromptQueues;
   /** Unsent draft text per conversation, so switching threads loses nothing. */
   composerDrafts: ComposerSlots;
-  setComposerQueue: (conversationId: string, prompt: string) => void;
-  clearComposerQueue: (conversationId: string) => void;
+  /**
+   * Sprint 104 (#162): enqueue a captured prompt for its target conversation.
+   * Returns 'full' (cap 10) without mutating anything, else 'queued'.
+   */
+  enqueuePrompt: (item: Omit<QueueItem, 'id' | 'status' | 'createdAt'>) => 'queued' | 'full';
+  removeQueued: (conversationId: string, itemId: string) => void;
+  editQueued: (conversationId: string, itemId: string, displayText: string, prompt: string) => void;
+  moveQueued: (conversationId: string, itemId: string, direction: -1 | 1) => void;
+  retryQueued: (conversationId: string, itemId: string) => void;
+  /** Explicit user resume after a failed/cancelled turn paused the queue. */
+  resumeQueue: (conversationId: string) => void;
+  /** Dispatch the head item when the target conversation is truly ready. */
+  maybeDrainQueue: (conversationId: string) => void;
   setComposerDraft: (conversationId: string, text: string) => void;
 
   // ── Soft cap gate (Sprint 99 R11 + Resolved Gaps 2/3) ──
@@ -565,10 +591,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       .map((c) => c.id);
     saveOpenThreadIds(ids);
 
-    const composerQueues = pruneSlots(state.composerQueues, ids);
+    const promptQueues = pruneQueues(state.promptQueues, ids);
     const composerDrafts = pruneSlots(state.composerDrafts, ids);
-    if (composerQueues !== state.composerQueues || composerDrafts !== state.composerDrafts) {
-      set({ composerQueues, composerDrafts });
+    if (promptQueues !== state.promptQueues || composerDrafts !== state.composerDrafts) {
+      set({ promptQueues, composerDrafts });
     }
   }
 
@@ -579,7 +605,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       title: deriveThreadTitle(conversation),
       runtime: runtimeOfConversation(conversation),
       status: deriveThreadStatus(conversation),
-      hasQueuedPrompt: !!get().composerQueues[conversation.id]?.trim(),
+      hasQueuedPrompt: queueFor(get().promptQueues, conversation.id).length > 0,
       isActive: conversation.id === activeId,
     };
   }
@@ -644,6 +670,126 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
    * kept active; it is only replaced when it is an untouched blank and there is
    * real restored work to show instead.
    */
+  // ── Sprint 104 (#162): queue dispatch + comment target resolution ──────
+
+  /**
+   * Dispatch one captured queue item to ITS OWN conversation — which may be a
+   * background thread. Mirrors the send functions' turn shapes but reads
+   * nothing from the active conversation: everything was frozen at enqueue.
+   */
+  function dispatchQueueItem(item: QueueItem): void {
+    const state = get();
+    const conversation = state.conversations[item.conversationId];
+    if (!conversation) {
+      // Target thread is gone — drop the item rather than misroute it.
+      set({ promptQueues: removeQueueItem(state.promptQueues, item.conversationId, item.id) });
+      return;
+    }
+    try {
+      set({ promptQueues: markQueueStatus(get().promptQueues, item.conversationId, item.id, 'sending') });
+      if (item.runtimeId === 'claude-code') {
+        const turn: AgentConversationTurn = {
+          id: nextId(),
+          conversationId: item.conversationId,
+          userPrompt: item.displayText,
+          activeFilePath: item.documentPath,
+          attachments: item.attachments,
+          activities: [],
+          isRunning: true,
+          isPlan: false,
+          planHandled: false,
+          planDecision: undefined,
+          planText: '',
+          pendingQuestion: undefined,
+          pendingPlanApproval: undefined,
+          timestamp: Date.now(),
+        };
+        patchConversation(item.conversationId, (c) => ({ agentConversation: [...c.agentConversation, turn] }));
+        vscode.postMessage({
+          type: 'agent-execute',
+          conversationId: item.conversationId,
+          agentId: 'claude-code',
+          prompt: item.prompt,
+          attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
+          approvalMode: item.autonomy,
+          planFirst: item.planFirst,
+          skipActiveFile: item.skipActiveFile,
+          skipBrowserContext: item.skipBrowserContext,
+          mentionedAgentPaths: item.mentionedAgentPaths,
+        });
+      } else {
+        const turn: CodexConversationTurn = {
+          id: nextId(),
+          conversationId: item.conversationId,
+          userPrompt: item.displayText,
+          runtime: item.runtimeId === 'opencode' ? 'opencode' : 'codex',
+          requestedPlanMode: item.planFirst,
+          activeFilePath: item.documentPath,
+          attachments: item.attachments,
+          streamingText: '',
+          activities: [],
+          pendingQuestion: undefined,
+          executionContinuation: false,
+          requiresPlanReview: false,
+          planText: '',
+          planExplanation: undefined,
+          planSteps: [],
+          planHandled: false,
+          planDecision: undefined,
+          isRunning: true,
+          timestamp: Date.now(),
+        };
+        patchConversation(item.conversationId, (c) => ({ codexConversation: [...c.codexConversation, turn] }));
+        vscode.postMessage({
+          type: 'agent-execute',
+          conversationId: item.conversationId,
+          agentId: item.runtimeId,
+          prompt: item.prompt,
+          model: item.modelId,
+          approvalMode: item.autonomy,
+          planFirst: item.planFirst,
+          skipActiveFile: item.skipActiveFile,
+          skipBrowserContext: item.skipBrowserContext,
+          attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
+        });
+      }
+      set({ promptQueues: removeQueueItem(get().promptQueues, item.conversationId, item.id) });
+    } catch (err) {
+      // Keep the item visible with its error — never silently discard (R3).
+      set({
+        promptQueues: markQueueStatus(
+          get().promptQueues, item.conversationId, item.id, 'failed',
+          err instanceof Error ? err.message : String(err),
+        ),
+      });
+    }
+  }
+
+  /**
+   * Sprint 104 R2: a comment task targets a STABLE conversation for its
+   * assigned agent — an open thread already bound to that runtime (prefer one
+   * that is ready), else a new background thread. The visible thread is never
+   * retargeted.
+   */
+  function resolveCommentTargetConversation(runtimeId: 'claude-code' | 'codex' | 'opencode'): string {
+    const state = get();
+    const threadRt = runtimeId === 'claude-code' ? 'claude' : runtimeId;
+    const candidates = Object.values(state.conversations)
+      .filter((c) => runtimeOfConversation(c) === threadRt);
+    const ready = candidates.find((c) => isReadyToDrain(deriveActivityState(c)));
+    if (ready) return ready.id;
+    if (candidates.length > 0) {
+      return [...candidates].sort((a, b) => b.createdAt - a.createdAt)[0].id;
+    }
+    const conversation = createConversationState(nextId(), {
+      selectedAgent: runtimeId,
+      pendingRuntime: { runtimeId, modelId: '', mode: 'auto', planFirst: false },
+    });
+    set({ conversations: { ...state.conversations, [conversation.id]: conversation } });
+    syncOpenThreads();
+    return conversation.id;
+  }
+
   function restoreOpenThreads(): void {
     const state = get();
     const storedIds = loadOpenThreadIds();
@@ -714,7 +860,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     savedConversations: [],
     showHistoryPanel: false,
 
-    composerQueues: {},
+    promptQueues: {},
     composerDrafts: {},
     pendingThreadOpen: null,
 
@@ -920,12 +1066,58 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     cancelThreadOpen: () => set({ pendingThreadOpen: null }),
 
-    setComposerQueue: (conversationId, prompt) => {
-      set({ composerQueues: setSlot(get().composerQueues, conversationId, prompt) });
+    // ── Sprint 104 (#162): bounded per-conversation prompt queue ──────────
+
+    enqueuePrompt: (input) => {
+      const item: QueueItem = {
+        ...input,
+        id: nextId(),
+        status: 'queued',
+        createdAt: Date.now(),
+      };
+      const result = enqueueItem(get().promptQueues, item);
+      if (result.outcome === 'full') return 'full';
+      set({ promptQueues: result.queues });
+      // Idle target → the item should not sit in the queue a moment longer.
+      get().maybeDrainQueue(item.conversationId);
+      return 'queued';
     },
 
-    clearComposerQueue: (conversationId) => {
-      set({ composerQueues: clearSlot(get().composerQueues, conversationId) });
+    removeQueued: (conversationId, itemId) => {
+      set({ promptQueues: removeQueueItem(get().promptQueues, conversationId, itemId) });
+    },
+
+    editQueued: (conversationId, itemId, displayText, prompt) => {
+      set({ promptQueues: updateItemPrompt(get().promptQueues, conversationId, itemId, displayText, prompt) });
+    },
+
+    moveQueued: (conversationId, itemId, direction) => {
+      set({ promptQueues: moveQueueItem(get().promptQueues, conversationId, itemId, direction) });
+    },
+
+    retryQueued: (conversationId, itemId) => {
+      set({ promptQueues: requeueFailed(get().promptQueues, conversationId, itemId) });
+      get().maybeDrainQueue(conversationId);
+    },
+
+    resumeQueue: (conversationId) => {
+      // Explicit user action after a failed/cancelled turn paused the queue:
+      // force-dispatch the head item (readiness gate deliberately bypassed for
+      // the paused states only — running/waiting states still block).
+      const conversation = get().conversations[conversationId];
+      if (!conversation) return;
+      const state = deriveActivityState(conversation);
+      if (state === 'running' || state === 'plan-review' || state === 'waiting-input' || state === 'waiting-approval') return;
+      const item = nextDispatchable(get().promptQueues, conversationId);
+      if (item) dispatchQueueItem(item);
+    },
+
+    maybeDrainQueue: (conversationId) => {
+      const conversation = get().conversations[conversationId];
+      if (!conversation) return;
+      if (!isReadyToDrain(deriveActivityState(conversation))) return;
+      const item = nextDispatchable(get().promptQueues, conversationId);
+      if (item) dispatchQueueItem(item);
     },
 
     setComposerDraft: (conversationId, text) => {
@@ -1265,6 +1457,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         approved: true,
         alwaysAllow: false,
       });
+      // Sprint 104 R3: a resolved checkpoint may unblock the queue (no-op
+      // while the turn keeps running — the readiness gate decides).
+      get().maybeDrainQueue(conversation.id);
     },
 
     rejectPlan: (turnId, feedback?) => {
@@ -1292,6 +1487,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         alwaysAllow: false,
         feedback: feedback?.trim() || undefined,
       });
+      get().maybeDrainQueue(conversation.id);
     },
 
     answerAgentQuestion: (turnId, question, answers) => {
@@ -1551,6 +1747,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         approvalMode: policyOf(conversation.pendingRuntime).autonomy,
         planFirst: false,
       });
+      get().maybeDrainQueue(conversation.id);
     },
 
     discardCodexPlan: (turnId, feedback?) => {
@@ -1571,6 +1768,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           'plan',
         );
       }
+      get().maybeDrainQueue(get().activeConversationId ?? '');
     },
 
     startCodexLogin: () => {
@@ -1835,20 +2033,31 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
 
         case 'comment:submit': {
-          // Sprint 94 (#81): a comment assigned to an agent (@claude/@codex/
-          // @opencode) was sent from the editor. Route it to the mentioned runtime
-          // and submit — reuses the normal send path (→ agent-execute).
+          // Sprint 104 (#162, supersedes the Sprint 94 direct-send): a comment
+          // assigned to an agent routes through the SAME queue as composer
+          // prompts, into a stable conversation for that agent. The old path
+          // retargeted the visible thread's runtime and silently dropped the
+          // prompt when the runtime was busy (audit F-class bug) — both gone.
+          if (!message.prompt) break;
           const rt: 'claude-code' | 'codex' | 'opencode' =
             message.agentId === 'codex'
               ? 'codex'
               : message.agentId === 'opencode'
                 ? 'opencode'
                 : 'claude-code';
-          get().setPendingRuntime({ runtimeId: rt });
-          if (!message.prompt) break;
-          if (rt === 'codex') get().sendCodexMessage(message.prompt);
-          else if (rt === 'opencode') get().sendOpenCodeMessage(message.prompt);
-          else get().sendAgentMessage(message.prompt);
+          const targetId = resolveCommentTargetConversation(rt);
+          const target = get().conversations[targetId];
+          const policy = target ? policyOf(target.pendingRuntime) : { autonomy: 'auto' as const, planFirst: false };
+          get().enqueuePrompt({
+            conversationId: targetId,
+            runtimeId: rt,
+            autonomy: policy.autonomy,
+            planFirst: false,
+            modelId: rt === 'codex' ? target?.codexSelectedModel : rt === 'opencode' ? target?.opencodeSelectedModel : undefined,
+            prompt: message.prompt,
+            displayText: message.prompt,
+            source: 'comment',
+          });
           break;
         }
 
@@ -2242,6 +2451,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             patchConversation(targetId, (c) => computeContextState(c.agentConversation));
             // Auto-save the conversation that finished — not "the current" one.
             setTimeout(() => persistConversation(targetId), 100);
+            // Sprint 104 R3: the turn ended — drain this conversation's queue
+            // (readiness-gated: pending cards / failed turns block inside).
+            get().maybeDrainQueue(targetId);
           }
           break;
         }
@@ -2338,7 +2550,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             },
             { requireRunning: false },
           );
-          if (landed) setTimeout(() => persistConversation(targetId), 100);
+          if (landed) {
+            setTimeout(() => persistConversation(targetId), 100);
+            // Sprint 104 R3: drain on turn completion (readiness-gated —
+            // a requiresPlanReview turn keeps the queue waiting).
+            get().maybeDrainQueue(targetId);
+          }
           break;
         }
 

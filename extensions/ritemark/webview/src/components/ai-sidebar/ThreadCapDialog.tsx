@@ -33,7 +33,7 @@ import {
 export function ThreadCapDialog() {
   const pendingThreadOpen = useAISidebarStore((s) => s.pendingThreadOpen);
   const conversations = useAISidebarStore((s) => s.conversations);
-  const composerQueues = useAISidebarStore((s) => s.composerQueues);
+  const promptQueues = useAISidebarStore((s) => s.promptQueues);
   const closeConversation = useAISidebarStore((s) => s.closeConversation);
   const confirmThreadOpen = useAISidebarStore((s) => s.confirmThreadOpen);
   const cancelThreadOpen = useAISidebarStore((s) => s.cancelThreadOpen);
@@ -47,7 +47,7 @@ export function ThreadCapDialog() {
       title: deriveThreadTitle(c),
       runtime: runtimeOfConversation(c),
       status: deriveThreadStatus(c),
-      hasQueuedPrompt: !!composerQueues[c.id]?.trim(),
+      hasQueuedPrompt: (promptQueues[c.id]?.length ?? 0) > 0,
     }))
     .filter((t) => canCloseThread(t.status, t.hasQueuedPrompt));
 

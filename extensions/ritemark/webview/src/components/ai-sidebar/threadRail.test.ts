@@ -34,6 +34,7 @@ const storage = new MemoryStorage();
 const { useAISidebarStore, resetOpenThreadRestoreForTest } = await import('./store');
 const { createConversationState, isConversationEmpty, INTERRUPTED_TURN_MESSAGE } = await import('./conversationState');
 const { slotFor, setSlot, clearSlot, pruneSlots } = await import('./composerQueue');
+const { queueFor } = await import('./promptQueue');
 const { SOFT_THREAD_CAP } = await import('./threadStatus');
 const { listConversations, saveOpenThreadIds, loadOpenThreadIds } = await import('./chatHistoryStorage');
 const { vscode } = await import('../../lib/vscode');
@@ -216,24 +217,36 @@ function seedThreads(specs: Array<Partial<AgentConversationTurn>>): string[] {
 {
   resetAll();
   const ids = seedThreads([{ isRunning: true }, { isRunning: true }]);
-  const store = useAISidebarStore.getState();
 
-  store.setComposerQueue(ids[0], 'follow-up for thread A');
+  // Sprint 104 (#162): the queue is a bounded QueueItem[] per thread. Both
+  // threads are RUNNING here, so enqueued items stay queued (no auto-drain).
+  const enqueueFor = (conversationId: string, text: string) =>
+    useAISidebarStore.getState().enqueuePrompt({
+      conversationId,
+      runtimeId: 'claude-code',
+      autonomy: 'auto',
+      planFirst: false,
+      prompt: text,
+      displayText: text,
+      source: 'composer',
+    });
+  enqueueFor(ids[0], 'follow-up for thread A');
   const withA = useAISidebarStore.getState();
-  assert.equal(slotFor(withA.composerQueues, ids[0]), 'follow-up for thread A');
+  assert.equal(queueFor(withA.promptQueues, ids[0])[0]?.displayText, 'follow-up for thread A');
   // The load-bearing assertion: thread B cannot see thread A's queued prompt.
-  assert.equal(slotFor(withA.composerQueues, ids[1]), null, 'a queue never leaks into another thread');
+  assert.equal(queueFor(withA.promptQueues, ids[1]).length, 0, 'a queue never leaks into another thread');
 
-  useAISidebarStore.getState().setComposerQueue(ids[1], 'follow-up for thread B');
+  enqueueFor(ids[1], 'follow-up for thread B');
   const both = useAISidebarStore.getState();
-  assert.equal(slotFor(both.composerQueues, ids[0]), 'follow-up for thread A');
-  assert.equal(slotFor(both.composerQueues, ids[1]), 'follow-up for thread B');
+  assert.equal(queueFor(both.promptQueues, ids[0])[0]?.displayText, 'follow-up for thread A');
+  assert.equal(queueFor(both.promptQueues, ids[1])[0]?.displayText, 'follow-up for thread B');
 
-  // Clearing one thread's queue leaves the other's alone.
-  useAISidebarStore.getState().clearComposerQueue(ids[0]);
+  // Removing one thread's item leaves the other's alone.
+  const itemA = queueFor(both.promptQueues, ids[0])[0];
+  useAISidebarStore.getState().removeQueued(ids[0], itemA.id);
   const cleared = useAISidebarStore.getState();
-  assert.equal(slotFor(cleared.composerQueues, ids[0]), null);
-  assert.equal(slotFor(cleared.composerQueues, ids[1]), 'follow-up for thread B');
+  assert.equal(queueFor(cleared.promptQueues, ids[0]).length, 0);
+  assert.equal(queueFor(cleared.promptQueues, ids[1])[0]?.displayText, 'follow-up for thread B');
 
   // Drafts are keyed the same way — switching threads must not carry text over.
   useAISidebarStore.getState().setComposerDraft(ids[0], 'half-written prompt');
@@ -259,11 +272,14 @@ function seedThreads(specs: Array<Partial<AgentConversationTurn>>): string[] {
 
 {
   resetAll();
-  // Closing a thread drops its queued prompt with it.
-  const ids = seedThreads([{}, {}]);
-  useAISidebarStore.getState().setComposerQueue(ids[0], 'queued in A');
+  // Closing a thread drops its queued items with it (Sprint 104 queue).
+  const ids = seedThreads([{ isRunning: true }, {}]);
+  useAISidebarStore.getState().enqueuePrompt({
+    conversationId: ids[0], runtimeId: 'claude-code', autonomy: 'auto', planFirst: false,
+    prompt: 'queued in A', displayText: 'queued in A', source: 'composer',
+  });
   useAISidebarStore.getState().closeConversation(ids[0]);
-  assert.equal(slotFor(useAISidebarStore.getState().composerQueues, ids[0]), null);
+  assert.equal(queueFor(useAISidebarStore.getState().promptQueues, ids[0]).length, 0);
 }
 
 // ── 4. Persistence and restart (R13 / E7) ────────────────────────────────

@@ -6,9 +6,11 @@ status: Draft
 sprints:
   - sprint-102
   - sprint-103
+  - sprint-104
 tags:
   - sprint-102
   - sprint-103
+  - sprint-104
   - ai-transparency
   - privacy
   - human-review
@@ -17,8 +19,14 @@ tags:
 
 # Ritemark v1.8.6 — Clear Start, Trustworthy AI
 
-**Status:** Draft — Sprints 102–103 complete; remaining v1.8.6 sprints are not complete.  
+**Status:** Draft — Sprints 102–104 complete; remaining v1.8.6 sprints are not complete.  
 **Release issues:** [#163 — AI transparency and policy alignment](https://github.com/ProductoryHQ/ritemark-native/issues/163) · [#132 — truthful Plan controls](https://github.com/ProductoryHQ/ritemark-native/issues/132) · [#161 — truthful activity state](https://github.com/ProductoryHQ/ritemark-native/issues/161)
+
+## Follow-ups that wait their turn (Sprint 104)
+
+- **Queue several prompts per chat.** While an agent works, keep typing — each Enter adds to a visible **Queued · n/10** list you can edit, reorder, or remove before it runs. Nothing is silently dropped, and the composer never locks.
+- **Comments queue too.** Sending an assigned comment to a busy agent now waits its turn in that agent's own thread instead of disappearing.
+- **The queue respects your checkpoints.** A plan waiting for review, a question, or an approval pauses draining; a failed turn holds the queue until you press Resume.
 
 ## Plans you can actually review (Sprint 103)
 
