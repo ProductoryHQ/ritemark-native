@@ -16,7 +16,6 @@ export function SetupWizard() {
   const openNodeDownload = useAISidebarStore((s) => s.openNodeDownload);
   const configureApiKey = useAISidebarStore((s) => s.configureApiKey);
   const reloadWindow = useAISidebarStore((s) => s.reloadWindow);
-  const dismissWelcome = useAISidebarStore((s) => s.dismissWelcome);
 
   if (!setupStatus) return null;
 
@@ -24,7 +23,6 @@ export function SetupWizard() {
   const needsInstall = setupStatus.state === 'not-installed';
   const needsAuth = setupStatus.state === 'needs-auth';
   const loginInProgress = setupStatus.state === 'auth-in-progress';
-  const isReady = setupStatus.state === 'ready';
   const missingGit = environmentStatus?.platform === 'win32' && !environmentStatus?.gitInstalled;
   const missingNode = environmentStatus?.platform === 'win32' && !environmentStatus?.nodeInstalled;
   const missingPowerShell = environmentStatus?.platform === 'win32' && !environmentStatus?.powershellAvailable;
@@ -41,11 +39,9 @@ export function SetupWizard() {
         : 'Could not verify Claude'
       : loginInProgress
         ? 'Finish sign-in in your browser'
-        : isReady
-          ? 'Claude is ready'
-          : offlineBlocked
-            ? 'Connect to the internet'
-            : 'Sign in with Claude.ai';
+        : offlineBlocked
+          ? 'Connect to the internet'
+          : 'Sign in with Claude.ai';
 
   // Filter out version-looking error strings: when getClaudeVersion fails on
   // a non-zero exit but stdout contains "1.2.3 (Claude Code)" the upstream
@@ -65,11 +61,9 @@ export function SetupWizard() {
       ? brokenDescription
       : loginInProgress
         ? 'Your terminal and browser were opened for Claude.ai sign-in. Ritemark will update automatically when sign-in completes.'
-        : isReady
-          ? 'Claude can now work with your files in this workspace.'
-          : offlineBlocked
-            ? 'Claude sign-in needs an internet connection.'
-            : 'To use Claude in Ritemark, sign in with Claude.ai or use an Anthropic API key.';
+        : offlineBlocked
+          ? 'Claude sign-in needs an internet connection.'
+          : 'To use Claude in Ritemark, sign in with Claude.ai or use an Anthropic API key.';
 
   return (
     <div className="flex-1 overflow-y-auto px-3 py-4">
@@ -82,8 +76,6 @@ export function SetupWizard() {
               <Icon name="warning" size={20} className="text-[var(--vscode-testing-iconFailed)]" />
             ) : loginInProgress ? (
               <Icon name="circle-notch" size={20} className="animate-spin text-[var(--r-accent)]" />
-            ) : isReady ? (
-              <Icon name="check-circle" size={20} className="text-[var(--vscode-testing-iconPassed)]" />
             ) : needsAuth ? (
               <Icon name="sign-in" size={20} className="text-[var(--r-accent)]" />
             ) : (
@@ -151,13 +143,6 @@ export function SetupWizard() {
                   <Icon name="key" size={14} />
                   Use API key instead
                 </SecondaryButton>
-              )}
-
-              {isReady && (
-                <PrimaryButton onClick={dismissWelcome}>
-                  <Icon name="check-circle" size={14} />
-                  Get Started
-                </PrimaryButton>
               )}
             </div>
 

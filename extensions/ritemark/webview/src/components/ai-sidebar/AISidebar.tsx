@@ -11,6 +11,7 @@ import type { ConversationState } from './conversationState';
 import { vscode } from '../../lib/vscode';
 import { OfflineBanner } from './OfflineBanner';
 import { OnboardingWizard } from './OnboardingWizard';
+import { sidebarGate } from './sidebarGate';
 import { SetupWizard } from './SetupWizard';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
@@ -101,6 +102,7 @@ export function AISidebar() {
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const hasSeenWelcome = useAISidebarStore((s) => s.hasSeenWelcome);
+  const dismissWelcome = useAISidebarStore((s) => s.dismissWelcome);
   const showHistoryPanel = useAISidebarStore((s) => s.showHistoryPanel);
   const loadConversationList = useAISidebarStore((s) => s.loadConversationList);
   const chatFontSize = useAISidebarStore((s) => s.chatFontSize);
@@ -124,11 +126,27 @@ export function AISidebar() {
   const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
   const showWelcome = isClaudeCode && setupStatus !== null
     && setupStatus.state === 'ready' && !hasSeenWelcome && !hasAnyRuntimeConversation;
+
+  // Sprint 107 R4: the "Claude is ready — Get Started" card no longer renders.
+  // Its bookkeeping still runs the moment the ready-with-no-conversation state
+  // is reached, so hasSeenWelcome / ritemark.ai.hasSeenClaudeWelcome end up
+  // exactly as a manual "Get Started" click would have left them.
+  useEffect(() => {
+    if (ready && showWelcome) dismissWelcome();
+  }, [ready, showWelcome, dismissWelcome]);
+
   const showCodexSetup = isCodex && codexStatus.state !== 'ready';
   // OpenCode zero-key: no conversation yet and all four provider booleans are false
   const showOpenCodeSetup = isOpenCode && !hasAnyRuntimeConversation
     && acpProviders
     && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
+  const sidebarView = sidebarGate({
+    ready,
+    onboardingNeeded: Boolean(onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed),
+    needsSetup,
+    showCodexSetup: Boolean(showCodexSetup),
+    showOpenCodeSetup: Boolean(showOpenCodeSetup),
+  });
   const currentApprovedPlan = isClaudeCode
     ? getActiveApprovedPlanForClaude(agentConversation)
     : (isCodex || isOpenCode)
@@ -154,21 +172,21 @@ export function AISidebar() {
       {!isOnline && <OfflineBanner />}
 
       {/* Onboarding wizard — shown on first run when no agent is ready */}
-      {ready && onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed ? (
+      {sidebarView === 'onboarding' ? (
         <OnboardingWizard />
-      ) : ready && (needsSetup || showWelcome) ? (
+      ) : sidebarView === 'claude-setup' ? (
         <>
           <SelectionIndicator />
           <SetupWizard />
         </>
-      ) : ready && showCodexSetup ? (
+      ) : sidebarView === 'codex-setup' ? (
         <>
           <SelectionIndicator />
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <CodexSetupView />
           </div>
         </>
-      ) : ready && showOpenCodeSetup ? (
+      ) : sidebarView === 'opencode-setup' ? (
         <>
           <SelectionIndicator />
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">

@@ -45,10 +45,12 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 4: Remove the ready-welcome branch (W4 — R4)
 
-- [ ] `webview/src/components/ai-sidebar/AISidebar.tsx`: change the `ready && (needsSetup || showWelcome)` branch to `ready && needsSetup`, leaving the `OnboardingWizard`/`CodexSetupView`/`OpenCodeSetupView` branches untouched
-- [ ] Wire automatic `dismissWelcome()` firing (effect or equivalent) the moment the ready-with-no-conversation condition is met, so `hasSeenWelcome`/`ritemark.ai.hasSeenClaudeWelcome` bookkeeping still happens without the click
-- [ ] `SetupWizard.tsx`: remove the now-unreachable `isReady` ("Claude is ready" / "Get Started" / "Technical details") branch
-- [ ] Update or add webview component tests covering: ready+no-conversation → composer (not a card); needsSetup / onboarding / Codex / OpenCode paths unaffected
+> **Completed EARLY, 2026-08-04, on Jarmo's direct order ("claude is ready badge peaks ju kadunud olema")** — shipped standalone as PR sprint-107-clean-start ahead of the rest of Sprint 107. Extension-tier, webview-only.
+
+- [x] `webview/src/components/ai-sidebar/AISidebar.tsx`: change the `ready && (needsSetup || showWelcome)` branch to `ready && needsSetup`, leaving the `OnboardingWizard`/`CodexSetupView`/`OpenCodeSetupView` branches untouched (implemented via the new pure `sidebarGate()` — same decision, unit-testable)
+- [x] Wire automatic `dismissWelcome()` firing (effect or equivalent) the moment the ready-with-no-conversation condition is met, so `hasSeenWelcome`/`ritemark.ai.hasSeenClaudeWelcome` bookkeeping still happens without the click (verified live: injected `agent-setup:complete` ready status → `ritemark.ai.hasSeenClaudeWelcome: true` persisted to the profile settings)
+- [x] `SetupWizard.tsx`: remove the now-unreachable `isReady` ("Claude is ready" / "Get Started") branch — the Technical-details `<details>` block stays because it serves the still-reachable broken/needs-auth states (spec R4: needsSetup path renders exactly as before)
+- [x] Webview tests: `sidebarGate.test.ts` covers ready+no-conversation → chat (no card) and the untouched needsSetup / onboarding / Codex / OpenCode paths; added to the extension test chain
 
 ## Phase 5: QA and closeout
 
