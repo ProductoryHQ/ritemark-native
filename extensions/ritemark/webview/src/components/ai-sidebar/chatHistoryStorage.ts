@@ -38,6 +38,11 @@ export interface SavedConversationData extends SavedConversation {
   chatMessages: ChatMessage[];
   conversationHistory: ConversationEntry[];
   // agentId inherited from SavedConversation (may be 'ritemark-agent' for legacy compat)
+  /**
+   * Sprint 103 R8: the thread's autonomy policy + Plan chip, so a reload
+   * cannot silently widen Manual back to Auto. Absent on pre-103 records.
+   */
+  turnPolicy?: { mode: 'auto' | 'ask' | 'plan'; planFirst?: boolean };
 }
 
 /** v2 data record — preserves old fields for downgrade compatibility */

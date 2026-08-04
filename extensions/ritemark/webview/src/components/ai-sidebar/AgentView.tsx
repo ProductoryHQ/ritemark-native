@@ -111,6 +111,7 @@ export function AgentTurnBlock({
           approval={turn.approval}
           onApprove={(id) => handleToolApproval(String(id), true)}
           onReject={(id) => handleToolApproval(String(id), false)}
+          agentLabel="Claude"
         />
       )}
 

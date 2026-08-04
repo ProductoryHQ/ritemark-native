@@ -526,6 +526,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       codexConversation: conversation.codexConversation,
       chatMessages: conversation.chatMessages,
       conversationHistory: conversation.conversationHistory,
+      // Sprint 103 R8: persist the thread's policy — a reload must never
+      // silently widen Manual back to Auto.
+      turnPolicy: {
+        mode: conversation.pendingRuntime.mode,
+        planFirst: conversation.pendingRuntime.planFirst === true,
+      },
     });
 
     set({ savedConversations: listConversations() });
@@ -621,7 +627,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       pendingRuntime: {
         runtimeId: restoredAgentId,
         modelId: template?.pendingRuntime.modelId ?? '',
-        mode: template?.pendingRuntime.mode ?? 'auto',
+        // Sprint 103 R8: the thread's own persisted policy wins; only pre-103
+        // records without one fall back to the boot template.
+        mode: data.turnPolicy?.mode ?? template?.pendingRuntime.mode ?? 'auto',
+        planFirst: data.turnPolicy?.planFirst === true,
       },
       ...computeContextState(agentConv),
     }));

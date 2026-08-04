@@ -197,6 +197,7 @@ export function CodexTurn({
           approval={turn.approval}
           onApprove={onApprove}
           onReject={onReject}
+          agentLabel={runtimeLabel}
         />
       )}
 
@@ -382,30 +383,40 @@ export function ApprovalCard({
   approval,
   onApprove,
   onReject,
+  agentLabel,
 }: {
   approval: NonNullable<CodexConversationTurn['approval']>;
   onApprove: (requestId: string | number) => void;
   onReject: (requestId: string | number) => void;
+  /** Sprint 103 design pass: who is asking ("Claude" / "Codex" / "OpenCode"). */
+  agentLabel?: string;
 }) {
   const isCommand = approval.approvalType === 'command';
 
+  // Sprint 103 design pass: same card language as PlanReviewCard — calm indigo
+  // header with the amber "blocked on you" pulse (an approval is routine, not a
+  // warning), a provenance line naming the gate, and footer buttons that share
+  // the row when wide and stack full-width when the sidebar is narrow.
   return (
-    <div className="mx-1 rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-input-background)]/80 p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
-      <div className="mb-2 flex items-center gap-2 text-[var(--r-ink-strong)]">
-        <Icon name="warning" size={14} className="text-[var(--vscode-inputValidation-warningBorder)]" />
-        <span className="text-xs font-semibold">
-          {isCommand ? 'Shell Command Approval' : 'File Change Approval'}
-        </span>
+    <div className="rounded-lg border border-[var(--r-accent-fainter)] overflow-hidden bg-[var(--vscode-input-background)]/80">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--r-accent)] border-b border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)]/60">
+        <Icon name="shield-check" size={12} className="shrink-0" />
+        <span className="flex-1">{agentLabel ? `${agentLabel} is waiting for approval` : 'Waiting for your approval'}</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--r-warning)] animate-pulse shrink-0" />
+      </div>
+
+      <div className="px-2.5 pt-1 pb-0.5 text-[11px] text-[var(--r-ink-muted)]">
+        {isCommand ? 'Shell command · Manual mode' : 'File change · Manual mode'}
       </div>
 
       {/* Command preview */}
       {isCommand && approval.command && (
-        <div className="mb-2">
+        <div className="px-2.5 py-1.5">
           <code className="block rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 p-2 font-mono text-[11px] whitespace-pre-wrap break-all">
             {approval.command}
           </code>
           {approval.workingDir && (
-            <div className="text-[10px] opacity-50 mt-1">
+            <div className="mt-1 text-[10px] text-[var(--r-ink-faint)]">
               in {approval.workingDir}
             </div>
           )}
@@ -414,27 +425,34 @@ export function ApprovalCard({
 
       {/* File changes preview */}
       {!isCommand && approval.fileChanges && (
-        <div className="mb-2">
-          {Object.entries(approval.fileChanges).map(([path, change]) => (
-            <div key={path} className="mb-1">
-              <div className="text-[11px] font-medium">{path}</div>
-              {(() => {
-                if (change != null && typeof change === 'object' && 'type' in change) {
-                  return <div className="text-[10px] opacity-60">{(change as { type: string }).type}</div>;
-                }
-                return null;
-              })()}
-            </div>
-          ))}
+        <div className="px-2.5 py-1.5 space-y-1">
+          {Object.entries(approval.fileChanges).map(([path, change]) => {
+            const changeType = change != null && typeof change === 'object' && 'type' in change
+              ? (change as { type: string }).type
+              : null;
+            // The user cares about the document, not the mount point: show the
+            // last two path segments; the full path lives in the tooltip.
+            const segments = path.split('/').filter(Boolean);
+            const displayPath = segments.slice(-2).join('/');
+            return (
+              <div key={path} className="flex items-center gap-1.5 min-w-0">
+                <Icon name="file-text" size={12} className="shrink-0 text-[var(--r-ink-muted)]" />
+                <code className="min-w-0 truncate font-mono text-[11px] text-[var(--r-ink-strong)]" title={path}>{displayPath}</code>
+                {changeType && (
+                  <span className="shrink-0 rounded border border-[var(--r-hairline)] px-1 text-[10px] text-[var(--r-ink-muted)]">{changeType}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Buttons */}
-      <div className="flex gap-2">
-        <Button variant="default" size="sm" onClick={() => onApprove(approval.requestId)}>
+      {/* Actions */}
+      <div className="flex flex-wrap items-center gap-2 px-2.5 py-2 border-t border-[var(--r-hairline)]">
+        <Button variant="default" size="sm" className="flex-1 basis-[45%] whitespace-nowrap" onClick={() => onApprove(approval.requestId)}>
           <Icon name="check" size={12} /> Approve
         </Button>
-        <Button variant="outline" size="sm" onClick={() => onReject(approval.requestId)}>
+        <Button variant="outline" size="sm" className="flex-1 basis-[45%] whitespace-nowrap" onClick={() => onReject(approval.requestId)}>
           <Icon name="x" size={12} /> Reject
         </Button>
       </div>
