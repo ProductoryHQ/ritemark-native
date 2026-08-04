@@ -8,11 +8,13 @@ sprints:
   - sprint-103
   - sprint-104
   - sprint-105
+  - sprint-106
 tags:
   - sprint-102
   - sprint-103
   - sprint-104
   - sprint-105
+  - sprint-106
   - ai-transparency
   - privacy
   - human-review
@@ -21,8 +23,12 @@ tags:
 
 # Ritemark v1.8.6 — Clear Start, Trustworthy AI
 
-**Status:** Draft — Sprints 102–105 complete; remaining v1.8.6 sprints are not complete.  
+**Status:** Draft — Sprints 102–106 complete (Sprint 107 Clean Start in progress separately).  
 **Release issues:** [#163 — AI transparency and policy alignment](https://github.com/ProductoryHQ/ritemark-native/issues/163) · [#132 — truthful Plan controls](https://github.com/ProductoryHQ/ritemark-native/issues/132) · [#161 — truthful activity state](https://github.com/ProductoryHQ/ritemark-native/issues/161)
+
+## A clear place to start (Sprint 106)
+
+- **Home lives in the left rail.** After the one-time Welcome is gone, Home stays: create a **Markdown document** with one obvious click, start a **New AI task**, open a document or folder, insert a table — or jump back into your recently edited documents.
 
 ## Comments become a work list (Sprint 105)
 
