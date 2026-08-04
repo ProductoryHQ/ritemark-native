@@ -206,14 +206,21 @@ For full setup, see [Set Up AI → OpenCode (bring your own key)](../setup-ai.md
 
 These behaviors apply to agent runs in the AI sidebar (Claude and Codex).
 
-### Keep typing while an agent runs — your prompt queues
+### Keep typing while an agent runs — your prompts queue
 
-The composer no longer locks while an agent is working. Type a follow-up while Claude or Codex is
-still running and press Enter: instead of being blocked, the prompt parks in a **"Queued"** notch
-above the input. When the current run finishes, the queued prompt **auto-sends**.
+> Redesigned in v1.8.6 (Sprint 104).
 
-- One queued prompt at a time — you can park exactly one follow-up.
-- Discard it before it sends by clicking the **×** on the Queued notch.
+The composer never locks while an agent is working. Each Enter adds your follow-up to a visible
+**Queued · n/10** list above the input (up to 10 per chat). When the current run finishes — and no
+plan review, question, or approval is waiting for you — the next item sends automatically, in order.
+
+- **Edit, reorder, or remove** any queued item before it runs (hover a row for its actions).
+- **Comments queue too:** sending an assigned comment to a busy agent adds it to that agent's own
+  thread queue instead of dropping it.
+- A **failed or stopped** turn pauses the queue; press **Resume** to continue.
+- Background threads drain on their own — a queued follow-up in another thread runs when that
+  thread's agent finishes, even if you're looking elsewhere.
+- The queue is session-local: it does not survive closing the app.
 
 ### Modes: Manual / Auto + Plan
 

@@ -25,7 +25,9 @@ import {
   useAIInformationDisclosure,
 } from './AIInformation';
 import { resolveAIIdentity } from './aiDisclosure';
-import { shouldQueueInsteadOfSend, shouldAutoSendQueuedPrompt, slotFor } from './composerQueue';
+import { shouldQueueInsteadOfSend } from './composerQueue';
+import { queueFor } from './promptQueue';
+import { QueuePanel } from './QueuePanel';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
@@ -160,18 +162,14 @@ export function ChatInput() {
   // state. Queue SEMANTICS are unchanged (#95 owns redesigning them); what
   // changed is that a prompt queued in thread A can never fire in thread B.
   const activeConversationId = useAISidebarStore((s) => s.activeConversationId);
-  const composerQueues = useAISidebarStore((s) => s.composerQueues);
+  const promptQueues = useAISidebarStore((s) => s.promptQueues);
   const composerDrafts = useAISidebarStore((s) => s.composerDrafts);
-  const setComposerQueue = useAISidebarStore((s) => s.setComposerQueue);
-  const clearComposerQueue = useAISidebarStore((s) => s.clearComposerQueue);
+  const enqueuePrompt = useAISidebarStore((s) => s.enqueuePrompt);
   const setComposerDraft = useAISidebarStore((s) => s.setComposerDraft);
 
-  const queuedPrompt = slotFor(composerQueues, activeConversationId);
-  const setQueuedPrompt = useCallback((prompt: string | null) => {
-    if (!activeConversationId) return;
-    if (prompt === null) clearComposerQueue(activeConversationId);
-    else setComposerQueue(activeConversationId, prompt);
-  }, [activeConversationId, setComposerQueue, clearComposerQueue]);
+  // Sprint 104 (#162): the one-slot queuedPrompt is gone — the thread has a
+  // bounded visible queue. The composer never locks while items are queued.
+  const queuedItems = queueFor(promptQueues, activeConversationId);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [pathChips, setPathChips] = useState<PathChip[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -278,6 +276,36 @@ export function ChatInput() {
             : 'Ask anything... (type / for commands)';
   const hasSelectedContext = !selection.isEmpty && !!selection.text;
 
+  const [queueFullNotice, setQueueFullNotice] = useState(false);
+  const enqueueComposerItem = useCallback((displayText: string, prompt: string, mentionedAgentPaths?: string[]) => {
+    if (!activeConversationId) return 'queued' as const;
+    const policy = policyOf(pendingRuntime);
+    const outcome = enqueuePrompt({
+      conversationId: activeConversationId,
+      runtimeId: pendingRuntime.runtimeId,
+      autonomy: policy.autonomy,
+      planFirst: policy.planFirst,
+      modelId: pendingRuntime.runtimeId === 'codex'
+        ? codexSelectedModel
+        : pendingRuntime.runtimeId === 'opencode'
+          ? opencodeSelectedModel
+          : undefined,
+      prompt,
+      displayText,
+      source: 'composer',
+      attachments: attachments.length > 0 ? attachments : undefined,
+      skipActiveFile: hideActiveFile,
+      skipBrowserContext: hideBrowserContext,
+      mentionedAgentPaths,
+    });
+    if (outcome === 'full') {
+      setQueueFullNotice(true);
+      setTimeout(() => setQueueFullNotice(false), 4000);
+    }
+    return outcome;
+  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, attachments, hideActiveFile, hideBrowserContext, enqueuePrompt]);
+
+
   // Build final message with path chips and pinned agent prepended
   const buildFinalPrompt = useCallback((): string => {
     let prompt = value.trim();
@@ -302,9 +330,14 @@ export function ChatInput() {
     // Sprint 74 R2 (#82): while the agent runs, park the prompt in the queue
     // instead of dropping the send. Auto-sent when the run completes.
     if (shouldQueueInsteadOfSend({ isLoading, isAgentMode, hasOverridePrompt: overridePrompt !== undefined })) {
-      setQueuedPrompt(prompt);
+      const mentioned = parseMentions(discoveredAgents, value)
+        .map((m) => discoveredAgents.find((a) => a.id === m.agentId)?.filePath)
+        .filter((pth): pth is string => !!pth);
+      const outcome = enqueueComposerItem(value.trim() || prompt, prompt, mentioned.length > 0 ? mentioned : undefined);
+      if (outcome === 'full') return; // keep the composer text — nothing was queued
       setValue('');
       setPathChips([]);
+      setAttachments([]);
       setShowMentionPopup(false);
       setShowCommandPopup(false);
       if (textareaRef.current) {
@@ -384,18 +417,9 @@ export function ChatInput() {
   // gives the switch-back case for free: a thread that finished in the
   // background is remembered as "was running", so returning to it sends its
   // queued prompt into that thread — where it was typed.
-  const prevRunningByThreadRef = useRef(new Map<string, boolean>());
-  useEffect(() => {
-    if (!activeConversationId) return;
-    const memory = prevRunningByThreadRef.current;
-    const wasRunning = memory.get(activeConversationId) ?? agentRunning;
-    memory.set(activeConversationId, agentRunning);
-    if (shouldAutoSendQueuedPrompt({ wasRunning, isRunning: agentRunning, queuedPrompt })) {
-      const prompt = queuedPrompt as string;
-      setQueuedPrompt(null);
-      handleSend(prompt);
-    }
-  }, [activeConversationId, agentRunning, queuedPrompt, setQueuedPrompt, handleSend]);
+  // Sprint 104 (#162): the render-level auto-send effect is gone — the store's
+  // maybeDrainQueue dispatches on turn completion, so BACKGROUND threads drain
+  // too (the old effect only ever served the visible composer).
 
   // R14: switching threads swaps the draft too — the text you were typing stays
   // with the thread you were typing it in.
@@ -501,7 +525,7 @@ export function ChatInput() {
             // not bypass straight to send (which drops it for Claude / misroutes
             // for Codex). Auto-send re-runs it through handleSend on completion.
             if (shouldQueueInsteadOfSend({ isLoading, isAgentMode, hasOverridePrompt: false })) {
-              setQueuedPrompt(prompt);
+              enqueueComposerItem(prompt, prompt);
               setValue('');
               setShowCommandPopup(false);
               return;
@@ -927,7 +951,7 @@ export function ChatInput() {
         // Sprint 74 R2: no separator stripe above a notch — the notch visually
         // belongs to the input card, so the container border-top is dropped
         // whenever any notch (selected text / queued prompt) is showing.
-        hasSelectedContext || queuedPrompt ? '' : 'border-t border-[var(--r-hairline)]'
+        hasSelectedContext || queuedItems.length > 0 ? '' : 'border-t border-[var(--r-hairline)]'
       } ${isDragOver ? 'bg-[var(--r-surface-soft)]' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -948,46 +972,8 @@ export function ChatInput() {
           top border by 1px so there's no seam. */}
       <SelectedContextTab />
 
-      {/* Sprint 74 R2 (#82): queued-prompt notch. Same SelectedContextTab notch
-          pattern. When stacked below the selected-text tab it drops its top
-          rounding/border and uses a thin internal divider instead — one visual
-          block, zero seams (notch-stack rule, see prototypes/composer-queue.html). */}
-      {queuedPrompt && (
-        <div
-          className={`mx-2.5 -mb-px px-2.5 py-1.5 border-[rgba(148,163,184,0.20)]
-            bg-gradient-to-b from-[rgba(248,250,252,0.82)] to-[rgba(248,250,252,0.52)]
-            dark:from-[rgba(25,22,53,0.62)] dark:to-[rgba(25,22,53,0.62)] dark:border-[rgba(129,140,248,0.16)]
-            ${hasSelectedContext
-              ? 'border-l border-r border-t border-t-[rgba(148,163,184,0.14)] dark:border-t-[rgba(129,140,248,0.10)]'
-              : 'rounded-t-lg border border-b-0'}`}
-          role="status"
-          aria-label="Queued prompt"
-        >
-          <div className="flex items-center gap-1.5">
-            <Icon name="clock" size={12} className="shrink-0 opacity-60" />
-            <span className="text-[11px] font-medium text-[var(--r-ink-muted)] flex-1 truncate">
-              Queued — sends when the agent finishes
-            </span>
-            <button
-              onClick={() => setQueuedPrompt(null)}
-              className="
-                shrink-0 inline-flex items-center justify-center
-                w-4 h-4 rounded
-                text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]
-                focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]
-                transition-colors
-              "
-              aria-label="Discard queued prompt"
-              title="Discard queued prompt"
-            >
-              <Icon name="x" size={12} />
-            </button>
-          </div>
-          <div className="mt-0.5 text-[11px] leading-snug text-[var(--r-ink-body)] truncate">
-            {queuedPrompt}
-          </div>
-        </div>
-      )}
+      {/* Sprint 104 (#162): bounded queue panel replaces the one-slot notch. */}
+      <QueuePanel stackedUnderSelection={hasSelectedContext} queueFullNotice={queueFullNotice} />
 
       {/* Drag overlay indicator */}
       {isDragOver && (
@@ -1142,7 +1128,6 @@ export function ChatInput() {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={placeholder}
-          disabled={!!queuedPrompt}
           rows={2}
           className="block w-full resize-none bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ fontSize: 'var(--chat-font-size, 13px)' }}
