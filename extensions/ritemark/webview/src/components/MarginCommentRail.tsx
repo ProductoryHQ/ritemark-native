@@ -22,6 +22,7 @@ import {
   type CommentAgentAlias,
 } from '../extensions/comment/commentModel'
 import { sendToExtension } from '../bridge'
+import { useCommentTaskStatuses, COMMENT_STATUS_LABEL, type CommentTaskStatus } from '../extensions/comment/commentTaskStatus'
 
 interface RailMarker {
   key: string
@@ -386,12 +387,22 @@ export function MarginCommentRail({
           prompt = `${instruction}\n\n---\nThis comment refers to the following text:\n"${anchored}"`
         }
       }
-      sendToExtension('comment:send-to-ai', { agentId, prompt })
+      sendToExtension('comment:send-to-ai', {
+        agentId,
+        prompt,
+        // Sprint 105 (#165): the stable id lets queue/turn status flow back
+        // to THIS marker. Id-less legacy comments simply show no status.
+        commentIds: m.commentId ? [m.commentId] : [],
+      })
       setSentKey(m.key)
       window.setTimeout(() => setSentKey((k) => (k === m.key ? null : k)), 2500)
     },
     [editor],
   )
+
+  // Sprint 105 (#165): live task status per stable comment id (queued /
+  // running / done / failed), pushed from the sidebar's queue + turn facts.
+  const taskStatuses = useCommentTaskStatuses()
 
   if (!markers.length) return null
 
@@ -457,6 +468,11 @@ export function MarginCommentRail({
                   </button>
                 </div>
                 <div className="rm-bubble-text">{renderNoteWithMentions(m.note)}</div>
+                {m.commentId && taskStatuses[m.commentId] && (
+                  <div className={`rm-task-status rm-task-status--${taskStatuses[m.commentId]}`}>
+                    {COMMENT_STATUS_LABEL[taskStatuses[m.commentId] as CommentTaskStatus]}
+                  </div>
+                )}
                 {assigned && (
                   <div className="rm-bubble-foot">
                     <button
@@ -483,6 +499,12 @@ export function MarginCommentRail({
               <button className="rm-marker" onClick={() => setOpenKey(m.key)}>
                 <span className="rm-marker-ico"><CommentIcon /></span>
                 <span className="rm-marker-txt">{renderNoteWithMentions(preview)}</span>
+                {m.commentId && taskStatuses[m.commentId] && (
+                  <span
+                    className={`rm-task-dot rm-task-dot--${taskStatuses[m.commentId]}`}
+                    title={COMMENT_STATUS_LABEL[taskStatuses[m.commentId] as CommentTaskStatus]}
+                  />
+                )}
               </button>
             )}
           </div>

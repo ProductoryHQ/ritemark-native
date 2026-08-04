@@ -65,6 +65,19 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   // Track all active webview panels for broadcasting tool execution
   private static activeWebviews: Set<vscode.Webview> = new Set();
 
+  /**
+   * Sprint 105 (#165): push a comment-task status update to every open editor
+   * webview. Each editor filters by its own documentPath, so broadcasting is
+   * safe and avoids a path→webview registry.
+   */
+  public static broadcastCommentTaskStatus(payload: {
+    documentPath: string; commentIds: string[]; status: 'queued' | 'running' | 'done' | 'failed' | 'cleared';
+  }): void {
+    for (const webview of RitemarkEditorProvider.activeWebviews) {
+      webview.postMessage({ type: 'comment:task-status', ...payload }).then(undefined, () => {});
+    }
+  }
+
   /** Resolvers for insertDiagram waiting on the webview's imageInserted ack. */
   private pendingInsertAcks: Map<string, () => void> = new Map();
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
@@ -717,12 +730,17 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'comment:send-to-ai': {
             // Sprint 94 (#81): relay an agent-assigned comment to the AI sidebar.
+            // Sprint 105 (#164/#165): carry the stable comment ids + document
+            // path so the sidebar can correlate queue/task status back here.
             // Lazy require avoids a load-time circular import with ./extension.
             const agentId = message.agentId as string | undefined;
             const prompt = message.prompt as string | undefined;
             if (agentId && prompt) {
               const ext = require('./extension') as typeof import('./extension');
-              ext.unifiedViewProvider?.submitCommentPrompt(agentId, prompt);
+              ext.unifiedViewProvider?.submitCommentPrompt(agentId, prompt, {
+                commentIds: Array.isArray(message.commentIds) ? message.commentIds as string[] : undefined,
+                documentPath: vscode.workspace.asRelativePath(document.uri, false),
+              });
             }
             return;
           }

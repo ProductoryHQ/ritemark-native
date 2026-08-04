@@ -5,6 +5,7 @@ import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
 import { DOCXViewer } from './components/viewers/DOCXViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
+import { CommentsMenuButton } from './components/header/CommentsMenuButton'
 import { PropertiesSidePanel } from './components/properties'
 import { AgentConfiguratorPanel } from './components/agent'
 import type { AgentFrontmatter, AgentSkill } from './components/agent'
@@ -617,6 +618,7 @@ function App() {
         propertiesActive={propertiesPanelShown}
         agentActive={agentPanelShown}
         onAgentClick={isAgentMode ? handleAgentPanelClick : undefined}
+        commentsSlot={features.commentCallouts !== false ? <CommentsMenuButton getEditor={() => editorRef.current} /> : undefined}
         hasFileChanged={showFileChangeNotification}
         onRefresh={() => {
           setShowFileChangeNotification(false)

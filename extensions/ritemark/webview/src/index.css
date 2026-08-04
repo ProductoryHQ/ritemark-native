@@ -362,3 +362,27 @@ body {
   background: rgba(129, 140, 248, 0.18);
   color: var(--ritemark-dark-indigo, #818cf8);
 }
+
+/* ── Sprint 105 (#165): comment task status — marker dot + bubble line ── */
+.rm-task-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  margin-left: 4px;
+}
+.rm-task-dot--queued  { background: transparent; box-shadow: inset 0 0 0 1.5px var(--r-warning); }
+.rm-task-dot--running { background: var(--r-accent); animation: rm-task-pulse 1.4s ease-in-out infinite; }
+.rm-task-dot--done    { background: var(--r-success); }
+.rm-task-dot--failed  { background: var(--r-error); }
+@keyframes rm-task-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.rm-task-status {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.rm-task-status--queued  { color: var(--r-warning); }
+.rm-task-status--running { color: var(--r-accent); }
+.rm-task-status--done    { color: var(--r-success); }
+.rm-task-status--failed  { color: var(--r-error); }
