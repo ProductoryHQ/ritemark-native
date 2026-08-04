@@ -23,11 +23,32 @@ import type {
 } from './types';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
 
-/** Per-run runtime draft selection (runtime + model + approval mode). */
+/** Per-run runtime draft selection (runtime + model + policy). */
 export interface PendingRuntimeSelection {
   runtimeId: 'claude-code' | 'codex' | 'opencode';
   modelId: string;
+  /**
+   * Autonomy policy (Sprint 103 R1/R8): 'auto' or 'ask'. The value 'plan'
+   * only exists in pre-Sprint-103 persisted threads and is normalized to
+   * auto + planFirst by {@link policyOf}.
+   */
   mode: 'auto' | 'ask' | 'plan';
+  /**
+   * Plan chip state (Sprint 103 R1, decision D2): stays on until a plan is
+   * APPROVED, then auto-resets. Cancel/discard leaves it on.
+   */
+  planFirst?: boolean;
+}
+
+/**
+ * The two-axis policy of a selection, with legacy 'plan' normalized
+ * (Sprint 103 R1/R8 migration): `plan` → autonomy 'auto' + planFirst on.
+ */
+export function policyOf(p: PendingRuntimeSelection): { autonomy: 'auto' | 'ask'; planFirst: boolean } {
+  return {
+    autonomy: p.mode === 'ask' ? 'ask' : 'auto',
+    planFirst: p.planFirst === true || p.mode === 'plan',
+  };
 }
 
 /**

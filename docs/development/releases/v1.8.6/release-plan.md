@@ -3,7 +3,7 @@
 **Status:** In progress — Sprint 102 started 2026-08-03  
 **Target:** v1.8.6  
 **GitHub milestone:** [v1.8.6](https://github.com/ProductoryHQ/ritemark-native/milestone/7) — open, milestone #7  
-**Release type:** Undecided — extension-only remains subject to normal release preflight and a release-specific canary; Home may still require a full app release if exact Activity Bar placement needs a VS Code shell patch  
+**Release type:** Undecided — extension-only remains subject to normal release preflight and a release-specific canary; Home may still require a full app release if exact Activity Bar placement needs a VS Code shell patch. Sprint 107 (Clean Start) adds a *confirmed* shell-tier VS Code patch (013, `patches/vscode/`) plus a `branding/product.json`-consumption change independent of the Home question, which further weighs v1.8.6 toward a full app release.  
 **Release owner:** Jarmo  
 **Created:** 2026-08-03  
 **Depends on:** v1.8.5 (published 2026-07-29)
@@ -43,6 +43,7 @@ This is one coherent trust-and-onboarding release, not a grab bag of unrelated f
 | Comments overview + assigned-comment actions | Comments are visible in the margin one at a time, but the document has no obvious total or document-level action surface | Users can see the remaining comment workload and send all comments assigned to each agent as one deliberate task | Editor webview + existing editor-to-agent relay; architecture update only if a new batch contract is required | Include as a focused comments workflow improvement | Include |
 | Multi-prompt queue for composer and comments | Each chat currently holds only one queued composer prompt, while comment submissions bypass that queue and can be silently ignored by a busy runtime | Users can line up several follow-ups or comment tasks and trust that they will run in order without losing context | AI sidebar state + comment routing; no runtime-interface change expected | Include with the comments workflow — correctness before richer controls | Include |
 | Persistent Home / first-task launcher | The startup Welcome already creates real Markdown documents, but users lack an obvious way back once they are working | “New document” becomes permanently discoverable; returning users get quick actions and recent work | Prototype as extension-contributed Activity Bar view; shell-tier only if exact first-position pinning requires a patch | Include if the extension-only path is good enough | Include |
+| Clean Start — first-open trust & editor-resolution fix | User-reported bug, root-caused with empirical reproduction on the shipped v1.8.5 app: double-clicking a `.md` opens as raw text with Restricted Mode and a terminal-trust modal on every launch, because `branding/product.json`'s `configurationDefaults` (added Sprint 57) has never actually been read by desktop VS Code; fits release-thesis pillar 1 (“Where do I start?” / a clear, trustworthy first open) | A brand-new user's very first `.md` double-click opens correctly with no trust noise; existing users' already-stuck text tabs get healed automatically; scheduled-agent automation gains a consent gate it never had | Shell patch (`patches/vscode/013-ritemark-configuration-defaults.patch`) + `branding/product.json`-consumption change + extension-tier daemon/webview work | Include — root-cause fix for a first-open failure found via direct reproduction, not speculative | Include — Jarmo approved 2026-08-04 |
 
 Decision values: `Include`, `Defer`, `Reject`, or `Discuss`.
 
@@ -381,15 +382,16 @@ Recommended Home MVP:
 
 ## Sprint Map
 
-The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful lifecycle state must exist before queue auto-drain, and comments must consume the shared queue rather than invent another send path. Sprint 102 is complete; Sprint 106’s extension prototype can progress independently, but each remaining sprint still uses its own branch and approval gate.
+The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful lifecycle state must exist before queue auto-drain, and comments must consume the shared queue rather than invent another send path. Sprint 102 is complete; Sprint 106’s extension prototype and Sprint 107’s first-open trust fix can both progress independently of the critical path, but each remaining sprint still uses its own branch and approval gate.
 
 | Sprint | Purpose | Issues | Dependency | PR | Status |
 | --- | --- | --- | --- | --- | --- |
 | [Sprint 102 — AI Transparency and Policy Alignment](./sprint-102-ai-transparency/sprint-plan.md) | AI information UI, first-interaction disclosure, accurate Terms/Privacy, counsel decision | #163 | v1.8.5 | [native #166](https://github.com/ProductoryHQ/ritemark-native/pull/166), [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77), [policy #20](https://github.com/jarmo-productory/productory-2026/pull/20) merged | Done |
-| [Sprint 103 — Truthful Agent Plans and Activity State](./sprint-103-agent-truth/sprint-plan.md) | Enforced Plan behavior, compact capability-aware control, truthful completion/background state | #132, #161 | v1.8.5 | TBD | Planned |
+| [Sprint 103 — Truthful Agent Plans and Activity State](./sprint-103-agent-truth/sprint-plan.md) | Enforced Plan behavior, compact capability-aware control, truthful completion/background state | #132, #161 | v1.8.5 | TBD | Implemented on `sprint-103-agent-truth` — dev-validated with evidence; awaiting Jarmo's test + PR |
 | [Sprint 104 — Reliable Multi-Prompt Queue](./sprint-104-prompt-queue/sprint-plan.md) | Bounded per-chat queue shared by composer and comment prompts | #162 | Sprint 103 | TBD | Planned |
 | [Sprint 105 — Comments Command Center](./sprint-105-comments-command-center/sprint-plan.md) | Unique comment count, overview, per-agent batch dispatch, comment task status foundation | #164, #165 | Sprint 104 | TBD | Planned |
 | [Sprint 106 — Home and First-Task Launcher](./sprint-106-home-launcher/sprint-plan.md) | Extension-first Home MVP reusing document/chat commands | #74 | v1.8.5; delivery-tier decision during prototype | TBD | Planned |
+| [Sprint 107 — Clean Start (Trustworthy First Open)](./sprint-107-clean-start/sprint-plan.md) | Wire `product.json` `configurationDefaults` into desktop (patch 013), keep trust off with daemon consent hardening for scheduled runs, heal existing stuck text tabs, remove the ready-only welcome card | none pre-filed | v1.8.5 | TBD | Plan approved 2026-08-04 (Jarmo); D1=Option A, D2=grandfather decided; **execution on hold until the sprint queue reaches 107** (sprints 102–106 first) |
 
 ## Issue Intake
 
@@ -410,10 +412,11 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 | Sprint | Branch | PR | Issues | Merge status | QA status | Release-note status |
 | --- | --- | --- | --- | --- | --- | --- |
 | sprint-102-ai-transparency | `sprint-102-ai-transparency` | [native #166](https://github.com/ProductoryHQ/ritemark-native/pull/166); [web #77](https://github.com/jarmo-productory/ritemark-web/pull/77); [policy #20](https://github.com/jarmo-productory/productory-2026/pull/20) | #163 | all merged and live | Automated QA passed; CDP and manual runtime/offline/link QA passed; counsel approval received; web Playwright passed 86/86; all four EN/ET policy routes verified in production | Sprint 102 complete |
-| sprint-103-agent-truth | `sprint-103-agent-truth` | TBD | #132, #161 | not started | not run | not drafted |
+| sprint-103-agent-truth | `sprint-103-agent-truth` | TBD | #132, #161 | implemented on branch (not merged) | unit suites green; CDP plan-truth matrix green (`scripts/qa/plan-truth-matrix.sh`); Claude-side dev validation done — Jarmo walk pending | CHANGELOG + release-notes + user docs updated |
 | sprint-104-prompt-queue | `sprint-104-prompt-queue` | TBD | #162 | not started | not run | not drafted |
 | sprint-105-comments-command-center | `sprint-105-comments-command-center` | TBD | #164, #165 | not started | not run | not drafted |
 | sprint-106-home-launcher | `sprint-106-home-launcher` | TBD | #74 | not started | not run | not drafted |
+| sprint-107-clean-start | `sprint-107-clean-start` (not yet created) | TBD | none pre-filed | not started | not run | not drafted |
 
 ## Risks and Constraints
 
@@ -471,6 +474,7 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 - [ ] Is extension-contributed Home sufficient, even if exact first-icon placement is not guaranteed?
 - [ ] If extension-only delivery is selected, run a release-specific production canary as a normal release check; otherwise choose a full app release.
 - [ ] If Home forces a full app release, run current QA/release preflight and complete #143 Windows reputation operations.
+- [ ] Confirm v1.8.6 moves to a full app release given Sprint 107's confirmed shell-tier patch 013 (`patches/vscode/`) plus a `branding/product.json`-consumption change — independent of, and in addition to, the Home placement question above.
 - [ ] Confirm whether #143 was already completed in Microsoft’s portal; repository evidence cannot answer this.
 - [x] Create and milestone all seven included GitHub issues: #74, #132, and #161–#165.
 - [x] Defer #156 automatic replies, #155 chat quoting, Cloud Sharing, and the unrelated open backlog.
@@ -517,3 +521,6 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 | 2026-08-03 | Record the external publication boundary: `ritemark-web` can host the AI-information routes, but Productory Terms/Privacy live elsewhere and remain blocked on counsel + site-owner publication. | Cross-repo audit |
 | 2026-08-03 | Confirm OpenCode, offline, and link-handling manual QA; record that counsel approval was received. Productory policy publication and packaged-candidate verification remain external release gates. | Jarmo |
 | 2026-08-03 | Merge productory-2026 PR #20 and native PR #166, publish the approved EN/ET Terms and Privacy copy, verify all four production routes, close #163, and mark Sprint 102 complete. Packaged-candidate link verification remains a release-execution gate. | Sprint 102 closure |
+| 2026-08-03 | Sprint 103 SDD artifacts drafted on a live plan-truth audit: Claude "Plan" proven to run on `bypassPermissions` with the plan card appearing only via accidental model recovery; Auto mode shown to plan and block silently; fix path is the SDK's native plan mode. Awaiting Jarmo's SDD approval + decisions D1–D5. | Sprint 103 preparation |
+| 2026-08-04 | Root-caused the "`.md` opens as code + trust-dialog noise" first-open bug via empirical reproduction on the installed v1.8.5 production app: `branding/product.json`'s `configurationDefaults` (Sprint 57) is dead on desktop VS Code, only the web workbench reads it. Drafted Sprint 107 (Clean Start) SDD artifacts — patch 013 to wire it into the desktop bootstrap, keep trust off (Sprint 57 intent) paired with new daemon consent hardening for schedule-triggered runs, a one-shot sticky-tab healer for already-affected users, and (Jarmo-authorized) removal of the "Claude is ready" welcome card. Source-level audit confirms the R1 mechanism against `EditorResolverService`/`WorkspaceTrustManagementService`/`DefaultConfiguration` before any code is written. Added a Candidate Scope row and flagged that this weighs v1.8.6 toward a full app release. Awaiting Jarmo's plan approval and decisions D1 (daemon consent model) and D2 (legacy-workspace grandfathering). | Sprint 107 preparation |
+| 2026-08-04 | Jarmo approved the Sprint 107 (Clean Start) plan ("Sprint accepted") and decided its two open questions: D1 = Option A (per-workspace opt-in toast for schedule-triggered daemon runs, reviewable/revocable in Agent Library; Option B kept in the docs as the rejected alternative); D2 = grandfather (workspaces already actively scheduling tasks before this ships keep working without a retroactive consent prompt; only new workspaces go through the D1 toast). Explicit execution hold set alongside the approval: implementation and branch creation (`git checkout -b sprint-107-clean-start`) must not start until the v1.8.6 sprint queue reaches Sprint 107 — sprints 102–106 run first (102 done, 103 in progress). Sprint 107's SDD artifacts and this release plan updated to record all three decisions and the hold; no code, patch, or branch created. | Sprint 107 decisions (Jarmo, relayed 2026-08-04) |

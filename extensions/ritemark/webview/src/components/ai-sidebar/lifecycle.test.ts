@@ -7,7 +7,6 @@ import {
   finalizeCodexTurnResult,
   getActiveApprovedPlanForClaude,
   getActiveApprovedPlanForCodex,
-  shouldRequestPlanMode,
 } from './lifecycle';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
 
@@ -336,16 +335,8 @@ function testPlanModeResultWithoutStructuredUpdateStillRequiresReview() {
   assert.equal(finalizedTurn.isRunning, false);
 }
 
-function testPlanModePromptDetection() {
-  assert.equal(shouldRequestPlanMode('Work in plan mode first.'), true);
-  assert.equal(shouldRequestPlanMode('Enter plan mode and propose steps.'), true);
-  assert.equal(
-    shouldRequestPlanMode(buildCodexApprovedPlanPrompt('Work in plan mode first.', '1. Do work')),
-    false,
-    'approved-plan continuation prompt must not accidentally re-enter plan mode'
-  );
-  assert.equal(shouldRequestPlanMode('Just edit the file directly.'), false);
-}
+// Sprint 103 R1 (D4): prompt-text plan-mode detection removed — plan-first is
+// explicit UI state only, so there is nothing to sniff-test anymore.
 
 function main() {
   testActivePlanFallbackPromotesFirstItemToInProgress();
@@ -360,7 +351,6 @@ function main() {
   testBuildCodexApprovedPlanPromptKeepsOriginalRequest();
   testApprovedContinuationPlanUpdateDoesNotReenterReview();
   testPlanModeResultWithoutStructuredUpdateStillRequiresReview();
-  testPlanModePromptDetection();
   console.log('Webview lifecycle tests passed.');
 }
 

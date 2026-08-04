@@ -11,6 +11,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { AgentTurnBlock } from './AgentView';
 import { CodexTurn, CompatibilityNotice, getCompatibilityNotice } from './CodexView';
+import { ActivityStatusLine } from './ActivityStatusLine';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
 
 type MergedTurn =
@@ -123,6 +124,9 @@ export function UnifiedConversationView() {
             />
           )
         )}
+
+        {/* Sprint 103 R7: single truthful status line under the transcript. */}
+        {merged.length > 0 && <ActivityStatusLine />}
 
         <div ref={endRef} />
       </div>

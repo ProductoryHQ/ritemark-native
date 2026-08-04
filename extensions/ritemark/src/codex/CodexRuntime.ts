@@ -72,6 +72,11 @@ export function buildCodexBaseInstructions(extraSystemPrompt: string | undefined
 }
 
 const CODEX_PLAN_DEVELOPER_INSTRUCTIONS = [
+  // Sprint 103 R5: plan turns run in a READ-ONLY sandbox — the model must know
+  // it is planning, not executing, or it wastes the turn on blocked edits and
+  // ends with an apology instead of a plan.
+  'You are in a PLANNING phase: the workspace is read-only for this turn, so do not attempt to edit files or run write commands.',
+  'Read what you need, then present a short, reviewable plan of the intended changes (files, sections, new content). The user approves the plan before any execution happens.',
   'When you need the user to choose between options or provide required clarifications before continuing, you must use the request_user_input tool instead of asking in plain assistant text.',
   'Do not present a question as normal chat text if request_user_input can express it.',
   'When you produce a plan, prefer structured plan updates over embedding the whole plan only in prose.',
@@ -80,17 +85,16 @@ const CODEX_PLAN_DEVELOPER_INSTRUCTIONS = [
 
 const CODEX_PLAN_TURN_REMINDER = [
   'Ritemark runtime reminder:',
+  '- This is a PLANNING turn: the workspace is read-only. Do not attempt edits; present a reviewable plan instead.',
   '- If you need the user to answer a question or choose from options, you must call request_user_input.',
   '- Do not ask the question in normal assistant text when request_user_input can represent it.',
   '- If the user explicitly asked for multiple-choice questions, use request_user_input for them.',
   '- After calling request_user_input, wait for the answer instead of finishing the turn with the question in prose.',
 ].join('\n');
 
-function shouldStartCodexInPlanMode(prompt: string): boolean {
-  return /\bplan mode\b/i.test(prompt)
-    || /\bwork in plan\b/i.test(prompt)
-    || /\benter plan mode\b/i.test(prompt);
-}
+// Sprint 103 R1: prompt-text sniffing removed (decision D4) — plan-first is an
+// explicit UI choice carried on `turn.mode`; words like "plan mode" in a prompt
+// must never silently retarget permissions.
 
 /**
  * Render a Codex turn error into a user-readable string.
@@ -189,11 +193,18 @@ export class CodexSession implements RuntimeSession {
     }
     const config = this._config;
     const resolvedModel = turn.model ?? config.model ?? null;
-    const shouldUsePlanMode = turn.mode === 'plan'
-      || (turn.mode !== 'execute' && shouldStartCodexInPlanMode(turn.prompt));
+    // Sprint 103 R1 (D4): only the explicit turn mode selects plan-first.
+    const shouldUsePlanMode = turn.mode === 'plan';
 
     const approvalPolicy = (config.codexApprovalPolicy ?? 'untrusted') as 'untrusted' | 'on-request' | 'on-failure' | 'never';
-    const sandbox = (config.codexSandboxMode ?? 'workspace-write') as 'read-only' | 'workspace-write' | 'danger-full-access';
+    // Sprint 103 R5: plan turns run in a READ-ONLY sandbox so "No files changed
+    // yet" is enforced, not narrated. Sandbox is fixed at threadStart, so the
+    // approvalKey below (which includes it) makes the existing reset machinery
+    // recreate the thread when crossing the plan boundary; the approved-plan
+    // continuation prompt re-carries the task context (audit Repro C).
+    const sandbox = (shouldUsePlanMode
+      ? 'read-only'
+      : (config.codexSandboxMode ?? 'workspace-write')) as 'read-only' | 'workspace-write' | 'danger-full-access';
     const approvalKey = `${approvalPolicy}:${sandbox}`;
 
     // Reset THIS conversation's thread when its browser-tools state OR its

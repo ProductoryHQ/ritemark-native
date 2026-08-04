@@ -12,6 +12,7 @@ import { FilesSummary } from './FilesSummary';
 import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
 import { extractPlanDisplayText, planTurnNeedsApproval } from './planText';
+
 import type { AgentConversationTurn } from './types';
 
 const OVERFLOW_PATTERNS = [
@@ -168,16 +169,9 @@ export function AgentResponse({ turn }: AgentResponseProps) {
         </div>
       )}
 
-      {/* Summary line: files + duration + cost */}
-      <div className="mt-2 text-[10px] text-[var(--r-ink-muted)] flex flex-wrap items-center gap-x-2">
-        {result.filesModified.length > 0 && (
-          <span>Modified {result.filesModified.length} file{result.filesModified.length !== 1 ? 's' : ''}</span>
-        )}
-        {result.metrics.durationMs > 0 && (
-          <span>{(result.metrics.durationMs / 1000).toFixed(1)}s</span>
-        )}
-      </div>
-
+      {/* Sprint 103 design pass: the old "Modified N files · Xs" summary row is
+          gone — it triple-duplicated FilesSummary (files), ActivityDetails
+          (duration), and the ActivityStatusLine (both). One fact, one place. */}
       <FilesSummary files={result.filesModified} />
       <ActivityDetails activities={activities} metrics={result.metrics} />
     </div>

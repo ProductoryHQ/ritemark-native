@@ -22,7 +22,7 @@ export interface ModelOption {
   description: string;
 }
 
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
   type: AgentProgressType;
@@ -81,6 +81,13 @@ export interface AgentMetrics {
   durationMs: number;
   costUsd: number | null;
   model: string | null;
+  /** Sprint 103 R7: ms of durationMs spent waiting on the user. */
+  waitedMs?: number;
+}
+
+/** Sprint 103 R7: headline duration = agent working time, not human wait time. */
+export function activeDurationMs(metrics: AgentMetrics): number {
+  return Math.max(0, metrics.durationMs - (metrics.waitedMs ?? 0));
 }
 
 // ── Chat types ──
@@ -370,7 +377,7 @@ export type ExtensionMessage =
   | { type: 'connectivity-status'; isOnline: boolean }
   // Sprint 94 (#81): a comment assigned to an agent, relayed from the editor.
   | { type: 'comment:submit'; agentId: string; prompt: string }
-  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]> }
+  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103 R6: per-runtime capability map. */ runtimeCapabilities?: Record<string, { planFirst: boolean; liveModeSwitch: boolean; structuredPlanSteps: boolean }> }
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
