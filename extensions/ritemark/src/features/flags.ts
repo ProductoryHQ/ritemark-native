@@ -22,6 +22,8 @@ export interface FeatureFlag {
  * All known flag IDs
  */
 export type FlagId =
+  // Sprint 106 (#74): persistent Home / first-task launcher
+  | 'home-launcher'
   | 'voice-dictation'
   | 'markdown-export'
   | 'save-as-markdown-from-preview'
@@ -49,6 +51,16 @@ export type FlagId =
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  // Sprint 106 (#74): persistent Home re-entry surface (Activity Bar view with
+  // New document / New AI task / recent work). Experimental = real runtime
+  // kill-switch during rollout; ON by default per HARD RULE #2.
+  'home-launcher': {
+    id: 'home-launcher',
+    label: 'Home Launcher',
+    description: 'Persistent Home view in the Activity Bar: create a Markdown document, start an AI task, or reopen recent work after the Welcome page is gone.',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   // Sprint 99 (R15): parallel agent chats. Default ON per HARD RULE #2. This is a
   // CODE-LEVEL KILL-SWITCH ONLY — Settings has no flag-toggle UI, so flipping it
   // requires an emergency follow-up release, not a user action. With the flag off

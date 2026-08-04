@@ -343,6 +343,20 @@ export function activate(context: vscode.ExtensionContext) {
   // discovery so seeded items appear immediately in the sidebar.
   seedStarterPackOnFirstRun(context.extensionPath);
 
+  // Sprint 106 (#74): Home / first-task launcher — persistent re-entry point.
+  // Flag-gated (home-launcher, experimental kill-switch); reuses existing
+  // commands only, no duplicate creation logic.
+  // Sprint 106 (#74): the Home view is contributed unconditionally (a
+  // when-gated sole view left the container hidden via hideIfEmpty before the
+  // context key could be set). The provider itself honors the kill-switch: with
+  // the flag off it renders a one-line disabled notice instead of the launcher.
+  {
+    const { HomeViewProvider } = require('./views/HomeViewProvider') as typeof import('./views/HomeViewProvider');
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(HomeViewProvider.viewType, new HomeViewProvider(isEnabled('home-launcher'))),
+    );
+  }
+
   // Register Agent Library View Provider
   agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath, daemon.store);
   context.subscriptions.push(
