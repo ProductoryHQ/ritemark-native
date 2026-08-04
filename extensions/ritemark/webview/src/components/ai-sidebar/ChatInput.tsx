@@ -1324,21 +1324,29 @@ export function ChatInput() {
                 ? 'Manual — approves each file change and command with you'
                 : 'Auto — makes changes without asking; you review the result'}
             >
-              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+              {/* div, not span — the SelectTrigger base applies [&>span]:line-clamp-1,
+                  whose -webkit-box/vertical layout stacks the icon above the label. */}
+              <div className="flex items-center gap-1 whitespace-nowrap">
                 <Icon name={composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'} size={12} />
                 {composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
-              </span>
+              </div>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ask">
                 <div className="flex flex-col">
-                  <span className="text-[13px]">Manual</span>
+                  <span className="flex items-center gap-1.5 text-[13px]">
+                    <Icon name="shield-check" size={14} />
+                    Manual
+                  </span>
                   <span className="text-[11px] text-[var(--r-ink-muted)]">Approves each file change and command with you.</span>
                 </div>
               </SelectItem>
               <SelectItem value="auto">
                 <div className="flex flex-col">
-                  <span className="text-[13px]">Auto</span>
+                  <span className="flex items-center gap-1.5 text-[13px]">
+                    <Icon name="lightning" size={14} />
+                    Auto
+                  </span>
                   <span className="text-[11px] text-[var(--r-ink-muted)]">Makes changes without asking. You review the result.</span>
                 </div>
               </SelectItem>

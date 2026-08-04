@@ -4,6 +4,7 @@
 
 import { ActivityCard } from './ActivityCard';
 import { activeDurationMs } from './types';
+import { formatSeconds } from './activityState';
 import type { AgentProgress, AgentMetrics } from './types';
 
 interface ActivityDetailsProps {
@@ -15,9 +16,10 @@ export function ActivityDetails({ activities, metrics }: ActivityDetailsProps) {
   if (!activities.length) return null;
 
   const stepCount = activities.length;
-  // Sprint 103 R7: report agent working time, not human wait time.
+  // Sprint 103 R7: report agent working time, not human wait time — in the
+  // same format the status line uses (one vocabulary for one fact).
   const activeMs = metrics ? activeDurationMs(metrics) : 0;
-  const duration = activeMs > 0 ? (activeMs / 1000).toFixed(1) + 's' : null;
+  const duration = activeMs > 0 ? formatSeconds(activeMs / 1000) : null;
 
   const summaryParts = [`${stepCount} steps`];
   if (duration) summaryParts.push(duration);
