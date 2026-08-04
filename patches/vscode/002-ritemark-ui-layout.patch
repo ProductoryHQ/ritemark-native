@@ -4,7 +4,7 @@ Sprint 53: Chrome activity bar refactor (28px action labels, 40px container).
 Sprint 54: Agent Library activity bar entry, auxiliary bar chrome polish.
 Sprint 55: Rebased onto VS Code 1.117.0 (CSS var migration, compact-mode constants).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-index 833787070f3..0e7f8b9689d 100644
+index 833787070f3..edda964f30d 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 +++ b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 @@ -323,6 +323,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
@@ -17,18 +17,22 @@ index 833787070f3..0e7f8b9689d 100644
  				}
  			});
  		}
-@@ -382,7 +385,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -382,7 +385,13 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  			const icon = themeIcon || resources.joinPath(extension.extensionLocation, descriptor.icon);
  			const id = `workbench.view.extension.${descriptor.id}`;
  			const title = descriptor.title || id;
 -			const viewContainer = this.registerCustomViewContainer(id, title, icon, order++, extension.identifier, location);
-+			const effectiveOrder = location === ViewContainerLocation.AuxiliaryBar && descriptor.id === 'ritemark-ai' ? 0 : order;
++			// Ritemark: pin ritemark-ai first in the auxiliary bar and ritemark-home
++			// FIRST in the primary Activity Bar (before the built-in Explorer at 0).
++			const effectiveOrder = location === ViewContainerLocation.AuxiliaryBar && descriptor.id === 'ritemark-ai' ? 0
++				: location === ViewContainerLocation.Sidebar && descriptor.id === 'ritemark-home' ? -1
++					: order;
 +			const viewContainer = this.registerCustomViewContainer(id, title, icon, effectiveOrder, extension.identifier, location);
 +			order++;
  
  			// Move those views that belongs to this container
  			if (existingViewContainers.length) {
-@@ -413,7 +418,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -413,7 +422,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  					ViewPaneContainer,
  					[id, { mergeViewWithContainerWhenSingleView: true }]
  				),
