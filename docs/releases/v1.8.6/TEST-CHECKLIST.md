@@ -75,5 +75,5 @@
 - [x] Autonomy switch Auto↔Manual keeps conversation memory *(dev)*
 - [x] Cancel at plan review: card cleared, chip stays on, status not stuck in review *(dev + unit)*
 - [ ] OpenCode selected: no Plan chip (needs BYOK-keyed profile — Jarmo)
-- [ ] Dark + light pass on packaged candidate (dev pass done; note: ritemark-dark theme itself is near-black — separate task filed)
+- [ ] Dark + light pass on packaged candidate (dev pass done with Ritemark Dark — the slate/indigo theme; earlier "black skin" observation was VS Code default Dark+ applied by a mislabeled setting in the automation profile, not a theme regression)
 - [ ] Old thread saved with mode "plan" opens as Auto + Plan chip on
