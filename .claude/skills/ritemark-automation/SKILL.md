@@ -3,7 +3,7 @@ name: ritemark-automation
 description: Drive the Ritemark dev instance from the terminal via Chrome DevTools Protocol — for end-to-end testing, webview-internals debugging, demo recordings, and release screenshots. Use whenever you need to launch Ritemark, interact with its UI (AI sidebar, integrated browser, Settings, command palette), capture screenshots programmatically, or debug INSIDE a webview / custom editor (evaluate JS in webview targets, trace postMessage bridges, diagnose vscode-resource serving). Built on agent-browser + raw CDP (scripts/cdp-eval.js), with Ritemark-specific knowledge (trust dialog, webview target topology, active-frame nesting, service-worker resource rules, workspace requirement for AI features).
 allowed-tools: Read, Bash, Glob, Grep
 metadata:
-  version: 1.1.0
+  version: 1.2.0
 ---
 
 # Ritemark Automation Skill
@@ -19,12 +19,27 @@ Companion to the upstream `launch` skill in `vscode/.claude/skills/launch/`. The
 
 If the task is *just* "launch Ritemark dev so I can poke at it manually," use the `rundev` skill instead — this skill is for driving the UI without a human in the loop.
 
+## Path convention — derive `$REPO_ROOT`, never hardcode it
+
+Every snippet below refers to the checkout via `$REPO_ROOT`. The repo has already moved once (`~/Projects/ritemark-native` → `~/Projects/ritemark-dev/ritemark-native`), so absolute paths in this file rot. Derive the root instead:
+
+```bash
+REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+```
+
+Why `--git-common-dir` and not `--show-toplevel`: run from a `.claude/worktrees/*` session, `--show-toplevel` returns the worktree root, whose `vscode/` directory is **empty**. The common dir always points at the main checkout's `.git`, and the main checkout is the only place the `vscode/` submodule, its `node_modules` (agent-browser, `ws`), and `./scripts/code.sh` actually exist.
+
+Shell state does not persist between Bash tool calls — re-run the derivation line at the top of every Bash invocation (the longer blocks below already include it).
+
 ## Prerequisites — verify once per session
 
 ```bash
+# 0. Resolve the repo root (see ## Path convention):
+REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+
 # 1. agent-browser binary present? (it lives inside vscode/node_modules, not globally)
-ls /Users/jarmotuisk/Projects/ritemark-native/vscode/node_modules/.bin/agent-browser
-# If missing: cd vscode && npm install (or run `./scripts/code.sh` once which auto-installs)
+ls "$REPO_ROOT/vscode/node_modules/.bin/agent-browser"
+# If missing: cd "$REPO_ROOT/vscode" && npm install (or run `./scripts/code.sh` once which auto-installs)
 
 # 2. arm64 Node available? (dev launch needs arm64, NOT the x86_64 v23.0.0 nvm default)
 ls /Users/jarmotuisk/.nvm/versions/node/v22.21.1/bin/node && \
@@ -39,6 +54,8 @@ lsof -t -i :9224 && echo "port in use" || echo "port free"
 There is exactly one correct way to launch Ritemark for automation. Memorize the shape:
 
 ```bash
+REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+
 # Pick a fresh user-data-dir for each automation run so prior consent dialogs,
 # auto-share state, and feature-flag toggles don't leak between runs.
 USERDATA="/tmp/ritemark-automation-userdata"
@@ -47,7 +64,7 @@ SCREENSHOT_DIR="/tmp/ritemark-screenshots/$(date +%Y-%m-%dT%H-%M-%S)"
 mkdir -p "$WORKSPACE" "$SCREENSHOT_DIR"
 [ -f "$WORKSPACE/README.md" ] || echo "# Automation Workspace" > "$WORKSPACE/README.md"
 
-cd /Users/jarmotuisk/Projects/ritemark-native/vscode
+cd "$REPO_ROOT/vscode"
 
 # Launch in background. The three knobs that matter:
 #   --remote-debugging-port=9224       — enables CDP (the whole point)
@@ -65,7 +82,7 @@ VSCODE_SKIP_PRELAUNCH=1 \
 
 # Connect with retry — first launch is slow.
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  if npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode \
+  if npx --no-install --prefix "$REPO_ROOT/vscode" \
        agent-browser connect 9224 2>/dev/null; then
     echo "Connected on try $i"; break
   fi
@@ -88,9 +105,9 @@ If `$WORKSPACE` is a path Ritemark hasn't seen before, you get:
 It's a modal — every other click will fail with `Element ... is blocked by another element (likely a modal or overlay)`. Dismiss it FIRST:
 
 ```bash
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser snapshot -i | grep -E "trust the authors"
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser snapshot -i | grep -E "trust the authors"
 # Find the "Yes, I trust the authors" ref, then:
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser click @e27   # ref will vary
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser click @e27   # ref will vary
 ```
 
 To avoid re-prompting on every run, reuse the same `$USERDATA` across runs after the first time — the trust decision is persisted there.
@@ -107,7 +124,7 @@ To avoid re-prompting on every run, reuse the same `$USERDATA` across runs after
 agent-browser **auto-switches to the most recently activated target** (the loaded webview). To take screenshots of the AI sidebar or interact with workbench UI again, switch back:
 
 ```bash
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser tab 0
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser tab 0
 ```
 
 This is the single most common foot-gun. Symptom: `screenshot --full` produces just the loaded HTML page, not Ritemark. Fix: `tab 0`.
@@ -128,14 +145,14 @@ j['ritemark.features.browser-agent-control']=true;
 fs.writeFileSync(p, JSON.stringify(j,null,2));
 "
 # Then reload window so the extension re-reads the flag:
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser press Meta+Shift+p
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser press Meta+Shift+p
 sleep 1
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser keyboard type "Developer: Reload Window"
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser keyboard type "Developer: Reload Window"
 sleep 1
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser press Enter
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser press Enter
 sleep 8                                              # reload takes a few seconds
 for i in 1 2 3 4 5; do
-  npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser connect 9224 2>/dev/null && break
+  npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser connect 9224 2>/dev/null && break
   sleep 2
 done
 ```
@@ -152,15 +169,15 @@ Ritemark's AI sidebar uses Monaco for its composer. The launch skill warns that 
 # 1. Focus chat input. The AI sidebar exposes this shortcut globally.
 # (If your prompt doesn't end up in the chat, the secondary side bar may not be open.
 #  Open it with Cmd+Opt+B or click the Ritemark AI tab.)
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser press Control+Meta+i
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser press Control+Meta+i
 sleep 1
 
 # 2. Type the prompt. keyboard type works:
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser keyboard type \
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser keyboard type \
   'Summarize what is on this page in one sentence.'
 
 # 3. Send.
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser press Enter
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser press Enter
 ```
 
 **Fallback for character-by-character typing** (only if `keyboard type` produces empty text — verify with a screenshot):
@@ -170,9 +187,9 @@ PROMPT='Hello world'
 for ((i=0; i<${#PROMPT}; i++)); do
   CHAR="${PROMPT:$i:1}"
   case "$CHAR" in
-    " ") npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser press Space > /dev/null ;;
-    '"') npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser press Shift+Quote > /dev/null ;;
-    *)   npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser press "$CHAR" > /dev/null ;;
+    " ") npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser press Space > /dev/null ;;
+    '"') npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser press Shift+Quote > /dev/null ;;
+    *)   npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser press "$CHAR" > /dev/null ;;
   esac
 done
 ```
@@ -181,23 +198,23 @@ done
 
 ```bash
 # 1. Click the Browser activity-bar tab (left strip). Discover its ref via snapshot.
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser snapshot -i | grep -E 'tab "Browser"'
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser snapshot -i | grep -E 'tab "Browser"'
 # Example output: - tab "Browser" [ref=e9]
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser click @e9
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser click @e9
 
 # 2. Click "New Browser Tab".
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser snapshot -i | grep -E 'New Browser Tab'
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser click @e12    # ref will vary
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser snapshot -i | grep -E 'New Browser Tab'
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser click @e12    # ref will vary
 
 # 3. URL bar — keyboard type works here.
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser snapshot -i | grep -E 'Enter a URL'
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser click @e22
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser keyboard type "file:///tmp/test.html"
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser press Enter
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser snapshot -i | grep -E 'Enter a URL'
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser click @e22
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser keyboard type "file:///tmp/test.html"
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser press Enter
 
 # 4. !!! Switch CDP back to the workbench tab — see gotcha #2 above.
 sleep 2
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser tab 0
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser tab 0
 ```
 
 ## Screenshots — paper trail for demos and release notes
@@ -205,11 +222,11 @@ npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agen
 ```bash
 # Save with timestamped name inside SCREENSHOT_DIR. Always use --full to capture
 # the whole workbench window, NOT just the active webview.
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser \
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser \
   screenshot --full "$SCREENSHOT_DIR/$(date +%H-%M-%S)-state.png"
 
 # If you need an element-specific screenshot:
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser \
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser \
   screenshot ".part.auxiliarybar" "$SCREENSHOT_DIR/sidebar.png"
 ```
 
@@ -273,10 +290,12 @@ This skill ships a helper (`scripts/cdp-eval.js` in the skill directory) that
 connects to a target's `webSocketDebuggerUrl` and runs `Runtime.evaluate`:
 
 ```bash
-export NODE_PATH=/Users/jarmotuisk/Projects/ritemark-native/vscode/node_modules   # ABSOLUTE — 'ws' lives there
+REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+CDP_EVAL="$REPO_ROOT/.claude/skills/ritemark-automation/scripts/cdp-eval.js"
+export NODE_PATH="$REPO_ROOT/vscode/node_modules"   # ABSOLUTE — 'ws' lives there
 WS=$(curl -s http://localhost:9224/json/list | node -e "...pick .webSocketDebuggerUrl...")
-node .claude/skills/ritemark-automation/scripts/cdp-eval.js "$WS" "document.title"
-node .claude/skills/ritemark-automation/scripts/cdp-eval.js --await "$WS" "fetch(url).then(r=>r.status)"
+node "$CDP_EVAL" "$WS" "document.title"
+node "$CDP_EVAL" --await "$WS" "fetch(url).then(r=>r.status)"
 ```
 
 **The #1 structural gotcha:** the `vscode-webview://...` target document is VS
@@ -332,7 +351,7 @@ const trace = window.__rmBridge = { loaded: true, events: [] };
 ```
 
 ```bash
-node scripts/cdp-eval.js "$WS" "(function(){const af=document.getElementById('active-frame');
+node "$CDP_EVAL" "$WS" "(function(){const af=document.getElementById('active-frame');
   return JSON.stringify(af.contentWindow.__rmBridge ? af.contentWindow.__rmBridge.events : 'no bridge');})()"
 ```
 
@@ -361,7 +380,8 @@ embed-partner source check) in minutes each.
 Leaving Code-OSS running consumes 1–4 GB of RAM and holds the CDP port. After every automation run:
 
 ```bash
-npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser close
+REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser close
 pids=$(lsof -t -i :9224)
 if [ -n "$pids" ]; then kill $pids; fi
 # Verify:
@@ -383,13 +403,14 @@ lsof -i :9224 && echo "still running" || echo "stopped"
 
 ## Calling convention
 
-Every `agent-browser` invocation from this skill uses `--prefix /Users/jarmotuisk/Projects/ritemark-native/vscode` so we pick the binary out of the vscode submodule's node_modules rather than depending on a global install. Keep the prefix to avoid "command not found" surprises when the repo is the only place the dep is declared.
+Every `agent-browser` invocation from this skill uses `--prefix "$REPO_ROOT/vscode"` (see ## Path convention) so we pick the binary out of the vscode submodule's node_modules rather than depending on a global install. Keep the prefix to avoid "command not found" surprises when the repo is the only place the dep is declared.
 
 A short shell function helps readability if you write a longer automation script:
 
 ```bash
+REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 ab() {
-  npx --no-install --prefix /Users/jarmotuisk/Projects/ritemark-native/vscode agent-browser "$@"
+  npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser "$@"
 }
 ab connect 9224
 ab snapshot -i | head -30

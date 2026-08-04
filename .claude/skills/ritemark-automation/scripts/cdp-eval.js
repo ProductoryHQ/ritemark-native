@@ -4,8 +4,10 @@
 // only drives the top-level workbench page.
 //
 // Usage:
-//   NODE_PATH=/Users/jarmotuisk/Projects/ritemark-native/vscode/node_modules \
+//   REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+//   NODE_PATH="$REPO_ROOT/vscode/node_modules" \
 //     node cdp-eval.js [--await] <webSocketDebuggerUrl> <expression>
+//   (REPO_ROOT = the MAIN checkout root — see SKILL.md ## Path convention)
 //
 //   --await  : awaitPromise (expression may return a Promise)
 //
