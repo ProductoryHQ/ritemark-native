@@ -1,0 +1,26 @@
+/**
+ * sidebarGate — Sprint 107 R4: the pure decision for which top-level view the
+ * AI sidebar renders. Extracted from AISidebar.tsx's render ternary so the
+ * contract "a ready Claude with no conversation goes STRAIGHT to chat — no
+ * 'Claude is ready' welcome card" is unit-testable.
+ */
+
+export type SidebarView = 'onboarding' | 'claude-setup' | 'codex-setup' | 'opencode-setup' | 'chat';
+
+export interface SidebarGateInput {
+  ready: boolean;
+  /** First run, no agent ready yet, wizard not dismissed. */
+  onboardingNeeded: boolean;
+  /** Claude selected and its binary/auth is not ready (broken, missing, needs sign-in). */
+  needsSetup: boolean;
+  showCodexSetup: boolean;
+  showOpenCodeSetup: boolean;
+}
+
+export function sidebarGate(i: SidebarGateInput): SidebarView {
+  if (i.ready && i.onboardingNeeded) return 'onboarding';
+  if (i.ready && i.needsSetup) return 'claude-setup';
+  if (i.ready && i.showCodexSetup) return 'codex-setup';
+  if (i.ready && i.showOpenCodeSetup) return 'opencode-setup';
+  return 'chat';
+}
