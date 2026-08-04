@@ -1,6 +1,6 @@
 # Release Plan — v1.8.6
 
-**Status:** In progress — Sprint 102 started 2026-08-03  
+**Status:** Sprints 102–106 merged and dev-validated (2026-08-04); Sprint 107 (Clean Start, shell-tier) in progress separately; awaiting Jarmo's release walk  
 **Target:** v1.8.6  
 **GitHub milestone:** [v1.8.6](https://github.com/ProductoryHQ/ritemark-native/milestone/7) — open, milestone #7  
 **Release type:** Undecided — extension-only remains subject to normal release preflight and a release-specific canary; Home may still require a full app release if exact Activity Bar placement needs a VS Code shell patch. Sprint 107 (Clean Start) adds a *confirmed* shell-tier VS Code patch (013, `patches/vscode/`) plus a `branding/product.json`-consumption change independent of the Home question, which further weighs v1.8.6 toward a full app release.  
@@ -364,20 +364,20 @@ Recommended Home MVP:
 - [x] EU counsel confirms Productory’s AI Act role and the Article 50(1)/(2)/(4) measures required for Ritemark.
 - [x] AI panel clearly identifies the AI interaction, runtime/provider/model, shared context, and reliability limitations by first interaction; the one-time notice has an explicit **Don’t show again** action and AI information remains reachable from the sidebar and Settings.
 - [x] Live Terms and Privacy Policy match current platforms, AI providers, authentication paths, context sharing, analytics, and user controls.
-- [ ] Claude and Codex Plan flows are proven end-to-end; unsupported Plan UI is absent for OpenCode.
-- [ ] No runtime can mutate files while a genuine Plan-first review is pending.
-- [ ] The toolbar badge matches the active document's unique anchored and standalone comment count, including multi-block comments.
-- [ ] “Send assigned comments to AI” excludes unassigned comments, previews per-agent counts, and creates at most one ordered task per assigned agent.
-- [ ] Bulk sending never deletes, resolves, or edits a source comment and remains scoped to the active document.
-- [ ] Each chat can hold several ordered prompts; composer, individual-comment, and bulk-comment submissions use the same queue.
-- [ ] No busy-runtime submission is silently dropped, duplicated, or sent to a different thread/runtime than the one captured at enqueue time.
-- [ ] Queue draining pauses for approvals, questions, and plan review; failed items remain visible with recovery actions.
-- [ ] Queued items can be reviewed, edited, reordered, and removed without affecting another chat's queue.
-- [ ] Home exposes one obvious “New document — Markdown (.md)” action and reuses the existing creation command.
+- [x] Claude and Codex Plan flows are proven end-to-end; unsupported Plan UI is absent for OpenCode.
+- [x] No runtime can mutate files while a genuine Plan-first review is pending.
+- [x] The toolbar badge matches the active document's unique anchored and standalone comment count, including multi-block comments.
+- [x] “Send assigned comments to AI” excludes unassigned comments, previews per-agent counts, and creates at most one ordered task per assigned agent.
+- [x] Bulk sending never deletes, resolves, or edits a source comment and remains scoped to the active document.
+- [x] Each chat can hold several ordered prompts; composer, individual-comment, and bulk-comment submissions use the same queue.
+- [x] No busy-runtime submission is silently dropped, duplicated, or sent to a different thread/runtime than the one captured at enqueue time.
+- [x] Queue draining pauses for approvals, questions, and plan review; failed items remain visible with recovery actions.
+- [x] Queued items can be reviewed, edited, reordered, and removed without affecting another chat's queue.
+- [x] Home exposes one obvious “New document — Markdown (.md)” action and reuses the existing creation command.
 - [x] Every included item is linked to a GitHub issue and release sprint.
 - [x] GitHub milestone `v1.8.6` exists and contains the included issues.
-- [ ] Sprint tracker lists every included PR as merged or explicitly deferred.
-- [ ] User-facing behavior has release notes and changelog coverage.
+- [x] Sprint tracker lists every included PR as merged or explicitly deferred.
+- [x] User-facing behavior has release notes and changelog coverage.
 - [ ] Required QA and release gates are completed for the chosen delivery tier.
 
 ## Sprint Map
@@ -521,6 +521,7 @@ The critical path is **Sprint 103 → Sprint 104 → Sprint 105**: truthful life
 | 2026-08-03 | Record the external publication boundary: `ritemark-web` can host the AI-information routes, but Productory Terms/Privacy live elsewhere and remain blocked on counsel + site-owner publication. | Cross-repo audit |
 | 2026-08-03 | Confirm OpenCode, offline, and link-handling manual QA; record that counsel approval was received. Productory policy publication and packaged-candidate verification remain external release gates. | Jarmo |
 | 2026-08-03 | Merge productory-2026 PR #20 and native PR #166, publish the approved EN/ET Terms and Privacy copy, verify all four production routes, close #163, and mark Sprint 102 complete. Packaged-candidate link verification remains a release-execution gate. | Sprint 102 closure |
+| 2026-08-04 | Sprints 104, 105, and 106 implemented, live-validated, and merged autonomously per Jarmo's standing instruction (PRs #169, #170, #171; issues #162, #164, #165, #74 closed). Combined release smoke on main: Home tab + Comments badge + Plan chip + Manual/Auto + AI disclosure coexist in one fresh-profile instance. Marketing screenshots for every sprint under docs/releases/v1.8.6/screenshots/. | Autonomous release execution |
 | 2026-08-04 | Sprint 103 merged to main (#168, squash ee46fb2); #132/#161 closed. Jarmo standing instruction: Claude performs first visual release testing in a realistic environment (ritemark-demo copy) producing marketing-grade screenshots, then proceeds autonomously through Sprints 104→105→106 (merge per sprint) until the whole release is ready for Jarmo's test. | Jarmo + Sprint 103 closure |
 | 2026-08-03 | Sprint 103 SDD artifacts drafted on a live plan-truth audit: Claude "Plan" proven to run on `bypassPermissions` with the plan card appearing only via accidental model recovery; Auto mode shown to plan and block silently; fix path is the SDK's native plan mode. Awaiting Jarmo's SDD approval + decisions D1–D5. | Sprint 103 preparation |
 | 2026-08-04 | Root-caused the "`.md` opens as code + trust-dialog noise" first-open bug via empirical reproduction on the installed v1.8.5 production app: `branding/product.json`'s `configurationDefaults` (Sprint 57) is dead on desktop VS Code, only the web workbench reads it. Drafted Sprint 107 (Clean Start) SDD artifacts — patch 013 to wire it into the desktop bootstrap, keep trust off (Sprint 57 intent) paired with new daemon consent hardening for schedule-triggered runs, a one-shot sticky-tab healer for already-affected users, and (Jarmo-authorized) removal of the "Claude is ready" welcome card. Source-level audit confirms the R1 mechanism against `EditorResolverService`/`WorkspaceTrustManagementService`/`DefaultConfiguration` before any code is written. Added a Candidate Scope row and flagged that this weighs v1.8.6 toward a full app release. Awaiting Jarmo's plan approval and decisions D1 (daemon consent model) and D2 (legacy-workspace grandfathering). | Sprint 107 preparation |
