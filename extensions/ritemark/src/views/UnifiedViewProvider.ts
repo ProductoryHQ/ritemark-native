@@ -430,6 +430,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
         }
 
+        case 'comment:task-status': {
+          // Sprint 105 (#165): the sidebar's queue/turn facts flow back to the
+          // editor webviews so margin markers can show honest task status.
+          const { RitemarkEditorProvider } = require('../ritemarkEditor') as typeof import('../ritemarkEditor');
+          RitemarkEditorProvider.broadcastCommentTaskStatus({
+            documentPath: String(message.documentPath ?? ''),
+            commentIds: Array.isArray(message.commentIds) ? message.commentIds : [],
+            status: message.status,
+          });
+          break;
+        }
+
         case 'agent-cancel': {
           // Cancels ONLY the named conversation; sibling conversations keep running.
           const session = this._findRuntimeSession(message.conversationId, message.agentId as AgentId);
@@ -648,9 +660,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * mentioned runtime and submits (→ the normal agent-execute path). If the view
    * isn't resolved yet, focus the container first so `_view` gets populated.
    */
-  public submitCommentPrompt(agentId: string, prompt: string) {
+  public submitCommentPrompt(
+    agentId: string,
+    prompt: string,
+    meta?: { commentIds?: string[]; documentPath?: string },
+  ) {
     const dispatch = () =>
-      this._view?.webview.postMessage({ type: 'comment:submit', agentId, prompt });
+      this._view?.webview.postMessage({
+        type: 'comment:submit', agentId, prompt,
+        commentIds: meta?.commentIds, documentPath: meta?.documentPath,
+      });
     if (this._view) {
       this.show();
       dispatch();

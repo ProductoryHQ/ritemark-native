@@ -19,6 +19,8 @@ interface DocumentHeaderProps {
   onAgentClick?: () => void
   hasFileChanged?: boolean
   onRefresh?: () => void
+  /** Sprint 105 (#164): document-level comments entry (button + overview). */
+  commentsSlot?: React.ReactNode
   features: Features
 }
 
@@ -33,6 +35,7 @@ export function DocumentHeader({
   onAgentClick,
   hasFileChanged = false,
   onRefresh,
+  commentsSlot,
   features
 }: DocumentHeaderProps) {
   return (
@@ -66,6 +69,8 @@ export function DocumentHeader({
           >
             <Icon name="info" size={14} tone={propertiesActive ? 'active' : 'muted'} />
           </Button>
+
+          {commentsSlot}
 
           {onAgentClick && (
             <Button

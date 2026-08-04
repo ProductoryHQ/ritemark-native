@@ -63,6 +63,15 @@ Ritemark auto-saves after 1 second. If changes aren't saving:
 > spawn errors), see [AI Agents](features/ai-agents.md). For OpenAI-key issues in Flows, see
 > [Set Up AI → OpenAI API Key for Flows](setup-ai.md#openai-api-key-for-flows).
 
+### "AI Offline" badge in the sidebar
+
+If Ritemark can't reach the AI provider, the sidebar shows an **AI Offline** badge.
+
+1. Check your internet connection.
+2. Click **Check again** on the badge to re-test connectivity on demand — you'll see a brief "Checking…" state. (Added in v1.8.5; before that you had to wait out the ~30-second poll or restart.)
+3. Once connectivity is back, **Check again** brings the sidebar online without a restart.
+4. If it stays offline with a working connection, verify your API key / sign-in on the affected agent (see [AI Agents](features/ai-agents.md)).
+
 ### New helpers do not appear in the Agent Library
 
 1. Check that the helper exists under `.claude/` or `.agents/`

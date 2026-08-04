@@ -287,6 +287,12 @@ interface AISidebarState {
    * Returns 'full' (cap 10) without mutating anything, else 'queued'.
    */
   enqueuePrompt: (item: Omit<QueueItem, 'id' | 'status' | 'createdAt'>) => 'queued' | 'full';
+  /**
+   * Sprint 105 (#165): comment-task status registry keyed by queue item id.
+   * Statuses reflect queue/turn FACTS only; every transition is pushed back to
+   * the editor webviews via comment:task-status.
+   */
+  commentTasks: Record<string, { commentIds: string[]; documentPath: string; conversationId: string; status: 'queued' | 'running' | 'done' | 'failed' }>;
   removeQueued: (conversationId: string, itemId: string) => void;
   editQueued: (conversationId: string, itemId: string, displayText: string, prompt: string) => void;
   moveQueued: (conversationId: string, itemId: string, direction: -1 | 1) => void;
@@ -672,6 +678,44 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
    */
   // ── Sprint 104 (#162): queue dispatch + comment target resolution ──────
 
+  /** Sprint 105 (#165): update the registry + push the fact editor-ward. */
+  function setCommentTaskStatus(
+    itemId: string,
+    task: { commentIds: string[]; documentPath: string; conversationId: string; status: 'queued' | 'running' | 'done' | 'failed' },
+  ): void {
+    set({ commentTasks: { ...get().commentTasks, [itemId]: task } });
+    vscode.postMessage({
+      type: 'comment:task-status',
+      documentPath: task.documentPath,
+      commentIds: task.commentIds,
+      status: task.status,
+    });
+  }
+
+  /** A user-removed queued comment task returns its markers to neutral. */
+  function clearCommentTask(itemId: string): void {
+    const task = get().commentTasks[itemId];
+    if (!task || task.status !== 'queued') return;
+    const next = { ...get().commentTasks };
+    delete next[itemId];
+    set({ commentTasks: next });
+    vscode.postMessage({
+      type: 'comment:task-status',
+      documentPath: task.documentPath,
+      commentIds: task.commentIds,
+      status: 'cleared',
+    });
+  }
+
+  /** Terminal transition for every RUNNING comment task of a conversation. */
+  function finalizeCommentTasks(conversationId: string, status: 'done' | 'failed'): void {
+    for (const [itemId, task] of Object.entries(get().commentTasks)) {
+      if (task.conversationId === conversationId && task.status === 'running') {
+        setCommentTaskStatus(itemId, { ...task, status });
+      }
+    }
+  }
+
   /**
    * Dispatch one captured queue item to ITS OWN conversation — which may be a
    * background thread. Mirrors the send functions' turn shapes but reads
@@ -754,6 +798,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         });
       }
       set({ promptQueues: removeQueueItem(get().promptQueues, item.conversationId, item.id) });
+      const task = get().commentTasks[item.id];
+      if (task) setCommentTaskStatus(item.id, { ...task, status: 'running' });
     } catch (err) {
       // Keep the item visible with its error — never silently discard (R3).
       set({
@@ -762,6 +808,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           err instanceof Error ? err.message : String(err),
         ),
       });
+      const task = get().commentTasks[item.id];
+      if (task) setCommentTaskStatus(item.id, { ...task, status: 'failed' });
     }
   }
 
@@ -861,6 +909,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     showHistoryPanel: false,
 
     promptQueues: {},
+    commentTasks: {},
     composerDrafts: {},
     pendingThreadOpen: null,
 
@@ -1078,6 +1127,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const result = enqueueItem(get().promptQueues, item);
       if (result.outcome === 'full') return 'full';
       set({ promptQueues: result.queues });
+      // Sprint 105 (#165): a comment-originated item enters the status registry
+      // as 'queued' and the editor's margin marker learns about it immediately.
+      if (item.source === 'comment' && item.commentIds?.length && item.documentPath) {
+        setCommentTaskStatus(item.id, {
+          commentIds: item.commentIds,
+          documentPath: item.documentPath,
+          conversationId: item.conversationId,
+          status: 'queued',
+        });
+      }
       // Idle target → the item should not sit in the queue a moment longer.
       get().maybeDrainQueue(item.conversationId);
       return 'queued';
@@ -1085,6 +1144,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     removeQueued: (conversationId, itemId) => {
       set({ promptQueues: removeQueueItem(get().promptQueues, conversationId, itemId) });
+      clearCommentTask(itemId);
     },
 
     editQueued: (conversationId, itemId, displayText, prompt) => {
@@ -2057,6 +2117,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             prompt: message.prompt,
             displayText: message.prompt,
             source: 'comment',
+            commentIds: Array.isArray(message.commentIds) ? message.commentIds : undefined,
+            documentPath: typeof message.documentPath === 'string' ? message.documentPath : undefined,
           });
           break;
         }
@@ -2451,6 +2513,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             patchConversation(targetId, (c) => computeContextState(c.agentConversation));
             // Auto-save the conversation that finished — not "the current" one.
             setTimeout(() => persistConversation(targetId), 100);
+            // Sprint 105 (#165): the running comment task of THIS conversation
+            // reaches its terminal state with the turn.
+            finalizeCommentTasks(targetId, message.error ? 'failed' : 'done');
             // Sprint 104 R3: the turn ended — drain this conversation's queue
             // (readiness-gated: pending cards / failed turns block inside).
             get().maybeDrainQueue(targetId);
@@ -2552,6 +2617,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           );
           if (landed) {
             setTimeout(() => persistConversation(targetId), 100);
+            finalizeCommentTasks(targetId, message.error ? 'failed' : (message.status === 'interrupted' ? 'failed' : 'done'));
             // Sprint 104 R3: drain on turn completion (readiness-gated —
             // a requiresPlanReview turn keeps the queue waiting).
             get().maybeDrainQueue(targetId);

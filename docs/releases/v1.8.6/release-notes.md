@@ -7,10 +7,12 @@ sprints:
   - sprint-102
   - sprint-103
   - sprint-104
+  - sprint-105
 tags:
   - sprint-102
   - sprint-103
   - sprint-104
+  - sprint-105
   - ai-transparency
   - privacy
   - human-review
@@ -19,8 +21,14 @@ tags:
 
 # Ritemark v1.8.6 — Clear Start, Trustworthy AI
 
-**Status:** Draft — Sprints 102–104 complete; remaining v1.8.6 sprints are not complete.  
+**Status:** Draft — Sprints 102–105 complete; remaining v1.8.6 sprints are not complete.  
 **Release issues:** [#163 — AI transparency and policy alignment](https://github.com/ProductoryHQ/ritemark-native/issues/163) · [#132 — truthful Plan controls](https://github.com/ProductoryHQ/ritemark-native/issues/132) · [#161 — truthful activity state](https://github.com/ProductoryHQ/ritemark-native/issues/161)
+
+## Comments become a work list (Sprint 105)
+
+- **Count what needs attention.** The editor toolbar shows a Comments badge with the document's true comment count; the overview splits it into assigned and unassigned, per agent.
+- **Send assigned comments as real tasks.** One click queues one ordered task per agent — Claude gets Claude's comments, Codex gets Codex's — with a confirmation first. Your comments stay in the document; nothing is auto-resolved.
+- **Watch each comment's task.** Margin markers show live status: queued, working, finished, or failed.
 
 ## Follow-ups that wait their turn (Sprint 104)
 
