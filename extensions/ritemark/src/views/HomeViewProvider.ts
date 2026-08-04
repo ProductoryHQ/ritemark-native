@@ -145,17 +145,17 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
   body { font-family: var(--vscode-font-family); font-size: 13px; color: var(--ink-strong); padding: 12px 10px 16px; }
 
   .cta {
-    display: flex; flex-direction: column; align-items: center; gap: 1px;
-    width: 100%; padding: 11px 14px 9px; border: 0; border-radius: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 10px 14px; border: 0; border-radius: 10px; cursor: pointer;
     background: var(--accent); color: #fff; font-family: inherit;
+    font-size: 13px; font-weight: 600; white-space: nowrap;
     box-shadow: 0 4px 6px -1px rgba(67,56,202,0.25);
     transition: background 120ms ease;
   }
   .cta:hover { background: var(--accent-deep); }
   .cta:active { transform: scale(0.98); }
   .cta:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--ring), 0 4px 6px -1px rgba(67,56,202,0.25); }
-  .cta-top { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
-  .cta-hint { font-size: 11px; opacity: 0.78; }
+  .cta svg { flex: 0 0 auto; }
 
   .section { margin-top: 18px; }
   .section-title {
@@ -180,8 +180,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
 <body>
   ${hasFolder ? `
   <button class="cta" data-command="ritemark.newDocument" autofocus>
-    <span class="cta-top">${svgIcon('file-plus', 16)}New document</span>
-    <span class="cta-hint">Markdown (.md)</span>
+    ${svgIcon('file-plus', 16)}New document
   </button>
 
   <div class="section">
