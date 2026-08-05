@@ -191,6 +191,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
         }
 
+        case 'open-source': // legacy name from inline-code path clicks (was silently dropped)
+        case 'chat:open-file': {
+          // Chat links/paths to workspace files open in Ritemark's own
+          // editors. Confined to the workspace folder — chat content is
+          // model-authored, so it never gets to open arbitrary disk paths.
+          const rawPath = typeof message.filePath === 'string' ? message.filePath.trim() : '';
+          if (rawPath) await this._openWorkspaceFile(rawPath);
+          break;
+        }
+
         case 'ai-configure-key':
           vscode.commands.executeCommand('ritemark.configureApiKey');
           break;
@@ -1169,6 +1179,39 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _sendChatFontSize() {
     const fontSize = vscode.workspace.getConfiguration('ritemark.chat').get<number>('fontSize', 13);
     this._view?.webview.postMessage({ type: 'settings:chatFontSize', fontSize });
+  }
+
+  /**
+   * Open a chat-referenced file in the workspace. Relative paths resolve
+   * against the workspace root; the resolved realpath must stay INSIDE the
+   * workspace (chat content is model-authored — no traversal, no symlink
+   * escape). `vscode.open` routes through editor associations, so .md lands
+   * in Ritemark's editor, spreadsheets in theirs, etc.
+   */
+  private async _openWorkspaceFile(rawPath: string): Promise<void> {
+    const workspaceRoot = this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+      void vscode.window.showWarningMessage('Open a folder to follow file links from chat.');
+      return;
+    }
+    const fs = await import('fs');
+    const path = await import('path');
+    const resolved = path.isAbsolute(rawPath) ? rawPath : path.join(workspaceRoot, rawPath);
+    let realTarget: string;
+    let realRoot: string;
+    try {
+      realTarget = fs.realpathSync(resolved);
+      realRoot = fs.realpathSync(workspaceRoot);
+    } catch {
+      void vscode.window.showWarningMessage(`File not found in this workspace: ${rawPath}`);
+      return;
+    }
+    if (realTarget !== realRoot && !realTarget.startsWith(realRoot + path.sep)) {
+      void vscode.window.showWarningMessage(`Chat links only open files inside the current folder: ${rawPath}`);
+      return;
+    }
+    if (!fs.statSync(realTarget).isFile()) return;
+    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(realTarget));
   }
 
   private _sendActiveFile() {
