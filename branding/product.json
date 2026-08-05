@@ -195,6 +195,7 @@
     "workbench.tree.indent": 12,
     "workbench.editor.enablePreview": false,
     "workbench.secondarySideBar.showLabels": false,
+    "workbench.panel.showLabels": false,
     "workbench.editorAssociations": {
       "*.md": "ritemark.editor",
       "*.markdown": "ritemark.editor",
