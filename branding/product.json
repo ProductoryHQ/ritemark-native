@@ -192,7 +192,7 @@
     "workbench.layoutControl.enabled": true,
     "workbench.layoutControl.type": "toggles",
     "security.workspace.trust.enabled": false,
-    "workbench.tree.indent": 20,
+    "workbench.tree.indent": 12,
     "workbench.editor.enablePreview": false,
     "workbench.editorAssociations": {
       "*.md": "ritemark.editor",
