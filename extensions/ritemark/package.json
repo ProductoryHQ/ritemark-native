@@ -675,6 +675,16 @@
     ],
     "keybindings": [
       {
+        "key": "ctrl+n",
+        "mac": "cmd+n",
+        "command": "ritemark.newDocument"
+      },
+      {
+        "key": "ctrl+n",
+        "mac": "cmd+n",
+        "command": "-workbench.action.files.newUntitledFile"
+      },
+      {
         "key": "cmd+b",
         "command": "-workbench.action.toggleSidebarVisibility",
         "when": "activeCustomEditorId == ritemark.editor"
