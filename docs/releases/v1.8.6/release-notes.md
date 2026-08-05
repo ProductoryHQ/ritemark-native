@@ -1,74 +1,61 @@
----
-date: '2026-08-04'
-title: 'Ritemark v1.8.6 — Clear Start, Trustworthy AI'
-author: Jarmo Tuisk
-status: Draft
-sprints:
-  - sprint-102
-  - sprint-103
-  - sprint-104
-  - sprint-105
-  - sprint-106
-tags:
-  - sprint-102
-  - sprint-103
-  - sprint-104
-  - sprint-105
-  - sprint-106
-  - ai-transparency
-  - privacy
-  - human-review
-  - plan-mode
----
+# Ritemark 1.8.6 — Clean Start
 
-# Ritemark v1.8.6 — Clear Start, Trustworthy AI
+Ritemark 1.8.6 is about trust — the app now does what it shows, from the first
+double-click to the model badge in the corner.
 
-**Status:** Draft — Sprints 102–106 complete (Sprint 107 Clean Start in progress separately).  
-**Release issues:** [#163 — AI transparency and policy alignment](https://github.com/ProductoryHQ/ritemark-native/issues/163) · [#132 — truthful Plan controls](https://github.com/ProductoryHQ/ritemark-native/issues/132) · [#161 — truthful activity state](https://github.com/ProductoryHQ/ritemark-native/issues/161)
+## Highlights
 
-## A clear place to start (Sprint 106)
+**Clean first open.** Double-click a markdown file on a brand-new install and
+it opens straight in the Ritemark editor. No "do you trust the authors?"
+dialog, no plain-text code view, no Restricted Mode banner. Profiles bitten by
+the old bug self-heal on first launch.
 
-- **Home lives in the left rail.** After the one-time Welcome is gone, Home stays: create a **Markdown document** with one obvious click, start a **New AI task**, open a document or folder, insert a table — or jump back into your recently edited documents.
+**Home, first.** A persistent Home launcher is now the first thing in the
+sidebar — New document, quick actions, and your recent documents (or recent
+folders when nothing is open). One click back into your work.
 
-## Comments become a work list (Sprint 105)
+**Truthful agent plans.** "Plan only" mode is enforced by the runtime — the
+agent physically cannot edit files while planning, plans always appear for
+review, and approval hands over to exactly the autonomy you chose (Manual or
+Auto). If the model chooses to plan on its own, that is labeled too.
 
-- **Count what needs attention.** The editor toolbar shows a Comments badge with the document's true comment count; the overview splits it into assigned and unassigned, per agent.
-- **Send assigned comments as real tasks.** One click queues one ordered task per agent — Claude gets Claude's comments, Codex gets Codex's — with a confirmation first. Your comments stay in the document; nothing is auto-resolved.
-- **Watch each comment's task.** Margin markers show live status: queued, working, finished, or failed.
+**The model you pick is the model that runs.** Model selection is pinned on
+every path — chat, queued prompts, comment tasks, flows, scheduled agents. If
+the runtime ever resolves something different, the conversation says so
+out loud.
 
-## Follow-ups that wait their turn (Sprint 104)
+**Scheduled agents ask first.** A folder that defines scheduled AI agents gets
+one clear question before anything is armed — and the decision is reversible
+any time from the Agent Library. Folders already using scheduling keep working.
 
-- **Queue several prompts per chat.** While an agent works, keep typing — each Enter adds to a visible **Queued · n/10** list you can edit, reorder, or remove before it runs. Nothing is silently dropped, and the composer never locks.
-- **Comments queue too.** Sending an assigned comment to a busy agent now waits its turn in that agent's own thread instead of disappearing.
-- **The queue respects your checkpoints.** A plan waiting for review, a question, or an approval pauses draining; a failed turn holds the queue until you press Resume.
+**Comments as a command center.** The toolbar shows the document's true
+comment count; assigned comments (@claude / @codex / @opencode — anywhere in
+the comment, not just the start) dispatch as ordered per-agent tasks through
+the prompt queue, with live status dots in the margin.
 
-## Plans you can actually review (Sprint 103)
+**A queue you can see.** Up to 10 follow-up prompts per chat, visible and
+editable, draining only when the agent is genuinely free.
 
-- **Plan mode is now enforced, not promised.** Turn on the **Plan** chip and the agent plans in a technically read-only phase — Claude runs in the SDK's native plan mode, Codex plans in a read-only sandbox. Nothing in your workspace changes until you approve the plan.
-- **The plan always shows up.** The review card appears reliably on the first attempt, shows the plan as rendered markdown with a verified *"No files changed yet."* line, and says who asked for the plan — including *"Claude chose to plan first"* when the agent decided on its own.
-- **Approve & continue, or keep planning.** Approval continues execution in the same conversation under your autonomy choice; **Keep planning** sends your feedback back for a revised plan without anything running.
-- **Simpler, honest controls.** The old `Auto / Ask / Plan` strip is now an autonomy select (**Manual** / **Auto**) plus the Plan chip; switching autonomy mid-thread keeps the agent's memory of your conversation. OpenCode shows no Plan control because it cannot enforce one — the UI no longer pretends otherwise.
-- **A status line that tells the truth.** One line under the conversation shows what is actually happening — working, waiting for you (plan review / question / approval), done, failed, or stopped. "Done" never appears while something still needs you, the headline time is agent working time, and "Modified N files" counts only your workspace files.
+**Reliable editing around agents.** When an agent updates a file on disk, the
+editor shows the fresh content within seconds — and your own typing never
+triggers false "file changed" alarms. Real conflicts (someone else wrote while
+you have unsaved edits) still get a review banner.
 
-## AI transparency
+**A calmer, more writerly shell.** One word — Folder — everywhere (no more
+Workspace/Project confusion); a File menu that speaks Ritemark (New Document
+⌘N, New Table); no Selection menu, no preview-tab surprises, chevron-free
+folder tree with the selected file in indigo; horizontal rules with real
+breathing room; Sofia Sans in every corner.
 
-- **Know when you are interacting with AI.** A compact notice appears before the first AI sidebar interaction without blocking the composer. Its explicit **Don’t show again** action records the one-time acknowledgement.
-- **See the current AI identity.** The disclosure names the selected runtime, provider/service, and model using the same state as the model picker.
-- **Understand what may be shared.** The persistent **AI information** view—available from both the composer and Ritemark Settings—explains prompts, active files, selections, attachments, shared browser context, conversation handoffs, and tool results.
-- **Review before relying on output.** Ritemark now states directly that approval controls do not verify correctness and that important facts, sources, calculations, commands, and changes need human review.
-- **Separate AI processing from app analytics.** The information view explains that AI requests go directly through the selected runtime/provider, while anonymous Ritemark product analytics uses PostHog when enabled.
+## Fixes
 
-## Context accuracy fixes
+- Finder no longer shows "Ritemark.app (1.117.0)" — the bundle carries the real Ritemark version
+- Chat links to workspace files (including `README.md:12` style) open in Ritemark
+- The AI info banner shows until dismissed, then never again — verified across restarts
+- Comment task prompts keep cross-agent references intact
 
-- Removing the active-file chip now excludes that item for Codex and OpenCode turns as well as Claude Code turns.
-- Switching runtimes no longer lets a stale model identifier from the previous runtime leak into the AI information view.
-- Browser context is shown only for Claude Code and Codex, matching the host's actual injection behavior.
-- OpenCode attachment payloads now reach the ACP runtime instead of stopping at the composer.
+## For the record
 
-## Public information
-
-The paired Ritemark website work is live with English and Estonian AI-information pages and corrected support claims. The counsel-approved Productory Terms and Privacy corrections are also published in English and Estonian.
-
-## Still to come in v1.8.6
-
-This file covers Sprint 102 only. Sprint 103–106 release notes will be added as those approved sprints are implemented.
+Sprint 102 (AI transparency), 103 (truthful plans), 104 (prompt queue),
+105 (comments command center), 106 (Home launcher), 107 (Clean Start), plus
+the 2026-08-05 live test-pass fixes. Full details: docs/CHANGELOG.md.
