@@ -58,6 +58,11 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path));
           }
           return;
+        case 'open-recent-folder':
+          if (typeof message.path === 'string') {
+            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(message.path), { forceNewWindow: false });
+          }
+          return;
         case 'refresh':
           await this.render();
           return;
@@ -101,6 +106,32 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /**
+   * No-folder state: the most recently opened folders (the same source the
+   * Welcome page shows) — a returning user's highest-value click is jumping
+   * back into their folder. `_workbench.getRecentlyOpened` is internal, but
+   * Ritemark IS the workbench; a failure just renders an empty section.
+   */
+  private async _recentFolders(): Promise<Array<{ label: string; detail: string; fsPath: string }>> {
+    try {
+      const recents = await vscode.commands.executeCommand<{
+        workspaces?: Array<{ folderUri?: vscode.Uri }>;
+      }>('_workbench.getRecentlyOpened');
+      const home = process.env.HOME ?? '';
+      return (recents?.workspaces ?? [])
+        .map((w) => w.folderUri)
+        .filter((u): u is vscode.Uri => !!u && u.scheme === 'file')
+        .slice(0, 5)
+        .map((u) => ({
+          label: path.basename(u.fsPath),
+          detail: home && u.fsPath.startsWith(home) ? `~${u.fsPath.slice(home.length)}` : u.fsPath,
+          fsPath: u.fsPath,
+        }));
+    } catch {
+      return [];
+    }
+  }
+
   async render(): Promise<void> {
     if (!this._view) return;
     if (!this._enabled) {
@@ -110,17 +141,30 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     }
     const hasFolder = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
     const recents = hasFolder ? await this._recentDocuments() : [];
-    this._view.webview.html = this._html(hasFolder, recents);
+    const recentFolders = hasFolder ? [] : await this._recentFolders();
+    this._view.webview.html = this._html(hasFolder, recents, recentFolders);
   }
 
-  private _html(hasFolder: boolean, recents: Array<{ label: string; detail: string; fsPath: string }>): string {
+  private _html(
+    hasFolder: boolean,
+    recents: Array<{ label: string; detail: string; fsPath: string }>,
+    recentFolders: Array<{ label: string; detail: string; fsPath: string }> = [],
+  ): string {
     const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const recentRows = recents.map((r) => `
       <button class="row" data-open="${esc(r.fsPath)}" title="${esc(r.detail)}">
         <span class="row-ico">${svgIcon('file-text', 16)}</span>
         <span class="row-main"><span class="row-label">${esc(r.label)}</span><span class="row-detail">${esc(r.detail)}</span></span>
       </button>`).join('');
-    const quickRows = QUICK_ACTIONS.map((a) => `
+    const folderRows = recentFolders.map((r) => `
+      <button class="row" data-open-folder="${esc(r.fsPath)}" title="${esc(r.detail)}">
+        <span class="row-ico">${svgIcon('folder', 16)}</span>
+        <span class="row-main"><span class="row-label">${esc(r.label)}</span><span class="row-detail">${esc(r.detail)}</span></span>
+      </button>`).join('');
+    // New AI task needs a workspace folder (agent runs refuse without one) —
+    // every other action works folderless, so the launcher stays the same.
+    const actions = hasFolder ? QUICK_ACTIONS : QUICK_ACTIONS.filter((a) => a.id !== 'new-ai-task');
+    const quickRows = actions.map((a) => `
       <button class="row" data-command="${esc(a.command)}">
         <span class="row-ico">${svgIcon(a.icon, 16)}</span>
         <span class="row-main"><span class="row-label">${esc(a.label)}</span></span>
@@ -193,12 +237,19 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     ${recents.length > 0 ? recentRows : '<p class="empty">Documents you edit will show up here.</p>'}
   </div>
   ` : `
-  <p class="empty">Open a folder to start writing — your documents live in a folder Ritemark can see.</p>
+  <button class="cta" data-command="ritemark.newDocument" autofocus>
+    ${svgIcon('file-plus', 16)}New document
+  </button>
+
   <div class="section">
-    <button class="row" data-command="workbench.action.files.openFolder">
-      <span class="row-ico">${svgIcon('folder', 16)}</span>
-      <span class="row-main"><span class="row-label">Open folder…</span></span>
-    </button>
+    <div class="section-title">Quick actions</div>
+    ${quickRows}
+  </div>
+
+  <div class="section">
+    <div class="section-title">Recent folders</div>
+    ${recentFolders.length > 0 ? folderRows : '<p class="empty">Folders you open will show up here.</p>'}
+    <p class="empty" style="margin-top:6px">Open a folder to unlock AI tasks — your documents live in a folder Ritemark can see.</p>
   </div>
   `}
 <script>
@@ -208,6 +259,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     if (!btn) return;
     if (btn.dataset.command) vscodeApi.postMessage({ type: 'run-command', command: btn.dataset.command });
     else if (btn.dataset.open) vscodeApi.postMessage({ type: 'open-recent', path: btn.dataset.open });
+    else if (btn.dataset.openFolder) vscodeApi.postMessage({ type: 'open-recent-folder', path: btn.dataset.openFolder });
   });
 </script>
 </body></html>`;
