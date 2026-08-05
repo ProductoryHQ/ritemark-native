@@ -7,6 +7,7 @@ import { discoverAgents, discoverCommands, validateAgentFrontmatter } from '../a
 import type { DiscoveredAgent, DiscoveredCommand, ItemScope } from '../agent/discovery';
 import { COLORS, ICONS } from '../agent/iconPack';
 import type { DaemonResultStore } from '../daemon/DaemonResultStore';
+import type { DaemonController } from '../daemon/index';
 
 type HelperType = 'skill' | 'agent';
 
@@ -121,7 +122,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _workspacePath: string | undefined,
-    private readonly _resultStore?: DaemonResultStore
+    private readonly _resultStore?: DaemonResultStore,
+    private readonly _daemon?: DaemonController
   ) {}
 
   public resolveWebviewView(
@@ -169,6 +171,13 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         case 'launchChat':
           void this._launchChat(message.agentId, message.filePath);
           break;
+        case 'setDaemonConsent': {
+          const next = message.state === 'granted' ? 'granted' : 'declined';
+          if (this._daemon) {
+            void this._daemon.setConsent(next).then(() => this.refresh());
+          }
+          return;
+        }
         case 'approveScheduledRun':
           void vscode.commands.executeCommand(
             'ritemark.daemon.approveScheduledAction',
@@ -263,6 +272,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       commands,
       flows,
       scheduledRuns,
+      // Sprint 107 R2: per-workspace consent state for schedule-triggered runs.
+      daemonConsent: this._daemon && this._daemon.scheduler ? this._daemon.getConsent() : null,
       workspacePath: this._workspacePath || '',
       userHomePath: os.homedir(),
     });
@@ -688,6 +699,19 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }
 
     /* === Scheduled runs section === */
+    .consent-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; margin: 2px 0 4px; border-radius: 6px;
+      background: var(--r-surface-soft, rgba(148,163,184,0.10));
+    }
+    .consent-label { font-size: 11px; color: var(--r-ink-muted); flex: 1; min-width: 0; }
+    .consent-btn {
+      flex-shrink: 0; border: 0; border-radius: 5px; padding: 4px 10px;
+      font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+      background: var(--r-accent, #4338CA); color: #fff;
+    }
+    .consent-btn:hover { background: var(--r-accent-deep, #3730A3); }
+
     .run-time {
       font-size: 10px; font-weight: 400;
       color: var(--r-ink-faint); margin-left: auto;
@@ -929,6 +953,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     let commands = [];
     let flows = [];
     let scheduledRuns = [];
+    let daemonConsent = null; // Sprint 107 R2: 'granted' | 'declined' | 'undecided' | null
     let workspacePath = '';
     let userHomePath = '';
     let selectedPath = null;
@@ -1017,6 +1042,13 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         }
       });
     }
+
+    // Sprint 107 R2: consent toggle clicks (delegated — rows re-render often).
+    document.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.consent-btn') : null;
+      if (!btn) return;
+      vscode.postMessage({ type: 'setDaemonConsent', state: btn.getAttribute('data-consent') });
+    });
 
     // === Modal handlers ===
     function openModal(type) {
@@ -1148,6 +1180,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         commands = msg.commands || [];
         flows = msg.flows || [];
         scheduledRuns = msg.scheduledRuns || [];
+        daemonConsent = msg.daemonConsent ?? null;
         workspacePath = msg.workspacePath || '';
         userHomePath = msg.userHomePath || '';
         render();
@@ -1356,6 +1389,21 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       html += '<div class="section-header-meta"><span class="section-count">' + items.length + '</span></div>';
       html += '</div>';
       if (collapsed) return html;
+      // Sprint 107 R2: consent status + toggle — schedule-triggered runs fire
+      // without a user gesture, so the workspace opt-in is always visible and
+      // reversible here.
+      if (daemonConsent) {
+        const on = daemonConsent === 'granted';
+        html += '<div class="consent-row">';
+        html += '<span class="consent-label">' + (on
+          ? 'Scheduled agents may run automatically in this folder.'
+          : (daemonConsent === 'declined'
+            ? 'Scheduled agents are paused in this folder.'
+            : 'Scheduled agents need your permission to run in this folder.')) + '</span>';
+        html += '<button class="consent-btn" data-consent="' + (on ? 'declined' : 'granted') + '">'
+          + (on ? 'Pause' : 'Allow') + '</button>';
+        html += '</div>';
+      }
       for (const run of items) {
         if (run.supersededBy) continue;
         const meta = scheduledOutcomeMeta(run.outcome);

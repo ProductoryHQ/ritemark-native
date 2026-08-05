@@ -15,7 +15,10 @@ export interface RegisteredEntry {
   config: ScheduleConfig;
   filePath: string;
   nextFire: Date;
-  timerId: ReturnType<typeof setTimeout>;
+  /** Undefined when the entry is parsed but NOT armed (no workspace consent). */
+  timerId: ReturnType<typeof setTimeout> | undefined;
+  /** Sprint 107 R2: false = visible in the Agent Library but never fires. */
+  armed: boolean;
 }
 
 const TICK_INTERVAL_MS = 30_000; // re-evaluate every 30 s
@@ -36,7 +39,13 @@ export class Scheduler {
     private readonly store: DaemonResultStore,
     private readonly status: DaemonStatusEvents,
     private readonly workspacePath: string,
-    private readonly onRunsChanged?: () => void
+    private readonly onRunsChanged?: () => void,
+    /**
+     * Sprint 107 R2 (D1 Option A): schedule-triggered runs fire without a user
+     * gesture, so arming is gated on per-workspace consent. Entries still
+     * parse and register un-armed so the Agent Library can show them.
+     */
+    private readonly consentGranted: () => boolean = () => true
   ) {}
 
   start(): void {
@@ -50,7 +59,7 @@ export class Scheduler {
       clearInterval(this.tickTimer);
     }
     for (const entry of this.entries.values()) {
-      clearTimeout(entry.timerId);
+      if (entry.timerId !== undefined) clearTimeout(entry.timerId);
     }
     this.entries.clear();
     this.watcher?.dispose();
@@ -75,16 +84,38 @@ export class Scheduler {
     if (!nextFire) {
       return;
     }
+    // R2: without consent the entry is registered for VISIBILITY only — no
+    // timer is armed, so nothing can fire. grantConsentAndArm() re-arms.
+    const armed = this.consentGranted();
     const delay = Math.max(0, nextFire.getTime() - Date.now());
-    const timerId = setTimeout(() => this.fire(filePath), delay);
-    this.entries.set(filePath, { task, config: task.schedule, filePath, nextFire, timerId });
+    const timerId = armed ? setTimeout(() => this.fire(filePath), delay) : undefined;
+    this.entries.set(filePath, { task, config: task.schedule, filePath, nextFire, timerId, armed });
     this.status.setScheduledCount(this.entries.size);
+  }
+
+  /** Sprint 107 R2: (re-)arm every parsed entry after consent is granted. */
+  rearmAll(): void {
+    for (const filePath of [...this.entries.keys()]) {
+      this.reloadFile(filePath);
+    }
+  }
+
+  /** Disarm every entry (consent revoked) — entries stay visible. */
+  disarmAll(): void {
+    for (const filePath of [...this.entries.keys()]) {
+      this.reloadFile(filePath);
+    }
+  }
+
+  /** How many schedule-eligible entries exist (armed or not). */
+  get entryCount(): number {
+    return this.entries.size;
   }
 
   unregister(filePath: string): void {
     const existing = this.entries.get(filePath);
     if (existing) {
-      clearTimeout(existing.timerId);
+      if (existing.timerId !== undefined) clearTimeout(existing.timerId);
       this.entries.delete(filePath);
       this.status.setScheduledCount(this.entries.size);
     }
@@ -99,6 +130,10 @@ export class Scheduler {
     // and tear down so no scheduled run executes while the feature is disabled.
     if (!isEnabled('scheduled-tasks-daemon')) {
       this.stop();
+      return;
+    }
+    // R2 defense in depth: consent revoked after arming — never fire.
+    if (!this.consentGranted()) {
       return;
     }
     // Skip if this task is already running — prevents a second headless runtime
@@ -233,10 +268,11 @@ export class Scheduler {
   // ---------------------------------------------------------------------------
 
   private tick(): void {
-    // Re-evaluate missed fires (e.g. system sleep)
+    // Re-evaluate missed fires (e.g. system sleep). Un-armed entries (no
+    // consent) never fire from the tick either.
     for (const [filePath, entry] of this.entries) {
-      if (Date.now() >= entry.nextFire.getTime()) {
-        clearTimeout(entry.timerId);
+      if (entry.armed && Date.now() >= entry.nextFire.getTime()) {
+        if (entry.timerId !== undefined) clearTimeout(entry.timerId);
         this.fire(filePath);
       }
     }

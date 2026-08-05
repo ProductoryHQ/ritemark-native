@@ -358,7 +358,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // Register Agent Library View Provider
-  agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath, daemon.store);
+  agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath, daemon.store, daemon);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(AgentLibraryViewProvider.viewType, agentLibraryViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
