@@ -678,3 +678,36 @@ index c1de3497f5d..a425599808a 100644
  	}
  
  	private readonly profilesDisposable = this._register(new MutableDisposable<DisposableStore>());
+diff --git a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
+index bb8dd6560d4..2b6123c13bc 100644
+--- a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
++++ b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
+@@ -18,6 +18,7 @@ import { IOutlinePane } from './outline.js';
+ // --- actions
+ 
+ import './outlineActions.js';
++import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js'; // Ritemark
+ 
+ // --- view
+ 
+@@ -34,6 +35,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
+ 	collapsed: true,
+ 	order: 2,
+ 	weight: 30,
++	when: ContextKeyExpr.false(), // Ritemark: no Outline section in the Folder view
+ 	focusCommand: { id: 'outline.focus' }
+ }], VIEW_CONTAINER);
+ 
+diff --git a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
+index acf3e73a07c..895e0953a02 100644
+--- a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
++++ b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
+@@ -37,7 +37,7 @@ export class TimelinePaneDescriptor implements IViewDescriptor {
+ 	readonly canToggleVisibility = true;
+ 	readonly hideByDefault = false;
+ 	readonly canMoveView = true;
+-	readonly when = TimelineHasProviderContext;
++	readonly when = ContextKeyExpr.false(); // Ritemark: no Timeline section in the Folder view
+ 
+ 	focusCommand = { id: 'timeline.focus' };
+ }

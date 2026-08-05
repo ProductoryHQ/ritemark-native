@@ -36,6 +36,9 @@ export function ActivityStatusLine() {
   const liveActivity = last?.isRunning
     ? last.activities[last.activities.length - 1]?.message?.slice(0, 80)
     : undefined;
+  const runningSubagents = last?.isRunning && 'subagents' in last
+    ? ((last as { subagents?: Array<{ status: string }> }).subagents?.filter((x) => x.status === 'running').length ?? 0)
+    : 0;
 
   const presentation = presentActivityState(state, { activeSeconds, waitedSeconds, errorFirstLine, liveActivity });
   if (!presentation) return null;
@@ -56,6 +59,12 @@ export function ActivityStatusLine() {
         className={presentation.spin ? 'animate-spin' : undefined}
       />
       <span className="min-w-0 truncate">{presentation.label}</span>
+      {runningSubagents > 0 && (
+        <span className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--r-accent-soft)] px-1.5 py-0.5 text-[10px] text-[var(--r-accent-deep)]">
+          <Icon name="robot" size={12} />
+          {runningSubagents}
+        </span>
+      )}
     </div>
   );
 }

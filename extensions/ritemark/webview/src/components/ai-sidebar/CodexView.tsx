@@ -11,7 +11,6 @@ import { useAISidebarStore, useActiveConversation } from './store';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { UserPromptBubble, AIResponseBubble } from './ChatBubbles';
-import { RunningIndicator } from './RunningIndicator';
 import { AgentQuestion } from './AgentQuestion';
 import { PlanReviewCard } from './PlanReviewCard';
 import { RenderedMarkdown } from './RenderedMarkdown';
@@ -237,10 +236,8 @@ export function CodexTurn({
         <AIResponseBubble content={turn.streamingText} />
       )}
 
-      {/* Running indicator (only if no activities or approval to show) */}
-      {turn.isRunning && !hasActivities && !turn.approval && !turn.streamingText && (
-        <RunningIndicator activities={turn.activities} />
-      )}
+      {/* The conversation-level ActivityStatusLine covers the starting state —
+          no per-turn spinner box (one status point, Sprint 103 R7). */}
 
       {/* Phase F: slow-RPC progress notice (e.g. cold thread/start). Shown
           while still running and no other progress signal has arrived. */}

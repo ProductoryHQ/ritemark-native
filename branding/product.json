@@ -192,6 +192,8 @@
     "workbench.layoutControl.enabled": true,
     "workbench.layoutControl.type": "toggles",
     "security.workspace.trust.enabled": false,
+    "workbench.tree.indent": 20,
+    "workbench.editor.enablePreview": false,
     "workbench.editorAssociations": {
       "*.md": "ritemark.editor",
       "*.markdown": "ritemark.editor",

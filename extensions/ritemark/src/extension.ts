@@ -353,7 +353,7 @@ export function activate(context: vscode.ExtensionContext) {
   {
     const { HomeViewProvider } = require('./views/HomeViewProvider') as typeof import('./views/HomeViewProvider');
     context.subscriptions.push(
-      vscode.window.registerWebviewViewProvider(HomeViewProvider.viewType, new HomeViewProvider(isEnabled('home-launcher'))),
+      vscode.window.registerWebviewViewProvider(HomeViewProvider.viewType, new HomeViewProvider(context.extensionUri, isEnabled('home-launcher'))),
     );
   }
 
