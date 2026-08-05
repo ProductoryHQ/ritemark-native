@@ -268,6 +268,8 @@ export type ImageAttachment = FileAttachment;
 export interface AgentExecutionOptions {
   prompt: string;
   workspacePath: string;
+  /** Model drift fix (2026-08-05): one-shot runs pin a model explicitly. */
+  model?: string;
   attachments?: FileAttachment[];
   allowedTools?: string[];
   settingSources?: AgentSettingSource[];
