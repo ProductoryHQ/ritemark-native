@@ -9,6 +9,7 @@ import { useMemo, useCallback } from 'react';
 import { marked } from 'marked';
 import { cn } from '../../lib/utils';
 import { vscode } from '../../lib/vscode';
+import { classifyChatHref, stripLineSuffix } from './chatLinks';
 
 // Configure marked for safety + good defaults
 marked.setOptions({
@@ -33,7 +34,22 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    // Only handle clicks on <code> elements that are NOT inside <pre> (not code blocks)
+
+    // Markdown links: workspace file links open in Ritemark's own editors,
+    // web links go through the host's openExternal (single, predictable path).
+    const anchor = target.closest('a');
+    if (anchor) {
+      const link = classifyChatHref(anchor.getAttribute('href'));
+      e.preventDefault();
+      if (link.kind === 'external') {
+        vscode.postMessage({ type: 'openExternal', url: link.url });
+      } else if (link.kind === 'file') {
+        vscode.postMessage({ type: 'chat:open-file', filePath: link.path });
+      }
+      return;
+    }
+
+    // Inline-code file paths ("src/foo.ts:42") outside code blocks.
     if (target.tagName !== 'CODE' || target.closest('pre')) return;
 
     const text = target.textContent?.trim();
@@ -43,9 +59,7 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
     // Match patterns like: src/foo.ts, ./bar.js, /absolute/path, file.ts:42
     if (text.includes('/') || /^\w+\.\w+/.test(text)) {
       e.preventDefault();
-      // Strip trailing line number (file.ts:42 → file.ts)
-      const filePath = text.replace(/:\d+$/, '');
-      vscode.postMessage({ type: 'open-source', filePath });
+      vscode.postMessage({ type: 'chat:open-file', filePath: stripLineSuffix(text) });
     }
   }, []);
 

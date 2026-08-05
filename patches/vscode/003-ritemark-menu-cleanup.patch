@@ -464,3 +464,26 @@ index 16802452df2..be2ca64f668 100644
  		const relevantExtensions = [this._completionsExtensionId, this._chatExtensionId].filter((id): id is string => !!id);
  
  		this.isRunningUnificationExperiment = isRunningUnificationExperiment.bindTo(this._contextKeyService);
+diff --git a/extensions/git/package.json b/extensions/git/package.json
+index 0af7ea21268..f7b59d22d3a 100644
+--- a/extensions/git/package.json
++++ b/extensions/git/package.json
+@@ -4329,18 +4329,6 @@
+         "view": "scm",
+         "contents": "%view.workbench.scm.closedRepositories%",
+         "when": "config.git.enabled && !git.missing && git.state == initialized && git.closedRepositoryCount > 1"
+-      },
+-      {
+-        "view": "explorer",
+-        "contents": "%view.workbench.cloneRepository%",
+-        "when": "config.git.enabled && git.state == initialized && scm.providerCount == 0",
+-        "group": "5_scm@1"
+-      },
+-      {
+-        "view": "explorer",
+-        "contents": "%view.workbench.learnMore%",
+-        "when": "config.git.enabled && git.state == initialized && scm.providerCount == 0",
+-        "group": "5_scm@10"
+       }
+     ]
+   },

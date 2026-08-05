@@ -1102,7 +1102,7 @@ index bdc603ff1a4..e0bbe7af85f 100644
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index ecc6af48668..189a6071cac 100644
+index ecc6af48668..e3a7a31becf 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 @@ -25,7 +25,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
@@ -1134,7 +1134,7 @@ index ecc6af48668..189a6071cac 100644
  	ctorDescriptor: new SyncDescriptor(ExplorerViewPaneContainer),
  	storageId: 'workbench.explorer.views.state',
  	icon: explorerViewIcon,
-@@ -265,8 +267,8 @@ export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewC
+@@ -265,19 +267,17 @@ export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewC
  	order: 0,
  	openCommandActionDescriptor: {
  		id: VIEWLET_ID,
@@ -1145,6 +1145,35 @@ index ecc6af48668..189a6071cac 100644
  		keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyE },
  		order: 0
  	},
+ }, ViewContainerLocation.Sidebar, { isDefault: true });
+ 
+ const openFolder = localize('openFolder', "Open Folder");
+-const addAFolder = localize('addAFolder', "add a folder");
+ const openRecent = localize('openRecent', "Open Recent");
+ 
+ const addRootFolderButton = `[${openFolder}](command:${AddRootFolderAction.ID})`;
+-const addAFolderButton = `[${addAFolder}](command:${AddRootFolderAction.ID})`;
+ const openFolderButton = `[${openFolder}](command:${OpenFolderAction.ID})`;
+ const openFolderViaWorkspaceButton = `[${openFolder}](command:${OpenFolderViaWorkspaceAction.ID})`;
+ const openRecentButton = `[${openRecent}](command:${OpenRecentAction.ID})`;
+@@ -325,7 +325,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+ 
+ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+ 	content: localize({ key: 'noFolderButEditorsHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
+-		"You have not yet opened a folder.\n{0}\nOpening a folder will close all currently open editors. To keep them open, {1} instead.", openFolderButton, addAFolderButton),
++		"Open a folder to start writing — your documents live in a folder Ritemark can see.\n{0}", openFolderButton), // Ritemark: writer-voice empty state
+ 	when: ContextKeyExpr.and(
+ 		// editors are opened
+ 		ContextKeyExpr.has('editorIsOpen'),
+@@ -342,7 +342,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+ 
+ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+ 	content: localize({ key: 'noFolderHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
+-		"You have not yet opened a folder.\n{0}", openFolderButton),
++		"Open a folder to start writing — your documents live in a folder Ritemark can see.\n{0}", openFolderButton), // Ritemark: writer-voice empty state
+ 	when: ContextKeyExpr.and(
+ 		// no editor is open
+ 		ContextKeyExpr.has('editorIsOpen')?.negate(),
 diff --git a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 index db5712fe9b0..0ea986538c2 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
