@@ -754,6 +754,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           conversationId: item.conversationId,
           agentId: 'claude-code',
           prompt: item.prompt,
+          // Model drift fix: pin the frozen model — never let the CLI's own
+          // user config decide (falls back to the conversation selection).
+          model: item.modelId || get().conversations[item.conversationId]?.selectedModel || undefined,
           attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
           approvalMode: item.autonomy,
           planFirst: item.planFirst,
@@ -1295,6 +1298,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         conversationId: conversation.id,
         agentId: 'claude-code',
         prompt: fullPrompt,
+        // Model drift fix: always pin the UI-selected model.
+        model: conversation.selectedModel || undefined,
         attachments: attachmentPayload,
         approvalMode: claudePolicy.autonomy,
         planFirst: claudePolicy.planFirst,

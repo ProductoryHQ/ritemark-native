@@ -72,13 +72,17 @@ function enqueue(conversationId: string, text: string, over: Record<string, unkn
 // ── 1. Idle target: enqueue dispatches immediately ──
 {
   resetAll();
-  seed('idle-1');
+  seed('idle-1', { selectedModel: 'claude-test-model' });
   const outcome = enqueue('idle-1', 'run now');
   assert.equal(outcome, 'queued');
   assert.equal(queueFor(useAISidebarStore.getState().promptQueues, 'idle-1').length, 0, 'idle target drains immediately');
   const exec = posted.find((m) => m.type === 'agent-execute');
   assert.ok(exec, 'agent-execute posted');
   assert.equal(exec!.conversationId, 'idle-1');
+  // Model drift fix (2026-08-05): a Claude dispatch NEVER goes out modeless —
+  // an absent model let the bundled CLI fall back to the user's personal
+  // ~/.claude.json and silently run a different model than the UI showed.
+  assert.equal(exec!.model, 'claude-test-model', 'frozen/selected model is pinned on the payload');
   const conv = useAISidebarStore.getState().conversations['idle-1'];
   assert.equal(conv.agentConversation.length, 1, 'turn appended to the TARGET conversation');
   assert.equal(conv.agentConversation[0].isRunning, true);

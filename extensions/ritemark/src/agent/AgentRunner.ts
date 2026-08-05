@@ -258,6 +258,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
   const {
     prompt,
     workspacePath,
+    model,
     attachments,
     allowedTools = DEFAULT_TOOLS,
     settingSources,
@@ -953,7 +954,18 @@ export class AgentSession {
             sessionId: message.session_id ?? null,
           });
           this._model = message.model || null;
-          this._emitProgress?.('init', `Starting Claude (${message.model || 'claude'})`);
+          // Model truth (2026-08-05): the CLI reports the model it ACTUALLY
+          // resolved (may carry a "[1m]" 1M-context suffix). If we pinned one
+          // and got another, say so in the transcript — silent drift between
+          // the UI label and the running model is never acceptable.
+          const actualModel = (message.model || '') as string;
+          const normalizedActual = actualModel.replace(/\[1m\]$/, '');
+          if (this._modelId && actualModel && normalizedActual !== this._modelId) {
+            this._emitProgress?.('init',
+              `Model mismatch — running on ${actualModel}, but ${this._modelId} was requested. The runtime could not apply the requested model.`);
+          } else {
+            this._emitProgress?.('init', `Starting Claude (${actualModel || 'claude'})`);
+          }
           // Fetch supported models from the SDK session
           this._fetchSupportedModels();
         } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {

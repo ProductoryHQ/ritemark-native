@@ -330,9 +330,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             }
           }
 
+          // Model drift fix (2026-08-05): a Claude session must NEVER start
+          // without an explicit model — an absent model hands the choice to
+          // the bundled CLI, which reads the USER'S personal ~/.claude.json /
+          // settings and can silently run a different model than the UI shows.
+          const pinnedModel = isClaudeCode
+            ? (typeof model === 'string' && model ? model : this._reconciledClaudeModel())
+            : model;
+
           const sessionConfig: RuntimeSessionConfig = {
             workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
-            model,
+            model: pinnedModel,
             byokEnv: buildByokEnv(byokKeys),
             excludedFolders,
             anthropicApiKey,
@@ -1212,6 +1220,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
     if (!fs.statSync(realTarget).isFile()) return;
     await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(realTarget));
+  }
+
+  /** The UI-selected Claude model, reconciled against the resolved catalog. */
+  private _reconciledClaudeModel(): string {
+    const selected = vscode.workspace.getConfiguration('ritemark.ai')
+      .get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code'));
+    return modelCatalog.getModels('anthropic').some((m) => m.id === selected)
+      ? selected
+      : modelCatalog.getDefault('anthropic', 'claude-code');
   }
 
   private _sendActiveFile() {

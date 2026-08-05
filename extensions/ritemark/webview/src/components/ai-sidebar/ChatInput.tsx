@@ -285,11 +285,15 @@ export function ChatInput() {
       runtimeId: pendingRuntime.runtimeId,
       autonomy: policy.autonomy,
       planFirst: policy.planFirst,
+      // Model drift fix (2026-08-05): EVERY runtime freezes its model at
+      // enqueue — Claude included. An absent model let the CLI fall back to
+      // the user's personal ~/.claude.json and silently run a different model
+      // than the UI showed.
       modelId: pendingRuntime.runtimeId === 'codex'
         ? codexSelectedModel
         : pendingRuntime.runtimeId === 'opencode'
           ? opencodeSelectedModel
-          : undefined,
+          : (pendingRuntime.modelId ?? selectedModel),
       prompt,
       displayText,
       source: 'composer',
