@@ -1175,7 +1175,7 @@ index ecc6af48668..8e2364cda33 100644
  		// no editor is open
  		ContextKeyExpr.has('editorIsOpen')?.negate(),
 diff --git a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-index db5712fe9b0..6e49df2955f 100644
+index db5712fe9b0..97012c7c1ef 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 +++ b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 @@ -16,13 +16,14 @@
@@ -1195,7 +1195,7 @@ index db5712fe9b0..6e49df2955f 100644
  }
  
  .explorer-folders-view .explorer-item > a,
-@@ -106,3 +107,33 @@
+@@ -106,3 +107,29 @@
  .monaco-workbench.context-menu-visible .explorer-folders-view.highlight .monaco-list-row {
  	outline: none !important;
  }
@@ -1225,10 +1225,6 @@ index db5712fe9b0..6e49df2955f 100644
 +	padding-right: 0;
 +}
 +
-+/* Align level-1 rows exactly with the pane title's left edge. */
-+.explorer-folders-view .monaco-list .monaco-tl-contents {
-+	padding-left: 6px;
-+}
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 index 5b115684ac0..8677e1f68e7 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerView.ts

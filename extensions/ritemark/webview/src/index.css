@@ -177,6 +177,14 @@ body {
   margin: 0.5em 0;
 }
 
+/* Horizontal rule — a breathing point between sections: exactly 24px above
+   and below (Jarmo, 2026-08-05), hairline in the ink ladder's faint tone. */
+.ProseMirror hr {
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--r-hairline, #E2E8F0);
+}
+
 .ProseMirror h1 { font-size: 2em; font-weight: 600; margin: 1em 0 0.5em; }
 .ProseMirror h2 { font-size: 1.5em; font-weight: 600; margin: 1em 0 0.5em; }
 .ProseMirror h3 { font-size: 1.25em; font-weight: 600; margin: 1em 0 0.5em; }
