@@ -11,7 +11,7 @@
  * Pure over a minimal doc interface so it is unit-testable without TipTap.
  */
 
-import { parseCommentBody, type CommentAgentAlias } from './commentModel'
+import { detectAgentAlias, stripAgentMentions, type CommentAgentAlias } from './commentModel'
 
 /** The minimal ProseMirror surface the index needs (test-fakeable). */
 export interface MinimalNode {
@@ -64,13 +64,16 @@ export function collectDocumentComments(doc: MinimalNode): IndexedComment[] {
   doc.descendants((node, pos) => {
     if (node.type.name === 'commentNode') {
       const note = String(node.attrs.note ?? '')
-      const parsed = parseCommentBody(note)
+      // 2026-08-05 fix: assignment = the FIRST @agent mention ANYWHERE in the
+      // body (same rule the margin rail uses) — the old prefix-only parse said
+      // "0 assigned" for a mid-sentence @claude while the rail showed the pill.
+      const alias = detectAgentAlias(note)
       nodes.push({
         key: `n:${pos}`,
         kind: 'node',
         note,
-        alias: parsed.alias,
-        instruction: parsed.text,
+        alias,
+        instruction: alias ? stripAgentMentions(note) : note.trim(),
         position: pos,
       })
       return
@@ -103,14 +106,14 @@ export function collectDocumentComments(doc: MinimalNode): IndexedComment[] {
   })
 
   const marks: IndexedComment[] = [...markAcc.values()].map((a) => {
-    const parsed = parseCommentBody(a.note)
+    const alias = detectAgentAlias(a.note)
     return {
       key: a.key,
       commentId: a.commentId,
       kind: 'mark' as const,
       note: a.note,
-      alias: parsed.alias,
-      instruction: parsed.text,
+      alias,
+      instruction: alias ? stripAgentMentions(a.note) : a.note.trim(),
       anchoredText: a.ranges
         .map((r) => doc.textBetween(r.from, r.to, ' '))
         .filter(Boolean)

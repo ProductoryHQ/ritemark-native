@@ -75,6 +75,20 @@ function fakeDoc(specs: FakeSpec[]): MinimalNode {
   assert.equal(comments.length, 2, 'adjacent legacy fragments merge; distant duplicate text stays separate')
 }
 
+// Mid-sentence mentions assign too (2026-08-05 fix — Jarmo's live catch: the
+// toolbar said "0 assigned" while the rail showed the @claude pill).
+{
+  const doc = fakeDoc([
+    { kind: 'text', text: 'feedback passage', pos: 5, mark: { id: 'm1', note: 'ole hea mõtle kaasa @claude - minu arust see on ülemõtlemine' } },
+  ])
+  const [c] = collectDocumentComments(doc)
+  assert.equal(c.alias, 'claude', 'mid-sentence @claude assigns')
+  assert.match(c.instruction, /ole hea mõtle kaasa/)
+  assert.doesNotMatch(c.instruction, /@claude/, 'mention stripped from the task instruction')
+  const sum = summarizeComments([c])
+  assert.equal(sum.assigned, 1)
+}
+
 // @unknown does not assign (negative case from Sprint 94 R8).
 {
   const doc = fakeDoc([{ kind: 'node', note: '@somebody do a thing', pos: 3 }])
