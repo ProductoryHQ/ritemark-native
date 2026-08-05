@@ -111,6 +111,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   // single source of truth for "is the webview stale?".
   private lastSentToWebview = new Map<string, string>();
 
+  // Fingerprints of the last ~20 contents THIS editor wrote for each file
+  // (webview edits + our own reloads). A disk read matching one of these is
+  // the user's own work coming back through autosave — never an "external
+  // change", never a banner. External writers (agents, CLIs) produce content
+  // whose hash we have not seen. (Jarmo, 2026-08-05: self-edits must be
+  // silent; only genuinely foreign writes may notify.)
+  private selfContentHashes = new Map<string, string[]>();
+
   // 10-second auto-reload timer per open file. Started when a dirty-state external
   // change surfaces the Refresh banner; cancelled if the user clicks Refresh first.
   // On fire, force-reloads the editor with disk content (overrides unsaved local edits).
@@ -954,6 +962,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       this.cancelAutoReload(document.uri.fsPath);
       this.applyingFromWebview.delete(document.uri.toString());
       this.lastSentToWebview.delete(document.uri.fsPath);
+      this.selfContentHashes.delete(document.uri.fsPath);
 
       // Hide word count if no more Ritemark editors are open
       if (RitemarkEditorProvider.activeWebviews.size === 0) {
@@ -963,6 +972,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private updateDocument(document: vscode.TextDocument, content: string): void {
+    this.recordSelfContent(document.uri.fsPath, content);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(
       document.uri,
@@ -1313,6 +1323,17 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     this.lastSentToWebview.set(filePath, this.contentHash(content));
   }
 
+  private recordSelfContent(filePath: string, content: string): void {
+    const list = this.selfContentHashes.get(filePath) ?? [];
+    list.push(this.contentHash(content));
+    if (list.length > 20) list.shift();
+    this.selfContentHashes.set(filePath, list);
+  }
+
+  private isSelfContent(filePath: string, content: string): boolean {
+    return (this.selfContentHashes.get(filePath) ?? []).includes(this.contentHash(content));
+  }
+
   private updateFileLoadTime(filePath: string): void {
     try {
       const stats = fs.statSync(filePath);
@@ -1403,6 +1424,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       );
       await this.applyEditFromWebview(document, edit);
 
+      this.recordSelfContent(filePath, fileContent);
       // Update load time
       this.updateFileLoadTime(filePath);
 
@@ -1410,9 +1432,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       webview.postMessage(this.buildLoadMessage(document, webview));
       this.markSentToWebview(filePath, document.getText());
 
-      // Show success notification
-      const filename = path.basename(filePath);
-      vscode.window.showInformationMessage(`Refreshed ${filename}`);
+      // No success snackbar — the refreshed content IS the feedback
+      // (Jarmo, 2026-08-05).
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       vscode.window.showErrorMessage(`Failed to refresh: ${message}`);
@@ -1494,6 +1515,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     }
 
     if (document.isDirty && diskContent !== document.getText()) {
+      if (this.isSelfContent(filePath, diskContent)) {
+        // Our own (possibly one-keystroke-stale) autosave — the webview is
+        // ahead of disk, not in conflict with it. Silence.
+        return;
+      }
       // Unsaved local edits AND a different disk version → refresh banner +
       // 10s auto-reload, never a silent overwrite. Don't re-post while a
       // banner/timer is already pending (the poll would otherwise repeat it
