@@ -245,6 +245,17 @@ else
 fi
 echo ""
 
+# Stamp the macOS bundle with the Ritemark marketing version. Finder's
+# "Open With" / Get Info reads CFBundleShortVersionString, which VS Code's
+# gulp build sets to the UPSTREAM VS Code version (e.g. 1.117.0) — users saw
+# "Ritemark.app (1.117.0)". product.json's internal "version" stays untouched;
+# this runs before codesign-app.sh so the signature covers the edited plist.
+INFO_PLIST="$APP_PATH/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $RITEMARK_VERSION" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $RITEMARK_VERSION" "$INFO_PLIST"
+echo -e "${GREEN}Info.plist stamped: CFBundleShortVersionString=$RITEMARK_VERSION${NC}"
+echo ""
+
 # Floor the BUNDLED extension's version to X.Y.Z-0 so over-the-air X.Y.Z-ext.N
 # patches win VS Code's extension scanner (GH #142). Shared with the CI release
 # workflows via scripts/floor-bundled-extension.sh.
