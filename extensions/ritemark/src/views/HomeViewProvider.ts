@@ -41,11 +41,17 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.homeView';
   private _view: vscode.WebviewView | null = null;
 
-  constructor(private readonly _enabled: boolean = true) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _enabled: boolean = true,
+  ) {}
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this._view = view;
-    view.webview.options = { enableScripts: true };
+    view.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'media')],
+    };
     view.webview.onDidReceiveMessage(async (message: { type?: string; command?: string; path?: string }) => {
       switch (message.type) {
         case 'run-command':
@@ -136,7 +142,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     if (!this._view) return;
     if (!this._enabled) {
       // home-launcher kill-switch: honest disabled notice, no launcher UI.
-      this._view.webview.html = '<html><body style="font-family:var(--vscode-font-family);font-size:12px;color:var(--vscode-descriptionForeground);padding:12px">Home is disabled by the home-launcher feature flag.</body></html>';
+      this._view.webview.html = `<html><body style="font-family:'Sofia Sans',-apple-system,sans-serif;font-size:12px;color:var(--vscode-descriptionForeground);padding:12px">Home is disabled by the home-launcher feature flag.</body></html>`;
       return;
     }
     const hasFolder = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
@@ -150,6 +156,9 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     recents: Array<{ label: string; detail: string; fsPath: string }>,
     recentFolders: Array<{ label: string; detail: string; fsPath: string }> = [],
   ): string {
+    const webview = this._view!.webview;
+    const fontLatin = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'fonts', 'SofiaSans-latin.woff2'));
+    const fontLatinExt = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'fonts', 'SofiaSans-latin-ext.woff2'));
     const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const recentRows = recents.map((r) => `
       <button class="row" data-open="${esc(r.fsPath)}" title="${esc(r.detail)}">
@@ -172,6 +181,23 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
 
     return /* html */ `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
+  /* Brand font — Ritemark UI is Sofia Sans, never the system stack. */
+  @font-face {
+    font-family: 'Sofia Sans';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('${fontLatinExt}') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: 'Sofia Sans';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('${fontLatin}') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
   :root {
     --ink-strong: var(--vscode-sideBar-foreground, #1E1B4B);
     --ink-muted: var(--vscode-descriptionForeground, #64748B);
@@ -186,13 +212,13 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     --ring: rgba(129,140,248,0.38);
   }
   * { box-sizing: border-box; margin: 0; }
-  body { font-family: var(--vscode-font-family); font-size: 13px; color: var(--ink-strong); padding: 12px 10px 16px; }
+  body { font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: var(--ink-strong); padding: 14px 10px 16px; }
 
   .cta {
     display: flex; align-items: center; justify-content: center; gap: 8px;
-    width: 100%; padding: 10px 14px; border: 0; border-radius: 10px; cursor: pointer;
+    width: 100%; padding: 11px 14px; border: 0; border-radius: 10px; cursor: pointer;
     background: var(--accent); color: #fff; font-family: inherit;
-    font-size: 13px; font-weight: 600; white-space: nowrap;
+    font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap;
     box-shadow: 0 4px 6px -1px rgba(67,56,202,0.25);
     transition: background 120ms ease;
   }

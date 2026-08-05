@@ -6,7 +6,6 @@ import { useRef, useEffect, useCallback } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { EmptyState } from './EmptyState';
-import { RunningIndicator } from './RunningIndicator';
 import { AgentResponse } from './AgentResponse';
 import { AgentQuestion } from './AgentQuestion';
 import { AgentPlanApproval } from './AgentPlanApproval';
@@ -115,9 +114,9 @@ export function AgentTurnBlock({
         />
       )}
 
-      {turn.isRunning && !turn.pendingQuestion && !turn.pendingPlanApproval && !turn.approval && (
-        <RunningIndicator activities={turn.activities} subagents={turn.subagents} />
-      )}
+      {/* 2026-08-05 Jarmo: the per-turn spinner box duplicated the
+          conversation-level ActivityStatusLine (Sprint 103 R7's single status
+          point) — removed; its subagent badge lives there now. */}
 
       {/* Result */}
       {turn.result && <AgentResponse turn={turn} />}

@@ -900,10 +900,10 @@ export function ChatInput() {
     : pendingRuntime.runtimeId === 'codex'
       ? `Codex · ${currentCodexModel?.label || codexSelectedModel || 'Model'}`
       : `Claude · ${currentClaudeModel?.label || selectedModel || 'Model'}`;
-  const contextCount = (showActiveFileChip ? 1 : 0) + (showBrowserContextChip ? 1 : 0) + pathChips.length;
+  // 2026-08-05 Jarmo: no "N context" here — the context chips above the
+  // composer already show exactly what's included; counting them again is noise.
   const contextSummary = [
     attachmentCount > 0 ? `${attachmentCount} attached` : null,
-    contextCount > 0 ? `${contextCount} context` : null,
     mentions.length > 0 ? `${mentions.length} agent${mentions.length === 1 ? '' : 's'}` : null,
   ].filter(Boolean).join(' · ');
   const aiIdentity = resolveAIIdentity({
@@ -1298,22 +1298,36 @@ export function ChatInput() {
             </SelectContent>
           </Select>
 
-          {/* Sprint 103 R8: two-axis control — autonomy (Manual/Auto) + Plan chip (D1/D2). */}
+          {/* Sprint 103 R8 + 2026-08-05 Jarmo: ONE mode select — Manual / Auto /
+              Plan only. "Plan only" is planFirst on top of the last autonomy;
+              approving a plan auto-resets it (D2), so the select falls back to
+              showing Manual/Auto. */}
           <Select
-            value={composerPolicy.autonomy}
-            onValueChange={(v) => setPendingRuntime({ mode: v === 'ask' ? 'ask' : 'auto', planFirst: composerPolicy.planFirst })}
+            value={composerPolicy.planFirst && planCapable ? 'plan' : composerPolicy.autonomy}
+            onValueChange={(v) => {
+              if (v === 'plan') {
+                setPendingRuntime({ mode: composerPolicy.autonomy, planFirst: true });
+              } else {
+                setPendingRuntime({ mode: v === 'ask' ? 'ask' : 'auto', planFirst: false });
+              }
+            }}
           >
             <SelectTrigger
               className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0"
-              title={composerPolicy.autonomy === 'ask'
-                ? 'Manual — approves each file change and command with you'
-                : 'Auto — makes changes without asking; you review the result'}
+              title={composerPolicy.planFirst && planCapable
+                ? 'Plan only — the agent plans and waits for your approval. Turns off when a plan is approved.'
+                : composerPolicy.autonomy === 'ask'
+                  ? 'Manual — approves each file change and command with you'
+                  : 'Auto — makes changes without asking; you review the result'}
             >
               {/* div, not span — the SelectTrigger base applies [&>span]:line-clamp-1,
                   whose -webkit-box/vertical layout stacks the icon above the label. */}
               <div className="flex items-center gap-1 whitespace-nowrap">
-                <Icon name={composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'} size={12} />
-                {composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
+                <Icon
+                  name={composerPolicy.planFirst && planCapable ? 'clipboard-text' : composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'}
+                  size={12}
+                />
+                {composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
               </div>
             </SelectTrigger>
             <SelectContent>
@@ -1335,26 +1349,21 @@ export function ChatInput() {
                   <span className="text-[11px] text-[var(--r-ink-muted)]">Makes changes without asking. You review the result.</span>
                 </div>
               </SelectItem>
+              {planCapable && (
+                <SelectItem value="plan">
+                  <div className="flex flex-col">
+                    <span className="flex items-center gap-1.5 text-[13px]">
+                      <Icon name="clipboard-text" size={14} />
+                      Plan only
+                    </span>
+                    <span className="text-[11px] text-[var(--r-ink-muted)]">Plans and waits for your approval. Resets after a plan is approved.</span>
+                  </div>
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
 
-          {planCapable ? (
-            <button
-              onClick={() => setPendingRuntime({ mode: composerPolicy.autonomy, planFirst: !composerPolicy.planFirst })}
-              title={composerPolicy.planFirst
-                ? 'Plan is on — the agent plans first and waits for your approval. Turns off when a plan is approved.'
-                : 'Ask for a reviewable plan before any changes.'}
-              className={[
-                'inline-flex h-6 shrink-0 items-center gap-1 rounded border px-2 text-[11px] font-medium transition-colors',
-                composerPolicy.planFirst
-                  ? 'border-transparent bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)] shadow-[inset_0_0_0_1px_var(--r-accent-fainter)]'
-                  : 'border-[var(--r-hairline)] bg-transparent text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]',
-              ].join(' ')}
-            >
-              <Icon name="clipboard-text" size={12} />
-              Plan
-            </button>
-          ) : composerPolicy.planFirst ? (
+          {!planCapable && composerPolicy.planFirst ? (
             /* R6: runtime without a plan contract — deactivate visibly, never pretend. */
             <span className="text-[10px] text-[var(--r-ink-faint)] whitespace-nowrap">
               Plan off — not supported by this runtime

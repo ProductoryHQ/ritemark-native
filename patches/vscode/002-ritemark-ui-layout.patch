@@ -1175,7 +1175,7 @@ index ecc6af48668..8e2364cda33 100644
  		// no editor is open
  		ContextKeyExpr.has('editorIsOpen')?.negate(),
 diff --git a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-index db5712fe9b0..0ea986538c2 100644
+index db5712fe9b0..b59b743f0a0 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 +++ b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 @@ -16,13 +16,14 @@
@@ -1195,7 +1195,7 @@ index db5712fe9b0..0ea986538c2 100644
  }
  
  .explorer-folders-view .explorer-item > a,
-@@ -106,3 +107,16 @@
+@@ -106,3 +107,28 @@
  .monaco-workbench.context-menu-visible .explorer-folders-view.highlight .monaco-list-row {
  	outline: none !important;
  }
@@ -1212,11 +1212,52 @@ index db5712fe9b0..0ea986538c2 100644
 +	box-shadow: inset 2px 0 0 0 var(--vscode-list-focusAndSelectionOutline, var(--vscode-focusBorder, #4338CA)) !important;
 +	outline: none !important;
 +}
++
++/* Ritemark 2026-08-05: no expand chevrons — folders toggle on row click and
++   the arrow column is pure visual noise for writers. */
++.explorer-folders-view .monaco-list .monaco-tl-twistie {
++	display: none !important;
++}
++
++/* With the twistie column gone the tree hugged the left edge — restore
++   breathing room uniformly (relative depth indent is preserved). */
++.explorer-folders-view .monaco-list .monaco-tl-contents {
++	padding-left: 12px;
++}
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
-index 5b115684ac0..9ca4a048788 100644
+index 5b115684ac0..8677e1f68e7 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
-@@ -1066,12 +1066,7 @@ registerAction2(class extends Action2 {
+@@ -430,7 +430,27 @@ export class ExplorerView extends ViewPane implements IExplorerView {
+ 					// No action needed, active file is already focused and selected
+ 					return;
+ 				}
+-				return this.explorerService.select(activeFile, reveal);
++				// Ritemark: only select files that live under a workspace root —
++				// URI-based so it does not race the lazily-built tree model.
++				const inTree = this.explorerService.roots.some(root =>
++					this.uriIdentityService.extUri.isEqualOrParent(activeFile, root.resource));
++				if (inTree) {
++					return this.explorerService.select(activeFile, reveal);
++				}
++				// Active editor is a file OUTSIDE this tree (e.g. an untitled
++				// draft) — clear the stale highlight.
++				this.tree.setSelection([]);
++				this.tree.setFocus([]);
++				return;
++			}
++
++			// No resolvable file resource. Editor-change events fire with a
++			// transient undefined active editor while custom-editor webviews
++			// swap focus — clearing then would wipe a valid selection. Only
++			// clear when something IS active (settings page, welcome, etc).
++			if (this.editorService.activeEditor) {
++				this.tree.setSelection([]);
++				this.tree.setFocus([]);
+ 			}
+ 		}
+ 	}
+@@ -1066,12 +1086,7 @@ registerAction2(class extends Action2 {
  			title: nls.localize2('refreshExplorer', "Refresh Explorer"),
  			f1: true,
  			icon: Codicon.refresh,
@@ -1230,7 +1271,7 @@ index 5b115684ac0..9ca4a048788 100644
  			metadata: {
  				description: nls.localize2('refreshExplorerMetadata', "Forces a refresh of the Explorer.")
  			},
-@@ -1094,12 +1089,7 @@ registerAction2(class extends Action2 {
+@@ -1094,12 +1109,7 @@ registerAction2(class extends Action2 {
  			title: nls.localize2('collapseExplorerFolders', "Collapse Folders in Explorer"),
  			f1: true,
  			icon: Codicon.collapseAll,
