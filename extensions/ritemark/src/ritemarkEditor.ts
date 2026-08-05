@@ -625,6 +625,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             this.updateFileLoadTime(document.uri.fsPath);
             webview.postMessage(this.buildLoadMessage(document, webview));
             this.markSentToWebview(document.uri.fsPath, document.getText());
+            // Codex review (PR #182): the LOADED content is self-known — while
+            // the user types with autosave pending/off, the old disk copy must
+            // never read as a foreign conflict (the 10s auto-reload would
+            // discard their unsaved edits).
+            this.recordSelfContent(document.uri.fsPath, document.getText());
             return;
 
           case 'searchWorkspaceFiles':
@@ -1572,6 +1577,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       });
     }
     this.markSentToWebview(filePath, diskContent);
+    this.recordSelfContent(filePath, diskContent);
   }
 
   private disposeDeleteWatcher(filePath: string): void {

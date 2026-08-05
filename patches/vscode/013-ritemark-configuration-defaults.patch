@@ -1,0 +1,56 @@
+Ritemark Configuration Defaults (Sprint 107 R1, GH #—): product.json
+`configurationDefaults` apply on DESKTOP.
+
+VS Code only reads configuration defaults from product.json on the WEB
+workbench (environmentService.options). Ritemark's branding block
+(trust off, *.md → ritemark.editor, theme, tree/indent, preview off)
+was therefore dead on desktop — the "md opens as code + trust dialog"
+first-run bug. This patch:
+  - adds `configurationDefaults` to IProductConfiguration
+  - registers `product.configurationDefaults` in DefaultConfiguration
+    (additive; user/workspace settings still override)
+
+diff --git a/src/vs/base/common/product.ts b/src/vs/base/common/product.ts
+index a352bdd7d61..82a29046dc1 100644
+--- a/src/vs/base/common/product.ts
++++ b/src/vs/base/common/product.ts
+@@ -65,6 +65,14 @@ export type ExtensionVirtualWorkspaceSupport = {
+ };
+ 
+ export interface IProductConfiguration {
++	/**
++	 * Ritemark (Sprint 107 R1): default configuration overrides contributed by
++	 * the product, applied like extension-contributed configurationDefaults but
++	 * sourced from product.json. Desktop path — the web workbench reads the
++	 * equivalent from IWorkbenchConstructionOptions.configurationDefaults.
++	 */
++	readonly configurationDefaults?: Record<string, unknown>;
++
+ 	readonly version: string;
+ 	readonly date?: string;
+ 	readonly quality?: string;
+diff --git a/src/vs/workbench/services/configuration/browser/configuration.ts b/src/vs/workbench/services/configuration/browser/configuration.ts
+index b34ba019c26..24a0fe65b03 100644
+--- a/src/vs/workbench/services/configuration/browser/configuration.ts
++++ b/src/vs/workbench/services/configuration/browser/configuration.ts
+@@ -4,6 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { URI } from '../../../../base/common/uri.js';
++import product from '../../../../platform/product/common/product.js'; // Ritemark Sprint 107 R1
+ import { Event, Emitter } from '../../../../base/common/event.js';
+ import * as errors from '../../../../base/common/errors.js';
+ import { Disposable, IDisposable, dispose, toDisposable, MutableDisposable, combinedDisposable, DisposableStore } from '../../../../base/common/lifecycle.js';
+@@ -48,6 +49,12 @@ export class DefaultConfiguration extends BaseDefaultConfiguration {
+ 		if (environmentService.options?.configurationDefaults) {
+ 			this.configurationRegistry.registerDefaultConfigurations([{ overrides: environmentService.options.configurationDefaults as IStringDictionary<IStringDictionary<unknown>> }]);
+ 		}
++		// Ritemark (Sprint 107 R1): product.json configurationDefaults apply on
++		// DESKTOP too — the block above only fires on the web workbench. Additive;
++		// user/workspace settings still override these defaults.
++		if (product.configurationDefaults) {
++			this.configurationRegistry.registerDefaultConfigurations([{ overrides: product.configurationDefaults as IStringDictionary<IStringDictionary<unknown>> }]);
++		}
+ 	}
+ 
+ 	protected override getConfigurationDefaultOverrides(): IStringDictionary<unknown> {

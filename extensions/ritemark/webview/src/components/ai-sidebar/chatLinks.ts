@@ -25,9 +25,12 @@ export function classifyChatHref(rawHref: string | null | undefined): ChatLinkTa
       return { kind: 'none' };
     }
   }
+  // Codex review (PR #176): "README.md:12" — a root-level path with a line
+  // suffix — must not be mistaken for a scheme. Strip the suffix first.
+  const withoutLine = stripLineSuffix(href);
   // Any other scheme (mailto:, vscode:, command:, data:, javascript:) is not
   // ours to open from chat content.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return { kind: 'none' };
+  if (/^[a-z][a-z0-9+.-]*:/i.test(withoutLine)) return { kind: 'none' };
   // Scheme-less → treat as a workspace-relative (or absolute posix) file path.
   let decoded = href;
   try {

@@ -18,6 +18,10 @@ assert.deepEqual(classifyChatHref('src/foo.ts:42'), { kind: 'file', path: 'src/f
 assert.deepEqual(classifyChatHref('src/foo.ts:42:7'), { kind: 'file', path: 'src/foo.ts' })
 assert.equal(stripLineSuffix('C:\\ws\\a.md'), 'C:\\ws\\a.md')
 
+// Root-level paths WITH line suffixes are files, not schemes (Codex, PR #176).
+assert.deepEqual(classifyChatHref('README.md:12'), { kind: 'file', path: 'README.md' })
+assert.deepEqual(classifyChatHref('foo.ts:42'), { kind: 'file', path: 'foo.ts' })
+
 // Web links stay external.
 assert.deepEqual(classifyChatHref('https://ritemark.app/docs'), { kind: 'external', url: 'https://ritemark.app/docs' })
 assert.deepEqual(classifyChatHref('HTTP://example.com'), { kind: 'external', url: 'HTTP://example.com' })

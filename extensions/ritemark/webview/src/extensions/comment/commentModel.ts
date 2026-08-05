@@ -70,6 +70,18 @@ export function detectAgentAlias(body: string): CommentAgentAlias | null {
   return m ? (m[1].toLowerCase() as CommentAgentAlias) : null
 }
 
+/**
+ * Strip only the FIRST mention of the ASSIGNED agent (Codex review, PR #184) —
+ * other mentions ("@claude compare with @codex notes") are meaningful context
+ * for the task prompt and must survive.
+ */
+export function stripAssignmentMention(body: string, alias: CommentAgentAlias): string {
+  return body
+    .replace(new RegExp(`@(${alias})(?=$|[\\s:])\\s*:?`, 'i'), '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 /** Strip recognized `@agent` mentions from a note to build a clean AI prompt. */
 export function stripAgentMentions(body: string): string {
   return body

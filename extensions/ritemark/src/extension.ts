@@ -47,6 +47,7 @@ import {
 import { BrowserHistoryStore } from './browser/BrowserHistoryStore';
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
+import { findStuckMarkdownTabs } from './utils/stickyTabHealer';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
@@ -246,6 +247,36 @@ export function activate(context: vscode.ExtensionContext) {
       context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
       context.globalState.update('ritemark.designFoundationsThemeMigration', designFoundationsThemeMigration);
     }, 1500);
+  }
+
+  // === Sprint 107 R3: one-shot sticky markdown-tab healer ===
+  // Profiles bitten by the pre-R1 bug can have .md files permanently pinned
+  // open in the PLAIN TEXT editor. Once per profile (globalState marker,
+  // same pattern as the theme migration above), reopen every file-scheme
+  // .md/.markdown TEXT tab in Ritemark's editor, best-effort preserving
+  // active state and view column. Named tradeoff (spec R3): a deliberate
+  // per-tab "Reopen With → Text Editor" choice is lost once, silently.
+  const stickyTabHealerVersion = 'sprint-107-v1';
+  if (context.globalState.get<string>('ritemark.stickyTabHealerVersion') !== stickyTabHealerVersion) {
+    setTimeout(async () => {
+      try {
+        const resolveTextInput = (input: unknown): { path: string } | null =>
+          input instanceof vscode.TabInputText && input.uri.scheme === 'file'
+            ? input.uri
+            : null;
+        const candidates = findStuckMarkdownTabs(vscode.window.tabGroups.all, resolveTextInput);
+        for (const candidate of candidates) {
+          await vscode.commands.executeCommand('vscode.openWith', candidate.uri, 'ritemark.editor', {
+            preview: false,
+            preserveFocus: !candidate.isActive,
+            viewColumn: candidate.viewColumn,
+          });
+        }
+      } catch {
+        // Inert on any failure — the healer must never produce user-visible noise.
+      }
+      void context.globalState.update('ritemark.stickyTabHealerVersion', stickyTabHealerVersion);
+    }, 1500 /* after editor-group restore settles */);
   }
 
   // === Layout settings: EVERY startup ===
