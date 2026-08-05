@@ -1175,7 +1175,7 @@ index ecc6af48668..8e2364cda33 100644
  		// no editor is open
  		ContextKeyExpr.has('editorIsOpen')?.negate(),
 diff --git a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-index db5712fe9b0..b59b743f0a0 100644
+index db5712fe9b0..6e49df2955f 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 +++ b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 @@ -16,13 +16,14 @@
@@ -1195,7 +1195,7 @@ index db5712fe9b0..b59b743f0a0 100644
  }
  
  .explorer-folders-view .explorer-item > a,
-@@ -106,3 +107,28 @@
+@@ -106,3 +107,33 @@
  .monaco-workbench.context-menu-visible .explorer-folders-view.highlight .monaco-list-row {
  	outline: none !important;
  }
@@ -1214,15 +1214,20 @@ index db5712fe9b0..b59b743f0a0 100644
 +}
 +
 +/* Ritemark 2026-08-05: no expand chevrons — folders toggle on row click and
-+   the arrow column is pure visual noise for writers. */
++   the arrow column is pure visual noise for writers. visibility (NOT display)
++   because the twistie box carries the tree's depth indentation: hiding its
++   box flattened the hierarchy visually. */
 +.explorer-folders-view .monaco-list .monaco-tl-twistie {
-+	display: none !important;
++	visibility: hidden;
++	/* Collapse the arrow's own 16px+6px box so level-1 rows align with the
++	   pane title; the depth indent (inline padding) is preserved. */
++	width: 0;
++	padding-right: 0;
 +}
 +
-+/* With the twistie column gone the tree hugged the left edge — restore
-+   breathing room uniformly (relative depth indent is preserved). */
++/* Align level-1 rows exactly with the pane title's left edge. */
 +.explorer-folders-view .monaco-list .monaco-tl-contents {
-+	padding-left: 12px;
++	padding-left: 6px;
 +}
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 index 5b115684ac0..8677e1f68e7 100644
