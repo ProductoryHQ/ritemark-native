@@ -4,12 +4,16 @@ import { Scheduler } from './Scheduler';
 import { DaemonResultStore } from './DaemonResultStore';
 import { DaemonStatusEvents } from './DaemonStatusEvents';
 import { isEnabled } from '../features/featureGate';
+import { getConsentState, setConsentState, type ConsentState } from './workspaceConsent';
 
 export interface DaemonController {
   store: DaemonResultStore;
   /** Register a listener fired whenever run history changes (for UI refresh). */
   onRunsChanged(listener: () => void): void;
   scheduler?: Scheduler;
+  /** Sprint 107 R2: per-workspace consent for schedule-triggered runs. */
+  getConsent(): ConsentState;
+  setConsent(state: ConsentState): Thenable<void>;
 }
 
 /**
@@ -38,11 +42,39 @@ export function initDaemon(
   // Gated on the 'scheduled-tasks-daemon' flag. When the flag is off the
   // scheduler is never created: no workspace scan, no cron timers, no runs.
   // The store + commands remain so the UI degrades cleanly.
+  // Sprint 107 R2 (D1 Option A + D2 grandfather): schedule-triggered runs are
+  // armed only with per-workspace consent; existing run history counts as
+  // consent (grandfathered).
+  const consentOf = () => getConsentState(context.workspaceState, store);
+
   let status: DaemonStatusEvents | undefined;
   if (workspacePath && isEnabled('scheduled-tasks-daemon')) {
     status = new DaemonStatusEvents(context, store);
-    scheduler = new Scheduler(context, store, status, workspacePath, () => runsChanged.fire());
+    scheduler = new Scheduler(
+      context, store, status, workspacePath, () => runsChanged.fire(),
+      () => consentOf() === 'granted'
+    );
     scheduler.start();
+
+    // One-shot, non-blocking opt-in toast: only when this workspace defines
+    // schedule-eligible agents and no decision has been made yet.
+    if (scheduler.entryCount > 0 && consentOf() === 'undecided') {
+      const n = scheduler.entryCount;
+      void vscode.window.showInformationMessage(
+        n === 1
+          ? 'This folder defines 1 scheduled AI agent. Allow it to run automatically on its schedule?'
+          : `This folder defines ${n} scheduled AI agents. Allow them to run automatically on their schedules?`,
+        'Allow', 'Not now'
+      ).then((choice) => {
+        if (choice === 'Allow') {
+          void setConsentState(context.workspaceState, 'granted').then(() => scheduler?.rearmAll());
+        } else if (choice === 'Not now') {
+          // Declined — no re-prompt nagging; reversible any time from the
+          // Agent Library's scheduled-agents section.
+          void setConsentState(context.workspaceState, 'declined');
+        }
+      });
+    }
   }
 
   context.subscriptions.push(
@@ -143,6 +175,15 @@ export function initDaemon(
     scheduler,
     onRunsChanged: (listener) => {
       context.subscriptions.push(runsChanged.event(listener));
+    },
+    getConsent: consentOf,
+    setConsent: (state) => {
+      const done = setConsentState(context.workspaceState, state);
+      return done.then(() => {
+        // Re-register entries so armed/disarmed reflects the new decision.
+        scheduler?.rearmAll();
+        runsChanged.fire();
+      });
     },
   };
 }

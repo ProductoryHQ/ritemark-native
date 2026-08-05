@@ -229,7 +229,7 @@ with open("'"$PRODUCT_JSON"'", "r") as f:
 data["ritemarkVersion"] = "'"$RITEMARK_VERSION"'"
 import os, pathlib
 branding = json.load(open(pathlib.Path("'"$(pwd)"'") / "branding" / "product.json"))
-for key in ("posthogProjectApiKey", "posthogHost", "builtInExtensionsEnabledWithAutoUpdates", "defaultChatAgent", "trustedExtensionAuthAccess", "extensionEnabledApiProposals"):
+for key in ("posthogProjectApiKey", "posthogHost", "builtInExtensionsEnabledWithAutoUpdates", "defaultChatAgent", "trustedExtensionAuthAccess", "extensionEnabledApiProposals", "configurationDefaults"):
     if key in branding:
         data[key] = branding[key]
 with open("'"$PRODUCT_JSON"'", "w") as f:

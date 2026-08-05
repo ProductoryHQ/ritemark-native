@@ -11,7 +11,7 @@
  * Pure over a minimal doc interface so it is unit-testable without TipTap.
  */
 
-import { detectAgentAlias, stripAgentMentions, type CommentAgentAlias } from './commentModel'
+import { detectAgentAlias, stripAssignmentMention, type CommentAgentAlias } from './commentModel'
 
 /** The minimal ProseMirror surface the index needs (test-fakeable). */
 export interface MinimalNode {
@@ -73,7 +73,7 @@ export function collectDocumentComments(doc: MinimalNode): IndexedComment[] {
         kind: 'node',
         note,
         alias,
-        instruction: alias ? stripAgentMentions(note) : note.trim(),
+        instruction: alias ? stripAssignmentMention(note, alias) : note.trim(),
         position: pos,
       })
       return
@@ -113,7 +113,7 @@ export function collectDocumentComments(doc: MinimalNode): IndexedComment[] {
       kind: 'mark' as const,
       note: a.note,
       alias,
-      instruction: alias ? stripAgentMentions(a.note) : a.note.trim(),
+      instruction: alias ? stripAssignmentMention(a.note, alias) : a.note.trim(),
       anchoredText: a.ranges
         .map((r) => doc.textBetween(r.from, r.to, ' '))
         .filter(Boolean)

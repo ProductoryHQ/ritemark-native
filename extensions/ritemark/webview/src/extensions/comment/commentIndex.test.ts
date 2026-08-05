@@ -89,6 +89,15 @@ function fakeDoc(specs: FakeSpec[]): MinimalNode {
   assert.equal(sum.assigned, 1)
 }
 
+// Cross-agent references survive in the instruction (Codex, PR #184).
+{
+  const doc = fakeDoc([{ kind: 'node', note: '@claude compare this with @codex notes', pos: 3 }])
+  const [c] = collectDocumentComments(doc)
+  assert.equal(c.alias, 'claude')
+  assert.match(c.instruction, /@codex notes/, 'informational mention preserved')
+  assert.doesNotMatch(c.instruction, /^@claude/, 'assignment mention stripped')
+}
+
 // @unknown does not assign (negative case from Sprint 94 R8).
 {
   const doc = fakeDoc([{ kind: 'node', note: '@somebody do a thing', pos: 3 }])

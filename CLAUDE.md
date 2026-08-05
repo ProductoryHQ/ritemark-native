@@ -151,7 +151,7 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (12)
+### Current patches (13)
 
 | Patch | Purpose |
 | --- | --- |
@@ -167,6 +167,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `010-ritemark-browser-action-bridge.patch` | Enables AI agent actions (click, navigate, fill) in the integrated browser |
 | `011-ritemark-cloud-file-error.patch` | Maps Windows OneDrive/SharePoint cloud-file read errors to an actionable message |
 | `012-ritemark-shell-watchdog.patch` | Quarantines a broken user-dir copy of `ritemark.ritemark` on activation failure and falls back to the bundled built-in |
+| `013-ritemark-configuration-defaults.patch` | product.json `configurationDefaults` apply on desktop (trust off, `*.md` → Ritemark editor, theme/tree/preview defaults) |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 

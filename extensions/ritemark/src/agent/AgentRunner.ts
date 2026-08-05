@@ -331,6 +331,11 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       options: {
         cwd: workspacePath,
         ...(pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable } : {}),
+        // Model drift fix (Codex review, PR #183): one-shot sessions (flows,
+        // daemon) never run modeless — otherwise the CLI resolves the model
+        // from the user's personal config. Lazy require: modelCatalog pulls in
+        // vscode, which the tsx unit tests cannot load at module scope.
+        model: model ?? (require('../ai/modelCatalog') as typeof import('../ai/modelCatalog')).getDefault('anthropic', 'claude-code'),
         settingSources: resolveSettingSources(settingSources),
         // Sprint 103 R2: headless flow runs auto-approve via canUseTool below —
         // same behavior as the old bypassPermissions without the dangerous flag.
