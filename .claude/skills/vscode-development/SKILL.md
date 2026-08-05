@@ -501,6 +501,8 @@ Three runtime crashes appeared only in prod bundle (dev mode unaffected): `onboa
 
 ### Native module arch check after submodule bump
 
+**Default-drift scan (mandatory on every upstream bump, added 2026-08-05):** upstream changes workbench SETTING DEFAULTS silently — e.g. `workbench.secondarySideBar.showLabels` flipped the aux-bar tabs from icons to text and surfaced only on FRESH profiles at release-candidate stage. After any bump: `git -C vscode diff <old>..<new> -- src/vs/workbench/browser/workbench.contribution.ts` and review every new/changed `'default':` that touches visible chrome; pin anything Ritemark's look depends on in `branding/product.json` `configurationDefaults` (live on desktop via patch 013). The shell's appearance must never ride an unpinned upstream default. Also test chrome on a FRESH `--user-data-dir` — seasoned profiles can mask default changes.
+
 After `update-vscode.sh`, verify `vscode/node_modules` doesn't carry stale x86_64 native modules (GH #39) and `out/` of html/css/json language-features isn't stale CJS post-ESM-flip (GH #41). `update-vscode.sh` + `check-native-modules.sh` enforce this since 2026-05-02.
 
 ## References

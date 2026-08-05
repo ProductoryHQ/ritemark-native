@@ -77,3 +77,9 @@
 - [ ] OpenCode selected: no Plan chip (needs BYOK-keyed profile — Jarmo)
 - [ ] Dark + light pass on packaged candidate (dev pass done with Ritemark Dark — the slate/indigo theme; earlier "black skin" observation was VS Code default Dark+ applied by a mislabeled setting in the automation profile, not a theme regression)
 - [ ] Old thread saved with mode "plan" opens as Auto + Plan chip on
+
+## Visual parity gate (added 2026-08-05 — default-drift lesson)
+
+- [ ] Launch the candidate on a **FRESH profile** (`--user-data-dir` to an empty dir) — never judge chrome from a seasoned profile; several renderings (aux tabs, tree, preview tabs) differ on first run.
+- [ ] Side-by-side against the previous release, compare: Activity Bar order/icons, secondary-sidebar top strip (ICONS, not text), File menu contents, explorer tree (indent/selection), editor surface (hr spacing, fonts).
+- [ ] Any unexplained difference = upstream default drift → pin the setting in `branding/product.json` `configurationDefaults` (live on desktop since patch 013).
