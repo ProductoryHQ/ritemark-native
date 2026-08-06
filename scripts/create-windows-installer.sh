@@ -90,7 +90,9 @@ echo "  ✓ Inno Setup script found"
 # Extract version
 echo
 echo "[2/4] Extracting version..."
-VERSION=$(node -p "require('$PROJECT_ROOT/vscode/package.json').version")
+# Ritemark version comes from branding (vscode/package.json is the VS Code
+# upstream version — using it produced Ritemark-1.117.0-...-setup.exe).
+VERSION=$(node -p "require('$PROJECT_ROOT/branding/product.json').ritemarkVersion")
 echo "  Version: $VERSION"
 
 # Create dist directory
@@ -111,14 +113,23 @@ echo
 
 # Docker command
 # Mount the entire project directory so Inno Setup can access all files
+# SourcePath must be ABSOLUTE in the wine view (Z:\work = /work) — the
+# relative ..\..\VSCode-win32-x64 default resolves wrongly under the
+# containerized compiler and silently packages the wrong directory.
 docker run --rm \
     -v "$PROJECT_ROOT:/work" \
     amake/innosetup \
+    "/DSourcePath=Z:\\work\\VSCode-win32-x64" \
     "installer/windows/ritemark-build.iss"
 
 # Check if installer was created
-INSTALLER_NAME="RiteMark-${VERSION}-win32-x64-setup.exe"
+INSTALLER_NAME="Ritemark-${VERSION}-win32-x64-setup.exe"
+# Inno writes to installer-output/ (iss OutputDir); publish location is dist/
+BUILT_PATH="$PROJECT_ROOT/installer-output/$INSTALLER_NAME"
 INSTALLER_PATH="$DIST_DIR/$INSTALLER_NAME"
+if [ -f "$BUILT_PATH" ]; then
+    mv "$BUILT_PATH" "$INSTALLER_PATH"
+fi
 
 if [ ! -f "$INSTALLER_PATH" ]; then
     echo -e "${RED}ERROR: Installer not created${NC}"
