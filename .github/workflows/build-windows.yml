@@ -536,6 +536,47 @@ jobs:
           name: ritemark-windows-x64
           path: r/VSCode-win32-x64/
           retention-days: 30
+      - name: Build Windows installer (Inno Setup)
+        # v1.8.6: the installer is built ON the runner so its wrapper exe can
+        # be signed with the same Trusted Signing profile as the binaries
+        # (locally-built installers could not be signtool-signed from macOS).
+        # Runs AFTER binary signing so the payload carries signed binaries.
+        shell: pwsh
+        working-directory: r
+        run: |
+          choco install innosetup -y --no-progress | Out-Null
+          $version = (Get-Content branding/product.json | ConvertFrom-Json).ritemarkVersion
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $src = (Resolve-Path "VSCode-win32-x64").Path
+          & $iscc "/DAppVersion=$version" "/DSourcePath=$src" "installer\windows\ritemark.iss"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $exe = "installer-output\Ritemark-$version-win32-x64-setup.exe"
+          if (-not (Test-Path $exe)) { Write-Error "installer missing: $exe"; exit 1 }
+          Write-Host "Installer built: $exe ($([math]::Round((Get-Item $exe).Length/1MB)) MB)"
+
+      - name: Sign Windows installer (Azure Trusted Signing)
+        if: ${{ vars.AZURE_SIGNING_ENABLED == 'true' }}
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
+          endpoint: https://neu.codesigning.azure.net
+          trusted-signing-account-name: ritemark-signing
+          certificate-profile-name: ritemark-public-trust
+          files-folder: r/installer-output
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ritemark-windows-installer
+          path: r/installer-output/*.exe
+          retention-days: 30
+
 
       - name: Build summary
         shell: bash
