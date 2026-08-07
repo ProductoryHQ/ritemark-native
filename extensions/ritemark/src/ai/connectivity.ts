@@ -1,17 +1,40 @@
 /**
  * Network Connectivity Detection
- * Monitors online/offline status and notifies subscribers
+ * Monitors online/offline status and notifies subscribers.
+ *
+ * Verdict policy (GH #193): a single failed probe must never flip the UI.
+ * Each round races several independent endpoints (online if ANY responds),
+ * and the offline verdict needs two consecutive failed rounds — see
+ * connectivityPolicy.ts for the pure, unit-tested decision logic.
  */
 
 import * as vscode from 'vscode';
 import * as https from 'https';
+import { anyProbeSucceeds, nextConnectivityState } from './connectivityPolicy';
 
 // Event emitter for connectivity changes
 export const connectivityChanged = new vscode.EventEmitter<{ isOnline: boolean }>();
 
+// Online if ANY of these responds. A single vendor's outage — or a network
+// that blocks one of them — must not read as "offline". Any HTTP response
+// counts, even 401/404: it proves the network path works.
+const PROBE_ENDPOINTS: ReadonlyArray<{ hostname: string; path: string }> = [
+  { hostname: 'api.anthropic.com', path: '/' },
+  { hostname: 'api.openai.com', path: '/v1/models' },
+  { hostname: 'captive.apple.com', path: '/hotspot-detect.html' },
+];
+// 5s sat below real-world tail latency (VPN/mobile links, vendor edge spikes)
+// and produced false offline verdicts on healthy connections.
+const PROBE_TIMEOUT_MS = 8000;
+const CHECK_INTERVAL_MS = 30000;
+const QUICK_RECHECK_DELAY_MS = 5000;
+
 let _isOnline = true;
+let _failStreak = 0;
+let _pendingCheck: Promise<void> | null = null;
 let _statusBarItem: vscode.StatusBarItem | null = null;
 let _checkInterval: NodeJS.Timeout | null = null;
+let _quickRecheckTimer: NodeJS.Timeout | null = null;
 
 /**
  * Get current connectivity status
@@ -20,21 +43,17 @@ export function isOnline(): boolean {
   return _isOnline;
 }
 
-/**
- * Check connectivity by pinging a reliable endpoint
- */
-async function checkConnectivity(): Promise<boolean> {
+function probeEndpoint(endpoint: { hostname: string; path: string }): Promise<boolean> {
   return new Promise((resolve) => {
     const req = https.request(
       {
-        hostname: 'api.openai.com',
+        hostname: endpoint.hostname,
         port: 443,
-        path: '/v1/models',
+        path: endpoint.path,
         method: 'HEAD',
-        timeout: 5000
+        timeout: PROBE_TIMEOUT_MS
       },
-      (res) => {
-        // Any response (even 401) means we're online
+      () => {
         resolve(true);
       }
     );
@@ -53,13 +72,46 @@ async function checkConnectivity(): Promise<boolean> {
 }
 
 /**
- * Update status and notify if changed
+ * One probe round: race all endpoints, succeed on the first response.
  */
-async function updateStatus(): Promise<void> {
+function checkConnectivity(): Promise<boolean> {
+  return anyProbeSucceeds(PROBE_ENDPOINTS.map(probeEndpoint));
+}
+
+/**
+ * Update status and notify if changed. Concurrent callers (interval, quick
+ * recheck, webview "Check again") share one in-flight round.
+ */
+function updateStatus(): Promise<void> {
+  if (_pendingCheck) return _pendingCheck;
+  _pendingCheck = runCheckRound().finally(() => {
+    _pendingCheck = null;
+  });
+  return _pendingCheck;
+}
+
+async function runCheckRound(): Promise<void> {
+  const probeOk = await checkConnectivity();
   const wasOnline = _isOnline;
-  _isOnline = await checkConnectivity();
+  const next = nextConnectivityState(_isOnline, _failStreak, probeOk);
+  _isOnline = next.isOnline;
+  _failStreak = next.failStreak;
+
+  if (_quickRecheckTimer) {
+    clearTimeout(_quickRecheckTimer);
+    _quickRecheckTimer = null;
+  }
+  if (next.scheduleQuickRecheck) {
+    _quickRecheckTimer = setTimeout(() => {
+      _quickRecheckTimer = null;
+      void updateStatus();
+    }, QUICK_RECHECK_DELAY_MS);
+  }
 
   if (wasOnline !== _isOnline) {
+    console.log(
+      `[ritemark connectivity] ${_isOnline ? 'back online' : `offline after ${_failStreak} consecutive failed probe rounds`}`
+    );
     connectivityChanged.fire({ isOnline: _isOnline });
     updateStatusBar();
   }
@@ -101,16 +153,19 @@ export function initConnectivity(context: vscode.ExtensionContext): void {
     _statusBarItem?.show();
   });
 
-  // Periodic check every 30 seconds
+  // Periodic check
   _checkInterval = setInterval(() => {
-    updateStatus();
-  }, 30000);
+    void updateStatus();
+  }, CHECK_INTERVAL_MS);
 
   // Cleanup on deactivation
   context.subscriptions.push({
     dispose: () => {
       if (_checkInterval) {
         clearInterval(_checkInterval);
+      }
+      if (_quickRecheckTimer) {
+        clearTimeout(_quickRecheckTimer);
       }
       connectivityChanged.dispose();
     }
