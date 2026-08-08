@@ -49,6 +49,7 @@ breathing room; Sofia Sans in every corner.
 
 ## Fixes
 
+- The "Offline — AI features require internet connection" banner no longer flickers on a healthy connection: connectivity now races several independent endpoints (any response counts) and only two consecutive failed rounds mean offline — recovery is instant
 - Finder no longer shows "Ritemark.app (1.117.0)" — the bundle carries the real Ritemark version
 - Chat links to workspace files (including `README.md:12` style) open in Ritemark
 - The AI info banner shows until dismissed, then never again — verified across restarts
