@@ -57,8 +57,8 @@ breathing room; Sofia Sans in every corner.
 
 ## Known issues
 
-- **Recent documents in very large folders.** Home's recent-documents list picks from the first 200 markdown files the workspace scan returns, then sorts those by modification time — so in a folder with more than 200 markdown files the newest files can be missing entirely. Fix tracked in #194.
-- **Browser "Recent" only records pages opened by command.** Pages you navigate to inside the browser panel (address bar, link clicks) are not added to the list — only pages opened via "Open in integrated browser", an agent action, or a terminal link. Fix tracked in #195.
+- **Recent documents in very large folders.** Home's recent-documents list picks from the first 200 markdown files the workspace scan returns, then sorts those by modification time — so in a folder with more than 200 markdown files the newest files can be missing entirely. Fix tracked in [issue #194](https://github.com/ProductoryHQ/ritemark-native/issues/194).
+- **Browser "Recent" only records pages opened by command.** Pages you navigate to inside the browser panel (address bar, link clicks) are not added to the list — only pages opened via "Open in integrated browser", an agent action, or a terminal link. Fix tracked in [issue #195](https://github.com/ProductoryHQ/ritemark-native/issues/195).
 
 ## For the record
 
