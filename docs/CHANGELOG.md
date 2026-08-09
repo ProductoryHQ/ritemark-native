@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — v1.8.6
+## [1.8.6] — 2026-08-09
 
-> **In progress.** Sprint 102 — AI Transparency (#163); Sprint 103 — Truthful Agent Plans (#132, #161); Sprint 104 — Reliable Multi-Prompt Queue (#162); Sprint 105 — Comments Command Center (#164, #165); Sprint 106 — Home Launcher (#74); Sprint 107 — Clean Start (first-open fix, daemon consent, tab healer; R4 welcome-card removal shipped early). Later v1.8.6 sprints will extend this entry.
+Sprint 102 — AI Transparency (#163); Sprint 103 — Truthful Agent Plans (#132, #161); Sprint 104 — Reliable Multi-Prompt Queue (#162); Sprint 105 — Comments Command Center (#164, #165); Sprint 106 — Home Launcher (#74); Sprint 107 — Clean Start (first-open fix, daemon consent, tab healer; R4 welcome-card removal shipped early), plus the connectivity fix below.
+
+### Fixed (post-candidate)
+- **The offline banner no longer flickers on a healthy connection (#193).** Connectivity was decided by a single `HEAD` to `api.openai.com` with a 5 s timeout, re-rolled every 30 s — one slow or dropped probe flipped the UI to "Offline". Measured on 2026-08-08: ~10% of probes to OpenAI's edge failed on a working connection, so the banner reappeared every few minutes. Each round now races three independent endpoints (Anthropic, OpenAI, Apple captive portal — any HTTP response counts as online) with an 8 s timeout, and the offline verdict requires **two consecutive** failed rounds with a 5 s confirm round after the first; one success recovers instantly. Decision logic is a pure, unit-tested module (`src/ai/connectivityPolicy.ts`)
 
 ### Changed
 - **Mode control is ONE dropdown: Manual / Auto / Plan only.** The separate Plan chip is gone — "Plan only" lives in the same select, still auto-resets to the underlying autonomy when a plan is approved
@@ -34,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Home is the same launcher with or without a folder.** The no-folder Home now shows the full launcher — New document (works folderless via drafts), Open document, New table, Open folder, and your recent folders (one-click re-entry) — instead of a bare "open a folder" dead end. Only "New AI task" stays folder-gated (agent runs require a workspace)
 - **Chat file links now open in Ritemark.** A chat reply linking to a workspace file ("[Koondfailis](koondfail.md)") opens that file in Ritemark's own editor on click — previously the click died silently (the webview's `open-source` message had no host handler). Web links route through the browser as before; paths are confined to the workspace folder (realpath-checked), and inline-code paths like `docs/plan.md:12` work too
 - **Project view speaks Ritemark, not VS Code.** The no-folder empty state now says "Open a folder to start writing — your documents live in a folder Ritemark can see" with a single Open Folder action (patch 002); the git extension's "Clone Repository" block and the "how to use Git and source control in VS Code read our docs" link no longer appear there (patch 003)
-- **Finder showed "Ritemark.app (1.117.0)".** The macOS bundle's `CFBundleShortVersionString` was left at the upstream VS Code version by the build; `build-prod.sh` now stamps `Info.plist` with the Ritemark version (takes effect from the next full app build)
+- **Finder showed "Ritemark.app (1.117.0)".** The macOS bundle's `CFBundleShortVersionString` was left at the upstream VS Code version by the build; `build-prod.sh` now stamps `Info.plist` with the Ritemark version. Both v1.8.6 macOS builds ship stamped — note that the Apple Silicon stamp comes from `build-prod.sh` while the Intel build is produced by CI, which has no stamp step: the v1.8.6 Intel bundle was stamped manually at release time and the CI gap is tracked in #200
 
 ### Removed
 - **"Claude is ready — Get Started" welcome card (Sprint 107 R4).** A ready Claude sidebar with no conversation now opens straight into the chat composer — the interstitial card and its extra click are gone. Its bookkeeping (`hasSeenClaudeWelcome`) still records automatically, and the real setup states (install, repair, sign-in, Codex/OpenCode setup, first-run onboarding) are unchanged

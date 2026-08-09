@@ -55,6 +55,11 @@ breathing room; Sofia Sans in every corner.
 - The AI info banner shows until dismissed, then never again — verified across restarts
 - Comment task prompts keep cross-agent references intact
 
+## Known issues
+
+- **Recent documents in very large folders.** Home's recent-documents list picks from the first 200 markdown files the workspace scan returns, then sorts those by modification time — so in a folder with more than 200 markdown files the newest files can be missing entirely. Fix tracked in #194.
+- **Browser "Recent" only records pages opened by command.** Pages you navigate to inside the browser panel (address bar, link clicks) are not added to the list — only pages opened via "Open in integrated browser", an agent action, or a terminal link. Fix tracked in #195.
+
 ## For the record
 
 Sprint 102 (AI transparency), 103 (truthful plans), 104 (prompt queue),
