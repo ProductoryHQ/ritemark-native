@@ -62,8 +62,9 @@ A 60-minute recording converts in **1.2 seconds**, entirely in the extension hos
 3. **Peaks for the waveform** are computed host-side by scanning a 16 kHz mono WAV (produced by the same `afconvert` call for m4a, or a cheap dedicated one for other formats) and downsampling to ~2000 points, stored on the session. Given the 1.2 s conversion cost, this is not a concern.
 4. **`transcribe:audioChunk`** is removed from the bridge message list.
 
-## Residual risks
+## Residual risks — closed during Phase 1 (2026-08-12)
 
-- `.ogg` support is claimed but untested; verify during Phase 1 or drop it from the accepted list.
-- `afconvert` on a corrupt file must be checked for its own exit code — do not assume it fails loudly (see A2's exit-code trap).
+- **`.ogg` verified.** A libvorbis `.ogg` transcribed correctly through the bundled binary with no conversion. It stays in the accepted list.
+- **`afconvert` fails loudly.** On a truncated `.m4a` it prints `Error: Couldn't open input file`, exits **1**, and writes no output file — it does *not* share whisper-cli's exit-0 trap. `convertToWav` still checks for a real output file as well, because one silent-success trap in a sprint is enough.
 - Windows has neither `afconvert` nor a local engine, so `m4a` on Windows goes to ElevenLabs, which accepts it directly. No gap.
+- **Waveform peaks are macOS-only.** Peaks come from an `afconvert` pass, so on Windows `peaks` is empty and the player must fall back to a plain seek bar rather than a waveform. Cosmetic, and consistent with the platform story in R13 — but it is a real difference to design for in Phase 4.
