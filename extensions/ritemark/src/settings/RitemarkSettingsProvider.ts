@@ -11,6 +11,8 @@ import { isEnabled } from '../features/featureGate';
 import { CodexAppServer, CodexAuth, emitCodexStatusInvalidated, onCodexStatusInvalidated } from '../codex';
 import { UpdateService } from '../update';
 import { AVAILABLE_MODELS, getModelPath, isModelDownloaded } from '../voiceDictation/modelManager';
+import { SessionStore } from '../speech/SessionStore';
+import { sessionStoreDir } from '../speech/paths';
 import {
   getAgentEnvironmentStatus,
   getSetupStatus,
@@ -352,7 +354,15 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         } else if (message.key === 'openrouter-api-key' && isEnabled('opencode-integration')) {
           // Sprint 76 R3a (Q-UX4): validate against the OpenRouter key endpoint.
           await this.testOpenRouterKey(webview);
+        } else if (message.key === 'elevenlabs-api-key' && isEnabled('transcription-workbench')) {
+          // Sprint 108 R4: a cheap authenticated GET, so a bad key is caught in
+          // Settings rather than halfway through a 44 MB upload.
+          await this.testElevenLabsKey(webview);
         }
+        break;
+
+      case 'transcription:clearStorage':
+        await this.clearTranscriptionStorage(webview);
         break;
 
       case 'claude:install':
@@ -510,6 +520,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     const openrouterKey = openrouterEnabled
       ? await this.context.secrets.get('openrouter-api-key')
       : undefined;
+    // Sprint 108 R4: 'elevenlabs-api-key' joins the same SecretStorage list.
+    // Gated on the transcription flag so the card disappears with the feature.
+    const transcriptionEnabled = isEnabled('transcription-workbench');
+    const elevenlabsKey = transcriptionEnabled
+      ? await this.context.secrets.get('elevenlabs-api-key')
+      : undefined;
+    const transcriptionStorageBytes = transcriptionEnabled ? await this.transcriptionStorageBytes() : 0;
 
     const initialUpdateSnapshot = await this.updateService.getStatusSnapshot();
     const updateCenterPromise = initialUpdateSnapshot.lastCheckedAt === 0
@@ -615,6 +632,12 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         openrouterEnabled,
         openrouterKey: openrouterKey || '',
         openrouterKeyConfigured: !!openrouterKey,
+        // Sprint 108 R4/R12: the ElevenLabs card and the transcription-data row
+        // both disappear when the feature flag is off.
+        transcriptionEnabled,
+        elevenlabsKey: elevenlabsKey || '',
+        elevenlabsKeyConfigured: !!elevenlabsKey,
+        transcriptionStorageBytes,
 
         // Update-adjacent components
         componentStatus,
@@ -1092,6 +1115,84 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * /api/v1/key endpoint (no token spend) — same card pattern as the other
    * provider keys.
    */
+  /**
+   * Sprint 108 R4 — validate the ElevenLabs key against a cheap authenticated
+   * endpoint. `/v1/user` returns the account, costs nothing, and needs no audio.
+   */
+  private async testElevenLabsKey(webview: vscode.Webview): Promise<void> {
+    const key = await this.context.secrets.get('elevenlabs-api-key');
+    if (!key) {
+      webview.postMessage({ type: 'testResult', key: 'elevenlabs', success: false, error: 'No API key configured' });
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.elevenlabs.io/v1/user', {
+        method: 'GET',
+        headers: { 'xi-api-key': key },
+      });
+
+      if (!response.ok) {
+        // 401 is the case that matters, and "rejected the key" is more useful
+        // to the reader than the status line.
+        throw new Error(
+          response.status === 401
+            ? 'ElevenLabs rejected this key'
+            : `ElevenLabs returned an error (${response.status})`
+        );
+      }
+
+      webview.postMessage({ type: 'testResult', key: 'elevenlabs', success: true, message: 'API key is valid' });
+    } catch (err) {
+      webview.postMessage({
+        type: 'testResult',
+        key: 'elevenlabs',
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }
+
+  /** Sprint 108 R12 — bytes held by stored transcripts, for the Settings row. */
+  private async transcriptionStorageBytes(): Promise<number> {
+    try {
+      const store = new SessionStore(sessionStoreDir(this.context.globalStorageUri.fsPath));
+      return await store.sizeBytes();
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Sprint 108 R12 — delete stored transcripts.
+   *
+   * Confirmed first, because sessions hold the user's speaker renames and
+   * corrections (D5). Recordings and exported markdown are never touched.
+   */
+  private async clearTranscriptionStorage(webview: vscode.Webview): Promise<void> {
+    const confirm = await vscode.window.showWarningMessage(
+      'Delete all stored transcripts?',
+      {
+        modal: true,
+        detail:
+          'Speaker names, corrections and insights stored with your transcripts will be removed. Your recordings and any exported Markdown files are not affected.',
+      },
+      'Delete transcripts'
+    );
+    if (confirm !== 'Delete transcripts') return;
+
+    try {
+      const store = new SessionStore(sessionStoreDir(this.context.globalStorageUri.fsPath));
+      await store.clear();
+      vscode.window.showInformationMessage('Stored transcripts deleted.');
+    } catch (err) {
+      vscode.window.showErrorMessage(
+        `Could not delete stored transcripts: ${err instanceof Error ? err.message : 'unknown error'}`
+      );
+    }
+    await this.sendCurrentSettings(webview);
+  }
+
   private async testOpenRouterKey(webview: vscode.Webview): Promise<void> {
     const key = await this.context.secrets.get('openrouter-api-key');
     if (!key) {

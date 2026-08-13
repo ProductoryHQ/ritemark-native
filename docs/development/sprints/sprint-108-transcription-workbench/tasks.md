@@ -39,14 +39,23 @@ Status here is the source of truth for "what is done" — but only when it agree
 - **Pre-existing, out of scope:** `npm test` short-circuits at test 31 of 68 (`SaveFileNodeExecutor.integration.test.ts` needs the `vscode` module). Running each independently: **65 pass, 3 fail** — that one, `ClaudeCodeNodeExecutor.integration.test.ts` (same cause) and `daemon/workspaceConsent.test.ts` (top-level await under CJS). Not introduced by this sprint; flagged separately.
 - **Waveform peaks are macOS-only** (they come from `afconvert`). Phase 4 needs a plain seek-bar fallback on Windows.
 
-## Phase 2: Settings, keys, flag (R4, R13)
+## Phase 2: Settings, keys, flag (R4, R13) — COMPLETE (2026-08-12)
 
-- [ ] `features/flags.ts` — add `transcription-workbench` (`stable`, `['darwin','win32']`)
-- [ ] `RitemarkSettingsProvider.ts` — `elevenlabs-api-key` in the SecretStorage key list + store/read/test handlers
-- [ ] `RitemarkSettings.tsx` — ElevenLabs key card in the existing API Keys section (no page restructure)
-- [ ] Settings: transcription data size + **Clear transcription data**
-- [ ] Unit test: flag platform gating
-- [ ] Commit Workstream 2
+- [x] `features/flags.ts` — `transcription-workbench` (`stable`, `['darwin','win32']` — broader than `voice-dictation` on purpose)
+- [x] `RitemarkSettingsProvider.ts` — `elevenlabs-api-key` read + payload fields; **storage needed no change**, the `setApiKey` handler was already generic on `message.key`
+- [x] `testElevenLabsKey` — authenticated `GET /v1/user`, so a bad key is caught in Settings rather than halfway through a 44 MB upload
+- [x] `RitemarkSettings.tsx` — ElevenLabs card appended to the existing API Keys section, copied structurally from the OpenRouter card. Purely additive; no restructure
+- [x] Transcription data row (size + **Clear**) under Component readiness, with a modal confirm that names what is and is not deleted
+- [x] `src/speech/paths.ts` — one definition of the session directory, shared by Settings and the pipeline
+- [x] Unit test: flag platform gating, incl. a guard that it never silently matches `voice-dictation`'s macOS-only list
+- [x] Verified live in dev mode via CDP: both surfaces render, `Clear` correctly disabled when empty, rest of the page intact
+- [x] `tsc` clean (host + webview), webview bundle rebuilt, `pre-commit-validator.sh` green
+- [x] Commit Workstream 2
+
+### Found during Phase 2
+
+- **Verification caught a false pass.** After the first build the card did not appear: `tsc --noEmit` and the webview build had both run, but the extension host bundle had not — `npm run compile` is what emits `out/extension.js`. The old host never sent `transcriptionEnabled`, so the flag-gated card silently stayed hidden. Same shape as the known `build-prod.sh` trap: type-checking is not compiling.
+- Copy fix after reading it on screen: the empty state read "Nothing stored yet — stored transcripts, speaker names and corrections." Now the whole sentence is chosen per state.
 
 ## Phase 3: Transcribe activity-bar app (R1, R13)
 

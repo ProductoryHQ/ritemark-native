@@ -45,7 +45,9 @@ export type FlagId =
   // Sprint 94: comment callouts (#81) — editor-only comments + AI assignment
   | 'comment-callouts'
   // Sprint 99 (R15): parallel agent chats — multi-conversation store + rail
-  | 'parallelChats';
+  | 'parallelChats'
+  // Sprint 108: audio transcription workbench (Transcribe activity-bar app)
+  | 'transcription-workbench';
 
 /**
  * Feature flag registry
@@ -99,6 +101,17 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     description: 'Speech-to-text using Whisper (macOS only)',
     status: 'stable',
     platforms: ['darwin'],
+  },
+  // Sprint 108: the Transcribe app + Transcript Workbench. Ships on Windows
+  // too, unlike voice-dictation — the on-device engine is macOS-only (#133) but
+  // ElevenLabs works everywhere, and the engine registry reports the difference
+  // rather than hiding the feature (D4/R13).
+  'transcription-workbench': {
+    id: 'transcription-workbench',
+    label: 'Transcription Workbench',
+    description: 'Transcribe audio recordings into speaker-attributed markdown, on-device with Whisper or with ElevenLabs Scribe.',
+    status: 'stable',
+    platforms: ['darwin', 'win32'],
   },
   'markdown-export': {
     id: 'markdown-export',
