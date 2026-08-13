@@ -77,22 +77,42 @@ export function segmentsForSpeaker(segments: WorkbenchSegment[], speakerId: stri
 }
 
 /**
- * Confidence threshold below which a word is marked as uncertain.
+ * Confidence below which a word is a candidate for the uncertainty mark.
  *
- * Per-engine because the two scales are not the same shape: whisper's `p` is a
- * token probability that sits very high for ordinary words, while ElevenLabs'
- * value is `exp(logprob)` and spreads lower. Both were sampled against real
- * output — a 113s on-device run put 372 words between 0.115 and 1.0.
+ * 0.55 was measured against real on-device output (372 words from a 2-minute
+ * recording): nothing at all falls below 0.5, and 0.55 catches the mis-heard
+ * proper noun without dragging in the whole function-word tail.
  *
- * Deliberately conservative: a false "uncertain" mark on every third word
- * teaches the user to ignore the highlight, which is worse than missing some.
+ * The same number is used for ElevenLabs, whose scale is `exp(logprob)` rather
+ * than a token probability. That is an assumption, not a measurement — it needs
+ * a real diarized recording to tune, which is a QA item rather than a guess to
+ * bake in as two different-looking constants.
  */
-export function confidenceThreshold(engine: string): number {
-  return engine === 'elevenlabs' ? 0.55 : 0.6;
+export function confidenceThreshold(_engine: string): number {
+  return 0.55;
 }
 
+/**
+ * Short words are excluded from marking regardless of confidence.
+ *
+ * Measured against real on-device output: the low-probability tail is dominated
+ * by short function words at segment boundaries — "and" (0.52), "The" (0.54),
+ * "One" (0.54) — where whisper is unsure about the boundary, not the word. The
+ * genuinely useful mark in the same sample was "Merike" (0.52), a name. Marking
+ * every uncertain "and" teaches the reader to ignore the highlight, which
+ * costs more than the misses.
+ *
+ * Length rather than a stopword list: Ritemark is used in Estonian as much as
+ * English, and a per-language word list would rot.
+ */
+const MIN_MARKED_WORD_LENGTH = 4;
+
 export function isLowConfidence(word: WorkbenchWord, engine: string): boolean {
-  return word.confidence !== undefined && word.confidence < confidenceThreshold(engine);
+  if (word.confidence === undefined) return false;
+  if (word.confidence >= confidenceThreshold(engine)) return false;
+
+  const letters = word.text.replace(/[^\p{L}\p{N}]/gu, '');
+  return letters.length >= MIN_MARKED_WORD_LENGTH;
 }
 
 /** The label to show for a segment, or null when nobody is attributed. */

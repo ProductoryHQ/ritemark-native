@@ -81,13 +81,30 @@ async function run(): Promise<void> {
 
   // ── confidence ──
 
-  assert.ok(
-    confidenceThreshold('elevenlabs') !== confidenceThreshold('whisper-local'),
-    'the two engines report confidence on different scales',
-  );
+  assert.ok(confidenceThreshold('whisper-local') > 0 && confidenceThreshold('whisper-local') < 1);
 
-  assert.equal(isLowConfidence({ text: 'Merike', start: 0, end: 1, confidence: 0.11 }, 'whisper-local'), true);
+  assert.equal(
+    isLowConfidence({ text: 'Merike', start: 0, end: 1, confidence: 0.52 }, 'whisper-local'),
+    true,
+    'an uncertain name is exactly what the mark is for',
+  );
   assert.equal(isLowConfidence({ text: 'the', start: 0, end: 1, confidence: 0.99 }, 'whisper-local'), false);
+
+  // Measured against real output: whisper's low-probability tail is mostly
+  // short function words at segment boundaries. Marking those trains the
+  // reader to ignore the highlight.
+  for (const short of ['and', 'The', 'One', 'so', 'I']) {
+    assert.equal(
+      isLowConfidence({ text: short, start: 0, end: 1, confidence: 0.2 }, 'whisper-local'),
+      false,
+      `"${short}" is too short to be worth marking however unsure the engine was`,
+    );
+  }
+  assert.equal(
+    isLowConfidence({ text: 'Wednesday,', start: 0, end: 1, confidence: 0.52 }, 'whisper-local'),
+    true,
+    'punctuation does not count against the length rule',
+  );
 
   // R9: an engine that reports nothing must produce NO marks — not a mark on
   // every word because `undefined < threshold` was allowed to be true.

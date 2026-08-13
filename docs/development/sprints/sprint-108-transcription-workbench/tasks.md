@@ -109,13 +109,30 @@ Status here is the source of truth for "what is done" — but only when it agree
 
 - **Diarized UI** — speaker chips, colours, and global rename — has no ElevenLabs key on this machine, so it is covered by unit tests and the host-side rename path only. Needs a real diarized recording at QA (Jarmo's key).
 
-## Phase 5: Insights rail (R10)
+## Phase 5: Insights rail (R10) — COMPLETE (2026-08-13)
 
-- [ ] `src/speech/insights.ts` — prompts, existing runtime, model ids from `ai/modelConfig.ts`, timestamp→segment resolution, cancellable
-- [ ] `InsightsRail.tsx` — cards, generated-content label naming the model, timestamp seek buttons, generating/failed/no-runtime states
-- [ ] Persist insights on the session
-- [ ] Unit test: timestamp resolution incl. unresolvable items dropped
-- [ ] Commit Workstream 5
+- [x] `src/speech/insightsParsing.ts` — prompt building, timestamp parsing, citation resolution. Pure (no `vscode`), so it is unit tested
+- [x] `src/speech/insights.ts` — runs a one-shot prompt on the **existing** Claude Code runtime; model id from `modelCatalog.getDefault('anthropic', 'claude-code')`, never hardcoded; cancellable
+- [x] `InsightsRail.tsx` — Summary / Decisions / Action items / Open questions / Key quotes; every item's timestamp is a seek button; generating, failed, and no-runtime states
+- [x] Insights persisted on the session (survive reopening) and carried into the Markdown export
+- [x] Unit tests — `insights.test.ts`: timestamp formats, snapping, and the case that matters: **uncitable items are dropped**
+- [x] Commit Workstream 5
+
+### Verified live against the real runtime
+
+Generated on a 2-minute on-device transcript: **11 items, 0 citing a non-segment moment** — the resolution/drop logic holds in production, not just in tests. Quotes came back verbatim. Model reported as `claude-sonnet-5`, resolved from the catalog.
+
+Notably, **every item came back with no owner** — correct, because this was a non-diarized transcript and the prompt forbids attributing to a named person. D3 held all the way through to the model.
+
+### Found during Phase 5
+
+- **Confidence marking was too noisy.** The flat 0.6 threshold painted `and`, `The`, `One`, `now,` amber — whisper's low-probability tail is dominated by short function words at segment *boundaries*, where it is unsure about the split, not the word. Measured the real distribution (372 words: nothing below 0.5; 8 below 0.6) and changed the rule to **0.55 plus a minimum word length of 4**. Result on the same recording: 8 marks → **2** (`Wednesday,` and `Merike`), both worth checking. Length rather than a stopword list because Ritemark is used in Estonian as much as English.
+- The two per-engine thresholds had converged on the same number, which pretended to knowledge I do not have. Now one constant, with the ElevenLabs side documented as an assumption needing a real diarized recording to tune.
+- **Transcribing from the workbench stored `durationSec: 0`**, so the library row read "Length unknown". The webview was trusted for a value the host can probe; it now probes host-side, matching the panel path.
+
+### Known characteristic
+
+Insight generation takes **1–3 minutes** even for a short recording: the agentic runtime has real startup cost, and this is a one-shot extraction wearing an agent's clothes. Acceptable for a background action with a visible cancel, but if it becomes annoying, the fix is a direct model call rather than the full runtime.
 
 ## Phase 6: Export and sessions (R11, R12) — COMPLETE (2026-08-13)
 

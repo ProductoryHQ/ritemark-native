@@ -19,9 +19,12 @@ import type { EngineRegistry } from './speech/engineRegistry';
 import type { JobManager } from './speech/JobManager';
 import type { SessionStore } from './speech/SessionStore';
 import { sessionIdForPath } from './speech/SessionStore';
+import { probeDurationSec } from './speech/durationProbe';
 import type { EngineId, TranscriptionJob } from './speech/types';
 import { trackEvent } from './analytics/posthog';
 import { exportSession } from './speech/autoExport';
+import { generateInsights, insightsWorkspacePath } from './speech/insights';
+import { getSetupStatus } from './agent/setup';
 
 class AudioDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -35,6 +38,8 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
 
   private readonly _panels = new Map<string, vscode.WebviewPanel>();
   private readonly _jobSubscription: () => void;
+  /** In-flight insight runs, so a second click cancels rather than stacks. */
+  private readonly _insightRuns = new Map<string, AbortController>();
 
   constructor(
     private readonly _context: vscode.ExtensionContext,
@@ -84,7 +89,11 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
           this._jobs.enqueue({
             audioPath: fsPath,
             engineId: message.engineId as EngineId,
-            durationSec: typeof message.durationSec === 'number' ? message.durationSec : 0,
+            // Probed here rather than taken from the webview: starting a
+            // transcription from this tab must produce the same metadata as
+            // starting it from the panel, or the library row reads
+            // "Length unknown" for no reason the user can see.
+            durationSec: (await probeDurationSec(fsPath)) ?? 0,
             language: null,
           });
           await this._push(fsPath, panel);
@@ -94,6 +103,12 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
           break;
         case 'workbench:export':
           await this._export(fsPath, panel);
+          break;
+        case 'workbench:generateInsights':
+          await this._generateInsights(fsPath, panel);
+          break;
+        case 'workbench:cancelInsights':
+          this._insightRuns.get(fsPath)?.abort();
           break;
         case 'workbench:openSettings':
           await vscode.commands.executeCommand('ritemark.aiSettings');
@@ -163,10 +178,54 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
     await this._push(fsPath, panel);
   }
 
+  /**
+   * R10 — generate the summary/decisions/actions/quotes.
+   *
+   * Runs on the existing agent runtime and stores the result on the session, so
+   * it survives reopening and reaches the Markdown export.
+   */
+  private async _generateInsights(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
+    if (this._insightRuns.has(fsPath)) return;
+
+    const session = await this._store.get(sessionIdForPath(fsPath));
+    if (!session || session.segments.length === 0) return;
+
+    const controller = new AbortController();
+    this._insightRuns.set(fsPath, controller);
+    void panel.webview.postMessage({ type: 'workbench:insightsState', state: 'generating' });
+
+    try {
+      const insights = await generateInsights({
+        session,
+        workspacePath: insightsWorkspacePath(session),
+        signal: controller.signal,
+      });
+
+      // Re-read: a speaker rename may have landed while the model was thinking.
+      const latest = (await this._store.get(session.id)) ?? session;
+      await this._store.save({ ...latest, insights });
+      void panel.webview.postMessage({ type: 'workbench:insightsState', state: 'idle' });
+    } catch (error) {
+      void panel.webview.postMessage({
+        type: 'workbench:insightsState',
+        state: 'failed',
+        message: error instanceof Error ? error.message : 'Could not generate insights.',
+      });
+    } finally {
+      this._insightRuns.delete(fsPath);
+      await this._push(fsPath, panel);
+    }
+  }
+
   private async _push(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
-    const [session, engines] = await Promise.all([
+    const [session, engines, runtimeReady] = await Promise.all([
       this._store.get(sessionIdForPath(fsPath)),
       this._registry.statuses(),
+      // R10: with no runtime configured the rail explains what to set up
+      // rather than offering a button that fails.
+      getSetupStatus()
+        .then((status) => status.authenticated)
+        .catch(() => false),
     ]);
 
     const job = this._jobs
@@ -182,6 +241,7 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
         job: job ?? null,
         engines,
         hasExport: Boolean(session?.exportPath && fs.existsSync(session.exportPath)),
+        runtimeReady,
       },
     });
   }

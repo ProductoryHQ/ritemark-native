@@ -15,6 +15,7 @@ import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/button';
 import { vscode } from '../../../lib/vscode';
 import { Waveform } from './Waveform';
+import { InsightsRail, type Insights, type InsightsState } from './InsightsRail';
 import {
   activeSegmentIndex,
   formatClock,
@@ -47,6 +48,7 @@ interface Session {
   segments: WorkbenchSegment[];
   peaks: number[];
   costUsd?: number;
+  insights?: Insights;
 }
 
 interface WorkbenchState {
@@ -57,6 +59,8 @@ interface WorkbenchState {
   engines: EngineStatus[];
   /** A Markdown export already exists on disk for this recording (R11). */
   hasExport?: boolean;
+  /** False when no agent runtime is configured, so the rail explains instead of failing (R10). */
+  runtimeReady?: boolean;
 }
 
 const SPEEDS = [1, 1.25, 1.5, 2];
@@ -69,6 +73,8 @@ export function Workbench() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [followPlayback, setFollowPlayback] = useState(true);
+  const [insightsState, setInsightsState] = useState<InsightsState>('idle');
+  const [insightsError, setInsightsError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -76,7 +82,12 @@ export function Workbench() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'workbench:state') setState(event.data.data as WorkbenchState);
+      if (event.data?.type === 'workbench:state') {
+        setState(event.data.data as WorkbenchState);
+      } else if (event.data?.type === 'workbench:insightsState') {
+        setInsightsState(event.data.state as InsightsState);
+        setInsightsError(event.data.message ?? null);
+      }
     };
     window.addEventListener('message', handleMessage);
     vscode.postMessage({ type: 'workbench:ready' });
@@ -236,25 +247,35 @@ export function Workbench() {
         }}
       />
 
-      <div
-        ref={transcriptRef}
-        className="flex-1 overflow-y-auto px-5 py-4"
-        onWheel={() => setFollowPlayback(false)}
-      >
-        <div className="mx-auto max-w-3xl">
-          {segments.map((segment, index) => (
-            <SegmentRow
-              key={segment.id}
-              ref={index === activeIndex ? activeRef : undefined}
-              segment={segment}
-              speakers={session.speakers}
-              previousSpeaker={index > 0 ? segments[index - 1].speaker : undefined}
-              active={index === activeIndex}
-              engine={lowConfidenceEngine}
-              onSeek={() => seek(segment.start, true)}
-            />
-          ))}
+      <div className="flex min-h-0 flex-1">
+        <div
+          ref={transcriptRef}
+          className="flex-1 overflow-y-auto px-5 py-4"
+          onWheel={() => setFollowPlayback(false)}
+        >
+          <div className="mx-auto max-w-3xl">
+            {segments.map((segment, index) => (
+              <SegmentRow
+                key={segment.id}
+                ref={index === activeIndex ? activeRef : undefined}
+                segment={segment}
+                speakers={session.speakers}
+                previousSpeaker={index > 0 ? segments[index - 1].speaker : undefined}
+                active={index === activeIndex}
+                engine={lowConfidenceEngine}
+                onSeek={() => seek(segment.start, true)}
+              />
+            ))}
+          </div>
         </div>
+
+        <InsightsRail
+          insights={session.insights ?? null}
+          state={insightsState}
+          error={insightsError}
+          runtimeReady={state.runtimeReady !== false}
+          onSeek={(seconds) => seek(seconds, true)}
+        />
       </div>
     </div>
   );
