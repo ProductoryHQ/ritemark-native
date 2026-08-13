@@ -396,8 +396,24 @@ export function activate(context: vscode.ExtensionContext) {
     const { createSpeechSubsystem } = require('./speech') as typeof import('./speech');
     const { TranscribeViewProvider } = require('./views/TranscribeViewProvider') as typeof import('./views/TranscribeViewProvider');
 
+    const { TranscriptWorkbenchProvider } = require('./transcriptWorkbenchProvider') as typeof import('./transcriptWorkbenchProvider');
+
     const speech = createSpeechSubsystem(context);
     void speech.jobs.recoverInterrupted();
+
+    const workbenchProvider = new TranscriptWorkbenchProvider(
+      context,
+      speech.registry,
+      speech.jobs,
+      speech.store,
+    );
+    context.subscriptions.push(
+      workbenchProvider,
+      vscode.window.registerCustomEditorProvider(TranscriptWorkbenchProvider.viewType, workbenchProvider, {
+        webviewOptions: { retainContextWhenHidden: true },
+        supportsMultipleEditorsPerDocument: false,
+      }),
+    );
 
     const transcribeViewProvider = new TranscribeViewProvider(
       context.extensionUri,

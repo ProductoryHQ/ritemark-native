@@ -83,22 +83,31 @@ Status here is the source of truth for "what is done" — but only when it agree
 - **Finder drag-and-drop cannot be supported.** Electron no longer exposes a filesystem path for files dragged from Finder, so that case shows "Use Add recording to pick it instead" rather than failing silently. Dragging from the VS Code Explorer works (uri-list).
 - `Icon` only accepts sizes 12/14/16/20 — caught by the type-checker, not at runtime.
 
-## Phase 4: Workbench, playback, speakers, confidence (R6–R9)
+## Phase 4: Workbench, playback, speakers, confidence (R6–R9) — COMPLETE (2026-08-12)
 
-- [ ] **First:** click-and-listen check — audible playback under a real user gesture (A3 could not verify this via CDP)
-- [ ] **First:** verify `ritemark.transcriptWorkbench` at `priority: "default"` wins over built-in `vscode.audioPreview` for mp3/wav/ogg
-- [ ] `src/transcriptWorkbenchProvider.ts` — `CustomReadonlyEditorProvider` (pdf provider shape)
-- [ ] `package.json` — `ritemark.transcriptWorkbench` custom editor for the audio extensions
-- [ ] `webview/src/main.tsx` — route `data-editor-type === 'transcript-workbench'` (lazy)
-- [ ] `Workbench.tsx` — layout shell, session load, scroll restore, no-session → offer to transcribe
-- [ ] `PlayerBar.tsx` — play/pause, time, speed, seek (per A3)
-- [ ] `Waveform.tsx` — canvas from stored peaks, click-to-seek, no library
-- [ ] `TranscriptPane.tsx` / `Segment.tsx` — click-to-seek, active highlight, auto-scroll with manual-scroll yield, keyboard shortcuts
-- [ ] `SpeakerBar.tsx` / `RenamePopover.tsx` — chips, stable palette, global rename with affected count, persistence
-- [ ] On-device "no speaker separation" row + **Re-run with ElevenLabs**
-- [ ] `ConfidenceMark.tsx` — `logprob` threshold (documented in code), absent for engines without confidence
-- [ ] Unit tests: active-segment selection, rename reducer, peaks downsampling
-- [ ] Commit Workstream 4
+- [x] **Click-and-listen confirmed.** A real CDP `Input` click on Play (a genuine user gesture, unlike `element.click()`) produced `paused: false`, `currentTime` advancing, `readyState: 4`, `volume: 1`, `muted: false`, no media error. The last A3 unknown is closed.
+- [x] **Priority contest won.** Opening `mono-lecture.mp3` gave the **Transcript** editor with our `<audio>` element, not the built-in `vscode.audioPreview`. `priority: "default"` outranks `builtin` as expected — no patch, no stripping of `media-preview` needed.
+- [x] `src/transcriptWorkbenchProvider.ts` — `CustomReadonlyEditorProvider` over the audio file; never reads the file into memory (the webview streams it by URI); `localResourceRoots` includes the recording's folder
+- [x] `package.json` — custom editor for `.m4a .mp3 .wav .flac .ogg .aac` at `priority: "default"`
+- [x] `webview/src/main.tsx` — lazy `transcript-workbench` route
+- [x] `Workbench.tsx` — player, speaker bar, transcript; no-session state offers to transcribe with the same honest engine choice; running-job state shows progress
+- [x] Player — play/pause, clock, 1×/1.25×/1.5×/2×, seek. **Never auto-plays** (A3's user-gesture rule)
+- [x] `Waveform.tsx` — canvas from stored peaks, click-to-seek, no library added. Falls back to a plain seek bar where there are no peaks (Windows)
+- [x] Transcript — click-to-seek-and-play, active highlight, auto-scroll that yields on manual scroll, space/←/→ keys
+- [x] Speaker chips, stable palette, rename popover stating the affected segment count, persisted host-side
+- [x] On-device "cannot separate speakers" row + **Re-run with ElevenLabs**
+- [x] Confidence marking on both engines, per-engine thresholds documented in code, absent when an engine reports nothing
+- [x] Unit tests — `playback.test.ts`: active-segment selection (incl. gaps), speaker palette, thresholds, clock, peak resampling
+- [x] Commit Workstream 4
+
+### Found during Phase 4
+
+- **Bug caught by looking at the screenshot, not by any test:** whisper's timestamp tokens (`[_TT_212]`) were leaking into the word list and, carrying low probabilities, being painted amber — so the transcript read `software.[_TT_212]` with an "uncertain" mark. The special-token filter required a trailing `_` (`[_BEG_]`, `[_EOT_]`) and timestamp tokens end in a digit. Fixed, regression-tested, and re-verified end to end: 0 tokens leaking, and low-confidence marks dropped from 5 bogus to **1 genuine** word. The segment `text` field was always clean, which is why nothing upstream noticed.
+- The icon pack has no pause glyph; a `minus` reads as "remove", so pause is two bars.
+
+### Not verified live
+
+- **Diarized UI** — speaker chips, colours, and global rename — has no ElevenLabs key on this machine, so it is covered by unit tests and the host-side rename path only. Needs a real diarized recording at QA (Jarmo's key).
 
 ## Phase 5: Insights rail (R10)
 

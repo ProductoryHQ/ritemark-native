@@ -25,10 +25,19 @@ async function run(): Promise<void> {
     { text: '[_BEG_]', p: 0.9 },
     { text: ' Mer', offsets: { from: 100, to: 200 }, p: 0.9 },
     { text: 'ike', offsets: { from: 200, to: 340 }, p: 0.4 },
+    // Timestamp tokens close with a digit, not an underscore. Letting these
+    // through glued "[_TT_212]" onto the previous word and — with their low
+    // probability — painted it amber in the workbench.
+    { text: '[_TT_212]', p: 0.11 },
     { text: ' and', offsets: { from: 350, to: 460 }, p: 0.99 },
+    { text: '[_EOT_]', p: 0.5 },
   ]);
 
   assert.equal(words.length, 2, 'special tokens are dropped, sub-word pieces merge');
+  assert.ok(
+    words.every((word) => !/\[_/.test(word.text)),
+    'no decoder token survives into the transcript',
+  );
   assert.equal(words[0].text, 'Merike');
   assert.equal(words[0].start, 0.1, 'ms offsets become seconds');
   assert.equal(words[0].end, 0.34);

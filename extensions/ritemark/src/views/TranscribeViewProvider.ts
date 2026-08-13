@@ -10,6 +10,7 @@
  * and Ritemark tokens instead of a second hand-rolled stylesheet.
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { EngineRegistry } from '../speech/engineRegistry';
@@ -194,21 +195,24 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
 
   // ── sessions ──────────────────────────────────────────────────────────────
 
+  /** Opens the recording in the Transcript Workbench (R6). */
   private async _openSession(sessionId: string): Promise<void> {
     const session = await this._store.get(sessionId);
     if (!session) return;
 
-    // Phase 4 replaces this with the Transcript Workbench editor. Until that
-    // exists, opening a finished recording opens its markdown export — which
-    // is written automatically on completion (R11), so there is always
-    // something to open.
-    if (session.exportPath) {
-      const document = await vscode.workspace.openTextDocument(vscode.Uri.file(session.exportPath));
-      await vscode.window.showTextDocument(document);
+    if (session.audioMissing || !fs.existsSync(session.audioPath)) {
+      // R12: the transcript is still here; only the recording moved. Say that
+      // rather than opening an editor onto a file that is not there.
+      vscode.window.showWarningMessage(
+        `${path.basename(session.audioPath)} is no longer at its recorded location. The transcript is kept.`,
+      );
       return;
     }
-    vscode.window.showInformationMessage(
-      `No export found for ${path.basename(session.audioPath)} yet.`,
+
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      vscode.Uri.file(session.audioPath),
+      'ritemark.transcriptWorkbench',
     );
   }
 

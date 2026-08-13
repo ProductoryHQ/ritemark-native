@@ -46,9 +46,18 @@ interface WhisperJson {
   transcription?: WhisperSegment[];
 }
 
-/** Special tokens like `[_BEG_]` are decoder bookkeeping, not speech. */
+/**
+ * Special tokens are decoder bookkeeping, not speech.
+ *
+ * Two shapes occur and they do not end the same way: `[_BEG_]` and `[_EOT_]`
+ * close with an underscore, but the timestamp tokens are `[_TT_212]`. An
+ * earlier version required a trailing `_`, so every timestamp token survived
+ * into the word list, glued itself onto the preceding word, and — carrying a
+ * low probability — showed up in the workbench as an amber "uncertain" mark on
+ * text like `software.[_TT_212]`.
+ */
 function isSpecialToken(text: string): boolean {
-  return /^\s*\[_.*_\]\s*$/.test(text);
+  return /^\s*\[_[^\]]*\]\s*$/.test(text);
 }
 
 /**

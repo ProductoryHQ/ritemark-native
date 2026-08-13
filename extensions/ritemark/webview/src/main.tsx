@@ -73,6 +73,12 @@ const TranscribePanel = lazy(() =>
   import('./components/transcribe/TranscribePanel').then((m) => ({ default: m.TranscribePanel }))
 )
 
+// Lazy load the Transcript Workbench (Sprint 108) — the editor surface for a
+// recording: waveform, speaker-separated transcript, click-a-line-to-hear-it.
+const TranscriptWorkbench = lazy(() =>
+  import('./components/transcribe/workbench/Workbench').then((m) => ({ default: m.Workbench }))
+)
+
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
@@ -133,6 +139,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'transcribe-panel' ? (
       <Suspense fallback={<LoadingFallback />}>
         <TranscribePanel />
+      </Suspense>
+    ) : editorType === 'transcript-workbench' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <TranscriptWorkbench />
       </Suspense>
     ) : (
       <App />
