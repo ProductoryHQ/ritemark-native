@@ -388,6 +388,32 @@ export function activate(context: vscode.ExtensionContext) {
     );
   }
 
+  // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too — only the
+  // on-device engine is macOS-only, and the registry says so rather than the
+  // whole view disappearing). Jobs live in the subsystem, not the view, so a
+  // running transcription survives the panel being closed.
+  if (isEnabled('transcription-workbench')) {
+    const { createSpeechSubsystem } = require('./speech') as typeof import('./speech');
+    const { TranscribeViewProvider } = require('./views/TranscribeViewProvider') as typeof import('./views/TranscribeViewProvider');
+
+    const speech = createSpeechSubsystem(context);
+    void speech.jobs.recoverInterrupted();
+
+    const transcribeViewProvider = new TranscribeViewProvider(
+      context.extensionUri,
+      speech.registry,
+      speech.jobs,
+      speech.store,
+      context.globalState,
+    );
+    context.subscriptions.push(
+      transcribeViewProvider,
+      vscode.window.registerWebviewViewProvider(TranscribeViewProvider.viewType, transcribeViewProvider, {
+        webviewOptions: { retainContextWhenHidden: true },
+      }),
+    );
+  }
+
   // Register Agent Library View Provider
   agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath, daemon.store, daemon);
   context.subscriptions.push(

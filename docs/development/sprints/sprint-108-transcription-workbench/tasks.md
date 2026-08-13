@@ -57,17 +57,31 @@ Status here is the source of truth for "what is done" — but only when it agree
 - **Verification caught a false pass.** After the first build the card did not appear: `tsc --noEmit` and the webview build had both run, but the extension host bundle had not — `npm run compile` is what emits `out/extension.js`. The old host never sent `transcriptionEnabled`, so the flag-gated card silently stayed hidden. Same shape as the known `build-prod.sh` trap: type-checking is not compiling.
 - Copy fix after reading it on screen: the empty state read "Nothing stored yet — stored transcripts, speaker names and corrections." Now the whole sentence is chosen per state.
 
-## Phase 3: Transcribe activity-bar app (R1, R13)
+## Phase 3: Transcribe activity-bar app (R1, R13) — COMPLETE (2026-08-12)
 
-- [ ] `media/transcribe-icon.svg` — audio-lines mark matching the existing activity-bar icon set
-- [ ] `package.json` — `ritemark-transcribe` container + `ritemark.transcribeView`
-- [ ] `src/views/TranscribeViewProvider.ts` — modelled on `AgentLibraryViewProvider`; job subscription; activity-bar badge
-- [ ] `extension.ts` — register behind the flag
-- [ ] `webview/src/main.tsx` — route `data-editor-type === 'transcribe-panel'` (lazy)
-- [ ] `components/transcribe/TranscribePanel.tsx` + `RecordingRow` + `EngineStatusCard` + `DropZone` (shadcn `ui/button` only)
-- [ ] First-run state, engine cards with real state, Windows message linking #133
-- [ ] Drag-and-drop and file-picker import; video/broken-file refusal copy
-- [ ] Commit Workstream 3
+- [x] `media/transcribe-icon.svg` — audio-lines mark, phosphor-weight, matching the existing set
+- [x] `package.json` — `ritemark-transcribe` container + `ritemark.transcribeView`
+- [x] `src/views/TranscribeViewProvider.ts` — import/staging, engine state, job subscription, activity-bar badge
+- [x] `src/speech/durationProbe.ts` + test — `afinfo` then WAV header; returns **null** rather than inventing a length for a cost estimate
+- [x] `src/speech/index.ts` — one factory for registry + jobs + store, called from `extension.ts`
+- [x] `extension.ts` — registered behind the flag; `recoverInterrupted()` runs on activation
+- [x] `webview/src/main.tsx` — lazy route for `transcribe-panel`
+- [x] `components/transcribe/TranscribePanel.tsx` + `types.ts` — drop zone, pending-import engine chooser, job rows, library rows, first-run cards. shadcn `Button` throughout
+- [x] First-run state, engine cards with real state, Windows path links #133
+- [x] Drag-and-drop and file-picker import; video/unsupported refusal copy
+- [x] Commit Workstream 3
+
+### Verified live in dev mode (CDP)
+
+- Drop `long-meeting.m4a` → duration probed as **1 h 1 min**, engine choices with cost, on-device marked Free/private, ElevenLabs correctly disabled with "No API key — needed for speaker separation"
+- Full transcription of `short-2spk.m4a` → job row → Library. Session on disk: **38 segments, 2002 peaks, 372 words with confidence** (min 0.115 — R9 has real on-device data, confirming A2 in production), `speakerSeparation: 'none'`, `speakers: []` — no invented speakers
+- Video drop → "Video files are not supported yet. Export the audio track…"
+
+### Found during Phase 3
+
+- **Upstream VS Code bug — activity-bar badge cannot be cleared with `undefined`.** `WebviewViewPane.updateBadge` stores the new badge then registers an activity only `if (badge)`; it never clears the previous activity, so a finished job left "1 transcribing" on the icon permanently. Worked around by assigning `{ value: 0 }`, which the renderer hides via its `if (total > 0)` check. **Deliberately not patched:** `patches/` is shell-tier, so a three-line upstream fix would turn this sprint into a full app rebuild + notarization for a cosmetic badge. Worth revisiting if a shell release happens for other reasons.
+- **Finder drag-and-drop cannot be supported.** Electron no longer exposes a filesystem path for files dragged from Finder, so that case shows "Use Add recording to pick it instead" rather than failing silently. Dragging from the VS Code Explorer works (uri-list).
+- `Icon` only accepts sizes 12/14/16/20 — caught by the type-checker, not at runtime.
 
 ## Phase 4: Workbench, playback, speakers, confidence (R6–R9)
 
