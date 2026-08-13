@@ -117,13 +117,27 @@ Status here is the source of truth for "what is done" — but only when it agree
 - [ ] Unit test: timestamp resolution incl. unresolvable items dropped
 - [ ] Commit Workstream 5
 
-## Phase 6: Export and sessions (R11, R12)
+## Phase 6: Export and sessions (R11, R12) — COMPLETE (2026-08-13)
 
-- [ ] Export command — target resolution (setting, default `Transcripts/`), write, open in Ritemark editor
-- [ ] Auto-export on completion (D5 mitigation)
-- [ ] Overwrite confirmation / numbered sibling
-- [ ] Relink flow for moved audio; delete that leaves audio and exports untouched
-- [ ] Unit tests: markdown shape with renames, target-path resolution incl. no workspace open
+*(taken before Phase 5: it closes the loop back to Markdown and carries the D5 mitigation.)*
+
+- [x] `src/speech/exportTranscript.ts` — pure path resolution + writer. Workspace → `<workspace>/<folder>/`; no workspace → beside the recording; absolute setting honoured
+- [x] `ritemark.transcription.exportFolder` setting, default `Transcripts`
+- [x] `src/speech/autoExport.ts` + registration — **every completed transcription writes a Markdown file automatically**, so a transcript is never only in hidden app storage (D5)
+- [x] Auto-export never overwrites (numbered sibling); the manual **Update Markdown** button asks *Replace* / *Save a copy* first, because the existing file may have been hand-edited
+- [x] **Export to Markdown** / **Update Markdown** button in the workbench header
+- [x] Panel row actions: open the Markdown transcript; **Find it** to relink a moved recording (R12)
+- [x] Unit tests — `exportTranscript.test.ts`: path rules, never-clobber, overwrite-the-known-file, renames reaching the file
+- [x] Commit Workstream 6
+
+### Verified live
+
+- Transcribed a recording → `a3-workspace/Transcripts/short-2spk.md` appeared **without being asked**, with front matter (title, date, duration, engine, language, `speakers: none — this engine cannot separate speakers`, source path) and the timestamped transcript
+- Opening it from the library row lands in **Ritemark's visual editor** (TipTap confirmed in the DOM), and the AI sidebar picks it up as the active document — the loop from audio back to Ritemark is closed
+
+### Found during Phase 6
+
+- **The export opened as raw Markdown source.** `vscode.workspace.openTextDocument` + `showTextDocument` forces the plain text editor and bypasses the registered custom editor, so the transcript appeared as syntax with line numbers — the exact thing Ritemark exists to avoid. Both call sites now use `vscode.commands.executeCommand('vscode.open', …)`, which resolves the default editor. Caught by looking at the screenshot; every test still passed.
 - [ ] Commit Workstream 6
 
 ## Phase 7: QA and closeout

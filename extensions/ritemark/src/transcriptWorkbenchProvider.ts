@@ -12,14 +12,16 @@
  * the webview streams it by URI (audit A3 confirmed range requests are served).
  */
 
-import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import type { EngineRegistry } from './speech/engineRegistry';
 import type { JobManager } from './speech/JobManager';
 import type { SessionStore } from './speech/SessionStore';
 import { sessionIdForPath } from './speech/SessionStore';
 import type { EngineId, TranscriptionJob } from './speech/types';
 import { trackEvent } from './analytics/posthog';
+import { exportSession } from './speech/autoExport';
 
 class AudioDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -90,6 +92,9 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
         case 'workbench:renameSpeaker':
           await this._renameSpeaker(fsPath, message.speakerId, message.label);
           break;
+        case 'workbench:export':
+          await this._export(fsPath, panel);
+          break;
         case 'workbench:openSettings':
           await vscode.commands.executeCommand('ritemark.aiSettings');
           break;
@@ -123,6 +128,41 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
     if (panel) await this._push(fsPath, panel);
   }
 
+  /**
+   * R11 — export after corrections.
+   *
+   * An export already exists (written automatically when the transcription
+   * finished), so this asks before replacing it: the user may have edited that
+   * file, and their edits are not ours to discard.
+   */
+  private async _export(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
+    const session = await this._store.get(sessionIdForPath(fsPath));
+    if (!session) return;
+
+    let collision: 'overwrite' | 'unique' = 'unique';
+
+    if (session.exportPath && fs.existsSync(session.exportPath)) {
+      const choice = await vscode.window.showWarningMessage(
+        `Update ${path.basename(session.exportPath)}?`,
+        {
+          modal: true,
+          detail: 'The existing Markdown export will be replaced with the current transcript, including any speaker names you have changed.',
+        },
+        'Replace',
+        'Save a copy',
+      );
+      if (!choice) return;
+      collision = choice === 'Replace' ? 'overwrite' : 'unique';
+    }
+
+    const filePath = await exportSession(this._store, session, collision);
+    // `vscode.open`, not `showTextDocument`: the latter forces the plain text
+    // editor, and the whole point of exporting is to land in Ritemark's visual
+    // markdown editor rather than in a wall of syntax.
+    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { preview: false });
+    await this._push(fsPath, panel);
+  }
+
   private async _push(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
     const [session, engines] = await Promise.all([
       this._store.get(sessionIdForPath(fsPath)),
@@ -141,6 +181,7 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
         session,
         job: job ?? null,
         engines,
+        hasExport: Boolean(session?.exportPath && fs.existsSync(session.exportPath)),
       },
     });
   }

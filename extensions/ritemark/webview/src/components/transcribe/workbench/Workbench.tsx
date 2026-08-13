@@ -55,6 +55,8 @@ interface WorkbenchState {
   session: Session | null;
   job: { state: string; progress: { percent: number | null } } | null;
   engines: EngineStatus[];
+  /** A Markdown export already exists on disk for this recording (R11). */
+  hasExport?: boolean;
 }
 
 const SPEEDS = [1, 1.25, 1.5, 2];
@@ -164,6 +166,17 @@ export function Workbench() {
               {session.costUsd ? ` · $${session.costUsd.toFixed(2)}` : ''}
             </div>
           </div>
+
+          {/* The transcript is already on disk — an export was written when the
+              transcription finished (R11). This updates it after corrections. */}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            onClick={() => vscode.postMessage({ type: 'workbench:export' })}
+          >
+            {state.hasExport ? 'Update Markdown' : 'Export to Markdown'}
+          </Button>
         </div>
 
         <div className="mt-3 flex items-center gap-3">

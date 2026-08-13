@@ -398,8 +398,14 @@ export function activate(context: vscode.ExtensionContext) {
 
     const { TranscriptWorkbenchProvider } = require('./transcriptWorkbenchProvider') as typeof import('./transcriptWorkbenchProvider');
 
+    const { registerAutoExport } = require('./speech/autoExport') as typeof import('./speech/autoExport');
+
     const speech = createSpeechSubsystem(context);
     void speech.jobs.recoverInterrupted();
+
+    // R11 / the D5 mitigation: sessions live in hidden app storage, so every
+    // finished transcription immediately writes a Markdown file the user owns.
+    context.subscriptions.push(registerAutoExport(speech.jobs, speech.store));
 
     const workbenchProvider = new TranscriptWorkbenchProvider(
       context,

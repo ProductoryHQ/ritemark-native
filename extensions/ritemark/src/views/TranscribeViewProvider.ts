@@ -20,6 +20,7 @@ import { AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, classifyInput } from '../speech/aud
 import { probeDurationSec } from '../speech/durationProbe';
 import { sessionIdForPath } from '../speech/SessionStore';
 import { ensureModelDownloaded } from '../voiceDictation/modelManager';
+import { exportSession } from '../speech/autoExport';
 import type { EngineId, TranscriptionJob, TranscriptSession } from '../speech/types';
 
 /** What a row in the panel needs; deliberately not the whole session. */
@@ -110,6 +111,12 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
           break;
         case 'transcribe:deleteSession':
           void this._deleteSession(message.sessionId);
+          break;
+        case 'transcribe:relinkSession':
+          void this._relinkSession(message.sessionId);
+          break;
+        case 'transcribe:openExport':
+          void this._openExport(message.sessionId);
           break;
         case 'transcribe:downloadModel':
           // Reuses dictation's downloader — same model, same cache, resumable,
@@ -234,7 +241,44 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     await this._pushState();
   }
 
-  /** R11's automatic export is wired in Phase 6; this keeps the badge honest. */
+  /**
+   * R12: point a session at a recording that moved.
+   *
+   * The transcript was never lost — only the path went stale — so this asks for
+   * the file rather than offering to delete anything.
+   */
+  private async _relinkSession(sessionId: string): Promise<void> {
+    const session = await this._store.get(sessionId);
+    if (!session) return;
+
+    const picked = await vscode.window.showOpenDialog({
+      canSelectMany: false,
+      openLabel: 'Relink recording',
+      title: `Find ${path.basename(session.audioPath)}`,
+      filters: { Audio: AUDIO_EXTENSIONS.map((ext) => ext.slice(1)) },
+    });
+    if (!picked?.[0]) return;
+
+    await this._store.relink(sessionId, picked[0].fsPath);
+    await this._pushState();
+  }
+
+  /** Opens the Markdown export written when the transcription finished. */
+  private async _openExport(sessionId: string): Promise<void> {
+    const session = await this._store.get(sessionId);
+    if (!session?.exportPath || !fs.existsSync(session.exportPath)) {
+      // The export may have been moved or deleted; writing a fresh one is more
+      // useful than an error about a file the user does not care about.
+      const rewritten = session ? await exportSession(this._store, session, 'unique') : null;
+      if (!rewritten) return;
+      await openInRitemark(rewritten);
+      await this._pushState();
+      return;
+    }
+
+    await openInRitemark(session.exportPath);
+  }
+
   private async _onJobCompleted(_session: TranscriptSession): Promise<void> {
     await this._pushState();
   }
@@ -342,6 +386,16 @@ function isActive(job: TranscriptionJob): boolean {
     job.state === 'transcribing' ||
     job.state === 'saving'
   );
+}
+
+/**
+ * Open a Markdown file the way a user expects — in Ritemark's editor.
+ *
+ * `showTextDocument` would force the plain text editor and show the transcript
+ * as raw syntax, which is the opposite of why the export exists.
+ */
+async function openInRitemark(filePath: string): Promise<void> {
+  await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { preview: false });
 }
 
 function getNonce(): string {

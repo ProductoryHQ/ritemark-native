@@ -470,7 +470,7 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
       className="group flex cursor-pointer items-center gap-2.5 px-4 py-2 hover:bg-surface-soft"
       onClick={() => vscode.postMessage({ type: 'transcribe:openSession', sessionId: recording.sessionId })}
     >
-      <Icon name="file-text" size={16} className="shrink-0 text-ink-muted" />
+      <Icon name="microphone" size={16} className="shrink-0 text-ink-muted" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-xs font-medium" title={recording.audioName}>
           {recording.audioName}
@@ -495,9 +495,35 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
           </span>
         </div>
         {recording.audioMissing && (
-          <div className="mt-0.5 text-[10px] text-ritemark-warning">Recording moved or deleted</div>
+          <div className="mt-1 flex items-center gap-2">
+            {/* R12: the transcript is intact — only the path went stale. Offer
+                to find the file rather than implying anything was lost. */}
+            <span className="text-[10px] text-ritemark-warning">Recording moved or deleted</span>
+            <button
+              type="button"
+              className="text-[10px] font-semibold text-accent hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                vscode.postMessage({ type: 'transcribe:relinkSession', sessionId: recording.sessionId });
+              }}
+            >
+              Find it
+            </button>
+          </div>
         )}
       </div>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="shrink-0 opacity-0 group-hover:opacity-100"
+        title="Open Markdown transcript"
+        onClick={(event) => {
+          event.stopPropagation();
+          vscode.postMessage({ type: 'transcribe:openExport', sessionId: recording.sessionId });
+        }}
+      >
+        <Icon name="file-text" size={14} />
+      </Button>
       <Button
         variant="ghost"
         size="icon-sm"
