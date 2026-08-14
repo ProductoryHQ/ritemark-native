@@ -1559,8 +1559,8 @@ export function RitemarkSettings() {
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-ink-strong">Transcription data</div>
                   <div className="text-xs text-ink-muted mt-0.5">
-                    {transcriptionStorageSummary(settings.transcriptionStorageBytes)} Your recordings and exported
-                    Markdown are stored separately and are not affected.
+                    {transcriptionStorageSummary(settings.transcriptionStorageBytes)} Your recordings and any documents
+                    you saved are stored separately and are not affected.
                   </div>
                 </div>
                 <Button

@@ -57,8 +57,8 @@ interface WorkbenchState {
   session: Session | null;
   job: { state: string; progress: { percent: number | null } } | null;
   engines: EngineStatus[];
-  /** A Markdown export already exists on disk for this recording (R11). */
-  hasExport?: boolean;
+  /** The document this transcript was saved as, once the user has saved it. */
+  savedDocument?: { name: string; path: string } | null;
   /** False when no agent runtime is configured, so the rail explains instead of failing (R10). */
   runtimeReady?: boolean;
 }
@@ -178,23 +178,35 @@ export function Workbench() {
             </div>
           </div>
 
-          {/* The transcript is already on disk — an export was written when the
-              transcription finished (R11). This updates it after corrections. */}
-          <Button
-            variant="secondary"
-            size="sm"
-            className="shrink-0"
-            onClick={() => vscode.postMessage({ type: 'workbench:export' })}
-          >
-            {state.hasExport ? 'Update Markdown' : 'Export to Markdown'}
-          </Button>
+          {/* Saving is the act that makes this the user's — so they choose the
+              folder, and the document they made stays linked here afterwards. */}
+          <div className="flex shrink-0 items-center gap-2">
+            {state.savedDocument && (
+              <button
+                type="button"
+                onClick={() => vscode.postMessage({ type: 'workbench:openDocument' })}
+                className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft"
+                title={`Open ${state.savedDocument.path}`}
+              >
+                <Icon name="file-text" size={14} />
+                <span className="truncate">{state.savedDocument.name}</span>
+              </button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => vscode.postMessage({ type: 'workbench:save' })}
+            >
+              {state.savedDocument ? 'Save again' : 'Save to document'}
+            </Button>
+          </div>
         </div>
 
         <div className="mt-3 flex items-center gap-3">
-          <button
-            type="button"
+          <Button
+            size="icon"
+            className="shrink-0 rounded-full"
             onClick={togglePlay}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep"
             title={playing ? 'Pause' : 'Play'}
           >
             {/* The icon pack has no pause glyph, and a minus reads as "remove".
@@ -207,7 +219,7 @@ export function Workbench() {
             ) : (
               <Icon name="play" size={14} />
             )}
-          </button>
+          </Button>
 
           <Waveform
             peaks={session.peaks}
@@ -274,6 +286,7 @@ export function Workbench() {
           state={insightsState}
           error={insightsError}
           runtimeReady={state.runtimeReady !== false}
+          savedDocumentName={state.savedDocument?.name ?? null}
           onSeek={(seconds) => seek(seconds, true)}
         />
       </div>

@@ -540,6 +540,11 @@
           "command": "ritemark.browser.history.clearAll",
           "when": "view == ritemark.browserView",
           "group": "navigation@2"
+        },
+        {
+          "command": "ritemark.aiSettings",
+          "when": "view == ritemark.transcribeView",
+          "group": "navigation@1"
         }
       ],
       "explorer/context": [

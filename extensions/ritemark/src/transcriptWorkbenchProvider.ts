@@ -22,9 +22,12 @@ import { sessionIdForPath } from './speech/SessionStore';
 import { probeDurationSec } from './speech/durationProbe';
 import type { EngineId, TranscriptionJob } from './speech/types';
 import { trackEvent } from './analytics/posthog';
-import { exportSession } from './speech/autoExport';
+import { saveTranscriptTo } from './speech/autoExport';
 import { generateInsights, insightsWorkspacePath } from './speech/insights';
 import { getSetupStatus } from './agent/setup';
+
+/** Remembers the folder chosen last time, so Save opens where they were. */
+const LAST_SAVE_DIR_KEY = 'speech:lastSaveDir';
 
 class AudioDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -101,8 +104,11 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
         case 'workbench:renameSpeaker':
           await this._renameSpeaker(fsPath, message.speakerId, message.label);
           break;
-        case 'workbench:export':
-          await this._export(fsPath, panel);
+        case 'workbench:save':
+          await this._save(fsPath, panel);
+          break;
+        case 'workbench:openDocument':
+          await this._openDocument(fsPath, panel);
           break;
         case 'workbench:generateInsights':
           await this._generateInsights(fsPath, panel);
@@ -144,45 +150,10 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
   }
 
   /**
-   * R11 — export after corrections.
-   *
-   * An export already exists (written automatically when the transcription
-   * finished), so this asks before replacing it: the user may have edited that
-   * file, and their edits are not ours to discard.
-   */
-  private async _export(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
-    const session = await this._store.get(sessionIdForPath(fsPath));
-    if (!session) return;
-
-    let collision: 'overwrite' | 'unique' = 'unique';
-
-    if (session.exportPath && fs.existsSync(session.exportPath)) {
-      const choice = await vscode.window.showWarningMessage(
-        `Update ${path.basename(session.exportPath)}?`,
-        {
-          modal: true,
-          detail: 'The existing Markdown export will be replaced with the current transcript, including any speaker names you have changed.',
-        },
-        'Replace',
-        'Save a copy',
-      );
-      if (!choice) return;
-      collision = choice === 'Replace' ? 'overwrite' : 'unique';
-    }
-
-    const filePath = await exportSession(this._store, session, collision);
-    // `vscode.open`, not `showTextDocument`: the latter forces the plain text
-    // editor, and the whole point of exporting is to land in Ritemark's visual
-    // markdown editor rather than in a wall of syntax.
-    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { preview: false });
-    await this._push(fsPath, panel);
-  }
-
-  /**
    * R10 — generate the summary/decisions/actions/quotes.
    *
    * Runs on the existing agent runtime and stores the result on the session, so
-   * it survives reopening and reaches the Markdown export.
+   * it survives reopening and reaches the saved document.
    */
   private async _generateInsights(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
     if (this._insightRuns.has(fsPath)) return;
@@ -217,6 +188,61 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
     }
   }
 
+  /**
+   * R11 — save the transcript as a document the user owns.
+   *
+   * Asks where it goes. The transcript belongs to the user, so they choose the
+   * folder rather than discovering it in one we picked; the choice is
+   * remembered so the next save opens in the same place.
+   *
+   * Deliberately does NOT steal focus afterwards — the saved document stays
+   * linked in the header, so it can be opened when wanted rather than now.
+   */
+  private async _save(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
+    const session = await this._store.get(sessionIdForPath(fsPath));
+    if (!session) return;
+
+    const remembered = this._context.globalState.get<string>(LAST_SAVE_DIR_KEY);
+    const fallback = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.dirname(fsPath);
+    const defaultDir = remembered && fs.existsSync(remembered) ? remembered : fallback;
+
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      defaultUri: vscode.Uri.file(defaultDir),
+      openLabel: 'Save here',
+      title: `Save ${path.basename(fsPath)} transcript to…`,
+    });
+    if (!picked?.[0]) return;
+
+    const dir = picked[0].fsPath;
+    await this._context.globalState.update(LAST_SAVE_DIR_KEY, dir);
+
+    const filePath = await saveTranscriptTo(this._store, session, dir);
+    void vscode.window.showInformationMessage(`Transcript saved to ${path.basename(filePath)}.`);
+    await this._push(fsPath, panel);
+  }
+
+  /** Open the saved document. The link only exists when there is one. */
+  private async _openDocument(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
+    const session = await this._store.get(sessionIdForPath(fsPath));
+    if (!session?.exportPath) return;
+
+    if (!fs.existsSync(session.exportPath)) {
+      // Moved or deleted since it was saved: say so and drop the stale link
+      // rather than opening an editor onto nothing.
+      void vscode.window.showWarningMessage(
+        `${path.basename(session.exportPath)} is no longer where it was saved. Save it again to create a new copy.`,
+      );
+      await this._store.save({ ...session, exportPath: undefined });
+      await this._push(fsPath, panel);
+      return;
+    }
+
+    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(session.exportPath), { preview: false });
+  }
+
   private async _push(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
     const [session, engines, runtimeReady] = await Promise.all([
       this._store.get(sessionIdForPath(fsPath)),
@@ -240,7 +266,10 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
         session,
         job: job ?? null,
         engines,
-        hasExport: Boolean(session?.exportPath && fs.existsSync(session.exportPath)),
+        savedDocument:
+          session?.exportPath && fs.existsSync(session.exportPath)
+            ? { name: path.basename(session.exportPath), path: session.exportPath }
+            : null,
         runtimeReady,
       },
     });

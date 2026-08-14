@@ -157,6 +157,20 @@ Insight generation takes **1–3 minutes** even for a short recording: the agent
 - **The export opened as raw Markdown source.** `vscode.workspace.openTextDocument` + `showTextDocument` forces the plain text editor and bypasses the registered custom editor, so the transcript appeared as syntax with line numbers — the exact thing Ritemark exists to avoid. Both call sites now use `vscode.commands.executeCommand('vscode.open', …)`, which resolves the default editor. Caught by looking at the screenshot; every test still passed.
 - [ ] Commit Workstream 6
 
+## Phase 6b: Scope changes from Jarmo's live test (2026-08-13)
+
+Found by using the thing on a real 41-minute Estonian recording. All agreed in-session.
+
+- [x] **The diarized path is verified.** ElevenLabs on a real recording: 4 speakers, Estonian detected, 567 segments, `Speaker 1 → Kristiina` rename applied everywhere. This was the one thing Phases 1–5 could not close.
+- [x] **"Markdown" removed from user-facing copy.** Ritemark exists so people do not have to think in markdown; the word has no place in the UI. Now "document" throughout — panel, workbench, Settings, dialogs.
+- [x] **Save asks where.** "Save to document" opens a folder picker (remembering the last choice) instead of writing to a folder we chose. The saved document then stays **linked in the workbench header** — click to open, and the button becomes "Save again".
+- [x] **Insights got "Add to document"**, so the action is where the user is looking when they decide to keep them.
+- [x] **Automatic export removed.** It silently wrote into a folder the user had not chosen, which contradicts an explicit Save. **This drops the D5 mitigation** — nothing is written unless the user saves. Jarmo's call, made with the trade stated.
+- [x] **Settings moved to the view title bar** (`package.json` `view/title`, reusing `ritemark.aiSettings`). A gear inside the panel body landed on its own row under the title and read as a stray control. Matters most on Windows, where the cloud engine is the only one and a user without a key has no other route to the key field.
+- [x] **Windows first run verified by simulation** (`EngineRegistry('win32')` + no key, temporarily): on-device shows "Not available on Windows yet" + **Why?** → #133; ElevenLabs shows "No API key" + **Add key**; "Add recording" is disabled. Experiment reverted.
+- [x] **AI sidebar now gets the transcript.** With a workbench tab active it was handing the agent the `.m4a` path — worse than no context, because it looks like context. It now resolves to the saved document, via a registered resolver so `UnifiedViewProvider` stays ignorant of speech storage. Before a save there is nothing readable, so it offers nothing rather than something wrong.
+- [x] **Global rule: an icon on a button matches the button's text colour.** Fixed at source — `Icon` defaults to a muted `fill` **attribute** that does not inherit, so `ui/button.tsx` now carries `[&_svg]:fill-current`. CSS beats presentation attributes, so every button in the app obeys it without call sites remembering. The round play control was also a hand-rolled `<button>`; it is now the shadcn `Button`.
+
 ## Phase 7: QA and closeout
 
 - [ ] Run the full `scenarios.md` matrix in dev mode (`/rundev`) with the real fixtures, including the 60-minute file — Claude drives it before Jarmo is told it is ready

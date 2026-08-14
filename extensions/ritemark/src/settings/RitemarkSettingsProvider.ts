@@ -1175,7 +1175,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       {
         modal: true,
         detail:
-          'Speaker names, corrections and insights stored with your transcripts will be removed. Your recordings and any exported Markdown files are not affected.',
+          'Speaker names, corrections and insights stored with your transcripts will be removed. Your recordings and any documents you saved are not affected.',
       },
       'Delete transcripts'
     );

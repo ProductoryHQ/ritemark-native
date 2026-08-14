@@ -20,7 +20,6 @@ import { AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, classifyInput } from '../speech/aud
 import { probeDurationSec } from '../speech/durationProbe';
 import { sessionIdForPath } from '../speech/SessionStore';
 import { ensureModelDownloaded } from '../voiceDictation/modelManager';
-import { exportSession } from '../speech/autoExport';
 import type { EngineId, TranscriptionJob, TranscriptSession } from '../speech/types';
 
 /** What a row in the panel needs; deliberately not the whole session. */
@@ -231,7 +230,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       `Remove the transcript for ${path.basename(session.audioPath)}?`,
       {
         modal: true,
-        detail: 'The transcript, speaker names and corrections are deleted. The recording and any exported Markdown are not touched.',
+        detail: 'The transcript, speaker names and corrections are deleted. The recording and any document you saved are not touched.',
       },
       'Remove transcript',
     );
@@ -263,19 +262,20 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     await this._pushState();
   }
 
-  /** Opens the Markdown export written when the transcription finished. */
+  /**
+   * Open the saved document, if the user has saved one.
+   *
+   * Saving happens in the workbench, where the folder is chosen — this never
+   * writes a file behind the user's back.
+   */
   private async _openExport(sessionId: string): Promise<void> {
     const session = await this._store.get(sessionId);
     if (!session?.exportPath || !fs.existsSync(session.exportPath)) {
-      // The export may have been moved or deleted; writing a fresh one is more
-      // useful than an error about a file the user does not care about.
-      const rewritten = session ? await exportSession(this._store, session, 'unique') : null;
-      if (!rewritten) return;
-      await openInRitemark(rewritten);
-      await this._pushState();
+      vscode.window.showInformationMessage(
+        'This recording has not been saved as a document yet. Open it and choose Save to document.',
+      );
       return;
     }
-
     await openInRitemark(session.exportPath);
   }
 

@@ -1,17 +1,14 @@
 /**
- * Sprint 108 R11 — write a Markdown export as soon as a transcription finishes.
+ * Sprint 108 R11 — saving a transcript as a document the user owns.
  *
- * This is what makes D5 safe. Sessions live in the extension's global storage,
- * which the user cannot see, back up, or sync; if the app is reinstalled, that
- * store goes with it. So every completed transcription immediately produces a
- * file in the workspace that the user owns outright.
- *
- * It never overwrites: an existing file might have been edited by hand, and
- * silently replacing a person's edits is worse than leaving a numbered sibling.
+ * Sessions live in the extension's global storage, which the user cannot see,
+ * back up, or sync. Saving is therefore the act that makes the work theirs —
+ * and because it is theirs, THEY choose where it goes (the folder picker lives
+ * in the workbench provider; this module does the writing).
  */
 
+import * as path from 'path';
 import * as vscode from 'vscode';
-import type { JobManager } from './JobManager';
 import type { SessionStore } from './SessionStore';
 import { DEFAULT_EXPORT_FOLDER, writeTranscriptMarkdown } from './exportTranscript';
 import type { TranscriptSession } from './types';
@@ -27,35 +24,28 @@ export function workspaceRoot(): string | undefined {
 }
 
 /**
- * Export a session and record where it went, so a later manual export updates
- * that same file instead of scattering siblings.
+ * Write the transcript into a folder the user picked.
+ *
+ * Re-saving updates the document they already know about; a first save never
+ * clobbers an unrelated file that happens to share the name.
  */
-export async function exportSession(
+export async function saveTranscriptTo(
   store: SessionStore,
   session: TranscriptSession,
-  collision: 'overwrite' | 'unique',
+  directory: string,
 ): Promise<string> {
+  const savingOverPrevious = Boolean(
+    session.exportPath && path.dirname(session.exportPath) === directory,
+  );
+
   const result = await writeTranscriptMarkdown({
     session,
-    workspaceRoot: workspaceRoot(),
-    folderSetting: exportFolderSetting(),
-    collision,
+    workspaceRoot: undefined,
+    // An absolute folder is honoured as-is by resolveExportDir.
+    folderSetting: directory,
+    collision: savingOverPrevious ? 'overwrite' : 'unique',
   });
 
   await store.save({ ...session, exportPath: result.filePath });
   return result.filePath;
-}
-
-export function registerAutoExport(jobs: JobManager, store: SessionStore): vscode.Disposable {
-  const unsubscribe = jobs.onEvent((event) => {
-    if (event.type !== 'job-completed') return;
-
-    void exportSession(store, event.session, 'unique').catch((error) => {
-      // A failed export must not look like a failed transcription — the
-      // transcript is safe in the session store either way.
-      console.warn('[Transcribe] Automatic export failed:', error);
-    });
-  });
-
-  return { dispose: unsubscribe };
 }

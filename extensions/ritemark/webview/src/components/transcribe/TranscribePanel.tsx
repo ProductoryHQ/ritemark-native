@@ -103,6 +103,9 @@ export function TranscribePanel() {
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
     >
+      {/* Settings lives in the view's TITLE BAR (package.json view/title), not
+          here — a second gear inside the panel body puts it on its own row
+          below the title, which reads as a stray control. */}
       <div className="p-3 pb-2">
         <Button
           className="w-full"
@@ -328,7 +331,7 @@ function FirstRun({ engines }: { engines: EngineStatus[] }) {
   return (
     <div className="mx-3 mb-3 rounded-lg border border-hairline bg-surface p-3">
       <p className="mb-2.5 text-xs leading-relaxed text-ink-body">
-        Transcribe turns a recording into Markdown you can edit. Set up an engine to begin.
+        Transcribe turns a recording into a document you can edit. Set up an engine to begin.
       </p>
       <div className="space-y-2">
         {engines.map((engine) => (
@@ -516,7 +519,7 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
         variant="ghost"
         size="icon-sm"
         className="shrink-0 opacity-0 group-hover:opacity-100"
-        title="Open Markdown transcript"
+        title="Open saved document"
         onClick={(event) => {
           event.stopPropagation();
           vscode.postMessage({ type: 'transcribe:openExport', sessionId: recording.sessionId });

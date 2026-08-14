@@ -2,9 +2,8 @@
  * Sprint 108 R12 — session storage.
  *
  * D5 (Jarmo, 2026-08-12): sessions live in the extension's global storage, not
- * in sidecar files next to the audio. The trapped-data risk that comes with
- * that is answered by R11, which writes a markdown export automatically when a
- * transcription completes — so a transcript is never ONLY in here.
+ * in sidecar files next to the audio. This is the working copy; the document
+ * the user saves (R11, folder of their choosing) is the artifact they own.
  *
  * File-backed rather than `Memento`-backed on purpose: a session carries
  * hundreds of segments plus ~2000 waveform peaks, which is too much to push
@@ -79,6 +78,22 @@ export class SessionStore {
   /** The session for an audio file, if one exists. */
   async getForAudio(audioPath: string): Promise<TranscriptSession | null> {
     return this.get(sessionIdForPath(audioPath));
+  }
+
+  /**
+   * The saved document for a recording, read synchronously.
+   *
+   * Sync because the AI sidebar resolves "the active file" on a hot path that
+   * has no await to spare; a session file is a few hundred kilobytes at most.
+   */
+  getSavedDocumentSync(audioPath: string): string | null {
+    try {
+      const raw = fs.readFileSync(this.file(sessionIdForPath(audioPath)), 'utf-8');
+      const session = JSON.parse(raw) as TranscriptSession;
+      return session.exportPath && fs.existsSync(session.exportPath) ? session.exportPath : null;
+    } catch {
+      return null;
+    }
   }
 
   async list(): Promise<TranscriptSession[]> {
