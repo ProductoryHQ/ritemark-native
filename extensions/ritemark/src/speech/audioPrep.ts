@@ -153,12 +153,16 @@ export function convertToWav(source: string, dest: string, sampleRate: number): 
         resolve();
         return;
       }
+      // The converter's own stderr goes to the log, not to the user: R13 says a
+      // failure names the cause and the next action, and "Couldn't open input
+      // file ('dta?')" is neither.
+      if (stderr.trim()) {
+        console.warn('[Transcribe] afconvert failed:', stderr.trim().split('\n')[0]);
+      }
       reject(
         new TranscriptionError(
           'unreadable-audio',
-          `${path.basename(source)} could not be read as audio. It may be incomplete or corrupted.${
-            stderr.trim() ? ` (${stderr.trim().split('\n')[0]})` : ''
-          }`,
+          `${path.basename(source)} could not be read as audio. It may be incomplete, or in a format Ritemark cannot open.`,
         ),
       );
     });

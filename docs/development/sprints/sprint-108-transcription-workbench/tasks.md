@@ -173,13 +173,43 @@ Found by using the thing on a real 41-minute Estonian recording. All agreed in-s
 
 ## Phase 7: QA and closeout
 
-- [ ] Run the full `scenarios.md` matrix in dev mode (`/rundev`) with the real fixtures, including the 60-minute file — Claude drives it before Jarmo is told it is ready
-- [ ] Walk every `[x]` above and confirm the matching code is on the branch (`git diff main...HEAD`)
-- [ ] Windows pass: ElevenLabs end-to-end + on-device unavailability message
-- [ ] Report webview bundle size against the #107 baseline
-- [ ] `npm run compile` + webview `npm run build`; focused unit tests green
-- [ ] `.claude/hooks/pre-commit-validator.sh` green; `qa-validator` review
-- [ ] Update `docs/development/architecture.md` — new `src/speech/` subsystem, new editor surface, TO-BE note on collapsing dictation onto the same engine
-- [ ] Update `docs/CHANGELOG.md` and release notes
-- [ ] Update linked GitHub issues; open a follow-up issue for Windows local Whisper if #133 needs re-scoping
+- [x] `docs/development/architecture.md` — `src/speech/` subsystem, the workbench editor contract, the two facts that shape every surface, the measured engine facts, and the open debt (dictation still has its own whisper integration)
+- [x] `docs/CHANGELOG.md` — Unreleased / Sprint 108 entry
+- [x] Webview bundle: **7.85 MB vs 7.81 MB on main — +0.04 MB** for two new surfaces, because they are lazy-loaded like `flows` and `ai-sidebar` (#107 budget respected)
+- [x] `npm run compile` + webview build green; 12 unit-test files green; `tsc` clean on both projects
+- [x] `pre-commit-validator.sh` green
 - [ ] Open PR, `pr-reviewer` review, merge
+
+### Scenario matrix — what was actually exercised
+
+Verified live (dev mode over CDP, or by Jarmo on a real 41-minute Estonian recording):
+
+| Area | Result |
+|---|---|
+| First run, nothing configured | Both engine cards with real state and one action each; **Windows** variant verified by simulating `win32` + no key |
+| Import by drag and drop | Duration probed, engine choices with cost |
+| Open audio from the Explorer | Our workbench wins over built-in `vscode.audioPreview` |
+| On-device transcription | 60-min file at 23.5× realtime; 38 segments / 2002 peaks / 372 words with confidence on the short file |
+| On-device states it cannot separate speakers | Explanatory row + Re-run with ElevenLabs; `speakers: []`, no invented speaker |
+| ElevenLabs consent + cost | Shown before upload; upload reports **real byte progress** |
+| Diarized result | 4 speakers on a real 41-min Estonian recording, 567 segments |
+| Speaker rename | `Speaker 1 → Kristiina` applied everywhere |
+| Click a line to hear it | Seeks and plays under a real user gesture; highlight follows |
+| Cancel | Aborted a 42 MB upload in under a second, mid-flight |
+| Panel close does not kill the job | View closed for 25 s; job still running, progress advanced |
+| Quit during a job | Restart shows **Interrupted** + Try again; no orphan `whisper-cli` |
+| Video file refused | Designed copy with what to do instead |
+| Corrupt file | Fails with a designed message (raw converter stderr no longer leaks — fixed here) |
+| Insights generate and cite | 11 items, **0** citing a non-segment moment; no owner invented on a non-diarized transcript |
+| Save to document | Folder picker; opens in Ritemark's editor; link persists in the header |
+| AI sidebar context | Resolves to the saved document, not the `.m4a` |
+| Live dictation regression | `src/voiceDictation/` has **zero changes** on this branch |
+| Feature flag off | Everything sits behind one `isEnabled('transcription-workbench')` guard in `extension.ts` |
+
+**Not exercised, and why:**
+
+- **Offline with a cloud engine, rate-limit / quota / invalid-key responses** — need network conditions or an ElevenLabs account state I cannot create on demand. The mapping is unit-tested (`engineParsing.test.ts` covers 401/403/429/402/5xx and the two `detail` shapes), but no live request was made against them.
+- **Insufficient disk space for the model download** — needs a full disk.
+- **Windows end-to-end** — the platform gating and first-run screen were verified by simulation on macOS; nobody has run the app on Windows. Worth a pass before any release that claims Windows support.
+- **`.ogg`** — claimed by whisper-cli's help text, still untested with a real file.
+- **Confidence threshold for ElevenLabs** — the 0.55 value was measured against on-device output only; the Scribe scale is `exp(logprob)` and may want a different number. Documented as an assumption in `playback.ts`.

@@ -100,13 +100,14 @@ extensions/ritemark/src/
 ├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
 ├── settings/        Settings page bridge
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime
-├── voiceDictation/  Whisper-based STT (macOS only)
+├── voiceDictation/  Whisper-based STT for live dictation (macOS only)
+├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions
 ├── export/          PDF/DOCX export
 ├── update/          Seamless updates — feed, resolver, installer, integrity, status bar
-└── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts, drawioEditorProvider.ts
+└── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts, drawioEditorProvider.ts, transcriptWorkbenchProvider.ts
 ```
 
-Editor provider contracts: `ritemarkEditor.ts` is a `CustomTextEditorProvider` (markdown + CSV, editable). `excelEditorProvider.ts` is a full `CustomEditorProvider<ExcelDocument>` since Sprint 81 — .xlsx is editable (dirty tracking via `CustomDocumentContentChangeEvent`, save/save-as/revert/hot-exit backup; no undo-redo stack), .xls stays read-only. `docxEditorProvider.ts` and `pdfEditorProvider.ts` are read-only (`CustomReadonlyEditorProvider`).
+Editor provider contracts: `ritemarkEditor.ts` is a `CustomTextEditorProvider` (markdown + CSV, editable). `excelEditorProvider.ts` is a full `CustomEditorProvider<ExcelDocument>` since Sprint 81 — .xlsx is editable (dirty tracking via `CustomDocumentContentChangeEvent`, save/save-as/revert/hot-exit backup; no undo-redo stack), .xls stays read-only. `docxEditorProvider.ts` and `pdfEditorProvider.ts` are read-only (`CustomReadonlyEditorProvider`), as is `transcriptWorkbenchProvider.ts` — whose document is the AUDIO file, with the transcript held as session state beside it (Sprint 108).
 
 Entry point `extension.ts` registers all providers, commands, and views.
 
@@ -451,6 +452,63 @@ interface ScheduledTask {
 6. **Cross-runtime context (Sprint 80 pre-flight, agent handler only):** When an agent-task result is surfaced in the Agent Library alongside interactive history, what context (if any) carries between them? Design decision required before wiring `AgentTaskHandler` — see [#97](https://github.com/ProductoryHQ/ritemark-native/issues/97). Does not block the scheduler or non-agent handlers.
 
 **Sprint 80 scope:** ship `Scheduler`, `ScheduledTask`, `DaemonResultStore`, `DaemonStatusEvents`, and exactly one concrete handler (`AgentTaskHandler`). `GitSyncHandler` / `ScriptHandler` ship as interface-only stubs (`run()` throws `not implemented`) to prove the interface generalizes without committing to their behaviour.
+
+---
+
+## Transcription (Sprint 108)
+
+`src/speech/` turns a recording into a document. It is shaped like `src/runtime/`
+rather than folded into `ai/modelConfig.ts`, because an STT engine is a **runtime**
+— a child process or an HTTP client, with its own readiness, platform support and
+failure modes — not an LLM model id. `ai/modelConfig.ts` remains the single
+registry for LLM models, including the one the insights rail uses.
+
+```
+src/speech/
+├── TranscriptionEngine.ts   the interface (capabilities, readiness, cost, transcribe)
+├── engineRegistry.ts        registration + platform filtering + local-first preference
+├── engines/
+│   ├── whisperLocalEngine.ts   bundled whisper.cpp, macOS only (#133)
+│   └── elevenLabsEngine.ts     Scribe v2, diarized, one request per file
+├── JobManager.ts            single-flight queue, progress, cancel, restart recovery
+├── SessionStore.ts          file-backed sessions in globalStorage (D5)
+├── audioPrep.ts             format gate, afconvert for m4a/aac, waveform peaks
+├── durationProbe.ts         afinfo / WAV header — returns null rather than guessing
+├── segmentFolding.ts        word stream → segments (majority-vote speaker)
+├── insights.ts              one-shot extraction on the existing agent runtime
+├── insightsParsing.ts       prompt + citation resolution (pure, unit-tested)
+├── transcriptMarkdown.ts    session → document
+├── exportTranscript.ts      where the document lands
+└── activeTranscript.ts      resolver so the AI sidebar gets the transcript, not the .m4a
+```
+
+**Two facts shape every surface** and are not implementation details:
+
+1. **On-device Whisper cannot separate speakers.** whisper.cpp offers only
+   English-only turn markers (`-tdrz`) or a stereo split. Real diarization means
+   ElevenLabs. So "private" and "knows who spoke" are mutually exclusive, and the
+   UI states the trade at the point of choice rather than hiding it.
+2. **On-device Whisper is macOS-only** (`binaries/darwin-arm64/`, #133). Transcribe
+   still ships on Windows with ElevenLabs; the registry reports the gap so the UI
+   can explain it rather than the feature silently shrinking.
+
+**Engine facts worth not rediscovering** (measured in the Phase 0 audits, see
+`docs/development/sprints/sprint-108-transcription-workbench/research/`):
+
+- whisper-cli reads mp3/wav/flac/ogg natively; only m4a/aac need `afconvert`
+  (1.2 s for a 60-minute file). Nothing decodes in the webview.
+- whisper-cli **exits 0 when audio exists but cannot be decoded**. Success requires
+  a parseable JSON sidecar with ≥1 segment, never the exit code alone.
+- 60 minutes transcribes in ~154 s (23.5× realtime) at ~2.5 GB peak RSS.
+- ElevenLabs `speaker_id` is assigned **per request**, so a diarized file is never
+  windowed — windowing renumbers speakers and breaks global rename.
+- Webview `<audio>` + `asWebviewUri` serves range requests (seek to 45:00 in a
+  42 MB file: 223 ms). The first `play()` must ride a real user gesture.
+
+**Open debt:** live dictation (`voiceDictation/`) still has its own whisper
+integration with a 30 s timeout and `--no-timestamps`, deliberately untouched by
+Sprint 108. A later sprint can collapse both callers onto `speech/engines/whisperLocalEngine`
+so there is one Whisper integration rather than two.
 
 ---
 
