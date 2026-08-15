@@ -413,6 +413,16 @@
             "scope": "application"
           }
         }
+      },
+      {
+        "title": "Ritemark Transcription",
+        "properties": {
+          "ritemark.transcription.exportFolder": {
+            "type": "string",
+            "default": "Transcripts",
+            "markdownDescription": "Folder for exported transcripts, relative to the workspace root (or an absolute path). With no workspace open, transcripts are written beside the recording."
+          }
+        }
       }
     ],
     "viewsContainers": {
@@ -421,6 +431,11 @@
           "id": "ritemark-home",
           "title": "Home",
           "icon": "media/home-icon.svg"
+        },
+        {
+          "id": "ritemark-transcribe",
+          "title": "Transcribe",
+          "icon": "media/transcribe-icon.svg"
         },
         {
           "id": "ritemark-agent-library",
@@ -477,6 +492,15 @@
           "contextualTitle": "Browser",
           "visibility": "visible"
         }
+      ],
+      "ritemark-transcribe": [
+        {
+          "type": "webview",
+          "id": "ritemark.transcribeView",
+          "name": "Transcribe",
+          "contextualTitle": "Transcribe",
+          "visibility": "visible"
+        }
       ]
     },
     "menus": {
@@ -516,6 +540,11 @@
           "command": "ritemark.browser.history.clearAll",
           "when": "view == ritemark.browserView",
           "group": "navigation@2"
+        },
+        {
+          "command": "ritemark.aiSettings",
+          "when": "view == ritemark.transcribeView",
+          "group": "navigation@1"
         }
       ],
       "explorer/context": [
@@ -611,6 +640,31 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "ritemark.transcriptWorkbench",
+        "displayName": "Transcript Workbench",
+        "selector": [
+          {
+            "filenamePattern": "*.m4a"
+          },
+          {
+            "filenamePattern": "*.mp3"
+          },
+          {
+            "filenamePattern": "*.wav"
+          },
+          {
+            "filenamePattern": "*.flac"
+          },
+          {
+            "filenamePattern": "*.ogg"
+          },
+          {
+            "filenamePattern": "*.aac"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "configurationDefaults": {
@@ -699,7 +753,7 @@
   "scripts": {
     "compile": "tsc --noEmit -p ./ && node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/utils/imageWriter.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/acp/acpClient.test.ts && npx tsx src/acp/acpManager.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/ai-sidebar/planText.test.ts && npx tsx webview/src/components/ai-sidebar/composerQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueueStore.test.ts && npx tsx webview/src/components/ai-sidebar/aiDisclosure.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/update/updateService.test.ts && npx tsx src/update/activationIntegrity.test.ts && npx tsx src/update/applyUpdate.test.ts && npx tsx src/update/versionComparison.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts && npx tsx webview/src/components/agent/agentSchema.test.ts && npx tsx webview/src/components/agent/cronSchedule.test.ts && npx tsx src/daemon/workspaceConsent.test.ts && npx tsx src/utils/stickyTabHealer.test.ts && npx tsx src/daemon/scheduleParser.test.ts && npx tsx src/daemon/cron.test.ts && npx tsx src/daemon/DaemonResultStore.test.ts && npx tsx src/agent/frontmatterRoundtrip.test.ts && npx tsx src/export/v2/imageSource.test.ts && npx tsx src/export/saveAsMarkdown.test.ts && npx tsx webview/src/lib/svgRasterExport.test.ts && npx tsx src/ai/modelCatalog/modelCatalog.test.ts && npx tsx src/ai/capabilityContext.test.ts && npx tsx src/ai/connectivityPolicy.test.ts && npx tsx webview/src/extensions/comment/commentRoundTrip.test.ts && npx tsx webview/src/extensions/comment/commentIndex.test.ts && npx tsx src/agent/ClaudeCodeRuntime.test.ts && npx tsx src/codex/CodexRuntime.test.ts && npx tsx src/acp/AcpRuntime.test.ts && npx tsx webview/src/components/ai-sidebar/conversationRouting.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeSwitching.test.ts && npx tsx webview/src/components/ai-sidebar/conversationModel.test.ts && npx tsx webview/src/components/ai-sidebar/threadStatus.test.ts && npx tsx webview/src/components/ai-sidebar/threadRail.test.ts && npx tsx webview/src/components/ai-sidebar/activityState.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/chatLinks.test.ts && npx tsx src/browser/browserActionSerialization.test.ts",
+    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/utils/imageWriter.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/acp/acpClient.test.ts && npx tsx src/acp/acpManager.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/ai-sidebar/planText.test.ts && npx tsx webview/src/components/ai-sidebar/composerQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueueStore.test.ts && npx tsx webview/src/components/ai-sidebar/aiDisclosure.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/update/updateService.test.ts && npx tsx src/update/activationIntegrity.test.ts && npx tsx src/update/applyUpdate.test.ts && npx tsx src/update/versionComparison.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/speech/transcriptionFlag.test.ts && npx tsx src/speech/durationProbe.test.ts && npx tsx src/speech/segmentFolding.test.ts && npx tsx src/speech/engineParsing.test.ts && npx tsx src/speech/audioPrep.test.ts && npx tsx src/speech/transcriptMarkdown.test.ts && npx tsx src/speech/SessionStore.test.ts && npx tsx src/speech/engineRegistry.test.ts && npx tsx src/speech/JobManager.test.ts && npx tsx src/speech/insights.test.ts && npx tsx src/speech/exportTranscript.test.ts && npx tsx webview/src/components/transcribe/workbench/playback.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts && npx tsx webview/src/components/agent/agentSchema.test.ts && npx tsx webview/src/components/agent/cronSchedule.test.ts && npx tsx src/daemon/workspaceConsent.test.ts && npx tsx src/utils/stickyTabHealer.test.ts && npx tsx src/daemon/scheduleParser.test.ts && npx tsx src/daemon/cron.test.ts && npx tsx src/daemon/DaemonResultStore.test.ts && npx tsx src/agent/frontmatterRoundtrip.test.ts && npx tsx src/export/v2/imageSource.test.ts && npx tsx src/export/saveAsMarkdown.test.ts && npx tsx webview/src/lib/svgRasterExport.test.ts && npx tsx src/ai/modelCatalog/modelCatalog.test.ts && npx tsx src/ai/capabilityContext.test.ts && npx tsx src/ai/connectivityPolicy.test.ts && npx tsx webview/src/extensions/comment/commentRoundTrip.test.ts && npx tsx webview/src/extensions/comment/commentIndex.test.ts && npx tsx src/agent/ClaudeCodeRuntime.test.ts && npx tsx src/codex/CodexRuntime.test.ts && npx tsx src/acp/AcpRuntime.test.ts && npx tsx webview/src/components/ai-sidebar/conversationRouting.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeSwitching.test.ts && npx tsx webview/src/components/ai-sidebar/conversationModel.test.ts && npx tsx webview/src/components/ai-sidebar/threadStatus.test.ts && npx tsx webview/src/components/ai-sidebar/threadRail.test.ts && npx tsx webview/src/components/ai-sidebar/activityState.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/chatLinks.test.ts && npx tsx src/browser/browserActionSerialization.test.ts",
     "test:integration": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/LLMNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration:free": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts",
     "test:all": "npm run test && npm run test:integration",

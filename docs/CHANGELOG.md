@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.0] — 2026-08-15
+
+Sprint 108 — Transcribe.
+
+### Added
+- **Transcribe: turn a recording into a document, without leaving Ritemark.** A new Activity Bar app takes an audio file (`.m4a`, `.mp3`, `.wav`, `.flac`, `.ogg`, `.aac`) and produces a speaker-attributed transcript you can read, correct, play back and save. It replaces the upload-to-cloud, transcribe-elsewhere, re-format-by-hand round trip
+- **Two engines, and the trade is stated at the point of choice.** *On-device (Whisper)* keeps the audio on your machine and costs nothing, but cannot tell speakers apart — whisper.cpp has no real diarization. *ElevenLabs Scribe* separates speakers (up to 32) but uploads the file; before it does, the panel shows the duration and the estimated cost. Nothing runs until you pick
+- **Transcript Workbench** — a dedicated editor for a recording: waveform player, speaker-separated transcript, **click any line to hear it**. That is the point: a quote can be checked against the audio in two seconds before it goes to a client
+- **Speaker chips with one-click global rename.** Rename `Speaker 2` once and all its segments follow, in the workbench and in the saved document
+- **Uncertainty is marked.** Words the engine was unsure about are highlighted, on **both** engines — tuned against real output so it flags names and jargon rather than every "and"
+- **Insights rail** — summary, decisions, action items, open questions and key quotes, generated on the agent runtime you already use. Every item carries a timestamp that plays the moment it came from; anything the model cannot cite to a real line is discarded rather than shown
+- **Save to document** — choose the folder, get Markdown with front matter, speaker headings and timestamps, opened in Ritemark's editor. The saved document stays linked in the workbench header, and the AI sidebar treats it as the active file, so "ask Claude about this recording" works
+- **Windows is supported** with ElevenLabs. The on-device engine says plainly that it is not available on Windows yet ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)) instead of the feature quietly disappearing
+- Jobs survive closing the panel, show progress on the Activity Bar icon, can be cancelled, and are reported honestly as **Interrupted** if the app closes mid-transcription
+
+---
+
 ## [1.8.6] — 2026-08-09
 
 Sprint 102 — AI Transparency (#163); Sprint 103 — Truthful Agent Plans (#132, #161); Sprint 104 — Reliable Multi-Prompt Queue (#162); Sprint 105 — Comments Command Center (#164, #165); Sprint 106 — Home Launcher (#74); Sprint 107 — Clean Start (first-open fix, daemon consent, tab healer; R4 welcome-card removal shipped early), plus the connectivity fix below.

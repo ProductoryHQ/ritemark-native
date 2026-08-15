@@ -60,6 +60,7 @@ import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
 import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
+import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech/activeTranscript';
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { createRuntime } from '../runtime/runtimeFactory';
@@ -1337,6 +1338,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
     if (activeTab?.input && typeof activeTab.input === 'object' && 'uri' in activeTab.input) {
       const uri = (activeTab.input as { uri: vscode.Uri }).uri;
+      const viewType = (activeTab.input as { viewType?: string }).viewType;
+
+      // Sprint 108: the Transcript Workbench's document is an AUDIO file. Hand
+      // the agent the saved transcript instead — a path to an .m4a is not
+      // context, it is a file it will fail to read. Until the user saves,
+      // there is nothing readable to offer, and saying nothing is honest.
+      if (viewType === TRANSCRIPT_WORKBENCH_VIEW_TYPE) {
+        const document = transcriptDocumentFor(uri.fsPath);
+        return document
+          ? { path: vscode.workspace.asRelativePath(document) }
+          : undefined;
+      }
+
       return {
         path: vscode.workspace.asRelativePath(uri),
         selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,

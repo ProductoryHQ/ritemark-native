@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcribe · Option A — Library &amp; Document</title>
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --r-surface:#FFFFFF; --r-surface-muted:#F8FAFC; --r-surface-soft:#F1F5F9;
+    --r-hairline:#E2E8F0; --r-hairline-strong:#CBD5E1;
+    --r-ink-strong:#1E1B4B; --r-ink-body:#475569; --r-ink-muted:#64748B; --r-ink-faint:#94A3B8;
+    --r-accent:#4338CA; --r-accent-deep:#3730A3; --r-accent-soft:#E0E7FF; --r-accent-fainter:#C7D2FE;
+    --r-success:#22C55E; --r-success-soft:#DCFCE7;
+    --r-warning:#F59E0B; --r-warning-soft:#FEF3C7;
+    --r-error:#EF4444; --r-error-soft:#FEE2E2;
+    --r-shadow-indigo:0 4px 6px -1px rgba(67,56,202,.25);
+    --r-radius:10px; --r-radius-input:6px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Sofia Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    font-size:13px; color:var(--r-ink-strong); background:#D6DCE4;
+    -webkit-font-smoothing:antialiased; padding:32px 24px 56px;
+  }
+  button{font-family:inherit;cursor:pointer}
+  .page{max-width:1320px;margin:0 auto}
+
+  /* header */
+  .hd{margin-bottom:20px}
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+       padding:3px 10px;border-radius:4px;background:#E0E7FF;color:#3730A3;margin-bottom:10px}
+  .hd h1{font-size:24px;font-weight:600;letter-spacing:-.2px;margin-bottom:6px}
+  .hd p{font-size:14px;color:var(--r-ink-body);max-width:760px;line-height:1.55}
+  .hd .bet{margin-top:10px;padding-left:12px;border-left:2px solid var(--r-accent);
+           font-size:13px;color:var(--r-ink-body);max-width:760px;line-height:1.5}
+  .hd .bet b{color:var(--r-ink-strong);font-weight:600}
+
+  /* window mock */
+  .win{background:var(--r-surface);border:1px solid #C8D0DA;border-radius:8px;overflow:hidden;
+       box-shadow:0 10px 44px rgba(30,27,75,.20);display:flex;flex-direction:column;height:748px}
+  .titlebar{height:34px;background:var(--r-surface-muted);border-bottom:1px solid var(--r-hairline);
+            display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0}
+  .dots{display:flex;gap:6px}
+  .dot{width:11px;height:11px;border-radius:50%;background:#CBD5E1}
+  .titlebar .t{flex:1;text-align:center;font-size:11.5px;color:var(--r-ink-muted);font-weight:500}
+  .body{flex:1;display:flex;min-height:0}
+
+  /* activity bar */
+  .actbar{width:48px;background:var(--r-surface-muted);border-right:1px solid var(--r-hairline);
+          display:flex;flex-direction:column;align-items:center;padding-top:6px;gap:2px;flex-shrink:0}
+  .act{width:48px;height:44px;display:flex;align-items:center;justify-content:center;
+       color:var(--r-ink-faint);border-left:2px solid transparent;position:relative}
+  .act svg{width:20px;height:20px;stroke-width:1.5}
+  .act.on{color:var(--r-accent);border-left-color:var(--r-accent);background:rgba(67,56,202,.06)}
+  .act .badge{position:absolute;right:7px;top:8px;min-width:15px;height:15px;border-radius:8px;
+              background:var(--r-accent);color:#fff;font-size:9px;font-weight:700;
+              display:flex;align-items:center;justify-content:center;padding:0 4px;
+              box-shadow:0 0 0 2px var(--r-surface-muted)}
+
+  /* sidebar */
+  .side{width:332px;flex-shrink:0;background:var(--r-surface);border-right:1px solid var(--r-hairline);
+        display:flex;flex-direction:column;min-height:0}
+  .side-title{padding:12px 14px 8px 16px;font-size:11px;font-weight:700;letter-spacing:.7px;
+              text-transform:uppercase;color:var(--r-ink-body);display:flex;align-items:center;gap:6px}
+  .side-title .sp{flex:1}
+  .icon-btn{width:24px;height:24px;border:none;background:transparent;border-radius:4px;
+            color:var(--r-ink-muted);display:flex;align-items:center;justify-content:center}
+  .icon-btn svg{width:14px;height:14px;stroke-width:1.6}
+  .icon-btn:hover{background:var(--r-surface-soft);color:var(--r-accent)}
+  .side-scroll{flex:1;overflow:hidden;display:flex;flex-direction:column}
+
+  .pad{padding:0 12px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:32px;padding:0 14px;
+       border-radius:var(--r-radius-input);font-size:12.5px;font-weight:600;border:1px solid transparent;
+       white-space:nowrap;line-height:1}
+  .btn svg{width:14px;height:14px;stroke-width:1.8;flex-shrink:0}
+  .btn-primary{background:var(--r-accent);color:#fff;box-shadow:var(--r-shadow-indigo)}
+  .btn-primary:hover{background:var(--r-accent-deep)}
+  .btn-ghost{background:var(--r-surface);color:var(--r-ink-body);border-color:var(--r-hairline-strong)}
+  .btn-ghost:hover{border-color:var(--r-accent);color:var(--r-accent);background:var(--r-accent-soft)}
+  .btn-block{width:100%}
+  .btn-sm{height:26px;padding:0 10px;font-size:11.5px;border-radius:5px}
+
+  /* engine selector */
+  .engine{margin:10px 12px 0;border:1px solid var(--r-hairline);border-radius:var(--r-radius-input);
+          padding:8px 10px;display:flex;align-items:center;gap:9px;background:var(--r-surface-muted)}
+  .engine .ic{width:26px;height:26px;border-radius:6px;background:var(--r-accent-soft);color:var(--r-accent);
+              display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .engine .ic svg{width:14px;height:14px;stroke-width:1.7}
+  .engine .txt{flex:1;min-width:0}
+  .engine .n{font-size:12px;font-weight:600;line-height:1.3}
+  .engine .s{font-size:10.5px;color:var(--r-ink-muted);line-height:1.35;margin-top:1px}
+  .chev{color:var(--r-ink-faint);width:13px;height:13px;stroke-width:2;flex-shrink:0}
+
+  .sec{padding:16px 16px 6px;font-size:10px;font-weight:700;letter-spacing:.9px;
+       text-transform:uppercase;color:var(--r-ink-faint);display:flex;align-items:center;gap:6px}
+  .sec .c{color:var(--r-ink-faint);font-weight:600;letter-spacing:0}
+
+  /* job card */
+  .job{margin:0 12px 8px;border:1px solid var(--r-accent-fainter);background:#FBFBFF;
+       border-radius:var(--r-radius);padding:10px 11px}
+  .job-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:9px}
+  .job-name{flex:1;min-width:0;font-size:12.5px;font-weight:600;line-height:1.35;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .job-meta{font-size:10.5px;color:var(--r-ink-muted);margin-top:2px}
+  .bar{height:4px;border-radius:2px;background:var(--r-surface-soft);overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--r-accent);border-radius:2px}
+  .job-foot{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;color:var(--r-accent-deep);font-weight:600}
+  .job-foot .r{margin-left:auto;color:var(--r-ink-muted);font-weight:400;font-size:10.5px}
+
+  /* rows */
+  .row{display:flex;align-items:center;gap:10px;padding:9px 16px;border-left:2px solid transparent}
+  .row:hover{background:var(--r-surface-soft)}
+  .row.sel{background:var(--r-accent-soft);border-left-color:var(--r-accent)}
+  .row .ficon{width:28px;height:28px;border-radius:6px;background:var(--r-surface-soft);color:var(--r-ink-muted);
+              display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .row.sel .ficon{background:#fff;color:var(--r-accent)}
+  .row .ficon svg{width:14px;height:14px;stroke-width:1.6}
+  .row .m{flex:1;min-width:0}
+  .row .n{font-size:12.5px;font-weight:500;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .d{font-size:10.5px;color:var(--r-ink-muted);margin-top:2px;display:flex;align-items:center;gap:5px}
+  .pill{font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:1.5px 6px;border-radius:999px;
+        background:var(--r-surface-soft);color:var(--r-ink-muted);text-transform:uppercase}
+  .pill.local{background:var(--r-success-soft);color:#15803D}
+  .pill.cloud{background:var(--r-accent-soft);color:var(--r-accent-deep)}
+  .pill.err{background:var(--r-error-soft);color:#B91C1C}
+  .sepline{height:1px;background:var(--r-hairline);margin:8px 16px}
+
+  .fail{margin:0 12px;border:1px solid #FCA5A5;background:#FFF7F7;border-radius:var(--r-radius);padding:9px 11px}
+  .fail .n{font-size:12px;font-weight:600;color:#991B1B}
+  .fail .s{font-size:10.5px;color:#B91C1C;margin-top:2px;line-height:1.4}
+  .fail .acts{display:flex;gap:6px;margin-top:8px}
+
+  /* editor area */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--r-surface)}
+  .tabs{height:35px;background:var(--r-surface-muted);border-bottom:1px solid var(--r-hairline);display:flex;flex-shrink:0}
+  .tab{display:flex;align-items:center;gap:7px;padding:0 14px;font-size:12px;color:var(--r-ink-muted);
+       border-right:1px solid var(--r-hairline)}
+  .tab.on{background:var(--r-surface);color:var(--r-ink-strong);font-weight:500;
+          box-shadow:inset 0 2px 0 var(--r-accent)}
+  .tab svg{width:13px;height:13px;stroke-width:1.6;color:var(--r-accent)}
+  .doc{flex:1;overflow:hidden;padding:34px 44px;min-width:0}
+  .doc-inner{max-width:620px}
+  .doc h1{font-size:27px;font-weight:600;letter-spacing:-.4px;line-height:1.2;margin-bottom:8px}
+  .doc .front{font-size:11.5px;color:var(--r-ink-muted);margin-bottom:22px;display:flex;gap:8px;flex-wrap:wrap}
+  .spk{margin-bottom:16px}
+  .spk .sh{font-size:13px;font-weight:700;color:var(--r-accent-deep);margin-bottom:3px;
+           display:flex;align-items:baseline;gap:8px}
+  .spk .ts{font-size:10.5px;font-weight:500;color:var(--r-ink-faint);font-variant-numeric:tabular-nums}
+  .spk p{font-size:14.5px;line-height:1.62;color:var(--r-ink-body)}
+  .hint-note{margin-top:20px;padding:9px 12px;border-radius:8px;background:var(--r-surface-muted);
+             border:1px dashed var(--r-hairline-strong);font-size:11.5px;color:var(--r-ink-muted);line-height:1.5}
+
+  /* aux bar (AI sidebar) */
+  .aux{width:250px;flex-shrink:0;border-left:1px solid var(--r-hairline);background:var(--r-surface-muted);
+       display:flex;flex-direction:column}
+  .aux-t{padding:12px 14px 8px;font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--r-ink-body)}
+  .sugg{margin:0 12px 8px;border:1px solid var(--r-hairline);background:var(--r-surface);border-radius:8px;
+        padding:9px 10px;font-size:12px;line-height:1.4;color:var(--r-ink-body);display:flex;gap:8px;align-items:flex-start}
+  .sugg svg{width:13px;height:13px;stroke-width:1.7;color:var(--r-accent);flex-shrink:0;margin-top:2px}
+  .sugg:hover{border-color:var(--r-accent);background:#FBFBFF}
+  .aux-note{margin-top:auto;padding:12px;font-size:10.5px;color:var(--r-ink-faint);line-height:1.5;
+            border-top:1px solid var(--r-hairline)}
+
+  /* annotations */
+  .notes{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .note{background:var(--r-surface);border:1px solid var(--r-hairline);border-radius:var(--r-radius);padding:14px 16px}
+  .note h3{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--r-accent);margin-bottom:10px}
+  .note li{list-style:none;font-size:12px;line-height:1.5;color:var(--r-ink-body);
+           padding-left:14px;position:relative;margin-bottom:7px}
+  .note li::before{content:'';position:absolute;left:2px;top:7px;width:4px;height:4px;border-radius:50%;background:var(--r-accent-fainter)}
+  .note li b{color:var(--r-ink-strong);font-weight:600}
+  .note.warn h3{color:#B45309}
+  .note.warn li::before{background:#FCD34D}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hd">
+    <span class="tag">Option A</span>
+    <h1>Library &amp; Document</h1>
+    <p>The activity-bar app is a <b>queue and a library</b>. The transcript itself is an ordinary markdown file that opens in the Ritemark editor, so everything downstream — editing, AI questions, export, sharing — is machinery that already exists.</p>
+    <div class="bet"><b>The bet:</b> a transcript is just another document. Ritemark is already good at documents; it only needs to learn how to make one out of audio.</div>
+  </div>
+
+  <div class="win">
+    <div class="titlebar">
+      <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="t">2026-08-12-client-call.md — Notes</div>
+      <div style="width:52px"></div>
+    </div>
+
+    <div class="body">
+      <!-- ACTIVITY BAR -->
+      <div class="actbar">
+        <div class="act" title="Home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        </div>
+        <div class="act on" title="Transcribe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round">
+            <path d="M3 11v2"/><path d="M7.5 7v10"/><path d="M12 4v16"/><path d="M16.5 8v8"/><path d="M21 11v2"/>
+          </svg>
+          <span class="badge">1</span>
+        </div>
+        <div class="act" title="Agent Library">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="6" height="16" rx="1"/><rect x="11" y="4" width="4" height="16" rx="1"/><path d="M17.5 4.8 21 19.4"/></svg>
+        </div>
+        <div class="act" title="Browser">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg>
+        </div>
+      </div>
+
+      <!-- SIDEBAR -->
+      <div class="side">
+        <div class="side-title">
+          <span>Transcribe</span><span class="sp"></span>
+          <button class="icon-btn" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></button>
+        </div>
+
+        <div class="pad">
+          <button class="btn btn-primary btn-block">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add recording
+          </button>
+        </div>
+
+        <div class="engine">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></div>
+          <div class="txt">
+            <div class="n">On-device · Whisper</div>
+            <div class="s">Private — audio never leaves this Mac</div>
+          </div>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+
+        <div class="side-scroll">
+          <div class="sec">In progress</div>
+          <div class="job">
+            <div class="job-top">
+              <div style="flex:1;min-width:0">
+                <div class="job-name">board-review-aug.m4a</div>
+                <div class="job-meta">1 h 12 min · On-device · Estonian</div>
+              </div>
+              <button class="icon-btn" title="Cancel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+            <div class="bar"><i style="width:47%"></i></div>
+            <div class="job-foot"><span>Transcribing · 47%</span><span class="r">~3 min left</span></div>
+          </div>
+
+          <div class="sec">Recent <span class="c">· 6</span></div>
+
+          <div class="row sel">
+            <div class="ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div>
+            <div class="m">
+              <div class="n">2026-08-12-client-call.md</div>
+              <div class="d"><span class="pill cloud">ElevenLabs</span><span>47 min · 2 speakers</span></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div>
+            <div class="m">
+              <div class="n">discovery-kadri.md</div>
+              <div class="d"><span class="pill local">On-device</span><span>32 min · yesterday</span></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div>
+            <div class="m">
+              <div class="n">workshop-day-2.md</div>
+              <div class="d"><span class="pill local">On-device</span><span>2 h 04 min · 9 Aug</span></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div>
+            <div class="m">
+              <div class="n">sales-sync-0805.md</div>
+              <div class="d"><span class="pill cloud">ElevenLabs</span><span>28 min · 5 Aug</span></div>
+            </div>
+          </div>
+
+          <div class="sepline"></div>
+
+          <div class="fail">
+            <div class="n">team-standup.mp4</div>
+            <div class="s">Video files aren’t supported yet — export the audio track, or use an .m4a / .mp3 file.</div>
+            <div class="acts">
+              <button class="btn btn-ghost btn-sm">Learn more</button>
+              <button class="btn btn-ghost btn-sm">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDITOR -->
+      <div class="main">
+        <div class="tabs">
+          <div class="tab on">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+            2026-08-12-client-call.md
+          </div>
+          <div class="tab">roadmap.md</div>
+        </div>
+        <div class="doc">
+          <div class="doc-inner">
+            <h1>Client call — Nordic Retail</h1>
+            <div class="front">
+              <span>12 August 2026 · 47 min</span><span>·</span>
+              <span>ElevenLabs Scribe · 2 speakers</span><span>·</span>
+              <span>client-call.m4a</span>
+            </div>
+
+            <div class="spk">
+              <div class="sh">Kadri <span class="ts">00:00:14</span></div>
+              <p>So the reason we wanted this call is the reporting piece. Our store managers are still exporting to spreadsheets every Monday morning, and nobody trusts the numbers by Wednesday.</p>
+            </div>
+            <div class="spk">
+              <div class="sh">Jarmo <span class="ts">00:00:41</span></div>
+              <p>Right. And when you say nobody trusts them — is that a data problem or a timing problem? Because those need very different answers.</p>
+            </div>
+            <div class="spk">
+              <div class="sh">Kadri <span class="ts">00:00:58</span></div>
+              <p>Honestly, timing. The data is fine on Monday. By Wednesday three people have edited the same sheet and we can’t tell which version went to the board.</p>
+            </div>
+
+            <div class="hint-note">This is a normal markdown file in your workspace. Rename a speaker with find-and-replace, edit it like any document, and ask the AI sidebar anything about it.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUX BAR -->
+      <div class="aux">
+        <div class="aux-t">Ritemark AI</div>
+        <div class="sugg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>Summarise this transcript</span></div>
+        <div class="sugg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>Pull out decisions and action items</span></div>
+        <div class="sugg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>Draft a follow-up memo for Kadri</span></div>
+        <div class="aux-note">Insights come from the existing AI sidebar acting on the open document — no separate insights engine.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <h3>What’s new</h3>
+      <ul>
+        <li><b>One activity-bar item</b> — “Transcribe”, with a progress badge while a job runs</li>
+        <li><b>Job queue + library</b> of finished transcripts, with the engine used shown on every row</li>
+        <li><b>Engine selector</b> at the top: the privacy choice is visible before you start, not buried in Settings</li>
+        <li><b>Transcript writer</b> — speaker headings, timestamps, front-matter — producing a real <b>.md</b> in the workspace</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>What it reuses</h3>
+      <ul>
+        <li>The <b>Ritemark editor</b> is the transcript viewer — no new editor surface</li>
+        <li>The <b>AI sidebar</b> is the insights feature — summaries, decisions, memos</li>
+        <li><b>Export</b> to PDF/DOCX and (later) Cloud sharing work on day one</li>
+        <li>Existing <b>Whisper</b> stack for the on-device engine</li>
+      </ul>
+    </div>
+    <div class="note warn">
+      <h3>What you give up</h3>
+      <ul>
+        <li><b>No audio playback</b> tied to the text — you can’t click a line to hear it</li>
+        <li><b>Speaker renaming is find-and-replace</b>, not a first-class action</li>
+        <li>Risk it reads as a <b>converter</b> rather than a product — the app is a queue, and the queue is empty most of the time</li>
+        <li>Correction work happens in the editor, where a wrong edit is indistinguishable from a real one</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

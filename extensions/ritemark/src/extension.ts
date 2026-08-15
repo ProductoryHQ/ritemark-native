@@ -388,6 +388,55 @@ export function activate(context: vscode.ExtensionContext) {
     );
   }
 
+  // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too — only the
+  // on-device engine is macOS-only, and the registry says so rather than the
+  // whole view disappearing). Jobs live in the subsystem, not the view, so a
+  // running transcription survives the panel being closed.
+  if (isEnabled('transcription-workbench')) {
+    const { createSpeechSubsystem } = require('./speech') as typeof import('./speech');
+    const { TranscribeViewProvider } = require('./views/TranscribeViewProvider') as typeof import('./views/TranscribeViewProvider');
+
+    const { TranscriptWorkbenchProvider } = require('./transcriptWorkbenchProvider') as typeof import('./transcriptWorkbenchProvider');
+
+    const { setTranscriptDocumentResolver } = require('./speech/activeTranscript') as typeof import('./speech/activeTranscript');
+
+    const speech = createSpeechSubsystem(context);
+    void speech.jobs.recoverInterrupted();
+
+    // So "ask Claude about this recording" means the transcript, not the
+    // unreadable .m4a the workbench tab is technically showing.
+    setTranscriptDocumentResolver((audioPath) => speech.store.getSavedDocumentSync(audioPath));
+
+
+    const workbenchProvider = new TranscriptWorkbenchProvider(
+      context,
+      speech.registry,
+      speech.jobs,
+      speech.store,
+    );
+    context.subscriptions.push(
+      workbenchProvider,
+      vscode.window.registerCustomEditorProvider(TranscriptWorkbenchProvider.viewType, workbenchProvider, {
+        webviewOptions: { retainContextWhenHidden: true },
+        supportsMultipleEditorsPerDocument: false,
+      }),
+    );
+
+    const transcribeViewProvider = new TranscribeViewProvider(
+      context.extensionUri,
+      speech.registry,
+      speech.jobs,
+      speech.store,
+      context.globalState,
+    );
+    context.subscriptions.push(
+      transcribeViewProvider,
+      vscode.window.registerWebviewViewProvider(TranscribeViewProvider.viewType, transcribeViewProvider, {
+        webviewOptions: { retainContextWhenHidden: true },
+      }),
+    );
+  }
+
   // Register Agent Library View Provider
   agentLibraryViewProvider = new AgentLibraryViewProvider(context.extensionUri, workspacePath, daemon.store, daemon);
   context.subscriptions.push(

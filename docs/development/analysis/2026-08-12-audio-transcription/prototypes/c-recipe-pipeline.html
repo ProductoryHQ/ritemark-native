@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcribe · Option C — Recipe Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --r-surface:#FFFFFF; --r-surface-muted:#F8FAFC; --r-surface-soft:#F1F5F9;
+    --r-hairline:#E2E8F0; --r-hairline-strong:#CBD5E1;
+    --r-ink-strong:#1E1B4B; --r-ink-body:#475569; --r-ink-muted:#64748B; --r-ink-faint:#94A3B8;
+    --r-accent:#4338CA; --r-accent-deep:#3730A3; --r-accent-soft:#E0E7FF; --r-accent-fainter:#C7D2FE;
+    --r-success:#22C55E; --r-success-soft:#DCFCE7;
+    --r-warning:#F59E0B; --r-warning-soft:#FEF3C7;
+    --r-error:#EF4444; --r-error-soft:#FEE2E2;
+    --r-shadow-indigo:0 4px 6px -1px rgba(67,56,202,.25);
+    --r-radius:10px; --r-radius-input:6px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sofia Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+       font-size:13px;color:var(--r-ink-strong);background:#D6DCE4;
+       -webkit-font-smoothing:antialiased;padding:32px 24px 56px}
+  button{font-family:inherit;cursor:pointer}
+  .page{max-width:1320px;margin:0 auto}
+
+  .hd{margin-bottom:20px}
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+       padding:3px 10px;border-radius:4px;background:#E0E7FF;color:#3730A3;margin-bottom:10px}
+  .hd h1{font-size:24px;font-weight:600;letter-spacing:-.2px;margin-bottom:6px}
+  .hd p{font-size:14px;color:var(--r-ink-body);max-width:780px;line-height:1.55}
+  .hd .bet{margin-top:10px;padding-left:12px;border-left:2px solid var(--r-accent);
+           font-size:13px;color:var(--r-ink-body);max-width:780px;line-height:1.5}
+  .hd .bet b{color:var(--r-ink-strong);font-weight:600}
+
+  .win{background:var(--r-surface);border:1px solid #C8D0DA;border-radius:8px;overflow:hidden;
+       box-shadow:0 10px 44px rgba(30,27,75,.20);display:flex;flex-direction:column;height:742px}
+  .titlebar{height:34px;background:var(--r-surface-muted);border-bottom:1px solid var(--r-hairline);
+            display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0}
+  .dots{display:flex;gap:6px}.dot{width:11px;height:11px;border-radius:50%;background:#CBD5E1}
+  .titlebar .t{flex:1;text-align:center;font-size:11.5px;color:var(--r-ink-muted);font-weight:500}
+  .body{flex:1;display:flex;min-height:0}
+
+  .actbar{width:48px;background:var(--r-surface-muted);border-right:1px solid var(--r-hairline);
+          display:flex;flex-direction:column;align-items:center;padding-top:6px;gap:2px;flex-shrink:0}
+  .act{width:48px;height:44px;display:flex;align-items:center;justify-content:center;
+       color:var(--r-ink-faint);border-left:2px solid transparent}
+  .act svg{width:20px;height:20px;stroke-width:1.5}
+  .act.on{color:var(--r-accent);border-left-color:var(--r-accent);background:rgba(67,56,202,.06)}
+
+  .side{width:352px;flex-shrink:0;background:var(--r-surface);border-right:1px solid var(--r-hairline);
+        display:flex;flex-direction:column;min-height:0}
+  .side-title{padding:12px 14px 8px 16px;font-size:11px;font-weight:700;letter-spacing:.7px;
+              text-transform:uppercase;color:var(--r-ink-body)}
+  .side-scroll{flex:1;overflow:hidden;padding:0 14px}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:32px;padding:0 14px;
+       border-radius:var(--r-radius-input);font-size:12.5px;font-weight:600;border:1px solid transparent;
+       white-space:nowrap;line-height:1}
+  .btn svg{width:14px;height:14px;stroke-width:1.8;flex-shrink:0}
+  .btn-primary{background:var(--r-accent);color:#fff;box-shadow:var(--r-shadow-indigo)}
+  .btn-primary:hover{background:var(--r-accent-deep)}
+  .btn-ghost{background:var(--r-surface);color:var(--r-ink-body);border-color:var(--r-hairline-strong)}
+  .btn-ghost:hover{border-color:var(--r-accent);color:var(--r-accent);background:var(--r-accent-soft)}
+  .btn-block{width:100%}
+  .btn-sm{height:26px;padding:0 10px;font-size:11.5px;border-radius:5px}
+
+  /* file card */
+  .file{border:1px solid var(--r-hairline);border-radius:var(--r-radius);padding:10px 11px;
+        display:flex;align-items:center;gap:10px;background:var(--r-surface-muted)}
+  .file .ic{width:32px;height:32px;border-radius:7px;background:var(--r-accent-soft);color:var(--r-accent);
+            display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .file .ic svg{width:16px;height:16px;stroke-width:1.7}
+  .file .m{flex:1;min-width:0}
+  .file .n{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .file .d{font-size:10.5px;color:var(--r-ink-muted);margin-top:2px}
+  .icon-btn{width:24px;height:24px;border:none;background:transparent;border-radius:4px;color:var(--r-ink-muted);
+            display:flex;align-items:center;justify-content:center}
+  .icon-btn svg{width:14px;height:14px;stroke-width:1.7}
+  .icon-btn:hover{background:var(--r-surface-soft);color:var(--r-accent)}
+
+  .lbl{font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--r-ink-faint);
+       margin:16px 0 7px;display:flex;align-items:center}
+  .lbl .r{margin-left:auto;font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--r-accent);cursor:pointer}
+
+  /* recipes */
+  .recipes{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .rec{border:1px solid var(--r-hairline);border-radius:var(--r-radius);padding:9px 10px;background:var(--r-surface);
+       position:relative}
+  .rec:hover{border-color:var(--r-accent-fainter);background:#FBFBFF}
+  .rec.on{border-color:var(--r-accent);background:var(--r-accent-soft);box-shadow:0 0 0 3px rgba(67,56,202,.10)}
+  .rec .rn{font-size:12px;font-weight:600;line-height:1.3;display:flex;align-items:center;gap:6px}
+  .rec .rn svg{width:13px;height:13px;stroke-width:1.7;color:var(--r-accent);flex-shrink:0}
+  .rec .rd{font-size:10.5px;color:var(--r-ink-muted);line-height:1.4;margin-top:4px}
+  .rec.on .rd{color:var(--r-accent-deep)}
+
+  /* engine row */
+  .opt{border:1px solid var(--r-hairline);border-radius:var(--r-radius);overflow:hidden}
+  .opt-row{display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid var(--r-hairline)}
+  .opt-row:last-child{border-bottom:none}
+  .opt-row .k{font-size:11.5px;color:var(--r-ink-muted);width:74px;flex-shrink:0}
+  .opt-row .v{font-size:12px;font-weight:600;flex:1;display:flex;align-items:center;gap:6px}
+  .opt-row .v .tick{width:13px;height:13px;stroke-width:2.2;color:var(--r-success)}
+  .chev{color:var(--r-ink-faint);width:13px;height:13px;stroke-width:2;flex-shrink:0}
+  .costline{display:flex;align-items:flex-start;gap:8px;margin-top:9px;padding:9px 11px;border-radius:var(--r-radius);
+            background:var(--r-warning-soft);border:1px solid #FDE68A}
+  .costline svg{width:14px;height:14px;stroke-width:1.9;color:#B45309;flex-shrink:0;margin-top:1px}
+  .costline p{font-size:11.5px;line-height:1.45;color:#92400E}
+  .costline b{font-weight:700}
+
+  .runbar{padding:12px 14px;border-top:1px solid var(--r-hairline);background:var(--r-surface-muted);display:flex;gap:8px}
+
+  /* editor */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--r-surface)}
+  .tabs{height:35px;background:var(--r-surface-muted);border-bottom:1px solid var(--r-hairline);display:flex;flex-shrink:0}
+  .tab{display:flex;align-items:center;gap:7px;padding:0 14px;font-size:12px;color:var(--r-ink-muted);border-right:1px solid var(--r-hairline)}
+  .tab.on{background:var(--r-surface);color:var(--r-ink-strong);font-weight:500;box-shadow:inset 0 2px 0 var(--r-accent)}
+  .tab svg{width:13px;height:13px;stroke-width:1.6;color:var(--r-accent)}
+  .doc{flex:1;overflow:hidden;padding:32px 46px}
+  .doc-inner{max-width:600px}
+  .doc h1{font-size:26px;font-weight:600;letter-spacing:-.4px;line-height:1.2;margin-bottom:7px}
+  .doc .front{font-size:11.5px;color:var(--r-ink-muted);margin-bottom:22px}
+  .doc h2{font-size:15px;font-weight:700;margin:20px 0 8px;letter-spacing:-.1px}
+  .doc p{font-size:14.5px;line-height:1.62;color:var(--r-ink-body);margin-bottom:10px}
+  .doc ul{margin:0 0 4px}
+  .doc li{list-style:none;font-size:14.5px;line-height:1.6;color:var(--r-ink-body);
+          padding-left:18px;position:relative;margin-bottom:6px}
+  .doc li::before{content:'';position:absolute;left:3px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--r-accent-fainter)}
+  .doc li b{color:var(--r-ink-strong);font-weight:600}
+  .details{margin-top:22px;border:1px solid var(--r-hairline);border-radius:var(--r-radius);
+           padding:11px 13px;background:var(--r-surface-muted);display:flex;align-items:center;gap:9px}
+  .details svg{width:14px;height:14px;stroke-width:2;color:var(--r-ink-muted)}
+  .details .tx{font-size:12.5px;font-weight:600;color:var(--r-ink-body)}
+  .details .sx{font-size:11px;color:var(--r-ink-faint);margin-left:auto}
+
+  /* state panels */
+  .states{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .sp{background:var(--r-surface);border:1px solid #C8D0DA;border-radius:8px;overflow:hidden;
+      box-shadow:0 6px 24px rgba(30,27,75,.14);display:flex;flex-direction:column;height:432px}
+  .sp-bar{height:30px;background:#E2E8F0;border-bottom:1px solid var(--r-hairline);display:flex;align-items:center;
+          padding:0 11px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--r-ink-body)}
+  .sp-body{flex:1;padding:14px;display:flex;flex-direction:column;min-height:0}
+
+  .drop{border:2px dashed var(--r-hairline-strong);border-radius:var(--r-radius);padding:26px 18px;text-align:center;
+        background:var(--r-surface-muted)}
+  .drop .di{width:44px;height:44px;border-radius:12px;background:var(--r-accent-soft);color:var(--r-accent);
+            display:flex;align-items:center;justify-content:center;margin:0 auto 11px}
+  .drop .di svg{width:22px;height:22px;stroke-width:1.6}
+  .drop h4{font-size:14px;font-weight:600;margin-bottom:5px}
+  .drop p{font-size:11.5px;color:var(--r-ink-muted);line-height:1.5;margin-bottom:12px}
+  .eng-status{margin-top:16px;border:1px solid var(--r-hairline);border-radius:var(--r-radius);overflow:hidden}
+  .es{display:flex;align-items:center;gap:9px;padding:10px 11px;border-bottom:1px solid var(--r-hairline)}
+  .es:last-child{border-bottom:none}
+  .es .sw{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .sw.ok{background:var(--r-success)}.sw.no{background:var(--r-warning)}
+  .es .m{flex:1;min-width:0}
+  .es .n{font-size:12px;font-weight:600;line-height:1.3}
+  .es .d{font-size:10.5px;color:var(--r-ink-muted);margin-top:2px;line-height:1.4}
+
+  /* pipeline steps */
+  .steps{margin-top:4px}
+  .step{display:flex;gap:10px;padding:2px 0}
+  .step .col{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+  .step .bul{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+             border:1.5px solid var(--r-hairline-strong);background:var(--r-surface);color:var(--r-ink-faint);flex-shrink:0}
+  .step .bul svg{width:10px;height:10px;stroke-width:3}
+  .step.done .bul{background:var(--r-success);border-color:var(--r-success);color:#fff}
+  .step.now .bul{border-color:var(--r-accent);background:var(--r-accent-soft);color:var(--r-accent)}
+  .step .line{width:1.5px;flex:1;background:var(--r-hairline);margin:2px 0}
+  .step.done .line{background:var(--r-success)}
+  .step .tx{padding-bottom:14px;flex:1}
+  .step .n{font-size:12.5px;font-weight:600;line-height:1.3}
+  .step.pend .n{color:var(--r-ink-faint);font-weight:500}
+  .step .d{font-size:11px;color:var(--r-ink-muted);margin-top:3px;line-height:1.4}
+  .step.now .n{color:var(--r-accent-deep)}
+  .bar{height:4px;border-radius:2px;background:var(--r-surface-soft);overflow:hidden;margin-top:6px;max-width:190px}
+  .bar i{display:block;height:100%;background:var(--r-accent);border-radius:2px}
+  .runfoot{margin-top:auto;display:flex;gap:8px;align-items:center}
+  .runfoot .t{font-size:11px;color:var(--r-ink-muted);margin-right:auto}
+
+  .notes{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .note{background:var(--r-surface);border:1px solid var(--r-hairline);border-radius:var(--r-radius);padding:14px 16px}
+  .note h3{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--r-accent);margin-bottom:10px}
+  .note li{list-style:none;font-size:12px;line-height:1.5;color:var(--r-ink-body);padding-left:14px;position:relative;margin-bottom:7px}
+  .note li::before{content:'';position:absolute;left:2px;top:7px;width:4px;height:4px;border-radius:50%;background:var(--r-accent-fainter)}
+  .note li b{color:var(--r-ink-strong);font-weight:600}
+  .note.warn h3{color:#B45309}.note.warn li::before{background:#FCD34D}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hd">
+    <span class="tag">Option C</span>
+    <h1>Recipe Pipeline</h1>
+    <p>The activity-bar app <b>is</b> the whole feature: drop a file, pick what you want made out of it, press Run. The primary output is the <b>document you actually needed</b> — a meeting memo, interview notes — with the raw transcript kept as an appendix.</p>
+    <div class="bet"><b>The bet:</b> nobody wants a transcript. They want the memo. Ritemark already has Flows and agent runtimes — this is a pipeline product, not a transcription product.</div>
+  </div>
+
+  <div class="win">
+    <div class="titlebar">
+      <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="t">client-call — memo.md — Notes</div>
+      <div style="width:52px"></div>
+    </div>
+
+    <div class="body">
+      <div class="actbar">
+        <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></div>
+        <div class="act on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 11v2"/><path d="M7.5 7v10"/><path d="M12 4v16"/><path d="M16.5 8v8"/><path d="M21 11v2"/></svg></div>
+        <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="6" height="16" rx="1"/><rect x="11" y="4" width="4" height="16" rx="1"/><path d="M17.5 4.8 21 19.4"/></svg></div>
+        <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg></div>
+      </div>
+
+      <div class="side">
+        <div class="side-title">Transcribe</div>
+        <div class="side-scroll">
+          <div class="file">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 11v2"/><path d="M7.5 7v10"/><path d="M12 4v16"/><path d="M16.5 8v8"/><path d="M21 11v2"/></svg></div>
+            <div class="m">
+              <div class="n">client-call.m4a</div>
+              <div class="d">47 min 32 s · 44 MB · Estonian + English</div>
+            </div>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+
+          <div class="lbl">Make <span class="r">Manage recipes</span></div>
+          <div class="recipes">
+            <div class="rec on">
+              <div class="rn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>Meeting memo</div>
+              <div class="rd">Summary, decisions, actions, owners</div>
+            </div>
+            <div class="rec">
+              <div class="rn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h11M8 12h11M8 18h11"/><circle cx="4" cy="6" r="1.4"/><circle cx="4" cy="12" r="1.4"/><circle cx="4" cy="18" r="1.4"/></svg>Interview notes</div>
+              <div class="rd">Themes, verbatim quotes, follow-ups</div>
+            </div>
+            <div class="rec">
+              <div class="rn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 5h16v11H4z"/><path d="M9 20h6"/><path d="M12 16v4"/></svg>Lecture notes</div>
+              <div class="rd">Outline, key concepts, definitions</div>
+            </div>
+            <div class="rec">
+              <div class="rn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 4h14v16H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Transcript only</div>
+              <div class="rd">No AI pass — raw text with speakers</div>
+            </div>
+          </div>
+
+          <div class="lbl">How</div>
+          <div class="opt">
+            <div class="opt-row">
+              <span class="k">Engine</span>
+              <span class="v">ElevenLabs Scribe</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <div class="opt-row">
+              <span class="k">Speakers</span>
+              <span class="v"><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m4 12 5 5L20 6"/></svg>Detect automatically</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <div class="opt-row">
+              <span class="k">Language</span>
+              <span class="v">Auto-detect</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <div class="opt-row">
+              <span class="k">Save to</span>
+              <span class="v">Notes / Clients / Nordic</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+          </div>
+
+          <div class="costline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".6" fill="currentColor"/><circle cx="12" cy="12" r="9"/></svg>
+            <p><b>This uploads your audio to ElevenLabs.</b> 47 min ≈ <b>$0.17</b>. Switch to on-device to keep it on this Mac — but on-device can’t separate speakers.</p>
+          </div>
+        </div>
+
+        <div class="runbar">
+          <button class="btn btn-primary" style="flex:1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M6 4.5v15l13-7.5z"/></svg>
+            Run
+          </button>
+          <button class="btn btn-ghost">Preview steps</button>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="tabs">
+          <div class="tab on">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+            client-call — memo.md
+          </div>
+          <div class="tab">roadmap.md</div>
+        </div>
+        <div class="doc">
+          <div class="doc-inner">
+            <h1>Client call — Nordic Retail</h1>
+            <div class="front">12 August 2026 · 47 min · Kadri Lepik, Jarmo Tuisk · generated from client-call.m4a</div>
+
+            <h2>What was decided</h2>
+            <ul>
+              <li>The reporting problem is <b>version drift</b>, not data quality — fix the single-source-of-truth, not the spreadsheet.</li>
+              <li>Weekly store reports only for the first phase; regional roll-ups come later.</li>
+              <li>Target is the <b>September board meeting</b>.</li>
+            </ul>
+
+            <h2>Actions</h2>
+            <ul>
+              <li><b>Jarmo</b> — one-page proposal by 19 August</li>
+              <li><b>Kadri</b> — share the last four weeks of reports</li>
+              <li><b>Kadri</b> — confirm who signs off before the board pack</li>
+            </ul>
+
+            <h2>Open questions</h2>
+            <ul>
+              <li>Who owns the numbers between Monday and Wednesday today?</li>
+              <li>Is the September date fixed, or is it the first board meeting after summer?</li>
+            </ul>
+
+            <div class="details">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>
+              <span class="tx">Full transcript</span>
+              <span class="sx">482 segments · 2 speakers · collapsed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATES -->
+  <div class="states">
+    <div class="sp">
+      <div class="sp-bar">State · first run, nothing set up</div>
+      <div class="sp-body">
+        <div class="drop">
+          <div class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+          <h4>Drop a recording here</h4>
+          <p>m4a, mp3, wav, flac · up to 10 hours<br>Video files aren’t supported yet</p>
+          <button class="btn btn-ghost btn-sm">Choose file…</button>
+        </div>
+        <div class="eng-status">
+          <div class="es">
+            <span class="sw no"></span>
+            <div class="m">
+              <div class="n">On-device · Whisper</div>
+              <div class="d">Model not downloaded — 1.5 GB, one time</div>
+            </div>
+            <button class="btn btn-ghost btn-sm">Download</button>
+          </div>
+          <div class="es">
+            <span class="sw no"></span>
+            <div class="m">
+              <div class="n">ElevenLabs Scribe</div>
+              <div class="d">No API key — needed for speaker separation</div>
+            </div>
+            <button class="btn btn-ghost btn-sm">Add key</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp">
+      <div class="sp-bar">State · pipeline running</div>
+      <div class="sp-body">
+        <div class="file" style="margin-bottom:16px">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 11v2"/><path d="M7.5 7v10"/><path d="M12 4v16"/><path d="M16.5 8v8"/><path d="M21 11v2"/></svg></div>
+          <div class="m">
+            <div class="n">client-call.m4a</div>
+            <div class="d">Meeting memo · ElevenLabs Scribe</div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step done">
+            <div class="col"><span class="bul"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m4 12 5 5L20 6"/></svg></span><span class="line"></span></div>
+            <div class="tx"><div class="n">Prepare audio</div><div class="d">Converted to 16 kHz mono · 47:32</div></div>
+          </div>
+          <div class="step done">
+            <div class="col"><span class="bul"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="m4 12 5 5L20 6"/></svg></span><span class="line"></span></div>
+            <div class="tx"><div class="n">Transcribe</div><div class="d">ElevenLabs Scribe · 9 341 words</div></div>
+          </div>
+          <div class="step now">
+            <div class="col"><span class="bul"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="12" cy="12" r="4"/></svg></span><span class="line"></span></div>
+            <div class="tx">
+              <div class="n">Separate speakers</div>
+              <div class="d">2 speakers detected · labelling segments</div>
+              <div class="bar"><i style="width:62%"></i></div>
+            </div>
+          </div>
+          <div class="step pend">
+            <div class="col"><span class="bul"></span></div>
+            <div class="tx"><div class="n">Draft meeting memo</div><div class="d">Claude · summary, decisions, actions</div></div>
+          </div>
+        </div>
+        <div class="runfoot">
+          <span class="t">Started 2 min ago · you can close this panel</span>
+          <button class="btn btn-ghost btn-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <h3>What’s new</h3>
+      <ul>
+        <li>A <b>recipe chooser</b> — the user picks the deliverable, not the technology</li>
+        <li>A <b>visible pipeline</b>: prepare → transcribe → speakers → draft, each step nameable and skippable</li>
+        <li><b>Cost and privacy shown at the decision point</b>, in the same place as the Run button</li>
+        <li>Output is a <b>finished document</b>, with the transcript collapsed underneath as evidence</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>What it reuses</h3>
+      <ul>
+        <li>The <b>Flows engine</b> — a recipe is a flow; users can edit them and add their own</li>
+        <li>The <b>agent runtimes</b> for the drafting step — no new AI plumbing</li>
+        <li>The <b>Ritemark editor</b> for the result; no new editor surface</li>
+        <li>Closest match to the workflow you have today (Word → markdown → Ritemark), minus three apps</li>
+      </ul>
+    </div>
+    <div class="note warn">
+      <h3>The risk</h3>
+      <ul>
+        <li><b>The source is hidden.</b> If the model paraphrases a decision wrongly, nothing on screen contradicts it</li>
+        <li>No playback, so <b>a quote can’t be verified</b> before it goes to a client</li>
+        <li>Recipe quality becomes the product — that’s prompt work, and it never fully stops</li>
+        <li>Users who just want a clean transcript have to know to pick “Transcript only”</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

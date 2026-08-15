@@ -69,6 +69,7 @@ These work across all modes.
 
 | Feature | Description |
 |---------|-------------|
+| [Transcribe](transcribe.md) | Turn a recording into a speaker-attributed document |
 | [Export](export.md) | PDF and Word export |
 
 ---

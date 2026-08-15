@@ -31,6 +31,11 @@ interface SettingsData {
   openrouterEnabled: boolean;
   openrouterKey: string;
   openrouterKeyConfigured: boolean;
+  // Sprint 108 R4/R12: transcription key + stored-transcript footprint.
+  transcriptionEnabled: boolean;
+  elevenlabsKey: string;
+  elevenlabsKeyConfigured: boolean;
+  transcriptionStorageBytes: number;
   chatFontSize: number;
   currentTheme: string;
   availableThemes: ThemeInfo[];
@@ -134,7 +139,7 @@ interface CodexAuthStatus {
 }
 
 interface TestResult {
-  key: 'openai' | 'google' | 'anthropic' | 'openrouter';
+  key: 'openai' | 'google' | 'anthropic' | 'openrouter' | 'elevenlabs';
   success: boolean;
   error?: string;
   message?: string;
@@ -146,14 +151,17 @@ export function RitemarkSettings() {
   const [googleKey, setGoogleKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
   const [openrouterKey, setOpenrouterKey] = useState('');
+  const [elevenlabsKey, setElevenlabsKey] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showOpenrouterKey, setShowOpenrouterKey] = useState(false);
+  const [showElevenlabsKey, setShowElevenlabsKey] = useState(false);
   const [testingOpenai, setTestingOpenai] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
   const [testingOpenrouter, setTestingOpenrouter] = useState(false);
+  const [testingElevenlabs, setTestingElevenlabs] = useState(false);
   // Track last manual update-check click. Used to show the spinner during the
   // brief gap between click and the backend's first 'checking' state push,
   // and to time-out the spinner if the backend never reports back (defensive
@@ -187,6 +195,9 @@ export function RitemarkSettings() {
           if (!openrouterKey && message.data.openrouterKey) {
             setOpenrouterKey(message.data.openrouterKey);
           }
+          if (!elevenlabsKey && message.data.elevenlabsKey) {
+            setElevenlabsKey(message.data.elevenlabsKey);
+          }
           break;
 
         case 'testResult':
@@ -195,6 +206,7 @@ export function RitemarkSettings() {
           if (message.key === 'google') setTestingGoogle(false);
           if (message.key === 'anthropic') setTestingAnthropic(false);
           if (message.key === 'openrouter') setTestingOpenrouter(false);
+          if (message.key === 'elevenlabs') setTestingElevenlabs(false);
           break;
 
         case 'codex:authStatus':
@@ -271,7 +283,9 @@ export function RitemarkSettings() {
         ? 'anthropic'
         : keyName === 'openrouter-api-key'
           ? 'openrouter'
-          : 'google';
+          : keyName === 'elevenlabs-api-key'
+            ? 'elevenlabs'
+            : 'google';
     setTestResults((prev) => {
       const next = { ...prev };
       delete next[resultKey];
@@ -286,6 +300,8 @@ export function RitemarkSettings() {
       setTestingAnthropic(true);
     } else if (keyName === 'openrouter-api-key') {
       setTestingOpenrouter(true);
+    } else if (keyName === 'elevenlabs-api-key') {
+      setTestingElevenlabs(true);
     } else {
       setTestingGoogle(true);
     }
@@ -1103,6 +1119,89 @@ export function RitemarkSettings() {
           </div>
         )}
 
+        {/* ElevenLabs API Key — Sprint 108 R4, flag-gated with Transcribe.
+            Optional: on-device transcription needs no key. What the key buys is
+            speaker separation, which the on-device engine cannot do at all. */}
+        {settings.transcriptionEnabled && (
+          <div className="mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-ink-strong">
+                ElevenLabs API Key
+                <span className="ml-2 text-xs text-ink-muted">(optional)</span>
+              </label>
+              {settings.elevenlabsKeyConfigured && (
+                <span className="flex items-center gap-1 text-xs text-ritemark-success">
+                  <Icon name="check" size={12} />
+                  Configured
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-2 mb-2">
+              <div className="flex-1 relative">
+                <input
+                  type={showElevenlabsKey ? 'text' : 'password'}
+                  value={elevenlabsKey}
+                  onChange={(e) => setElevenlabsKey(e.target.value)}
+                  placeholder="sk_..."
+                  className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
+                />
+                <button
+                  onClick={() => setShowElevenlabsKey(!showElevenlabsKey)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
+                >
+                  {showElevenlabsKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
+                </button>
+              </div>
+              <Button
+                onClick={() => handleSaveApiKey('elevenlabs-api-key', elevenlabsKey)}
+                size="lg"
+              >
+                Save
+              </Button>
+              <Button
+                onClick={() => handleTestApiKey('elevenlabs-api-key')}
+                disabled={!settings.elevenlabsKeyConfigured || testingElevenlabs}
+                variant="secondary"
+                size="lg"
+              >
+                {testingElevenlabs ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
+              </Button>
+            </div>
+
+            {testResults.elevenlabs && (
+              <div
+                className={`text-xs p-2 rounded ${
+                  testResults.elevenlabs.success
+                    ? 'bg-ritemark-success-soft text-ritemark-success'
+                    : 'bg-ritemark-error-soft text-ritemark-error'
+                }`}
+              >
+                {testResults.elevenlabs.success ? (
+                  <span className="flex items-center gap-1">
+                    <Icon name="check" size={12} /> {testResults.elevenlabs.message || 'API key is valid'}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <Icon name="x" size={12} /> {testResults.elevenlabs.error}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs text-ink-muted mt-2">
+              Used for: Transcribe — speaker separation in recordings. On-device transcription works without a
+              key, but cannot tell speakers apart. Audio is uploaded to ElevenLabs when you choose this engine.
+              <a
+                href="https://elevenlabs.io/app/settings/api-keys"
+                className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
+              >
+                Get an ElevenLabs key <Icon name="arrow-square-out" size={12} />
+              </a>
+            </p>
+          </div>
+        )}
+
       </section>
 
       {/* Agent Timeout Section */}
@@ -1451,6 +1550,30 @@ export function RitemarkSettings() {
                 </button>
               </RuntimeStatusCard>
             </div>
+
+            {/* Sprint 108 R12: transcripts live in app storage (D5), so the
+                only way a user can see or reclaim that space is here. */}
+            {settings.transcriptionEnabled && (
+              <div className="mt-3 flex items-start gap-3 p-3 rounded-lg bg-surface border border-hairline">
+                <Icon name="hard-drive" size={16} className="text-ink-muted shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-ink-strong">Transcription data</div>
+                  <div className="text-xs text-ink-muted mt-0.5">
+                    {transcriptionStorageSummary(settings.transcriptionStorageBytes)} Your recordings and any documents
+                    you saved are stored separately and are not affected.
+                  </div>
+                </div>
+                <Button
+                  onClick={() => vscode.postMessage({ type: 'transcription:clearStorage' })}
+                  disabled={!settings.transcriptionStorageBytes}
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0"
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -1504,6 +1627,17 @@ function formatSize(bytes?: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+/**
+ * Sprint 108 R12. The whole sentence, not just the number: `formatSize` says
+ * "Size unknown" at zero, and an empty store needs different words rather than
+ * a number glued onto a sentence written for the non-empty case.
+ */
+function transcriptionStorageSummary(bytes: number): string {
+  return !bytes || bytes <= 0
+    ? 'No stored transcripts yet.'
+    : `${formatSize(bytes)} of stored transcripts, speaker names and corrections.`;
 }
 
 interface ToggleRowProps {
