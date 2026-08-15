@@ -145,11 +145,16 @@ check_info "This is what CI does — patches must apply against fresh vanilla VS
 
 VANILLA_CACHE="/tmp/vscode-vanilla-$VSCODE_TAG"
 
-if [ -d "$VANILLA_CACHE/.git" ]; then
+# A directory named .git is not proof of a usable clone. macOS reaps /tmp, and
+# what it leaves behind is the directory skeleton with every file gone — which
+# passes -d, then makes the git calls below exit 128 and, under `set -e`, kills
+# the whole pre-flight with no message. Ask git whether it can read the repo.
+if git rev-parse --resolve-git-dir "$VANILLA_CACHE/.git" >/dev/null 2>&1; then
     check_info "Using cached vanilla clone at $VANILLA_CACHE"
     git -C "$VANILLA_CACHE" checkout . 2>/dev/null
     git -C "$VANILLA_CACHE" clean -fd 2>/dev/null
 else
+    rm -rf "$VANILLA_CACHE"
     check_info "Cloning vanilla VS Code $VSCODE_TAG (cached for future runs)..."
     if git clone --depth 1 --branch "$VSCODE_TAG" https://github.com/microsoft/vscode.git "$VANILLA_CACHE" 2>&1 | tail -1; then
         check_pass "Cloned vanilla VS Code $VSCODE_TAG"
