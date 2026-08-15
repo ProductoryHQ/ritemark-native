@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-04 (Sprint 106 — Home launcher view)
+**Last updated:** 2026-08-13 (Sprint 108 — transcription subsystem, Transcript Workbench editor, `transcription-workbench` flag)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---

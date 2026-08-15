@@ -89,17 +89,7 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
           await this._push(fsPath, panel);
           break;
         case 'workbench:transcribe':
-          this._jobs.enqueue({
-            audioPath: fsPath,
-            engineId: message.engineId as EngineId,
-            // Probed here rather than taken from the webview: starting a
-            // transcription from this tab must produce the same metadata as
-            // starting it from the panel, or the library row reads
-            // "Length unknown" for no reason the user can see.
-            durationSec: (await probeDurationSec(fsPath)) ?? 0,
-            language: null,
-          });
-          await this._push(fsPath, panel);
+          await this._startTranscription(fsPath, panel, message.engineId as EngineId);
           break;
         case 'workbench:renameSpeaker':
           await this._renameSpeaker(fsPath, message.speakerId, message.label);
@@ -150,6 +140,52 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
   }
 
   /**
+   * Start a transcription from the workbench.
+   *
+   * R4/N2: an upload needs informed consent, and it needs it HERE too. The
+   * panel shows duration and cost before anything leaves the machine; a
+   * "Transcribe with ElevenLabs" click in this tab must not be a quieter route
+   * to the same upload.
+   */
+  private async _startTranscription(
+    fsPath: string,
+    panel: vscode.WebviewPanel,
+    engineId: EngineId,
+  ): Promise<void> {
+    // Probed host-side so this produces the same metadata as the panel path.
+    const durationSec = await probeDurationSec(fsPath);
+
+    const engine = this._registry.get(engineId);
+    if (!engine.isLocal) {
+      const cost = durationSec === null ? null : engine.estimateCostUsd(durationSec);
+      const length = durationSec === null ? 'This recording' : formatMinutes(durationSec);
+      const price =
+        cost === null
+          ? 'ElevenLabs charges about $0.22 per hour; the length could not be read, so the cost cannot be estimated up front.'
+          : `Estimated cost: $${cost.toFixed(2)}.`;
+
+      const choice = await vscode.window.showWarningMessage(
+        `Upload ${path.basename(fsPath)} to ${engine.label}?`,
+        {
+          modal: true,
+          detail: `${length} of audio will be sent to ${engine.label} for transcription. ${price}\n\nOn-device transcription keeps the audio on this machine, but cannot separate speakers.`,
+        },
+        'Upload and transcribe',
+      );
+      if (choice !== 'Upload and transcribe') return;
+    }
+
+    this._jobs.enqueue({
+      audioPath: fsPath,
+      engineId,
+      workspaceRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null,
+      durationSec: durationSec ?? 0,
+      language: null,
+    });
+    await this._push(fsPath, panel);
+  }
+
+  /**
    * R10 — generate the summary/decisions/actions/quotes.
    *
    * Runs on the existing agent runtime and stores the result on the session, so
@@ -169,6 +205,7 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
       const insights = await generateInsights({
         session,
         workspacePath: insightsWorkspacePath(session),
+        anthropicApiKey: await this._context.secrets.get('anthropic-api-key'),
         signal: controller.signal,
       });
 
@@ -220,6 +257,7 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
     await this._context.globalState.update(LAST_SAVE_DIR_KEY, dir);
 
     const filePath = await saveTranscriptTo(this._store, session, dir);
+    if (!filePath) return; // the user declined the overwrite
     void vscode.window.showInformationMessage(`Transcript saved to ${path.basename(filePath)}.`);
     await this._push(fsPath, panel);
   }
@@ -307,6 +345,15 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
 </body>
 </html>`;
   }
+}
+
+/** `47 min` / `1 h 12 min` — for a sentence the user reads before spending. */
+function formatMinutes(seconds: number): string {
+  const total = Math.round(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.round((total % 3600) / 60);
+  if (hours > 0) return `${hours} h ${minutes} min`;
+  return `${Math.max(1, minutes)} min`;
 }
 
 function isActive(job: TranscriptionJob): boolean {

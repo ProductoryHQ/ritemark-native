@@ -99,6 +99,64 @@ async function run(): Promise<void> {
     assert.equal(relinked?.audioMissing, false);
     assert.equal(relinked?.audioFingerprint, fingerprintFile(movedTo), 'the fingerprint follows the file');
 
+    // Ids are path-derived, so a relink MUST re-key: every lookup goes through
+    // sessionIdForPath(currentPath). Without this the transcript survives on
+    // disk but the recording opens as "not transcribed yet".
+    assert.equal(relinked?.id, sessionIdForPath(movedTo), 'the session is re-keyed to the new path');
+    const foundAtNewPath = await store.getForAudio(movedTo);
+    assert.ok(foundAtNewPath, 'and is found by the path it now lives at');
+    assert.equal(foundAtNewPath.segments.length, 1, 'with its transcript intact');
+    assert.equal(await store.get(sessionIdForPath(second)), null, 'the stale entry is gone — no duplicate');
+
+    // ── the library is project-scoped ──
+    //
+    // Sessions live in GLOBAL storage, so without this filter every folder
+    // shows every other folder's recordings.
+    const projectA = path.join(dir, 'project-a');
+    const projectB = path.join(dir, 'project-b');
+    const inA = path.join(audioDir, 'a.m4a');
+    const inB = path.join(audioDir, 'b.m4a');
+    fs.writeFileSync(inA, 'audio');
+    fs.writeFileSync(inB, 'audio');
+    await store.save(session(inA, { workspaceRoot: projectA }));
+    await store.save(session(inB, { workspaceRoot: projectB }));
+
+    const forA = await store.listForWorkspace(projectA);
+    assert.deepEqual(
+      forA.map((entry) => path.basename(entry.audioPath)),
+      ['a.m4a'],
+      'a project sees only its own recordings',
+    );
+    assert.equal((await store.listForWorkspace(projectB)).length, 1);
+    assert.equal(
+      (await store.listForWorkspace(path.join(dir, 'never-used'))).length,
+      0,
+      'an unrelated folder sees nothing',
+    );
+
+    // A recording transcribed with no folder open belongs to the no-folder case,
+    // and must not leak into a project.
+    const loose = path.join(audioDir, 'loose.m4a');
+    fs.writeFileSync(loose, 'audio');
+    await store.save(session(loose, { workspaceRoot: null }));
+    assert.equal(
+      (await store.listForWorkspace(projectA)).length,
+      1,
+      'a folderless recording does not appear inside a project',
+    );
+    // Sessions written before project scoping existed have no `workspaceRoot`,
+    // so they land in the no-folder case too. That is the migration we want:
+    // nothing is lost, and nothing pollutes a project it was not made in.
+    const folderless = await store.listForWorkspace(null);
+    assert.ok(
+      folderless.some((entry) => path.basename(entry.audioPath) === 'loose.m4a'),
+      'a folderless recording is visible with no folder open',
+    );
+    assert.ok(
+      folderless.every((entry) => (entry.workspaceRoot ?? null) === null),
+      'and only folderless ones are',
+    );
+
     // ── size and deletion ──
 
     assert.ok((await store.sizeBytes()) > 0, 'the store can report its own footprint for Settings');

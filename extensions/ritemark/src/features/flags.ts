@@ -109,9 +109,13 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   'transcription-workbench': {
     id: 'transcription-workbench',
     label: 'Transcription Workbench',
-    description: 'Transcribe audio recordings into speaker-attributed markdown, on-device with Whisper or with ElevenLabs Scribe.',
+    description: 'Transcribe audio recordings into speaker-attributed documents, on-device with Whisper or with ElevenLabs Scribe.',
     status: 'stable',
-    platforms: ['darwin', 'win32'],
+    // All three: the `customEditors` contribution claims audio extensions
+    // unconditionally, so gating the provider off on Linux would leave the
+    // manifest promising an editor that does not exist. ElevenLabs is plain
+    // HTTP and works there anyway; only the on-device engine is macOS-only.
+    platforms: ['darwin', 'win32', 'linux'],
   },
   'markdown-export': {
     id: 'markdown-export',

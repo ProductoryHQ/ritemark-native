@@ -7,10 +7,11 @@
  * in the workbench provider; this module does the writing).
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { SessionStore } from './SessionStore';
-import { DEFAULT_EXPORT_FOLDER, writeTranscriptMarkdown } from './exportTranscript';
+import { DEFAULT_EXPORT_FOLDER, exportFileName, writeTranscriptMarkdown } from './exportTranscript';
 import type { TranscriptSession } from './types';
 
 export function exportFolderSetting(): string {
@@ -33,17 +34,38 @@ export async function saveTranscriptTo(
   store: SessionStore,
   session: TranscriptSession,
   directory: string,
-): Promise<string> {
-  const savingOverPrevious = Boolean(
-    session.exportPath && path.dirname(session.exportPath) === directory,
-  );
+): Promise<string | null> {
+  const target = path.join(directory, exportFileName(session));
+
+  // The document is the user's, and they may have edited it after saving.
+  // Replacing it without asking destroys that work, so overwriting is always
+  // an explicit choice — never inferred from "same folder as last time".
+  let collision: 'overwrite' | 'unique' = 'unique';
+
+  if (fs.existsSync(target)) {
+    const choice = await vscode.window.showWarningMessage(
+      `${path.basename(target)} already exists.`,
+      {
+        modal: true,
+        detail:
+          'Replacing it discards any edits you made to that document. Saving a copy keeps both.',
+      },
+      'Replace',
+      'Save a copy',
+    );
+    if (!choice) return null;
+    collision = choice === 'Replace' ? 'overwrite' : 'unique';
+  }
 
   const result = await writeTranscriptMarkdown({
     session,
     workspaceRoot: undefined,
     // An absolute folder is honoured as-is by resolveExportDir.
     folderSetting: directory,
-    collision: savingOverPrevious ? 'overwrite' : 'unique',
+    collision,
+    // 'overwrite' targets the session's remembered export; here the user chose
+    // this folder and this name, so aim at exactly that file.
+    overwriteTarget: target,
   });
 
   await store.save({ ...session, exportPath: result.filePath });

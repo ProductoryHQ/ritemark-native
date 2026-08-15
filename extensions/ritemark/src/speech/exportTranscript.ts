@@ -15,6 +15,8 @@ import { existsSync } from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { sessionToMarkdown, exportFileName } from './transcriptMarkdown';
+
+export { exportFileName };
 import type { TranscriptSession } from './types';
 
 export const DEFAULT_EXPORT_FOLDER = 'Transcripts';
@@ -69,6 +71,8 @@ export interface ExportOptions {
    * anything the user may have edited).
    */
   collision: 'overwrite' | 'unique';
+  /** Exact file to replace when `collision` is 'overwrite'. */
+  overwriteTarget?: string;
 }
 
 export interface ExportResult {
@@ -92,7 +96,7 @@ export async function writeTranscriptMarkdown(options: ExportOptions): Promise<E
   if (options.collision === 'overwrite') {
     // Re-exporting after corrections should update the file the user already
     // knows about, not scatter numbered siblings around their folder.
-    target = options.session.exportPath ?? preferred;
+    target = options.overwriteTarget ?? options.session.exportPath ?? preferred;
     overwritten = await fileExists(target);
   } else {
     target = uniqueExportPath(preferred, existsSync);

@@ -116,6 +116,18 @@ export class SessionStore {
   }
 
   /**
+   * Sessions belonging to one project.
+   *
+   * The library is project-scoped: opening a different folder must not show
+   * another project's recordings, even though the store itself is global.
+   * A session recorded with no folder open belongs to the no-folder case.
+   */
+  async listForWorkspace(workspaceRoot: string | null): Promise<TranscriptSession[]> {
+    const sessions = await this.listWithAudioState();
+    return sessions.filter((session) => (session.workspaceRoot ?? null) === workspaceRoot);
+  }
+
+  /**
    * Mark sessions whose audio has moved or been deleted.
    *
    * R12: an unlinked session keeps its transcript. Losing the recording must
@@ -129,18 +141,33 @@ export class SessionStore {
     }));
   }
 
-  /** Point an existing session at a moved recording. */
+  /**
+   * Point an existing session at a moved recording.
+   *
+   * The session id is DERIVED FROM THE PATH, so relinking has to re-key: every
+   * lookup (the workbench, the AI-sidebar resolver, save) computes
+   * `sessionIdForPath(currentPath)`. Keeping the old id would leave the
+   * transcript on disk but unreachable — the recording would open as "not
+   * transcribed yet" with the renames, insights and saved document orphaned.
+   *
+   * Written under the new id first, then the old entry removed, so a crash in
+   * between leaves a duplicate rather than nothing.
+   */
   async relink(sessionId: string, newAudioPath: string): Promise<TranscriptSession | null> {
     const session = await this.get(sessionId);
     if (!session) return null;
 
+    const newId = sessionIdForPath(newAudioPath);
     const relinked: TranscriptSession = {
       ...session,
+      id: newId,
       audioPath: newAudioPath,
       audioFingerprint: fingerprintFile(newAudioPath),
       audioMissing: false,
     };
+
     await this.save(relinked);
+    if (newId !== sessionId) await this.delete(sessionId);
     return relinked;
   }
 

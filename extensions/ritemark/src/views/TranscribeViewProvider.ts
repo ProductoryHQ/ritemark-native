@@ -191,6 +191,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     this._jobs.enqueue({
       audioPath: pending.audioPath,
       engineId,
+      workspaceRoot: currentWorkspaceRoot(),
       // Unknown length is not a blocker: the engine reports the real duration
       // back, and 0 only affects a cost figure we already declined to invent.
       durationSec: pending.durationSec ?? 0,
@@ -290,7 +291,9 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
 
     const [engines, sessions] = await Promise.all([
       this._registry.statuses(),
-      this._store.listWithAudioState(),
+      // Project-scoped: the store is global (D5), but a folder must not show
+      // another project's recordings.
+      this._store.listForWorkspace(currentWorkspaceRoot()),
     ]);
 
     const jobs = this._jobs.list();
@@ -376,6 +379,11 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
 </body>
 </html>`;
   }
+}
+
+/** The folder a recording belongs to, or null when none is open. */
+function currentWorkspaceRoot(): string | null {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
 }
 
 function isActive(job: TranscriptionJob): boolean {

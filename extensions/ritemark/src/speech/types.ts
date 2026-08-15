@@ -76,6 +76,16 @@ export interface TranscriptSession {
   durationSec: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The folder that was open when this recording was transcribed.
+   *
+   * Sessions live in GLOBAL storage (D5), so without this the library would be
+   * machine-wide: every project would show every other project's recordings.
+   * The recording itself often lives outside the folder (Downloads, a shared
+   * drive), so the project is recorded at transcription time rather than
+   * inferred from the audio path. `null` means no folder was open.
+   */
+  workspaceRoot?: string | null;
 
   engine: EngineId;
   /** BCP-47-ish code the engine detected or was told. */
@@ -97,6 +107,8 @@ export interface TranscriptSession {
 /** What an engine returns. The session is assembled from this by JobManager. */
 export interface TranscriptionResult {
   segments: TranscriptSegment[];
+  /** Set when the engine knows the length better than our probe did. */
+  durationSec?: number;
   language: string | null;
   speakerSeparation: SpeakerSeparation;
   costUsd?: number;

@@ -21,6 +21,12 @@ export * from './insightsParsing';
 export interface GenerateInsightsOptions {
   session: TranscriptSession;
   workspacePath: string;
+  /**
+   * BYOK key for users authenticated by API key rather than a Claude.ai login.
+   * The AI sidebar threads this through too; without it those users get a
+   * runtime that reports itself unavailable while Settings says it is ready.
+   */
+  anthropicApiKey?: string;
   signal?: AbortSignal;
 }
 
@@ -44,7 +50,14 @@ export async function generateInsights(options: GenerateInsightsOptions): Promis
   const session = await runtime.createSession(`transcribe-insights-${options.session.id}`, {
     workspacePath: options.workspacePath,
     model,
-    // Read-only work over text we already hold: nothing to approve.
+    ...(options.anthropicApiKey ? { anthropicApiKey: options.anthropicApiKey } : {}),
+    // NO TOOLS. A transcript is untrusted text — it can contain anything a
+    // person said, or anything a meeting participant read aloud from a screen.
+    // With the runtime's default tool set plus 'auto', a transcript that looks
+    // like an instruction could get Bash/Write/Edit executed without an
+    // approval ever being shown. This task needs no tools at all: the
+    // transcript is in the prompt and the answer is text.
+    allowedTools: [],
     approvalMode: 'auto',
     onProgress: () => undefined,
     onApprovalRequest: () => undefined,

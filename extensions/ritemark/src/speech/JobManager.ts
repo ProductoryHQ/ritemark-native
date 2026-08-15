@@ -32,6 +32,8 @@ const INFLIGHT_KEY = 'speech:inflightJobs';
 export interface EnqueueRequest {
   audioPath: string;
   engineId: EngineId;
+  /** Folder open at import time — scopes the library to the project (null = none). */
+  workspaceRoot: string | null;
   /** Measured in the webview from the audio element — exact and cross-platform. */
   durationSec: number;
   language: string | null;
@@ -214,6 +216,7 @@ export class JobManager {
         audioPath: job.audioPath,
         durationSec: job.durationSec,
         engineId: job.engine,
+        workspaceRoot: request.workspaceRoot,
         peaks,
         result,
       });
@@ -307,9 +310,11 @@ export function buildSession(input: {
   audioPath: string;
   durationSec: number;
   engineId: EngineId;
+  workspaceRoot?: string | null;
   peaks: number[];
   result: {
     segments: TranscriptSession['segments'];
+    durationSec?: number;
     language: string | null;
     speakerSeparation: TranscriptSession['speakerSeparation'];
     costUsd?: number;
@@ -331,10 +336,13 @@ export function buildSession(input: {
     id: sessionIdForPath(input.audioPath),
     audioPath: input.audioPath,
     audioFingerprint: safeFingerprint(input.audioPath),
-    durationSec: input.durationSec,
+    // The engine's own figure wins: our probe cannot read compressed formats
+    // on Windows and reports 0 there.
+    durationSec: input.result.durationSec ?? input.durationSec,
     createdAt: now,
     updatedAt: now,
     engine: input.engineId,
+    workspaceRoot: input.workspaceRoot ?? null,
     language: input.result.language,
     speakerSeparation: input.result.speakerSeparation,
     ...(input.result.costUsd !== undefined ? { costUsd: input.result.costUsd } : {}),

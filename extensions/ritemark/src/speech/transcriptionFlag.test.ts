@@ -18,8 +18,8 @@ async function run(): Promise<void> {
 
   assert.deepEqual(
     [...flag.platforms].sort(),
-    ['darwin', 'win32'],
-    'Transcribe ships on Windows — only the on-device engine is macOS-only (#133)',
+    ['darwin', 'linux', 'win32'],
+    'every platform: only the ON-DEVICE engine is macOS-only (#133), and the manifest claims audio extensions unconditionally',
   );
 
   assert.notDeepEqual(

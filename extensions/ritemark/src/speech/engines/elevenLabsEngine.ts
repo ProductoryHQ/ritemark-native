@@ -66,6 +66,8 @@ interface ScribeResponse {
   language_code?: string;
   words?: ScribeWord[];
   text?: string;
+  /** Scribe reports the true length; on Windows our probe often cannot. */
+  audio_duration_secs?: number;
 }
 
 /**
@@ -178,13 +180,24 @@ export class ElevenLabsEngine implements TranscriptionEngine {
     const segments = foldWordsIntoSegments(words);
     const diarized = words.some((word) => word.speaker);
 
+    // On Windows `probeDurationSec` returns null for every compressed format,
+    // so the job carries 0 — which would persist as "0 s" and a $0 cost for a
+    // transcription that was actually paid for. Scribe knows the real length;
+    // fall back to the last word's end if it did not say.
+    const reported =
+      typeof parsed.audio_duration_secs === 'number' && parsed.audio_duration_secs > 0
+        ? parsed.audio_duration_secs
+        : words[words.length - 1]?.end;
+    const durationSec = options.durationSec > 0 ? options.durationSec : reported;
+
     return {
       segments,
+      ...(durationSec && durationSec > 0 ? { durationSec } : {}),
       language: parsed.language_code ?? null,
       // Honest: if the response came back without speaker labels, say so rather
       // than presenting a single unnamed speaker as if it were diarized.
       speakerSeparation: diarized ? 'diarized' : 'none',
-      costUsd: this.estimateCostUsd(options.durationSec),
+      costUsd: this.estimateCostUsd(durationSec ?? options.durationSec),
     };
   }
 
