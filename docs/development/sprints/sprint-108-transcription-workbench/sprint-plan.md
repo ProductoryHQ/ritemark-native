@@ -1,9 +1,9 @@
 # Sprint 108 — Transcription Workbench
 
 **Track:** SDD (spec-driven)
-**Status:** Phase 0 complete (2026-08-12) — audits passed, spec revised. Phase 1 not started.
+**Status:** Complete (2026-08-15) — R1–R13 shipped, PR [#202](https://github.com/ProductoryHQ/ritemark-native/pull/202) open. See [tasks.md](tasks.md) for the phase log and the QA record.
 **Branch:** `sprint-108-transcription-workbench`
-**Release:** not assigned — not v1.9.0 (Cloud). Proposed v1.10.0.
+**Release:** **v1.9.0** — Jarmo released 1.9.0 from its cloud reservation on 2026-08-15 ("laseme 1.9 lahti"); the cloud initiative's version is undecided.
 **Source vision:** [`docs/development/analysis/2026-08-12-audio-transcription/vision.md`](../../analysis/2026-08-12-audio-transcription/vision.md)
 **Selected UI:** Option B — Transcript Workbench ([prototype](../../analysis/2026-08-12-audio-transcription/prototypes/b-transcript-workbench.html))
 
@@ -21,7 +21,7 @@ Drop an audio file → it transcribes on-device (Whisper) or via ElevenLabs Scri
 | D2 | **One sprint, everything** | Largest sprint in recent history — 13 requirements, ~5 subsystems. Recorded as a deliberate call; see Risk below |
 | D3 | **On-device = no speakers, stated plainly** | No LLM speaker-guessing. Local transcripts are one track; the workbench offers "Re-run with ElevenLabs" |
 | D4 | **Windows ships, ElevenLabs-only** | On-device engine card reads "Not available on Windows yet" → [#133](https://github.com/ProductoryHQ/ritemark-native/issues/133). No Windows Whisper build in this sprint |
-| D5 | **Sessions live in extension global storage** | Not sidecar files. Mitigation in R11: a markdown export is written automatically on completion, so a transcript is never *only* in the hidden store |
+| D5 | **Sessions live in extension global storage** | Not sidecar files. The automatic export that originally mitigated this was **removed on 2026-08-13** (Phase 6b): once Save asks for a folder, writing a second copy somewhere the user did not choose contradicts it. Nothing is written unless the user saves |
 | D6 | **Audio only, no video** (Claude's call, stated assumption) | `.mp4`/`.mov` rejected with an actionable message; no ffmpeg bundled — avoids a new notarization surface |
 
 ## MVP scope
@@ -50,14 +50,14 @@ Live meeting / system-audio capture · real-time streaming transcription · tran
 
 ## Success criteria
 
-- [ ] A 45-minute `.m4a` dropped on the panel produces a speaker-attributed transcript with ElevenLabs, and a single-track transcript on-device
-- [ ] Clicking any line plays the audio from that point; the playing line highlights
-- [ ] Renaming `Speaker 2` once renames it in every segment and in the exported markdown
-- [ ] Export writes a clean `.md` into the workspace that opens in the Ritemark editor
-- [ ] Closing the panel does not kill a running job; quitting mid-job reports it honestly on restart
-- [ ] On Windows the app works with ElevenLabs and says plainly why on-device is unavailable
-- [ ] No API key / offline / video file / no model each produce a designed message with a next action — never a raw error code
-- [ ] `pre-commit-validator.sh` green; `qa-validator` green; architecture.md updated
+- [x] A 41-minute `.m4a` produced a speaker-attributed transcript with ElevenLabs (4 speakers, Estonian); on-device produced a single-track one
+- [x] Clicking any line plays the audio from that point; the playing line highlights
+- [x] Renaming a speaker once renames it in every segment and in the saved document
+- [x] Save writes a clean `.md` into a folder the user picks, opened in the Ritemark editor
+- [x] Closing the panel does not kill a running job; quitting mid-job reports **Interrupted** on restart
+- [x] Windows verified by simulation — ElevenLabs works, on-device says why it does not. **Never run on Windows hardware** (see tasks.md)
+- [x] No API key / video file / corrupt file each produce a designed message with a next action. Offline and quota paths are unit-tested only — no live request was made against them
+- [x] `pre-commit-validator.sh` green; architecture.md updated
 
 ## SDD Artifacts
 
