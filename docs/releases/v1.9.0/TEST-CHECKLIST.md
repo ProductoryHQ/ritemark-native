@@ -1,11 +1,17 @@
 # v1.9.0 Test Checklist
 
-**Status:** Gate 1 candidate — signed, **not notarized**
+**Status:** Gate 1 **PASSED** (Jarmo, 2026-08-17) — arm64 notarized and stapled
 **Release:** Ritemark v1.9.0 — Transcribe
 **Sprint:** 108 — Transcription Workbench ([#202](https://github.com/ProductoryHQ/ritemark-native/pull/202))
-**Candidate:** `dist/Ritemark-1.9.0-darwin-arm64.dmg` (582,651,317 bytes)
-**SHA-256:** `7396175885e98c9944a8e832691f990fbcca5f89b23b25f46577f2f22333cd10`
-**DMG built:** 2026-08-15 12:56 — the 60-minute hardening clock starts here
+**Candidate:** `dist/Ritemark-1.9.0-darwin-arm64.dmg` (582,653,931 bytes)
+**SHA-256:** `3b54f0c8c43ca5142e2d1d7818cc1937cc88e0c5521e1572bebd8799780271e5`
+— computed **after** stapling, which rewrites the DMG. The pre-staple value
+(`7396175885e9…`) is what Gate 1 was tested against; the post-staple value above
+is the one the update feed and the GitHub Release must carry.
+**DMG built:** 2026-08-15 12:56 · **Gate 1 passed + notarized:** 2026-08-17 12:11
+(47 h hardening, against a 60-minute minimum)
+**Notarization:** submission `3b0b18d6-4a45-4aa9-a67c-3e911b2fc84e` — Accepted,
+stapled, `spctl` reports `source=Notarized Developer ID`
 
 ## Automated checks (done before handover)
 
@@ -29,12 +35,18 @@
 - [x] Panel opens: `TRANSCRIBE` title with the gear on the same row, **Add recording**, supported formats listed
 - [x] The `+` glyph on the primary button is white, matching the button text
 
-## Gate 1 — Jarmo, on the installed DMG
+## Gate 1 — Jarmo, on the installed DMG — **PASSED 2026-08-17**
+
+Jarmo tested the signed, un-notarized arm64 DMG and gave the approval phrase
+("tested locally"). The approval was given for the build as a whole; the boxes
+below are left unticked because there is no itemized record of which ones he
+exercised, and ticking them on his behalf would invent a test record. The gate
+is passed — the detail simply was not captured.
 
 ### Install
 
 - [ ] DMG mounts, drag-to-Applications works
-- [ ] App opens without a Gatekeeper block that cannot be dismissed (expected: right-click → Open on first launch; **this build is not notarized**)
+- [ ] App opens (right-click → Open on first launch, since the tested build was not yet notarized)
 - [ ] About reports 1.9.0
 
 ### Transcribe — on-device
