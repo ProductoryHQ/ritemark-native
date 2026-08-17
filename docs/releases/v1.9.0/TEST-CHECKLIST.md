@@ -88,6 +88,36 @@ is passed — the detail simply was not captured.
 - [ ] Export to PDF and Word
 - [ ] Browser panel
 
+## Gate 2 — Jarmo, x64 DMG + Windows installer
+
+Both built from `main` @ `99f19d6`, version read from `branding/product.json`.
+
+| Artifact | Size | State | SHA-256 |
+| --- | --- | --- | --- |
+| `dist/Ritemark-1.9.0-darwin-x64.dmg` | 629,206,918 | Signed Developer ID, **not notarized** | `255a65a27ad525f4d445806f7d2d3672baa27bdac71f28e3ce40893847deca90` |
+| `dist/Ritemark-1.9.0-win32-x64-setup.exe` | 396,596,576 | Authenticode-signed (Azure Trusted Signing) | `8fd87df2d6f3c34375ec874a7935df4772fefec8d66adde69318a42410760d79` |
+
+x64 DMG built 2026-08-17 12:29 — its own 60-minute hardening clock, separate
+from arm64's. CI: macOS x64 run `32018123566` (18 min), Windows run
+`32018126868` (38 min), both success. Repo returned to public afterwards.
+
+### macOS x64 (Intel)
+
+- [ ] DMG mounts and installs; right-click → Open on first launch (not notarized yet)
+- [ ] About reports 1.9.0
+- [ ] Transcribe via ElevenLabs works end to end
+- [ ] The on-device card explains itself rather than failing oddly — see [#203](https://github.com/ProductoryHQ/ritemark-native/issues/203): no x64 whisper binary ships, so it currently reads "missing from this build"
+- [ ] Editing, AI sidebar, Settings, export — no Intel-specific breakage
+
+### Windows
+
+- [ ] Installer runs; no unsigned-publisher warning (Authenticode signing ran in CI)
+- [ ] Smart App Control / SmartScreen behaviour noted — reputation is earned over time, signing alone does not clear it ([#130](https://github.com/ProductoryHQ/ritemark-native/issues/130))
+- [ ] About reports 1.9.0
+- [ ] Transcribe: ElevenLabs works; the on-device card says it is not available on Windows yet ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133))
+- [ ] Save to document writes and opens correctly on Windows paths
+- [ ] Editing, AI sidebar, Settings, export
+
 ## Known not exercised
 
 These are stated rather than quietly omitted:
