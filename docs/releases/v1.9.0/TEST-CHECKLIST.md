@@ -88,18 +88,55 @@ is passed — the detail simply was not captured.
 - [ ] Export to PDF and Word
 - [ ] Browser panel
 
-## Gate 2 — Jarmo, x64 DMG + Windows installer
+## ⛔ All three artifacts WITHDRAWN (2026-08-17)
 
-Both built from `main` @ `99f19d6`, version read from `branding/product.json`.
+Jarmo found, by using the build, that recordings vanished when he opened a
+different project. They had not been deleted — the project-scoped library
+filtered them out and then rendered the same empty state as a first-time user.
+Fixed in `ff32a68`; see the driven-checklist section below for what that cost.
 
-| Artifact | Size | State | SHA-256 |
-| --- | --- | --- | --- |
-| `dist/Ritemark-1.9.0-darwin-x64.dmg` | 629,206,918 | Signed Developer ID, **not notarized** | `255a65a27ad525f4d445806f7d2d3672baa27bdac71f28e3ce40893847deca90` |
-| `dist/Ritemark-1.9.0-win32-x64-setup.exe` | 396,596,576 | Authenticode-signed (Azure Trusted Signing) | `8fd87df2d6f3c34375ec874a7935df4772fefec8d66adde69318a42410760d79` |
+These artifacts all predate the fix and must not be shipped:
 
-x64 DMG built 2026-08-17 12:29 — its own 60-minute hardening clock, separate
-from arm64's. CI: macOS x64 run `32018123566` (18 min), Windows run
-`32018126868` (38 min), both success. Repo returned to public afterwards.
+| Artifact | State |
+| --- | --- |
+| `Ritemark-1.9.0-darwin-arm64.dmg` (notarized `3b0b18d6…`) | superseded — rebuild |
+| `Ritemark-1.9.0-darwin-x64.dmg` (signed `255a65a2…`) | superseded — rebuild |
+| `Ritemark-1.9.0-win32-x64-setup.exe` (signed `8fd87df2…`) | superseded — rebuild |
+
+Gate 1 and Gate 2 both restart. Per the ordering rule, macOS arm64 Gate 1 must
+pass before any x64/Windows CI is dispatched again.
+
+## Driven checklist (Claude, on the built app — 2026-08-17)
+
+Run after Jarmo's instruction to test it myself rather than hand over a
+smoke-tested build. Prod app for the shipped-bundle checks; dev mode for the
+rest, once the prod bundle refused a second instance alongside the installed
+copy.
+
+**Verified working**
+
+- [x] Transcript survives closing the window and reopening the same folder
+- [x] Cancel stops the job — confirmed the `whisper-cli` process actually exits
+- [x] Activity-bar badge shows the running-job count; progress reaches 35%+ with a live percentage
+- [x] Undecodable audio produces an honest error rather than an empty transcript (A2's exit-0 trap holds)
+- [x] Transcript renders with timestamps, speaker attribution and amber confidence marks
+- [x] Click a line → audio seeks there, plays, and the line is marked as it goes
+- [x] Waveform click seeks; playback speed cycles 1× → 1.25× → 1.5×
+- [x] Speaker rename dialog opens pre-filled and states how many segments it will change
+- [x] Insights render with clickable timestamps, owners attributed
+- [x] The saved document opens in Ritemark's editor and stays linked in the workbench header ("Save again")
+- [x] With the workbench open, the AI sidebar treats the saved transcript as the active file
+- [x] The gear in the Transcribe title bar opens Ritemark Settings
+- [x] A moved recording shows "Recording moved or deleted" with **Find it**
+- [x] **Fix verified**: empty state now reports how many recordings live elsewhere, and the toggle lists them with their project
+
+**Not verified, and why**
+
+- [ ] Interrupted-job recovery — the app would not start a second instance alongside the installed 1.9.0, and dev mode stopped yielding a debug target before this could be re-run
+- [ ] Save-to-document folder picker — native dialog, not drivable here
+- [ ] Settings' transcript storage size / clear row — Settings opened, but the page did not scroll to that row
+- [ ] Keyboard control (space, ←, →)
+- [ ] The final cosmetic tweak moving the project label to its own line — type-checks and is present in the built bundle, not seen rendered
 
 ### macOS x64 (Intel)
 
