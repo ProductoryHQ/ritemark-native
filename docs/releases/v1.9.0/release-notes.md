@@ -18,7 +18,8 @@ produces a transcript you can read, correct, play back and save as Markdown.
 the trade is on screen when you do:
 
 - **On-device (Whisper)** — free, the audio never leaves your machine, and it
-  **cannot tell speakers apart**
+  **cannot tell speakers apart**. Apple silicon only; on an Intel Mac the card
+  says so and ElevenLabs is the route
 - **ElevenLabs Scribe** — separates speakers, uploads the file, and shows the
   estimated cost before it does
 

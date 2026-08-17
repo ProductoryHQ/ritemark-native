@@ -33,7 +33,7 @@ Ritemark reads the length and shows what each engine would do with it. Nothing r
 | Where the audio goes | Stays on your machine | Uploaded to ElevenLabs |
 | Cost | Free | About $0.22 per hour, shown before upload |
 | Speakers | **Cannot separate them** | Separates them, up to 32 |
-| Platform | macOS only ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)) | macOS, Windows, Linux |
+| Platform | macOS on Apple silicon only ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)) | macOS, Windows, Linux |
 
 This is a real trade, not a preference: today, "the audio never leaves my machine" and "I know who said what" cannot both be true. Pick per recording.
 
@@ -89,6 +89,6 @@ From there it is an ordinary Ritemark document: edit it, export it to PDF or Wor
 
 ## Requirements
 
-- **On-device:** macOS. The first run downloads a 1.5 GB speech model, once.
+- **On-device:** macOS on Apple silicon (M1 and later). The first run downloads a 1.5 GB speech model, once. On an Intel Mac the engine reports that it is missing from the build — use ElevenLabs there.
 - **ElevenLabs:** an API key from [elevenlabs.io](https://elevenlabs.io/app/settings/api-keys), and a connection.
 - **Insights:** any configured AI runtime (Claude sign-in or an API key).
