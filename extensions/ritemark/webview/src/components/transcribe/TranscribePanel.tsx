@@ -161,7 +161,7 @@ export function TranscribePanel() {
         )}
 
         {state.recordings.length > 0 && (
-          <Section title="Library" count={state.recordings.length}>
+          <Section title={state.showAllProjects ? 'All projects' : 'Library'} count={state.recordings.length}>
             {state.recordings.map((recording) => (
               <RecordingRow key={recording.sessionId} recording={recording} />
             ))}
@@ -170,10 +170,44 @@ export function TranscribePanel() {
 
         {!state.pending && !nothingReady && state.recordings.length === 0 && activeJobs.length === 0 && (
           <p className="px-4 py-6 text-center text-xs leading-relaxed text-ink-muted">
-            Add a recording to transcribe it.
-            <br />
-            {state.acceptedExtensions.join(', ')}
+            {state.otherProjectCount > 0 ? (
+              // The library is project-scoped, so an empty list here does NOT
+              // mean an empty library. Saying only "add a recording" made
+              // transcripts that were safe on disk look deleted.
+              <>
+                No recordings in this project yet.
+                <br />
+                {state.otherProjectCount === 1
+                  ? 'There is 1 in another project.'
+                  : `There are ${state.otherProjectCount} in other projects.`}
+              </>
+            ) : (
+              <>
+                Add a recording to transcribe it.
+                <br />
+                {state.acceptedExtensions.join(', ')}
+              </>
+            )}
           </p>
+        )}
+
+        {/* Present whenever recordings exist outside this project, empty list or
+            not — the whole point is that hidden recordings are never silent. */}
+        {state.otherProjectCount > 0 && (
+          <div className="px-4 pb-4 pt-1">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              onClick={() =>
+                vscode.postMessage({ type: 'transcribe:setScope', showAll: !state.showAllProjects })
+              }
+            >
+              {state.showAllProjects
+                ? 'Show only this project'
+                : `Show all projects (${state.otherProjectCount} more)`}
+            </Button>
+          </div>
         )}
       </div>
     </div>
@@ -497,6 +531,17 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
             {` · ${formatRelativeDate(recording.createdAt)}`}
           </span>
         </div>
+        {/* Its own line, not inline with the metadata: the sidebar is narrow and
+            competing for that row truncated the duration. Only set for rows from
+            elsewhere, so the list never leaves you guessing where one is from. */}
+        {recording.projectName && (
+          <div className="mt-1 flex items-center gap-1 text-[10px] text-ink-faint">
+            <Icon name="folder-open" size={12} className="shrink-0" />
+            <span className="truncate" title={`Transcribed in ${recording.projectName}`}>
+              {recording.projectName}
+            </span>
+          </div>
+        )}
         {recording.audioMissing && (
           <div className="mt-1 flex items-center gap-2">
             {/* R12: the transcript is intact — only the path went stale. Offer

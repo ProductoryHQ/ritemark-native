@@ -51,6 +51,8 @@ export interface RecordingSummary {
   createdAt: string;
   audioMissing: boolean;
   exportPath?: string;
+  /** Present only when the row comes from a different project. */
+  projectName?: string;
 }
 
 export interface PendingImport {
@@ -70,6 +72,11 @@ export interface TranscribeState {
   platform: string;
   acceptedExtensions: string[];
   videoExtensions: string[];
+  /** Recordings that belong to other projects — never hidden without saying so. */
+  otherProjectCount: number;
+  showAllProjects: boolean;
+  /** False when no folder is open, which is its own kind of "project". */
+  hasProject: boolean;
 }
 
 export const ACTIVE_STATES: JobState[] = ['queued', 'preparing', 'uploading', 'transcribing', 'saving'];

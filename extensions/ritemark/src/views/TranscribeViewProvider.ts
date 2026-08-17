@@ -34,6 +34,8 @@ interface RecordingSummary {
   createdAt: string;
   audioMissing: boolean;
   exportPath?: string;
+  /** Set only for rows from another project, so the row can say where it is from. */
+  projectName?: string;
 }
 
 /** A file the user picked but has not transcribed yet. */
@@ -50,6 +52,8 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
 
   private _view: vscode.WebviewView | null = null;
   private _pending: PendingImport | null = null;
+  /** Whether the library is showing every project's recordings, not just this one's. */
+  private _showAllProjects = false;
   private readonly _disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -124,6 +128,10 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
           break;
         case 'transcribe:openSettings':
           void vscode.commands.executeCommand('ritemark.aiSettings');
+          break;
+        case 'transcribe:setScope':
+          this._showAllProjects = message.showAll === true;
+          void this._pushState();
           break;
         case 'transcribe:openIssue':
           void vscode.env.openExternal(
@@ -289,12 +297,22 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
   private async _pushState(): Promise<void> {
     if (!this._view) return;
 
-    const [engines, sessions] = await Promise.all([
+    const root = currentWorkspaceRoot();
+    const [engines, allSessions] = await Promise.all([
       this._registry.statuses(),
-      // Project-scoped: the store is global (D5), but a folder must not show
-      // another project's recordings.
-      this._store.listForWorkspace(currentWorkspaceRoot()),
+      // Every session, then partitioned here. The library is project-scoped —
+      // a folder must not show another project's recordings — but the panel
+      // still has to be able to SAY that the others exist. Filtering them out
+      // in the store made an empty library indistinguishable from "you have
+      // never transcribed anything", which reads as data loss.
+      this._store.listWithAudioState(),
     ]);
+
+    const belongsHere = (session: TranscriptSession): boolean =>
+      (session.workspaceRoot ?? null) === root;
+    const mine = allSessions.filter(belongsHere);
+    const elsewhere = allSessions.filter((session) => !belongsHere(session));
+    const sessions = this._showAllProjects ? allSessions : mine;
 
     const jobs = this._jobs.list();
     const activeJobPaths = new Set(
@@ -312,6 +330,10 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       createdAt: session.createdAt,
       audioMissing: session.audioMissing === true,
       ...(session.exportPath ? { exportPath: session.exportPath } : {}),
+      // Only worth showing when the row could be from somewhere else.
+      ...(belongsHere(session)
+        ? {}
+        : { projectName: session.workspaceRoot ? path.basename(session.workspaceRoot) : 'No folder' }),
     }));
 
     const lastEngineId = this._memento.get<string>('speech:lastEngineId');
@@ -328,6 +350,9 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
         platform: process.platform,
         acceptedExtensions: AUDIO_EXTENSIONS,
         videoExtensions: VIDEO_EXTENSIONS,
+        otherProjectCount: elsewhere.length,
+        showAllProjects: this._showAllProjects,
+        hasProject: root !== null,
       },
     });
 
