@@ -88,7 +88,22 @@ is passed — the detail simply was not captured.
 - [ ] Export to PDF and Word
 - [ ] Browser panel
 
-## ⛔ All three artifacts WITHDRAWN (2026-08-17)
+## ✅ SHIPPED 2026-08-20
+
+Published: https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.9.0
+
+| Artifact | Size | SHA-256 (post-staple) |
+| --- | --- | --- |
+| `Ritemark-arm64.dmg` | 583,392,434 | `dfda96c95de4e08e2ce4684b9e01e7dba90e5f5879ecd704cea83ecb70e4dab4` |
+| `Ritemark-x64.dmg` | 626,896,407 | `d9948d37e984b47f0dab852e866ec8e6d767108a34fa96753ada1c6bcb382367` |
+| `Ritemark-Setup.exe` | 396,621,848 | `9b248918c860e93a53e327b19f3359cce7296f8a7761a3d1f69ff9f4d474e8d4` |
+
+Both DMGs notarized and stapled (`e78669d4…` arm64, `8127a3bf…` x64); the
+installer is Authenticode-signed via Azure Trusted Signing. The update feed
+retains all 18 releases and resolves 1.9.0 for darwin/arm64, darwin/x64 and
+win32/x64; all three advertised URLs verified live.
+
+## ⛔ The first set of artifacts was WITHDRAWN (2026-08-17)
 
 Jarmo found, by using the build, that recordings vanished when he opened a
 different project. They had not been deleted — the project-scoped library
