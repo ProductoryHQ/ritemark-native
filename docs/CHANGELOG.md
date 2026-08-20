@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.9.0] — 2026-08-15
+## [1.9.0] — 2026-08-20
 
 Sprint 108 — Transcribe.
 
@@ -21,6 +21,8 @@ Sprint 108 — Transcribe.
 - **Save to document** — choose the folder, get Markdown with front matter, speaker headings and timestamps, opened in Ritemark's editor. The saved document stays linked in the workbench header, and the AI sidebar treats it as the active file, so "ask Claude about this recording" works
 - **Windows is supported** with ElevenLabs. The on-device engine says plainly that it is not available on Windows yet ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)) instead of the feature quietly disappearing
 - Jobs survive closing the panel, show progress on the Activity Bar icon, can be cancelled, and are reported honestly as **Interrupted** if the app closes mid-transcription
+- **The library is project-scoped, and says so.** Recordings belong to the folder that was open when they were transcribed. A project with none reports how many are filed elsewhere and offers **Show all projects**, each row labelled with where it was made — an empty list never means a lost transcript
+- On-device transcription requires **Apple silicon**; on an Intel Mac the engine card says so and ElevenLabs is the route ([#203](https://github.com/ProductoryHQ/ritemark-native/issues/203))
 
 ---
 

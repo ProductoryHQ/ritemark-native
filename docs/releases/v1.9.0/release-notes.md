@@ -92,7 +92,9 @@ Full guide: [Transcribe](../../user/features/transcribe.md).
 ## Also in this release
 
 - Waveform, playback speed (1× to 2×), keyboard control (space, ←, →)
-- Transcripts are scoped to the folder they were made in — one project does not
-  show another's recordings
+- Transcripts are scoped to the folder they were made in, so one project does
+  not show another's recordings — and when a project has none, Transcribe says
+  how many are filed elsewhere rather than looking empty. **Show all projects**
+  lists them all, each labelled with where it was made
 - A recording that moves can be relinked without losing its transcript
 - Stored transcript data is visible and clearable in **Settings**
