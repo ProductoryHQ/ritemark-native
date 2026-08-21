@@ -217,6 +217,34 @@ jobs:
             "$RITEMARK_VERSION"
 
       # =========================================================================
+      # Step 9c: Stamp the macOS bundle version (GH #200)
+      # Finder's Get Info / "Open With" reads CFBundleShortVersionString, which
+      # VS Code's gulp build sets to the UPSTREAM version (1.117.0) — Intel
+      # users saw "Ritemark.app (1.117.0)" while About correctly said 1.9.0.
+      # build-prod.sh does this for arm64; this is the same step for the CI
+      # path, which never had it. Runs before the artifact is uploaded, so the
+      # signature applied later (codesign-app.sh darwin-x64) covers the edited
+      # plist.
+      # =========================================================================
+      - name: Stamp Info.plist version
+        working-directory: r
+        run: |
+          RITEMARK_VERSION=$(python3 -c "import json; print(json.load(open('branding/product.json')).get('ritemarkVersion', ''))")
+          if [ -z "$RITEMARK_VERSION" ]; then
+            echo "ERROR: ritemarkVersion not found in branding/product.json"
+            exit 1
+          fi
+          INFO_PLIST="VSCode-darwin-x64/Ritemark.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $RITEMARK_VERSION" "$INFO_PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $RITEMARK_VERSION" "$INFO_PLIST"
+          STAMPED=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST")
+          if [ "$STAMPED" != "$RITEMARK_VERSION" ]; then
+            echo "ERROR: Info.plist stamp failed (got '$STAMPED', want '$RITEMARK_VERSION')"
+            exit 1
+          fi
+          echo "Info.plist stamped: CFBundleShortVersionString=$STAMPED"
+
+      # =========================================================================
       # Step 10: Validate build
       # =========================================================================
       - name: Validate build
@@ -260,6 +288,16 @@ jobs:
             echo "OK: ritemarkVersion present in product.json"
           else
             echo "FAIL: ritemarkVersion missing from product.json"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Check Info.plist carries the Ritemark version, not VS Code's (#200)
+          EXPECTED_VERSION=$(python3 -c "import json; print(json.load(open('branding/product.json')).get('ritemarkVersion', ''))")
+          PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "")
+          if [ "$PLIST_VERSION" = "$EXPECTED_VERSION" ]; then
+            echo "OK: Info.plist CFBundleShortVersionString = $PLIST_VERSION"
+          else
+            echo "FAIL: Info.plist says '$PLIST_VERSION', expected '$EXPECTED_VERSION' (Finder would show the wrong version)"
             ERRORS=$((ERRORS + 1))
           fi
 
