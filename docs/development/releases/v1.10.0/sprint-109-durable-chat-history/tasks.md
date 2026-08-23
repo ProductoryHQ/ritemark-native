@@ -77,4 +77,4 @@ scope/global fixture matrix are implemented and tested.
 - [x] Run `./scripts/validate-qa.sh` — passed 2026-08-23 after final review fixes, compile/build, focused tests, and rundev verification.
 - [x] Update `docs/development/architecture.md` for subsystem/protocol/state ownership/flag; set `Last updated` on/after branch creation date.
 - [x] Update `docs/user/features/ai-agents.md`, `docs/CHANGELOG.md`, and v1.10.0 release notes strategy.
-- [ ] Update release tracker and Sprint 109 GitHub issue; commit, push, PR, review, and merge.
+- [x] Update release tracker and Sprint 109 GitHub issue; commit, push, PR, and local risk-first review are complete. Merge/issue closure is authoritative in [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209), avoiding a stale duplicated boolean after GitHub changes state.

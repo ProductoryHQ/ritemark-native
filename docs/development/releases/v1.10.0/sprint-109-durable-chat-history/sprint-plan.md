@@ -1,6 +1,6 @@
 # Sprint 109 — Durable Chat History
 
-**Status:** Merge-ready — implementation, cleanup, review, official QA, and macOS live accessibility/visual gates pass; PR/merge pending (2026-08-23)<br>
+**Status:** Final QA complete — implementation, cleanup, review, official QA, and macOS live accessibility/visual gates pass in [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209) (2026-08-23)<br>
 **Parent release:** [v1.10.0 Durable Agent Conversations](../release-plan.md)<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8)<br>
 **Issue:** [#205 — Sprint 109: Durable project-safe Agent Conversations](https://github.com/ProductoryHQ/ritemark-native/issues/205)<br>
