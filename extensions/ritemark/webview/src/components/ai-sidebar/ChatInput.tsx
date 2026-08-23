@@ -1127,6 +1127,7 @@ export function ChatInput() {
             prompt is already queued (one queued prompt at a time). */}
         <textarea
           ref={textareaRef}
+          aria-label="Message"
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}

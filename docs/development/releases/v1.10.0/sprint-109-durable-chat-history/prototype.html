@@ -1,0 +1,1582 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ritemark Agent Conversations — Sprint 109/110 prototype</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css">
+  <style>
+    @font-face {
+      font-family: "Sofia Sans";
+      src: url("../../../../../extensions/ritemark/media/fonts/SofiaSans-latin.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+    }
+
+    :root {
+      --r-surface: #ffffff;
+      --r-surface-muted: #f8fafc;
+      --r-surface-soft: #f1f5f9;
+      --r-hairline: #e2e8f0;
+      --r-hairline-strong: #cbd5e1;
+      --r-ink-strong: #1e1b4b;
+      --r-ink-body: #475569;
+      --r-ink-muted: #64748b;
+      --r-ink-faint: #94a3b8;
+      --r-accent: #4338ca;
+      --r-accent-deep: #3730a3;
+      --r-accent-soft: #e0e7ff;
+      --r-accent-fainter: #c7d2fe;
+      --r-warning: #f59e0b;
+      --r-warning-soft: #fef3c7;
+      --r-error: #ef4444;
+      --r-error-soft: #fee2e2;
+      --r-success: #22c55e;
+      --r-success-soft: #dcfce7;
+      --r-ring: rgba(67, 56, 202, 0.10);
+      --shadow-xs: 0 1px 2px rgba(30, 27, 75, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(30, 27, 75, 0.08), 0 2px 4px -2px rgba(30, 27, 75, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(30, 27, 75, 0.10), 0 4px 6px -4px rgba(30, 27, 75, 0.08);
+      --shadow-indigo: 0 4px 6px -1px rgba(67, 56, 202, 0.25);
+      color-scheme: light;
+    }
+
+    html[data-theme="dark"] {
+      --r-surface: #1e1b4b;
+      --r-surface-muted: #191635;
+      --r-surface-soft: #251f5c;
+      --r-hairline: #3730a3;
+      --r-hairline-strong: #4338ca;
+      --r-ink-strong: #f8fafc;
+      --r-ink-body: #c7d2fe;
+      --r-ink-muted: #94a3b8;
+      --r-ink-faint: #64748b;
+      --r-accent: #818cf8;
+      --r-accent-deep: #6366f1;
+      --r-accent-soft: rgba(129, 140, 248, 0.16);
+      --r-accent-fainter: rgba(129, 140, 248, 0.28);
+      --r-warning: #fbbf24;
+      --r-warning-soft: rgba(245, 158, 11, 0.18);
+      --r-error: #f87171;
+      --r-error-soft: rgba(239, 68, 68, 0.18);
+      --r-success: #4ade80;
+      --r-success-soft: rgba(34, 197, 94, 0.18);
+      --r-ring: rgba(129, 140, 248, 0.25);
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 980px;
+      min-height: 100vh;
+      background: var(--r-surface-muted);
+      color: var(--r-ink-strong);
+      font-family: "Sofia Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 4px var(--r-ring);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .prototype-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-height: 64px;
+      padding: 10px 20px;
+      background: color-mix(in srgb, var(--r-surface) 94%, transparent);
+      border-bottom: 1px solid var(--r-hairline);
+      backdrop-filter: blur(10px);
+    }
+
+    .prototype-title {
+      flex: 0 0 230px;
+      min-width: 0;
+    }
+
+    .prototype-title strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .prototype-title span {
+      display: block;
+      color: var(--r-ink-muted);
+      font-size: 11px;
+    }
+
+    .scene-nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      overflow-x: auto;
+      padding: 4px;
+    }
+
+    .scene-button, .theme-button {
+      flex: none;
+      border: 1px solid var(--r-hairline);
+      border-radius: 4px;
+      background: var(--r-surface);
+      color: var(--r-ink-body);
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: 120ms ease;
+    }
+
+    .scene-button:hover, .theme-button:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+    .scene-button.is-active {
+      border-color: var(--r-accent);
+      background: var(--r-accent-soft);
+      color: var(--r-accent-deep);
+      font-weight: 600;
+    }
+
+    .theme-button {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .prototype-note {
+      max-width: 1220px;
+      margin: 16px auto 0;
+      padding: 0 18px;
+      color: var(--r-ink-muted);
+      font-size: 12px;
+    }
+
+    .scene-description { display: none; }
+    body[data-scene="transitional"] .description-transitional,
+    body[data-scene="panel"] .description-panel,
+    body[data-scene="recovery"] .description-recovery,
+    body[data-scene="delete"] .description-delete,
+    body[data-scene="restored"] .description-restored,
+    body[data-scene="final"] .description-final { display: inline; }
+
+    .stage {
+      width: min(1220px, calc(100vw - 36px));
+      height: min(760px, calc(100vh - 124px));
+      min-height: 620px;
+      margin: 12px auto 28px;
+      overflow: hidden;
+      border: 1px solid var(--r-hairline-strong);
+      border-radius: 10px;
+      background: var(--r-surface);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .window-titlebar {
+      height: 38px;
+      display: grid;
+      grid-template-columns: 160px 1fr 160px;
+      align-items: center;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--r-hairline);
+      background: var(--r-surface-muted);
+      color: var(--r-ink-muted);
+      font-size: 12px;
+    }
+
+    .traffic { display: flex; gap: 7px; }
+    .traffic span { width: 10px; height: 10px; border-radius: 50%; background: var(--r-hairline-strong); }
+    .window-name { text-align: center; color: var(--r-ink-body); font-weight: 500; }
+    .window-actions { text-align: right; }
+
+    .workspace {
+      height: calc(100% - 38px);
+      display: grid;
+      grid-template-columns: 192px minmax(350px, 1fr) 424px;
+    }
+
+    .file-sidebar {
+      min-width: 0;
+      padding: 14px 10px;
+      background: var(--r-surface-muted);
+      border-right: 1px solid var(--r-hairline);
+    }
+
+    .sidebar-heading, .group-label {
+      padding: 8px 8px 5px;
+      color: var(--r-ink-strong);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      padding: 7px 8px;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      color: var(--r-ink-body);
+    }
+
+    .file-row.is-active {
+      padding-left: 6px;
+      border-left-color: var(--r-accent);
+      background: var(--r-accent-soft);
+      color: var(--r-ink-strong);
+      font-weight: 500;
+    }
+
+    .file-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .editor {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--r-surface);
+    }
+
+    .editor-tabs {
+      height: 38px;
+      display: flex;
+      align-items: stretch;
+      border-bottom: 1px solid var(--r-hairline);
+      background: var(--r-surface-muted);
+    }
+
+    .editor-tab {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 14px;
+      border-right: 1px solid var(--r-hairline);
+      color: var(--r-ink-muted);
+    }
+
+    .editor-tab.is-active {
+      background: var(--r-surface);
+      color: var(--r-ink-strong);
+      font-weight: 500;
+    }
+
+    .document {
+      flex: 1;
+      overflow: hidden;
+      padding: 44px clamp(36px, 6vw, 76px);
+    }
+
+    .document h1 {
+      margin: 0 0 10px;
+      font-size: 26px;
+      line-height: 1.2;
+      font-weight: 650;
+      letter-spacing: -.2px;
+    }
+
+    .document .lede { color: var(--r-ink-body); font-size: 15px; margin-bottom: 32px; }
+    .document h2 { margin: 26px 0 8px; font-size: 17px; font-weight: 600; }
+    .document p { color: var(--r-ink-body); font-size: 14px; line-height: 1.65; }
+    .document-line { height: 8px; margin: 9px 0; border-radius: 3px; background: var(--r-surface-soft); }
+    .document-line:nth-child(2n) { width: 86%; }
+    .document-line:nth-child(3n) { width: 67%; }
+
+    .agent-sidebar {
+      position: relative;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-left: 1px solid var(--r-hairline);
+      background: var(--r-surface);
+    }
+
+    .agent-webview {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--r-surface);
+    }
+
+    .secondary-sidebar-header {
+      flex: 0 0 48px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 9px;
+      border-bottom: 1px solid var(--r-hairline);
+      background: var(--r-surface-muted);
+    }
+
+    .shell-composites,
+    .shell-view-actions,
+    .shell-global-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .shell-spacer { flex: 1; min-width: 8px; }
+
+    .shell-separator {
+      width: 1px;
+      height: 24px;
+      margin: 0 4px;
+      background: var(--r-hairline-strong);
+    }
+
+    .shell-action {
+      position: relative;
+      width: 30px;
+      height: 30px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--r-ink-muted);
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .shell-action:hover {
+      background: var(--r-surface-soft);
+      color: var(--r-ink-strong);
+    }
+
+    .shell-action.is-active {
+      background: var(--r-accent-soft);
+      color: var(--r-accent-deep);
+      border-radius: 8px;
+    }
+
+    body[data-scene="panel"] #open-conversations,
+    body[data-scene="recovery"] #open-conversations,
+    body[data-scene="delete"] #open-conversations {
+      background: var(--r-accent-soft);
+      color: var(--r-accent-deep);
+    }
+
+    .shell-action .attention-dot {
+      position: absolute;
+      top: 3px;
+      right: 2px;
+      width: 6px;
+      height: 6px;
+      box-shadow: 0 0 0 2px var(--r-warning-soft);
+    }
+
+    .shell-action.is-muted { color: var(--r-ink-faint); }
+
+    .ghost-button, .icon-button {
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--r-ink-body);
+      cursor: pointer;
+    }
+
+    .ghost-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+    }
+
+    .ghost-button:hover, .icon-button:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+    .ghost-button.has-attention { color: var(--r-ink-strong); font-weight: 500; }
+
+    .attention-dot, .working-dot {
+      width: 7px;
+      height: 7px;
+      flex: none;
+      border-radius: 50%;
+      background: var(--r-warning);
+      box-shadow: 0 0 0 3px var(--r-warning-soft);
+    }
+
+    .working-dot { background: var(--r-accent); box-shadow: 0 0 0 3px var(--r-accent-soft); }
+
+    .icon-button {
+      width: 30px;
+      height: 30px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0;
+      font-size: 16px;
+    }
+
+    .chat-layout {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+
+    .chat-main {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .messages {
+      flex: 1;
+      overflow: auto;
+      padding: 18px 18px 12px;
+    }
+
+    .context-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 100%;
+      padding: 4px 8px;
+      border: 1px solid var(--r-hairline);
+      border-radius: 4px;
+      color: var(--r-ink-muted);
+      background: var(--r-surface-muted);
+      font-size: 12px;
+    }
+
+    .bubble { margin-top: 18px; }
+    .bubble-label { margin-bottom: 5px; color: var(--r-ink-muted); font-size: 11px; font-weight: 600; letter-spacing: .35px; text-transform: uppercase; }
+    .user-bubble {
+      margin-left: 24px;
+      padding: 10px 12px;
+      border-radius: 10px 10px 3px 10px;
+      background: var(--r-accent-soft);
+      color: var(--r-ink-strong);
+    }
+
+    .assistant-copy { color: var(--r-ink-body); line-height: 1.6; }
+    .assistant-copy ul { margin: 8px 0 0; padding-left: 18px; }
+
+    .activity-line {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--r-hairline);
+      color: var(--r-ink-muted);
+      font-size: 12px;
+    }
+
+    .restored-notice, .capacity-notice {
+      display: none;
+      align-items: flex-start;
+      gap: 9px;
+      margin: 0 14px 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--r-hairline);
+      border-left: 3px solid var(--r-accent);
+      border-radius: 6px;
+      background: var(--r-surface-muted);
+      color: var(--r-ink-body);
+      font-size: 12px;
+    }
+
+    body[data-scene="restored"] .restored-notice { display: flex; }
+    body[data-capacity="blocked"] .capacity-notice { display: flex; border-left-color: var(--r-warning); }
+
+    .composer {
+      flex: none;
+      padding: 10px 12px 12px;
+      border-top: 1px solid var(--r-hairline);
+      background: var(--r-surface);
+    }
+
+    .composer-box {
+      position: relative;
+      min-height: 84px;
+      border: 1px solid var(--r-hairline-strong);
+      border-radius: 10px;
+      background: var(--r-surface);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .composer textarea {
+      width: 100%;
+      height: 48px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      padding: 11px 12px 6px;
+      background: transparent;
+      color: var(--r-ink-strong);
+    }
+
+    .composer textarea::placeholder { color: var(--r-ink-faint); }
+    .composer-actions { display: flex; align-items: center; gap: 4px; padding: 2px 7px 7px; }
+    .composer-mode { color: var(--r-ink-body); padding: 4px 6px; font-size: 12px; }
+    .send-button {
+      margin-left: auto;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 6px;
+      background: var(--r-accent);
+      color: #fff;
+      box-shadow: var(--shadow-indigo);
+      cursor: pointer;
+    }
+
+    .send-button:active { transform: scale(.98); }
+
+    .live-rail {
+      width: 56px;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 8px;
+      overflow: visible;
+      border-left: 1px solid var(--r-hairline);
+      background: var(--r-surface-muted);
+    }
+
+    .rail-list {
+      flex: none;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-top: 20px;
+      overflow: visible;
+    }
+
+    .rail-divider {
+      width: 24px;
+      height: 1px;
+      flex: none;
+      margin: 0 0 12px;
+      background: var(--r-hairline);
+    }
+
+    .rail-entry {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      flex: none;
+    }
+
+    .rail-item {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      flex: none;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--r-ink-muted);
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+    }
+
+    .rail-item:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+    .rail-item.is-current { background: var(--r-accent-soft); color: var(--r-accent); }
+    .rail-item .rail-status { position: absolute; right: 5px; bottom: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--r-accent); border: 1px solid var(--r-surface-muted); pointer-events: none; }
+    .rail-item.needs-user .rail-status { background: var(--r-warning); }
+    .rail-item .rail-pin-mark { position: absolute; top: 3px; right: 3px; width: 13px; height: 13px; display: grid; place-items: center; border-radius: 50%; background: var(--r-surface-muted); color: var(--r-accent); font-size: 9px; pointer-events: none; }
+
+    .rail-pin-action {
+      position: absolute;
+      z-index: 5;
+      top: -6px;
+      right: -6px;
+      width: 20px;
+      height: 20px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid var(--r-hairline-strong);
+      border-radius: 50%;
+      background: var(--r-surface);
+      color: var(--r-accent);
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(.92);
+      transition: opacity 120ms ease, transform 120ms ease, background 120ms ease;
+    }
+
+    .rail-entry:hover .rail-pin-action,
+    .rail-entry:focus-within .rail-pin-action,
+    body[data-pin-demo="true"] .rail-entry.pin-demo-target .rail-pin-action,
+    body[data-unpin-demo="true"] .rail-entry.unpin-demo-target .rail-pin-action {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+
+    .rail-entry:hover .rail-pin-mark,
+    .rail-entry:focus-within .rail-pin-mark,
+    body[data-unpin-demo="true"] .rail-entry.unpin-demo-target .rail-pin-mark { opacity: 0; }
+
+    .rail-pin-action:hover,
+    .rail-pin-action:focus-visible {
+      outline: none;
+      background: var(--r-accent-soft);
+      box-shadow: 0 0 0 4px var(--r-ring-color), var(--shadow-sm);
+    }
+
+    .rail-pin-action::after {
+      content: "Pin";
+      position: absolute;
+      top: 50%;
+      right: calc(100% + 7px);
+      padding: 4px 7px;
+      border-radius: 4px;
+      background: var(--r-ink-strong);
+      color: var(--r-surface);
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(3px, -50%);
+      transition: opacity 100ms ease, transform 100ms ease;
+    }
+
+    .rail-pin-action:hover::after,
+    .rail-pin-action:focus-visible::after {
+      opacity: 1;
+      transform: translate(0, -50%);
+    }
+
+    .conversation-avatar {
+      width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      color: var(--ink-muted);
+      font-size: 16px;
+    }
+
+    .conversation-avatar.is-row {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+    }
+
+    .rail-primary {
+      margin-bottom: 12px;
+      background: var(--r-accent);
+      color: #fff;
+      box-shadow: var(--shadow-indigo);
+    }
+
+    .rail-primary:hover {
+      background: var(--r-accent-deep);
+      color: #fff;
+      box-shadow: 0 8px 20px -4px rgba(67, 56, 202, .35);
+    }
+
+    .rail-primary:active { transform: scale(.98); }
+
+    .rail-all {
+      margin-top: 12px;
+      border: 0;
+      background: transparent;
+    }
+
+    body[data-scene="panel"] .rail-all,
+    body[data-scene="recovery"] .rail-all,
+    body[data-scene="delete"] .rail-all {
+      background: var(--r-accent-soft);
+      color: var(--r-accent);
+    }
+
+    .rail-all .attention-dot {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 6px;
+      height: 6px;
+      box-shadow: 0 0 0 2px var(--r-warning-soft);
+      pointer-events: none;
+    }
+
+    .rail-item[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      z-index: 60;
+      top: 50%;
+      right: calc(100% + 10px);
+      padding: 6px 9px;
+      border: 1px solid var(--r-hairline);
+      border-radius: 6px;
+      background: var(--r-ink-strong);
+      color: var(--r-surface);
+      box-shadow: var(--shadow-md);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.35;
+      width: max-content;
+      max-width: 260px;
+      white-space: normal;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(4px, -50%);
+      transition: opacity 100ms ease, transform 100ms ease;
+    }
+
+    .rail-item[data-tooltip]:hover::after,
+    .rail-item[data-tooltip]:focus-visible::after {
+      opacity: 1;
+      transform: translate(0, -50%);
+      transition-delay: 250ms;
+    }
+
+    body[data-tooltip-demo="true"] .rail-list .rail-item.is-current::after {
+      opacity: 1;
+      transform: translate(0, -50%);
+      transition-delay: 0ms;
+    }
+
+    .conversations-panel {
+      position: absolute;
+      inset: 0 56px 0 0;
+      z-index: 20;
+      display: none;
+      flex-direction: column;
+      background: var(--r-surface);
+    }
+
+    body[data-scene="panel"] .conversations-panel,
+    body[data-scene="recovery"] .conversations-panel,
+    body[data-scene="delete"] .conversations-panel { display: flex; }
+
+    .panel-head {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 50px;
+      padding: 8px 10px 8px 14px;
+      border-bottom: 1px solid var(--r-hairline);
+    }
+
+    .panel-head-copy { min-width: 0; margin-right: auto; }
+    .panel-title { display: block; font-size: 15px; font-weight: 600; }
+    .panel-project { display: block; color: var(--r-ink-muted); font-size: 11px; }
+
+    .panel-body { flex: 1; min-height: 0; overflow: auto; padding: 6px 8px 18px; }
+    .conversation-group { margin-top: 6px; }
+    .conversation-group-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-right: 8px;
+    }
+    .conversation-group-label {
+      flex: 1;
+      padding: 10px 8px 5px;
+      color: var(--r-ink-strong);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    .conversation-group-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--r-ink-muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .conversation-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 54px;
+      padding: 7px 6px 7px 9px;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .conversation-row.is-pinned,
+    .conversation-row.is-on-rail {
+      grid-template-columns: 18px minmax(0, 1fr) auto auto;
+    }
+
+    .conversation-row:hover { background: var(--r-surface-soft); }
+    .conversation-row.is-current {
+      border-left-color: var(--r-accent);
+      background: var(--r-accent-soft);
+    }
+
+    .conversation-main { min-width: 0; }
+    .conversation-name { overflow: hidden; color: var(--r-ink-strong); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+    .conversation-meta { margin-top: 2px; color: var(--r-ink-muted); font-size: 11px; }
+    .row-status { display: inline-flex; align-items: center; gap: 6px; color: var(--r-ink-body); font-size: 12px; white-space: nowrap; }
+    .row-status .ph { color: var(--r-accent); }
+    .row-status.needs-user .attention-dot { width: 6px; height: 6px; box-shadow: none; }
+    .row-actions { display: flex; align-items: center; gap: 2px; }
+    .row-action {
+      opacity: 0;
+      color: var(--r-ink-muted);
+      transition: opacity 120ms ease, color 120ms ease, background 120ms ease;
+    }
+    .conversation-row:hover .row-action,
+    .conversation-row:focus-within .row-action,
+    .row-action:focus-visible { opacity: 1; }
+    .row-action:hover,
+    .row-action:focus-visible {
+      color: var(--r-accent);
+      background: var(--r-accent-soft);
+    }
+    .row-action.delete-trigger:hover,
+    .row-action.delete-trigger:focus-visible {
+      color: var(--r-error);
+      background: var(--r-error-soft);
+    }
+    body[data-delete-demo="true"] .delete-demo-target .row-action {
+      opacity: 1;
+    }
+
+    .earlier-row {
+      margin: 2px 0 0;
+      padding: 10px;
+      border: 1px solid var(--r-hairline);
+      border-radius: 6px;
+      background: var(--r-surface-muted);
+    }
+
+    .earlier-copy { color: var(--r-ink-body); font-size: 12px; }
+    .earlier-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .small-button {
+      border: 1px solid var(--r-hairline);
+      border-radius: 4px;
+      background: var(--r-surface);
+      color: var(--r-ink-body);
+      padding: 5px 8px;
+      cursor: pointer;
+    }
+
+    .small-button:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+
+    .recovery-only { display: none; }
+    body[data-scene="recovery"] .recovery-only { display: block; }
+    body[data-scene="recovery"] .normal-only { display: none; }
+
+    .migration-banner, .error-card, .corrupt-card {
+      margin: 8px 0;
+      padding: 10px 11px;
+      border: 1px solid var(--r-hairline);
+      border-left: 3px solid var(--r-accent);
+      border-radius: 6px;
+      background: var(--r-surface-muted);
+      color: var(--r-ink-body);
+      font-size: 12px;
+    }
+
+    .migration-banner strong, .error-card strong, .corrupt-card strong { display: block; margin-bottom: 2px; color: var(--r-ink-strong); }
+    .error-card { border-left-color: var(--r-error); }
+    .corrupt-card { border-left-color: var(--r-warning); }
+    .recovery-actions { margin-top: 8px; }
+
+    .dialog-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(30, 27, 75, 0.45);
+      backdrop-filter: blur(6px);
+    }
+
+    body[data-scene="delete"] .dialog-layer { display: flex; }
+    body[data-dialog="closed"] .dialog-layer { display: none; }
+
+    .dialog {
+      width: min(360px, 100%);
+      overflow: hidden;
+      border: 1px solid var(--r-hairline);
+      border-radius: 10px;
+      background: var(--r-surface);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .dialog-head { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--r-hairline); }
+    .dialog-head strong { margin-right: auto; font-size: 16px; font-weight: 600; }
+    .dialog-body { padding: 18px 16px; color: var(--r-ink-body); font-size: 14px; }
+    .dialog-body p { margin: 0 0 8px; }
+    .dialog-warning { color: var(--r-ink-muted); font-size: 12px; }
+    .dialog-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--r-hairline); }
+    .secondary-button, .danger-button {
+      border: 0;
+      border-radius: 10px;
+      padding: 8px 13px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .secondary-button { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+    .danger-button { background: var(--r-error); color: #fff; box-shadow: 0 4px 6px -1px color-mix(in srgb, var(--r-error) 28%, transparent); font-weight: 600; }
+    .danger-button:active { transform: scale(.98); }
+
+    .toast {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 60;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      max-width: 310px;
+      padding: 11px 12px;
+      border: 1px solid var(--r-hairline);
+      border-left: 3px solid var(--r-accent);
+      border-radius: 10px;
+      background: var(--r-surface);
+      box-shadow: var(--shadow-lg);
+    }
+
+    body[data-toast="visible"] .toast { display: flex; }
+    .toast-copy { min-width: 0; margin-right: auto; color: var(--r-ink-body); }
+    .undo-button { border: 0; background: transparent; color: var(--r-accent); font-weight: 600; cursor: pointer; }
+
+    .empty-state {
+      display: none;
+      height: 100%;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      text-align: center;
+    }
+
+    .empty-state strong { display: block; margin-top: 10px; font-size: 14px; }
+    .empty-state span { display: block; margin: 4px 0 12px; color: var(--r-ink-muted); font-size: 12px; }
+    .primary-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 14px;
+      background: var(--r-accent);
+      color: #fff;
+      box-shadow: var(--shadow-indigo);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    @media (max-width: 1100px) {
+      .workspace { grid-template-columns: 150px minmax(300px, 1fr) 390px; }
+      .prototype-title { flex-basis: 190px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body data-scene="transitional" data-dialog="open" data-toast="hidden" data-capacity="ok">
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <symbol id="conversation-mark-s01" viewBox="0 0 100 100">
+      <g fill="#818CF8">
+        <ellipse cx="50" cy="29" rx="8" ry="18"/>
+        <ellipse cx="50" cy="29" rx="8" ry="18" transform="rotate(60 50 50)"/>
+        <ellipse cx="50" cy="29" rx="8" ry="18" transform="rotate(120 50 50)"/>
+        <ellipse cx="50" cy="29" rx="8" ry="18" transform="rotate(180 50 50)"/>
+        <ellipse cx="50" cy="29" rx="8" ry="18" transform="rotate(240 50 50)"/>
+        <ellipse cx="50" cy="29" rx="8" ry="18" transform="rotate(300 50 50)"/>
+      </g>
+      <circle cx="50" cy="50" r="13" fill="#4F46E5"/>
+    </symbol>
+    <symbol id="conversation-mark-s02" viewBox="0 0 100 100">
+      <g>
+        <circle cx="77" cy="50" r="10" fill="#D97706"/>
+        <circle cx="63.5" cy="73.4" r="10" fill="#FBBF24"/>
+        <circle cx="36.5" cy="73.4" r="10" fill="#D97706"/>
+        <circle cx="23" cy="50" r="10" fill="#FBBF24"/>
+        <circle cx="36.5" cy="26.6" r="10" fill="#D97706"/>
+        <circle cx="63.5" cy="26.6" r="10" fill="#FBBF24"/>
+      </g>
+      <circle cx="50" cy="50" r="10" fill="#92400E"/>
+    </symbol>
+    <symbol id="conversation-mark-s03" viewBox="0 0 100 100">
+      <g fill="#60A5FA">
+        <ellipse cx="50" cy="31" rx="16" ry="28"/>
+        <ellipse cx="50" cy="31" rx="16" ry="28" transform="rotate(120 50 50)"/>
+        <ellipse cx="50" cy="31" rx="16" ry="28" transform="rotate(240 50 50)"/>
+      </g>
+      <circle cx="50" cy="50" r="11" fill="#1E40AF"/>
+    </symbol>
+    <symbol id="conversation-mark-s04" viewBox="0 0 100 100">
+      <rect x="60.4" y="52" width="19" height="19" rx="5" transform="rotate(75 69.9 61.5)" fill="#DC2626"/>
+      <rect x="40.5" y="63.5" width="19" height="19" rx="5" transform="rotate(135 50 73)" fill="#F87171"/>
+      <rect x="20.6" y="52" width="19" height="19" rx="5" transform="rotate(195 30.1 61.5)" fill="#DC2626"/>
+      <rect x="20.6" y="29" width="19" height="19" rx="5" transform="rotate(255 30.1 38.5)" fill="#F87171"/>
+      <rect x="40.5" y="17.5" width="19" height="19" rx="5" transform="rotate(315 50 27)" fill="#DC2626"/>
+      <rect x="60.4" y="29" width="19" height="19" rx="5" transform="rotate(15 69.9 38.5)" fill="#F87171"/>
+      <circle cx="50" cy="50" r="9" fill="#991B1B"/>
+    </symbol>
+    <symbol id="conversation-mark-s05" viewBox="0 0 100 100">
+      <g fill="#4ADE80">
+        <ellipse cx="50" cy="26" rx="7" ry="17"/>
+        <ellipse cx="50" cy="26" rx="7" ry="17" transform="rotate(72 50 50)"/>
+        <ellipse cx="50" cy="26" rx="7" ry="17" transform="rotate(144 50 50)"/>
+        <ellipse cx="50" cy="26" rx="7" ry="17" transform="rotate(216 50 50)"/>
+        <ellipse cx="50" cy="26" rx="7" ry="17" transform="rotate(288 50 50)"/>
+      </g>
+      <g fill="#BBF7D0" transform="rotate(36 50 50)">
+        <ellipse cx="50" cy="38" rx="4" ry="10"/>
+        <ellipse cx="50" cy="38" rx="4" ry="10" transform="rotate(72 50 50)"/>
+        <ellipse cx="50" cy="38" rx="4" ry="10" transform="rotate(144 50 50)"/>
+        <ellipse cx="50" cy="38" rx="4" ry="10" transform="rotate(216 50 50)"/>
+        <ellipse cx="50" cy="38" rx="4" ry="10" transform="rotate(288 50 50)"/>
+      </g>
+      <circle cx="50" cy="50" r="8" fill="#16A34A"/>
+    </symbol>
+    <symbol id="conversation-mark-s06" viewBox="0 0 100 100">
+      <g fill="#818CF8">
+        <ellipse cx="50" cy="30" rx="17" ry="27" transform="rotate(45 50 50)"/>
+        <ellipse cx="50" cy="30" rx="17" ry="27" transform="rotate(135 50 50)"/>
+        <ellipse cx="50" cy="30" rx="17" ry="27" transform="rotate(225 50 50)"/>
+        <ellipse cx="50" cy="30" rx="17" ry="27" transform="rotate(315 50 50)"/>
+      </g>
+      <circle cx="50" cy="50" r="12" fill="#312E81"/>
+    </symbol>
+  </svg>
+  <header class="prototype-bar">
+    <div class="prototype-title">
+      <strong>Agent Conversations prototype</strong>
+      <span>Sprint 109 → Sprint 110</span>
+    </div>
+    <nav class="scene-nav" aria-label="Prototype scenes">
+      <button class="scene-button is-active" data-scene-button="transitional">109 transitional</button>
+      <button class="scene-button" data-scene-button="panel">All conversations</button>
+      <button class="scene-button" data-scene-button="recovery">Recovery &amp; errors</button>
+      <button class="scene-button" data-scene-button="delete">Delete &amp; Undo</button>
+      <button class="scene-button" data-scene-button="restored">Restored context</button>
+      <button class="scene-button" data-scene-button="final">1.10 final</button>
+    </nav>
+    <button class="theme-button" id="theme-toggle" aria-pressed="false">
+      <i class="ph ph-moon" aria-hidden="true"></i>
+      <span>Dark</span>
+    </button>
+  </header>
+
+  <div class="prototype-note" aria-live="polite">
+    <strong>Shell-faithful:</strong> the top row is native VS Code secondary-sidebar chrome; AI, Terminal, Settings, maximize, and close keep their real positions.
+    <span class="scene-description description-transitional">Conversation rail: primary New, Pinned shortcuts, every Working/Needs you conversation, three activity-ordered recent chats, the current conversation when otherwise absent, then All conversations. Selecting a chat does not reorder Recents.</span>
+    <span class="scene-description description-panel">All conversations covers only the transcript column; the conversation rail remains visible. Conversations use the calm shared chat-bubble icon; hover a rail shortcut for one title tooltip and a separate upper-right Pin or Unpin action.</span>
+    <span class="scene-description description-recovery">Ambiguous legacy conversations stay under Project unknown; storage and corruption failures are explicit.</span>
+    <span class="scene-description description-delete">Delete is confirmed and followed by an in-app Undo notification. Running work would use “Stop and delete…”.</span>
+    <span class="scene-description description-restored">A restored transcript clearly says the agent starts with a new working context. Opening alone starts no runtime.</span>
+    <span class="scene-description description-final">The conversation rail remains the permanent navigation: New, Pinned plus automatic active/recent shortcuts, and All conversations in one vertical rail.</span>
+  </div>
+
+  <main class="stage" aria-label="Ritemark window prototype">
+    <div class="window-titlebar">
+      <div class="traffic" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="window-name">proposal.md — alpha-project</div>
+      <div class="window-actions"><i class="ph ph-sidebar-simple" aria-hidden="true"></i></div>
+    </div>
+
+    <div class="workspace">
+      <aside class="file-sidebar" aria-label="Files">
+        <div class="sidebar-heading">Project</div>
+        <div class="file-row"><i class="ph ph-folder-open" aria-hidden="true"></i><span>alpha-project</span></div>
+        <div class="group-label">Recent</div>
+        <div class="file-row is-active"><i class="ph ph-file-text" aria-hidden="true"></i><span>proposal.md</span></div>
+        <div class="file-row"><i class="ph ph-file-text" aria-hidden="true"></i><span>release-notes.md</span></div>
+        <div class="file-row"><i class="ph ph-file-text" aria-hidden="true"></i><span>onboarding.md</span></div>
+        <div class="group-label">Folders</div>
+        <div class="file-row"><i class="ph ph-folder" aria-hidden="true"></i><span>Research</span></div>
+        <div class="file-row"><i class="ph ph-folder" aria-hidden="true"></i><span>Drafts</span></div>
+      </aside>
+
+      <section class="editor" aria-label="Document editor">
+        <div class="editor-tabs">
+          <div class="editor-tab is-active"><i class="ph ph-file-text" aria-hidden="true"></i>proposal.md</div>
+          <div class="editor-tab">release-notes.md</div>
+        </div>
+        <article class="document">
+          <h1>Durable agent conversations</h1>
+          <div class="lede">A project-safe conversation system for Ritemark.</div>
+          <h2>Product principle</h2>
+          <p>A conversation is durable content. The current transcript and background work are views of the same canonical record.</p>
+          <div class="document-line"></div>
+          <div class="document-line"></div>
+          <div class="document-line"></div>
+          <h2>Release outcome</h2>
+          <div class="document-line"></div>
+          <div class="document-line"></div>
+          <div class="document-line"></div>
+        </article>
+      </section>
+
+      <aside class="agent-sidebar" aria-label="AI Assistant">
+        <header class="secondary-sidebar-header" aria-label="VS Code secondary sidebar title bar">
+          <div class="shell-composites" aria-label="Secondary sidebar views">
+            <button class="shell-action is-active" title="Ritemark AI" aria-label="Ritemark AI, active">
+              <i class="ph ph-sparkle" aria-hidden="true"></i>
+            </button>
+            <button class="shell-action" title="Terminal" aria-label="Terminal">
+              <i class="ph ph-terminal-window" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <div class="shell-spacer"></div>
+
+          <div class="shell-view-actions" aria-label="Ritemark AI actions">
+            <button class="shell-action" title="AI Settings" aria-label="AI Settings">
+              <i class="ph ph-gear" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <span class="shell-separator" aria-hidden="true"></span>
+
+          <div class="shell-global-actions" aria-label="Secondary sidebar actions">
+            <button class="shell-action is-muted" title="Maximize secondary sidebar" aria-label="Maximize secondary sidebar">
+              <i class="ph ph-corners-out" aria-hidden="true"></i>
+            </button>
+            <button class="shell-action is-muted" title="Close secondary sidebar" aria-label="Close secondary sidebar">
+              <i class="ph ph-x" aria-hidden="true"></i>
+            </button>
+          </div>
+        </header>
+        <div class="agent-webview" aria-label="Ritemark AI webview">
+          <div class="chat-layout">
+          <div class="chat-main">
+            <div class="messages" tabindex="0">
+              <div class="context-chip"><i class="ph ph-file-text" aria-hidden="true"></i> Context: proposal.md</div>
+              <div class="bubble">
+                <div class="bubble-label">You</div>
+                <div class="user-bubble">Turn the audit findings into a clear release proposal.</div>
+              </div>
+              <div class="bubble">
+                <div class="bubble-label">Claude</div>
+                <div class="assistant-copy">
+                  I reorganized the proposal around three user-visible outcomes:
+                  <ul>
+                    <li>one conversation list per project;</li>
+                    <li>crash-safe local history;</li>
+                    <li>honest continuation after restart.</li>
+                  </ul>
+                  <div class="activity-line"><i class="ph ph-check" aria-hidden="true"></i> 4 actions completed</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="restored-notice" role="status">
+              <i class="ph ph-info" aria-hidden="true"></i>
+              <span><strong>This conversation was restored.</strong> Previous messages are visible, but the agent starts with a new working context.</span>
+            </div>
+            <div class="capacity-notice" role="alert">
+              <i class="ph ph-warning" aria-hidden="true"></i>
+              <span>Five conversations are already working or waiting for you. Finish, answer, or stop one before starting another.</span>
+            </div>
+
+            <div class="composer">
+              <div class="composer-box">
+                <textarea id="composer-input" aria-label="Message" placeholder="Ask the agent…"></textarea>
+                <div class="composer-actions">
+                  <button class="ghost-button composer-mode">Auto</button>
+                  <button class="icon-button" aria-label="Attach file"><i class="ph ph-paperclip" aria-hidden="true"></i></button>
+                  <button class="icon-button" aria-label="Use microphone"><i class="ph ph-microphone" aria-hidden="true"></i></button>
+                  <button class="send-button" id="send-button" aria-label="Send"><i class="ph ph-arrow-up" aria-hidden="true"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <nav class="live-rail" aria-label="Conversation shortcuts">
+            <button class="rail-item rail-primary" id="new-conversation" data-tooltip="New conversation" aria-label="New conversation">
+              <i class="ph ph-plus" aria-hidden="true"></i>
+            </button>
+
+            <div class="rail-list" role="list" aria-label="Pinned, active, and recent conversations">
+              <div class="rail-entry unpin-demo-target" data-pinned="true" role="listitem">
+                <button class="rail-item needs-user" data-tooltip="Pinned — Review release notes — Needs you" aria-label="Pinned, Review release notes, Needs you"><i class="ph ph-chat-circle conversation-avatar" aria-hidden="true"></i><i class="ph ph-push-pin rail-pin-mark" aria-hidden="true"></i><span class="rail-status"></span></button>
+                <button class="rail-pin-action" aria-label="Unpin Review release notes"><i class="ph ph-push-pin-slash" aria-hidden="true"></i></button>
+              </div>
+              <span class="rail-divider" aria-hidden="true"></span>
+              <div class="rail-entry" role="listitem">
+                <button class="rail-item is-current" data-tooltip="Translate memo — Current" aria-label="Translate memo, Current"><i class="ph ph-chat-circle conversation-avatar" aria-hidden="true"></i></button>
+                <button class="rail-pin-action" aria-label="Pin Translate memo"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+              </div>
+              <div class="rail-entry" role="listitem">
+                <button class="rail-item" data-tooltip="Onboarding review — Working" aria-label="Onboarding review, Working"><i class="ph ph-chat-circle conversation-avatar" aria-hidden="true"></i><span class="rail-status"></span></button>
+                <button class="rail-pin-action" aria-label="Pin Onboarding review"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+              </div>
+              <div class="rail-entry pin-demo-target" role="listitem">
+                <button class="rail-item" data-tooltip="Migration comparison — Recent" aria-label="Migration comparison, Recent"><i class="ph ph-chat-circle conversation-avatar" aria-hidden="true"></i></button>
+                <button class="rail-pin-action" aria-label="Pin Migration comparison"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+              </div>
+              <div class="rail-entry" role="listitem">
+                <button class="rail-item" data-tooltip="Quarterly brief outline — Recent" aria-label="Quarterly brief outline, Recent"><i class="ph ph-chat-circle conversation-avatar" aria-hidden="true"></i></button>
+                <button class="rail-pin-action" aria-label="Pin Quarterly brief outline"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+              </div>
+              <div class="rail-entry" role="listitem">
+                <button class="rail-item" data-tooltip="Export notes — Recent" aria-label="Export notes, Recent"><i class="ph ph-chat-circle conversation-avatar" aria-hidden="true"></i></button>
+                <button class="rail-pin-action" aria-label="Pin Export notes"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+              </div>
+            </div>
+
+            <button class="rail-item rail-all" id="open-conversations" data-tooltip="All conversations — 1 needs you" aria-label="All conversations, 1 needs you">
+              <span class="attention-dot" aria-hidden="true"></span>
+              <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i>
+            </button>
+          </nav>
+          </div>
+
+          <section class="conversations-panel" aria-label="All conversations panel">
+          <header class="panel-head">
+            <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i>
+            <div class="panel-head-copy">
+              <span class="panel-title">All conversations</span>
+              <span class="panel-project">alpha-project</span>
+            </div>
+            <button class="icon-button" id="close-panel" title="Close All conversations" aria-label="Close All conversations"><i class="ph ph-x" aria-hidden="true"></i></button>
+          </header>
+
+          <div class="panel-body normal-only">
+            <div class="conversation-group">
+              <div class="conversation-group-heading">
+                <div class="conversation-group-label">Pinned</div>
+                <div class="conversation-group-hint"><i class="ph ph-push-pin" aria-hidden="true"></i> Always on the rail</div>
+              </div>
+              <div class="conversation-row is-pinned delete-demo-target" tabindex="0">
+                <i class="ph ph-chat-circle conversation-avatar is-row" aria-hidden="true"></i>
+                <div class="conversation-main">
+                  <div class="conversation-name">Review release notes</div>
+                  <div class="conversation-meta">Today, 11:42</div>
+                </div>
+                <div class="row-status needs-user"><span class="attention-dot"></span>Needs you</div>
+                <div class="row-actions">
+                  <button class="icon-button row-action pin-trigger" title="Unpin Review release notes" aria-label="Unpin Review release notes"><i class="ph ph-push-pin-slash" aria-hidden="true"></i></button>
+                  <button class="icon-button row-action delete-trigger" title="Delete Review release notes" aria-label="Delete Review release notes"><i class="ph ph-trash" aria-hidden="true"></i></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="conversation-group">
+              <div class="conversation-group-heading">
+                <div class="conversation-group-label">Active &amp; recent</div>
+                <div class="conversation-group-hint">Shown automatically</div>
+              </div>
+              <div class="conversation-row is-current is-on-rail" tabindex="0">
+                <i class="ph ph-chat-circle conversation-avatar is-row" aria-hidden="true"></i>
+                <div class="conversation-main">
+                  <div class="conversation-name">Translate memo</div>
+                  <div class="conversation-meta">Today, 10:42 · Current</div>
+                </div>
+                <div class="row-status"></div>
+                <div class="row-actions">
+                  <button class="icon-button row-action pin-trigger" title="Pin Translate memo" aria-label="Pin Translate memo"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+                  <button class="icon-button row-action delete-trigger" title="Delete Translate memo" aria-label="Delete Translate memo"><i class="ph ph-trash" aria-hidden="true"></i></button>
+                </div>
+              </div>
+              <div class="conversation-row is-on-rail" tabindex="0">
+                <i class="ph ph-chat-circle conversation-avatar is-row" aria-hidden="true"></i>
+                <div class="conversation-main">
+                  <div class="conversation-name">Onboarding review</div>
+                  <div class="conversation-meta">Today, 10:18</div>
+                </div>
+                <div class="row-status"><i class="ph ph-spinner-gap" aria-hidden="true"></i>Working</div>
+                <div class="row-actions">
+                  <button class="icon-button row-action pin-trigger" title="Pin Onboarding review" aria-label="Pin Onboarding review"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+                  <button class="icon-button row-action delete-trigger" title="Delete Onboarding review" aria-label="Delete Onboarding review"><i class="ph ph-trash" aria-hidden="true"></i></button>
+                </div>
+              </div>
+
+              <div class="conversation-row is-on-rail" tabindex="0">
+                <i class="ph ph-chat-circle conversation-avatar is-row" aria-hidden="true"></i>
+                <div class="conversation-main">
+                  <div class="conversation-name" title="Compare migration behavior across single-root and multi-root workspaces">Compare migration behavior across single-root and multi-root workspaces</div>
+                  <div class="conversation-meta">Today, 09:54 · Recent</div>
+                </div>
+                <div class="row-status"></div>
+                <div class="row-actions">
+                  <button class="icon-button row-action pin-trigger" title="Pin migration comparison" aria-label="Pin migration comparison"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+                  <button class="icon-button row-action delete-trigger" title="Delete migration comparison" aria-label="Delete migration comparison"><i class="ph ph-trash" aria-hidden="true"></i></button>
+                </div>
+              </div>
+              <div class="conversation-row is-on-rail" tabindex="0">
+                <i class="ph ph-chat-circle conversation-avatar is-row" aria-hidden="true"></i>
+                <div class="conversation-main">
+                  <div class="conversation-name">Quarterly brief outline</div>
+                  <div class="conversation-meta">Yesterday, 17:06 · Recent</div>
+                </div>
+                <div class="row-status"></div>
+                <div class="row-actions">
+                  <button class="icon-button row-action pin-trigger" title="Pin Quarterly brief outline" aria-label="Pin Quarterly brief outline"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+                  <button class="icon-button row-action delete-trigger" title="Delete Quarterly brief outline" aria-label="Delete Quarterly brief outline"><i class="ph ph-trash" aria-hidden="true"></i></button>
+                </div>
+              </div>
+              <div class="conversation-row is-on-rail" tabindex="0">
+                <i class="ph ph-chat-circle conversation-avatar is-row" aria-hidden="true"></i>
+                <div class="conversation-main">
+                  <div class="conversation-name">Export notes</div>
+                  <div class="conversation-meta">Yesterday, 15:31 · Recent</div>
+                </div>
+                <div class="row-status"></div>
+                <div class="row-actions">
+                  <button class="icon-button row-action pin-trigger" title="Pin Export notes" aria-label="Pin Export notes"><i class="ph ph-push-pin" aria-hidden="true"></i></button>
+                  <button class="icon-button row-action delete-trigger" title="Delete Export notes" aria-label="Delete Export notes"><i class="ph ph-trash" aria-hidden="true"></i></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="conversation-group">
+              <div class="conversation-group-label">Earlier conversations</div>
+              <div class="earlier-row" id="earlier-row">
+                <div class="conversation-name">Earlier conversation</div>
+                <div class="earlier-copy">Saved by an earlier Ritemark version and not linked to a project.</div>
+                <div class="earlier-actions">
+                  <button class="small-button" id="move-project">Move to this project</button>
+                  <button class="small-button">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-body recovery-only">
+            <div class="migration-banner">
+              <strong>Earlier conversations found</strong>
+              Three conversations were saved before project-safe history. Review them before moving anything into this project.
+            </div>
+            <div class="conversation-group">
+              <div class="conversation-group-label">Project unknown</div>
+              <div class="earlier-row">
+                <div class="conversation-name">Quarterly brief outline</div>
+                <div class="earlier-copy">Project unknown · 3 messages · saved 12 Aug</div>
+                <div class="earlier-actions">
+                  <button class="small-button" id="move-recovery">Move to this project</button>
+                  <button class="small-button">Delete</button>
+                </div>
+              </div>
+              <div class="earlier-row">
+                <div class="conversation-name">Untitled earlier conversation</div>
+                <div class="earlier-copy">Project unknown · 8 messages · saved 9 Aug</div>
+                <div class="earlier-actions">
+                  <button class="small-button">Move to this project</button>
+                  <button class="small-button">Delete</button>
+                </div>
+              </div>
+            </div>
+            <div class="conversation-group">
+              <div class="conversation-group-label">Storage diagnostics</div>
+              <div class="error-card" id="list-error">
+                <strong>Conversations could not be refreshed</strong>
+                The last verified list is still shown. Check storage permissions and try again.
+                <div class="recovery-actions"><button class="small-button" id="retry-list">Retry</button></div>
+              </div>
+              <div class="corrupt-card">
+                <strong>Couldn’t open one conversation</strong>
+                The damaged record was isolated. Other conversations are unaffected.
+                <div class="recovery-actions"><button class="small-button">View diagnostics</button></div>
+              </div>
+            </div>
+          </div>
+          </section>
+
+          <div class="dialog-layer" role="presentation">
+          <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+            <header class="dialog-head">
+              <i class="ph ph-trash" aria-hidden="true"></i>
+              <strong id="delete-title">Delete conversation?</strong>
+              <button class="icon-button" id="dialog-close" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
+            </header>
+            <div class="dialog-body">
+              <p><strong>Translate memo</strong> will be removed from this project’s Conversations list.</p>
+              <div class="dialog-warning">This affects only the conversation record. Project files are not deleted.</div>
+            </div>
+            <footer class="dialog-foot">
+              <button class="secondary-button" id="cancel-delete">Cancel</button>
+              <button class="danger-button" id="confirm-delete">Delete conversation</button>
+            </footer>
+          </section>
+          </div>
+
+          <div class="toast" role="status" aria-live="polite">
+            <i class="ph ph-trash" aria-hidden="true"></i>
+            <div class="toast-copy">Conversation deleted</div>
+            <button class="undo-button" id="undo-delete">Undo</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    const body = document.body;
+    const sceneButtons = [...document.querySelectorAll('[data-scene-button]')];
+    const themeButton = document.getElementById('theme-toggle');
+
+    function setScene(scene) {
+      body.dataset.scene = scene;
+      body.dataset.dialog = scene === 'delete' ? 'open' : 'closed';
+      body.dataset.toast = 'hidden';
+      body.dataset.capacity = 'ok';
+      sceneButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.sceneButton === scene));
+    }
+
+    sceneButtons.forEach((button) => button.addEventListener('click', () => setScene(button.dataset.sceneButton)));
+    document.getElementById('open-conversations').addEventListener('click', () => setScene('panel'));
+    [...document.querySelectorAll('.rail-list .rail-item')].forEach((button) => {
+      button.addEventListener('click', () => setScene('transitional'));
+    });
+    [...document.querySelectorAll('.rail-pin-action')].forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const entry = button.closest('.rail-entry');
+        const conversationButton = entry.querySelector('.rail-item');
+        const railList = document.querySelector('.rail-list');
+        const divider = railList.querySelector('.rail-divider');
+        const isPinned = entry.dataset.pinned === 'true';
+        const title = button.getAttribute('aria-label').replace(/^(?:Pin|Unpin) /, '');
+        const actionIcon = button.querySelector('i');
+
+        if (isPinned) {
+          entry.dataset.pinned = 'false';
+          conversationButton.dataset.tooltip = conversationButton.dataset.tooltip.replace(/^Pinned — /, '');
+          conversationButton.setAttribute('aria-label', conversationButton.getAttribute('aria-label').replace(/^Pinned, /, ''));
+          conversationButton.querySelector('.rail-pin-mark')?.remove();
+          button.setAttribute('aria-label', `Pin ${title}`);
+          actionIcon.className = 'ph ph-push-pin';
+          railList.insertBefore(entry, divider.nextElementSibling);
+        } else {
+          entry.dataset.pinned = 'true';
+          conversationButton.dataset.tooltip = `Pinned — ${conversationButton.dataset.tooltip}`;
+          conversationButton.setAttribute('aria-label', `Pinned, ${conversationButton.getAttribute('aria-label')}`);
+          const pinMark = document.createElement('i');
+          pinMark.className = 'ph ph-push-pin rail-pin-mark';
+          pinMark.setAttribute('aria-hidden', 'true');
+          conversationButton.appendChild(pinMark);
+          button.setAttribute('aria-label', `Unpin ${title}`);
+          actionIcon.className = 'ph ph-push-pin-slash';
+          railList.insertBefore(entry, divider);
+        }
+      });
+    });
+    document.getElementById('close-panel').addEventListener('click', () => setScene(body.dataset.lastBase === 'final' ? 'final' : 'transitional'));
+    document.getElementById('new-conversation').addEventListener('click', () => {
+      setScene('transitional');
+      document.getElementById('composer-input').value = '';
+      document.getElementById('composer-input').focus();
+    });
+    [...document.querySelectorAll('.delete-trigger')].forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setScene('delete');
+      });
+    });
+
+    function closeDialog() {
+      body.dataset.dialog = 'closed';
+      body.dataset.scene = 'panel';
+      sceneButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.sceneButton === 'panel'));
+    }
+
+    document.getElementById('cancel-delete').addEventListener('click', closeDialog);
+    document.getElementById('dialog-close').addEventListener('click', closeDialog);
+    document.getElementById('confirm-delete').addEventListener('click', () => {
+      body.dataset.dialog = 'closed';
+      body.dataset.scene = 'panel';
+      body.dataset.toast = 'visible';
+      sceneButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.sceneButton === 'panel'));
+    });
+    document.getElementById('undo-delete').addEventListener('click', () => {
+      body.dataset.toast = 'hidden';
+    });
+
+    function markMoved(button) {
+      button.textContent = 'Moved to alpha-project';
+      button.disabled = true;
+      button.closest('.earlier-row').style.borderLeft = '3px solid var(--r-success)';
+    }
+    document.getElementById('move-project').addEventListener('click', (event) => markMoved(event.currentTarget));
+    document.getElementById('move-recovery').addEventListener('click', (event) => markMoved(event.currentTarget));
+
+    document.getElementById('retry-list').addEventListener('click', () => {
+      document.getElementById('list-error').innerHTML = '<strong>Conversations refreshed</strong>The last verified list is current.';
+      document.getElementById('list-error').style.borderLeftColor = 'var(--r-success)';
+    });
+
+    document.getElementById('send-button').addEventListener('click', () => {
+      if (body.dataset.scene === 'restored') body.dataset.capacity = body.dataset.capacity === 'blocked' ? 'ok' : 'blocked';
+    });
+
+    themeButton.addEventListener('click', () => {
+      const dark = document.documentElement.dataset.theme !== 'dark';
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      themeButton.setAttribute('aria-pressed', String(dark));
+      themeButton.querySelector('i').className = dark ? 'ph ph-sun' : 'ph ph-moon';
+      themeButton.querySelector('span').textContent = dark ? 'Light' : 'Dark';
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        if (body.dataset.dialog !== 'closed') closeDialog();
+        else if (['panel', 'recovery'].includes(body.dataset.scene)) setScene('transitional');
+      }
+    });
+
+    const requestedParams = new URLSearchParams(window.location.search);
+    const requestedScene = requestedParams.get('scene');
+    const requestedTheme = requestedParams.get('theme');
+    body.dataset.tooltipDemo = String(requestedParams.get('tooltip') === 'demo');
+    body.dataset.deleteDemo = String(requestedParams.get('delete') === 'demo');
+    body.dataset.pinDemo = String(requestedParams.get('pin') === 'demo');
+    body.dataset.unpinDemo = String(requestedParams.get('unpin') === 'demo');
+    if (requestedTheme === 'dark') {
+      document.documentElement.dataset.theme = 'dark';
+      themeButton.setAttribute('aria-pressed', 'true');
+      themeButton.querySelector('i').className = 'ph ph-sun';
+      themeButton.querySelector('span').textContent = 'Light';
+    }
+    if (sceneButtons.some((button) => button.dataset.sceneButton === requestedScene)) setScene(requestedScene);
+  </script>
+</body>
+</html>

@@ -344,11 +344,12 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register Unified View Provider (Primary Sidebar / left)
   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets);
+  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets, context.globalStorageUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
-    })
+    }),
+    unifiedViewProvider,
   );
 
   // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
@@ -855,5 +856,6 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export async function deactivate() {
+  await unifiedViewProvider?.prepareForShutdown();
   await shutdownAnalytics();
 }

@@ -8,7 +8,7 @@ If you want to manage custom helpers, see [Agent Library](agent-library.md) for 
 
 > **New in v1.8.6:** Ritemark now identifies AI before the first sidebar interaction and keeps an **[AI information](#ai-information-and-context-sharing)** button beside the composer. It shows the selected runtime, provider/service, and model; explains what context may leave the device; and reminds you to review AI output.
 
-> **New in v1.8.5:** the AI sidebar now runs **[parallel agent chats](#parallel-agent-chats)** — several independent conversations at once, laid out in a thread rail on the right edge. The bundled runtimes were upgraded (Claude Code 2.1.217, OpenCode 1.18.4) and **Claude Opus 5** joined the model picker; agents also now receive a [capability context](#agents-know-their-ritemark-surroundings) describing the Ritemark environment.
+> **New in v1.10.0:** Agent conversations are saved locally per project in one durable **Conversations** list. A permanent right rail keeps Pinned, working, needs-you, recent, and otherwise-absent current conversations close without making the rail the owner of history.
 
 > **New in v1.7.3:** **OpenCode** joins Claude and Codex as a third, bring-your-own-key runtime over the Agent Client Protocol. See [OpenCode](#opencode) below and [Set Up AI → OpenCode](../setup-ai.md#opencode-bring-your-own-key) for setup. The sidebar composer also gained a [prompt queue](#running-agents-the-composer-and-plan-approval) and a fixed plan-approval flow this release.
 
@@ -34,7 +34,12 @@ Agent selection is per turn inside a conversation. You can keep one thread open 
 
 The AI sidebar is no longer a single conversation. You can run **several independent chats at once**, each with its own session — so you can keep one long-running task going while you start another, or ask a second runtime for a comparison without losing the first thread.
 
-- **The thread rail.** A slim rail down the right edge of the AI sidebar lists your open threads. Click a thread to switch to it; its full conversation history restores instantly. The rail's robot icons use Ritemark's brand indigo in both light and dark themes.
+- **The conversation rail.** New conversation is the strong `+` button. Under it, calm speech-bubble icons provide shortcuts to Pinned conversations, active work, and three recent idle conversations. The final speech-bubble button opens the full Conversations list. Hover or focus a shortcut to see its complete title and Pin/Unpin action.
+- **One list per project.** Conversations contains current, background, and earlier saved chats together. The list is host-owned and crash-safe; it is not derived from whichever shortcuts happen to be visible on the rail.
+- **Pinning is optional.** Working, needs-you, and recent chats appear automatically; an older current chat is appended while you view it. Selecting a conversation never promotes or reorders Recents. Pin up to five conversations when you want them to remain on the rail; unpinning does not delete or close anything.
+- **Delete is explicit.** Delete is available directly on a conversation row, asks for confirmation, and offers Undo. Running work uses Stop and delete.
+- **Titles improve after the first response.** Ritemark first shows a shortened version of your prompt, then asks the selected runtime for a short title without adding that request to the conversation. Use Rename on any row to choose your own title; Ritemark never overwrites a manual name.
+- **Restored transcript, honest context.** Opening a saved transcript does not start an agent. Until native continuation lands, Ritemark states that the next message starts with a new agent working context.
 - **Agents keep working in the background.** Start a run in one thread, switch to another, and the first agent keeps going. Responses always land in the thread that asked — threads never cross-talk.
 - **A thread cap.** To keep resource use in check there's a limit on how many threads can be open at once. Open past it and Ritemark tells you instead of silently spawning more sessions.
 - **Runtime is per thread.** Switch Claude ↔ Codex ↔ OpenCode inside any thread; the choice applies to that thread and the conversation stays continuous.

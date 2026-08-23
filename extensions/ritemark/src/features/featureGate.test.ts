@@ -5,6 +5,9 @@
  */
 
 import * as assert from 'assert';
+import { FLAGS } from './flags';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface FeatureFlag {
   id: string;
@@ -96,5 +99,14 @@ assert.strictEqual(isEnabledPure('voice-dictation', TEST_FLAGS, 'linux', { 'voic
 
 // Platform filtering takes priority over user setting
 assert.strictEqual(isEnabledPure('voice-dictation', TEST_FLAGS, 'win32', { 'voice-dictation': true }), false);
+
+// Sprint 109 rollout: experimental (real runtime flag), but default-on in the
+// extension manifest. After cutover, ConversationCutoverState owns monotonicity.
+assert.strictEqual(FLAGS.durableAgentConversations.status, 'experimental');
+const extensionManifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8')) as {
+  contributes: { configuration: Array<{ properties?: Record<string, { default?: boolean }> }> };
+};
+const featureProperties = extensionManifest.contributes.configuration[2].properties as Record<string, { default?: boolean }>;
+assert.strictEqual(featureProperties['ritemark.features.durableAgentConversations']?.default, true);
 
 console.log('All feature gate tests passed.');

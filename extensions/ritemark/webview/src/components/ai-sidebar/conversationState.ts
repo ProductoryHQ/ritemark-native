@@ -89,6 +89,8 @@ export interface ConversationState {
   estimatedTokens: number;
   contextUsagePercent: number;
   showContextWarning: boolean;
+  /** Transcript came from durable storage; runtime continuation is not implied. */
+  restoredTranscript: boolean;
 }
 
 export function createConversationState(
@@ -114,6 +116,7 @@ export function createConversationState(
     estimatedTokens: 0,
     contextUsagePercent: 0,
     showContextWarning: false,
+    restoredTranscript: false,
   };
   // `id` is the storage key — never let an override desync it from the map key.
   return { ...base, ...overrides, id };

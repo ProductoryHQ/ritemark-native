@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Durable Agent Conversations** — project-safe, crash-safe host storage with first-prompt-before-dispatch ordering, typed host/webview protocol, legacy migration, corrupt-record isolation, confirmed Delete and Undo.
+- **Conversations UI** — a permanent 56px rail with calm shared chat-bubble icons, optional Pin/Unpin, automatic working/needs-you/recent shortcuts, and one host-backed Conversations list that stays open beside the rail. Selecting a conversation changes only Current state and does not reorder Recents.
+- **Conversation titles that become useful automatically** — the first prompt appears immediately as a shortened title, the selected runtime replaces it with a 3–6-word title after the first response, and Rename in Conversations lets the user take permanent control.
+- **Stable conversation colors** — each project uses all eight base rainbow colors before deeper and softer variants; the same translucent-fill chat bubble follows a conversation across the rail, All conversations, restart, Rename, and Delete + Undo.
+
+### Changed
+- Agent transcripts are no longer owned by webview localStorage. Webview state retains only the selected canonical conversation, up to five Pin IDs, and harmless UI preferences.
+- Reopened Sprint 109 transcripts explicitly disclose that the next message starts with a new agent working context; native provider continuation remains Sprint 110 scope.
+- Live agent contexts are bounded in the host (five with parallel work, one otherwise). Ritemark releases only the least-recently-used non-current idle context; Working, Needs-you, and Current conversations are protected, while saved conversations remain unlimited.
+
 ## [1.9.0] — 2026-08-20
 
 Sprint 108 — Transcribe.

@@ -47,12 +47,21 @@ export type FlagId =
   // Sprint 99 (R15): parallel agent chats — multi-conversation store + rail
   | 'parallelChats'
   // Sprint 108: audio transcription workbench (Transcribe activity-bar app)
-  | 'transcription-workbench';
+  | 'transcription-workbench'
+  // Sprint 109: host-owned durable conversation archive + Conversations UI
+  | 'durableAgentConversations';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  'durableAgentConversations': {
+    id: 'durableAgentConversations',
+    label: 'Durable Agent Conversations',
+    description: 'Store complete Agent conversations safely in the extension host and show the project Conversations archive.',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   // Sprint 106 (#74): persistent Home re-entry surface (Activity Bar view with
   // New document / New AI task / recent work). Experimental = real runtime
   // kill-switch during rollout; ON by default per HARD RULE #2.

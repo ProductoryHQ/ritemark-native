@@ -1,0 +1,99 @@
+{
+  "fixtureVersion": 1,
+  "name": "global-duplicate-conflict-and-malformed-history",
+  "currentScope": {
+    "platform": "darwin",
+    "workspaceFileUri": null,
+    "folderUris": ["file:///fixtures/beta-project"]
+  },
+  "legacyEntries": [
+    {
+      "key": "ritemark-chat-metadata",
+      "value": [
+        { "id": "conv-global-1", "title": "Unknown project note", "agentId": "claude-code", "createdAt": 1767312000000, "updatedAt": 1767312060000 },
+        { "id": "conv-shared", "title": "First shared copy", "agentId": "codex", "createdAt": 1767315600000, "updatedAt": 1767315660000 },
+        { "id": "conv-shared", "title": "Conflicting shared copy", "agentId": "codex", "createdAt": 1767315600000, "updatedAt": 1767315720000 },
+        { "id": "conv-content-copy", "title": "Same content, new id", "agentId": "codex", "createdAt": 1767315600000, "updatedAt": 1767315780000 },
+        { "id": "conv-missing-data", "title": "Metadata without data", "agentId": "claude-code", "createdAt": 1767319200000, "updatedAt": 1767319260000 },
+        { "title": "Missing id", "agentId": "claude-code", "createdAt": "not-a-number", "updatedAt": null }
+      ]
+    },
+    {
+      "key": "ritemark-chat-conv-global-1",
+      "value": {
+        "id": "conv-global-1",
+        "title": "Unknown project note",
+        "agentId": "claude-code",
+        "createdAt": 1767312000000,
+        "updatedAt": 1767312060000,
+        "agentConversation": [],
+        "chatMessages": [
+          { "id": "message-global-user", "role": "user", "content": "Summarize the invented fixture.", "timestamp": 1767312000000 },
+          { "id": "message-global-assistant", "role": "assistant", "content": "This is synthetic fixture content.", "timestamp": 1767312060000 }
+        ],
+        "conversationHistory": []
+      }
+    },
+    {
+      "key": "ritemark-chat-conv-shared",
+      "value": {
+        "id": "conv-shared",
+        "title": "First shared copy",
+        "agentId": "codex",
+        "createdAt": 1767315600000,
+        "updatedAt": 1767315660000,
+        "agentConversation": [],
+        "codexConversation": [
+          { "id": "turn-shared", "runtime": "codex", "userPrompt": "Normalize this text.  ", "streamingText": "Done.\r\n", "activities": [], "result": { "status": "completed" }, "isRunning": false, "timestamp": 1767315600000 }
+        ],
+        "chatMessages": [],
+        "conversationHistory": []
+      }
+    },
+    {
+      "key": "ritemark-chat-conflict-conv-shared",
+      "value": {
+        "id": "conv-shared",
+        "title": "Conflicting shared copy",
+        "agentId": "codex",
+        "createdAt": 1767315600000,
+        "updatedAt": 1767315720000,
+        "agentConversation": [],
+        "codexConversation": [
+          { "id": "turn-shared-conflict", "runtime": "codex", "userPrompt": "Do a different task.", "streamingText": "Different result.", "activities": [], "result": { "status": "completed" }, "isRunning": false, "timestamp": 1767315600000 }
+        ],
+        "chatMessages": [],
+        "conversationHistory": []
+      }
+    },
+    {
+      "key": "ritemark-chat-conv-content-copy",
+      "value": {
+        "id": "conv-content-copy",
+        "title": "Same content, new id",
+        "agentId": "codex",
+        "createdAt": 1767315600000,
+        "updatedAt": 1767315780000,
+        "agentConversation": [],
+        "codexConversation": [
+          { "id": "turn-copy", "runtime": "codex", "userPrompt": "Normalize this text.", "streamingText": "Done.\n", "activities": [], "result": { "status": "completed" }, "isRunning": false, "timestamp": 1767315700000 }
+        ],
+        "chatMessages": [],
+        "conversationHistory": []
+      }
+    },
+    {
+      "key": "ritemark-chat-malformed-json",
+      "rawValue": "{\"id\":\"broken\",\"chatMessages\":["
+    }
+  ],
+  "expected": {
+    "currentProjectRecordCount": 0,
+    "unassignedCanonicalRecordCount": 3,
+    "dedupeByFingerprint": ["conv-content-copy"],
+    "preservedConflicts": ["conv-shared"],
+    "quarantineReasons": ["missing-record-data", "invalid-metadata", "invalid-json"],
+    "legacySourceRetained": true,
+    "moveToCurrentProjectRequiresExplicitUserAction": true
+  }
+}
