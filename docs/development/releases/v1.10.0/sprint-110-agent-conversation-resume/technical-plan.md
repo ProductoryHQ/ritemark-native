@@ -51,6 +51,7 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 - Claude: verify SDK session ID capture, resume after process/app restart, invalid ID, auth loss, model change, two sessions, and any transcript duplication behavior.
 - Codex: implement an audit harness for app-server `thread/resume`, `thread/read`, optional fork semantics, invalid thread, process restart, binary upgrade, auth loss, and two threads.
 - ACP/OpenCode: inspect initialize capabilities and live-test `session/load` / `session/resume` only if advertised by bundled OpenCode; never assume SDK method availability means server support.
+- For every runtime, inject failure at pre-send, confirmed-accept/no-final, ambiguous-accept, partial/progress/tool-before-final, and late-event-after-switch points; verify that the saved user request remains available to the next runtime without executable replay.
 - Record exact versions, commands/fixtures, traces with redacted IDs, observations, and ship/fallback decision per runtime.
 - Freeze descriptor tags, validation rules, `coveredThroughEventId` and ambiguous-crash policy, context budget, reconciliation source, lazy negotiation timing, and unavailable behavior in the SDD artifacts.
 - Stop for Jarmo’s explicit Phase 0 decision approval before Workstream 1.
@@ -76,8 +77,8 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 ## Workstream 3: Normalized context fallback (R4)
 
 - Add `src/conversations/contextPack.ts` with deterministic selection/serialization and tests.
-- Include user prompt and assistant final text event types only, with minimal turn/runtime labels; exclude executable/provider-specific/transient artifacts.
-- Apply a Phase 0-decided byte/token budget without an extra summarization model dependency. Preserve first purpose-bearing turn(s) and most recent complete turns; record omitted turn count.
+- Include ordered user prompts, including prior unanswered prompts, and assistant final text event types only, with minimal turn/runtime/dispatch-certainty labels; exclude executable/provider-specific/transient artifacts.
+- Apply a Phase 0-decided byte/token budget without an extra summarization model dependency. Preserve first purpose-bearing turn(s), the most recent unanswered request, and then recent complete turns; record omitted turn/prompt count.
 - Build through the event before the newly accepted prompt; that prompt is persisted first and dispatched once outside the context pack.
 - Render runtime-specific input framing in adapters while keeping one canonical normalized pack.
 - Insert a durable transcript boundary and host-derived `transcript-restored` state before the first fallback turn.
@@ -87,6 +88,7 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 - Runtime selector on a non-empty conversation becomes a `Continue with …` flow with shadcn confirmation dialog and context-loss explanation.
 - Preserve composer draft through confirmation/cancel.
 - On confirm, keep the canonical conversation ID, choose/create the target runtime’s descriptor, pass only normalized events after its coverage watermark, and insert a runtime/context boundary.
+- Treat a prior user prompt with no saved final answer as canonical handoff context in every dispatch-certainty state. Never resend it as an executable prompt; send only the newly accepted handoff instruction once.
 - Checkpoint watermark advancement only after proven provider acceptance. If a crash makes acceptance ambiguous and cannot be reconciled, invalidate the descriptor and use a fresh fallback rather than risk duplicate delta.
 - Reject late events from the previous binding using existing conversation scoping plus a continuation binding generation.
 - Show transcript/unavailable/runtime-unavailable notices inline; native-restored remains unobtrusive.
@@ -98,12 +100,12 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 - Aggregate `Needs you` > `Working` > idle on the All conversations button and conversation rail with accessible counts and reduced-motion behavior.
 - Ensure continuation transitions update the existing rail/history item rather than creating a duplicate or changing Pin state implicitly.
 - Keep browsing current-project-only and runtime-lazy; active-work protection applies only at Send, never when reading/selecting/saving.
-- Explicitly defer search, rename, All projects, runtime filters, and continuation-state filters beyond v1.10.0.
+- Explicitly defer search, All projects, runtime filters, and continuation-state filters beyond v1.10.0; preserve Sprint 109 Rename behavior.
 
 ## Workstream 6: Cross-runtime verification and release close (R8)
 
-- Unit tests: descriptor codecs/compatibility, state transitions, watermarks/deltas, context pack/truncation, handoff generation, crash/idempotency, reconciliation, redaction.
-- Integration tests: lazy open, native success/failure, current-prompt-once fallback, runtime unavailable, two parallel chats, process restart, late events, current-project privacy, and conversation-rail identity/derived-membership preservation.
+- Unit tests: descriptor codecs/compatibility, state transitions, watermarks/deltas, context pack/truncation including unanswered prompts, handoff generation, dispatch certainty, crash/idempotency, reconciliation, redaction.
+- Integration tests: lazy open, native success/failure, current-prompt-once fallback, failed-runtime switch with no final answer, runtime unavailable, two parallel chats, process restart, late events, current-project privacy, and conversation-rail identity/derived-membership preservation.
 - Live matrix for all available authenticated runtimes; capture exact unexercised rows and never mark them passed by inference.
 - Update architecture runtime contract/session table/conversation subsystem/protocol; update user docs, changelog, release notes, test checklist, tracker, and issue. Architecture `Last updated` must be on/after the Sprint 110 branch creation date.
 - Run QA and release-specific migration+resume canary before declaring v1.10.0 feature complete.

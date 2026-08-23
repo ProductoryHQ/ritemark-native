@@ -10,6 +10,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Claude live matrix: capture/resume, restart, invalid ID, auth loss, model change, two sessions, duplication behavior.
 - [ ] Codex live matrix: thread resume/read, restart, invalid ID, auth loss, binary upgrade, two threads, reconciliation behavior.
 - [ ] ACP/OpenCode capability and live load/resume matrix; mark fallback-only unless advertised behavior is proven.
+- [ ] For each runtime, switch away after pre-send failure, confirmed accept/no final, ambiguous accept, partial/tool/progress only, and process loss; verify the prior saved user prompt reaches the next runtime as labelled context and late events stay isolated.
 - [ ] Decide each runtime’s native/fallback status, descriptor codec, `coveredThroughEventId`/ambiguous-crash policy, context budget, lazy timing, and reconciliation source.
 - [ ] Update spec/scenarios/technical plan/sprint plan with Phase 0 decisions before Phase 1.
 - [ ] **Jarmo Phase 0 decision gate:** approve runtime matrix, context budget, watermark/crash semantics, and adapter scope before Phase 1.
@@ -33,8 +34,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 ## Phase 3: Transcript context fallback (W3 — R4)
 
 - [ ] Add deterministic normalized context pack builder and serialization.
-- [ ] Include only user prompts + assistant final text; exclude tools, approvals, pending questions, progress, rejected plans, hidden prompts, binaries.
-- [ ] Implement budget/truncation preserving purpose + recent complete turns and omitted-count disclosure.
+- [ ] Include ordered user prompts — including prior unanswered prompts — plus assistant final text; exclude tools, approvals, assistant questions awaiting input, partial/progress text, rejected plans, hidden prompts, binaries.
+- [ ] Implement budget/truncation preserving purpose + the most recent unanswered request + recent complete turns, with omitted-count disclosure.
 - [ ] Exclude the newly accepted prompt from fallback pack and dispatch it exactly once after continuation setup.
 - [ ] Add runtime framing, workspace-recheck instruction, durable transcript boundary, and `transcript-restored` state.
 - [ ] Test oversized, malformed, legacy, attachment, and no-usable-context paths.
@@ -43,6 +44,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 - [ ] Add Continue with … confirmation for non-empty runtime changes; preserve composer draft.
 - [ ] Maintain per-runtime descriptors and continuation binding generation under one canonical conversation ID.
+- [ ] Preserve a prior saved-but-unanswered prompt across runtime switch as labelled context in known-unsent, known-accepted, and ambiguous states; dispatch only the new handoff instruction once.
 - [ ] Inject only canonical delta after `coveredThroughEventId`; checkpoint advancement after proven acceptance and use fresh fallback on unreconciled crash ambiguity.
 - [ ] Add native/transcript/unavailable/runtime-unavailable inline states and accessible wording.
 - [ ] Reject late events from invalidated bindings and verify two concurrent handoffs.
@@ -55,7 +57,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Verify resume, fallback, restart, and handoff preserve the shared chat-bubble visual and do not reorder Recents without real activity.
 - [ ] Aggregate Needs you/Working state on the conversation rail and All conversations button accessibly.
 - [ ] Prove reading/selecting is unlimited and current-project-only; active-work limits apply only at Send.
-- [ ] Record search/rename/All-project/filter features as deferred follow-up scope.
+- [ ] Record search/All-project/filter features as deferred follow-up scope and preserve Sprint 109 Rename behavior.
 
 ## Phase 6: QA, docs, and release feature complete (W6 — R8)
 

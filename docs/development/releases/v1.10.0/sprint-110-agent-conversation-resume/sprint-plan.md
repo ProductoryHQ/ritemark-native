@@ -1,6 +1,6 @@
 # Sprint 110 — Agent Conversation Resume
 
-**Status:** Kickoff prepared 2026-08-23 from merged Sprint 109 — awaiting Jarmo SDD/Phase 0 approval<br>
+**Status:** Kickoff prepared 2026-08-23 from final merged Sprint 109 — awaiting Jarmo SDD/Phase 0 approval<br>
 **Parent release:** [v1.10.0 Durable Agent Conversations](../release-plan.md)<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8)<br>
 **Issue:** [#204 — Sprint 110: Resume Agent Conversations with truthful context](https://github.com/ProductoryHQ/ritemark-native/issues/204)<br>
@@ -42,7 +42,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 - Resuming work that was running when the app process exited.
 - Tool/approval/plan/progress/attachment-binary replay.
 - Cloud sync, collaboration, semantic memory/RAG, tags/folders, export/share.
-- Conversation search, rename, All-project browsing, runtime/continuation-state filters, archive, and trash.
+- Conversation search, All-project browsing, runtime/continuation-state filters, archive, and trash. Rename already shipped in Sprint 109.
 - Scheduled-task and Flow history sharing.
 - Unproven native-resume promises.
 
@@ -62,6 +62,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 - [ ] Unsupported/expired/invalid/auth-loss paths preserve history and take a tested honest fallback/unavailable route.
 - [ ] Fallback is deterministic, bounded, disclosed, and excludes executable/provider-specific artifacts.
 - [ ] Cross-runtime continuation happens only after explicit confirmation and never transfers opaque IDs.
+- [ ] A durably saved user prompt that received no final answer survives runtime failure/switch as explicitly labelled canonical context, while the new handoff prompt is sent exactly once.
 - [ ] Opening/selecting is runtime/auth/network-lazy; the newly accepted prompt is persisted before negotiation but sent exactly once outside fallback context.
 - [ ] Per-runtime coverage watermarks deliver only uncovered canonical delta and handle ambiguous crash without silent duplication.
 - [ ] Two concurrent conversations and late events remain isolated.
@@ -71,7 +72,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 
 ## Dependencies and Blockers
 
-- Sprint 109 merged through [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209) with stable ConversationStore/project identity/protocol; merge commit `e2a0f70` is the Sprint 110 branch base.
+- Sprint 109 merged through [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209) plus final rail polish [PR #210](https://github.com/ProductoryHQ/ritemark-native/pull/210); final main merge `e521c53` is incorporated into the Sprint 110 branch.
 - Ordering gate: Sprint 109 merge ✓ → dedicated non-`main` branch/worktree ✓ → Jarmo Sprint 110 SDD/Phase 0 approval → Phase 0 live audit → Jarmo Phase 0 decision approval → Phase 1.
 - Phase 0 auth/access for live Claude and Codex; OpenCode native scope is conditional on configured provider and advertised capabilities.
 - External protocols may expire/invalidate state across binary upgrades; fallback is required release functionality, not an edge-only backup.
@@ -85,6 +86,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 | Wrong session bound to a conversation | High | Tagged descriptors, scope/version validation, binding generation, two-chat tests. |
 | Fallback prompt too large or misleading | High | Deterministic budget, artifact allowlist, truncation disclosure, workspace-recheck instruction. |
 | Runtime switch implies shared memory | Medium | Explicit Continue with … confirmation and durable boundary. |
+| Runtime failure leaves the user's last request invisible to the next agent | High | Treat every durably saved user prompt as canonical context even without a matching final answer; audit dispatch certainty and label the request as unanswered rather than silently dropping or replaying it. |
 | Crash after provider accepts delta but before watermark save | High | Reconcile with provider evidence or invalidate descriptor and use fresh fallback; never silently resend ambiguous delta. |
 
 ## Product Decisions
@@ -94,10 +96,11 @@ Together with Sprint 109, users can find a project conversation after restart an
 | 2026-08-21 | Native same-runtime resume is preferred but must be proven per pinned runtime | Adapter scope can reduce to fallback without false claims. |
 | 2026-08-21 | Fallback includes user prompts + assistant final text only | Tools, approvals, plans, progress, and binaries are not replayed. |
 | 2026-08-21 | Cross-runtime continuation is explicit | Runtime selector becomes Continue with … on non-empty conversations. |
+| 2026-08-23 | Unanswered user prompts survive runtime failure and handoff | A saved prompt without a final assistant answer remains in normalized context and is labelled unanswered; it is context for the new agent, not an executable replay. |
 | 2026-08-21 | Provider IDs stay host-only | Webview receives status and safe metadata, not authority. |
 | 2026-08-21 | Per-runtime descriptors carry transcript coverage watermark | Native resume/handoff injects only uncovered canonical delta. |
 | 2026-08-22 | Keep the conversation rail permanent through Sprint 110 | Automatic active/recent membership is derived and Pinned is explicit permanence, while All conversations remains durable truth; continuation must preserve all three distinctions. |
-| 2026-08-21 | Search/rename/All-project/filter library features are deferred | Keeps the external-protocol sprint on the release-critical continuation path. |
+| 2026-08-21 | Search/All-project/filter library features are deferred; Rename is inherited from Sprint 109 | Keeps the external-protocol sprint on the release-critical continuation path without contradicting delivered history behavior. |
 
 ## Architecture Gate
 
@@ -108,7 +111,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 
 ## Approval Gate
 
-- [x] Sprint 109 merged and its store contract accepted through PR #209 (2026-08-23).
+- [x] Sprint 109 merged and its final store/UI contract accepted through PRs #209 and #210 (2026-08-23).
 - [ ] Jarmo approves R1–R8 and audit-first scope.
 - [x] Sprint 110 issue [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) exists under milestone v1.10.0.
 - [x] Branch `codex/sprint-110-agent-conversation-resume` and its dedicated worktree exist from merged `origin/main` (2026-08-23).

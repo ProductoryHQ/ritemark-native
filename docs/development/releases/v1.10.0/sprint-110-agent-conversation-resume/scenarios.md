@@ -68,6 +68,28 @@ When native resume fails and fallback is built
 Then the fallback pack ends at the event before that new prompt
 And the new prompt is dispatched exactly once as the runtime prompt
 
+### ★ Scenario: Unanswered request survives a failed-runtime handoff
+Given I sent Codex a durably saved request and Codex returned no saved final answer
+And I switch to Claude and send “Solve it yourself”
+When the cross-runtime fallback context is built
+Then it includes the earlier Codex-directed request labelled as unanswered
+And excludes Codex partial text, tools, progress, approvals, and opaque runtime state
+And “Solve it yourself” is excluded from the context pack and dispatched exactly once as Claude’s runtime prompt
+And the UI says the previous agent did not return a saved answer
+
+### Scenario: Dispatch certainty does not erase user intent
+Given the previous prompt may be known-unsent, known-accepted, or ambiguous after a runtime failure
+And no saved final answer exists
+When I confirm Continue with another runtime
+Then every state preserves the same canonical unanswered user request in normalized context
+And safe metadata distinguishes dispatch certainty without claiming that provider work or memory transferred
+
+### Scenario: Multiple unanswered prompts stay ordered and bounded
+Given several durably saved user prompts have no matching assistant final answer
+When fallback is built under its size budget
+Then the most recent unanswered request is preserved ahead of older complete turns
+And any omitted older prompts are disclosed rather than silently disappearing
+
 ### ★ Scenario: Oversized transcript truncates deterministically
 Given a transcript exceeds the context budget
 When fallback is built twice
@@ -100,6 +122,12 @@ Given I confirm Continue with Codex
 When the next turn starts
 Then Codex receives the normalized context pack, never Claude’s opaque descriptor
 And the transcript records a Codex / transcript-context boundary
+
+### Scenario: Late final answer after interrupted handoff cannot replace the active agent
+Given I switched away after the previous runtime failed to return a saved final answer
+When the invalidated old binding emits a late final or partial event
+Then it cannot enter the new runtime binding or alter its continuation watermark
+And it cannot hide, reorder, or mark the unanswered canonical request as resolved
 
 ### Scenario: Switching back uses only that runtime’s own descriptor
 Given a conversation previously used Claude, then Codex

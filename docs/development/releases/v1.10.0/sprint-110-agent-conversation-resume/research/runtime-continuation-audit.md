@@ -59,7 +59,8 @@ Allowlist:
 - user prompt text;
 - assistant final answer text;
 - minimal turn order/runtime label;
-- conversation purpose/initial framing and recent complete turns.
+- conversation purpose/initial framing, the most recent unanswered user request, and recent complete turns;
+- safe dispatch-certainty label (`not-sent`, `accepted`, or `ambiguous`) when a runtime failed without a saved final answer.
 
 Denylist:
 
@@ -72,9 +73,15 @@ Denylist:
 
 The audit must freeze a deterministic size budget and exact truncation algorithm without introducing a summarization-model dependency. The newly accepted prompt is persisted before continuation negotiation but excluded from this pack and dispatched exactly once afterward.
 
+## Interrupted handoff audit
+
+The live matrix must reproduce the user path: save a request for runtime A, prevent runtime A from returning a final answer, switch to runtime B, and send a short instruction such as “Solve it yourself.” The earlier request is canonical user intent even though it is not a complete turn. Runtime B must receive it as labelled context, while the short new instruction is the only newly dispatched prompt.
+
+Audit five failure points per runtime: failure before transport send; confirmed provider acceptance with no final answer; ambiguous acceptance after disconnect/crash; partial/progress/tool activity without a final answer; and late events after the binding was invalidated by handoff. Freeze which signals can safely produce `not-sent`, `accepted`, or `ambiguous`; unknown stays `ambiguous`. No provider partial/tool state crosses the boundary, and a late old-runtime event cannot resolve or overwrite the canonical unanswered request.
+
 ## Phase 0 required matrix
 
-For every runtime: lazy open/select, first session, second turn, close/reopen, app restart, process restart, invalid descriptor, auth loss, unavailable runtime, model/config change, binary upgrade, oversized transcript fallback, current-prompt-once, attachments/tool/plan history, cross-runtime return, coverage watermark delta, ambiguous crash between provider acceptance and watermark save, and two parallel conversations. Record exact versions, fixture prompts, redacted traces, result, and decision.
+For every runtime: lazy open/select, first session, second turn, close/reopen, app restart, process restart, invalid descriptor, auth loss, unavailable runtime, model/config change, binary upgrade, oversized transcript fallback, current-prompt-once, unanswered-prompt handoff at all five dispatch/failure points, attachments/tool/plan history, cross-runtime return, coverage watermark delta, ambiguous crash between provider acceptance and watermark save, late event after switch, multiple unanswered prompts, and two parallel conversations. Record exact versions, fixture prompts, redacted traces, result, and decision.
 
 Descriptors must track canonical transcript coverage (`coveredThroughEventId` or an audit-proven equivalent). Native resume/handoff receives only uncovered normalized delta; when provider acceptance is ambiguous after a crash, the safe outcome is descriptor invalidation plus fresh fallback unless the runtime supplies reliable reconciliation evidence.
 
@@ -84,6 +91,7 @@ Descriptors must track canonical transcript coverage (`coveredThroughEventId` or
 - Resume duplicates/reorders history and cannot be reconciled deterministically.
 - Provider ID becomes exposed to/untrusted from the webview.
 - Resume silently crosses runtime/model/auth/project boundaries.
+- A durably saved unanswered user prompt disappears from the next runtime’s normalized context or is replayed as an executable prompt without a new explicit user instruction.
 - The provider’s advertised capability differs from live behavior without a stable detection path.
 
 Any stop condition makes that adapter fallback-only for v1.10.0; it does not justify weakening the safety contract.

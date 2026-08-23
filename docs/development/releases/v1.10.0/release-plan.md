@@ -161,6 +161,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | 2026-08-22 | Runtime refresh precedes effort implementation | Effort capability/mapping must be measured against the exact runtime versions that ship. |
 | 2026-08-22 | Claude/Codex effort is first-class; OpenCode is ACP capability-driven | Avoid a false universal promise across diverse BYOK provider/models and preserve lazy open/select. |
 | 2026-08-23 | Use one ChatGPT-style host title policy across all runtimes | Immediate prompt fallback keeps the UI responsive; an isolated first-response classifier improves scanability; manual Rename remains final authority. |
+| 2026-08-23 | Preserve unanswered user intent across runtime failure and switch | A durably saved prompt without a final answer is normalized handoff context even when provider acceptance is unknown; only the new handoff instruction is dispatched, while partial/tool state stays behind. |
 
 ## Planning Approval
 
