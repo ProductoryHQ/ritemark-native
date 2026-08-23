@@ -454,6 +454,7 @@ export class AgentSession {
   private _emitQuestion: ((question: AgentQuestion) => void) | null = null;
   private _emitPlanApproval: ((request: AgentPlanApprovalRequest) => void) | null = null;
   private _emitToolApproval: ((request: AgentToolApprovalRequest) => void) | null = null;
+  private _emitDispatchAccepted: (() => void) | null = null;
   private _turnTimeout: ReturnType<typeof setTimeout> | null = null;
   private _turnTimeoutMs = 0;  // Stored so we can reset on activity
   private _planModeActive = false;
@@ -489,6 +490,8 @@ export class AgentSession {
   private readonly _modelId: string | undefined;
   private readonly _anthropicApiKey: string | undefined;
   private readonly _pathToClaudeCodeExecutable: string | undefined;
+  private readonly _resumeSessionId: string | undefined;
+  private readonly _onSessionCheckpoint: ((sessionId: string) => void) | undefined;
   private _mcpServers: Record<string, unknown> | undefined;
   private _extraSystemPromptAppend: string | undefined;
   /** Autonomy policy (Sprint 103 R1; mutable per turn via setApprovalMode). */
@@ -511,6 +514,8 @@ export class AgentSession {
     this._modelId = config.model;
     this._anthropicApiKey = config.anthropicApiKey;
     this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
+    this._resumeSessionId = config.resumeSessionId;
+    this._onSessionCheckpoint = config.onSessionCheckpoint;
     this._mcpServers = config.mcpServers;
     this._extraSystemPromptAppend = config.extraSystemPromptAppend;
     // Legacy 'plan' normalizes to auto + planFirst (Sprint 103 R1).
@@ -585,7 +590,7 @@ export class AgentSession {
    * subsequent calls feed into the existing warm process (~2-3s).
    */
   async sendMessage(options: AgentTurnOptions): Promise<AgentResult> {
-    const { prompt, attachments, activeFile, timeoutMinutes = DEFAULT_TIMEOUT_MINUTES, onProgress, onQuestion, onPlanApproval, onToolApproval } = options;
+    const { prompt, attachments, activeFile, timeoutMinutes = DEFAULT_TIMEOUT_MINUTES, onProgress, onQuestion, onPlanApproval, onToolApproval, onDispatchAccepted } = options;
 
     if (!prompt || prompt.trim() === '') {
       throw new Error('Agent prompt is empty');
@@ -648,6 +653,7 @@ export class AgentSession {
     this._emitQuestion = onQuestion || null;
     this._emitPlanApproval = onPlanApproval || null;
     this._emitToolApproval = onToolApproval || null;
+    this._emitDispatchAccepted = onDispatchAccepted || null;
 
     const resultPromise = new Promise<AgentResult>((resolve) => {
       this._turnResolve = resolve;
@@ -908,6 +914,7 @@ export class AgentSession {
       allowedTools: sdkAllowedTools,
       canUseTool: this._handleCanUseTool.bind(this),
       ...(this._mcpServers ? { mcpServers: this._mcpServers } : {}),
+      ...(this._resumeSessionId ? { resume: this._resumeSessionId } : {}),
     };
 
     if (this._modelId) {
@@ -948,6 +955,11 @@ export class AgentSession {
         if (this._closed) break;
         const message = rawMessage as SDKMessage;
 
+        // The SDK has now produced provider-originated evidence for this turn.
+        // This is deliberately later than enqueueing the prompt.
+        this._emitDispatchAccepted?.();
+        this._emitDispatchAccepted = null;
+
         // Reset inactivity timeout on any activity from the agent
         if (message.type !== 'result') {
           this._resetTurnTimeout();
@@ -959,6 +971,7 @@ export class AgentSession {
             sessionId: message.session_id ?? null,
           });
           this._model = message.model || null;
+          if (message.session_id) this._onSessionCheckpoint?.(message.session_id);
           // Model truth (2026-08-05): the CLI reports the model it ACTUALLY
           // resolved (may carry a "[1m]" 1M-context suffix). If we pinned one
           // and got another, say so in the transcript — silent drift between

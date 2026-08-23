@@ -1,6 +1,7 @@
 import {
   assertConversationId,
   type ConversationAttachmentMetadataV1,
+  type ConversationEventV1,
   type ConversationRecordV1,
   type ConversationStoreDiagnostics,
   type ConversationSummaryV1,
@@ -16,7 +17,9 @@ export interface ConversationTurnAttachment extends ConversationAttachmentMetada
   data: string;
 }
 
-export type ConversationProjectionV1 = Omit<ConversationRecordV1, 'continuation' | 'migration'>;
+export type ConversationProjectionV1 = Omit<ConversationRecordV1, 'continuations' | 'migration' | 'events'> & {
+  events: Exclude<ConversationEventV1, { kind: 'dispatch-receipt' }>[];
+};
 
 interface RequestBase {
   requestId: string;
@@ -228,6 +231,11 @@ export function parseConversationRequest(value: unknown): ConversationRequest {
 }
 
 export function projectConversation(record: ConversationRecordV1): ConversationProjectionV1 {
-  const { continuation: _continuation, migration: _migration, ...projection } = record;
-  return projection;
+  const { continuations: _continuations, migration: _migration, ...projection } = record;
+  return {
+    ...projection,
+    events: projection.events.filter(
+      (event): event is Exclude<ConversationEventV1, { kind: 'dispatch-receipt' }> => event.kind !== 'dispatch-receipt',
+    ),
+  };
 }

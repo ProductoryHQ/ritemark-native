@@ -58,6 +58,17 @@ export function projectionToConversation(
   }
 
   const selectedAgent = runtimeAgent(projection.runtimeSummary[projection.runtimeSummary.length - 1]);
+  const transcriptBoundaries = projection.events
+    .filter((event): event is Extract<typeof event, { kind: 'boundary' }> => (
+      event.kind === 'boundary' && event.boundaryKind === 'context-restored'
+    ))
+    .map((event) => ({
+      id: event.eventId,
+      turnId: event.turnId,
+      runtimeId: runtimeAgent(event.runtimeId),
+      timestamp: Date.parse(event.occurredAt),
+      message: event.message,
+    }));
   return createConversationState(projection.conversationId, {
     createdAt: Date.parse(projection.createdAt),
     agentConversation,
@@ -71,6 +82,6 @@ export function projectionToConversation(
       modelId: previous?.pendingRuntime.modelId ?? '',
       mode: previous?.pendingRuntime.mode ?? 'auto',
     },
-    restoredTranscript: true,
+    transcriptBoundaries,
   });
 }

@@ -25,6 +25,7 @@ Acceptance criteria:
 - A Phase 0 audit records bundled/pinned versions and live results for Claude SDK session resume, Codex app-server thread resume/read/fork behavior, and bundled ACP/OpenCode load/resume capabilities.
 - Each runtime receives a decision: `native-resume`, `native-resume-with-limits`, or `fallback-only`, with invalid/expired/auth-loss/upgrade behavior documented.
 - The audit tests two parallel conversations and proves that native IDs cannot cross-bind.
+- The audit crosses runtime-switch timing with dispatch certainty: failure before send, confirmed provider acceptance without a final answer, ambiguous acceptance, partial/progress/tool activity without a final answer, and a late old-runtime event after handoff.
 - Any unsupported or unstable capability reduces that adapter’s scope to fallback; it does not block the other runtimes or trigger an unplanned protocol rewrite.
 
 ### R2: Host-owned continuation descriptor contract
@@ -57,10 +58,11 @@ As a user, I want a saved conversation to remain meaningfully continuable even w
 
 Acceptance criteria:
 - Fallback creates a fresh runtime session and supplies a deterministic context pack derived from the canonical transcript through the event immediately before the newly accepted prompt.
-- The pack includes ordered user prompts and assistant final text plus minimal runtime/source labels; it omits raw tool calls/results, approvals, questions awaiting answer, transient progress, rejected plans, hidden system prompts, and attachment binaries.
-- The pack has a documented byte/token budget and deterministic truncation: preserve the conversation purpose plus most recent complete turns; disclose when older context was omitted.
+- The pack includes every relevant ordered user prompt — including a prior durably saved prompt with no matching assistant final answer — and assistant final text plus minimal runtime/source labels. It omits raw tool calls/results, approvals, assistant questions awaiting user input, transient progress/partial text, rejected plans, hidden system prompts, and attachment binaries.
+- The pack has a documented byte/token budget and deterministic truncation: preserve the conversation purpose, the most recent unanswered user request, and then the most recent complete turns; disclose when older context was omitted.
 - The transcript shows a one-time boundary before the new turn: **Context restored from transcript — a new agent session was started.**
 - The newly accepted prompt is persisted before negotiation/dispatch but excluded from the fallback context pack and sent exactly once as the actual runtime prompt.
+- A prior unanswered prompt is labelled as an unanswered request from the previous runtime and supplied only as context. It is never silently replayed as a second executable prompt; the user's newly accepted handoff instruction controls what the new runtime should do.
 - The agent is instructed not to claim access to omitted tool state/files unless it rechecks them.
 
 ### R5: Explicit cross-runtime handoff
@@ -74,6 +76,7 @@ Acceptance criteria:
 - The transcript records a visible runtime/context boundary and the selected agent.
 - Switching back may resume that runtime’s own compatible descriptor; it cannot reuse the other runtime’s session.
 - Composer text is preserved across the confirmation flow and no runtime call starts before confirmation.
+- If the previous runtime produced no saved final answer, the handoff includes its preceding canonical user request regardless of whether dispatch was known-failed, known-accepted, or ambiguous. Dispatch certainty is recorded as safe metadata; provider-specific partial/tool state is not transferred.
 
 ### R6: Truthful continuation states in the UI
 
@@ -82,7 +85,7 @@ As a user, I want to know whether the agent really remembers the conversation.
 Acceptance criteria:
 - Continuation resolves host-side from `not-attempted`/`pending` into one terminal result: `native-restored`, `transcript-restored`, `context-unavailable`, or `runtime-unavailable`.
 - Native restoration is quiet except for diagnostics; transcript restoration and unavailable states show an inline, accessible notice before the composer/new turn. Internal enum names are never user-facing.
-- Plain-language mapping is fixed: transcript restored → **Previous messages were included, but this is a new agent session.**; truncated → **Some older messages were left out.**; context unavailable → **You can read this conversation, but the agent can’t use its earlier context.**; runtime unavailable names sign-in/change-agent/start-new next actions.
+- Plain-language mapping is fixed: transcript restored → **Previous messages were included, but this is a new agent session.**; interrupted handoff → **The previous agent did not return a saved answer. Your earlier request was included as context.**; truncated → **Some older messages were left out.**; context unavailable → **You can read this conversation, but the agent can’t use its earlier context.**; runtime unavailable names sign-in/change-agent/start-new next actions.
 - Legacy read-only entries state that they can be read but not continued until moved/migrated.
 - No copy says “pick up exactly where you left off” unless native resume was proven and succeeded.
 - Continuation notices are not permanent list clutter after the user has acknowledged them; the transcript boundary remains as history.
@@ -98,18 +101,30 @@ Acceptance criteria:
 - The All conversations button and conversation rail aggregate authoritative state with `Needs you` overriding `Working`, expose accessible counts, and have no indicator when idle.
 - Reading/selecting any saved conversation is unlimited and lazy. Any limit applies only when starting simultaneous runtime work and uses active-work wording.
 - Current project remains the only browsing scope in v1.10.0; no other-project result can bind to the current workspace runtime.
-- Conversation search, rename, All-project browsing, runtime filter, and continuation-state filter are explicitly deferred beyond v1.10.0.
+- Conversation search, All-project browsing, runtime filter, and continuation-state filter are explicitly deferred beyond v1.10.0. Rename remains the Sprint 109 behavior.
 
 ### R8: Resilience, privacy, and release verification
 
 As the team, we want continuation to fail safely across real runtime and storage conditions.
 
 Acceptance criteria:
-- The cross-runtime matrix covers restart, close/reopen, process death, binary upgrade, auth loss, invalid descriptor, oversized transcript, attachments, plan/approval history, two parallel chats, and runtime unavailable.
+- The cross-runtime matrix covers restart, close/reopen, process death, binary upgrade, auth loss, invalid descriptor, oversized transcript, attachments, plan/approval history, two parallel chats, runtime unavailable, and runtime switch at every dispatch-certainty/no-final-answer stage.
 - Debug traces identify the attempted continuation mode and failure category without logging transcript content or provider secrets/IDs.
 - Unit/integration tests cover descriptor validation, state transitions, coverage watermarks/deltas, native/fallback selection, normalization/truncation, explicit handoff, crash/idempotency, duplicate-turn reconciliation, conversation-rail identity/derived-membership preservation, and isolation.
 - Live dev evidence walks every scenario in [scenarios.md](./scenarios.md) possible with available auth; unexercised paths are listed explicitly and not claimed.
 - Architecture, user docs, changelog, release notes, test checklist, release tracker, and issue are complete before release feature-complete status.
+
+### R9: Lightweight runtime switch disclosure (added 2026-08-23)
+
+As a user, I want choosing another agent to feel like a normal conversation action rather than a high-risk workflow.
+
+Acceptance criteria:
+- Choosing another runtime applies immediately; there is no confirmation dialog and no extra Continue/Cancel decision.
+- The composer draft is preserved. If the previous runtime is working, selecting another runtime stops that work through the existing cancellation path.
+- Selecting another runtime alone starts no agent call. The user may send the draft with the newly selected runtime or leave the conversation without continuing.
+- On the first Send after a runtime change, one quiet durable boundary appears between the prior transcript and the new user turn: **Continuing with [agent]. Previous messages were included as context.** This host-owned disclosure is deterministic even when the target runtime can reuse a compatible native session plus a normalized delta.
+- Transcript restoration does not also render a dismissible banner/card. Actionable `context-unavailable` and `runtime-unavailable` notices remain visible.
+- R5's confirmation-dialog criterion is superseded by this requirement; its provider isolation, watermark, unanswered-request, and late-event safety rules remain unchanged.
 
 ## Non-Requirements
 
@@ -117,7 +132,7 @@ Acceptance criteria:
 - Replay or reactivation of tool calls, approvals, questions, plan cards, background subprocesses, or attachment binaries.
 - Resuming a turn that was executing when the desktop process exited.
 - Semantic memory/RAG, cloud sync, collaboration, or conversation export.
-- Conversation search, rename, All-project browsing, runtime/continuation filters, tags, folders, archive, or trash.
+- Conversation search, All-project browsing, runtime/continuation filters, tags, folders, archive, or trash. Rename is already part of Sprint 109.
 - Sharing conversation context with scheduled tasks or Flows.
 - Guaranteeing native resume for a runtime whose pinned implementation fails Phase 0.
 
@@ -130,10 +145,15 @@ Acceptance criteria:
 - **Truth:** continuation state is a first-class result, not inferred from visible transcript.
 - **Timing:** open/select is lazy; negotiation starts on Send/explicit Continue and the current prompt is never included twice.
 - **Handoff coverage:** each runtime descriptor tracks `coveredThroughEventId`; only uncovered canonical delta crosses on resume/handoff.
+- **Interrupted handoff:** a prior saved-but-unanswered user prompt always crosses as labelled canonical context; partial provider state never does, and the new user instruction is the only newly dispatched prompt.
+- **Pinned runtime decision:** Claude, Codex and OpenCode are all `native-resume-with-limits`; each passed semantic recall after process restart plus two-conversation isolation on the exact shipped versions.
+- **ACP method:** use `session/resume` only. `session/load` replayed provider history and is excluded to prevent duplicate transcript/UI events.
+- **Fallback budget:** 32,000 UTF-8 bytes total; 12,000 bytes per selected message with deterministic head+tail truncation; first user purpose, latest unanswered request and newest complete turns receive priority without an LLM summary.
+- **Upgrade/model/policy safety:** exact compatibility only in v1.10.0. A mismatch invalidates only that runtime descriptor and uses transcript fallback.
+- **Watermark safety:** advance coverage only with the atomically saved assistant final; any accepted/ambiguous no-final crash invalidates that runtime descriptor before the next continuation.
+- **Dispatch receipt:** persist `not-sent`, then pessimistic `ambiguous` before transport, then `accepted` only on a runtime-specific positive receipt; unknown stays ambiguous.
+- **Runtime-switch UX (revised 2026-08-23):** runtime selection itself is sufficient intent. Apply it immediately, preserve the draft, and disclose transcript fallback as one durable inline boundary before the next turn; do not interrupt the flow with a confirmation dialog.
 
 ## Open Questions
 
-- Exact context-pack token/byte budget and purpose-summary method; decide from pinned runtime limits in Phase 0 without adding an LLM summarization dependency.
-- Whether bundled OpenCode supports stable `session/load`/`session/resume`; fallback-only until live proof.
-- Whether Codex thread history reconciliation should use `thread/read` after resume or trust only canonical Ritemark transcript; audit duplicate/order semantics first.
-- Exact crash-safe watermark checkpoint strategy per runtime; ambiguous provider acceptance must choose safe fresh fallback over possible duplicate delta.
+- No unresolved product/architecture questions remain for Phase 1. Live auth-loss, unavailable-runtime, and failure-injection rows remain mandatory implementation evidence; they do not change the frozen safe-fallback decisions above.

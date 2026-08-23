@@ -20,7 +20,7 @@ RuntimeRegistry
 AI Sidebar receives status/boundary only, never native IDs
 ```
 
-Proposed shared runtime shapes (exact naming frozen after Phase 0):
+Frozen shared runtime direction (exact TypeScript placement may change during implementation without changing this contract):
 
 ```ts
 type ContinuationMode =
@@ -46,11 +46,14 @@ interface RuntimeSessionConfig {
 
 Descriptors are opaque tagged unions validated by their adapter and stored by the host. Every descriptor carries `coveredThroughEventId`; the webview protocol exposes only `ContinuationState` and human-safe metadata.
 
+Phase 0 adapter scope is now fixed: Claude uses SDK `resume`, Codex uses `thread/resume` with `thread/read` for existence/diagnostics only, and OpenCode uses capability-gated `session/resume`. All three are `native-resume-with-limits` on exact pinned versions. ACP `session/load` is forbidden because the live fixture replayed historical updates.
+
 ## Workstream 0: Live pinned-protocol audit (R1)
 
 - Claude: verify SDK session ID capture, resume after process/app restart, invalid ID, auth loss, model change, two sessions, and any transcript duplication behavior.
 - Codex: implement an audit harness for app-server `thread/resume`, `thread/read`, optional fork semantics, invalid thread, process restart, binary upgrade, auth loss, and two threads.
 - ACP/OpenCode: inspect initialize capabilities and live-test `session/load` / `session/resume` only if advertised by bundled OpenCode; never assume SDK method availability means server support.
+- For every runtime, inject failure at pre-send, confirmed-accept/no-final, ambiguous-accept, partial/progress/tool-before-final, and late-event-after-switch points; verify that the saved user request remains available to the next runtime without executable replay.
 - Record exact versions, commands/fixtures, traces with redacted IDs, observations, and ship/fallback decision per runtime.
 - Freeze descriptor tags, validation rules, `coveredThroughEventId` and ambiguous-crash policy, context budget, reconciliation source, lazy negotiation timing, and unavailable behavior in the SDD artifacts.
 - Stop for Jarmo’s explicit Phase 0 decision approval before Workstream 1.
@@ -63,12 +66,15 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 - Route descriptor checkpoints through `ConversationController` into Sprint 109 serialized store operations.
 - Redact IDs and transcript content from diagnostics; log runtime kind, mode attempted, compatibility result, and failure category.
 - Reject wrong project/runtime/adapter-version descriptors before binding.
+- Replace new writes of Sprint 109's singular descriptor with a runtime-keyed map; decode the singular shape as migration input so existing records remain readable.
+- Add append-only dispatch receipt events: user + `not-sent` atomically, `ambiguous` before transport write, and `accepted` only after the runtime-specific positive signal. Missing/unknown is never upgraded optimistically.
+- Advance `coveredThroughEventId` only in the atomic checkpoint that stores the assistant final. An accepted/ambiguous no-final crash removes only that runtime's descriptor before retry/handoff.
 
 ## Workstream 2: Same-runtime native adapters (R3)
 
 - Claude adapter: resume only using Phase 0-proven SDK option/session lifecycle; checkpoint the authoritative session ID.
 - Codex adapter: add minimal app-server protocol/client methods proven in Phase 0; preserve existing shared-process event routing by `threadId`.
-- ACP adapter: implement load/resume only when the bundled server advertises and passes tests; otherwise explicitly declare fallback-only capability.
+- ACP adapter: implement `session/resume` only when the bundled server advertises it; never use `session/load` for continuation because it replays historical updates.
 - Normalize adapter result into `ContinuationState`; never let provider-native history overwrite the canonical Sprint 109 transcript silently.
 - Keep open/select runtime/auth/network-lazy; the continuation coordinator runs only after an accepted Send/explicit Continue.
 - Add failure injection for expired/invalid/auth/runtime-unavailable paths.
@@ -76,8 +82,8 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 ## Workstream 3: Normalized context fallback (R4)
 
 - Add `src/conversations/contextPack.ts` with deterministic selection/serialization and tests.
-- Include user prompt and assistant final text event types only, with minimal turn/runtime labels; exclude executable/provider-specific/transient artifacts.
-- Apply a Phase 0-decided byte/token budget without an extra summarization model dependency. Preserve first purpose-bearing turn(s) and most recent complete turns; record omitted turn count.
+- Include ordered user prompts, including prior unanswered prompts, and assistant final text event types only, with minimal turn/runtime/dispatch-certainty labels; exclude executable/provider-specific/transient artifacts.
+- Apply the frozen 32,000 UTF-8 byte pack limit and 12,000-byte per-message cap without an extra summarization model dependency. Preserve the first user purpose, the most recent unanswered request, and then recent complete turns; record omitted turn/prompt count.
 - Build through the event before the newly accepted prompt; that prompt is persisted first and dispatched once outside the context pack.
 - Render runtime-specific input framing in adapters while keeping one canonical normalized pack.
 - Insert a durable transcript boundary and host-derived `transcript-restored` state before the first fallback turn.
@@ -87,6 +93,7 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 - Runtime selector on a non-empty conversation becomes a `Continue with …` flow with shadcn confirmation dialog and context-loss explanation.
 - Preserve composer draft through confirmation/cancel.
 - On confirm, keep the canonical conversation ID, choose/create the target runtime’s descriptor, pass only normalized events after its coverage watermark, and insert a runtime/context boundary.
+- Treat a prior user prompt with no saved final answer as canonical handoff context in every dispatch-certainty state. Never resend it as an executable prompt; send only the newly accepted handoff instruction once.
 - Checkpoint watermark advancement only after proven provider acceptance. If a crash makes acceptance ambiguous and cannot be reconciled, invalidate the descriptor and use a fresh fallback rather than risk duplicate delta.
 - Reject late events from the previous binding using existing conversation scoping plus a continuation binding generation.
 - Show transcript/unavailable/runtime-unavailable notices inline; native-restored remains unobtrusive.
@@ -98,15 +105,24 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 - Aggregate `Needs you` > `Working` > idle on the All conversations button and conversation rail with accessible counts and reduced-motion behavior.
 - Ensure continuation transitions update the existing rail/history item rather than creating a duplicate or changing Pin state implicitly.
 - Keep browsing current-project-only and runtime-lazy; active-work protection applies only at Send, never when reading/selecting/saving.
-- Explicitly defer search, rename, All projects, runtime filters, and continuation-state filters beyond v1.10.0.
+- Explicitly defer search, All projects, runtime filters, and continuation-state filters beyond v1.10.0; preserve Sprint 109 Rename behavior.
 
 ## Workstream 6: Cross-runtime verification and release close (R8)
 
-- Unit tests: descriptor codecs/compatibility, state transitions, watermarks/deltas, context pack/truncation, handoff generation, crash/idempotency, reconciliation, redaction.
-- Integration tests: lazy open, native success/failure, current-prompt-once fallback, runtime unavailable, two parallel chats, process restart, late events, current-project privacy, and conversation-rail identity/derived-membership preservation.
+- Unit tests: descriptor codecs/compatibility, state transitions, watermarks/deltas, context pack/truncation including unanswered prompts, handoff generation, dispatch certainty, crash/idempotency, reconciliation, redaction.
+- Integration tests: lazy open, native success/failure, current-prompt-once fallback, failed-runtime switch with no final answer, runtime unavailable, two parallel chats, process restart, late events, current-project privacy, and conversation-rail identity/derived-membership preservation.
 - Live matrix for all available authenticated runtimes; capture exact unexercised rows and never mark them passed by inference.
 - Update architecture runtime contract/session table/conversation subsystem/protocol; update user docs, changelog, release notes, test checklist, tracker, and issue. Architecture `Last updated` must be on/after the Sprint 110 branch creation date.
 - Run QA and release-specific migration+resume canary before declaring v1.10.0 feature complete.
+
+## Workstream 7: Lightweight runtime switch disclosure (R9 — added 2026-08-23)
+
+- Remove the `ChatInput` confirmation-dialog state and apply a cross-runtime selection immediately. Reuse `cancelRequest()` only when the selection is a real non-empty-conversation handoff; its idle path remains a no-op.
+- Preserve composer draft and attachments because runtime selection does not mutate composer-owned state.
+- Keep dispatch lazy: selection changes UI state only; host continuation negotiation still begins after the next accepted Send.
+- Persist the canonical `context-restored` event synchronously with the first accepted turn after a runtime change, so disclosure does not depend on a later adapter callback. Generate agent-specific compact copy and render it through `TranscriptBoundary` immediately before the associated user turn; adapter-reported transcript fallback deduplicates against the same event.
+- Suppress the transient `transcript-restored` banner to avoid duplicate disclosure. Retain existing actionable unavailable-state notices.
+- Update runtime-switch, projection, continuation-presentation, typecheck/build, and live rundev evidence before re-closing QA.
 
 ## Implementation Order
 

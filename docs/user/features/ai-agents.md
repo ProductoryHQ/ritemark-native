@@ -39,10 +39,10 @@ The AI sidebar is no longer a single conversation. You can run **several indepen
 - **Pinning is optional.** Working, needs-you, and recent chats appear automatically; an older current chat is appended while you view it. Selecting a conversation never promotes or reorders Recents. Pin up to five conversations when you want them to remain on the rail; unpinning does not delete or close anything.
 - **Delete is explicit.** Delete is available directly on a conversation row, asks for confirmation, and offers Undo. Running work uses Stop and delete.
 - **Titles improve after the first response.** Ritemark first shows a shortened version of your prompt, then asks the selected runtime for a short title without adding that request to the conversation. Use Rename on any row to choose your own title; Ritemark never overwrites a manual name.
-- **Restored transcript, honest context.** Opening a saved transcript does not start an agent. Until native continuation lands, Ritemark states that the next message starts with a new agent working context.
+- **Restored transcript, honest context.** Opening a saved transcript does not start an agent. On your next Send, Ritemark first tries that runtime's compatible saved session. If it cannot use it—or you change agent—it starts a fresh session with a bounded text transcript and says so before the turn. Tool state, approvals, partial replies, and attachment contents are never replayed.
 - **Agents keep working in the background.** Start a run in one thread, switch to another, and the first agent keeps going. Responses always land in the thread that asked — threads never cross-talk.
 - **A thread cap.** To keep resource use in check there's a limit on how many threads can be open at once. Open past it and Ritemark tells you instead of silently spawning more sessions.
-- **Runtime is per thread.** Switch Claude ↔ Codex ↔ OpenCode inside any thread; the choice applies to that thread and the conversation stays continuous.
+- **Runtime is per thread.** Switching Claude ↔ Codex ↔ OpenCode applies immediately and keeps your draft in the composer. A failed or running previous agent is stopped; nothing new starts until you Send. If transcript fallback is needed, one quiet line between turns says that earlier messages were included as context. An unanswered request is labelled context rather than silently resent as a second command.
 
 ---
 

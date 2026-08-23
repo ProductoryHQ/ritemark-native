@@ -16,7 +16,7 @@
 import * as crypto from 'crypto';
 import { AcpManager } from './acpManager';
 import { traceAcp } from './acpTrace';
-import { findBundledAgentRuntime } from '../utils/bundledAgentRuntime';
+import { findBundledAgentRuntime, readBundledRuntimeVersion } from '../utils/bundledAgentRuntime';
 import { BrowserIpcServer } from '../browser/BrowserIpcServer';
 import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
 import {
@@ -44,6 +44,13 @@ import type {
   RuntimeStatus,
   UnifiedApprovalRequest,
 } from '../runtime/AgentRuntime';
+import {
+  continuationCheckpoint,
+  frameRuntimePrompt,
+  resolveRuntimeContinuation,
+  transcriptRestoredState,
+  type NormalizedRuntimeContext,
+} from '../runtime/continuation';
 
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
@@ -121,6 +128,7 @@ export class AcpSession implements RuntimeSession {
    * every prompt. See Sprint 101 technical-plan §4.
    */
   private _capabilityContextInjected = false;
+  private _dispatchAccepted = false;
 
   constructor(
     readonly conversationId: string,
@@ -128,6 +136,7 @@ export class AcpSession implements RuntimeSession {
     readonly acpSessionId: string,
     config: RuntimeSessionConfig,
     private readonly _runtime: AcpRuntime,
+    private _continuationContext?: NormalizedRuntimeContext,
   ) {
     this._config = config;
   }
@@ -136,6 +145,10 @@ export class AcpSession implements RuntimeSession {
 
   applyConfig(config: RuntimeSessionConfig): void {
     this._config = config;
+    const continuation = resolveRuntimeContinuation('opencode', config.continuation);
+    this._continuationContext = continuation.kind === 'native'
+      ? config.continuation?.nativeDelta
+      : config.continuation?.fallbackContext;
   }
 
   async prompt(turn: RuntimeTurnConfig): Promise<void> {
@@ -144,6 +157,7 @@ export class AcpSession implements RuntimeSession {
       throw new Error('AcpRuntime: createSession() must succeed before prompt()');
     }
     const config = this._config;
+    this._dispatchAccepted = false;
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
@@ -151,7 +165,10 @@ export class AcpSession implements RuntimeSession {
     // prompt). config.extraSystemPrompt is set by UnifiedViewProvider to the
     // ACP-flavoured render of src/ai/capabilityContext.ts.
     const capabilityContext = this._capabilityContextInjected ? undefined : config.extraSystemPrompt;
-    const { text: promptText, imageAttachmentCount } = buildAcpPromptText(turn, { capabilityContext });
+    const { text: rawPromptText, imageAttachmentCount } = buildAcpPromptText(turn, { capabilityContext });
+    const continuationContext = this._continuationContext;
+    this._continuationContext = undefined;
+    const promptText = frameRuntimePrompt(rawPromptText, continuationContext);
     if (capabilityContext && capabilityContext.trim()) {
       this._capabilityContextInjected = true;
     }
@@ -187,6 +204,7 @@ export class AcpSession implements RuntimeSession {
             }, timeoutMs);
           }),
         ]);
+        this.markDispatchAccepted();
         config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
       } catch (err) {
         // On timeout, stop the abandoned turn upstream so it does not keep
@@ -212,6 +230,13 @@ export class AcpSession implements RuntimeSession {
       // Best-effort: the session may already have settled or the connection dropped.
     }
     this._runtime._forgetSession(this);
+  }
+
+  /** First provider-originated progress/tool/final signal for this turn. */
+  markDispatchAccepted(): void {
+    if (this._dispatchAccepted) return;
+    this._dispatchAccepted = true;
+    this._config.onDispatchAccepted?.();
   }
 
   respondToApproval(requestId: string, approved: boolean, alwaysAllow: boolean, _feedback?: string): void {
@@ -279,16 +304,65 @@ export class AcpRuntime implements AgentRuntime {
   async createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession> {
     const existing = this._sessions.get(conversationId);
     if (existing) {
-      existing.applyConfig(config);
-      return existing;
+      const continuation = resolveRuntimeContinuation('opencode', config.continuation);
+      if (continuation.kind === 'native' || !config.continuation?.fallbackContext) {
+        existing.applyConfig(config);
+        return existing;
+      }
+      this.disposeSession(conversationId);
     }
 
     await this._ensureManager(config);
-    const acpSessionId = await this._manager!.start();
-    const session = new AcpSession(conversationId, acpSessionId, config, this);
+    const continuation = resolveRuntimeContinuation('opencode', config.continuation);
+    let acpSessionId: string | null = null;
+    let useNativeContext = false;
+    if (continuation.kind === 'native') {
+      config.onContinuationState?.({ mode: 'pending' });
+      try {
+        await this._manager!.resume(continuation.descriptor.nativeReference);
+        acpSessionId = continuation.descriptor.nativeReference;
+        useNativeContext = true;
+        config.onContinuationState?.({ mode: 'native-restored' });
+      } catch (error) {
+        traceAcp('runtime', 'native session resume rejected; starting fresh', {
+          conversationId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        config.onContinuationState?.(config.continuation?.fallbackContext
+          ? transcriptRestoredState(config.continuation.fallbackContext)
+          : { mode: 'context-unavailable', failureCategory: 'provider-rejected' });
+      }
+    } else if (continuation.kind === 'fallback') {
+      config.onContinuationState?.(config.continuation?.fallbackContext
+        ? transcriptRestoredState(config.continuation.fallbackContext)
+        : { mode: 'context-unavailable', failureCategory: continuation.failureCategory });
+    }
+    if (!acpSessionId) {
+      if (continuation.kind === 'fresh' && config.continuation?.fallbackContext) {
+        config.onContinuationState?.(transcriptRestoredState(config.continuation.fallbackContext));
+      }
+      acpSessionId = await this._manager!.start();
+    }
+    const session = new AcpSession(
+      conversationId,
+      acpSessionId,
+      config,
+      this,
+      useNativeContext ? config.continuation?.nativeDelta : config.continuation?.fallbackContext,
+    );
     this._sessions.set(conversationId, session);
     this._sessionsByAcpId.set(acpSessionId, session);
-    traceAcp('runtime', 'session-created', { conversationId, acpSessionId, liveSessions: this._sessions.size });
+    const compatibility = config.continuation?.compatibility;
+    if (compatibility) {
+      config.onContinuationCheckpoint?.(continuationCheckpoint(
+        acpSessionId,
+        compatibility,
+        continuation.kind === 'native'
+          ? continuation.descriptor.coveredThroughEventId
+          : config.continuation?.fallbackContext?.coveredThroughEventId ?? null,
+      ));
+    }
+    traceAcp('runtime', 'session-created', { conversationId, liveSessions: this._sessions.size });
     return session;
   }
 
@@ -317,6 +391,7 @@ export class AcpRuntime implements AgentRuntime {
       // considered ready when the binary is present.
       ready: true,
       authState: 'authenticated',
+      version: readBundledRuntimeVersion(runtime.path) ?? undefined,
       diagnostics: [`OpenCode binary: ${runtime.path}`],
     };
   }
@@ -392,7 +467,9 @@ export class AcpRuntime implements AgentRuntime {
       requestPermission: (params) => this._handlePermission(params),
       approveWrite: (request) => this._handleWriteApproval(request),
       onProgress: (progress, sessionId) => {
-        this._sessionsByAcpId.get(sessionId)?.config.onProgress(progress);
+        const session = this._sessionsByAcpId.get(sessionId);
+        session?.markDispatchAccepted();
+        session?.config.onProgress(progress);
       },
     });
   }
@@ -433,6 +510,7 @@ export class AcpRuntime implements AgentRuntime {
       traceAcp('approval', 'permission for unknown session — cancelled', { sessionId: params.sessionId });
       return { outcome: { outcome: 'cancelled' } };
     }
+    session.markDispatchAccepted();
     const config = session.config;
 
     // Unified 'auto' approval mode — allow without prompting the user.
@@ -475,6 +553,7 @@ export class AcpRuntime implements AgentRuntime {
       traceAcp('approval', 'write for unknown session — denied', { sessionId: request.sessionId, path: request.path });
       return false;
     }
+    session.markDispatchAccepted();
 
     // Auto-allow the write when THIS session already approved the file via
     // request_permission (C1 — never another session's approval).

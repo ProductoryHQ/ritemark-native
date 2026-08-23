@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-23 (Sprint 109 — durable conversation identity, recovery, lifecycle and bounded runtime attachments)
+**Last updated:** 2026-08-23 (Sprint 110 — native runtime continuation, bounded transcript fallback and explicit handoff)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -128,6 +128,14 @@ Live runtime context is separately bounded by `runtimeAttachmentPolicy.ts`: five
 
 Legacy localStorage is read-only after monotonic host cutover. `LegacyConversationMigrator` imports known single-root records into that project, sends ambiguous/global records to the explicit unassigned bucket, fingerprints content for idempotent dedupe, and preserves source conflicts rather than overwriting them. `durableAgentConversations` is an experimental default-on kill switch; after host authority exists, flag-off uses host compatibility presentation and never returns to dual writes.
 
+### Runtime continuation (Sprint 110)
+
+Durable transcript and provider memory are separate authorities. Each conversation may hold a host-only `continuations[runtimeId]` descriptor containing an opaque native reference, exact project/runtime/version/model/policy/auth compatibility binding, and `coveredThroughEventId`. The descriptor map is never projected to the webview. `runtime/continuation.ts` owns compatibility, HMAC fingerprinting, redacted diagnostics, and the shared `RuntimeContinuationRequest`/state contract; `conversations/contextPack.ts` owns one deterministic 32,000-byte transcript fallback for all runtimes.
+
+Continuation remains lazy: selecting or reading a conversation performs no runtime/auth/network work. On an accepted Send, `UnifiedViewProvider` excludes the new user event from context, tries only that runtime's exact-compatible native descriptor, and otherwise opens a fresh session with canonical user prompts plus completed assistant text. Tool/progress/approval/plan state, hidden prompts, partial responses, provider history, and attachment binaries are never replayed. Claude uses SDK `resume`, Codex uses `thread/resume`, and OpenCode uses capability-gated ACP `session/resume`; ACP `session/load` is forbidden because it replays provider history into the canonical transcript boundary.
+
+Dispatch certainty is append-only host state: the store atomically saves user text plus `not-sent`, writes `ambiguous` before transport, and appends `accepted` only after runtime-specific provider evidence. Coverage advances atomically with a completed assistant final. Any ambiguous/accepted turn without a saved final invalidates only that runtime's descriptor and uses fresh fallback next time. A per-conversation execution token plus controller lifecycle checks reject callbacks from an agent superseded by a handoff. The webview receives only truthful continuation status and durable transcript boundaries.
+
 ---
 
 ## Agent Runtime Architecture
@@ -140,6 +148,7 @@ mints **one `RuntimeSession` per conversation**:
 ```ts
 interface AgentRuntime {
   createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession>;
+  disposeSession(conversationId: string): void; // exactly one provider attachment
   getStatus(): Promise<RuntimeStatus>;   // adapter-level: binary + auth, NOT per-conversation
   dispose(): void;                        // every session
 }
@@ -617,6 +626,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-08-23 | Sprint 110 | **Truthful agent conversation continuation.** `runtime/continuation.ts` adds one host-owned descriptor/compatibility/state contract across Claude SDK resume, Codex `thread/resume`, and capability-gated ACP `session/resume` (never `session/load`). `conversations/contextPack.ts` adds the shared deterministic 32 KB user/final-text fallback. Runtime-keyed opaque descriptors and append-only `not-sent → ambiguous → accepted` receipts stay out of webview projections; coverage advances only with an atomically saved assistant final. Explicit cross-runtime confirmation preserves drafts and unanswered user intent, while per-conversation execution tokens and lifecycle checks reject late old-runtime events. |
 | 2026-08-23 | Sprint 109 | **Durable conversation lifecycle completed.** Records persist a stable 24-slot project color identity; hidden runtime context is separated from display prompts; UI and host share turn IDs; same-turn assistant continuations project as one response; Project unknown records can be explicitly moved/deleted/undone; running Delete+Undo and extension shutdown restore as honest Interrupted boundaries. The old webview open-thread cap/storage path is removed. A host-side five-or-one live attachment pool protects Working/Needs-you/current contexts, releases LRU non-current idle sessions, and never limits durable conversations. |
 | 2026-08-23 | Sprint 109 | **Host-owned conversation titles.** New `conversations/ConversationTitlePolicy.ts` is the single fallback/generated/manual normalization authority for Claude, Codex, and OpenCode conversations. `ConversationTitleGenerator.ts` runs once after the first successful response through a fresh tool-free/read-only runtime made by `createRuntime(runtimeId)`; it never touches the live session. New exact-field `conversation/rename` lets the Conversations row dialog checkpoint a manual title, with controller-side fallback comparison ensuring a late AI result cannot overwrite user intent. Codex/ACP streamed assistant text is now included in the terminal durable checkpoint so those runtimes have the same first-response title input and restart transcript fidelity. |
 | 2026-08-05 | Sprint 107 | **Clean Start (v1.8.6, #— Clean Start).** R1: patch 013 wires `branding/product.json` `configurationDefaults` into DESKTOP (`IProductConfiguration.configurationDefaults` + static `product` read in `DefaultConfiguration`; the block was previously web-only dead config) — first open of a loose `.md` lands in the Ritemark editor with trust off, no dialogs; `build-prod.sh` copies the block from branding; `apply-patches.sh` already syncs `vscode/product.json` from branding. R2: per-workspace daemon consent (see subsection above). R3: one-shot sticky-tab healer (`src/utils/stickyTabHealer.ts` pure selection + `extension.ts` globalState-guarded `vscode.openWith` reopen; named tradeoff: a deliberate per-tab Reopen-With→Text choice is lost once). R4 (welcome-card removal) shipped early on 2026-08-04. |

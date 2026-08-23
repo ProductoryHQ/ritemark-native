@@ -31,6 +31,12 @@ const projection: ConversationProjectionV1 = {
       occurredAt: '2026-08-23T10:03:00.000Z', runtimeId: 'codex',
       content: 'Implemented result', terminalStatus: 'completed',
     },
+    {
+      kind: 'boundary', eventId: 'boundary-1', turnId: 'turn-1', sequence: 3,
+      occurredAt: '2026-08-23T10:03:01.000Z', runtimeId: 'codex',
+      boundaryKind: 'context-restored',
+      message: 'Continuing with Codex. Previous messages were included as context.',
+    },
   ],
 };
 
@@ -39,6 +45,12 @@ assert.equal(restored.codexConversation.length, 1);
 assert.equal(restored.codexConversation[0].userPrompt, 'Visible user request');
 assert.equal(restored.codexConversation[0].streamingText, 'Proposed plan\n\nImplemented result');
 assert.equal(restored.codexConversation[0].result?.status, 'completed');
-assert.equal(restored.restoredTranscript, true);
+assert.deepEqual(restored.transcriptBoundaries, [{
+  id: 'boundary-1',
+  turnId: 'turn-1',
+  runtimeId: 'codex',
+  timestamp: Date.parse('2026-08-23T10:03:01.000Z'),
+  message: 'Continuing with Codex. Previous messages were included as context.',
+}]);
 
 console.log('conversationProjection.test.ts: all tests passed');

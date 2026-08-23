@@ -10,9 +10,14 @@ import {
   type ConversationResultMessage,
 } from './protocol';
 import { ConversationStore, ConversationStoreError } from './ConversationStore';
-import type { ConversationCheckpointV1, ConversationRecordV1 } from './types';
+import type {
+  ConversationCheckpointV1,
+  ConversationRecordV1,
+  DispatchReceiptStateV1,
+} from './types';
 import type { ConversationRolloutMode } from './ConversationCutoverState';
-import type { AgentId } from '../agent/types';
+import { AGENTS, type AgentId } from '../agent/types';
+import type { RuntimeContinuationDescriptorV1 } from '../runtime/continuation';
 import { LegacyConversationMigrator, type LegacyConversationCandidateV1 } from './LegacyConversationMigrator';
 import {
   fallbackTitleFromPrompt,
@@ -212,7 +217,15 @@ export class ConversationController {
           request.records as LegacyConversationCandidateV1[],
           this.dependencies.currentScope(),
         );
-        if (migration.created.length > 0) await this.dependencies.markHostAuthority?.();
+        // Completing a clean inventory handshake establishes host authority
+        // even for a genuinely empty legacy store. Do not cut over when every
+        // non-empty candidate failed: the legacy copy must remain visible so
+        // recovery is still possible.
+        if (request.records.length === 0
+          || migration.created.length > 0
+          || migration.deduplicated.length > 0) {
+          await this.dependencies.markHostAuthority?.();
+        }
         return result(request, { accepted: true, migration });
       }
 
@@ -233,6 +246,152 @@ export class ConversationController {
   async runtimeConversation(conversationId: string): Promise<ConversationRecordV1> {
     if (this.disposed) throw new Error('Conversation controller is disposed');
     return this.requireCurrentScope(conversationId);
+  }
+
+  /** Re-open an existing canonical turn for an approved plan continuation. */
+  async activateRuntimeContinuation(input: {
+    conversationId: string;
+    bindingGeneration: number;
+    runtimeId: AgentId;
+    turnId: string;
+  }): Promise<ConversationRecordV1> {
+    const record = await this.mutateLatest(
+      input.conversationId,
+      input.bindingGeneration,
+      (current) => {
+        const user = current.events.find(
+          (event) => event.kind === 'user-message' && event.turnId === input.turnId,
+        );
+        if (!user || user.runtimeId !== input.runtimeId) {
+          throw new ConversationProtocolError('Continuation has no matching canonical turn');
+        }
+        if ((current.lifecycle.state === 'working' || current.lifecycle.state === 'needs-user')
+          && current.lifecycle.activeTurnId === input.turnId) return null;
+        return { lifecycle: { state: 'working', activeTurnId: input.turnId } };
+      },
+    );
+    this.emitChanged(record);
+    return record;
+  }
+
+  /** Persist an opaque provider checkpoint without exposing it to the webview. */
+  async checkpointRuntimeContinuation(input: {
+    conversationId: string;
+    bindingGeneration: number;
+    runtimeId: AgentId;
+    descriptor: RuntimeContinuationDescriptorV1 | null;
+  }): Promise<ConversationRecordV1> {
+    if (input.descriptor && input.descriptor.runtimeId !== input.runtimeId) {
+      throw new ConversationProtocolError('Continuation runtime does not match its map key');
+    }
+    const record = await this.mutateLatest(
+      input.conversationId,
+      input.bindingGeneration,
+      (current) => {
+        const existing = current.continuations?.[input.runtimeId];
+        if (input.descriptor === null && !existing) return null;
+        // A delayed provider callback must not replace a newer checkpoint.
+        if (input.descriptor && existing && existing.capturedAt > input.descriptor.capturedAt) return null;
+        return { continuationUpdate: { runtimeId: input.runtimeId, descriptor: input.descriptor } };
+      },
+    );
+    this.emitChanged(record);
+    return record;
+  }
+
+  /**
+   * Append the crash-safe transport receipt. `ambiguous` is written before the
+   * transport call; `accepted` requires an adapter-approved positive signal.
+   */
+  async markRuntimeDispatch(input: {
+    conversationId: string;
+    bindingGeneration: number;
+    runtimeId: AgentId;
+    turnId: string;
+    state: Exclude<DispatchReceiptStateV1, 'not-sent'>;
+  }): Promise<ConversationRecordV1> {
+    const record = await this.mutateLatest(
+      input.conversationId,
+      input.bindingGeneration,
+      (current) => {
+        const user = current.events.find(
+          (event) => event.kind === 'user-message' && event.turnId === input.turnId,
+        );
+        if (!user || user.runtimeId !== input.runtimeId) {
+          throw new ConversationProtocolError('Dispatch receipt has no matching user turn');
+        }
+        const receipts = current.events.filter(
+          (event) => event.kind === 'dispatch-receipt' && event.turnId === input.turnId,
+        );
+        const previous = receipts[receipts.length - 1];
+        if (previous?.kind === 'dispatch-receipt' && previous.dispatchState === input.state) return null;
+        if (previous?.kind === 'dispatch-receipt' && previous.dispatchState === 'accepted') return null;
+        const requiredPrevious = input.state === 'ambiguous' ? 'not-sent' : 'ambiguous';
+        if (previous?.kind !== 'dispatch-receipt' || previous.dispatchState !== requiredPrevious) {
+          throw new ConversationProtocolError(
+            `Dispatch ${input.state} must follow ${requiredPrevious}`,
+          );
+        }
+        return {
+          appendEvents: [{
+            kind: 'dispatch-receipt',
+            eventId: this.randomId(),
+            turnId: input.turnId,
+            sequence: (current.events[current.events.length - 1]?.sequence ?? -1) + 1,
+            occurredAt: this.now().toISOString(),
+            runtimeId: input.runtimeId,
+            dispatchState: input.state,
+          }],
+        };
+      },
+    );
+    this.emitChanged(record);
+    return record;
+  }
+
+  /** Persist the one-time truthful transcript boundary for a fresh session. */
+  async recordTranscriptRestored(input: {
+    conversationId: string;
+    bindingGeneration: number;
+    runtimeId: AgentId;
+    turnId: string;
+    truncated: boolean;
+    unansweredPriorRequest: boolean;
+  }): Promise<ConversationRecordV1> {
+    const record = await this.mutateLatest(
+      input.conversationId,
+      input.bindingGeneration,
+      (current) => {
+        const alreadyRecorded = current.events.some(
+          (event) => event.kind === 'boundary'
+            && event.turnId === input.turnId
+            && event.runtimeId === input.runtimeId
+            && event.boundaryKind === 'context-restored',
+        );
+        if (alreadyRecorded) return null;
+        const details = [
+          `Continuing with ${AGENTS[input.runtimeId].label}. Previous messages were included as context.`,
+          ...(input.unansweredPriorRequest
+            ? ['The previous agent did not return a saved answer. Your earlier request was included as context.']
+            : []),
+          ...(input.truncated ? ['Some older messages were left out.'] : []),
+        ];
+        return {
+          appendEvents: [{
+            kind: 'boundary',
+            eventId: this.randomId(),
+            turnId: input.turnId,
+            sequence: (current.events[current.events.length - 1]?.sequence ?? -1) + 1,
+            occurredAt: this.now().toISOString(),
+            runtimeId: input.runtimeId,
+            boundaryKind: 'context-restored',
+            message: details.join(' '),
+          }],
+        };
+      },
+    );
+    this.emitChanged(record);
+    return record;
   }
 
   async currentRolloutMode(): Promise<ConversationRolloutMode> {
@@ -279,48 +438,79 @@ export class ConversationController {
     turnId?: string;
     generateTitle?: (request: FirstResponseTitleRequest) => Promise<string | null>;
   }): Promise<ConversationRecordV1> {
-    const current = await this.requireCurrentScope(input.conversationId);
-    const firstUserMessage = current.events.find((event) => event.kind === 'user-message');
-    const isFirstAssistantResponse = input.status === 'completed'
-      && Boolean(input.text.trim())
-      && !current.events.some((event) => event.kind === 'assistant-message');
+    const initial = await this.requireCurrentScope(input.conversationId);
+    const firstUserMessage = initial.events.find((event) => event.kind === 'user-message');
     const turnId = input.turnId ?? (
-      current.lifecycle.state === 'working' || current.lifecycle.state === 'needs-user'
-        ? current.lifecycle.activeTurnId
+      initial.lifecycle.state === 'working' || initial.lifecycle.state === 'needs-user'
+        ? initial.lifecycle.activeTurnId
         : this.randomId()
     );
-    const sequence = (current.events[current.events.length - 1]?.sequence ?? -1) + 1;
     const occurredAt = this.now().toISOString();
-    const appendEvents = input.text
-      ? [{
-          kind: 'assistant-message' as const,
-          eventId: this.randomId(),
-          turnId,
-          sequence,
-          occurredAt,
-          runtimeId: input.runtimeId,
-          content: input.text,
-          terminalStatus: input.status,
-        }]
-      : [{
-          kind: 'boundary' as const,
-          eventId: this.randomId(),
-          turnId,
-          sequence,
-          occurredAt,
-          runtimeId: input.runtimeId,
-          boundaryKind: input.status === 'cancelled' ? 'cancelled' as const : 'failed' as const,
-          message: input.error || (input.status === 'cancelled' ? 'The turn was cancelled.' : 'The turn failed.'),
-        }];
-    const record = await this.dependencies.store.checkpoint({
-      conversationId: current.conversationId,
-      bindingGeneration: input.bindingGeneration,
-      lifecycle: input.status === 'completed'
-        ? { state: 'idle' }
-        : { state: 'interrupted', turnId, reason: input.status === 'cancelled' ? 'cancelled' : 'failed' },
-      appendEvents,
-    });
+    const terminalEventId = this.randomId();
+    const record = await this.mutateLatest(
+      input.conversationId,
+      input.bindingGeneration,
+      (current) => {
+        const activeTurnMatches = (current.lifecycle.state === 'working' || current.lifecycle.state === 'needs-user')
+          && current.lifecycle.activeTurnId === turnId;
+        const activeUser = current.events.find(
+          (event) => event.kind === 'user-message' && event.turnId === turnId,
+        );
+        // A runtime switched away from this turn. Its late final must not append
+        // content or make the newer runtime look idle.
+        if (!activeTurnMatches || activeUser?.runtimeId !== input.runtimeId) return null;
+        const sequence = (current.events[current.events.length - 1]?.sequence ?? -1) + 1;
+        const appendEvents = input.text
+          ? [{
+              kind: 'assistant-message' as const,
+              eventId: terminalEventId,
+              turnId,
+              sequence,
+              occurredAt,
+              runtimeId: input.runtimeId,
+              content: input.text,
+              terminalStatus: input.status,
+            }]
+          : [{
+              kind: 'boundary' as const,
+              eventId: terminalEventId,
+              turnId,
+              sequence,
+              occurredAt,
+              runtimeId: input.runtimeId,
+              boundaryKind: input.status === 'cancelled' ? 'cancelled' as const : 'failed' as const,
+              message: input.error || (input.status === 'cancelled' ? 'The turn was cancelled.' : 'The turn failed.'),
+            }];
+        const assistantEvent = appendEvents[0];
+        const currentDescriptor = current.continuations?.[input.runtimeId];
+        const continuationUpdate = input.status === 'completed'
+          && assistantEvent.kind === 'assistant-message'
+          && assistantEvent.terminalStatus === 'completed'
+          && currentDescriptor
+          ? {
+              runtimeId: input.runtimeId,
+              descriptor: {
+                ...currentDescriptor,
+                coveredThroughEventId: assistantEvent.eventId,
+                capturedAt: occurredAt,
+              },
+            }
+          : input.status !== 'completed' && currentDescriptor
+            ? { runtimeId: input.runtimeId, descriptor: null }
+            : undefined;
+        return {
+          lifecycle: input.status === 'completed'
+            ? { state: 'idle' as const }
+            : { state: 'interrupted' as const, turnId, reason: input.status === 'cancelled' ? 'cancelled' as const : 'failed' as const },
+          appendEvents,
+          ...(continuationUpdate ? { continuationUpdate } : {}),
+        };
+      },
+    );
     this.emitChanged(record);
+    const isFirstAssistantResponse = input.status === 'completed'
+      && Boolean(input.text.trim())
+      && record.events.find((event) => event.kind === 'assistant-message')?.eventId === terminalEventId;
     if (isFirstAssistantResponse && firstUserMessage?.kind === 'user-message' && input.generateTitle) {
       return this.generateFirstResponseTitle(record, firstUserMessage.text, input.text, input.generateTitle);
     }
@@ -375,6 +565,12 @@ export class ConversationController {
       const turnId = current.lifecycle.activeTurnId;
       const lastEvent = current.events[current.events.length - 1];
       const lastRuntime = current.runtimeSummary[current.runtimeSummary.length - 1];
+      const interruptedRuntime = lastEvent?.runtimeId ?? lastRuntime;
+      const continuationRuntime = interruptedRuntime === 'claude-code'
+        || interruptedRuntime === 'codex'
+        || interruptedRuntime === 'opencode'
+        ? interruptedRuntime
+        : null;
       const interrupted = await this.dependencies.store.checkpoint({
         conversationId,
         bindingGeneration: current.bindingGeneration,
@@ -392,6 +588,9 @@ export class ConversationController {
             ? 'Ritemark closed while this turn was running.'
             : 'The live agent context was released.',
         }],
+        ...(continuationRuntime && current.continuations?.[continuationRuntime]
+          ? { continuationUpdate: { runtimeId: continuationRuntime, descriptor: null } }
+          : {}),
       });
       this.emitChanged(interrupted);
     }
@@ -425,17 +624,85 @@ export class ConversationController {
       mode: request.mode ?? null,
       attachments: (request.attachments ?? []).map(({ name, kind, mediaType, sizeBytes }) => ({ name, kind, mediaType, sizeBytes })),
     };
+    const receipt = {
+      kind: 'dispatch-receipt' as const,
+      eventId: this.randomId(),
+      turnId,
+      sequence: 1,
+      occurredAt: now,
+      runtimeId: request.agentId,
+      dispatchState: 'not-sent' as const,
+    };
     let record: ConversationRecordV1;
     if (request.conversationId) {
       const current = await this.requireCurrentScope(request.conversationId);
       if (request.bindingGeneration === undefined) throw new ConversationProtocolError('bindingGeneration is required for an existing conversation');
-      event.sequence = (current.events[current.events.length - 1]?.sequence ?? -1) + 1;
+      const priorTurnId = current.lifecycle.state === 'working' || current.lifecycle.state === 'needs-user'
+        ? current.lifecycle.activeTurnId
+        : null;
+      const priorUser = priorTurnId
+        ? [...current.events].reverse().find(
+            (candidate) => candidate.kind === 'user-message' && candidate.turnId === priorTurnId,
+          )
+        : undefined;
+      const priorRuntime = priorUser?.runtimeId === 'claude-code'
+        || priorUser?.runtimeId === 'codex'
+        || priorUser?.runtimeId === 'opencode'
+        ? priorUser.runtimeId
+        : null;
+      const latestUser = [...current.events].reverse().find(
+        (candidate) => candidate.kind === 'user-message',
+      );
+      const latestRuntime = latestUser?.runtimeId === 'claude-code'
+        || latestUser?.runtimeId === 'codex'
+        || latestUser?.runtimeId === 'opencode'
+        ? latestUser.runtimeId
+        : null;
+      const runtimeChanged = latestRuntime !== null && latestRuntime !== request.agentId;
+      // R9: runtime selection itself is intentionally quiet. Persist exactly
+      // one boundary when the first message is actually sent with the newly
+      // selected runtime. This cannot depend on an adapter later reporting
+      // `transcript-restored`: a compatible native session may still receive
+      // a normalized delta, and the user deserves the same honest disclosure.
+      const transitionBoundary = runtimeChanged
+        ? {
+            kind: 'boundary' as const,
+            eventId: this.randomId(),
+            turnId,
+            sequence: (current.events[current.events.length - 1]?.sequence ?? -1) + 1,
+            occurredAt: now,
+            runtimeId: request.agentId,
+            boundaryKind: 'context-restored' as const,
+            message: [
+              `Continuing with ${AGENTS[request.agentId].label}. Previous messages were included as context.`,
+              ...(priorTurnId && priorTurnId !== turnId
+                ? ['The previous agent did not return a saved answer.']
+                : []),
+            ].join(' '),
+          }
+        : priorTurnId && priorTurnId !== turnId
+          ? {
+              kind: 'boundary' as const,
+              eventId: this.randomId(),
+              turnId: priorTurnId,
+              sequence: (current.events[current.events.length - 1]?.sequence ?? -1) + 1,
+              occurredAt: now,
+              runtimeId: priorUser?.runtimeId ?? 'legacy-ritemark' as const,
+              boundaryKind: 'interrupted' as const,
+              message: 'The previous agent did not return a saved answer before the next request.',
+            }
+          : null;
+      event.sequence = (transitionBoundary?.sequence ?? (current.events[current.events.length - 1]?.sequence ?? -1)) + 1;
+      receipt.sequence = event.sequence + 1;
       record = await this.dependencies.store.checkpoint({
         conversationId: current.conversationId,
         bindingGeneration: request.bindingGeneration,
         expectedRevision: current.revision,
         lifecycle: { state: 'working', activeTurnId: turnId },
-        appendEvents: [event],
+        appendEvents: [...(transitionBoundary ? [transitionBoundary] : []), event, receipt],
+        ...(priorRuntime && current.continuations?.[priorRuntime]
+          ? { continuationUpdate: { runtimeId: priorRuntime, descriptor: null } }
+          : {}),
       });
     } else {
       record = await this.dependencies.store.create({
@@ -443,7 +710,7 @@ export class ConversationController {
         scope: scope.descriptor,
         title: normalizeManualTitle(request.title ?? '') ?? fallbackTitleFromPrompt(request.text),
         lifecycle: { state: 'working', activeTurnId: turnId },
-        events: [event],
+        events: [event, receipt],
       });
     }
 
@@ -462,6 +729,40 @@ export class ConversationController {
 
   private async requireCurrentScope(conversationId: string): Promise<ConversationRecordV1> {
     return this.requireVisibleScope(conversationId, false);
+  }
+
+  /**
+   * Rebuild revision-sensitive events from the latest record. Provider
+   * checkpoint, receipt, and final callbacks can legitimately race each other.
+   */
+  private async mutateLatest(
+    conversationId: string,
+    bindingGeneration: number,
+    build: (
+      current: ConversationRecordV1,
+    ) => Omit<ConversationCheckpointV1, 'conversationId' | 'bindingGeneration' | 'expectedRevision'> | null,
+  ): Promise<ConversationRecordV1> {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const current = await this.requireCurrentScope(conversationId);
+      if (current.bindingGeneration !== bindingGeneration) {
+        throw new ConversationStoreError('stale-binding', 'Conversation binding generation is stale');
+      }
+      const update = build(current);
+      if (!update) return current;
+      try {
+        return await this.dependencies.store.checkpoint({
+          ...update,
+          conversationId,
+          bindingGeneration,
+          expectedRevision: current.revision,
+        });
+      } catch (error) {
+        if (!(error instanceof ConversationStoreError) || error.code !== 'stale-revision' || attempt === 4) {
+          throw error;
+        }
+      }
+    }
+    throw new ConversationStoreError('stale-revision', 'Conversation revision changed repeatedly');
   }
 
   private async requireVisibleScope(conversationId: string, recovery: boolean): Promise<ConversationRecordV1> {

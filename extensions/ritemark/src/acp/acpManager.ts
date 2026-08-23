@@ -129,36 +129,8 @@ export class AcpManager {
    * a second session on the same connection is exactly the supported case now.
    */
   async start(): Promise<string> {
-    if (!this.client) {
-      const fsProxy = new AcpFsProxy({
-        workspaceRoot: this.config.workspaceRoot,
-        backend: this.config.fsBackend,
-        approveWrite: this.config.approveWrite,
-        trace: traceAcp,
-      });
-
-      const handlers: AcpClientHandlers = {
-        requestPermission: (params) => this.config.requestPermission(params),
-        sessionUpdate: (params) => this.handleSessionUpdate(params),
-        readTextFile: fsProxy.readTextFile,
-        writeTextFile: fsProxy.writeTextFile,
-      };
-
-      const client = new AcpClient({
-        command: this.config.binaryPath,
-        args: this.config.args,
-        cwd: this.config.workspaceRoot,
-        env: this.buildSpawnEnv(),
-        handlers,
-        onExit: (code, signal) => this.handleExit(code, signal),
-        onStderr: (line) => traceAcp('manager', 'stderr', line),
-        trace: traceAcp,
-      });
-      this.client = client;
-      await client.initialize();
-    }
-
-    const session = await this.client.newSession(this.config.workspaceRoot, this.config.mcpServers);
+    const client = await this.ensureClient();
+    const session = await client.newSession(this.config.workspaceRoot, this.config.mcpServers);
     this.sessions.set(session.sessionId, {
       sessionId: session.sessionId,
       sawContentThisTurn: false,
@@ -168,6 +140,54 @@ export class AcpManager {
     this.emit(session.sessionId, 'init', 'Starting OpenCode session…');
     traceAcp('manager', 'started', { sessionId: session.sessionId, liveSessions: this.sessions.size });
     return session.sessionId;
+  }
+
+  /** Resume uses ACP session/resume only. session/load is intentionally forbidden. */
+  async resume(sessionId: string): Promise<void> {
+    const client = await this.ensureClient();
+    await client.resumeSession(sessionId, this.config.workspaceRoot, this.config.mcpServers);
+    this.sessions.set(sessionId, {
+      sessionId,
+      sawContentThisTurn: false,
+      thoughtBuffer: '',
+      cancelRequested: false,
+    });
+    this.emit(sessionId, 'init', 'Resuming OpenCode session…');
+    traceAcp('manager', 'resumed', { liveSessions: this.sessions.size });
+  }
+
+  private async ensureClient(): Promise<AcpClient> {
+    if (this.client) return this.client;
+    const fsProxy = new AcpFsProxy({
+      workspaceRoot: this.config.workspaceRoot,
+      backend: this.config.fsBackend,
+      approveWrite: this.config.approveWrite,
+      trace: traceAcp,
+    });
+    const handlers: AcpClientHandlers = {
+      requestPermission: (params) => this.config.requestPermission(params),
+      sessionUpdate: (params) => this.handleSessionUpdate(params),
+      readTextFile: fsProxy.readTextFile,
+      writeTextFile: fsProxy.writeTextFile,
+    };
+    const client = new AcpClient({
+      command: this.config.binaryPath,
+      args: this.config.args,
+      cwd: this.config.workspaceRoot,
+      env: this.buildSpawnEnv(),
+      handlers,
+      onExit: (code, signal) => this.handleExit(code, signal),
+      onStderr: (line) => traceAcp('manager', 'stderr', line),
+      trace: traceAcp,
+    });
+    this.client = client;
+    try {
+      await client.initialize();
+      return client;
+    } catch (error) {
+      if (this.client === client) this.client = null;
+      throw error;
+    }
   }
 
   /**

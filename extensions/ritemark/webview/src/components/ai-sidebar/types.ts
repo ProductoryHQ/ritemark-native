@@ -399,7 +399,18 @@ export type ExtensionMessage =
   | { type: 'settings:chatFontSize'; fontSize: number }
   | { type: 'toggle-history-panel' }
   | { type: 'conversation/canonical-id'; clientConversationId: string; conversationId: string; bindingGeneration: number }
-  | { type: 'conversation/runtime-released'; conversationId: string }
+  | {
+      type: 'conversation/continuation-state';
+      conversationId: string;
+      turnId?: string;
+      runtimeId: AgentId;
+      state: {
+        mode: 'not-attempted' | 'pending' | 'native-restored' | 'transcript-restored' | 'context-unavailable' | 'runtime-unavailable';
+        failureCategory?: 'invalid-descriptor' | 'incompatible-descriptor' | 'authentication' | 'runtime-unavailable' | 'provider-rejected' | 'ambiguous-dispatch' | 'no-usable-context';
+        truncated?: boolean;
+        unansweredPriorRequest?: boolean;
+      };
+    }
   | import('../../../../src/conversations/protocol').ConversationResultMessage
   | import('../../../../src/conversations/protocol').ConversationHostEvent
   | { type: 'files-dropped'; paths: string[] }

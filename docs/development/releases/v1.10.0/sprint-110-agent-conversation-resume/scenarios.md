@@ -2,6 +2,8 @@
 
 BDD examples for [spec.md](./spec.md). These are the manual QA matrix; ★ scenarios are required in the automated/live continuation matrix where credentials are available.
 
+Phase 0 fixture status: Claude SDK `resume`, Codex `thread/resume`, and OpenCode ACP `session/resume` passed process-restart semantic recall plus two-conversation isolation on the pinned versions. OpenCode `session/load` is deliberately excluded because it replayed history. Fallback scenarios use the frozen 32,000 UTF-8 byte budget.
+
 ## Feature: Capability audit and descriptor isolation (R1, R2)
 
 ### ★ Scenario: Two native descriptors never cross-bind
@@ -68,6 +70,28 @@ When native resume fails and fallback is built
 Then the fallback pack ends at the event before that new prompt
 And the new prompt is dispatched exactly once as the runtime prompt
 
+### ★ Scenario: Unanswered request survives a failed-runtime handoff
+Given I sent Codex a durably saved request and Codex returned no saved final answer
+And I switch to Claude and send “Solve it yourself”
+When the cross-runtime fallback context is built
+Then it includes the earlier Codex-directed request labelled as unanswered
+And excludes Codex partial text, tools, progress, approvals, and opaque runtime state
+And “Solve it yourself” is excluded from the context pack and dispatched exactly once as Claude’s runtime prompt
+And the UI says the previous agent did not return a saved answer
+
+### Scenario: Dispatch certainty does not erase user intent
+Given the previous prompt may be known-unsent, known-accepted, or ambiguous after a runtime failure
+And no saved final answer exists
+When I confirm Continue with another runtime
+Then every state preserves the same canonical unanswered user request in normalized context
+And safe metadata distinguishes dispatch certainty without claiming that provider work or memory transferred
+
+### Scenario: Multiple unanswered prompts stay ordered and bounded
+Given several durably saved user prompts have no matching assistant final answer
+When fallback is built under its size budget
+Then the most recent unanswered request is preserved ahead of older complete turns
+And any omitted older prompts are disclosed rather than silently disappearing
+
 ### ★ Scenario: Oversized transcript truncates deterministically
 Given a transcript exceeds the context budget
 When fallback is built twice
@@ -89,6 +113,8 @@ And the UI says previous context is unavailable instead of sending an empty fake
 ## Feature: Explicit cross-runtime handoff (R5)
 
 ### ★ Scenario: Continue with another runtime requires confirmation
+> Superseded by R9 on 2026-08-23 after live smoke feedback; retained as decision history.
+
 Given a non-empty Claude conversation
 When I choose Continue with Codex
 Then a confirmation explains that Claude’s native working context will not transfer
@@ -100,6 +126,12 @@ Given I confirm Continue with Codex
 When the next turn starts
 Then Codex receives the normalized context pack, never Claude’s opaque descriptor
 And the transcript records a Codex / transcript-context boundary
+
+### Scenario: Late final answer after interrupted handoff cannot replace the active agent
+Given I switched away after the previous runtime failed to return a saved final answer
+When the invalidated old binding emits a late final or partial event
+Then it cannot enter the new runtime binding or alter its continuation watermark
+And it cannot hide, reorder, or mark the unanswered canonical request as resolved
 
 ### Scenario: Switching back uses only that runtime’s own descriptor
 Given a conversation previously used Claude, then Codex
@@ -123,6 +155,35 @@ Then an accessible notice appears before the next turn
 And it says Previous messages were included, but this is a new agent session
 And after acknowledgement it does not remain as a permanent list badge
 And the transcript boundary remains visible in history
+
+## Feature: Lightweight runtime switch disclosure (R9)
+
+### ★ Scenario: Runtime choice applies without a dialog
+Given a non-empty Claude conversation and text in the composer
+When I select Codex
+Then Codex becomes the selected runtime immediately
+And no confirmation dialog opens
+And my composer draft remains intact
+And no Codex call starts until I send a message
+
+### Scenario: Runtime handoff is one quiet line between turns
+Given I selected Codex after a Claude turn
+When I send the next message
+Then a durable inline line appears immediately before that new turn
+And it says Continuing with Codex. Previous messages were included as context.
+And no duplicate transcript-restored banner or card appears
+
+### Scenario: Selecting another runtime while work is active
+Given the current runtime is still working
+When I select another runtime
+Then Ritemark stops the prior runtime through the existing cancellation path
+And late output from the old binding cannot enter the conversation
+And the composer draft is preserved for the newly selected runtime
+
+### Scenario: Selecting another runtime without continuing
+Given I select another runtime in a non-empty conversation
+When I leave the conversation without sending
+Then no runtime starts and no synthetic transcript turn is created
 
 ### Scenario: Legacy read-only conversation
 Given an Earlier conversation has not been assigned/migrated
