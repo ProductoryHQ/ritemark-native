@@ -261,7 +261,7 @@ export class ConversationStore {
         lifecycle: input.lifecycle ?? { state: 'idle' },
         runtimeSummary: runtimeSummaryFor({ events: input.events ?? [] }),
         events: input.events ?? [],
-        ...(input.continuation ? { continuation: input.continuation } : {}),
+        ...(input.continuations ? { continuations: input.continuations } : {}),
         ...(input.migration ? { migration: input.migration } : {}),
       });
 
@@ -287,6 +287,12 @@ export class ConversationStore {
       }
 
       const events = [...current.events, ...(update.appendEvents ?? [])];
+      const continuations = { ...(current.continuations ?? {}) };
+      if (update.continuationUpdate) {
+        const { runtimeId, descriptor } = update.continuationUpdate;
+        if (descriptor === null) delete continuations[runtimeId];
+        else continuations[runtimeId] = descriptor;
+      }
       const next: ConversationRecordV1 = decodeConversationRecordV1({
         ...current,
         title: update.title ?? current.title,
@@ -295,11 +301,7 @@ export class ConversationStore {
         runtimeSummary: runtimeSummaryFor({ events }),
         revision: current.revision + 1,
         lastActivityAt: this.timestamp(),
-        ...(update.continuation === null
-          ? { continuation: undefined }
-          : update.continuation
-            ? { continuation: update.continuation }
-            : {}),
+        ...(Object.keys(continuations).length > 0 ? { continuations } : { continuations: undefined }),
       });
 
       await this.writeRecord(next);
@@ -418,6 +420,9 @@ export class ConversationStore {
         scope: destinationScope,
         identityColorSlot,
         revision: current.revision + 1,
+        // Native provider identities are project-bound. Moving a recovered
+        // conversation preserves transcript history but never its bindings.
+        continuations: undefined,
       });
       await this.writeRecord(moved);
       await this.updateIndexBestEffort();

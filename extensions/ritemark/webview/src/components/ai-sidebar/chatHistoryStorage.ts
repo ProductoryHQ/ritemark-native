@@ -271,6 +271,20 @@ export function discoverLegacyConversationCandidates(): LegacyConversationCandid
   return candidates;
 }
 
+/** Keep each bridge message within the host protocol's bounded import limit. */
+export function buildLegacyMigrationBatches(
+  candidates: readonly LegacyConversationCandidateV1[],
+  batchSize = 100,
+): LegacyConversationCandidateV1[][] {
+  if (!Number.isSafeInteger(batchSize) || batchSize < 1) throw new Error('batchSize must be a positive integer');
+  if (candidates.length === 0) return [[]];
+  const batches: LegacyConversationCandidateV1[][] = [];
+  for (let index = 0; index < candidates.length; index += batchSize) {
+    batches.push(candidates.slice(index, index + batchSize));
+  }
+  return batches;
+}
+
 /**
  * Load metadata list from localStorage, normalizing all records to v2 shape.
  */

@@ -114,6 +114,18 @@ Acceptance criteria:
 - Live dev evidence walks every scenario in [scenarios.md](./scenarios.md) possible with available auth; unexercised paths are listed explicitly and not claimed.
 - Architecture, user docs, changelog, release notes, test checklist, release tracker, and issue are complete before release feature-complete status.
 
+### R9: Lightweight runtime switch disclosure (added 2026-08-23)
+
+As a user, I want choosing another agent to feel like a normal conversation action rather than a high-risk workflow.
+
+Acceptance criteria:
+- Choosing another runtime applies immediately; there is no confirmation dialog and no extra Continue/Cancel decision.
+- The composer draft is preserved. If the previous runtime is working, selecting another runtime stops that work through the existing cancellation path.
+- Selecting another runtime alone starts no agent call. The user may send the draft with the newly selected runtime or leave the conversation without continuing.
+- On the first Send after a runtime change, one quiet durable boundary appears between the prior transcript and the new user turn: **Continuing with [agent]. Previous messages were included as context.** This host-owned disclosure is deterministic even when the target runtime can reuse a compatible native session plus a normalized delta.
+- Transcript restoration does not also render a dismissible banner/card. Actionable `context-unavailable` and `runtime-unavailable` notices remain visible.
+- R5's confirmation-dialog criterion is superseded by this requirement; its provider isolation, watermark, unanswered-request, and late-event safety rules remain unchanged.
+
 ## Non-Requirements
 
 - Invisible universal memory shared by all agents.
@@ -140,6 +152,7 @@ Acceptance criteria:
 - **Upgrade/model/policy safety:** exact compatibility only in v1.10.0. A mismatch invalidates only that runtime descriptor and uses transcript fallback.
 - **Watermark safety:** advance coverage only with the atomically saved assistant final; any accepted/ambiguous no-final crash invalidates that runtime descriptor before the next continuation.
 - **Dispatch receipt:** persist `not-sent`, then pessimistic `ambiguous` before transport, then `accepted` only on a runtime-specific positive receipt; unknown stays ambiguous.
+- **Runtime-switch UX (revised 2026-08-23):** runtime selection itself is sufficient intent. Apply it immediately, preserve the draft, and disclose transcript fallback as one durable inline boundary before the next turn; do not interrupt the flow with a confirmation dialog.
 
 ## Open Questions
 

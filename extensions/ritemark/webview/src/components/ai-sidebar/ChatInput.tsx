@@ -16,7 +16,7 @@ import {
   SelectTrigger,
 } from '../ui/select';
 import { useAISidebarStore, useActiveConversation } from './store';
-import { policyOf } from './conversationState';
+import { isRuntimeHandoff, policyOf } from './conversationState';
 import { SelectedContextTab } from './SelectedContextTab';
 import {
   AIFirstUseDisclosure,
@@ -188,6 +188,7 @@ export function ChatInput() {
   const mentionPopupRef = useRef<AgentMentionPopupHandle>(null);
   const commandPopupRef = useRef<SlashCommandPopupHandle>(null);
 
+  const activeConversation = useActiveConversation();
   const {
     pendingRuntime,
     isStreaming,
@@ -197,7 +198,7 @@ export function ChatInput() {
     selectedModel,
     codexSelectedModel,
     opencodeSelectedModel,
-  } = useActiveConversation();
+  } = activeConversation;
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const runtimeCapabilities = useAISidebarStore((s) => s.runtimeCapabilities);
   const agents = useAISidebarStore((s) => s.agents);
@@ -922,7 +923,7 @@ export function ChatInput() {
   });
   const aiInformation = useAIInformationDisclosure();
 
-  function handleRuntimeChange(value: string) {
+  const applyRuntimeChange = useCallback((value: string) => {
     if (value.startsWith('claude-code:')) {
       const modelId = value.slice('claude-code:'.length);
       if (selectedAgent !== 'claude-code') {
@@ -946,9 +947,26 @@ export function ChatInput() {
       selectOpenCodeModel(value);
       setPendingRuntime({ runtimeId: 'opencode', modelId: providerModel });
     }
+  }, [selectedAgent, selectAgent, selectModel, selectCodexModel, selectOpenCodeModel, setPendingRuntime]);
+
+  function handleRuntimeChange(value: string) {
+    const target = value.startsWith('claude-code:')
+      ? { runtimeId: 'claude-code' as const }
+      : value.startsWith('codex:')
+        ? { runtimeId: 'codex' as const }
+        : value.startsWith('opencode:')
+          ? { runtimeId: 'opencode' as const }
+          : null;
+    // Sprint 110 R9: choosing another agent is already explicit intent. Stop
+    // active prior work, preserve the composer draft, and wait for Send. The
+    // host adds one quiet durable transcript boundary when fallback is used.
+    if (target && isRuntimeHandoff(activeConversation, target.runtimeId)) cancelRequest();
+    applyRuntimeChange(value);
+    requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
   return (
+    <>
     <div
       ref={containerRef}
       className={`relative px-3 py-2.5 ${
@@ -1440,5 +1458,6 @@ export function ChatInput() {
         onAcknowledge={aiInformation.acknowledge}
       />
     </div>
+    </>
   );
 }

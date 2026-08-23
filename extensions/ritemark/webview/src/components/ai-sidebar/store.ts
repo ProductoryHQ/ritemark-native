@@ -22,6 +22,7 @@ import {
   setWorkspaceContext,
   setLegacyStorageReadOnly,
   discoverLegacyConversationCandidates,
+  buildLegacyMigrationBatches,
   type SavedConversationV2,
 } from './chatHistoryStorage';
 import type {
@@ -92,6 +93,45 @@ function nextId(): string {
   return `msg-${++msgCounter}-${Date.now()}`;
 }
 
+const RUNTIME_LABELS: Record<'claude-code' | 'codex' | 'opencode', string> = {
+  'claude-code': 'Claude',
+  codex: 'Codex',
+  opencode: 'OpenCode',
+};
+
+/**
+ * Add the immediate visual copy of the host-owned runtime boundary. The host
+ * persists the same boundary atomically with the accepted turn; a later
+ * canonical projection replaces this optimistic item instead of duplicating
+ * it. Keeping this local makes the disclosure appear with the user bubble,
+ * not only after reopening the conversation.
+ */
+function withRuntimeSwitchBoundary(
+  conversation: ConversationState,
+  runtimeId: 'claude-code' | 'codex' | 'opencode',
+  turnId: string,
+  timestamp: number,
+): ConversationState['transcriptBoundaries'] {
+  const latestClaude = conversation.agentConversation[conversation.agentConversation.length - 1];
+  const latestCodex = conversation.codexConversation[conversation.codexConversation.length - 1];
+  const latest = !latestClaude
+    ? latestCodex && { runtimeId: latestCodex.runtime ?? 'codex' as const, timestamp: latestCodex.timestamp }
+    : !latestCodex || latestClaude.timestamp >= latestCodex.timestamp
+      ? { runtimeId: 'claude-code' as const, timestamp: latestClaude.timestamp }
+      : { runtimeId: latestCodex.runtime ?? 'codex' as const, timestamp: latestCodex.timestamp };
+  if (!latest || latest.runtimeId === runtimeId) return conversation.transcriptBoundaries;
+  return [
+    ...conversation.transcriptBoundaries.filter((boundary) => boundary.turnId !== turnId),
+    {
+      id: `runtime-switch-${turnId}`,
+      turnId,
+      runtimeId,
+      timestamp,
+      message: `Continuing with ${RUNTIME_LABELS[runtimeId]}. Previous messages were included as context.`,
+    },
+  ];
+}
+
 /**
  * Tell the host to throw away a conversation's runtime session.
  *
@@ -113,39 +153,6 @@ function focusComposerSoon(): void {
       document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
     });
   });
-}
-
-/**
- * Build a compact cross-runtime handoff block from the other runtime's turns
- * that occurred after `sinceTimestamp`. Only includes completed turns (with a
- * response). Injected as a preamble so the receiving runtime knows what the
- * other runtime already said in this conversation.
- *
- * Note (spec non-requirement #97): handoff is strictly WITHIN one conversation.
- * It never reads another thread's turns.
- */
-function buildHandoffContext(
-  turns: Array<{ userPrompt: string; responseText: string | undefined; timestamp: number }>,
-  runtimeLabel: string,
-  sinceTimestamp: number,
-  maxTurns = 6,
-  maxResponseChars = 1200,
-): string | null {
-  const relevant = turns
-    .filter((t) => t.timestamp > sinceTimestamp && t.responseText)
-    .slice(-maxTurns);
-  if (relevant.length === 0) return null;
-
-  const lines: string[] = [
-    `[The following turns were handled by ${runtimeLabel} earlier in this conversation. You are a different AI assistant continuing the same conversation — do not claim to be ${runtimeLabel}.]`,
-  ];
-  for (const t of relevant) {
-    lines.push(`User: ${t.userPrompt}`);
-    const text = t.responseText!;
-    lines.push(`${runtimeLabel}: ${text.length > maxResponseChars ? text.slice(0, maxResponseChars) + '…' : text}`);
-  }
-  lines.push('[End of prior context. Respond to the user request below as yourself.]');
-  return lines.join('\n');
 }
 
 const DEFAULT_CODEX_STATUS: CodexSidebarStatus = {
@@ -261,6 +268,8 @@ interface AISidebarState {
   savedConversations: SavedConversationV2[];
   showHistoryPanel: boolean;
   conversationRolloutMode: 'unknown' | 'legacy' | 'host-canonical' | 'host-compat';
+  /** Current host flag; absent on an older host means enabled. */
+  durableAgentConversationsEnabled: boolean;
   hostConversations: ConversationSummaryV1[];
   earlierConversations: ConversationSummaryV1[];
   pinnedConversationIds: string[];
@@ -389,6 +398,7 @@ interface AISidebarState {
   refreshCodexStatus: () => void;
   repairCodex: () => void;
   dismissCodexNotice: (key: string) => void;
+  dismissContinuationNotice: (conversationId: string) => void;
   dismissCurrentPlan: (key: string) => void;
   reloadWindow: () => void;
   openAgentSettings: () => void;
@@ -430,10 +440,20 @@ function postConversationRequest(message: ConversationRequestWithoutId): void {
 const initialConversation = createConversationState(generateId());
 
 let legacyInventorySent = false;
+type LegacyMigrationBatch = ReturnType<typeof discoverLegacyConversationCandidates>;
+let pendingLegacyMigrationBatches: LegacyMigrationBatch[] = [];
+
+function startLegacyInventoryMigration(candidates: LegacyMigrationBatch): void {
+  legacyInventorySent = true;
+  pendingLegacyMigrationBatches = buildLegacyMigrationBatches(candidates);
+  const first = pendingLegacyMigrationBatches.shift();
+  if (first) postConversationRequest({ type: 'legacy/import-batch', records: first });
+}
 
 /** Test-only: allow a fresh migration handshake in the same process. */
 export function resetConversationMigrationGuardForTest(): void {
   legacyInventorySent = false;
+  pendingLegacyMigrationBatches = [];
 }
 
 export const useAISidebarStore = create<AISidebarState>((set, get) => {
@@ -651,7 +671,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         };
         patchConversation(item.conversationId, (c) => ({
           agentConversation: [...c.agentConversation, turn],
-          restoredTranscript: false,
+          transcriptBoundaries: withRuntimeSwitchBoundary(c, 'claude-code', turn.id, turn.timestamp),
         }));
         vscode.postMessage({
           type: 'agent-execute',
@@ -694,7 +714,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         };
         patchConversation(item.conversationId, (c) => ({
           codexConversation: [...c.codexConversation, turn],
-          restoredTranscript: false,
+          transcriptBoundaries: withRuntimeSwitchBoundary(c, item.runtimeId, turn.id, turn.timestamp),
         }));
         vscode.postMessage({
           type: 'agent-execute',
@@ -788,6 +808,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     savedConversations: [],
     showHistoryPanel: false,
     conversationRolloutMode: 'unknown',
+    durableAgentConversationsEnabled: true,
     hostConversations: [],
     earlierConversations: [],
     pinnedConversationIds: [],
@@ -1023,30 +1044,18 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       const activeFile = (!options?.skipActiveFile && state.activeFilePath) ? state.activeFilePath : undefined;
 
-      // Prepend Codex turns that happened after Claude's last turn (same thread only)
-      const lastAgentTimestamp = lastTurn?.timestamp ?? 0;
-      const handoff = buildHandoffContext(
-        conversation.codexConversation.map((t) => ({
-          userPrompt: t.userPrompt,
-          responseText: t.streamingText || undefined,
-          timestamp: t.timestamp,
-        })),
-        'Codex',
-        lastAgentTimestamp,
-      );
-      const basePrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
       // Selection context comes BEFORE the pinned-agent hidden context so the
       // agent's role instructions (if any) can frame their response around the
       // selected text. The order is:
-      //   [Selection context] → [Pinned agent instructions] → handoff → prompt
+      //   [Selection context] → [Pinned agent instructions] → prompt
       const selectionBlock = get().buildSelectionContextBlock();
       const hiddenPieces = [
         selectionBlock,
         options?.hiddenContext,
       ].filter((p): p is string => Boolean(p));
       const fullPrompt = hiddenPieces.length > 0
-        ? `${hiddenPieces.join('\n\n---\n\n')}\n\n---\n\n${basePrompt}`
-        : basePrompt;
+        ? `${hiddenPieces.join('\n\n---\n\n')}\n\n---\n\n${prompt}`
+        : prompt;
 
       const turn: AgentConversationTurn = {
         id: nextId(),
@@ -1067,7 +1076,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       patchConversation(conversation.id, (c) => ({
         agentConversation: [...c.agentConversation, turn],
-        restoredTranscript: false,
+        transcriptBoundaries: withRuntimeSwitchBoundary(c, 'claude-code', turn.id, turn.timestamp),
       }));
 
       // Send attachments as serializable payload (strip thumbnails for extension)
@@ -1373,26 +1382,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const lastTurn = conversation.codexConversation[conversation.codexConversation.length - 1];
       if (lastTurn?.isRunning) return;
 
-      // Prepend Claude turns that happened after Codex's last turn (same thread only)
-      const lastCodexTimestamp = lastTurn?.timestamp ?? 0;
-      const handoff = buildHandoffContext(
-        conversation.agentConversation.map((t) => ({
-          userPrompt: t.userPrompt,
-          responseText: t.result?.text || undefined,
-          timestamp: t.timestamp,
-        })),
-        'Claude',
-        lastCodexTimestamp,
-      );
       // Prepend selection context so the agent actually receives the docked
       // selection. The Codex turn shows only the user-typed prompt in the chat
       // bubble; the selection wrapper is invisible to the user but visible to
       // the model — same pattern Claude already uses for hiddenContext.
       const selectionBlock = get().buildSelectionContextBlock();
-      const handoffPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
       const fullPrompt = selectionBlock
-        ? `${selectionBlock}\n\n---\n\n${handoffPrompt}`
-        : handoffPrompt;
+        ? `${selectionBlock}\n\n---\n\n${prompt}`
+        : prompt;
 
       // Sprint 103 R1 (D4): plan-first comes ONLY from explicit UI state —
       // prompt-text sniffing removed.
@@ -1423,7 +1420,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       patchConversation(conversation.id, (c) => ({
         codexConversation: [...c.codexConversation, turn],
-        restoredTranscript: false,
+        transcriptBoundaries: withRuntimeSwitchBoundary(c, 'codex', turn.id, turn.timestamp),
       }));
       vscode.postMessage({
         type: 'agent-execute',
@@ -1465,26 +1462,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const lastTurn = conversation.codexConversation[conversation.codexConversation.length - 1];
       if (lastTurn?.isRunning) return;
 
-      // Cross-runtime handoff. OpenCode's send path was the only one of the three
-      // that never built this, so switching to OpenCode mid-conversation dropped
-      // everything Claude had said — it would answer "I have no prior context"
-      // with that context sitting one bubble above. Mirror sendCodexMessage:
-      // prepend Claude turns since OpenCode's last turn, plus the selection block.
-      const lastOpenCodeTimestamp = lastTurn?.timestamp ?? 0;
-      const handoff = buildHandoffContext(
-        conversation.agentConversation.map((t) => ({
-          userPrompt: t.userPrompt,
-          responseText: t.result?.text || undefined,
-          timestamp: t.timestamp,
-        })),
-        'Claude',
-        lastOpenCodeTimestamp,
-      );
       const selectionBlock = get().buildSelectionContextBlock();
-      const handoffPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
       const fullPrompt = selectionBlock
-        ? `${selectionBlock}\n\n---\n\n${handoffPrompt}`
-        : handoffPrompt;
+        ? `${selectionBlock}\n\n---\n\n${prompt}`
+        : prompt;
 
       // Strip the "opencode:" prefix — host expects bare "provider/model"
       const compositeValue = conversation.opencodeSelectedModel;
@@ -1516,7 +1497,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       patchConversation(conversation.id, (c) => ({
         codexConversation: [...c.codexConversation, turn],
-        restoredTranscript: false,
+        transcriptBoundaries: withRuntimeSwitchBoundary(c, 'opencode', turn.id, turn.timestamp),
       }));
       vscode.postMessage({
         type: 'agent-execute',
@@ -1669,6 +1650,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     dismissCodexNotice: (key) => {
       set({ dismissedCodexNoticeKey: key });
+    },
+
+    dismissContinuationNotice: (conversationId) => {
+      patchConversation(conversationId, () => ({ continuationNotice: null }));
     },
 
     dismissCurrentPlan: (key) => {
@@ -1960,7 +1945,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           conversations[message.conversationId] = {
             ...local,
             id: message.conversationId,
-            restoredTranscript: false,
             agentConversation: stampConversationId(local.agentConversation, message.conversationId),
             codexConversation: stampConversationId(local.codexConversation, message.conversationId),
           };
@@ -1974,14 +1958,56 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
         }
 
-        case 'conversation/runtime-released': {
+        case 'conversation/continuation-state': {
           const current = get();
           const conversation = current.conversations[message.conversationId];
           if (!conversation) break;
+          if (message.state.mode === 'transcript-restored' && message.turnId) {
+            const details = [
+              `Continuing with ${RUNTIME_LABELS[message.runtimeId]}. Previous messages were included as context.`,
+              ...(message.state.unansweredPriorRequest === true
+                ? ['The previous agent did not return a saved answer.']
+                : []),
+              ...(message.state.truncated === true ? ['Some older messages were left out.'] : []),
+            ];
+            set({
+              conversations: {
+                ...current.conversations,
+                [message.conversationId]: {
+                  ...conversation,
+                  continuationNotice: null,
+                  transcriptBoundaries: [
+                    ...conversation.transcriptBoundaries.filter((boundary) => boundary.turnId !== message.turnId),
+                    {
+                      id: `transcript-restored-${message.turnId}`,
+                      turnId: message.turnId,
+                      runtimeId: message.runtimeId,
+                      timestamp: Date.now(),
+                      message: details.join(' '),
+                    },
+                  ],
+                },
+              },
+            });
+            break;
+          }
+          const visibleMode = message.state.mode === 'context-unavailable'
+            || message.state.mode === 'runtime-unavailable';
           set({
             conversations: {
               ...current.conversations,
-              [message.conversationId]: { ...conversation, restoredTranscript: true },
+              [message.conversationId]: {
+                ...conversation,
+                continuationNotice: visibleMode
+                  ? {
+                      mode: message.state.mode as 'context-unavailable' | 'runtime-unavailable',
+                      runtimeId: message.runtimeId,
+                      ...(message.turnId ? { turnId: message.turnId } : {}),
+                      truncated: message.state.truncated === true,
+                      unansweredPriorRequest: message.state.unansweredPriorRequest === true,
+                    }
+                  : null,
+              },
             },
           });
           break;
@@ -1989,6 +2015,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
         case 'conversation/result': {
           if (!message.ok) {
+            if (message.operation === 'legacy/import-batch') {
+              // A later initialize may retry safely: host migration is
+              // fingerprint-deduplicated and authority was not advanced by a
+              // completely failed non-empty batch.
+              legacyInventorySent = false;
+              pendingLegacyMigrationBatches = [];
+            }
             set({ conversationStoreNotice: message.error.message });
             break;
           }
@@ -2003,10 +2036,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               savedConversations: initialized.rolloutMode === 'legacy' ? listConversations() : [],
               conversationStoreNotice: null,
             });
-            if (initialized.rolloutMode !== 'legacy' && !legacyInventorySent) {
-              legacyInventorySent = true;
+            if (initialized.rolloutMode === 'legacy'
+              && get().durableAgentConversationsEnabled
+              && !legacyInventorySent) {
+              // Copy-first cutover: inventory the legacy store while it is
+              // still authoritative. The host marks cutover only after this
+              // request succeeds, including the valid empty-inventory case.
+              startLegacyInventoryMigration(discoverLegacyConversationCandidates());
+            } else if (initialized.rolloutMode !== 'legacy' && !legacyInventorySent) {
               const records = discoverLegacyConversationCandidates();
-              if (records.length > 0) postConversationRequest({ type: 'legacy/import-batch', records: records.slice(0, 100) });
+              if (records.length > 0) startLegacyInventoryMigration(records);
+              else legacyInventorySent = true;
             }
             if (initialized.selectedConversationId) {
               postConversationRequest({ type: 'conversation/get', conversationId: initialized.selectedConversationId });
@@ -2022,7 +2062,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             break;
           }
           if (message.operation === 'legacy/import-batch') {
-            postConversationRequest({ type: 'conversation/list' });
+            const nextBatch = pendingLegacyMigrationBatches.shift();
+            if (nextBatch) {
+              postConversationRequest({ type: 'legacy/import-batch', records: nextBatch });
+              break;
+            }
+            // Re-resolve the monotonic cutover marker. A fresh profile has an
+            // empty import but must still enter host-canonical mode.
+            postConversationRequest({ type: 'conversation/initialize' });
             break;
           }
           if ((message.operation === 'conversation/rename' || message.operation === 'conversation/move-unassigned') && data.conversation) {
@@ -2186,6 +2233,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
           set({
             agenticEnabled: message.agenticEnabled,
+            durableAgentConversationsEnabled: message.durableAgentConversations !== false,
             codexEnabled: message.codexEnabled ?? false,
             agents: message.agents,
             models: newClaudeModels,

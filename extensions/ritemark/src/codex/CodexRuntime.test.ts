@@ -78,6 +78,11 @@ function makeMockAppServer(threadIds: string[] = ['thread-1']) {
       const id = threadIds[Math.min(threadSeq++, threadIds.length - 1)];
       return { thread: { id }, model: 'gpt-5' };
     },
+    threadResume: async (params: { threadId: string }) => {
+      calls.push(`threadResume:${params.threadId}`);
+      return { thread: { id: params.threadId } };
+    },
+    threadRead: async (threadId: string) => ({ thread: { id: threadId } }),
     turnStart: async (_threadId: string, _message: string) => {
       calls.push('turnStart');
       return { turn: { id: `turn-${_threadId}`, status: 'running' } };
@@ -300,6 +305,48 @@ async function run() {
 
   await testCancelDeclinesOutstandingApprovals();
 
+  // Native continuation binds the exact compatible thread, checkpoints it,
+  // and marks dispatch accepted only after turn/start acknowledges the turn.
+  {
+    const { runtime } = makeRuntime(['must-not-start']);
+    calls.length = 0;
+    const states: string[] = [];
+    const checkpoints: string[] = [];
+    let accepted = 0;
+    const compatibility = {
+      runtimeId: 'codex' as const,
+      scopeId: `ps1-${'a'.repeat(40)}`,
+      runtimeVersion: '0.144.4',
+      adapterContractVersion: 1,
+      modelId: 'gpt-5.6-codex',
+      compatibilityFingerprint: 'fingerprint',
+    };
+    const session = await openTurn(runtime, 'conv-resume', {
+      ...dummyConfig,
+      model: compatibility.modelId,
+      continuation: {
+        compatibility,
+        descriptor: {
+          descriptorVersion: 1,
+          ...compatibility,
+          nativeReference: 'thread-resume-me',
+          coveredThroughEventId: 'assistant-final-1',
+          capturedAt: '2026-08-23T10:00:00.000Z',
+        },
+      },
+      onContinuationState: (state) => states.push(state.mode),
+      onContinuationCheckpoint: (descriptor) => checkpoints.push(descriptor.nativeReference),
+      onDispatchAccepted: () => { accepted += 1; },
+    });
+    assert.strictEqual(session.threadId, 'thread-resume-me');
+    assert.ok(calls.includes('threadResume:thread-resume-me'));
+    assert.ok(!calls.includes('threadStart'), 'compatible native resume does not create a replacement thread');
+    assert.deepStrictEqual(states, ['pending', 'native-restored']);
+    assert.deepStrictEqual(checkpoints, ['thread-resume-me']);
+    assert.strictEqual(accepted, 1);
+    console.log('✓ Test 11: compatible native thread resume checkpoints and accepts exactly once');
+  }
+
   // ── Test 10: Sprint 101 — baseInstructions no longer REPLACED away ──
   {
     // When capability context is present, it IS the base (superset of the legacy
@@ -319,7 +366,7 @@ async function run() {
     console.log('✓ Test 10: buildCodexBaseInstructions — context is the base, no silent replace');
   }
 
-  console.log('\nAll 11 CodexRuntime tests passed!');
+  console.log('\nAll 12 CodexRuntime tests passed!');
 }
 
 run().then(

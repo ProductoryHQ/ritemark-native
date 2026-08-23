@@ -38,6 +38,22 @@ async function run(): Promise<void> {
   storage.deleteConversation(first.id);
   assert.equal(storage.listConversations().length, 1);
 
+  const candidates = Array.from({ length: 205 }, (_, index) => ({
+    sourceKey: `legacy-${index}`,
+    sourceId: `legacy-${index}`,
+    data: { id: `legacy-${index}` },
+  }));
+  assert.deepEqual(
+    storage.buildLegacyMigrationBatches(candidates).map((batch) => batch.length),
+    [100, 100, 5],
+    'all legacy conversations are retained across bounded bridge batches',
+  );
+  assert.deepEqual(
+    storage.buildLegacyMigrationBatches([]),
+    [[]],
+    'an empty inventory still emits one cutover handshake',
+  );
+
   console.log('chatHistoryStorageReadOnly.test.ts: all tests passed');
 }
 

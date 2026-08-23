@@ -312,6 +312,10 @@ export interface AgentSessionConfig {
    * the SDK's native `permissionMode: 'plan'` until a plan is approved.
    */
   planFirst?: boolean;
+  /** Exact-compatible Claude SDK session to resume on first query. */
+  resumeSessionId?: string;
+  /** Authoritative session id reported by the SDK init event. */
+  onSessionCheckpoint?: (sessionId: string) => void;
 }
 
 /**
@@ -335,6 +339,8 @@ export interface AgentTurnOptions {
   onPlanApproval?: (request: AgentPlanApprovalRequest) => void;
   /** Emitted in 'ask' mode before a Write/Edit/Bash tool executes. */
   onToolApproval?: (request: AgentToolApprovalRequest) => void;
+  /** First positive SDK signal after this turn enters the provider stream. */
+  onDispatchAccepted?: () => void;
 }
 
 /**

@@ -81,6 +81,7 @@ export class AcpClient {
   // The SDK connection object (camelCase methods → slash wire methods). Loosely
   // typed because it is created from the dynamically-imported ESM module.
   private connection: import('@agentclientprotocol/sdk').ClientSideConnection | null = null;
+  private sessionResumeAdvertised = false;
   private isDisposing = false;
   private readonly config: AcpClientConfig;
   private readonly trace?: AcpClientConfig['trace'];
@@ -137,8 +138,14 @@ export class AcpClient {
         fs: { readTextFile: true, writeTextFile: true },
       },
     });
+    this.sessionResumeAdvertised = result.agentCapabilities?.sessionCapabilities?.resume != null;
     this.trace?.('client', 'initialized', result);
     return result;
+  }
+
+  /** Capability negotiated during initialize; absence means resume is unsafe. */
+  supportsSessionResume(): boolean {
+    return this.sessionResumeAdvertised;
   }
 
   /** session/new — create a conversation session for the given cwd. */
@@ -148,6 +155,16 @@ export class AcpClient {
     const result = await connection.newSession({ cwd, mcpServers: (mcpServers ?? []) as never });
     this.trace?.('client', 'newSession', { cwd, mcpServerCount: (mcpServers ?? []).length, sessionId: result.sessionId });
     return result;
+  }
+
+  /** session/resume — reconnect to an existing provider session without load replay. */
+  async resumeSession(sessionId: string, cwd: string, mcpServers?: unknown[]): Promise<void> {
+    if (!this.sessionResumeAdvertised) {
+      throw new Error('ACP agent does not advertise session/resume support');
+    }
+    const connection = this.requireConnection();
+    await connection.resumeSession({ sessionId, cwd, mcpServers: (mcpServers ?? []) as never });
+    this.trace?.('client', 'resumeSession', { cwd, mcpServerCount: (mcpServers ?? []).length, sessionId });
   }
 
   /** session/prompt — send a user text message and await the turn result. */
@@ -209,6 +226,7 @@ export class AcpClient {
     this.isDisposing = true;
     this.killProcess('SIGTERM');
     this.connection = null;
+    this.sessionResumeAdvertised = false;
   }
 
   // ── Internals ────────────────────────────────────────────────────────────

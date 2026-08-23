@@ -141,7 +141,29 @@ async function run() {
     console.log('✓ Test 5: conversations hold independent sessions');
   }
 
-  console.log('\nAll 5 ClaudeCodeRuntime tests passed!');
+  // Test 6: an SDK result error remains a failed turn at the runtime boundary.
+  {
+    let completedError: string | undefined;
+    const session = makeSession('conv-error', {
+      ...mockSession,
+      sendMessage: async () => ({
+        text: '',
+        filesModified: [],
+        metrics: { durationMs: 0, costUsd: null, model: null },
+        error: 'resume rejected',
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (session as any)._config = {
+      ...dummyConfig,
+      onComplete: (result: { error?: string }) => { completedError = result.error; },
+    };
+    await session.prompt({ prompt: 'Continue safely' });
+    assert.strictEqual(completedError, 'resume rejected');
+    console.log('✓ Test 6: SDK result errors remain failed turns');
+  }
+
+  console.log('\nAll 6 ClaudeCodeRuntime tests passed!');
 }
 
 run().then(

@@ -1,6 +1,6 @@
 # Release Plan — v1.10.0 Durable Agent Conversations
 
-**Status:** In development — Sprint 109 final QA complete in [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209) with rail-pin polish in [PR #210](https://github.com/ProductoryHQ/ritemark-native/pull/210); Sprint 110 Phase 0 decision matrix is ready for approval; native Windows retained at the v1.10 candidate gate<br>
+**Status:** In development — Sprint 109 is merged; Sprint 110 is product-approved with implementation, lightweight handoff revision, live canary, code review, official QA, and release evidence complete; Sprint 110 commit/PR/merge remains pending; native Windows remains at the v1.10 candidate gate<br>
 **Target:** v1.10.0<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8) — created 2026-08-21<br>
 **Release type:** Full app distribution with extension-scoped implementation; deliberately not an `1.9.0-ext.N` lane<br>
@@ -72,7 +72,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | Sprint | Issue | Issue state | Branch | PR | Merge/defer | QA | Release notes | Status |
 |---|---|---|---|---|---|---|---|---|
 | [Sprint 109 — Durable Chat History](./sprint-109-durable-chat-history/sprint-plan.md) | [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) | Closed | `codex/sprint-109-durable-chat-history` | [#209](https://github.com/ProductoryHQ/ritemark-native/pull/209), [#210](https://github.com/ProductoryHQ/ritemark-native/pull/210) | PR #209 merged; final polish through PR #210 | Focused tests, compile/typecheck/build, official QA, and macOS `ritemark-demo` visual/accessibility evidence pass; native Windows retained at release candidate gate | Changelog, checklist, and three screenshots drafted | Final QA and approved rail-pin polish complete 2026-08-23 |
-| [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | In sprint | `codex/sprint-110-agent-conversation-resume` | — | Based on final Sprint 109 main (`e521c53`) | Claude/Codex/OpenCode semantic resume + two-chat isolation passed on exact pins; handoff receipt contract frozen | Not drafted | Phase 0 decision gate ready; Phase 1 remains gated on Jarmo approval |
+| [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | In sprint | `codex/sprint-110-agent-conversation-resume` | — | Based on final Sprint 109 main (`e521c53`) | Native adapters, bounded fallback, dispatch receipts, immediate draft-safe handoff with one inline boundary, fresh-profile cutover, Claude → Codex recall, restart canary, code review, and official QA pass | v1.10.0 release notes, checklist, and exactly three final-state screenshots complete | Product-approved 2026-08-23; commit/PR/merge pending |
 | [Sprint 111 — Agent Runtime Refresh](./sprint-111-agent-runtime-refresh/sprint-plan.md) | [#207](https://github.com/ProductoryHQ/ritemark-native/issues/207) | Open | `codex/sprint-111-agent-runtime-refresh` | — | Depends on Sprint 110 merge | Not run | Not drafted | Planned; branch not created |
 | [Sprint 112 — Composer Thinking Effort](./sprint-112-composer-thinking-effort/sprint-plan.md) | [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206) | Open | `codex/sprint-112-composer-thinking-effort` | — | Depends on Sprint 111 merge | Not run | Not drafted | Planned; branch not created |
 
@@ -167,7 +167,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 
 - [ ] Jarmo approves the expanded release thesis and four-sprint sequence.
 - [x] Jarmo approves Sprint 109 SDD artifacts and Phase 0 start (2026-08-22).
-- [ ] Jarmo approves Sprint 110 SDD artifacts.
+- [x] Jarmo approves Sprint 110 SDD artifacts and Phase 0 decisions (2026-08-23).
 - [ ] Jarmo approves Sprint 111 SDD artifacts and target-version audit gate.
 - [ ] Jarmo approves Sprint 112 SDD/design artifacts and effort capability gate.
 - [x] GitHub milestone v1.10.0 created 2026-08-21.
@@ -176,3 +176,4 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - [x] v1.9.0 canonical release plan and milestone reconciled to shipped Transcribe scope 2026-08-21.
 - [x] Sprint 109 branch created after approval (2026-08-22).
 - [x] Jarmo approved Sprint 110 SDD/audit-first scope and Phase 0 start (2026-08-23).
+- [x] Jarmo approved the final Sprint 110 behavior and release evidence (2026-08-23); delivery remains pending.

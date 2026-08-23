@@ -40,6 +40,23 @@ export interface PendingRuntimeSelection {
   planFirst?: boolean;
 }
 
+export interface ConversationContinuationNotice {
+  mode: 'context-unavailable' | 'runtime-unavailable';
+  runtimeId: AgentId;
+  turnId?: string;
+  truncated: boolean;
+  unansweredPriorRequest: boolean;
+}
+
+/** Durable, read-only history marker projected from a canonical boundary event. */
+export interface ConversationTranscriptBoundary {
+  id: string;
+  turnId: string;
+  runtimeId: AgentId;
+  timestamp: number;
+  message: string;
+}
+
 /**
  * The two-axis policy of a selection, with legacy 'plan' normalized
  * (Sprint 103 R1/R8 migration): `plan` → autonomy 'auto' + planFirst on.
@@ -89,8 +106,10 @@ export interface ConversationState {
   estimatedTokens: number;
   contextUsagePercent: number;
   showContextWarning: boolean;
-  /** Transcript came from durable storage; runtime continuation is not implied. */
-  restoredTranscript: boolean;
+  /** Live continuation disclosure; dismissing it does not remove durable history. */
+  continuationNotice: ConversationContinuationNotice | null;
+  /** Canonical transcript-restoration boundaries survive close/reopen and restart. */
+  transcriptBoundaries: ConversationTranscriptBoundary[];
 }
 
 export function createConversationState(
@@ -116,7 +135,8 @@ export function createConversationState(
     estimatedTokens: 0,
     contextUsagePercent: 0,
     showContextWarning: false,
-    restoredTranscript: false,
+    continuationNotice: null,
+    transcriptBoundaries: [],
   };
   // `id` is the storage key — never let an override desync it from the map key.
   return { ...base, ...overrides, id };
@@ -129,6 +149,15 @@ export function isConversationEmpty(conversation: ConversationState): boolean {
     && conversation.codexConversation.length === 0
     && conversation.chatMessages.length === 0
   );
+}
+
+/** R9: a non-empty cross-runtime change is an immediate, draft-safe handoff. */
+export function isRuntimeHandoff(
+  conversation: ConversationState,
+  targetRuntimeId: AgentId,
+): boolean {
+  return targetRuntimeId !== conversation.pendingRuntime.runtimeId
+    && !isConversationEmpty(conversation);
 }
 
 /** True when any turn in this thread is mid-flight. */

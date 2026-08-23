@@ -7,22 +7,79 @@
  * either conversation array has turns.
  */
 
-import { useRef, useEffect, useCallback } from 'react';
+import { Fragment, useRef, useEffect, useCallback } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { AgentTurnBlock } from './AgentView';
 import { CodexTurn, CompatibilityNotice, getCompatibilityNotice } from './CodexView';
 import { ActivityStatusLine } from './ActivityStatusLine';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
+import type {
+  ConversationContinuationNotice,
+  ConversationTranscriptBoundary,
+} from './conversationState';
+import { continuationPresentation } from './continuationPresentation';
+import { Icon } from '../ui/Icon';
 
 type MergedTurn =
   | { runtime: 'claude'; turn: AgentConversationTurn }
   | { runtime: 'codex'; turn: CodexConversationTurn };
 
+function ContinuationNotice({
+  notice,
+  onDismiss,
+}: {
+  notice: ConversationContinuationNotice;
+  onDismiss: () => void;
+}) {
+  const presentation = continuationPresentation(notice);
+  return (
+    <div
+      role="status"
+      className="relative rounded-r-md border border-l-[3px] border-[var(--r-hairline)] border-l-[var(--r-accent)] bg-[var(--r-surface-soft)] px-3 py-2.5 pr-9"
+    >
+      <div className="text-[13px] font-medium leading-[1.45] text-[var(--r-ink-strong)]">
+        {presentation.title}
+      </div>
+      {presentation.details.map((detail) => (
+        <div key={detail} className="mt-1 text-[12px] leading-[1.5] text-[var(--r-ink-muted)]">
+          {detail}
+        </div>
+      ))}
+      <button
+        type="button"
+        aria-label="Dismiss continuation notice"
+        onClick={onDismiss}
+        className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md border-0 bg-transparent text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]"
+      >
+        <Icon name="x" size={14} tone="inherit" />
+      </button>
+    </div>
+  );
+}
+
+function TranscriptBoundary({ boundary }: { boundary: ConversationTranscriptBoundary }) {
+  return (
+    <div className="flex items-start gap-2 px-1 py-1.5 text-[12px] leading-[1.5] text-[var(--r-ink-muted)]">
+      <span className="mt-0.5 shrink-0 text-[var(--r-accent)]">
+        <Icon name="clock-counter-clockwise" size={14} tone="inherit" />
+      </span>
+      <span>{boundary.message}</span>
+    </div>
+  );
+}
+
 export function UnifiedConversationView() {
-  const { agentConversation, codexConversation } = useActiveConversation();
+  const activeConversation = useActiveConversation();
+  const {
+    agentConversation,
+    codexConversation,
+    continuationNotice,
+    transcriptBoundaries,
+  } = activeConversation;
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const dismissedCodexNoticeKey = useAISidebarStore((s) => s.dismissedCodexNoticeKey);
   const dismissCodexNotice = useAISidebarStore((s) => s.dismissCodexNotice);
+  const dismissContinuationNotice = useAISidebarStore((s) => s.dismissContinuationNotice);
 
   // Claude actions
   const answerAgentQuestion = useAISidebarStore((s) => s.answerAgentQuestion);
@@ -100,30 +157,49 @@ export function UnifiedConversationView() {
           />
         )}
 
-        {merged.map((item) =>
-          item.runtime === 'claude' ? (
-            <AgentTurnBlock
-              key={item.turn.id}
-              turn={item.turn}
-              isMixedRuntime={isMixedRuntime}
-              answerAgentQuestion={answerAgentQuestion}
-              approvePlan={approvePlan}
-              rejectPlan={rejectPlan}
-              handleToolApproval={handleToolApproval}
-            />
-          ) : (
-            <CodexTurn
-              key={item.turn.id}
-              turn={item.turn}
-              isMixedRuntime={isMixedRuntime}
-              onApprove={(requestId) => handleCodexApproval(requestId, true)}
-              onReject={(requestId) => handleCodexApproval(requestId, false)}
-              onAnswerQuestion={answerCodexQuestion}
-              onApprovePlan={approveCodexPlan}
-              onDiscardPlan={discardCodexPlan}
-            />
-          )
-        )}
+        {merged.map((item, index) => {
+          const boundaries = transcriptBoundaries.filter((boundary) => boundary.turnId === item.turn.id);
+          const showLiveNotice = continuationNotice
+            && (continuationNotice.turnId === item.turn.id
+              || (!continuationNotice.turnId && index === merged.length - 1));
+          return (
+            <Fragment key={`${item.runtime}:${item.turn.id}`}>
+              {boundaries.map((boundary) => (
+                <TranscriptBoundary key={boundary.id} boundary={boundary} />
+              ))}
+              {showLiveNotice && (
+                <ContinuationNotice
+                  notice={continuationNotice}
+                  onDismiss={() => dismissContinuationNotice(activeConversation.id)}
+                />
+              )}
+              {item.runtime === 'claude' ? (
+                <AgentTurnBlock
+                  turn={item.turn}
+                  isMixedRuntime={isMixedRuntime}
+                  answerAgentQuestion={answerAgentQuestion}
+                  approvePlan={approvePlan}
+                  rejectPlan={rejectPlan}
+                  handleToolApproval={handleToolApproval}
+                />
+              ) : (
+                <CodexTurn
+                  turn={item.turn}
+                  isMixedRuntime={isMixedRuntime}
+                  onApprove={(requestId) => handleCodexApproval(requestId, true)}
+                  onReject={(requestId) => handleCodexApproval(requestId, false)}
+                  onAnswerQuestion={answerCodexQuestion}
+                  onApprovePlan={approveCodexPlan}
+                  onDiscardPlan={discardCodexPlan}
+                />
+              )}
+            </Fragment>
+          );
+        })}
+
+        {transcriptBoundaries
+          .filter((boundary) => !merged.some((item) => item.turn.id === boundary.turnId))
+          .map((boundary) => <TranscriptBoundary key={boundary.id} boundary={boundary} />)}
 
         {/* Sprint 103 R7: single truthful status line under the transcript. */}
         {merged.length > 0 && <ActivityStatusLine />}

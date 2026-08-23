@@ -1,6 +1,6 @@
 # Sprint 110 — Agent Conversation Resume
 
-**Status:** Phase 0 decision gate ready — all three pinned runtimes passed semantic resume and two-conversation isolation; Phase 1 remains gated on Jarmo's matrix/budget/watermark approval<br>
+**Status:** Product-approved by Jarmo on 2026-08-23; implementation, R9 lightweight handoff revision, live Claude → Codex smoke, code review, official QA, and release screenshots complete; commit/PR/merge pending<br>
 **Parent release:** [v1.10.0 Durable Agent Conversations](../release-plan.md)<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8)<br>
 **Issue:** [#204 — Sprint 110: Resume Agent Conversations with truthful context](https://github.com/ProductoryHQ/ritemark-native/issues/204)<br>
@@ -31,7 +31,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 - Shared host-owned continuation request/checkpoint/state contract.
 - Same-runtime native resume for each adapter that passes the audit.
 - Deterministic bounded transcript-context fallback.
-- Explicit cross-runtime Continue with … handoff and context boundaries.
+- Immediate cross-runtime selection with a send-lazy inline context boundary.
 - Truthful continuation/unavailable UX.
 - Continuation-aware integration with Sprint 109’s permanent automatic-working-set + Pinned conversation rail and All conversations list.
 - Cross-runtime resilience matrix, architecture/user docs, release notes, and release canary.
@@ -58,16 +58,16 @@ Together with Sprint 109, users can find a project conversation after restart an
 ## Success Criteria
 
 - [x] Every runtime has a pinned measured native/fallback decision.
-- [ ] Same-runtime native resume retains real context where supported.
-- [ ] Unsupported/expired/invalid/auth-loss paths preserve history and take a tested honest fallback/unavailable route.
-- [ ] Fallback is deterministic, bounded, disclosed, and excludes executable/provider-specific artifacts.
-- [ ] Cross-runtime continuation happens only after explicit confirmation and never transfers opaque IDs.
-- [ ] A durably saved user prompt that received no final answer survives runtime failure/switch as explicitly labelled canonical context, while the new handoff prompt is sent exactly once.
-- [ ] Opening/selecting is runtime/auth/network-lazy; the newly accepted prompt is persisted before negotiation but sent exactly once outside fallback context.
-- [ ] Per-runtime coverage watermarks deliver only uncovered canonical delta and handle ambiguous crash without silent duplication.
-- [ ] Two concurrent conversations and late events remain isolated.
-- [ ] The permanent conversation rail remains selection-only and current-project-scoped; resume/fallback state never creates duplicate rail/history entries, corrupts automatic membership, or changes Pin state implicitly.
-- [ ] No UI copy overclaims exact memory.
+- [x] Same-runtime native resume retains real context where supported.
+- [x] Unsupported/expired/invalid/auth-loss paths preserve history and take a tested honest fallback/unavailable route.
+- [x] Fallback is deterministic, bounded, disclosed, and excludes executable/provider-specific artifacts.
+- [x] Cross-runtime continuation happens only after deliberate runtime selection plus the next Send and never transfers opaque IDs.
+- [x] A durably saved user prompt that received no final answer survives runtime failure/switch as explicitly labelled canonical context, while the new handoff prompt is sent exactly once.
+- [x] Opening/selecting is runtime/auth/network-lazy; the newly accepted prompt is persisted before negotiation but sent exactly once outside fallback context.
+- [x] Per-runtime coverage watermarks deliver only uncovered canonical delta and handle ambiguous crash without silent duplication.
+- [x] Two concurrent conversations and late events remain isolated.
+- [x] The permanent conversation rail remains selection-only and current-project-scoped; resume/fallback state never creates duplicate rail/history entries, corrupts automatic membership, or changes Pin state implicitly.
+- [x] No UI copy overclaims exact memory.
 - [ ] Architecture Gate, QA matrix, user docs, release notes/checklist, canary, and issue tracker are complete.
 
 ## Dependencies and Blockers
@@ -85,7 +85,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 | UI transcript duplicates native history | High | Canonical Ritemark transcript; stable turn reconciliation; native history never overwrites silently. |
 | Wrong session bound to a conversation | High | Tagged descriptors, scope/version validation, binding generation, two-chat tests. |
 | Fallback prompt too large or misleading | High | Deterministic budget, artifact allowlist, truncation disclosure, workspace-recheck instruction. |
-| Runtime switch implies shared memory | Medium | Explicit Continue with … confirmation and durable boundary. |
+| Runtime switch implies shared memory | Medium | Immediate but send-lazy selection plus one quiet durable boundary between turns. |
 | Runtime failure leaves the user's last request invisible to the next agent | High | Treat every durably saved user prompt as canonical context even without a matching final answer; audit dispatch certainty and label the request as unanswered rather than silently dropping or replaying it. |
 | Crash after provider accepts delta but before watermark save | High | Reconcile with provider evidence or invalidate descriptor and use fresh fallback; never silently resend ambiguous delta. |
 
@@ -96,6 +96,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 | 2026-08-21 | Native same-runtime resume is preferred but must be proven per pinned runtime | Adapter scope can reduce to fallback without false claims. |
 | 2026-08-21 | Fallback includes user prompts + assistant final text only | Tools, approvals, plans, progress, and binaries are not replayed. |
 | 2026-08-21 | Cross-runtime continuation is explicit | Runtime selector becomes Continue with … on non-empty conversations. |
+| 2026-08-23 | Runtime selection itself is sufficient intent (R9, revises the earlier confirmation decision) | Remove the overblown handoff dialog, preserve the draft, keep Send lazy, and disclose transcript fallback as one quiet durable line between turns. |
 | 2026-08-23 | Unanswered user prompts survive runtime failure and handoff | A saved prompt without a final assistant answer remains in normalized context and is labelled unanswered; it is context for the new agent, not an executable replay. |
 | 2026-08-23 | Jarmo approved Sprint 110 SDD and Phase 0 start | Run the pinned live audit and return a measured native/fallback matrix before any continuation production code is implemented. |
 | 2026-08-23 | Claude, Codex, and OpenCode passed native semantic resume plus two-conversation isolation on exact pinned versions | All three are `native-resume-with-limits`; exact compatibility and deterministic fallback remain mandatory. |
@@ -103,6 +104,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 | 2026-08-23 | Context pack is capped at 32,000 UTF-8 bytes and 12,000 bytes per selected message | Deterministic purpose/latest-unanswered/recent-turn retention; no summarization-model call. |
 | 2026-08-23 | Coverage advances only with an atomically saved assistant final | Accepted or ambiguous no-final crash invalidates only that runtime descriptor and takes fresh fallback. |
 | 2026-08-23 | Dispatch certainty is append-only and pessimistic | Persist `not-sent`, then `ambiguous` before transport, then `accepted` only on positive provider signal; unknown never upgrades optimistically. |
+| 2026-08-23 | Jarmo approved the final Sprint 110 behavior and release evidence | Product scope is closed; delivery remains a separate commit/PR/merge step. |
 | 2026-08-21 | Provider IDs stay host-only | Webview receives status and safe metadata, not authority. |
 | 2026-08-21 | Per-runtime descriptors carry transcript coverage watermark | Native resume/handoff injects only uncovered canonical delta. |
 | 2026-08-22 | Keep the conversation rail permanent through Sprint 110 | Automatic active/recent membership is derived and Pinned is explicit permanence, while All conversations remains durable truth; continuation must preserve all three distinctions. |
@@ -121,4 +123,16 @@ Together with Sprint 109, users can find a project conversation after restart an
 - [x] Jarmo approves R1–R8 and audit-first scope (2026-08-23).
 - [x] Sprint 110 issue [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) exists under milestone v1.10.0.
 - [x] Branch `codex/sprint-110-agent-conversation-resume` and its dedicated worktree exist from merged `origin/main` (2026-08-23).
-- [ ] Phase 0 runtime/context/watermark decisions are recorded in every SDD artifact and explicitly approved by Jarmo before Phase 1.
+- [x] Phase 0 runtime/context/watermark decisions are recorded in every SDD artifact and explicitly approved by Jarmo before Phase 1 (2026-08-23).
+- [x] Jarmo approves the final R9 handoff behavior and Sprint 110 product closure (2026-08-23).
+
+## Implementation Evidence
+
+- Shared continuation contract: `src/runtime/continuation.ts`, `src/runtime/AgentRuntime.ts`.
+- Durable descriptor/receipt/watermark state: `src/conversations/types.ts`, `ConversationStore.ts`, `ConversationController.ts`.
+- Deterministic fallback: `src/conversations/contextPack.ts` (32,000 bytes total; 12,000-byte per-message ceiling).
+- Native adapters: Claude SDK resume, Codex `thread/resume`, capability-gated ACP `session/resume`; ACP `session/load` is absent by design.
+- Handoff UX: immediate draft-safe runtime selection plus host-owned context construction and one durable transcript boundary, persisted synchronously with the first accepted cross-runtime turn and mirrored optimistically in the live webview; the overblown confirmation dialog and old banner/preambles were removed.
+- Automated evidence: extension compile, webview typecheck/build, focused continuation/runtime/webview tests, complete conversation suite, and broad npm suite through the repository's pre-existing missing-`vscode` integration-test environment boundary.
+- Live evidence: [research/rundev-visual-evidence.md](./research/rundev-visual-evidence.md) records fresh-profile cutover, explicit handoff, semantic transcript recall, desktop restart, three defects found/fixed, and the remaining unexercised matrix.
+- Final review also closed the bounded-import edge: 205 legacy records migrate as `100 / 100 / 5`, and a wholly invalid non-empty inventory cannot advance host authority.

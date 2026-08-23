@@ -39,7 +39,6 @@ export function AISidebar() {
     agentConversation,
     codexConversation,
     legacyConversation,
-    restoredTranscript,
   } = useActiveConversation();
 
   // Set up message listener + handshake
@@ -207,11 +206,6 @@ export function AISidebar() {
           <div className="flex-1 min-h-0 flex overflow-hidden border-t border-[var(--r-hairline)]">
             <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                {restoredTranscript && (
-                  <div role="status" className="mx-3 mt-3 rounded-[8px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-2 text-[11px] leading-[1.4] text-[var(--r-ink-muted)]">
-                    Transcript restored. Your next message starts with a new agent working context.
-                  </div>
-                )}
                 {agentConversation.length > 0 || codexConversation.length > 0
                   ? <UnifiedConversationView />
                   : legacyConversation !== null

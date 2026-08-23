@@ -194,6 +194,21 @@ export interface ThreadStartResponse {
   reasoningEffort: string | null;
 }
 
+export interface ThreadResumeParams {
+  threadId: string;
+  cwd?: string | null;
+  approvalPolicy?: 'untrusted' | 'on-failure' | 'on-request' | 'never' | null;
+  sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access' | null;
+}
+
+export interface ThreadResumeResponse {
+  thread: ThreadInfo;
+}
+
+export interface ThreadReadResponse {
+  thread: ThreadInfo;
+}
+
 export interface ThreadInfo {
   id: string;
   preview: string;

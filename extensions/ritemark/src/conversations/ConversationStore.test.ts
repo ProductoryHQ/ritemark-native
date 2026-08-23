@@ -10,6 +10,8 @@ import {
 } from './ConversationStore';
 import { resolveProjectScope } from './projectScope';
 import type { ConversationEventV1 } from './types';
+import type { AgentId } from '../agent/types';
+import type { RuntimeContinuationDescriptorV1 } from '../runtime/continuation';
 
 const scope = resolveProjectScope({ folderUris: ['file:///fixtures/project'], platform: 'darwin' });
 
@@ -28,6 +30,21 @@ function userEvent(sequence: number, runtimeId: 'codex' | 'claude-code' = 'codex
     text: `Message ${sequence}`,
     mode: 'agent',
     attachments: [],
+  };
+}
+
+function descriptor(runtimeId: AgentId, scopeId: string, capturedAt: string): RuntimeContinuationDescriptorV1 {
+  return {
+    descriptorVersion: 1,
+    runtimeId,
+    nativeReference: `${runtimeId}-native-reference`,
+    scopeId,
+    runtimeVersion: `${runtimeId}-version`,
+    adapterContractVersion: 1,
+    modelId: null,
+    compatibilityFingerprint: `${runtimeId}-fingerprint`,
+    coveredThroughEventId: null,
+    capturedAt,
   };
 }
 
@@ -189,6 +206,33 @@ async function run(): Promise<void> {
     assert.equal(queued?.revision, 21);
     assert.deepEqual(queued?.runtimeSummary, ['codex', 'claude-code']);
 
+    const withCodexContinuation = await queueStore.checkpoint({
+      conversationId: queueId,
+      bindingGeneration: 0,
+      continuationUpdate: {
+        runtimeId: 'codex',
+        descriptor: descriptor('codex', scope.scopeId, '2026-08-22T12:00:00.000Z'),
+      },
+    });
+    const withBothContinuations = await queueStore.checkpoint({
+      conversationId: queueId,
+      bindingGeneration: 0,
+      continuationUpdate: {
+        runtimeId: 'claude-code',
+        descriptor: descriptor('claude-code', scope.scopeId, '2026-08-22T12:01:00.000Z'),
+      },
+    });
+    assert.equal(withBothContinuations.continuations?.codex?.nativeReference, 'codex-native-reference');
+    assert.equal(withBothContinuations.continuations?.['claude-code']?.nativeReference, 'claude-code-native-reference');
+    const withoutCodexContinuation = await queueStore.checkpoint({
+      conversationId: queueId,
+      bindingGeneration: 0,
+      continuationUpdate: { runtimeId: 'codex', descriptor: null },
+    });
+    assert.equal(withoutCodexContinuation.continuations?.codex, undefined);
+    assert.ok(withoutCodexContinuation.continuations?.['claude-code']);
+    assert.ok(withCodexContinuation.revision < withoutCodexContinuation.revision);
+
     const deleted = await queueStore.delete(queueId, 0);
     assert.equal(await queueStore.get(queueId), null);
     await assert.rejects(
@@ -242,6 +286,28 @@ async function run(): Promise<void> {
     assert.equal(migratedSlots.get(newerId), 1, 'pre-release backfill is deterministic by creation time');
     const persistedMigration = JSON.parse(fs.readFileSync(path.join(migrationDir, 'records', `${olderId}.json`), 'utf8')) as Record<string, unknown>;
     assert.equal(persistedMigration.identityColorSlot, 0, 'backfilled identity is persisted atomically');
+
+    const moveSource = resolveProjectScope({ folderUris: ['file:///fixtures/recovered'], platform: 'darwin' });
+    const moveDestination = resolveProjectScope({ folderUris: ['file:///fixtures/destination'], platform: 'darwin' });
+    const moveStore = new ConversationStore(path.join(temp, 'move'), dependencies);
+    const movable = await moveStore.create({
+      conversationId: uuid(301),
+      scopeId: moveSource.scopeId,
+      scope: moveSource.descriptor,
+      title: 'Move without provider authority',
+      continuations: {
+        opencode: descriptor('opencode', moveSource.scopeId, '2026-08-22T12:02:00.000Z'),
+      },
+    });
+    const moved = await moveStore.moveScope(
+      movable.conversationId,
+      movable.bindingGeneration,
+      moveSource.scopeId,
+      moveDestination.scopeId,
+      moveDestination.descriptor,
+    );
+    assert.equal(moved.scopeId, moveDestination.scopeId);
+    assert.equal(moved.continuations, undefined, 'project-bound provider identities are dropped on scope move');
 
     console.log('ConversationStore.test.ts: all tests passed');
   } finally {

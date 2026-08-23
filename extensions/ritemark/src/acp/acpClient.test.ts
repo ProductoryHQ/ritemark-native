@@ -41,12 +41,16 @@ rl.on('line', async (line) => {
   if (msg.method === 'initialize') {
     result(msg.id, {
       protocolVersion: 1,
-      agentCapabilities: {},
+      agentCapabilities: process.env.AGENT_SUPPORT_RESUME === '1'
+        ? { sessionCapabilities: { resume: {} } }
+        : {},
       authMethods: [],
       agentInfo: { name: 'ScriptedAgent', version: '0.0.1' },
     });
   } else if (msg.method === 'session/new') {
     result(msg.id, { sessionId: 'ses_test_1', configOptions: [] });
+  } else if (msg.method === 'session/resume') {
+    result(msg.id, {});
   } else if (msg.method === 'session/set_config_option') {
     result(msg.id, { configOptions: [] });
   } else if (msg.method === 'session/prompt') {
@@ -174,6 +178,35 @@ async function run() {
       `agent received the selected outcome, got: ${updates}`,
     );
     client.dispose();
+  }
+
+  // ── session/resume is capability-gated by the initialize handshake ──
+  {
+    const unsupported = new AcpClient({
+      command: nodeBin,
+      args: [agentScript],
+      cwd: os.tmpdir(),
+      handlers: noopHandlers(),
+    });
+    await unsupported.initialize();
+    assert.strictEqual(unsupported.supportsSessionResume(), false);
+    await assert.rejects(
+      unsupported.resumeSession('ses_existing', os.tmpdir()),
+      /does not advertise session\/resume/,
+    );
+    unsupported.dispose();
+
+    const supported = new AcpClient({
+      command: nodeBin,
+      args: [agentScript],
+      cwd: os.tmpdir(),
+      env: { ...process.env, AGENT_SUPPORT_RESUME: '1' },
+      handlers: noopHandlers(),
+    });
+    await supported.initialize();
+    assert.strictEqual(supported.supportsSessionResume(), true);
+    await supported.resumeSession('ses_existing', os.tmpdir());
+    supported.dispose();
   }
 
   // ── malformed JSON resilience: client survives a garbage line ──

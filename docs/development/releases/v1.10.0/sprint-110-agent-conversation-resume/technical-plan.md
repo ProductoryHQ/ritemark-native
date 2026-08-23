@@ -115,6 +115,15 @@ Phase 0 adapter scope is now fixed: Claude uses SDK `resume`, Codex uses `thread
 - Update architecture runtime contract/session table/conversation subsystem/protocol; update user docs, changelog, release notes, test checklist, tracker, and issue. Architecture `Last updated` must be on/after the Sprint 110 branch creation date.
 - Run QA and release-specific migration+resume canary before declaring v1.10.0 feature complete.
 
+## Workstream 7: Lightweight runtime switch disclosure (R9 — added 2026-08-23)
+
+- Remove the `ChatInput` confirmation-dialog state and apply a cross-runtime selection immediately. Reuse `cancelRequest()` only when the selection is a real non-empty-conversation handoff; its idle path remains a no-op.
+- Preserve composer draft and attachments because runtime selection does not mutate composer-owned state.
+- Keep dispatch lazy: selection changes UI state only; host continuation negotiation still begins after the next accepted Send.
+- Persist the canonical `context-restored` event synchronously with the first accepted turn after a runtime change, so disclosure does not depend on a later adapter callback. Generate agent-specific compact copy and render it through `TranscriptBoundary` immediately before the associated user turn; adapter-reported transcript fallback deduplicates against the same event.
+- Suppress the transient `transcript-restored` banner to avoid duplicate disclosure. Retain existing actionable unavailable-state notices.
+- Update runtime-switch, projection, continuation-presentation, typecheck/build, and live rundev evidence before re-closing QA.
+
 ## Implementation Order
 
 W0 audit/decision matrix + Jarmo gate → W1 contract/store integration → W2 proven native adapters → W3 fallback → W4 handoff/UX → W5 final navigation → W6 QA/docs/release close. Unsupported runtime-native resume stops only that W2 adapter and routes to W3; it does not block the release if fallback and truth criteria pass.

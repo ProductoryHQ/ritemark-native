@@ -113,6 +113,8 @@ And the UI says previous context is unavailable instead of sending an empty fake
 ## Feature: Explicit cross-runtime handoff (R5)
 
 ### ★ Scenario: Continue with another runtime requires confirmation
+> Superseded by R9 on 2026-08-23 after live smoke feedback; retained as decision history.
+
 Given a non-empty Claude conversation
 When I choose Continue with Codex
 Then a confirmation explains that Claude’s native working context will not transfer
@@ -153,6 +155,35 @@ Then an accessible notice appears before the next turn
 And it says Previous messages were included, but this is a new agent session
 And after acknowledgement it does not remain as a permanent list badge
 And the transcript boundary remains visible in history
+
+## Feature: Lightweight runtime switch disclosure (R9)
+
+### ★ Scenario: Runtime choice applies without a dialog
+Given a non-empty Claude conversation and text in the composer
+When I select Codex
+Then Codex becomes the selected runtime immediately
+And no confirmation dialog opens
+And my composer draft remains intact
+And no Codex call starts until I send a message
+
+### Scenario: Runtime handoff is one quiet line between turns
+Given I selected Codex after a Claude turn
+When I send the next message
+Then a durable inline line appears immediately before that new turn
+And it says Continuing with Codex. Previous messages were included as context.
+And no duplicate transcript-restored banner or card appears
+
+### Scenario: Selecting another runtime while work is active
+Given the current runtime is still working
+When I select another runtime
+Then Ritemark stops the prior runtime through the existing cancellation path
+And late output from the old binding cannot enter the conversation
+And the composer draft is preserved for the newly selected runtime
+
+### Scenario: Selecting another runtime without continuing
+Given I select another runtime in a non-empty conversation
+When I leave the conversation without sending
+Then no runtime starts and no synthetic transcript turn is created
 
 ### Scenario: Legacy read-only conversation
 Given an Earlier conversation has not been assigned/migrated

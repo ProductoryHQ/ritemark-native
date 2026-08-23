@@ -1,6 +1,19 @@
 import type { AgentId, AgentProgress, AgentQuestion, AgentQuestionItem, ActiveFileContext } from '../agent/types';
+import type {
+  RuntimeContinuationDescriptorV1,
+  RuntimeContinuationRequest,
+  RuntimeContinuationState,
+} from './continuation';
 
 export type { AgentId };
+export type {
+  ContinuationFailureCategory,
+  ContinuationMode,
+  NormalizedRuntimeContext,
+  RuntimeContinuationDescriptorV1,
+  RuntimeContinuationRequest,
+  RuntimeContinuationState,
+} from './continuation';
 
 export interface RuntimeTurnResult {
   text?: string;
@@ -25,6 +38,9 @@ export interface AgentRuntime {
    * session A must never mutate session B's state.
    */
   createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession>;
+
+  /** Release exactly one conversation's provider session. */
+  disposeSession(conversationId: string): void;
 
   /**
    * Adapter-level, deliberately NOT per-conversation: this reports on the
@@ -70,6 +86,14 @@ export interface RuntimeSessionConfig {
   anthropicApiKey?: string;
   /** BYOK provider env vars for AcpRuntime */
   byokEnv?: Record<string, string>;
+  /** Host-owned native descriptor and/or deterministic transcript fallback. */
+  continuation?: RuntimeContinuationRequest;
+  /** Runtime reports a new opaque checkpoint; the host persists it. */
+  onContinuationCheckpoint?: (descriptor: RuntimeContinuationDescriptorV1) => void;
+  /** Runtime reports the truthful continuation result; no provider IDs. */
+  onContinuationState?: (state: RuntimeContinuationState) => void;
+  /** First audit-approved positive signal that the current turn was accepted. */
+  onDispatchAccepted?: () => void;
   /**
    * Autonomy policy applied across all runtimes (Sprint 103 R1):
    * - 'auto'  — agents act without asking (no approval prompts)

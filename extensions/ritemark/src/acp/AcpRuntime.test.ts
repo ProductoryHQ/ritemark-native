@@ -58,6 +58,7 @@ const mockManager = {
   currentSessionId: 'ses-1',
   hasSession: () => true,
   start: async () => { calls.push('start'); return `ses-${++sessionSeq}`; },
+  resume: async (sessionId: string) => { calls.push(`resume:${sessionId}`); },
   prompt: async (_sessionId: string, _text: string) => {
     calls.push('prompt');
     return { stopReason: 'end_turn', usage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 } };
@@ -330,6 +331,46 @@ async function run() {
 
   await testHungTurnTimesOut();
 
+  // ACP continuation uses session/resume (never session/load) and retains the
+  // provider session id as a host-only checkpoint.
+  {
+    const runtime = new AcpRuntime();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = mockManager;
+    calls.length = 0;
+    const states: string[] = [];
+    const checkpoints: string[] = [];
+    const compatibility = {
+      runtimeId: 'opencode' as const,
+      scopeId: `ps1-${'b'.repeat(40)}`,
+      runtimeVersion: '1.18.4',
+      adapterContractVersion: 1,
+      modelId: 'opencode:anthropic/claude-opus-4-1',
+      compatibilityFingerprint: 'fingerprint',
+    };
+    const session = await runtime.createSession('conv-resume', {
+      ...dummyConfig,
+      continuation: {
+        compatibility,
+        descriptor: {
+          descriptorVersion: 1,
+          ...compatibility,
+          nativeReference: 'ses-resume-me',
+          coveredThroughEventId: 'assistant-final-2',
+          capturedAt: '2026-08-23T10:00:00.000Z',
+        },
+      },
+      onContinuationState: (state) => states.push(state.mode),
+      onContinuationCheckpoint: (descriptor) => checkpoints.push(descriptor.nativeReference),
+    });
+    assert.strictEqual((session as AcpSession).acpSessionId, 'ses-resume-me');
+    assert.ok(calls.includes('resume:ses-resume-me'));
+    assert.ok(!calls.includes('start'), 'compatible resume does not mint a new ACP session');
+    assert.deepStrictEqual(states, ['pending', 'native-restored']);
+    assert.deepStrictEqual(checkpoints, ['ses-resume-me']);
+    console.log('✓ Test 12: ACP session/resume is used without session/load');
+  }
+
   // ── Test 9: Sprint 101 — capability context prefixed, order preserved ──
   {
     const turn = { prompt: 'rewrite this', activeFile: { path: 'notes.md' } };
@@ -370,7 +411,20 @@ async function run() {
     console.log('✓ Test 10: capability context is once-per-session');
   }
 
-  console.log('\nAll 13 AcpRuntime tests passed!');
+  // First provider progress/tool/final evidence advances dispatch exactly once.
+  {
+    let accepted = 0;
+    const session = new AcpSession('conv-dispatch', 'ses-dispatch', {
+      ...dummyConfig,
+      onDispatchAccepted: () => { accepted += 1; },
+    }, {} as AcpRuntime);
+    session.markDispatchAccepted();
+    session.markDispatchAccepted();
+    assert.strictEqual(accepted, 1);
+    console.log('✓ Test 13: ACP provider evidence accepts dispatch once');
+  }
+
+  console.log('\nAll 15 AcpRuntime tests passed!');
 }
 
 run().then(

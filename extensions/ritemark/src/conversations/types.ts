@@ -1,5 +1,9 @@
 import type { AgentId } from '../agent/types';
 import {
+  RUNTIME_CONTINUATION_DESCRIPTOR_VERSION,
+  type RuntimeContinuationDescriptorV1,
+} from '../runtime/continuation';
+import {
   CONVERSATION_IDENTITY_COLOR_SLOT_COUNT,
   isConversationIdentityColorSlot,
 } from './identityColor';
@@ -87,19 +91,23 @@ export interface BoundaryEventV1 extends ConversationEventBaseV1 {
   message: string;
 }
 
+export type DispatchReceiptStateV1 = 'not-sent' | 'ambiguous' | 'accepted';
+
+/** Host-only transport certainty; contains no provider reference or content. */
+export interface DispatchReceiptEventV1 extends ConversationEventBaseV1 {
+  kind: 'dispatch-receipt';
+  dispatchState: DispatchReceiptStateV1;
+}
+
 export type ConversationEventV1 =
   | UserMessageEventV1
   | AssistantMessageEventV1
   | ActivityEventV1
   | AttentionEventV1
-  | BoundaryEventV1;
+  | BoundaryEventV1
+  | DispatchReceiptEventV1;
 
-export interface ContinuationDescriptorV1 {
-  runtimeId: RuntimeId;
-  nativeReference: string;
-  capturedAt: string;
-  compatibilityVersion: number;
-}
+export type ContinuationDescriptorsV1 = Partial<Record<AgentId, RuntimeContinuationDescriptorV1>>;
 
 export interface MigrationProvenanceV1 {
   source: 'legacy-scoped' | 'legacy-global' | 'legacy-recovery';
@@ -123,7 +131,7 @@ export interface ConversationRecordV1 {
   lifecycle: ConversationLifecycleV1;
   runtimeSummary: RuntimeId[];
   events: ConversationEventV1[];
-  continuation?: ContinuationDescriptorV1;
+  continuations?: ContinuationDescriptorsV1;
   migration?: MigrationProvenanceV1;
 }
 
@@ -176,7 +184,7 @@ export interface ConversationCreateInputV1 {
   lastActivityAt?: string;
   lifecycle?: ConversationLifecycleV1;
   events?: ConversationEventV1[];
-  continuation?: ContinuationDescriptorV1;
+  continuations?: ContinuationDescriptorsV1;
   migration?: MigrationProvenanceV1;
 }
 
@@ -187,7 +195,7 @@ export interface ConversationCheckpointV1 {
   title?: string;
   lifecycle?: ConversationLifecycleV1;
   appendEvents?: ConversationEventV1[];
-  continuation?: ContinuationDescriptorV1 | null;
+  continuationUpdate?: { runtimeId: AgentId; descriptor: RuntimeContinuationDescriptorV1 | null };
 }
 
 export interface ConversationDeleteResultV1 {
@@ -197,6 +205,7 @@ export interface ConversationDeleteResultV1 {
 }
 
 const RUNTIME_IDS = new Set<RuntimeId>(['claude-code', 'codex', 'opencode', 'legacy-ritemark']);
+const AGENT_RUNTIME_IDS = new Set<AgentId>(['claude-code', 'codex', 'opencode']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SCOPE_ID_PATTERN = /^ps1-[0-9a-f]{40}$/;
 
@@ -257,6 +266,12 @@ function stringArrayAt(value: unknown, path: string): string[] {
 function runtimeAt(value: unknown, path: string): RuntimeId {
   const runtime = stringAt(value, path) as RuntimeId;
   if (!RUNTIME_IDS.has(runtime)) fail(path, 'a known runtime id');
+  return runtime;
+}
+
+function agentRuntimeAt(value: unknown, path: string): AgentId {
+  const runtime = stringAt(value, path) as AgentId;
+  if (!AGENT_RUNTIME_IDS.has(runtime)) fail(path, 'a dispatchable runtime id');
   return runtime;
 }
 
@@ -329,7 +344,7 @@ function decodeEventBase(value: unknown, path: string): { input: Record<string, 
 
 export function decodeConversationEventV1(value: unknown, path = 'event'): ConversationEventV1 {
   const { input, base } = decodeEventBase(value, path);
-  const kind = enumAt(input.kind, `${path}.kind`, ['user-message', 'assistant-message', 'activity', 'attention', 'boundary'] as const);
+  const kind = enumAt(input.kind, `${path}.kind`, ['user-message', 'assistant-message', 'activity', 'attention', 'boundary', 'dispatch-receipt'] as const);
   if (kind === 'user-message') {
     if (!Array.isArray(input.attachments)) fail(`${path}.attachments`, 'an array');
     return {
@@ -378,6 +393,14 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
       attentionState: enumAt(input.attentionState, `${path}.attentionState`, ['pending', 'resolved', 'invalidated'] as const),
     };
   }
+  if (kind === 'dispatch-receipt') {
+    return {
+      ...base,
+      kind,
+      runtimeId: agentRuntimeAt(input.runtimeId, `${path}.runtimeId`),
+      dispatchState: enumAt(input.dispatchState, `${path}.dispatchState`, ['not-sent', 'ambiguous', 'accepted'] as const),
+    };
+  }
   return {
     ...base,
     kind,
@@ -386,13 +409,60 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
   };
 }
 
-function decodeContinuation(value: unknown, path: string): ContinuationDescriptorV1 {
+function decodeContinuation(value: unknown, path: string): RuntimeContinuationDescriptorV1 {
   const input = objectAt(value, path);
+  const descriptorVersion = input.descriptorVersion === undefined
+    ? RUNTIME_CONTINUATION_DESCRIPTOR_VERSION
+    : integerAt(input.descriptorVersion, `${path}.descriptorVersion`);
+  if (descriptorVersion !== RUNTIME_CONTINUATION_DESCRIPTOR_VERSION) {
+    fail(`${path}.descriptorVersion`, `${RUNTIME_CONTINUATION_DESCRIPTOR_VERSION}`);
+  }
   return {
-    runtimeId: runtimeAt(input.runtimeId, `${path}.runtimeId`),
+    descriptorVersion,
+    runtimeId: agentRuntimeAt(input.runtimeId, `${path}.runtimeId`),
     nativeReference: stringAt(input.nativeReference, `${path}.nativeReference`),
+    scopeId: stringAt(input.scopeId, `${path}.scopeId`),
+    runtimeVersion: stringAt(input.runtimeVersion, `${path}.runtimeVersion`),
+    adapterContractVersion: integerAt(input.adapterContractVersion, `${path}.adapterContractVersion`),
+    modelId: nullableStringAt(input.modelId, `${path}.modelId`),
+    compatibilityFingerprint: stringAt(input.compatibilityFingerprint, `${path}.compatibilityFingerprint`),
+    coveredThroughEventId: nullableStringAt(input.coveredThroughEventId, `${path}.coveredThroughEventId`),
     capturedAt: isoAt(input.capturedAt, `${path}.capturedAt`),
-    compatibilityVersion: integerAt(input.compatibilityVersion, `${path}.compatibilityVersion`),
+  };
+}
+
+function decodeContinuations(value: unknown, path: string): ContinuationDescriptorsV1 {
+  const input = objectAt(value, path);
+  const descriptors: ContinuationDescriptorsV1 = {};
+  for (const [key, raw] of Object.entries(input)) {
+    const runtimeId = agentRuntimeAt(key, `${path}.${key}`);
+    const descriptor = decodeContinuation(raw, `${path}.${key}`);
+    if (descriptor.runtimeId !== runtimeId) fail(`${path}.${key}.runtimeId`, `equal to map key ${runtimeId}`);
+    descriptors[runtimeId] = descriptor;
+  }
+  return descriptors;
+}
+
+/** Sprint 109 migration input: preserved but deliberately incompatible. */
+function decodeLegacyContinuation(
+  value: unknown,
+  scopeId: string,
+): ContinuationDescriptorsV1 {
+  const input = objectAt(value, 'continuation');
+  const runtimeId = agentRuntimeAt(input.runtimeId, 'continuation.runtimeId');
+  return {
+    [runtimeId]: {
+      descriptorVersion: RUNTIME_CONTINUATION_DESCRIPTOR_VERSION,
+      runtimeId,
+      nativeReference: stringAt(input.nativeReference, 'continuation.nativeReference'),
+      scopeId,
+      runtimeVersion: 'legacy-unknown',
+      adapterContractVersion: integerAt(input.compatibilityVersion, 'continuation.compatibilityVersion'),
+      modelId: null,
+      compatibilityFingerprint: 'legacy-incompatible',
+      coveredThroughEventId: null,
+      capturedAt: isoAt(input.capturedAt, 'continuation.capturedAt'),
+    },
   };
 }
 
@@ -426,6 +496,37 @@ function validateRecordRelationships(record: ConversationRecordV1): void {
   if ([...runtimes].some((runtime) => !record.runtimeSummary.includes(runtime))) {
     fail('runtimeSummary', 'to include every event runtime');
   }
+  const userTurns = new Map(record.events
+    .filter((event): event is UserMessageEventV1 => event.kind === 'user-message')
+    .map((event) => [event.turnId, event]));
+  const dispatchOrder: DispatchReceiptStateV1[] = ['not-sent', 'ambiguous', 'accepted'];
+  const dispatchCount = new Map<string, number>();
+  for (const event of record.events) {
+    if (event.kind !== 'dispatch-receipt') continue;
+    const user = userTurns.get(event.turnId);
+    if (!user || user.runtimeId !== event.runtimeId || user.sequence >= event.sequence) {
+      fail('events', 'dispatch receipts to follow a matching user message');
+    }
+    const count = dispatchCount.get(event.turnId) ?? 0;
+    if (event.dispatchState !== dispatchOrder[count]) {
+      fail('events', 'dispatch receipt states ordered as not-sent, ambiguous, accepted');
+    }
+    dispatchCount.set(event.turnId, count + 1);
+  }
+  for (const [runtimeId, descriptor] of Object.entries(record.continuations ?? {}) as Array<[AgentId, RuntimeContinuationDescriptorV1]>) {
+    if (descriptor.runtimeId !== runtimeId) fail(`continuations.${runtimeId}.runtimeId`, `equal to map key ${runtimeId}`);
+    if (descriptor.scopeId !== record.scopeId) fail(`continuations.${runtimeId}.scopeId`, 'equal to record scopeId');
+    if (descriptor.coveredThroughEventId !== null) {
+      const covered = record.events.find((event) => event.eventId === descriptor.coveredThroughEventId);
+      // Coverage belongs to the canonical transcript, not to the provider that
+      // authored the covered event. After an explicit cross-runtime handoff a
+      // fresh Codex/Claude/OpenCode session may legitimately cover the last
+      // completed answer written by another runtime through fallback context.
+      if (!covered || covered.kind !== 'assistant-message' || covered.terminalStatus !== 'completed') {
+        fail(`continuations.${runtimeId}.coveredThroughEventId`, 'a completed assistant event in the canonical transcript');
+      }
+    }
+  }
 }
 
 export function decodeConversationRecordV1(value: unknown): ConversationRecordV1 {
@@ -448,7 +549,11 @@ export function decodeConversationRecordV1(value: unknown): ConversationRecordV1
     runtimeSummary: input.runtimeSummary.map((runtime, index) => runtimeAt(runtime, `runtimeSummary[${index}]`)),
     events: input.events.map((event, index) => decodeConversationEventV1(event, `events[${index}]`)),
   };
-  if (input.continuation !== undefined) record.continuation = decodeContinuation(input.continuation, 'continuation');
+  if (input.continuations !== undefined) {
+    record.continuations = decodeContinuations(input.continuations, 'continuations');
+  } else if (input.continuation !== undefined) {
+    record.continuations = decodeLegacyContinuation(input.continuation, record.scopeId);
+  }
   if (input.migration !== undefined) record.migration = decodeMigration(input.migration, 'migration');
   validateRecordRelationships(record);
   return record;
