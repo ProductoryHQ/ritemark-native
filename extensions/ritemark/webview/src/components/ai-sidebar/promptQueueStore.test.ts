@@ -17,7 +17,7 @@ class MemoryStorage {
 const storage = new MemoryStorage();
 (globalThis as unknown as { localStorage: MemoryStorage }).localStorage = storage;
 
-const { useAISidebarStore, resetOpenThreadRestoreForTest } = await import('./store');
+const { useAISidebarStore, resetConversationMigrationGuardForTest } = await import('./store');
 const { createConversationState } = await import('./conversationState');
 const { queueFor } = await import('./promptQueue');
 const { vscode } = await import('../../lib/vscode');
@@ -32,7 +32,7 @@ function resetAll(): void {
   storage.clear();
   posted.length = 0;
   useAISidebarStore.setState(initialState, true);
-  resetOpenThreadRestoreForTest();
+  resetConversationMigrationGuardForTest();
 }
 
 function turn(overrides: Partial<AgentConversationTurn> = {}): AgentConversationTurn {

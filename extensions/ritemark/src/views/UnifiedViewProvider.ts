@@ -76,6 +76,18 @@ import {
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import { RUNTIME_CAPABILITIES, capabilitiesFor } from '../runtime/capabilities';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
+import { ConversationController } from '../conversations/ConversationController';
+import { ConversationStore, ConversationStoreError, conversationStoreDir } from '../conversations/ConversationStore';
+import { ConversationCutoverState } from '../conversations/ConversationCutoverState';
+import { LegacyConversationMigrator } from '../conversations/LegacyConversationMigrator';
+import { isConversationRequestMessage } from '../conversations/protocol';
+import { resolveProjectScope } from '../conversations/projectScope';
+import { ConversationTitleGenerator } from '../conversations/ConversationTitleGenerator';
+import {
+  decideRuntimeAttachmentCapacity,
+  PARALLEL_RUNTIME_ATTACHMENT_LIMIT,
+  SINGLE_RUNTIME_ATTACHMENT_LIMIT,
+} from '../conversations/runtimeAttachmentPolicy';
 
 /**
  * Conversation id used when a webview message predates the Sprint 99 protocol.
@@ -95,6 +107,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * the nesting rather than a flat map.
    */
   private readonly _runtimeSessions = new Map<string, Map<AgentId, RuntimeSession>>();
+  private readonly _runtimeSessionLastUsed = new Map<string, number>();
+  private _selectedConversationId: string | null = null;
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
 
@@ -114,11 +128,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   private _runtimeRegistry: RuntimeRegistry;
   private _approvalGate: UnifiedApprovalGate;
+  private readonly _conversationController: ConversationController;
+  private readonly _conversationTitleGenerator: ConversationTitleGenerator;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _workspacePath: string | undefined,
-    private readonly _secrets?: vscode.SecretStorage
+    private readonly _secrets: vscode.SecretStorage | undefined,
+    globalStorageUri: vscode.Uri,
   ) {
     this._disposeCodexStatusListener = onCodexStatusInvalidated((event) => {
       void this._handleExternalCodexStatusInvalidation(event.reason);
@@ -140,6 +157,24 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._approvalGate = new UnifiedApprovalGate((req) => {
       this._view?.webview.postMessage({ type: 'agent-approval-request', ...req });
     });
+    this._conversationTitleGenerator = new ConversationTitleGenerator(
+      (runtimeId) => createRuntime(runtimeId),
+    );
+    const conversationStore = new ConversationStore(conversationStoreDir(globalStorageUri.fsPath));
+    const conversationCutover = new ConversationCutoverState(conversationStore);
+    this._conversationController = new ConversationController({
+      store: conversationStore,
+      currentScope: () => resolveProjectScope({
+        workspaceFileUri: vscode.workspace.workspaceFile?.toString() ?? null,
+        folderUris: (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.toString()),
+        platform: process.platform,
+      }),
+      stopConversation: (conversationId) => this._stopConversationSessions(conversationId),
+      emit: (event) => { void this._view?.webview.postMessage(event); },
+      rolloutMode: () => conversationCutover.resolve(isEnabled('durableAgentConversations')),
+      markHostAuthority: () => conversationCutover.establishHostAuthority(),
+      migrator: new LegacyConversationMigrator(conversationStore),
+    });
   }
 
   public resolveWebviewView(
@@ -158,6 +193,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
+      if (isConversationRequestMessage(message)) {
+        const response = await this._conversationController.handle(message);
+        await webviewView.webview.postMessage(response);
+        return;
+      }
       switch (message.type) {
         case 'ready':
           this._sendApiKeyStatus();
@@ -219,6 +259,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'ai-select-agent':
+          if (typeof message.conversationId === 'string') {
+            this._selectedConversationId = message.conversationId;
+            this._runtimeSessionLastUsed.set(message.conversationId, Date.now());
+          }
           // Persist agent selection to settings
           await vscode.workspace.getConfiguration('ritemark.ai').update(
             'selectedAgent',
@@ -227,6 +271,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           );
           // Re-send config (triggers setup check for Claude Code)
           this._sendAgentConfig();
+          break;
+
+        case 'conversation:selected':
+          if (typeof message.conversationId === 'string') {
+            this._selectedConversationId = message.conversationId;
+            this._runtimeSessionLastUsed.set(message.conversationId, Date.now());
+          }
           break;
 
         case 'ai-select-model':
@@ -242,7 +293,59 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const { agentId, model, attachments } = message;
           // Sprint 99: every conversation-scoped message carries its conversation.
           // A missing id means a webview path that has not been migrated yet.
-          const conversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
+          const clientConversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
+          let acceptedConversation: import('../conversations/types').ConversationRecordV1 | null = null;
+          let hostConversationEnabled = false;
+          try {
+            hostConversationEnabled = await this._conversationController.currentRolloutMode() !== 'legacy';
+            if (hostConversationEnabled) {
+              acceptedConversation = message.conversationContinuation === true
+                ? await this._conversationController.runtimeConversation(clientConversationId)
+                : await this._conversationController.acceptRuntimeTurn({
+                    conversationId: clientConversationId,
+                    turnId: typeof message.conversationTurnId === 'string' && message.conversationTurnId.length <= 128
+                      ? message.conversationTurnId
+                      : undefined,
+                    agentId: agentId as AgentId,
+                    text: typeof message.displayPrompt === 'string'
+                      ? message.displayPrompt
+                      : typeof message.prompt === 'string' ? message.prompt : '',
+                    mode: message.approvalMode === 'ask' ? 'ask' : message.planFirst === true ? 'plan' : 'auto',
+                    attachments: Array.isArray(attachments)
+                      ? attachments.map((attachment: { name?: string; kind?: string; mediaType?: string; data?: string }) => ({
+                          name: attachment.name ?? 'Attachment',
+                          kind: attachment.kind ?? 'file',
+                          mediaType: attachment.mediaType ?? null,
+                          sizeBytes: typeof attachment.data === 'string' ? Buffer.byteLength(attachment.data) : null,
+                        }))
+                      : [],
+                  });
+            }
+          } catch (error) {
+            this._view?.webview.postMessage({
+              type: 'conversation/store-status',
+              state: 'degraded',
+              message: `Could not save your message. Nothing was sent to the agent. ${error instanceof Error ? error.message : String(error)}`,
+            });
+            break;
+          }
+          const conversationId = acceptedConversation?.conversationId ?? clientConversationId;
+          const bindingGeneration = acceptedConversation?.bindingGeneration ?? 0;
+          const conversationTurnId = typeof message.conversationTurnId === 'string' && message.conversationTurnId.length <= 128
+            ? message.conversationTurnId
+            : acceptedConversation && (acceptedConversation.lifecycle.state === 'working' || acceptedConversation.lifecycle.state === 'needs-user')
+              ? acceptedConversation.lifecycle.activeTurnId
+              : undefined;
+          if (acceptedConversation && conversationId !== clientConversationId) {
+            this._view?.webview.postMessage({
+              type: 'conversation/canonical-id',
+              clientConversationId,
+              conversationId,
+              bindingGeneration,
+            });
+          }
+          let terminalCheckpointWritten = false;
+          let streamedResponseText = '';
           const skipActiveFile = message.skipActiveFile === true;
           const skipBrowserContext = message.skipBrowserContext === true;
           const mentionedAgentPaths: string[] | undefined = message.mentionedAgentPaths;
@@ -338,6 +441,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const pinnedModel = isClaudeCode
             ? (typeof model === 'string' && model ? model : this._reconciledClaudeModel())
             : model;
+          const titleGeneration = ({ userPrompt, assistantResponse }: { userPrompt: string; assistantResponse: string }) =>
+            this._conversationTitleGenerator.generate({
+              runtimeId: agentId as AgentId,
+              workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
+              ...(typeof pinnedModel === 'string' && pinnedModel ? { model: pinnedModel } : {}),
+              ...(anthropicApiKey ? { anthropicApiKey } : {}),
+              byokEnv: buildByokEnv(byokKeys),
+              userPrompt,
+              assistantResponse,
+            });
 
           const sessionConfig: RuntimeSessionConfig = {
             workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
@@ -372,13 +485,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 this._view?.webview.postMessage({ type: 'agent-progress', conversationId, agentId, progress });
               } else {
                 if (progress.type === 'text') {
+                  streamedResponseText += progress.message;
                   this._view?.webview.postMessage({ type: 'codex-streaming', conversationId, delta: progress.message });
                 } else {
                   this._view?.webview.postMessage({ type: 'codex-progress', conversationId, progress });
                 }
               }
             },
-            onApprovalRequest: (req) => this._approvalGate.request({ ...req, conversationId }),
+            onApprovalRequest: (req) => {
+              this._runConversationCheckpoint(() => this._conversationController.attentionRuntimeTurn({
+                conversationId,
+                bindingGeneration,
+                runtimeId: agentId as AgentId,
+                attentionKind: 'approval',
+                prompt: req.kind === 'shell-command' ? (req.command ?? 'Command approval') : (req.filePath ?? 'Approval required'),
+              }), hostConversationEnabled);
+              return this._approvalGate.request({ ...req, conversationId });
+            },
             onComplete: (result) => {
               this._view?.webview.postMessage({
                 type: 'agent-result', conversationId,
@@ -389,8 +512,28 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 error: result.error,
               });
               this._refreshExplorerForAgentWrites(result.filesModified);
+              if (!terminalCheckpointWritten) {
+                terminalCheckpointWritten = true;
+                this._runConversationCheckpoint(() => this._conversationController.completeRuntimeTurn({
+                  conversationId,
+                  bindingGeneration,
+                  runtimeId: agentId as AgentId,
+                  turnId: conversationTurnId,
+                  text: result.text ?? '',
+                  status: result.error ? 'failed' : 'completed',
+                  error: result.error,
+                  generateTitle: titleGeneration,
+                }), hostConversationEnabled);
+              }
             },
             onQuestion: (question) => {
+              this._runConversationCheckpoint(() => this._conversationController.attentionRuntimeTurn({
+                conversationId,
+                bindingGeneration,
+                runtimeId: agentId as AgentId,
+                attentionKind: 'question',
+                prompt: question.questions.map((item) => item.question).join('\n'),
+              }), hostConversationEnabled);
               this._view?.webview.postMessage({ type: 'agent-question', conversationId, agentId, question });
             },
             onCodexComplete: (result) => {
@@ -401,6 +544,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 error: result.error,
               });
               this._refreshExplorerForAgentWrites(undefined);
+              if (!terminalCheckpointWritten) {
+                terminalCheckpointWritten = true;
+                const runtimeCompleted = !result.error && !/error|failed|cancelled/i.test(result.status);
+                this._runConversationCheckpoint(() => this._conversationController.completeRuntimeTurn({
+                  conversationId,
+                  bindingGeneration,
+                  runtimeId: agentId as AgentId,
+                  turnId: conversationTurnId,
+                  text: streamedResponseText,
+                  status: runtimeCompleted ? 'completed' : 'failed',
+                  error: result.error,
+                  generateTitle: titleGeneration,
+                }), hostConversationEnabled);
+              }
             },
             onExit: () => {
               // Codex app-server died mid-turn — finalize the turn so the webview
@@ -411,14 +568,40 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 status: 'error',
                 error: 'Codex exited unexpectedly. Please try again.',
               });
+              if (!terminalCheckpointWritten) {
+                terminalCheckpointWritten = true;
+                this._runConversationCheckpoint(() => this._conversationController.completeRuntimeTurn({
+                  conversationId,
+                  bindingGeneration,
+                  runtimeId: agentId as AgentId,
+                  turnId: conversationTurnId,
+                  text: '',
+                  status: 'failed',
+                  error: 'Runtime exited unexpectedly.',
+                }), hostConversationEnabled);
+              }
             },
             onCodexPlanDelta: (delta) => {
               this._view?.webview.postMessage({ type: 'codex-plan-text-delta', conversationId, delta });
             },
             onCodexPlanUpdate: (explanation, plan) => {
+              this._runConversationCheckpoint(() => this._conversationController.attentionRuntimeTurn({
+                conversationId,
+                bindingGeneration,
+                runtimeId: agentId as AgentId,
+                attentionKind: 'plan-review',
+                prompt: explanation ?? plan.map((step) => step.step).join('\n'),
+              }), hostConversationEnabled);
               this._view?.webview.postMessage({ type: 'codex-plan-update', conversationId, explanation, plan });
             },
             onCodexQuestion: (requestId, questions) => {
+              this._runConversationCheckpoint(() => this._conversationController.attentionRuntimeTurn({
+                conversationId,
+                bindingGeneration,
+                runtimeId: agentId as AgentId,
+                attentionKind: 'question',
+                prompt: questions.map((item) => item.question).join('\n'),
+              }), hostConversationEnabled);
               this._view?.webview.postMessage({ type: 'codex-question', conversationId, requestId, questions });
             },
             onRpcProgress: (_method, msg) => {
@@ -737,6 +920,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   public dispose() {
+    this._disposeAllRuntimeSessions();
+    this._conversationController.dispose();
     this._runtimeRegistry.get('opencode')?.dispose();
     (this._runtimeRegistry.get('codex') as CodexRuntime).stopLoginPolling();
     this._stopClaudeLoginPolling();
@@ -748,6 +933,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       clearInterval(this._browserContextPoll);
       this._browserContextPoll = null;
     }
+  }
+
+  public async prepareForShutdown(): Promise<void> {
+    await this._conversationController.interruptRuntimeAttachments(this._runtimeSessions.keys(), 'restart');
   }
 
   private async _sendApiKeyStatus() {
@@ -829,6 +1018,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // Sprint 99 kill-switch. Parallel chats are almost entirely webview behaviour,
     // so the flag has to cross the boundary or it cannot switch anything off.
     const parallelChatsEnabled = isEnabled('parallelChats');
+    const durableAgentConversations = isEnabled('durableAgentConversations');
     const codexEnabled = isEnabled('codex-integration');
     const config = vscode.workspace.getConfiguration('ritemark.ai');
     const selectedAgent = config.get<string>('selectedAgent', 'claude-code');
@@ -882,6 +1072,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       type: 'agent:config',
       agenticEnabled,
       parallelChatsEnabled,
+      durableAgentConversations,
       codexEnabled,
       selectedAgent,
       selectedModel: reconciledModel,
@@ -1440,6 +1631,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     runtime: AgentRuntime,
     config: RuntimeSessionConfig,
   ): Promise<RuntimeSession> {
+    await this._ensureRuntimeAttachmentCapacity(conversationId);
     let byAgent = this._runtimeSessions.get(conversationId);
     if (!byAgent) {
       byAgent = new Map<AgentId, RuntimeSession>();
@@ -1448,6 +1640,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
     const session = await runtime.createSession(conversationId, config);
     byAgent.set(agentId, session);
+    this._runtimeSessionLastUsed.set(conversationId, Date.now());
     return session;
   }
 
@@ -1455,7 +1648,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     conversationId: string | undefined,
     agentId: AgentId,
   ): RuntimeSession | undefined {
-    return this._runtimeSessions.get(conversationId ?? DEFAULT_CONVERSATION_ID)?.get(agentId);
+    const resolvedConversationId = conversationId ?? DEFAULT_CONVERSATION_ID;
+    const session = this._runtimeSessions.get(resolvedConversationId)?.get(agentId);
+    if (session) this._runtimeSessionLastUsed.set(resolvedConversationId, Date.now());
+    return session;
   }
 
   /** Tear down one conversation's sessions, leaving every other conversation alone. */
@@ -1466,12 +1662,76 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       session.dispose();
     }
     this._runtimeSessions.delete(conversationId);
+    this._runtimeSessionLastUsed.delete(conversationId);
+  }
+
+  private async _ensureRuntimeAttachmentCapacity(incomingConversationId: string): Promise<void> {
+    const capacity = isEnabled('parallelChats')
+      ? PARALLEL_RUNTIME_ATTACHMENT_LIMIT
+      : SINGLE_RUNTIME_ATTACHMENT_LIMIT;
+    while (true) {
+      const attachments = await Promise.all(Array.from(this._runtimeSessions.keys()).map(async (conversationId) => {
+        try {
+          const record = await this._conversationController.runtimeConversation(conversationId);
+          return {
+            conversationId,
+            lifecycle: record.lifecycle,
+            lastUsedAt: this._runtimeSessionLastUsed.get(conversationId) ?? 0,
+          };
+        } catch {
+          // A live session without a current-project durable record is unsafe to
+          // reuse. Treat it as idle so the bounded pool releases it first.
+          return {
+            conversationId,
+            lifecycle: { state: 'idle' } as const,
+            lastUsedAt: this._runtimeSessionLastUsed.get(conversationId) ?? 0,
+          };
+        }
+      }));
+      const decision = decideRuntimeAttachmentCapacity({
+        attachments,
+        incomingConversationId,
+        currentConversationId: this._selectedConversationId,
+        capacity,
+      });
+      if (decision.kind === 'available') return;
+      if (decision.kind === 'blocked') throw new Error(decision.message);
+      this._disposeRuntimeSessions(decision.conversationId);
+      void this._view?.webview.postMessage({
+        type: 'conversation/runtime-released',
+        conversationId: decision.conversationId,
+      });
+    }
   }
 
   private _disposeAllRuntimeSessions(): void {
     for (const conversationId of Array.from(this._runtimeSessions.keys())) {
       this._disposeRuntimeSessions(conversationId);
     }
+  }
+
+  private async _stopConversationSessions(conversationId: string): Promise<void> {
+    const byAgent = this._runtimeSessions.get(conversationId);
+    if (!byAgent) return;
+    await Promise.all(Array.from(byAgent.values()).map((session) => session.cancel()));
+    this._disposeRuntimeSessions(conversationId);
+  }
+
+  private _runConversationCheckpoint(operation: () => Promise<unknown>, enabled = true): void {
+    if (!enabled) return;
+    void operation().catch((error: unknown) => {
+      if (error instanceof ConversationStoreError
+        && ['deleted', 'not-found', 'stale-binding'].includes(error.code)) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[Conversations] Runtime checkpoint failed:', error);
+      void this._view?.webview.postMessage({
+        type: 'conversation/store-status',
+        state: 'degraded',
+        message: `Conversation checkpoint failed: ${message}`,
+      });
+    });
   }
 
 }

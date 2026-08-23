@@ -260,6 +260,33 @@ function testClearChatUsesFreshConversationId() {
   }
 }
 
+function testFlagOffStillInitializesAuthoritativeRolloutMode() {
+  const logged: unknown[][] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { logged.push(args); };
+  try {
+    useAISidebarStore.getState().handleExtensionMessage({
+      type: 'agent:config',
+      agenticEnabled: true,
+      durableAgentConversations: false,
+      selectedAgent: 'claude-code',
+      selectedModel: 'test-model',
+      agents: [],
+      models: [],
+    });
+    assert.ok(logged.some((args) => (
+      args[0] === '[Bridge] Would send conversation request:'
+      && typeof args[1] === 'object'
+      && args[1] !== null
+      && 'type' in args[1]
+      && args[1].type === 'conversation/initialize'
+    )), 'flag-off must still ask the host whether rollout is legacy or host-compat');
+  } finally {
+    console.log = originalLog;
+    resetStore();
+  }
+}
+
 function main() {
   testStartNewConversationDoesNotResetProviderSessions();
   testClearChatResetsOnlyItsOwnProviderSession();
@@ -268,6 +295,7 @@ function main() {
   testDismissCurrentPlanStoresKey();
   testNewChatUsesFreshConversationIdSoSessionsDoNotCollapse();
   testClearChatUsesFreshConversationId();
+  testFlagOffStillInitializesAuthoritativeRolloutMode();
   console.log('Conversation reset tests passed.');
 }
 

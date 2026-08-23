@@ -1,0 +1,75 @@
+{
+  "fixtureVersion": 1,
+  "name": "project-scope-matrix",
+  "cases": [
+    {
+      "id": "single-root",
+      "platform": "darwin",
+      "input": { "workspaceFileUri": null, "folderUris": ["file:///Fixtures/Alpha/"] },
+      "expectedDescriptor": { "kind": "single-root", "workspaceFileUri": null, "folderUris": ["file:///Fixtures/Alpha"] }
+    },
+    {
+      "id": "multi-root-a",
+      "equivalenceGroup": "multi-root-order",
+      "platform": "darwin",
+      "input": { "workspaceFileUri": null, "folderUris": ["file:///Fixtures/Beta", "file:///Fixtures/Alpha"] },
+      "expectedDescriptor": { "kind": "multi-root", "workspaceFileUri": null, "folderUris": ["file:///Fixtures/Alpha", "file:///Fixtures/Beta"] }
+    },
+    {
+      "id": "multi-root-b",
+      "equivalenceGroup": "multi-root-order",
+      "platform": "darwin",
+      "input": { "workspaceFileUri": null, "folderUris": ["file:///Fixtures/Alpha", "file:///Fixtures/Beta"] },
+      "expectedDescriptor": { "kind": "multi-root", "workspaceFileUri": null, "folderUris": ["file:///Fixtures/Alpha", "file:///Fixtures/Beta"] }
+    },
+    {
+      "id": "workspace-file",
+      "platform": "darwin",
+      "input": { "workspaceFileUri": "file:///Fixtures/team.code-workspace", "folderUris": ["file:///Fixtures/Alpha", "file:///Fixtures/Beta"] },
+      "expectedDescriptor": { "kind": "workspace-file", "workspaceFileUri": "file:///Fixtures/team.code-workspace", "folderUris": ["file:///Fixtures/Alpha", "file:///Fixtures/Beta"] },
+      "mustDifferFrom": ["multi-root-a", "multi-root-b"]
+    },
+    {
+      "id": "windows-case-a",
+      "equivalenceGroup": "windows-case",
+      "platform": "win32",
+      "input": { "workspaceFileUri": null, "folderUris": ["file:///C:/Fixtures/Alpha", "file:///d:/Fixtures/Beta/"] },
+      "expectedDescriptor": { "kind": "multi-root", "workspaceFileUri": null, "folderUris": ["file:///c:/fixtures/alpha", "file:///d:/fixtures/beta"] }
+    },
+    {
+      "id": "windows-case-b",
+      "equivalenceGroup": "windows-case",
+      "platform": "win32",
+      "input": { "workspaceFileUri": null, "folderUris": ["file:///D:/FIXTURES/BETA", "file:///c:/fixtures/alpha"] },
+      "expectedDescriptor": { "kind": "multi-root", "workspaceFileUri": null, "folderUris": ["file:///c:/fixtures/alpha", "file:///d:/fixtures/beta"] }
+    },
+    {
+      "id": "no-folder-a",
+      "equivalenceGroup": "installation-no-folder",
+      "platform": "darwin",
+      "input": { "workspaceFileUri": null, "folderUris": [] },
+      "expectedDescriptor": { "kind": "no-folder", "workspaceFileUri": null, "folderUris": [] }
+    },
+    {
+      "id": "no-folder-b",
+      "equivalenceGroup": "installation-no-folder",
+      "platform": "win32",
+      "input": { "workspaceFileUri": null, "folderUris": [] },
+      "expectedDescriptor": { "kind": "no-folder", "workspaceFileUri": null, "folderUris": [] }
+    },
+    {
+      "id": "moved-folder",
+      "platform": "darwin",
+      "input": { "workspaceFileUri": null, "folderUris": ["file:///Fixtures/Alpha-Renamed"] },
+      "expectedDescriptor": { "kind": "single-root", "workspaceFileUri": null, "folderUris": ["file:///Fixtures/Alpha-Renamed"] },
+      "mustDifferFrom": ["single-root"],
+      "automaticRelinkAllowed": false
+    }
+  ],
+  "legacyRules": {
+    "singleRootScopedPrefixMayMapToCurrentScope": true,
+    "multiRootFirstFolderPrefixMayMapToCurrentScope": false,
+    "globalPrefixMapsToNoFolder": false,
+    "ambiguousDestination": "unassigned-legacy"
+  }
+}

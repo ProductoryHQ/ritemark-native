@@ -105,6 +105,33 @@
   --r-warning-soft: var(--ritemark-warning-soft);
   --r-error: var(--ritemark-error);
   --r-error-soft: var(--ritemark-error-soft);
+  /* Persisted conversation identity slots. Each round exhausts the eight base
+     hue families before the next variation begins. Phosphor duotone supplies
+     the softer 20%-opacity interior; these colors never encode lifecycle. */
+  --r-conversation-0: #dc2626;  /* red */
+  --r-conversation-1: #ea580c;  /* orange */
+  --r-conversation-2: #d97706;  /* amber */
+  --r-conversation-3: #16a34a;  /* green */
+  --r-conversation-4: #0d9488;  /* teal */
+  --r-conversation-5: #2563eb;  /* blue */
+  --r-conversation-6: #7c3aed;  /* violet */
+  --r-conversation-7: #c026d3;  /* magenta */
+  --r-conversation-8: #991b1b;
+  --r-conversation-9: #9a3412;
+  --r-conversation-10: #92400e;
+  --r-conversation-11: #166534;
+  --r-conversation-12: #115e59;
+  --r-conversation-13: #1e40af;
+  --r-conversation-14: #5b21b6;
+  --r-conversation-15: #86198f;
+  --r-conversation-16: #ef4444;
+  --r-conversation-17: #f97316;
+  --r-conversation-18: #f59e0b;
+  --r-conversation-19: #22c55e;
+  --r-conversation-20: #14b8a6;
+  --r-conversation-21: #3b82f6;
+  --r-conversation-22: #8b5cf6;
+  --r-conversation-23: #d946ef;
   --r-ring-color: var(--ritemark-ring-color);
 
   --background: var(--r-surface);
@@ -151,6 +178,30 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-warning-soft: var(--ritemark-dark-warning-soft);
   --r-error: var(--ritemark-dark-error);
   --r-error-soft: var(--ritemark-dark-error-soft);
+  --r-conversation-0: #f87171;
+  --r-conversation-1: #fb923c;
+  --r-conversation-2: #fbbf24;
+  --r-conversation-3: #4ade80;
+  --r-conversation-4: #2dd4bf;
+  --r-conversation-5: #60a5fa;
+  --r-conversation-6: #a78bfa;
+  --r-conversation-7: #e879f9;
+  --r-conversation-8: #ef4444;
+  --r-conversation-9: #f97316;
+  --r-conversation-10: #f59e0b;
+  --r-conversation-11: #22c55e;
+  --r-conversation-12: #14b8a6;
+  --r-conversation-13: #3b82f6;
+  --r-conversation-14: #8b5cf6;
+  --r-conversation-15: #d946ef;
+  --r-conversation-16: #fca5a5;
+  --r-conversation-17: #fdba74;
+  --r-conversation-18: #fcd34d;
+  --r-conversation-19: #86efac;
+  --r-conversation-20: #5eead4;
+  --r-conversation-21: #93c5fd;
+  --r-conversation-22: #c4b5fd;
+  --r-conversation-23: #f0abfc;
   --r-ring-color: var(--ritemark-ring-color-dark);
 }
 

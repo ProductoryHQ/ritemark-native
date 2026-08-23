@@ -5,9 +5,8 @@
  * and renders the correct view based on store state.
  */
 
-import { useEffect } from 'react';
-import { useAISidebarStore, selectActiveConversation, useActiveConversation } from './store';
-import type { ConversationState } from './conversationState';
+import { useEffect, useRef } from 'react';
+import { useAISidebarStore, useActiveConversation } from './store';
 import { vscode } from '../../lib/vscode';
 import { OfflineBanner } from './OfflineBanner';
 import { OnboardingWizard } from './OnboardingWizard';
@@ -21,19 +20,18 @@ import { CodexSetupView } from './CodexSetupView';
 import { OpenCodeSetupView } from './OpenCodeSetupView';
 import { ChatInput } from './ChatInput';
 import { SelectionIndicator } from './SelectionIndicator';
-import { ChatHistoryPanel } from './ChatHistoryPanel';
+import { ConversationsPanel } from './ConversationsPanel';
 import { ThreadRail } from './ThreadRail';
-import { ThreadCapDialog } from './ThreadCapDialog';
 import { ActivePlanBanner } from './ActivePlanBanner';
 import { getActiveApprovedPlanForClaude, getActiveApprovedPlanForCodex } from './lifecycle';
 import { markdownStyles } from './RenderedMarkdown';
 import type { ExtensionMessage } from './types';
+import { sendConversationRequest } from '../../bridge';
 
 export function AISidebar() {
   const handleMessage = useAISidebarStore((s) => s.handleExtensionMessage);
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const ready = useAISidebarStore((s) => s.ready);
-  const parallelChatsEnabled = useAISidebarStore((s) => s.parallelChatsEnabled);
   const dismissCurrentPlan = useAISidebarStore((s) => s.dismissCurrentPlan);
   const {
     selectedAgent,
@@ -41,6 +39,7 @@ export function AISidebar() {
     agentConversation,
     codexConversation,
     legacyConversation,
+    restoredTranscript,
   } = useActiveConversation();
 
   // Set up message listener + handshake
@@ -53,26 +52,12 @@ export function AISidebar() {
     // Restore persisted state if available
     const savedState = vscode.getState() as Record<string, unknown> | null;
     if (savedState) {
-      // Re-hydrate the ACTIVE conversation from saved webview state.
-      // Sprint 99: this restores one thread (the one that was on screen). The
-      // full open-thread set persists per workspace in Phase 5 (R13).
       const store = useAISidebarStore.getState();
-      const restored: Partial<ConversationState> = {};
-      if (savedState.chatMessages) {
-        restored.chatMessages = savedState.chatMessages as ConversationState['chatMessages'];
-        restored.conversationHistory = (savedState.conversationHistory || []) as ConversationState['conversationHistory'];
+      if (Array.isArray(savedState.pinnedConversationIds)) {
+        store.setPinnedConversationIds(savedState.pinnedConversationIds.filter((id): id is string => typeof id === 'string'));
       }
-      if (savedState.agentConversation) {
-        restored.agentConversation = savedState.agentConversation as ConversationState['agentConversation'];
-      }
-      if (savedState.codexConversation) {
-        restored.codexConversation = savedState.codexConversation as ConversationState['codexConversation'];
-      }
-      if ('dismissedCurrentPlanKey' in savedState) {
-        restored.dismissedCurrentPlanKey = (savedState.dismissedCurrentPlanKey as string | null) ?? null;
-      }
-      if (Object.keys(restored).length > 0) {
-        store.restoreActiveConversation(restored);
+      if (typeof savedState.currentConversationId === 'string' && /^[0-9a-f]{8}-/i.test(savedState.currentConversationId)) {
+        sendConversationRequest({ type: 'conversation/get', requestId: `restore-${Date.now()}`, conversationId: savedState.currentConversationId });
       }
     }
 
@@ -84,16 +69,21 @@ export function AISidebar() {
 
   // Persist state across hide/show
   useEffect(() => {
+    let selectedConversationId = useAISidebarStore.getState().activeConversationId;
+    if (selectedConversationId) {
+      vscode.postMessage({ type: 'conversation:selected', conversationId: selectedConversationId });
+    }
     return useAISidebarStore.subscribe((state) => {
-      const active = selectActiveConversation(state);
       vscode.setState({
-        chatMessages: active.chatMessages,
-        conversationHistory: active.conversationHistory,
-        agentConversation: active.agentConversation,
-        codexConversation: active.codexConversation,
         currentConversationId: state.activeConversationId,
-        dismissedCurrentPlanKey: active.dismissedCurrentPlanKey,
+        pinnedConversationIds: state.pinnedConversationIds,
       });
+      if (state.activeConversationId !== selectedConversationId) {
+        selectedConversationId = state.activeConversationId;
+        if (selectedConversationId) {
+          vscode.postMessage({ type: 'conversation:selected', conversationId: selectedConversationId });
+        }
+      }
     });
   }, []);
 
@@ -106,6 +96,17 @@ export function AISidebar() {
   const showHistoryPanel = useAISidebarStore((s) => s.showHistoryPanel);
   const loadConversationList = useAISidebarStore((s) => s.loadConversationList);
   const chatFontSize = useAISidebarStore((s) => s.chatFontSize);
+  const historyWasOpen = useRef(showHistoryPanel);
+
+  useEffect(() => {
+    const wasOpen = historyWasOpen.current;
+    historyWasOpen.current = showHistoryPanel;
+    if (!wasOpen || showHistoryPanel) return;
+    const timeout = window.setTimeout(() => {
+      document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
+    }, 50);
+    return () => window.clearTimeout(timeout);
+  }, [showHistoryPanel]);
 
   // Initialize chat font size CSS variable
   useEffect(() => {
@@ -157,16 +158,13 @@ export function AISidebar() {
     : null;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden text-[var(--r-ink-strong)] bg-[var(--vscode-sideBar-background)]">
+    <div className="relative flex flex-col h-screen overflow-hidden text-[var(--r-ink-strong)] bg-[var(--vscode-sideBar-background)]">
       {/* Inject markdown styles once at root level */}
       <style dangerouslySetInnerHTML={{ __html: markdownStyles }} />
 
 
-      {/* Chat History Panel (overlay) */}
-      {showHistoryPanel && <ChatHistoryPanel />}
-
-      {/* Soft-cap prompt for "+" / History reopen (R11) */}
-      <ThreadCapDialog />
+      {/* Conversations panel overlay; the rail remains visible. */}
+      {showHistoryPanel && <ConversationsPanel />}
 
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}
@@ -208,27 +206,32 @@ export function AISidebar() {
           */}
           <div className="flex-1 min-h-0 flex overflow-hidden border-t border-[var(--r-hairline)]">
             <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-              {agentConversation.length > 0 || codexConversation.length > 0
-                ? <UnifiedConversationView />
-                : legacyConversation !== null
-                ? <LegacyConversationView />
-                : isCodex ? <CodexView />
-                : <AgentView />}
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                {restoredTranscript && (
+                  <div role="status" className="mx-3 mt-3 rounded-[8px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-2 text-[11px] leading-[1.4] text-[var(--r-ink-muted)]">
+                    Transcript restored. Your next message starts with a new agent working context.
+                  </div>
+                )}
+                {agentConversation.length > 0 || codexConversation.length > 0
+                  ? <UnifiedConversationView />
+                  : legacyConversation !== null
+                  ? <LegacyConversationView />
+                  : isCodex ? <CodexView />
+                  : <AgentView />}
+              </div>
+              {visibleCurrentPlan && (
+                <ActivePlanBanner
+                  planText={visibleCurrentPlan.planText}
+                  planSteps={'planSteps' in visibleCurrentPlan ? visibleCurrentPlan.planSteps : undefined}
+                  isRunning={visibleCurrentPlan.isRunning}
+                  allCompleted={Boolean(visibleCurrentPlan.allCompleted)}
+                  onDismiss={() => dismissCurrentPlan(visibleCurrentPlan.key)}
+                />
+              )}
+              <ChatInput />
             </div>
-            {parallelChatsEnabled && <ThreadRail />}
+            <ThreadRail />
           </div>
-
-          {/* Shared input */}
-          {visibleCurrentPlan && (
-            <ActivePlanBanner
-              planText={visibleCurrentPlan.planText}
-              planSteps={'planSteps' in visibleCurrentPlan ? visibleCurrentPlan.planSteps : undefined}
-              isRunning={visibleCurrentPlan.isRunning}
-              allCompleted={Boolean(visibleCurrentPlan.allCompleted)}
-              onDismiss={() => dismissCurrentPlan(visibleCurrentPlan.key)}
-            />
-          )}
-          <ChatInput />
         </>
       )}
 

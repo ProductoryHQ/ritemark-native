@@ -1,0 +1,18 @@
+{
+  "fixtureVersion": 1,
+  "name": "corrupt-index-and-isolated-record",
+  "storeEntries": [
+    { "path": "index.json", "rawValue": "{\"schemaVersion\":1,\"entries\":[" },
+    { "path": "records/conversation-a.json", "recordRef": "valid-record-a" },
+    { "path": "records/conversation-b.json", "recordRef": "valid-record-b" },
+    { "path": "records/conversation-corrupt.json", "rawValue": "{\"schemaVersion\":1,\"conversationId\":" },
+    { "path": "records/conversation-c.json.tmp-stale", "rawValue": "{\"partial\":true" }
+  ],
+  "expected": {
+    "listedConversationIds": ["conversation-a", "conversation-b"],
+    "quarantinedPaths": ["index.json", "records/conversation-corrupt.json"],
+    "ignoredStaleTemps": ["records/conversation-c.json.tmp-stale"],
+    "replacementGhostCreated": false,
+    "indexRebuiltFromRecordDirectory": true
+  }
+}

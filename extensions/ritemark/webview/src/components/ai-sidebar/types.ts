@@ -377,7 +377,7 @@ export type ExtensionMessage =
   | { type: 'connectivity-status'; isOnline: boolean }
   // Sprint 94 (#81): a comment assigned to an agent, relayed from the editor.
   | { type: 'comment:submit'; agentId: string; prompt: string; commentIds?: string[]; documentPath?: string }
-  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103 R6: per-runtime capability map. */ runtimeCapabilities?: Record<string, { planFirst: boolean; liveModeSwitch: boolean; structuredPlanSteps: boolean }> }
+  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103 R6: per-runtime capability map. */ runtimeCapabilities?: Record<string, { planFirst: boolean; liveModeSwitch: boolean; structuredPlanSteps: boolean }> }
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
@@ -398,6 +398,10 @@ export type ExtensionMessage =
   | { type: 'agent-setup:error'; error: string }
   | { type: 'settings:chatFontSize'; fontSize: number }
   | { type: 'toggle-history-panel' }
+  | { type: 'conversation/canonical-id'; clientConversationId: string; conversationId: string; bindingGeneration: number }
+  | { type: 'conversation/runtime-released'; conversationId: string }
+  | import('../../../../src/conversations/protocol').ConversationResultMessage
+  | import('../../../../src/conversations/protocol').ConversationHostEvent
   | { type: 'files-dropped'; paths: string[] }
   // Codex messages
   | { type: 'codex:status'; status: CodexSidebarStatus }

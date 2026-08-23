@@ -1,0 +1,44 @@
+{
+  "fixtureVersion": 1,
+  "name": "atomic-write-failure-ordering",
+  "cases": [
+    {
+      "id": "record-temp-write-fails",
+      "failAt": "record-temp-write",
+      "expectedRecord": "previous-version",
+      "expectedIndex": "previous-version",
+      "dispatchAllowed": false
+    },
+    {
+      "id": "record-rename-fails",
+      "failAt": "record-rename",
+      "expectedRecord": "previous-version",
+      "expectedIndex": "previous-version",
+      "dispatchAllowed": false,
+      "staleTempIgnoredOnRestart": true
+    },
+    {
+      "id": "record-committed-index-temp-fails",
+      "failAt": "index-temp-write",
+      "expectedRecord": "next-version",
+      "expectedIndex": "previous-version",
+      "discoverNextRecordByDirectoryReconciliation": true,
+      "dispatchAllowed": true
+    },
+    {
+      "id": "record-committed-index-rename-fails",
+      "failAt": "index-rename",
+      "expectedRecord": "next-version",
+      "expectedIndex": "previous-version",
+      "discoverNextRecordByDirectoryReconciliation": true,
+      "dispatchAllowed": true
+    },
+    {
+      "id": "corrupt-current-record",
+      "failAt": "record-parse-on-read",
+      "expectedRecord": "last-verified-backup-or-corrupt-row",
+      "quarantineCorruptBytes": true,
+      "replacementGhostCreated": false
+    }
+  ]
+}

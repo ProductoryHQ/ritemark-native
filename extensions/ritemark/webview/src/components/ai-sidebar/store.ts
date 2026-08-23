@@ -17,34 +17,31 @@ import {
   listConversations,
   loadConversation,
   saveConversation,
-  deleteConversation as deleteConversationFromStorage,
   generateId,
   generateTitle,
   setWorkspaceContext,
-  saveOpenThreadIds,
-  loadOpenThreadIds,
+  setLegacyStorageReadOnly,
+  discoverLegacyConversationCandidates,
   type SavedConversationV2,
 } from './chatHistoryStorage';
+import type {
+  ConversationInitializeResult,
+  ConversationProjectionV1,
+  ConversationRequest,
+} from '../../../../src/conversations/protocol';
+import { sendConversationRequest } from '../../bridge';
+import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
 import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult } from './lifecycle';
 import {
   createConversationState,
   isConversationEmpty,
-  markConversationInterrupted,
   policyOf,
   type ConversationState,
   type PendingRuntimeSelection,
 } from './conversationState';
-import {
-  deriveThreadStatus,
-  deriveThreadTitle,
-  evaluateSoftCap,
-  runtimeOfConversation,
-  type CapCandidate,
-  type ThreadRuntime,
-  type ThreadStatus,
-} from './threadStatus';
-import { clearSlot, pruneSlots, setSlot, type ComposerSlots } from './composerQueue';
+import { runtimeOfConversation } from './threadStatus';
+import { clearSlot, setSlot, type ComposerSlots } from './composerQueue';
 import {
   enqueueItem,
   removeItem as removeQueueItem,
@@ -52,8 +49,6 @@ import {
   moveItem as moveQueueItem,
   markStatus as markQueueStatus,
   requeueFailed,
-  pruneQueues,
-  queueFor,
   nextDispatchable,
   isReadyToDrain,
   type PromptQueues,
@@ -61,6 +56,7 @@ import {
 } from './promptQueue';
 import { deriveActivityState } from './activityState';
 import { resolveInboundConversationId } from './conversationRouting';
+import { projectionToConversation } from './conversationProjection';
 import type {
   AgentId,
   AgentInfo,
@@ -106,6 +102,17 @@ function nextId(): string {
  */
 function resetProviderSession(conversationId: string): void {
   vscode.postMessage({ type: 'conversation:reset', conversationId });
+}
+
+function focusComposerSoon(): void {
+  if (typeof document === 'undefined' || typeof requestAnimationFrame !== 'function') return;
+  requestAnimationFrame(() => {
+    // Wait through the panel-unmount frame. Otherwise the browser may move
+    // focus back to <body> when the selected row disappears after we focus.
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
+    });
+  });
 }
 
 /**
@@ -207,24 +214,6 @@ function stampConversationId<T extends { conversationId?: string }>(turns: T[], 
   return turns.map((t) => (t.conversationId === conversationId ? t : { ...t, conversationId }));
 }
 
-/**
- * A thread open on the rail, as the rail and History need to see it. Derived —
- * never stored — so it cannot drift from `conversations`.
- */
-export interface OpenThreadSummary {
-  id: string;
-  title: string;
-  runtime: ThreadRuntime;
-  status: ThreadStatus;
-  hasQueuedPrompt: boolean;
-  isActive: boolean;
-}
-
-/** A thread-open action parked behind the soft-cap prompt (R11). */
-export type PendingThreadOpen =
-  | { kind: 'new' }
-  | { kind: 'reopen'; conversationId: string };
-
 interface AISidebarState {
   // ── Connection state (APP-GLOBAL) ──
   hasApiKey: boolean;
@@ -240,7 +229,6 @@ interface AISidebarState {
    * rather than adds. Defaults to TRUE so a config message that never arrives
    * cannot silently disable a shipped feature — the host turns it off explicitly.
    */
-  parallelChatsEnabled: boolean;
   agents: AgentInfo[];
   models: ModelOption[];
 
@@ -272,6 +260,12 @@ interface AISidebarState {
   // ── Chat history (APP-GLOBAL) ──
   savedConversations: SavedConversationV2[];
   showHistoryPanel: boolean;
+  conversationRolloutMode: 'unknown' | 'legacy' | 'host-canonical' | 'host-compat';
+  hostConversations: ConversationSummaryV1[];
+  earlierConversations: ConversationSummaryV1[];
+  pinnedConversationIds: string[];
+  conversationStoreNotice: string | null;
+  pendingUndo: { undoToken: string; title: string; recovery: boolean } | null;
 
   // ── Composer state, keyed per thread (Sprint 99 R14 / E5) ──
   /**
@@ -302,10 +296,6 @@ interface AISidebarState {
   /** Dispatch the head item when the target conversation is truly ready. */
   maybeDrainQueue: (conversationId: string) => void;
   setComposerDraft: (conversationId: string, text: string) => void;
-
-  // ── Soft cap gate (Sprint 99 R11 + Resolved Gaps 2/3) ──
-  /** Set when "+" or a History reopen hit the soft cap and needs a decision. */
-  pendingThreadOpen: PendingThreadOpen | null;
 
   // ── Setup state (Claude Code) (APP-GLOBAL) ──
   setupStatus: SetupStatus | null;
@@ -343,24 +333,8 @@ interface AISidebarState {
   switchConversation: (id: string) => void;
   /** Ids of every open thread, in creation order. */
   listOpenConversations: () => string[];
-  /** Close a thread: frees its runtime session, keeps the transcript in History. */
-  closeConversation: (id: string) => void;
-  /**
-   * User pressed "+". Refocuses an existing empty thread, opens a new one, or —
-   * at the soft cap — raises `pendingThreadOpen` for the user to decide (R11).
-   */
+  /** User pressed "+". Refocus an existing blank or create a conversation. */
   requestNewThread: () => void;
-  /**
-   * User picked a conversation in History. Switches to it if it is already open,
-   * otherwise reopens it onto the rail under the same cap rule as "+" (Gap 3).
-   */
-  requestOpenConversation: (id: string) => void;
-  /** "Open anyway" / "opened after closing something" — perform the pending open. */
-  confirmThreadOpen: () => void;
-  /** Dismiss the cap prompt without opening anything. */
-  cancelThreadOpen: () => void;
-  /** Rail/History view model for every open thread, in creation order. */
-  listOpenThreads: () => OpenThreadSummary[];
   /** Restore persisted transcript fields into the active thread (webview state restore). */
   restoreActiveConversation: (partial: Partial<ConversationState>) => void;
 
@@ -429,28 +403,37 @@ interface AISidebarState {
   loadConversationList: () => void;
   saveCurrentConversation: () => void;
   loadSavedConversation: (id: string) => void;
-  deleteSavedConversation: (id: string) => void;
   startNewConversation: () => void;
   toggleHistoryPanel: () => void;
+  setPinnedConversationIds: (ids: string[]) => void;
+  pinConversation: (id: string) => void;
+  unpinConversation: (id: string) => void;
+  renameHostConversation: (id: string, title: string) => void;
+  moveEarlierConversation: (id: string) => void;
+  deleteHostConversation: (id: string, stopRunning?: boolean, recovery?: boolean) => void;
+  undoDeleteConversation: () => void;
 
   // ── Internal: message handler ──
   handleExtensionMessage: (message: ExtensionMessage) => void;
 }
 
+type ConversationRequestWithoutId = ConversationRequest extends infer Request
+  ? Request extends { requestId: string }
+    ? Omit<Request, 'requestId'>
+    : never
+  : never;
+
+function postConversationRequest(message: ConversationRequestWithoutId): void {
+  sendConversationRequest({ ...message, requestId: nextId() } as ConversationRequest);
+}
+
 const initialConversation = createConversationState(generateId());
 
-/**
- * Sprint 99 (R13): the open-thread set is restored ONCE per webview, on the
- * first `agent:config` that carries a workspace path — that is the first moment
- * the workspace-scoped storage prefix is known. A later `agent:config` must not
- * re-open threads the user has since closed, so the guard lives here at module
- * scope rather than in component state.
- */
-let openThreadsRestored = false;
+let legacyInventorySent = false;
 
-/** Test-only: forget the restore guard so a relaunch can be simulated. */
-export function resetOpenThreadRestoreForTest(): void {
-  openThreadsRestored = false;
+/** Test-only: allow a fresh migration handshake in the same process. */
+export function resetConversationMigrationGuardForTest(): void {
+  legacyInventorySent = false;
 }
 
 export const useAISidebarStore = create<AISidebarState>((set, get) => {
@@ -534,6 +517,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
   /** Persist ONE conversation. Background threads autosave without touching the active one. */
   function persistConversation(id: string): void {
     const state = get();
+    if (state.conversationRolloutMode !== 'legacy') return;
     const conversation = state.conversations[id];
     if (!conversation) return;
 
@@ -583,89 +567,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     const next = { ...state.conversations };
     delete next[leavingId];
     return next;
-  }
-
-  /**
-   * Sprint 99 (R13 / E7): mirror the open set to localStorage and drop composer
-   * slots belonging to threads that are no longer open. Called after every
-   * change to `conversations` so the persisted rail can never lag the store.
-   */
-  function syncOpenThreads(): void {
-    const state = get();
-    const ids = Object.values(state.conversations)
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .map((c) => c.id);
-    saveOpenThreadIds(ids);
-
-    const promptQueues = pruneQueues(state.promptQueues, ids);
-    const composerDrafts = pruneSlots(state.composerDrafts, ids);
-    if (promptQueues !== state.promptQueues || composerDrafts !== state.composerDrafts) {
-      set({ promptQueues, composerDrafts });
-    }
-  }
-
-  /** Read one open thread's rail/History view model. */
-  function summarizeThread(conversation: ConversationState, activeId: string | null): OpenThreadSummary {
-    return {
-      id: conversation.id,
-      title: deriveThreadTitle(conversation),
-      runtime: runtimeOfConversation(conversation),
-      status: deriveThreadStatus(conversation),
-      hasQueuedPrompt: queueFor(get().promptQueues, conversation.id).length > 0,
-      isActive: conversation.id === activeId,
-    };
-  }
-
-  /** Cap inputs for the open set, in rail order. */
-  function capCandidates(): CapCandidate[] {
-    const state = get();
-    return Object.values(state.conversations)
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .map((c) => {
-        const summary = summarizeThread(c, state.activeConversationId);
-        return { id: c.id, title: summary.title, status: summary.status, hasQueuedPrompt: summary.hasQueuedPrompt };
-      });
-  }
-
-  /**
-   * Rebuild a stored conversation as an OPEN thread.
-   *
-   * R13: transcripts restore immediately, sessions do NOT — nothing here starts
-   * a runtime. The session re-attaches on the user's next prompt in the thread.
-   */
-  function rehydrateStoredConversation(id: string, template: ConversationState | null): ConversationState | null {
-    const data = loadConversation(id);
-    if (!data) return null;
-
-    let agentConv = data.agentConversation || [];
-    let codexConv = data.codexConversation || [];
-    if (data.agentId === 'codex' && codexConv.length === 0 && agentConv.length > 0) {
-      codexConv = agentConv as unknown as typeof codexConv;
-      agentConv = [];
-    }
-    const restoredAgentId: AgentId =
-      data.agentId === 'claude-code' || data.agentId === 'codex' ? data.agentId : 'claude-code';
-
-    return markConversationInterrupted(createConversationState(id, {
-      createdAt: data.createdAt,
-      agentConversation: stampConversationId(agentConv, id),
-      codexConversation: stampConversationId(codexConv, id),
-      chatMessages: data.chatMessages || [],
-      conversationHistory: data.conversationHistory || [],
-      selectedAgent: restoredAgentId,
-      selectedModel: template?.selectedModel ?? '',
-      codexSelectedModel: template?.codexSelectedModel ?? '',
-      opencodeSelectedModel: template?.opencodeSelectedModel ?? '',
-      pendingRuntime: {
-        runtimeId: restoredAgentId,
-        modelId: template?.pendingRuntime.modelId ?? '',
-        // Sprint 103 R8: the thread's own persisted policy wins; only pre-103
-        // records without one fall back to the boot template.
-        mode: data.turnPolicy?.mode ?? template?.pendingRuntime.mode ?? 'auto',
-        planFirst: data.turnPolicy?.planFirst === true,
-      },
-      ...computeContextState(agentConv),
-    }));
   }
 
   /**
@@ -748,12 +649,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           pendingPlanApproval: undefined,
           timestamp: Date.now(),
         };
-        patchConversation(item.conversationId, (c) => ({ agentConversation: [...c.agentConversation, turn] }));
+        patchConversation(item.conversationId, (c) => ({
+          agentConversation: [...c.agentConversation, turn],
+          restoredTranscript: false,
+        }));
         vscode.postMessage({
           type: 'agent-execute',
           conversationId: item.conversationId,
+          conversationTurnId: turn.id,
           agentId: 'claude-code',
           prompt: item.prompt,
+          displayPrompt: item.displayText,
           // Model drift fix: pin the frozen model — never let the CLI's own
           // user config decide (falls back to the conversation selection).
           model: item.modelId || get().conversations[item.conversationId]?.selectedModel || undefined,
@@ -786,12 +692,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           isRunning: true,
           timestamp: Date.now(),
         };
-        patchConversation(item.conversationId, (c) => ({ codexConversation: [...c.codexConversation, turn] }));
+        patchConversation(item.conversationId, (c) => ({
+          codexConversation: [...c.codexConversation, turn],
+          restoredTranscript: false,
+        }));
         vscode.postMessage({
           type: 'agent-execute',
           conversationId: item.conversationId,
+          conversationTurnId: turn.id,
           agentId: item.runtimeId,
           prompt: item.prompt,
+          displayPrompt: item.displayText,
           model: item.modelId,
           approvalMode: item.autonomy,
           planFirst: item.planFirst,
@@ -837,40 +748,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       pendingRuntime: { runtimeId, modelId: '', mode: 'auto', planFirst: false },
     });
     set({ conversations: { ...state.conversations, [conversation.id]: conversation } });
-    syncOpenThreads();
     return conversation.id;
-  }
-
-  function restoreOpenThreads(): void {
-    const state = get();
-    const storedIds = loadOpenThreadIds();
-    if (storedIds.length === 0) return;
-
-    const template = state.activeConversationId ? state.conversations[state.activeConversationId] : null;
-    const restored: ConversationState[] = [];
-    for (const id of storedIds) {
-      if (state.conversations[id]) continue;
-      const conversation = rehydrateStoredConversation(id, template);
-      if (conversation) restored.push(conversation);
-    }
-    if (restored.length === 0) return;
-
-    const conversations = { ...state.conversations };
-    for (const conversation of restored) conversations[conversation.id] = conversation;
-
-    // Drop the throwaway blank the webview booted with — but only if the user
-    // has not typed in it, and only when something real replaces it (R10).
-    let activeId = state.activeConversationId;
-    const active = activeId ? conversations[activeId] : null;
-    if (active && isConversationEmpty(active)) {
-      delete conversations[active.id];
-      activeId = restored[restored.length - 1].id;
-    }
-
-    const nextActive = activeId ? conversations[activeId] : null;
-    if (!nextActive) return;
-    set({ conversations, activeConversationId: nextActive.id });
-    syncOpenThreads();
   }
 
   return {
@@ -881,7 +759,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     ready: false,
 
     agenticEnabled: false,
-    parallelChatsEnabled: true,
     agents: [],
     models: [],
 
@@ -910,12 +787,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     savedConversations: [],
     showHistoryPanel: false,
+    conversationRolloutMode: 'unknown',
+    hostConversations: [],
+    earlierConversations: [],
+    pinnedConversationIds: [],
+    conversationStoreNotice: null,
+    pendingUndo: null,
 
     promptQueues: {},
     commentTasks: {},
     composerDrafts: {},
-    pendingThreadOpen: null,
-
     setupStatus: null,
     environmentStatus: null,
     setupInProgress: false,
@@ -977,14 +858,18 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         conversations: { ...state.conversations, [conversation.id]: conversation },
         activeConversationId: conversation.id,
       });
-      syncOpenThreads();
       return conversation.id;
     },
 
     switchConversation: (id) => {
       const state = get();
       const target = state.conversations[id];
-      if (!target || id === state.activeConversationId) return;
+      if (!target) return;
+      if (id === state.activeConversationId) {
+        set({ showHistoryPanel: false });
+        focusComposerSoon();
+        return;
+      }
 
       // Sprint 99 (E4): NO resetProviderSessions() here. Switching is a view
       // change — every other thread keeps streaming.
@@ -994,7 +879,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         activeConversationId: id,
         showHistoryPanel: false,
       });
-      if (pruned) syncOpenThreads();
+      focusComposerSoon();
     },
 
     listOpenConversations: () => {
@@ -1004,68 +889,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         .map((c) => c.id);
     },
 
-    closeConversation: (id) => {
-      const state = get();
-      const target = state.conversations[id];
-      if (!target) return;
-
-      // Close ≠ delete: persist first so the transcript is complete in History.
-      persistConversation(id);
-      // Closing DOES free the runtime session — this is one of the two remaining
-      // legitimate reset sites (the other is an explicit clear/delete).
-      resetProviderSession(id);
-
-      const remaining = { ...get().conversations };
-      delete remaining[id];
-
-      if (id !== state.activeConversationId) {
-        set({ conversations: remaining });
-        syncOpenThreads();
-        return;
-      }
-
-      const nextId = Object.values(remaining).sort((a, b) => a.createdAt - b.createdAt)[0];
-      if (nextId) {
-        set({ conversations: remaining, activeConversationId: nextId.id });
-        syncOpenThreads();
-        return;
-      }
-      const fresh = createConversationState(generateId(), {
-        selectedAgent: target.selectedAgent,
-        selectedModel: target.selectedModel,
-        codexSelectedModel: target.codexSelectedModel,
-        opencodeSelectedModel: target.opencodeSelectedModel,
-        pendingRuntime: target.pendingRuntime,
-      });
-      set({
-        conversations: { [fresh.id]: fresh },
-        activeConversationId: fresh.id,
-      });
-      syncOpenThreads();
-    },
-
-    listOpenThreads: () => {
-      const state = get();
-      return Object.values(state.conversations)
-        .sort((a, b) => a.createdAt - b.createdAt)
-        .map((c) => summarizeThread(c, state.activeConversationId));
-    },
-
     requestNewThread: () => {
       const state = get();
-
-      // Kill-switch (R15): with parallel chats off, "new chat" means what it used
-      // to — replace the current conversation rather than open an additional one.
-      // clearChat saves the outgoing thread to History, so nothing is lost.
-      if (!state.parallelChatsEnabled) {
-        get().clearChat();
-        set({ showHistoryPanel: false });
-        return;
-      }
-
-      // R10: one empty thread at a time — "+" refocuses the blank that exists
-      // rather than stacking another. Checked across the whole open set, not
-      // just the active thread, so a blank parked in the background is reused.
       const existingEmpty = Object.values(state.conversations)
         .sort((a, b) => a.createdAt - b.createdAt)
         .find(isConversationEmpty);
@@ -1074,49 +899,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         set({ showHistoryPanel: false });
         return;
       }
-
-      const evaluation = evaluateSoftCap(capCandidates());
-      if (evaluation.atCap) {
-        set({ pendingThreadOpen: { kind: 'new' }, showHistoryPanel: false });
-        return;
-      }
       get().startNewConversation();
     },
-
-    requestOpenConversation: (id) => {
-      const state = get();
-      // Already on the rail → this is just a switch, and the cap is irrelevant.
-      if (state.conversations[id]) {
-        get().switchConversation(id);
-        return;
-      }
-
-      // Kill-switch: without parallel chats there is no rail to reopen ONTO, so
-      // History goes back to load-in-place.
-      if (!state.parallelChatsEnabled) {
-        get().loadSavedConversation(id);
-        return;
-      }
-      // Resolved Gap 3: a reopened thread is an open thread, so it obeys the
-      // same cap rule as "+". Exempting it would be an easy way to accumulate
-      // ten open threads without ever seeing the prompt.
-      const evaluation = evaluateSoftCap(capCandidates());
-      if (evaluation.atCap) {
-        set({ pendingThreadOpen: { kind: 'reopen', conversationId: id }, showHistoryPanel: false });
-        return;
-      }
-      get().loadSavedConversation(id);
-    },
-
-    confirmThreadOpen: () => {
-      const pending = get().pendingThreadOpen;
-      if (!pending) return;
-      set({ pendingThreadOpen: null });
-      if (pending.kind === 'new') get().startNewConversation();
-      else get().loadSavedConversation(pending.conversationId);
-    },
-
-    cancelThreadOpen: () => set({ pendingThreadOpen: null }),
 
     // ── Sprint 104 (#162): bounded per-conversation prompt queue ──────────
 
@@ -1281,7 +1065,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         timestamp: Date.now(),
       };
 
-      patchConversation(conversation.id, (c) => ({ agentConversation: [...c.agentConversation, turn] }));
+      patchConversation(conversation.id, (c) => ({
+        agentConversation: [...c.agentConversation, turn],
+        restoredTranscript: false,
+      }));
 
       // Send attachments as serializable payload (strip thumbnails for extension)
       const attachmentPayload = attachments?.map((att) => ({
@@ -1296,8 +1083,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
+        conversationTurnId: turn.id,
         agentId: 'claude-code',
         prompt: fullPrompt,
+        displayPrompt: prompt,
         // Model drift fix: always pin the UI-selected model.
         model: conversation.selectedModel || undefined,
         attachments: attachmentPayload,
@@ -1632,12 +1421,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         timestamp: Date.now(),
       };
 
-      patchConversation(conversation.id, (c) => ({ codexConversation: [...c.codexConversation, turn] }));
+      patchConversation(conversation.id, (c) => ({
+        codexConversation: [...c.codexConversation, turn],
+        restoredTranscript: false,
+      }));
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
+        conversationTurnId: turn.id,
         agentId: 'codex',
         prompt: fullPrompt,
+        displayPrompt: prompt,
         model: conversation.codexSelectedModel,
         // Sprint 103 R1: autonomy + planFirst on the wire — the host maps them
         // to the Codex approval policy, sandbox, and plan collaboration mode.
@@ -1645,7 +1439,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         planFirst: codexPlanFirst,
         skipBrowserContext,
         skipActiveFile,
-        attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
+        attachments: attachments?.map((attachment) => ({
+          id: attachment.id,
+          kind: attachment.kind,
+          name: attachment.name,
+          data: attachment.data,
+          mediaType: attachment.mediaType,
+        })),
       });
     },
 
@@ -1714,14 +1514,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         timestamp: Date.now(),
       };
 
-      patchConversation(conversation.id, (c) => ({ codexConversation: [...c.codexConversation, turn] }));
+      patchConversation(conversation.id, (c) => ({
+        codexConversation: [...c.codexConversation, turn],
+        restoredTranscript: false,
+      }));
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
+        conversationTurnId: turn.id,
         agentId: 'opencode',
         // The chat bubble shows the raw `prompt` (turn.userPrompt); the model
         // receives the handoff/selection-wrapped `fullPrompt`, same as Codex.
         prompt: fullPrompt,
+        displayPrompt: prompt,
         model,
         approvalMode: conversation.pendingRuntime.mode,
         skipActiveFile: options?.skipActiveFile,
@@ -1806,8 +1611,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
+        conversationTurnId: turnId,
         agentId: 'codex',
         prompt,
+        conversationContinuation: true,
         model: conversation.codexSelectedModel,
         approvalMode: policyOf(conversation.pendingRuntime).autonomy,
         planFirst: false,
@@ -1920,8 +1727,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     // ── Chat history actions ──
 
     loadConversationList: () => {
-      const list = listConversations();
-      set({ savedConversations: list });
+      if (get().conversationRolloutMode === 'legacy') {
+        set({ savedConversations: listConversations() });
+      } else {
+        postConversationRequest({ type: 'conversation/list' });
+      }
     },
 
     saveCurrentConversation: () => {
@@ -1941,6 +1751,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       if (state.conversations[id]) {
         get().switchConversation(id);
+        return;
+      }
+
+      if (state.conversationRolloutMode !== 'legacy' && state.hostConversations.some((item) => item.conversationId === id)) {
+        postConversationRequest({ type: 'conversation/get', conversationId: id });
         return;
       }
 
@@ -2010,22 +1825,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         activeConversationId: id,
         showHistoryPanel: false,
       });
-      syncOpenThreads();
+      focusComposerSoon();
 
       // Update agent selection in extension
       vscode.postMessage({ type: 'ai-select-agent', agentId: loadedAgentId, conversationId: id });
-    },
-
-    deleteSavedConversation: (id) => {
-      deleteConversationFromStorage(id);
-
-      // Deleting an OPEN conversation also closes it — that is a genuine
-      // "throw this away", so its runtime session is released.
-      if (get().conversations[id]) {
-        get().closeConversation(id);
-      }
-
-      set({ savedConversations: listConversations() });
     },
 
     /**
@@ -2040,6 +1843,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       if (id) persistConversation(id);
       get().createConversation();
       set({ showHistoryPanel: false });
+      focusComposerSoon();
     },
 
     toggleHistoryPanel: () => {
@@ -2051,12 +1855,71 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({ showHistoryPanel: !state.showHistoryPanel });
     },
 
+    setPinnedConversationIds: (ids) => {
+      const unique = [...new Set(ids)].slice(0, 5);
+      set({ pinnedConversationIds: unique });
+    },
+
+    pinConversation: (id) => {
+      const state = get();
+      if (state.pinnedConversationIds.includes(id) || state.pinnedConversationIds.length >= 5) return;
+      set({ pinnedConversationIds: [...state.pinnedConversationIds, id] });
+    },
+
+    unpinConversation: (id) => {
+      set({ pinnedConversationIds: get().pinnedConversationIds.filter((item) => item !== id) });
+    },
+
+    renameHostConversation: (id, title) => {
+      const summary = get().hostConversations.find((item) => item.conversationId === id);
+      const normalized = title.replace(/\s+/g, ' ').trim();
+      if (!summary || !normalized || normalized === summary.title) return;
+      postConversationRequest({
+        type: 'conversation/rename',
+        conversationId: id,
+        bindingGeneration: summary.bindingGeneration,
+        title: normalized,
+      });
+    },
+
+    moveEarlierConversation: (id) => {
+      const summary = get().earlierConversations.find((item) => item.conversationId === id);
+      if (!summary) return;
+      postConversationRequest({
+        type: 'conversation/move-unassigned',
+        conversationId: id,
+        bindingGeneration: summary.bindingGeneration,
+      });
+    },
+
+    deleteHostConversation: (id, stopRunning = false, recovery = false) => {
+      const summaries = recovery ? get().earlierConversations : get().hostConversations;
+      const summary = summaries.find((item) => item.conversationId === id);
+      if (!summary) return;
+      postConversationRequest({
+        type: 'conversation/delete',
+        conversationId: id,
+        bindingGeneration: summary.bindingGeneration,
+        stopRunning,
+        ...(recovery ? { recovery: true } : {}),
+      });
+    },
+
+    undoDeleteConversation: () => {
+      const pending = get().pendingUndo;
+      if (!pending) return;
+      postConversationRequest({
+        type: 'conversation/undo-delete',
+        undoToken: pending.undoToken,
+        ...(pending.recovery ? { recovery: true } : {}),
+      });
+    },
+
     /**
      * `/clear` — explicitly throw the current thread away.
      *
-     * This is one of the two remaining legitimate reset sites (the other is
-     * `closeConversation`). It resets exactly ONE conversation's runtime session,
-     * never "all providers". The thread keeps its rail slot but gets a fresh id
+     * It resets exactly ONE conversation's runtime session, never "all
+     * providers". The replacement gets a fresh id
      * so the next turn does not overwrite the cleared conversation in History
      * (#135).
      */
@@ -2080,7 +1943,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       conversations[fresh.id] = fresh;
 
       set({ conversations, activeConversationId: fresh.id });
-      syncOpenThreads();
     },
 
     // ── Message handler ──
@@ -2089,6 +1951,138 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const state = get();
 
       switch (message.type) {
+        case 'conversation/canonical-id': {
+          const current = get();
+          const local = current.conversations[message.clientConversationId];
+          if (!local) break;
+          const conversations = { ...current.conversations };
+          delete conversations[message.clientConversationId];
+          conversations[message.conversationId] = {
+            ...local,
+            id: message.conversationId,
+            restoredTranscript: false,
+            agentConversation: stampConversationId(local.agentConversation, message.conversationId),
+            codexConversation: stampConversationId(local.codexConversation, message.conversationId),
+          };
+          set({
+            conversations,
+            activeConversationId: current.activeConversationId === message.clientConversationId
+              ? message.conversationId
+              : current.activeConversationId,
+            pinnedConversationIds: current.pinnedConversationIds.map((id) => id === message.clientConversationId ? message.conversationId : id),
+          });
+          break;
+        }
+
+        case 'conversation/runtime-released': {
+          const current = get();
+          const conversation = current.conversations[message.conversationId];
+          if (!conversation) break;
+          set({
+            conversations: {
+              ...current.conversations,
+              [message.conversationId]: { ...conversation, restoredTranscript: true },
+            },
+          });
+          break;
+        }
+
+        case 'conversation/result': {
+          if (!message.ok) {
+            set({ conversationStoreNotice: message.error.message });
+            break;
+          }
+          const data = message.data as Record<string, unknown>;
+          if (message.operation === 'conversation/initialize') {
+            const initialized = message.data as ConversationInitializeResult;
+            setLegacyStorageReadOnly(initialized.rolloutMode !== 'legacy');
+            set({
+              conversationRolloutMode: initialized.rolloutMode,
+              hostConversations: initialized.conversations,
+              earlierConversations: initialized.earlierConversations,
+              savedConversations: initialized.rolloutMode === 'legacy' ? listConversations() : [],
+              conversationStoreNotice: null,
+            });
+            if (initialized.rolloutMode !== 'legacy' && !legacyInventorySent) {
+              legacyInventorySent = true;
+              const records = discoverLegacyConversationCandidates();
+              if (records.length > 0) postConversationRequest({ type: 'legacy/import-batch', records: records.slice(0, 100) });
+            }
+            if (initialized.selectedConversationId) {
+              postConversationRequest({ type: 'conversation/get', conversationId: initialized.selectedConversationId });
+            }
+            break;
+          }
+          if (message.operation === 'conversation/list' && Array.isArray(data.conversations)) {
+            set({
+              hostConversations: data.conversations as ConversationSummaryV1[],
+              earlierConversations: Array.isArray(data.earlierConversations) ? data.earlierConversations as ConversationSummaryV1[] : [],
+              conversationStoreNotice: null,
+            });
+            break;
+          }
+          if (message.operation === 'legacy/import-batch') {
+            postConversationRequest({ type: 'conversation/list' });
+            break;
+          }
+          if ((message.operation === 'conversation/rename' || message.operation === 'conversation/move-unassigned') && data.conversation) {
+            postConversationRequest({ type: 'conversation/list' });
+            set({ conversationStoreNotice: null });
+            break;
+          }
+          if ((message.operation === 'conversation/get' || message.operation === 'conversation/undo-delete') && data.conversation) {
+            if (data.recovery === true) {
+              postConversationRequest({ type: 'conversation/list' });
+              set({ conversationStoreNotice: null, pendingUndo: null });
+              break;
+            }
+            const projection = data.conversation as ConversationProjectionV1;
+            const current = get();
+            const restored = projectionToConversation(projection, current.activeConversationId ? current.conversations[current.activeConversationId] : undefined);
+            const conversations = { ...current.conversations, [restored.id]: restored };
+            const activeConversationId = restored.id;
+            set({
+              conversations,
+              activeConversationId,
+              showHistoryPanel: false,
+              conversationStoreNotice: null,
+              ...(message.operation === 'conversation/undo-delete' ? { pendingUndo: null } : {}),
+            });
+            focusComposerSoon();
+            postConversationRequest({ type: 'conversation/list' });
+            vscode.postMessage({ type: 'ai-select-agent', agentId: restored.selectedAgent, conversationId: restored.id });
+            break;
+          }
+          if (message.operation === 'conversation/delete' && typeof data.conversationId === 'string' && typeof data.undoToken === 'string') {
+            const current = get();
+            const recovery = data.recovery === true;
+            const source = recovery ? current.earlierConversations : current.hostConversations;
+            const title = source.find((item) => item.conversationId === data.conversationId)?.title ?? 'Conversation';
+            const conversations = { ...current.conversations };
+            delete conversations[data.conversationId];
+            const nextSummary = recovery ? undefined : current.hostConversations.find((item) => item.conversationId !== data.conversationId);
+            const nextOpenId = Object.keys(conversations)[0] ?? null;
+            set({
+              conversations,
+              activeConversationId: current.activeConversationId === data.conversationId ? nextOpenId : current.activeConversationId,
+              pinnedConversationIds: current.pinnedConversationIds.filter((id) => id !== data.conversationId),
+              pendingUndo: { undoToken: data.undoToken, title, recovery },
+            });
+            postConversationRequest({ type: 'conversation/list' });
+            if (!nextOpenId && nextSummary) postConversationRequest({ type: 'conversation/get', conversationId: nextSummary.conversationId });
+            break;
+          }
+          break;
+        }
+
+        case 'conversation/changed':
+          postConversationRequest({ type: 'conversation/list' });
+          break;
+
+        case 'conversation/store-status':
+          set({ conversationStoreNotice: message.state === 'degraded' ? (message.message ?? 'Conversation storage needs attention.') : null });
+          break;
+
         case 'ai-key-status':
           set({ hasApiKey: message.hasKey, ready: true });
           break;
@@ -2130,18 +2124,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
         case 'agent:config': {
           // Set workspace context for per-project history scoping, then immediately
-          // reload the conversation list so the history panel shows all saved entries.
+          // initialize the authoritative rollout mode before choosing legacy or
+          // host storage. The host cutover state, not the flag alone, owns this.
           if (message.workspacePath) {
             setWorkspaceContext(message.workspacePath);
+          }
+          if (get().conversationRolloutMode === 'unknown') {
+            postConversationRequest({ type: 'conversation/initialize' });
+          } else {
             get().loadConversationList();
-            // R13 / E7: the workspace prefix is only known now, so this is the
-            // first moment the persisted open-thread set can be read. Runs once
-            // per webview — a later agent:config must not re-open threads the
-            // user has since closed.
-            if (!openThreadsRestored) {
-              openThreadsRestored = true;
-              restoreOpenThreads();
-            }
           }
           const newCodexModels = message.codexModels || [];
           const newClaudeModels = message.models || [];
@@ -2195,7 +2186,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
           set({
             agenticEnabled: message.agenticEnabled,
-            parallelChatsEnabled: message.parallelChatsEnabled !== false,
             codexEnabled: message.codexEnabled ?? false,
             agents: message.agents,
             models: newClaudeModels,
@@ -2761,8 +2751,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
  * the selector mints a new object each call. Everything else the selector can
  * return is an object the store already owns, so it is stable by construction.
  *
- * In practice this is unreachable — the store always keeps at least one open
- * conversation (`closeConversation` and `clearChat` both create a replacement) —
+ * In practice this is unreachable — New and `/clear` always leave an active
+ * conversation —
  * it exists so callers get a `ConversationState` rather than a nullable.
  */
 const NO_ACTIVE_CONVERSATION: ConversationState = createConversationState('__no-active-conversation__');

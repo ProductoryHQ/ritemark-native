@@ -1,0 +1,94 @@
+{
+  "fixtureVersion": 1,
+  "name": "known-single-root-scoped-history",
+  "currentScope": {
+    "platform": "darwin",
+    "workspaceFileUri": null,
+    "folderUris": ["file:///fixtures/alpha-project"]
+  },
+  "legacyEntries": [
+    {
+      "key": "ritemark-chat-80ntuc-metadata",
+      "value": [
+        {
+          "id": "conv-alpha-1",
+          "title": "Draft launch note",
+          "agentId": "claude-code",
+          "createdAt": 1767225600000,
+          "updatedAt": 1767225660000
+        },
+        {
+          "id": "conv-alpha-2",
+          "title": "Check the table",
+          "agentId": "codex",
+          "createdAt": 1767229200000,
+          "updatedAt": 1767229320000
+        }
+      ]
+    },
+    {
+      "key": "ritemark-chat-80ntuc-conv-alpha-1",
+      "value": {
+        "id": "conv-alpha-1",
+        "title": "Draft launch note",
+        "agentId": "claude-code",
+        "createdAt": 1767225600000,
+        "updatedAt": 1767225660000,
+        "agentConversation": [
+          {
+            "id": "turn-alpha-1",
+            "userPrompt": "Create a short launch-note outline.",
+            "activities": [],
+            "result": {
+              "text": "Here is a three-part outline.",
+              "filesModified": [],
+              "metrics": { "durationMs": 1000, "costUsd": null, "model": null }
+            },
+            "isRunning": false,
+            "isPlan": false,
+            "planHandled": false,
+            "timestamp": 1767225600000
+          }
+        ],
+        "chatMessages": [],
+        "conversationHistory": []
+      }
+    },
+    {
+      "key": "ritemark-chat-80ntuc-conv-alpha-2",
+      "value": {
+        "id": "conv-alpha-2",
+        "title": "Check the table",
+        "agentId": "codex",
+        "createdAt": 1767229200000,
+        "updatedAt": 1767229320000,
+        "agentConversation": [],
+        "codexConversation": [
+          {
+            "id": "turn-alpha-2",
+            "runtime": "codex",
+            "userPrompt": "Check the totals in the sample table.",
+            "streamingText": "The totals are consistent.",
+            "activities": [],
+            "result": { "status": "completed" },
+            "isRunning": false,
+            "timestamp": 1767229200000
+          }
+        ],
+        "chatMessages": [],
+        "conversationHistory": []
+      }
+    },
+    {
+      "key": "ritemark-chat-80ntuc-open-threads",
+      "value": ["conv-alpha-2"]
+    }
+  ],
+  "expected": {
+    "currentProjectRecordCount": 2,
+    "unassignedRecordCount": 0,
+    "ignoredLegacyKeys": ["ritemark-chat-80ntuc-open-threads"],
+    "secondRunCreatesRecords": 0,
+    "legacySourceRetained": true
+  }
+}
