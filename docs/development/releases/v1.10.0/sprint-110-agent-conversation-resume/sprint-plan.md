@@ -1,6 +1,6 @@
 # Sprint 110 — Agent Conversation Resume
 
-**Status:** Kickoff prepared 2026-08-23 from final merged Sprint 109 — awaiting Jarmo SDD/Phase 0 approval<br>
+**Status:** Phase 0 runtime continuation audit in progress — SDD/audit-first scope approved by Jarmo 2026-08-23; Phase 1 remains gated on the separate Phase 0 decision approval<br>
 **Parent release:** [v1.10.0 Durable Agent Conversations](../release-plan.md)<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8)<br>
 **Issue:** [#204 — Sprint 110: Resume Agent Conversations with truthful context](https://github.com/ProductoryHQ/ritemark-native/issues/204)<br>
@@ -97,6 +97,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 | 2026-08-21 | Fallback includes user prompts + assistant final text only | Tools, approvals, plans, progress, and binaries are not replayed. |
 | 2026-08-21 | Cross-runtime continuation is explicit | Runtime selector becomes Continue with … on non-empty conversations. |
 | 2026-08-23 | Unanswered user prompts survive runtime failure and handoff | A saved prompt without a final assistant answer remains in normalized context and is labelled unanswered; it is context for the new agent, not an executable replay. |
+| 2026-08-23 | Jarmo approved Sprint 110 SDD and Phase 0 start | Run the pinned live audit and return a measured native/fallback matrix before any continuation production code is implemented. |
 | 2026-08-21 | Provider IDs stay host-only | Webview receives status and safe metadata, not authority. |
 | 2026-08-21 | Per-runtime descriptors carry transcript coverage watermark | Native resume/handoff injects only uncovered canonical delta. |
 | 2026-08-22 | Keep the conversation rail permanent through Sprint 110 | Automatic active/recent membership is derived and Pinned is explicit permanence, while All conversations remains durable truth; continuation must preserve all three distinctions. |
@@ -112,7 +113,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 ## Approval Gate
 
 - [x] Sprint 109 merged and its final store/UI contract accepted through PRs #209 and #210 (2026-08-23).
-- [ ] Jarmo approves R1–R8 and audit-first scope.
+- [x] Jarmo approves R1–R8 and audit-first scope (2026-08-23).
 - [x] Sprint 110 issue [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) exists under milestone v1.10.0.
 - [x] Branch `codex/sprint-110-agent-conversation-resume` and its dedicated worktree exist from merged `origin/main` (2026-08-23).
 - [ ] Phase 0 runtime/context/watermark decisions are recorded in every SDD artifact and explicitly approved by Jarmo before Phase 1.

@@ -1,7 +1,7 @@
 # Sprint 110 Research — Runtime Continuation Audit Baseline
 
 **Prepared:** 2026-08-21<br>
-**Status:** Kickoff baseline captured 2026-08-23 — live pinned protocol matrix remains mandatory in Sprint 110 Phase 0.<br>
+**Status:** Phase 0 in progress from Jarmo approval 2026-08-23 — kickoff baseline captured; live pinned protocol matrix running.<br>
 **Decision rule:** Native resume ships per adapter only after live proof; otherwise that adapter uses the bounded transcript fallback.
 
 ## Current Ritemark behavior
