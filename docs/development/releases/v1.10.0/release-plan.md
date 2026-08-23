@@ -1,6 +1,6 @@
 # Release Plan — v1.10.0 Durable Agent Conversations
 
-**Status:** In development — Sprint 109 final QA complete in [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209); native Windows retained at the v1.10 candidate gate<br>
+**Status:** In development — Sprint 109 merged through [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209); Sprint 110 kickoff prepared; native Windows retained at the v1.10 candidate gate<br>
 **Target:** v1.10.0<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8) — created 2026-08-21<br>
 **Release type:** Full app distribution with extension-scoped implementation; deliberately not an `1.9.0-ext.N` lane<br>
@@ -71,8 +71,8 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 
 | Sprint | Issue | Issue state | Branch | PR | Merge/defer | QA | Release notes | Status |
 |---|---|---|---|---|---|---|---|---|
-| [Sprint 109 — Durable Chat History](./sprint-109-durable-chat-history/sprint-plan.md) | [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) | Closes with PR | `codex/sprint-109-durable-chat-history` | [#209](https://github.com/ProductoryHQ/ritemark-native/pull/209) | Merge through PR #209 | Focused tests, compile/typecheck/build, official QA, and macOS `ritemark-demo` visual/accessibility evidence pass; native Windows retained at release candidate gate | Changelog, checklist, and three screenshots drafted | Final QA complete 2026-08-23; merge recorded by PR state |
-| [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | Open | `codex/sprint-110-agent-conversation-resume` | — | Depends on Sprint 109 merge | Not run | Not drafted | Planned; branch not created |
+| [Sprint 109 — Durable Chat History](./sprint-109-durable-chat-history/sprint-plan.md) | [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) | Done | `codex/sprint-109-durable-chat-history` | [#209](https://github.com/ProductoryHQ/ritemark-native/pull/209) | Merged as `e2a0f70` | Focused tests, compile/typecheck/build, official QA, and macOS `ritemark-demo` visual/accessibility evidence pass; native Windows retained at release candidate gate | Changelog, checklist, and three screenshots drafted | Complete 2026-08-23 |
+| [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | Open | `codex/sprint-110-agent-conversation-resume` | — | Based on merged Sprint 109 (`e2a0f70`) | Pre-Phase 0 version/capability probes recorded; live matrix not started | Not drafted | Kickoff prepared 2026-08-23; awaiting SDD/Phase 0 approval |
 | [Sprint 111 — Agent Runtime Refresh](./sprint-111-agent-runtime-refresh/sprint-plan.md) | [#207](https://github.com/ProductoryHQ/ritemark-native/issues/207) | Open | `codex/sprint-111-agent-runtime-refresh` | — | Depends on Sprint 110 merge | Not run | Not drafted | Planned; branch not created |
 | [Sprint 112 — Composer Thinking Effort](./sprint-112-composer-thinking-effort/sprint-plan.md) | [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206) | Open | `codex/sprint-112-composer-thinking-effort` | — | Depends on Sprint 111 merge | Not run | Not drafted | Planned; branch not created |
 

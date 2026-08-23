@@ -1,7 +1,7 @@
 # Sprint 110 Research — Runtime Continuation Audit Baseline
 
 **Prepared:** 2026-08-21<br>
-**Status:** Preliminary code/API evidence only — live pinned protocol matrix is mandatory in Sprint 110 Phase 0.<br>
+**Status:** Kickoff baseline captured 2026-08-23 — live pinned protocol matrix remains mandatory in Sprint 110 Phase 0.<br>
 **Decision rule:** Native resume ships per adapter only after live proof; otherwise that adapter uses the bounded transcript fallback.
 
 ## Current Ritemark behavior
@@ -11,6 +11,22 @@
 - Codex stores `threadId` only in the in-memory session adapter and currently starts new threads.
 - ACP/OpenCode currently calls `session/new`; Ritemark does not persist a load/resume descriptor.
 - Reopening history restores transcript arrays only. The next prompt therefore starts fresh provider context even when the UI looks continuous.
+
+## Kickoff preparation evidence (pre-Phase 0)
+
+These checks are read-only capability and version probes. They prepare the audit harness but do **not** count as native-resume proof because no persisted provider context was resumed and no model prompt was sent.
+
+| Surface | Shipped/pinned version | 2026-08-23 preparation observation | What remains unproven |
+|---|---:|---|---|
+| Claude Code / Agent SDK | CLI `2.1.217`; SDK `0.3.217` | Manifest and local `claude --version` agree. SDK types expose `query({ options: { resume: sessionId } })`; `system:init` already supplies `session_id`, but `AgentSession` only traces it. | Capture/persist/resume across app and process restart, invalid/auth/model/upgrade behavior, duplicate history, and two-session isolation. |
+| Codex app-server | `0.144.4` | Manifest and direct `codex-app-server --version` agree. Initialize followed by invalid-ID probes reached `thread/read`, `thread/resume`, and `thread/fork` validation (`-32600` invalid ID, not method-not-found), while production only implements `thread/start`. | Valid persisted-thread resume/read ordering, restart/auth/upgrade behavior, reconciliation, ambiguous acceptance, and two-thread isolation. |
+| OpenCode / ACP SDK | OpenCode `1.18.4`; ACP SDK `0.22.1` | Manifest and local `opencode --version` agree. Initialize advertises `loadSession: true` plus `sessionCapabilities.close/fork/list/resume`; production still calls only `session/new`. | Whether OpenCode persists IDs across restart, load versus resume replay semantics, auth/provider/config changes, invalid IDs, duplication, and two-session isolation. |
+
+Probe notes:
+
+- `./scripts/verify-agent-runtimes.sh --versions` passed Claude and OpenCode. In the restricted shell, Codex wrote a PATH-alias warning before its version line, so that script compared the wrong first line; a direct unsandboxed `codex-app-server --version` returned `0.144.4`.
+- OpenCode capability output is candidate evidence only. The ACP contract explicitly gates `loadSession` and `resumeSession` on advertised capabilities, and live behavior can still be incompatible or unstable.
+- No descriptor shape, context budget, reconciliation source, or adapter ship decision is frozen by these preparation probes.
 
 ## API evidence to verify live
 

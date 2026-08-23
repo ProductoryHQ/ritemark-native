@@ -1,12 +1,12 @@
 # Sprint 110 — Agent Conversation Resume
 
-**Status:** SDD artifacts drafted 2026-08-21 — planned after Sprint 109; awaiting Jarmo approval<br>
+**Status:** Kickoff prepared 2026-08-23 from merged Sprint 109 — awaiting Jarmo SDD/Phase 0 approval<br>
 **Parent release:** [v1.10.0 Durable Agent Conversations](../release-plan.md)<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8)<br>
 **Issue:** [#204 — Sprint 110: Resume Agent Conversations with truthful context](https://github.com/ProductoryHQ/ritemark-native/issues/204)<br>
 **Track:** Full SDD — external runtime protocols, shared interface, cross-runtime UX<br>
-**Branch:** `codex/sprint-110-agent-conversation-resume` (not created; create after Sprint 109 merge and approval)<br>
-**Worktree:** Not created; after Sprint 109 merge and Jarmo kickoff approval, create/verify dedicated branch/worktree before Phase 0<br>
+**Branch:** `codex/sprint-110-agent-conversation-resume` — created from `origin/main` at Sprint 109 merge `e2a0f70` on 2026-08-23<br>
+**Worktree:** `.worktrees/sprint-110-agent-conversation-resume` — clean dedicated worktree; planning/audit preparation only until approval<br>
 **Delivery tier:** Extension implementation inside a full app release
 
 ## Goal
@@ -71,8 +71,8 @@ Together with Sprint 109, users can find a project conversation after restart an
 
 ## Dependencies and Blockers
 
-- Sprint 109 merged with stable ConversationStore/project identity/protocol.
-- Ordering gate: Sprint 109 merge → Jarmo Sprint 110 kickoff approval → create/verify dedicated non-`main` branch/worktree → Phase 0 audit → Jarmo Phase 0 decision approval → Phase 1.
+- Sprint 109 merged through [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209) with stable ConversationStore/project identity/protocol; merge commit `e2a0f70` is the Sprint 110 branch base.
+- Ordering gate: Sprint 109 merge ✓ → dedicated non-`main` branch/worktree ✓ → Jarmo Sprint 110 SDD/Phase 0 approval → Phase 0 live audit → Jarmo Phase 0 decision approval → Phase 1.
 - Phase 0 auth/access for live Claude and Codex; OpenCode native scope is conditional on configured provider and advertised capabilities.
 - External protocols may expire/invalidate state across binary upgrades; fallback is required release functionality, not an edge-only backup.
 
@@ -108,8 +108,8 @@ Together with Sprint 109, users can find a project conversation after restart an
 
 ## Approval Gate
 
-- [ ] Sprint 109 merged and its store contract accepted.
+- [x] Sprint 109 merged and its store contract accepted through PR #209 (2026-08-23).
 - [ ] Jarmo approves R1–R8 and audit-first scope.
 - [x] Sprint 110 issue [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) exists under milestone v1.10.0.
-- [ ] Branch `codex/sprint-110-agent-conversation-resume` exists before implementation.
+- [x] Branch `codex/sprint-110-agent-conversation-resume` and its dedicated worktree exist from merged `origin/main` (2026-08-23).
 - [ ] Phase 0 runtime/context/watermark decisions are recorded in every SDD artifact and explicitly approved by Jarmo before Phase 1.
