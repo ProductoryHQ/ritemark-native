@@ -118,6 +118,7 @@ After Sprint 109, users can reliably find and reopen every saved conversation in
 | 2026-08-23 | Stable project-scoped colors implemented in Sprint 109 | Every record persists one of 24 slots: eight base rainbow hues, then deeper and softer rounds. Slots survive every surface, restart, Rename, Move, and Delete+Undo; existing draft records receive deterministic backfill. Exact reuse begins only after all slots are occupied, choosing the least-recently-active ownership. |
 | 2026-08-23 | Runtime capacity moved from stale UI tabs to host attachments | The old open-thread localStorage set and “Open anyway” cap dialog are removed. Host runtime context is five-or-one with protected Working/Needs-you/current sessions and LRU non-current idle release; durable reading, selection and creation remain unlimited. |
 | 2026-08-23 | Accessibility closeout completed before merge | Live run-dev checks cover 200% zoom, forced-colors focus, reduced-motion, single tooltips, and deterministic post-row-selection focus. The audit fixed Working pulse/transition motion, added the `Message` composer name, and made selecting the already-current row close the panel before restoring focus. |
+| 2026-08-23 | Rail pin affordance made visually subordinate | The pin keeps a 20×20 px action target but has no idle circle, border, background, or shadow. Its glyph is 8 px at rest and grows to 12 px only on direct hover or keyboard focus. |
 
 ## Architecture and Feature Flag
 

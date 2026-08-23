@@ -152,6 +152,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | 2026-08-22 | Keep one All conversations archive plus a permanent conversation rail | The archive owns durable truth; the rail automatically exposes active/recent work while familiar ChatGPT-style Pin/Unpin adds optional permanence. Selection does not reorder Recents. |
 | 2026-08-22 | Return conversation visuals to the shared chat bubble | Multi-color generated-looking marks conflict with Ritemark's calm Indigo-Editorial chrome; one Phosphor icon plus indigo active state is the production contract. |
 | 2026-08-23 | Add restrained stable color to the shared chat bubble | Color is a secondary memory aid, not semantic status: eight base hues first, then deeper/softer variants, with persisted project slots and lighter translucent fill. |
+| 2026-08-23 | Keep the rail pin visually subordinate to conversation identity | Preserve the safe action target while showing only a small borderless pin at rest; direct hover/focus enlarges the glyph without adding a competing badge surface. |
 | 2026-08-21 | Legacy global history is unassigned until explicit user action | Prevents silent cross-project leakage. |
 | 2026-08-21 | Local-only in v1.10.0 | Keeps the release focused; cloud sync requires a separate identity/privacy design. |
 | 2026-08-21 | Full SDD track for Sprints 109 and 110 | Each crosses webview, host, filesystem, and external runtime boundaries with high-risk edge cases. |
