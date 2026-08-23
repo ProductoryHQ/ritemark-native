@@ -57,8 +57,8 @@ export function ThreadRail() {
           </button>
         </ConversationTooltip>
         {isPinned && (
-          <span aria-hidden="true" className="pointer-events-none absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-[var(--r-hairline-strong)] bg-[var(--r-surface)] opacity-100 shadow-sm transition-opacity motion-reduce:transition-none group-hover:opacity-0 group-focus-within:opacity-0">
-            <Icon name="push-pin" size={12} tone="active" />
+          <span aria-hidden="true" className="pointer-events-none absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center opacity-100 transition-opacity motion-reduce:transition-none group-hover:opacity-0 group-focus-within:opacity-0">
+            <Icon name="push-pin" size={12} tone="active" className="scale-[0.667]" />
           </span>
         )}
         <ConversationTooltip label={pinLabel}>
@@ -71,9 +71,9 @@ export function ThreadRail() {
               if (pinAtCapacity) return;
               isPinned ? unpin(id) : pin(id);
             }}
-            className={`pointer-events-none absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-[var(--r-hairline-strong)] bg-[var(--r-surface)] text-[var(--r-accent)] opacity-0 shadow-sm transition-opacity motion-reduce:transition-none focus:pointer-events-auto focus:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 ${pinAtCapacity ? 'cursor-not-allowed opacity-60' : 'hover:bg-[var(--r-surface-soft)]'}`}
+            className={`group/pin pointer-events-none absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-[var(--r-accent)] opacity-0 transition-opacity motion-reduce:transition-none focus:pointer-events-auto focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 ${pinAtCapacity ? 'cursor-not-allowed group-hover:opacity-60 group-focus-within:opacity-60 focus:opacity-60' : 'hover:text-[var(--r-accent-deep)]'}`}
           >
-            <Icon name={isPinned ? 'push-pin-slash' : 'push-pin'} size={12} tone="inherit" />
+            <Icon name={isPinned ? 'push-pin-slash' : 'push-pin'} size={12} tone="inherit" className="scale-[0.667] transition-transform motion-reduce:transition-none group-hover/pin:scale-100 group-focus-visible/pin:scale-100" />
           </button>
         </ConversationTooltip>
       </div>
