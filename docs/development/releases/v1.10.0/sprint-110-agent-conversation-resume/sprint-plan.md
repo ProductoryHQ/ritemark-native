@@ -1,12 +1,12 @@
 # Sprint 110 — Agent Conversation Resume
 
-**Status:** Phase 0 runtime continuation audit in progress — SDD/audit-first scope approved by Jarmo 2026-08-23; Phase 1 remains gated on the separate Phase 0 decision approval<br>
+**Status:** Phase 0 decision gate ready — all three pinned runtimes passed semantic resume and two-conversation isolation; Phase 1 remains gated on Jarmo's matrix/budget/watermark approval<br>
 **Parent release:** [v1.10.0 Durable Agent Conversations](../release-plan.md)<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8)<br>
 **Issue:** [#204 — Sprint 110: Resume Agent Conversations with truthful context](https://github.com/ProductoryHQ/ritemark-native/issues/204)<br>
 **Track:** Full SDD — external runtime protocols, shared interface, cross-runtime UX<br>
 **Branch:** `codex/sprint-110-agent-conversation-resume` — created from `origin/main` at Sprint 109 merge `e2a0f70` on 2026-08-23<br>
-**Worktree:** `.worktrees/sprint-110-agent-conversation-resume` — clean dedicated worktree; planning/audit preparation only until approval<br>
+**Worktree:** `.worktrees/sprint-110-agent-conversation-resume` — dedicated worktree; isolated audit fixture/evidence only until Phase 1 approval<br>
 **Delivery tier:** Extension implementation inside a full app release
 
 ## Goal
@@ -57,7 +57,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 
 ## Success Criteria
 
-- [ ] Every runtime has a pinned measured native/fallback decision.
+- [x] Every runtime has a pinned measured native/fallback decision.
 - [ ] Same-runtime native resume retains real context where supported.
 - [ ] Unsupported/expired/invalid/auth-loss paths preserve history and take a tested honest fallback/unavailable route.
 - [ ] Fallback is deterministic, bounded, disclosed, and excludes executable/provider-specific artifacts.
@@ -98,6 +98,11 @@ Together with Sprint 109, users can find a project conversation after restart an
 | 2026-08-21 | Cross-runtime continuation is explicit | Runtime selector becomes Continue with … on non-empty conversations. |
 | 2026-08-23 | Unanswered user prompts survive runtime failure and handoff | A saved prompt without a final assistant answer remains in normalized context and is labelled unanswered; it is context for the new agent, not an executable replay. |
 | 2026-08-23 | Jarmo approved Sprint 110 SDD and Phase 0 start | Run the pinned live audit and return a measured native/fallback matrix before any continuation production code is implemented. |
+| 2026-08-23 | Claude, Codex, and OpenCode passed native semantic resume plus two-conversation isolation on exact pinned versions | All three are `native-resume-with-limits`; exact compatibility and deterministic fallback remain mandatory. |
+| 2026-08-23 | ACP production path is `session/resume`, never `session/load` | Live `session/load` replayed provider history and would risk duplicate canonical transcript/UI events. |
+| 2026-08-23 | Context pack is capped at 32,000 UTF-8 bytes and 12,000 bytes per selected message | Deterministic purpose/latest-unanswered/recent-turn retention; no summarization-model call. |
+| 2026-08-23 | Coverage advances only with an atomically saved assistant final | Accepted or ambiguous no-final crash invalidates only that runtime descriptor and takes fresh fallback. |
+| 2026-08-23 | Dispatch certainty is append-only and pessimistic | Persist `not-sent`, then `ambiguous` before transport, then `accepted` only on positive provider signal; unknown never upgrades optimistically. |
 | 2026-08-21 | Provider IDs stay host-only | Webview receives status and safe metadata, not authority. |
 | 2026-08-21 | Per-runtime descriptors carry transcript coverage watermark | Native resume/handoff injects only uncovered canonical delta. |
 | 2026-08-22 | Keep the conversation rail permanent through Sprint 110 | Automatic active/recent membership is derived and Pinned is explicit permanence, while All conversations remains durable truth; continuation must preserve all three distinctions. |

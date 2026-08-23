@@ -6,13 +6,13 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 0: Pinned runtime protocol audit (W0 — R1)
 
-- [ ] Record exact bundled Claude SDK, Codex app-server, ACP SDK, and OpenCode versions.
+- [x] Record exact bundled Claude SDK, Codex app-server, ACP SDK, and OpenCode versions.
 - [ ] Claude live matrix: capture/resume, restart, invalid ID, auth loss, model change, two sessions, duplication behavior.
 - [ ] Codex live matrix: thread resume/read, restart, invalid ID, auth loss, binary upgrade, two threads, reconciliation behavior.
-- [ ] ACP/OpenCode capability and live load/resume matrix; mark fallback-only unless advertised behavior is proven.
+- [x] ACP/OpenCode capability and live load/resume matrix; `session/resume` passed and `session/load` was rejected for production because it replayed history.
 - [ ] For each runtime, switch away after pre-send failure, confirmed accept/no final, ambiguous accept, partial/tool/progress only, and process loss; verify the prior saved user prompt reaches the next runtime as labelled context and late events stay isolated.
-- [ ] Decide each runtime’s native/fallback status, descriptor codec, `coveredThroughEventId`/ambiguous-crash policy, context budget, lazy timing, and reconciliation source.
-- [ ] Update spec/scenarios/technical plan/sprint plan with Phase 0 decisions before Phase 1.
+- [x] Decide each runtime’s native/fallback status, descriptor codec, `coveredThroughEventId`/ambiguous-crash policy, context budget, lazy timing, and reconciliation source.
+- [x] Update spec/scenarios/technical plan/sprint plan with Phase 0 decisions before Phase 1.
 - [ ] **Jarmo Phase 0 decision gate:** approve runtime matrix, context budget, watermark/crash semantics, and adapter scope before Phase 1.
 
 ## Phase 1: Shared continuation contract (W1 — R2, R8)

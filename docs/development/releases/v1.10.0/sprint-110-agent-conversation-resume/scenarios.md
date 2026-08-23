@@ -2,6 +2,8 @@
 
 BDD examples for [spec.md](./spec.md). These are the manual QA matrix; ★ scenarios are required in the automated/live continuation matrix where credentials are available.
 
+Phase 0 fixture status: Claude SDK `resume`, Codex `thread/resume`, and OpenCode ACP `session/resume` passed process-restart semantic recall plus two-conversation isolation on the pinned versions. OpenCode `session/load` is deliberately excluded because it replayed history. Fallback scenarios use the frozen 32,000 UTF-8 byte budget.
+
 ## Feature: Capability audit and descriptor isolation (R1, R2)
 
 ### ★ Scenario: Two native descriptors never cross-bind

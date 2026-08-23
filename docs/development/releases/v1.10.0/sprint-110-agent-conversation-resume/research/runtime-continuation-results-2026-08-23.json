@@ -1,0 +1,67 @@
+{
+  "fixture": "sprint-110-runtime-continuation-v1",
+  "platform": "darwin-arm64",
+  "versions": {
+    "claudeCli": "2.1.217",
+    "claudeAgentSdk": "0.3.217",
+    "codexAppServer": "0.144.4",
+    "openCode": "1.18.4",
+    "acpSdk": "0.22.1"
+  },
+  "semanticResume": {
+    "claude": {
+      "status": "PASS",
+      "api": "query.options.resume",
+      "processRestart": true,
+      "recallMatched": true,
+      "invalidDescriptorRejected": true
+    },
+    "codex": {
+      "status": "PASS",
+      "api": "thread/read + thread/resume",
+      "processRestart": true,
+      "readFoundThread": true,
+      "resumeReturnedSameId": true,
+      "recallMatched": true,
+      "invalidDescriptorRejected": true
+    },
+    "openCode": {
+      "status": "PASS",
+      "api": "session/resume",
+      "processRestart": true,
+      "advertisedCapabilities": {
+        "loadSession": true,
+        "resume": true,
+        "list": true,
+        "fork": true,
+        "close": true
+      },
+      "recallMatched": true,
+      "invalidDescriptorRejected": true,
+      "loadSessionReplayedHistory": true,
+      "loadSessionObservedUpdateCount": 6
+    }
+  },
+  "twoConversationIsolation": {
+    "claude": {
+      "status": "PASS",
+      "descriptorsDistinct": true,
+      "eachConversationRecalledOnlyItsOwnToken": true
+    },
+    "codex": {
+      "status": "PASS",
+      "descriptorsDistinct": true,
+      "eachConversationRecalledOnlyItsOwnToken": true
+    },
+    "openCode": {
+      "status": "PASS",
+      "descriptorsDistinct": true,
+      "eachConversationRecalledOnlyItsOwnToken": true
+    }
+  },
+  "privacy": {
+    "providerReferencesRecorded": false,
+    "promptOrResponseBodiesRecorded": false,
+    "onlyBooleanRecallEvidenceRecorded": true
+  }
+}

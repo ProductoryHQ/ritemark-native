@@ -20,7 +20,7 @@ RuntimeRegistry
 AI Sidebar receives status/boundary only, never native IDs
 ```
 
-Proposed shared runtime shapes (exact naming frozen after Phase 0):
+Frozen shared runtime direction (exact TypeScript placement may change during implementation without changing this contract):
 
 ```ts
 type ContinuationMode =
@@ -46,6 +46,8 @@ interface RuntimeSessionConfig {
 
 Descriptors are opaque tagged unions validated by their adapter and stored by the host. Every descriptor carries `coveredThroughEventId`; the webview protocol exposes only `ContinuationState` and human-safe metadata.
 
+Phase 0 adapter scope is now fixed: Claude uses SDK `resume`, Codex uses `thread/resume` with `thread/read` for existence/diagnostics only, and OpenCode uses capability-gated `session/resume`. All three are `native-resume-with-limits` on exact pinned versions. ACP `session/load` is forbidden because the live fixture replayed historical updates.
+
 ## Workstream 0: Live pinned-protocol audit (R1)
 
 - Claude: verify SDK session ID capture, resume after process/app restart, invalid ID, auth loss, model change, two sessions, and any transcript duplication behavior.
@@ -64,12 +66,15 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 - Route descriptor checkpoints through `ConversationController` into Sprint 109 serialized store operations.
 - Redact IDs and transcript content from diagnostics; log runtime kind, mode attempted, compatibility result, and failure category.
 - Reject wrong project/runtime/adapter-version descriptors before binding.
+- Replace new writes of Sprint 109's singular descriptor with a runtime-keyed map; decode the singular shape as migration input so existing records remain readable.
+- Add append-only dispatch receipt events: user + `not-sent` atomically, `ambiguous` before transport write, and `accepted` only after the runtime-specific positive signal. Missing/unknown is never upgraded optimistically.
+- Advance `coveredThroughEventId` only in the atomic checkpoint that stores the assistant final. An accepted/ambiguous no-final crash removes only that runtime's descriptor before retry/handoff.
 
 ## Workstream 2: Same-runtime native adapters (R3)
 
 - Claude adapter: resume only using Phase 0-proven SDK option/session lifecycle; checkpoint the authoritative session ID.
 - Codex adapter: add minimal app-server protocol/client methods proven in Phase 0; preserve existing shared-process event routing by `threadId`.
-- ACP adapter: implement load/resume only when the bundled server advertises and passes tests; otherwise explicitly declare fallback-only capability.
+- ACP adapter: implement `session/resume` only when the bundled server advertises it; never use `session/load` for continuation because it replays historical updates.
 - Normalize adapter result into `ContinuationState`; never let provider-native history overwrite the canonical Sprint 109 transcript silently.
 - Keep open/select runtime/auth/network-lazy; the continuation coordinator runs only after an accepted Send/explicit Continue.
 - Add failure injection for expired/invalid/auth/runtime-unavailable paths.
@@ -78,7 +83,7 @@ Descriptors are opaque tagged unions validated by their adapter and stored by th
 
 - Add `src/conversations/contextPack.ts` with deterministic selection/serialization and tests.
 - Include ordered user prompts, including prior unanswered prompts, and assistant final text event types only, with minimal turn/runtime/dispatch-certainty labels; exclude executable/provider-specific/transient artifacts.
-- Apply a Phase 0-decided byte/token budget without an extra summarization model dependency. Preserve first purpose-bearing turn(s), the most recent unanswered request, and then recent complete turns; record omitted turn/prompt count.
+- Apply the frozen 32,000 UTF-8 byte pack limit and 12,000-byte per-message cap without an extra summarization model dependency. Preserve the first user purpose, the most recent unanswered request, and then recent complete turns; record omitted turn/prompt count.
 - Build through the event before the newly accepted prompt; that prompt is persisted first and dispatched once outside the context pack.
 - Render runtime-specific input framing in adapters while keeping one canonical normalized pack.
 - Insert a durable transcript boundary and host-derived `transcript-restored` state before the first fallback turn.

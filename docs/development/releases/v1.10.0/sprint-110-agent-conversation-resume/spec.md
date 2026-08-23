@@ -134,11 +134,13 @@ Acceptance criteria:
 - **Timing:** open/select is lazy; negotiation starts on Send/explicit Continue and the current prompt is never included twice.
 - **Handoff coverage:** each runtime descriptor tracks `coveredThroughEventId`; only uncovered canonical delta crosses on resume/handoff.
 - **Interrupted handoff:** a prior saved-but-unanswered user prompt always crosses as labelled canonical context; partial provider state never does, and the new user instruction is the only newly dispatched prompt.
+- **Pinned runtime decision:** Claude, Codex and OpenCode are all `native-resume-with-limits`; each passed semantic recall after process restart plus two-conversation isolation on the exact shipped versions.
+- **ACP method:** use `session/resume` only. `session/load` replayed provider history and is excluded to prevent duplicate transcript/UI events.
+- **Fallback budget:** 32,000 UTF-8 bytes total; 12,000 bytes per selected message with deterministic head+tail truncation; first user purpose, latest unanswered request and newest complete turns receive priority without an LLM summary.
+- **Upgrade/model/policy safety:** exact compatibility only in v1.10.0. A mismatch invalidates only that runtime descriptor and uses transcript fallback.
+- **Watermark safety:** advance coverage only with the atomically saved assistant final; any accepted/ambiguous no-final crash invalidates that runtime descriptor before the next continuation.
+- **Dispatch receipt:** persist `not-sent`, then pessimistic `ambiguous` before transport, then `accepted` only on a runtime-specific positive receipt; unknown stays ambiguous.
 
 ## Open Questions
 
-- Exact context-pack token/byte budget and purpose-summary method; decide from pinned runtime limits in Phase 0 without adding an LLM summarization dependency.
-- Whether bundled OpenCode supports stable `session/load`/`session/resume`; fallback-only until live proof.
-- Whether Codex thread history reconciliation should use `thread/read` after resume or trust only canonical Ritemark transcript; audit duplicate/order semantics first.
-- Exact crash-safe watermark checkpoint strategy per runtime; ambiguous provider acceptance must choose safe fresh fallback over possible duplicate delta.
-- Which provider receipt signals can distinguish not-sent, accepted, and ambiguous dispatch without exposing provider IDs; Phase 0 must freeze the safe common metadata contract.
+- No unresolved product/architecture questions remain for Phase 1. Live auth-loss, unavailable-runtime, and failure-injection rows remain mandatory implementation evidence; they do not change the frozen safe-fallback decisions above.
