@@ -1,6 +1,6 @@
 # Release Plan — v1.10.0 Durable Agent Conversations
 
-**Status:** In development — Sprint 109 is merged; Sprint 110 is product-approved with implementation, lightweight handoff revision, live canary, independent review, official QA, and release evidence complete in [PR #211](https://github.com/ProductoryHQ/ritemark-native/pull/211), ready to merge; native Windows remains at the v1.10 candidate gate<br>
+**Status:** In development — Sprints 109 and 110 are merged; Sprint 110 shipped its product-approved continuation contract, lightweight handoff revision, live canary, independent review, official QA, and release evidence through [PR #211](https://github.com/ProductoryHQ/ritemark-native/pull/211); native Windows remains at the v1.10 candidate gate<br>
 **Target:** v1.10.0<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8) — created 2026-08-21<br>
 **Release type:** Full app distribution with extension-scoped implementation; deliberately not an `1.9.0-ext.N` lane<br>
@@ -72,7 +72,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | Sprint | Issue | Issue state | Branch | PR | Merge/defer | QA | Release notes | Status |
 |---|---|---|---|---|---|---|---|---|
 | [Sprint 109 — Durable Chat History](./sprint-109-durable-chat-history/sprint-plan.md) | [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) | Closed | `codex/sprint-109-durable-chat-history` | [#209](https://github.com/ProductoryHQ/ritemark-native/pull/209), [#210](https://github.com/ProductoryHQ/ritemark-native/pull/210) | PR #209 merged; final polish through PR #210 | Focused tests, compile/typecheck/build, official QA, and macOS `ritemark-demo` visual/accessibility evidence pass; native Windows retained at release candidate gate | Changelog, checklist, and three screenshots drafted | Final QA and approved rail-pin polish complete 2026-08-23 |
-| [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | In sprint; closes with PR #211 | `codex/sprint-110-agent-conversation-resume` | [#211](https://github.com/ProductoryHQ/ritemark-native/pull/211) | Independent review approved; ready to merge and close #204 | Native adapters, bounded fallback, dispatch receipts, immediate draft-safe handoff with one inline boundary, fresh-profile cutover, Claude → Codex recall, restart canary, independent review, and official QA pass | v1.10.0 release notes, checklist, and exactly three final-state screenshots complete | Product-approved and ready to merge 2026-08-23 |
+| [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | Closed | `codex/sprint-110-agent-conversation-resume` | [#211](https://github.com/ProductoryHQ/ritemark-native/pull/211) | Merged as `64cfd8a`; authenticated runtime-upgrade/failure-injection checks remain in the final release matrix | Native adapters, bounded fallback, dispatch receipts, immediate draft-safe handoff with one inline boundary, fresh-profile cutover, Claude → Codex recall, restart canary, independent review, and official QA pass | v1.10.0 release notes, checklist, and exactly three final-state screenshots complete | Complete 2026-08-23 |
 | [Sprint 111 — Agent Runtime Refresh](./sprint-111-agent-runtime-refresh/sprint-plan.md) | [#207](https://github.com/ProductoryHQ/ritemark-native/issues/207) | Open | `codex/sprint-111-agent-runtime-refresh` | — | Depends on Sprint 110 merge | Not run | Not drafted | Planned; branch not created |
 | [Sprint 112 — Composer Thinking Effort](./sprint-112-composer-thinking-effort/sprint-plan.md) | [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206) | Open | `codex/sprint-112-composer-thinking-effort` | — | Depends on Sprint 111 merge | Not run | Not drafted | Planned; branch not created |
 
@@ -124,8 +124,8 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 |---|---|---|---|
 | Irreversible or cross-project legacy migration | High | Copy-first, idempotent migration; quarantine ambiguous records; preserve legacy source until verification | Open — Sprint 109 |
 | Accepted prompt lost on crash | High | Persist before runtime dispatch; lifecycle checkpoint tests with forced disposal | Open — Sprint 109 |
-| Native provider session expired or invalid | High | Capability audit, validated resume descriptor, bounded disclosed fallback | Open — Sprint 110 |
-| UI claims continuation while runtime forgot | High | Explicit continuation state and inline context boundary | Open — Sprint 110 |
+| Native provider session expired or invalid | High | Capability audit, validated resume descriptor, bounded disclosed fallback | Retired in Sprint 110; reverify after Sprint 111 runtime refresh |
+| UI claims continuation while runtime forgot | High | Explicit continuation state and inline context boundary | Retired in Sprint 110; final runtime matrix retained |
 | Attachment/tool history causes storage or prompt growth | Medium | Persist attachment metadata only; omit binaries/tool traces from fallback context | Open |
 | Concurrent writes corrupt index/records | Medium | Serialized store operations, temp write + atomic rename, corrupt-record isolation | Open — Sprint 109 |
 | Risky migration ships broadly | Medium | Experimental/default-true kill switch, monotonic host-readable cutover, release-specific migration canary | Open |
