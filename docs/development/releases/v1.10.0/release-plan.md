@@ -1,6 +1,6 @@
 # Release Plan — v1.10.0 Durable Agent Conversations
 
-**Status:** In development — Sprint 109 final QA complete in [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209); native Windows retained at the v1.10 candidate gate<br>
+**Status:** In development — Sprint 109 final QA complete in [PR #209](https://github.com/ProductoryHQ/ritemark-native/pull/209) with rail-pin polish in [PR #210](https://github.com/ProductoryHQ/ritemark-native/pull/210); native Windows retained at the v1.10 candidate gate<br>
 **Target:** v1.10.0<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8) — created 2026-08-21<br>
 **Release type:** Full app distribution with extension-scoped implementation; deliberately not an `1.9.0-ext.N` lane<br>
@@ -71,7 +71,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 
 | Sprint | Issue | Issue state | Branch | PR | Merge/defer | QA | Release notes | Status |
 |---|---|---|---|---|---|---|---|---|
-| [Sprint 109 — Durable Chat History](./sprint-109-durable-chat-history/sprint-plan.md) | [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) | Closes with PR | `codex/sprint-109-durable-chat-history` | [#209](https://github.com/ProductoryHQ/ritemark-native/pull/209) | Merge through PR #209 | Focused tests, compile/typecheck/build, official QA, and macOS `ritemark-demo` visual/accessibility evidence pass; native Windows retained at release candidate gate | Changelog, checklist, and three screenshots drafted | Final QA complete 2026-08-23; merge recorded by PR state |
+| [Sprint 109 — Durable Chat History](./sprint-109-durable-chat-history/sprint-plan.md) | [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) | Closed | `codex/sprint-109-durable-chat-history` | [#209](https://github.com/ProductoryHQ/ritemark-native/pull/209), [#210](https://github.com/ProductoryHQ/ritemark-native/pull/210) | PR #209 merged; final polish through PR #210 | Focused tests, compile/typecheck/build, official QA, and macOS `ritemark-demo` visual/accessibility evidence pass; native Windows retained at release candidate gate | Changelog, checklist, and three screenshots drafted | Final QA and approved rail-pin polish complete 2026-08-23 |
 | [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | Open | `codex/sprint-110-agent-conversation-resume` | — | Depends on Sprint 109 merge | Not run | Not drafted | Planned; branch not created |
 | [Sprint 111 — Agent Runtime Refresh](./sprint-111-agent-runtime-refresh/sprint-plan.md) | [#207](https://github.com/ProductoryHQ/ritemark-native/issues/207) | Open | `codex/sprint-111-agent-runtime-refresh` | — | Depends on Sprint 110 merge | Not run | Not drafted | Planned; branch not created |
 | [Sprint 112 — Composer Thinking Effort](./sprint-112-composer-thinking-effort/sprint-plan.md) | [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206) | Open | `codex/sprint-112-composer-thinking-effort` | — | Depends on Sprint 111 merge | Not run | Not drafted | Planned; branch not created |
@@ -152,6 +152,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | 2026-08-22 | Keep one All conversations archive plus a permanent conversation rail | The archive owns durable truth; the rail automatically exposes active/recent work while familiar ChatGPT-style Pin/Unpin adds optional permanence. Selection does not reorder Recents. |
 | 2026-08-22 | Return conversation visuals to the shared chat bubble | Multi-color generated-looking marks conflict with Ritemark's calm Indigo-Editorial chrome; one Phosphor icon plus indigo active state is the production contract. |
 | 2026-08-23 | Add restrained stable color to the shared chat bubble | Color is a secondary memory aid, not semantic status: eight base hues first, then deeper/softer variants, with persisted project slots and lighter translucent fill. |
+| 2026-08-23 | Keep the rail pin visually subordinate to conversation identity | Preserve the safe action target while showing only a small borderless pin at rest; direct hover/focus enlarges the glyph without adding a competing badge surface. |
 | 2026-08-21 | Legacy global history is unassigned until explicit user action | Prevents silent cross-project leakage. |
 | 2026-08-21 | Local-only in v1.10.0 | Keeps the release focused; cloud sync requires a separate identity/privacy design. |
 | 2026-08-21 | Full SDD track for Sprints 109 and 110 | Each crosses webview, host, filesystem, and external runtime boundaries with high-risk edge cases. |
