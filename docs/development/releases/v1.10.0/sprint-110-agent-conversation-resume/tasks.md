@@ -69,7 +69,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Update `docs/development/architecture.md` with `Last updated` on/after branch creation date, plus user docs, `docs/CHANGELOG.md`, v1.10.0 release notes and test checklist.
 - [x] Run the Sprint 110 fresh-profile migration+resume canary and retain three release screenshots.
 - [x] Update the release tracker and Sprint 110 issue #204 with PR #211, QA, review, and explicit release-matrix deferrals.
-- [ ] Commit, push, PR, review, merge; mark release Feature complete only when all exceptions are deferred explicitly.
+- [x] Commit, push, independently review, and merge PR #211; close issue #204 while retaining post-Sprint 111 exceptions explicitly in the release matrix.
 
 ## Phase 7: Lightweight runtime switch disclosure (W7 — R9, added 2026-08-23)
 

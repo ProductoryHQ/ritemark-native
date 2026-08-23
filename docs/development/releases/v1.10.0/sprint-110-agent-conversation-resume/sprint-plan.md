@@ -1,6 +1,6 @@
 # Sprint 110 — Agent Conversation Resume
 
-**Status:** Product-approved by Jarmo on 2026-08-23; implementation, R9 lightweight handoff revision, live Claude → Codex smoke, independent review, official QA, and release screenshots complete in [PR #211](https://github.com/ProductoryHQ/ritemark-native/pull/211), ready to merge<br>
+**Status:** Complete — product-approved by Jarmo and merged through [PR #211](https://github.com/ProductoryHQ/ritemark-native/pull/211) as `64cfd8a` on 2026-08-23; implementation, R9 lightweight handoff revision, live Claude → Codex smoke, independent review, official QA, and release screenshots complete<br>
 **Parent release:** [v1.10.0 Durable Agent Conversations](../release-plan.md)<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8)<br>
 **Issue:** [#204 — Sprint 110: Resume Agent Conversations with truthful context](https://github.com/ProductoryHQ/ritemark-native/issues/204)<br>
@@ -68,7 +68,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 - [x] Two concurrent conversations and late events remain isolated.
 - [x] The permanent conversation rail remains selection-only and current-project-scoped; resume/fallback state never creates duplicate rail/history entries, corrupts automatic membership, or changes Pin state implicitly.
 - [x] No UI copy overclaims exact memory.
-- [ ] Architecture Gate, QA matrix, user docs, release notes/checklist, canary, and issue tracker are complete.
+- [x] Architecture Gate, Sprint 110 QA matrix plus explicit release deferrals, user docs, release notes/checklist, canary, and issue tracker are complete.
 
 ## Dependencies and Blockers
 
@@ -126,6 +126,7 @@ Together with Sprint 109, users can find a project conversation after restart an
 - [x] Phase 0 runtime/context/watermark decisions are recorded in every SDD artifact and explicitly approved by Jarmo before Phase 1 (2026-08-23).
 - [x] Jarmo approves the final R9 handoff behavior and Sprint 110 product closure (2026-08-23).
 - [x] Independent PR review finds no P0/P1/P2 blockers and PR #211 is ready to merge (2026-08-23).
+- [x] PR #211 merged to `main` as `64cfd8a` and issue #204 closed (2026-08-23).
 
 ## Implementation Evidence
 
