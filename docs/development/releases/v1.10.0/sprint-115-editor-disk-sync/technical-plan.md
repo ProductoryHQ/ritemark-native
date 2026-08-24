@@ -2,7 +2,7 @@
 
 ## Status and Gate
 
-This is an architecture proposal, not implementation authorization. Phase 0 reproduces the failure and freezes the protocol, selection, comparison, and multi-view decisions. Product-code work begins only after Jarmo approves the sprint and Phase 0 decisions on a dedicated `codex/sprint-115-editor-disk-sync` branch.
+This is an architecture proposal, not implementation authorization. The source audit, executable model, and compiler spike are complete; [research/phase-0-decision.md](./research/phase-0-decision.md) freezes the recommended protocol, retry, selection, comparison, recovery, and multi-view contract. Product-code work begins only after the remaining live evidence and Jarmo's separate Phase 0 decision on `codex/sprint-115-editor-disk-sync`.
 
 ## Architectural Decision
 
@@ -31,14 +31,14 @@ Each open URI has one coordinator record and one or more view sessions.
 
 | State | Identity | Owned by | Meaning |
 |---|---|---|---|
-| Disk | content hash plus observed file metadata | Coordinator | Latest bytes confirmed by a disk read. |
-| Model | `TextDocument.version`, content hash, `isDirty` | VS Code/coordinator snapshot | Current working-copy content. |
-| Base | disk revision/hash | Coordinator | External revision on which current local edits began. |
-| View | epoch, last sent revision, last acknowledged revision/hash | Coordinator per webview | What TipTap/table state proved it rendered. |
+| Disk | strong SHA-256 raw-byte validator plus logical text hash and format metadata | Coordinator | Latest bytes confirmed by a disk read. |
+| Model | `TextDocument.version`, logical text hash, `isDirty` | VS Code/coordinator snapshot | Current working-copy content. |
+| Base | disk validator plus base model hash | Coordinator | External/model pair from which current local edits began. |
+| View | document session, view epoch, last sent revision, last acknowledged revision/payload hash | Coordinator per webview | What TipTap/table state proved it rendered. |
 | Pending | target revision, attempt, deadline | Coordinator per webview | Update sent but not yet acknowledged. |
 | Conflict | base, local snapshot, disk snapshot | Coordinator | Local and disk changed independently from the same base. |
 
-A revision identity is `{ epoch, sequence, contentHash }`. Sequence is monotonic within the epoch; content hash detects equal bytes and supports idempotency. Epoch changes whenever a view is reconstructed.
+A document session UUID identifies one URI lifetime. Server revision is monotonic within that session; every webview bootstrap supplies a separate epoch UUID. Strong disk, logical text, and canonical render-payload hashes answer different questions and are not substituted for each other. The full identity rules are D3 in the Phase 0 decision.
 
 The external-change affordance is derived from `pending`, `applyError`, or `conflict`. Local-only divergence does not satisfy that predicate.
 
@@ -52,22 +52,35 @@ Create a Node/VS Code-free discriminated union for the document-sync messages an
 type DocumentUpdateMessage = {
   type: 'document:update'
   uri: string
-  epoch: string
+  documentSessionId: string
+  viewEpoch: string
   revision: number
-  baseRevision: number
-  contentHash: string
-  reason: 'open' | 'external' | 'revert' | 'resolution'
+  baseDiskHash: string
+  modelHash: string
+  payloadHash: string
+  reason: 'open' | 'external' | 'peer-edit' | 'undo-redo' | 'revert' | 'resolution'
   payload: MarkdownDocumentPayload | CsvDocumentPayload
 }
 
 type DocumentSyncStateMessage = {
   type: 'document:sync-state'
   uri: string
-  epoch: string
+  documentSessionId: string
+  viewEpoch: string
   state: 'synced' | 'applying' | 'conflict' | 'apply-error'
-  diskRevision: number
+  revision: number
   acknowledgedRevision: number
   attempt?: number
+}
+
+type DocumentEditResultMessage = {
+  type: 'document:edit-result'
+  uri: string
+  documentSessionId: string
+  viewEpoch: string
+  clientSequence: number
+  status: 'accepted' | 'stale' | 'rejected'
+  revision?: number
 }
 ```
 
@@ -77,16 +90,18 @@ type DocumentSyncStateMessage = {
 type DocumentAppliedMessage = {
   type: 'document:applied'
   uri: string
-  epoch: string
+  documentSessionId: string
+  viewEpoch: string
   revision: number
-  visibleContentHash: string
+  payloadHash: string
 }
 
 type DocumentEditMessage = {
   type: 'document:edit'
   uri: string
-  epoch: string
-  baseRevision: number
+  documentSessionId: string
+  viewEpoch: string
+  basedOnRevision: number
   clientSequence: number
   payload: MarkdownEditPayload | CsvEditPayload
 }
@@ -94,8 +109,10 @@ type DocumentEditMessage = {
 type DocumentConflictActionMessage = {
   type: 'document:conflict-action'
   uri: string
-  epoch: string
-  diskRevision: number
+  documentSessionId: string
+  viewEpoch: string
+  conflictRevision: number
+  diskHash: string
   action: 'compare' | 'keep-local' | 'use-disk' | 'retry-apply'
 }
 ```
@@ -110,7 +127,7 @@ Unknown messages, mismatched URIs/epochs, stale revisions, and invalid payloads 
 - Registers and unregisters view epochs independently from the URI lifecycle.
 - Reconciles disk, model, base, and each acknowledged view after invalidation hints.
 - Coalesces rapid observations to the newest confirmed disk revision.
-- Sends idempotent updates, waits for ACK, retries within a bounded budget, and exposes apply failure without claiming success.
+- Sends idempotent updates immediately, retries at 750 ms and 2.5 s, and exposes apply failure at 5 s without claiming success.
 - Detects local-only, clean external, and true conflict states without a bounded self-hash history.
 - Disposes watchers/polls only after the last view/document lease ends.
 
@@ -125,7 +142,7 @@ Unknown messages, mismatched URIs/epochs, stale revisions, and invalid payloads 
 
 For **Compare changes**, register a small read-only `TextDocumentContentProvider` under a `ritemark-sync:` scheme. It exposes immutable, revision-named local and disk snapshots to VS Code's diff command. Snapshot content is memory-only, scoped to the conflict, never saved automatically, and disposed after resolution/document close.
 
-**Keep my version** and **Use disk version** both re-read current disk identity before changing state. If the expected disk revision no longer matches, the coordinator creates a new conflict instead of writing.
+**Keep my version** and **Use disk version** both re-read the strong disk validator before changing state. If the expected validator no longer matches, the coordinator creates a new conflict instead of writing. Use-disk is one undoable `WorkspaceEdit`; standard Undo restoring the exact local snapshot as dirty is a hard live acceptance test. Keep-local does not change the model, so normal editor Undo remains unchanged.
 
 ## Webview Workstream
 
@@ -136,8 +153,9 @@ Add a small reducer/state module that accepts typed sync messages, rejects stale
 ### Editor application and acknowledgement
 
 - Remove the focused-editor early return for revisioned external updates.
+- Parse the target Markdown and apply the smallest structural ProseMirror transaction where possible so the existing selection maps through the change; use a clamped `Selection.near` whole-document fallback only when necessary.
 - Apply the full payload atomically from the webview's perspective.
-- Preserve focus; restore the previous selection/scroll position where valid and clamp it when the new document is shorter or structurally different.
+- Preserve focus and the nearest scroll anchor; retain a valid CSV cell or clamp to the nearest surviving cell.
 - Compute the visible serialized content identity after application.
 - Send `document:applied` only after content, properties/image mappings, or CSV data correspond to the same revision.
 - Never emit a normal local-edit message as a side effect of applying a host revision.
@@ -156,9 +174,9 @@ Use the existing Phosphor icon wrapper and design tokens. No new icon library, o
 4. Local-only divergence retains the base and stays quiet.
 5. Clean external divergence advances disk/base and sends one new view revision.
 6. Two-sided divergence captures immutable snapshots and enters conflict.
-7. Only a matching `document:applied` ACK advances visible state.
+7. Only a matching document session + view epoch + server revision + payload hash `document:applied` ACK advances visible state.
 
-Polling remains a single-file reliability fallback, but its cadence and stat/read optimization are frozen from trace evidence in Phase 0. Polling must be level-triggered and idempotent; correctness cannot depend on receiving every watcher event.
+Polling remains a three-second, one-per-URI full-content reliability fallback while a lease exists. It is level-triggered and idempotent; correctness cannot depend on receiving every watcher event. Watcher/model/save/poll signals are coalesced through the same serialized transition queue.
 
 ## File Surface
 

@@ -8,16 +8,16 @@ Branch/worktree gate satisfied 2026-08-24. Phase 0 decision gate remains open.
 
 ## Phase 0 — Reproduce and Freeze the Contract (R1–R8)
 
-- [ ] Reproduce the invisible focused-editor agent write on the exact v1.9.0 binary; capture disk bytes, model bytes, visible bytes, focus state, and timestamps.
-- [ ] Reproduce ordinary local typing/autosave lag and determine why the current external-change action activates.
-- [ ] Prove the former ten-second auto-reload can or cannot replace unsaved work; preserve a safe test fixture, never real user data.
+- [x] Reproduce the invisible focused-editor agent write on the exact v1.9.0 binary; capture disk bytes, inferred model state through Save, visible bytes, focus state, and timestamps in [`research/v1.9.0-live-reproduction.md`](./research/v1.9.0-live-reproduction.md).
+- [x] Reproduce ordinary local typing/autosave lag and confirm the current external-change action activates while disk bytes remain unchanged; preserve the evidence in [`research/v1.9.0-live-reproduction.md`](./research/v1.9.0-live-reproduction.md).
+- [x] Prove both in the exact released binary and the legacy transition model that the former ten-second auto-reload can replace unsaved work; preserve only disposable evidence and the safe executable fixture in [`research/phase0-sync-model.test.ts`](./research/phase0-sync-model.test.ts), never real user data.
 - [ ] Trace watcher, `onDidChangeTextDocument`, poll, autosave, host send, webview receive, TipTap apply, and ACK timing in folder and standalone-file modes.
 - [ ] Audit Markdown, CSV, multiple-view, panel hide/show, and close/reopen lifecycles.
-- [ ] Spike the Node-free shared protocol location and verify both host and webview TypeScript/Vite builds.
-- [ ] Freeze epoch/revision identity, ACK deadline/retry budget, poll fallback, and content-hash rules.
-- [ ] Freeze selection/scroll restoration behavior and the read-only conflict snapshot/diff mechanism.
-- [ ] Freeze **Keep my version** and **Use disk version** recovery/Undo semantics.
-- [ ] Update `research/current-state-sync-audit.md` with live evidence and any changed conclusion.
+- [x] Spike the Node-free shared protocol location and runtime validator; verify host TypeScript, webview TypeScript, and a production Vite build. The temporary source spike was removed after evidence capture.
+- [x] Freeze the recommended epoch/revision identity, 750 ms / 2.5 s / 5 s ACK budget, three-second poll fallback, and three distinct hash rules in [`research/phase-0-decision.md`](./research/phase-0-decision.md).
+- [x] Freeze transactional ProseMirror selection mapping, clamped fallback, scroll behavior, and the read-only conflict snapshot/diff mechanism.
+- [x] Freeze **Keep my version** and **Use disk version** recovery/Undo semantics, with Use-disk Undo retained as a hard live acceptance test.
+- [x] Update `research/current-state-sync-audit.md` with executable/static evidence, exact released-binary evidence, official-practice synthesis, the model-bypass finding, and the split-view lifecycle finding.
 - [ ] **Jarmo Phase 0 gate:** approve protocol, state model, conflict UX, selection fallback, multi-view ownership, and implementation scope.
 
 ## Phase 1 — Typed Protocol and Host Coordinator (R1, R2, R6, R7)

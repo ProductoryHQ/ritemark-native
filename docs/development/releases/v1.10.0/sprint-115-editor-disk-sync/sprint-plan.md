@@ -1,7 +1,7 @@
 # Sprint 115 — Reliable Editor–Disk Synchronization
 
 **Track:** Full SDD, audit-first  
-**Status:** Phase 0 in progress — planning approved 2026-08-24; implementation awaits Phase 0 decision freeze  
+**Status:** Phase 0 decision pending — exact v1.9.0 standalone reproduction, source audit, executable model, protocol spike, and D1–D12 candidate complete; broader implementation evidence remains
 **Branch:** `codex/sprint-115-editor-disk-sync`  
 **Worktree:** `.worktrees/sprint-115-editor-disk-sync`  
 **Issue:** [#221](https://github.com/ProductoryHQ/ritemark-native/issues/221) — linked to milestone v1.10.0  
@@ -63,8 +63,8 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 
 ## Dependencies and Gates
 
-- Jarmo approves this plan before any implementation work.
-- Create and verify `codex/sprint-115-editor-disk-sync` from a clean, synchronized `main` immediately after approval; never implement on `main`.
+- Jarmo has approved the sprint plan/kickoff; the separate Phase 0 implementation contract remains open.
+- Branch/worktree creation and the post-Sprint-113 rebase are complete; never implement on `main`.
 - Sprint 113 is merged and this branch is rebased onto `origin/main@18c6175`; Sprint 114 external Windows/Store release gates may continue independently.
 - Phase 0 requires a separate Jarmo decision on revision/ACK shape, retry deadline, conflict resolutions, selection fallback, protocol source location, and multi-view ownership.
 - Keep [#221](https://github.com/ProductoryHQ/ritemark-native/issues/221) aligned with scope, evidence, and decisions.
@@ -94,6 +94,9 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 - [design.md](./design.md) — header, conflict dialog, compare, focus, and accessibility contract.
 - [tasks.md](./tasks.md) — gated phase checklist.
 - [research/current-state-sync-audit.md](./research/current-state-sync-audit.md) — v1.9.0 source evidence, failure sequence, and external-practice synthesis.
+- [research/v1.9.0-live-reproduction.md](./research/v1.9.0-live-reproduction.md) — exact released-binary evidence for the stale focused view, destructive timer, and false disk-change action.
+- [research/phase-0-decision.md](./research/phase-0-decision.md) — D1–D12 implementation contract candidate, retry/hash values, recovery semantics, and remaining live evidence.
+- [research/phase0-sync-model.test.ts](./research/phase0-sync-model.test.ts) — executable legacy-failure and proposed-invariant model (7/7 pass).
 
 ## Product Decisions
 
@@ -108,6 +111,8 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 | 2026-08-24 | Do not add a feature flag or VS Code patch | The old path is unsafe; the fix belongs in the existing extension/webview architecture. |
 | 2026-08-24 | Jarmo approved Sprint 115 kickoff in a separate branch/worktree while Sprint 113 closes | Phase 0 may proceed independently; rebase onto the Sprint 113 merge before overlapping webview implementation. |
 | 2026-08-24 | Rebased Sprint 115 kickoff onto merged Sprint 113 | `origin/main@18c6175` is the branch base; release-plan overlap was reconciled before product-code work. |
+| 2026-08-24 | Prepare the D1–D12 Phase 0 contract candidate | Official VS Code, TipTap, ProseMirror, Node, and conditional-write practices support per-URI ownership, exact view receipts, strong disk validators, three-way conflicts, and bounded retries; live timing/Undo evidence and Jarmo approval remain. |
+| 2026-08-24 | Confirm the three legacy failures on the exact v1.9.0 standalone build | Focused and blurred views stayed stale, local-only typing activated the disk-change action with unchanged disk bytes, and the timer replaced model work while stale rendered content concealed the loss. |
 
 ## Planning Approval
 
