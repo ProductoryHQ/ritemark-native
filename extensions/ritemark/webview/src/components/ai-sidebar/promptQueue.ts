@@ -14,7 +14,7 @@
  */
 
 import type { ConversationActivityState } from './activityState';
-import type { FileAttachment } from './types';
+import type { FileAttachment, ThinkingEffort } from './types';
 
 export const QUEUE_CAP = 10;
 
@@ -26,6 +26,8 @@ export interface QueueItem {
   autonomy: 'auto' | 'ask';
   planFirst: boolean;
   modelId?: string;
+  /** Frozen with the item; later Composer changes cannot affect this turn. */
+  thinkingEffort: ThinkingEffort;
   /** Final prompt with all context baked in at enqueue time. */
   prompt: string;
   /** What the user typed — shown in the queue row. */

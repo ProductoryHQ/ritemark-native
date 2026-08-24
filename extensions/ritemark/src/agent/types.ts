@@ -5,6 +5,8 @@
  * Used by AgentRunner, UnifiedViewProvider, and webview.
  */
 
+import type { ExplicitThinkingEffort, ThinkingEffort } from '../runtime/thinkingEffort';
+
 /**
  * Available agent identifiers
  */
@@ -61,6 +63,10 @@ export interface ModelOption {
   id: string;
   label: string;
   description: string;
+  resolvedModel?: string;
+  supportsEffort?: boolean;
+  supportedEffortLevels?: ExplicitThinkingEffort[];
+  supportsAdaptiveThinking?: boolean;
 }
 
 
@@ -341,6 +347,10 @@ export interface AgentTurnOptions {
   onToolApproval?: (request: AgentToolApprovalRequest) => void;
   /** First positive SDK signal after this turn enters the provider stream. */
   onDispatchAccepted?: () => void;
+  /** Immutable Composer effort captured when this turn was accepted. */
+  thinkingEffort?: ThinkingEffort;
+  /** Called after the SDK query/config accepted the requested effort. */
+  onThinkingEffortApplied?: (applied?: ExplicitThinkingEffort) => void;
 }
 
 /**
@@ -352,6 +362,8 @@ export interface QueryHandle extends AsyncIterable<unknown> {
   close(): void;
   /** Change the permission mode of a live session (used by unified approval). */
   setPermissionMode?(mode: string): Promise<void>;
+  /** Change the effort of a warm Claude query without rebuilding its context. */
+  applyFlagSettings?(settings: { effortLevel: ExplicitThinkingEffort | null }): Promise<void>;
 }
 
 /**

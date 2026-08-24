@@ -191,6 +191,14 @@ export class ClaudeCodeSession implements RuntimeSession {
           providerAccepted = true;
           config.onDispatchAccepted?.();
         },
+        thinkingEffort: turn.thinkingEffort ?? 'auto',
+        onThinkingEffortApplied: (applied) => {
+          config.onThinkingEffortApplied?.({
+            requested: turn.thinkingEffort ?? 'auto',
+            ...(applied ? { applied } : {}),
+            adjusted: false,
+          });
+        },
       });
       let result = await send();
       // An invalid/expired resume can fail before the SDK emits any provider

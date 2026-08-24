@@ -51,6 +51,8 @@ import {
   transcriptRestoredState,
   type NormalizedRuntimeContext,
 } from '../runtime/continuation';
+import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
+import { thinkingEffortLabel } from '../runtime/thinkingEffort';
 
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
@@ -129,6 +131,7 @@ export class AcpSession implements RuntimeSession {
    */
   private _capabilityContextInjected = false;
   private _dispatchAccepted = false;
+  private _manualThinkingEffortApplied = false;
 
   constructor(
     readonly conversationId: string,
@@ -184,6 +187,42 @@ export class AcpSession implements RuntimeSession {
           ? config.model.slice('opencode:'.length)
           : config.model;
         await manager.setModel(this.acpSessionId, providerModel);
+        config.onThinkingEffortCapability?.(manager.getThinkingEffortCapability(this.acpSessionId));
+      }
+
+      const requestedThinkingEffort = turn.thinkingEffort ?? 'auto';
+      let appliedThinkingEffort: ExplicitThinkingEffort | undefined;
+      let effortFallback = false;
+      if (requestedThinkingEffort !== 'auto' || this._manualThinkingEffortApplied) {
+        try {
+          appliedThinkingEffort = await manager.setThinkingEffort(
+            this.acpSessionId,
+            requestedThinkingEffort,
+          );
+        } catch (error) {
+          if (requestedThinkingEffort === 'auto') throw error;
+          effortFallback = true;
+          appliedThinkingEffort = await manager.setThinkingEffort(this.acpSessionId, 'auto').catch(() => undefined);
+          this._manualThinkingEffortApplied = false;
+          config.onThinkingEffortApplied?.({
+            requested: requestedThinkingEffort,
+            ...(appliedThinkingEffort ? { applied: appliedThinkingEffort } : {}),
+            adjusted: true,
+          });
+          config.onProgress({
+            type: 'text',
+            message: `${thinkingEffortLabel(requestedThinkingEffort)} isn’t available for this OpenCode session. Using Auto.`,
+            timestamp: Date.now(),
+          });
+        }
+      }
+      if (!effortFallback && (requestedThinkingEffort === 'auto' || appliedThinkingEffort)) {
+        this._manualThinkingEffortApplied = requestedThinkingEffort !== 'auto';
+        config.onThinkingEffortApplied?.({
+          requested: requestedThinkingEffort,
+          ...(appliedThinkingEffort ? { applied: appliedThinkingEffort } : {}),
+          adjusted: false,
+        });
       }
 
       // A BYOK provider can hang a turn indefinitely — no response, no error —
@@ -352,6 +391,7 @@ export class AcpRuntime implements AgentRuntime {
     );
     this._sessions.set(conversationId, session);
     this._sessionsByAcpId.set(acpSessionId, session);
+    config.onThinkingEffortCapability?.(this._manager!.getThinkingEffortCapability(acpSessionId));
     const compatibility = config.continuation?.compatibility;
     if (compatibility) {
       config.onContinuationCheckpoint?.(continuationCheckpoint(
@@ -470,6 +510,9 @@ export class AcpRuntime implements AgentRuntime {
         const session = this._sessionsByAcpId.get(sessionId);
         session?.markDispatchAccepted();
         session?.config.onProgress(progress);
+      },
+      onThinkingEffortCapability: (capability, sessionId) => {
+        this._sessionsByAcpId.get(sessionId)?.config.onThinkingEffortCapability?.(capability);
       },
     });
   }

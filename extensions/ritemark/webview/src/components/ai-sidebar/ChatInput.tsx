@@ -28,11 +28,12 @@ import { resolveAIIdentity } from './aiDisclosure';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
 import { QueuePanel } from './QueuePanel';
+import { ThinkingEffortControl } from './ThinkingEffortControl';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
-import type { AgentId, FileAttachment, AttachmentKind } from './types';
+import type { AgentId, FileAttachment, AttachmentKind, ThinkingEffortCapability } from './types';
 
 let attachmentIdCounter = 0;
 let pathChipIdCounter = 0;
@@ -201,6 +202,11 @@ export function ChatInput() {
   } = activeConversation;
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const runtimeCapabilities = useAISidebarStore((s) => s.runtimeCapabilities);
+  const thinkingEffortCapabilities = useAISidebarStore((s) => s.thinkingEffortCapabilities);
+  const thinkingEffortNotice = useAISidebarStore((s) => activeConversationId
+    ? s.thinkingEffortNotices[activeConversationId] ?? null
+    : null);
+  const composerThinkingEffortEnabled = useAISidebarStore((s) => s.composerThinkingEffortEnabled);
   const agents = useAISidebarStore((s) => s.agents);
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
@@ -209,6 +215,8 @@ export function ChatInput() {
   const selectModel = useAISidebarStore((s) => s.selectModel);
   const selectCodexModel = useAISidebarStore((s) => s.selectCodexModel);
   const setPendingRuntime = useAISidebarStore((s) => s.setPendingRuntime);
+  const setThinkingEffort = useAISidebarStore((s) => s.setThinkingEffort);
+  const clearThinkingEffortNotice = useAISidebarStore((s) => s.clearThinkingEffortNotice);
   const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
   const cancelRequest = useAISidebarStore((s) => s.cancelRequest);
   const discoveredAgents = useAISidebarStore((s) => s.discoveredAgents);
@@ -245,6 +253,9 @@ export function ChatInput() {
   const isAgentMode = isClaudeCode || isCodex || isOpenCode;
   // Sprint 103 R8: two-axis composer policy (legacy 'plan' mode normalized).
   const composerPolicy = policyOf(pendingRuntime);
+  const composerThinkingEffort = composerThinkingEffortEnabled
+    ? activeConversation.thinkingEffortByRuntime[pendingRuntime.runtimeId] ?? 'auto'
+    : 'auto';
   // R6: the Plan chip renders only for runtimes with an enforceable plan contract.
   const planCapable = runtimeCapabilities[pendingRuntime.runtimeId]?.planFirst === true;
   // OpenCode zero-key check: all four provider booleans are false
@@ -295,6 +306,7 @@ export function ChatInput() {
         : pendingRuntime.runtimeId === 'opencode'
           ? opencodeSelectedModel
           : (pendingRuntime.modelId ?? selectedModel),
+      thinkingEffort: composerThinkingEffort,
       prompt,
       displayText,
       source: 'composer',
@@ -308,7 +320,7 @@ export function ChatInput() {
       setTimeout(() => setQueueFullNotice(false), 4000);
     }
     return outcome;
-  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, attachments, hideActiveFile, hideBrowserContext, enqueuePrompt]);
+  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, composerThinkingEffort, attachments, hideActiveFile, hideBrowserContext, enqueuePrompt]);
 
 
   // Build final message with path chips and pinned agent prepended
@@ -895,6 +907,44 @@ export function ChatInput() {
     }
   }
   const currentOpenCodeEntry = openCodeModels.find((m) => m.compositeValue === opencodeSelectedModel);
+  const currentCatalogEffort = pendingRuntime.runtimeId === 'codex'
+    ? currentCodexModel?.thinkingEffort
+    : pendingRuntime.runtimeId === 'claude-code'
+      ? currentClaudeModel?.thinkingEffort
+      : undefined;
+  const effortCapability = useMemo<ThinkingEffortCapability | null>(() => {
+    if (runtimeCapabilities[pendingRuntime.runtimeId]?.thinkingEffortSource === 'runtime-live') {
+      return activeConversationId
+        ? thinkingEffortCapabilities[activeConversationId]?.[pendingRuntime.runtimeId] ?? null
+        : null;
+    }
+    return {
+      selectable: currentCatalogEffort?.levels ?? [],
+      ...(currentCatalogEffort?.defaultLevel ? { defaultLevel: currentCatalogEffort.defaultLevel } : {}),
+      source: 'model-catalog',
+      supportsAppliedValue: false,
+    };
+  }, [activeConversationId, currentCatalogEffort, pendingRuntime.runtimeId, runtimeCapabilities, thinkingEffortCapabilities]);
+  const [localEffortNotice, setLocalEffortNotice] = useState<string | null>(null);
+
+  useEffect(() => setLocalEffortNotice(null), [activeConversationId]);
+
+  useEffect(() => {
+    if (!effortCapability || composerThinkingEffort === 'auto') return;
+    if (effortCapability.selectable.includes(composerThinkingEffort)) return;
+    const labels: Record<string, string> = { xhigh: 'Extra', low: 'Low', medium: 'Medium', high: 'High', max: 'Max', ultra: 'Ultra' };
+    setThinkingEffort('auto');
+    setLocalEffortNotice(`${labels[composerThinkingEffort] ?? composerThinkingEffort} isn’t available for this model. Using Auto.`);
+  }, [composerThinkingEffort, effortCapability, setThinkingEffort]);
+
+  useEffect(() => {
+    if (!thinkingEffortNotice && !localEffortNotice) return;
+    const timer = window.setTimeout(() => {
+      setLocalEffortNotice(null);
+      clearThinkingEffortNotice();
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [clearThinkingEffortNotice, localEffortNotice, thinkingEffortNotice]);
   const runtimeSelectValue = isOpenCode
     ? (opencodeSelectedModel || 'opencode:')
     : pendingRuntime.runtimeId === 'codex'
@@ -1386,10 +1436,31 @@ export function ChatInput() {
             </SelectContent>
           </Select>
 
+          {composerThinkingEffortEnabled ? (
+            <ThinkingEffortControl
+              runtimeLabel={pendingRuntime.runtimeId === 'codex' ? 'Codex' : pendingRuntime.runtimeId === 'opencode' ? 'OpenCode' : 'Claude'}
+              modelLabel={pendingRuntime.runtimeId === 'codex'
+                ? currentCodexModel?.label ?? 'Model'
+                : pendingRuntime.runtimeId === 'opencode'
+                  ? currentOpenCodeEntry?.label ?? 'Model'
+                  : currentClaudeModel?.label ?? 'Model'}
+              capability={effortCapability}
+              value={composerThinkingEffort}
+              onChange={setThinkingEffort}
+              running={isLoading}
+            />
+          ) : null}
+
           {!planCapable && composerPolicy.planFirst ? (
             /* R6: runtime without a plan contract — deactivate visibly, never pretend. */
             <span className="text-[10px] text-[var(--r-ink-faint)] whitespace-nowrap">
               Plan off — not supported by this runtime
+            </span>
+          ) : null}
+
+          {(thinkingEffortNotice || localEffortNotice) ? (
+            <span role="status" aria-live="polite" className="min-w-0 truncate text-[10px] text-[var(--r-ink-muted)]">
+              {thinkingEffortNotice || localEffortNotice}
             </span>
           ) : null}
 

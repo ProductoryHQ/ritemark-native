@@ -12,6 +12,7 @@ import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
+import { getSetupStatus } from './agent/setup';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
@@ -359,8 +360,13 @@ export function activate(context: vscode.ExtensionContext) {
   // serve the bundled floor immediately.
   modelCatalog.setDiscoveryProvider(async () => {
     const results: modelCatalog.DiscoveryResults = {};
+    const claudeSetup = await getSetupStatus();
     results.codex = await discoverCodex();
-    results.anthropic = await discoverAnthropic({ apiKey: (await context.secrets.get('anthropic-api-key')) ?? null });
+    results.anthropic = await discoverAnthropic({
+      apiKey: (await context.secrets.get('anthropic-api-key')) ?? null,
+      workspacePath,
+      binaryPath: claudeSetup.binaryPath,
+    });
     results.openai = await discoverOpenAI((await context.secrets.get('openai-api-key')) ?? null);
     results.gemini = await discoverGemini((await context.secrets.get('google-ai-key')) ?? null);
     return results;

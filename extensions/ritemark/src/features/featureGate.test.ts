@@ -108,5 +108,7 @@ const extensionManifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..
 };
 const featureProperties = extensionManifest.contributes.configuration[2].properties as Record<string, { default?: boolean }>;
 assert.strictEqual(featureProperties['ritemark.features.durableAgentConversations']?.default, true);
+assert.strictEqual(FLAGS['composer-thinking-effort'].status, 'experimental');
+assert.strictEqual(featureProperties['ritemark.features.composer-thinking-effort']?.default, true);
 
 console.log('All feature gate tests passed.');

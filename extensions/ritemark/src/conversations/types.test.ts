@@ -19,6 +19,7 @@ function record(): ConversationRecordV1 {
     bindingGeneration: 0,
     lifecycle: { state: 'idle' },
     runtimeSummary: ['codex'],
+    composerPreferences: { thinkingEffortByRuntime: {} },
     events: [{
       kind: 'user-message',
       eventId: 'event-1',
@@ -29,6 +30,7 @@ function record(): ConversationRecordV1 {
       text: 'Plan it',
       mode: 'agent',
       attachments: [{ name: 'brief.md', kind: 'file', mediaType: 'text/markdown', sizeBytes: 123 }],
+      thinkingEffort: 'auto',
     }],
   };
 }
@@ -51,6 +53,12 @@ function descriptor(overrides: Partial<RuntimeContinuationDescriptorV1> = {}): R
 
 function run(): void {
   assert.deepEqual(decodeConversationRecordV1(JSON.parse(JSON.stringify(record()))), record());
+  const preSprint112 = JSON.parse(JSON.stringify(record())) as Record<string, unknown>;
+  delete preSprint112.composerPreferences;
+  delete (preSprint112.events as Array<Record<string, unknown>>)[0].thinkingEffort;
+  const upgraded = decodeConversationRecordV1(preSprint112);
+  assert.deepEqual(upgraded.composerPreferences, { thinkingEffortByRuntime: {} });
+  assert.equal(upgraded.events[0].kind === 'user-message' && upgraded.events[0].thinkingEffort, 'auto');
   assert.throws(() => decodeConversationRecordV1({ ...record(), schemaVersion: 2 }), /schemaVersion must be 1/);
   assert.throws(() => decodeConversationRecordV1({ ...record(), conversationId: '../escape' }), /conversationId must be a UUID/);
   assert.throws(() => decodeConversationRecordV1({ ...record(), scopeId: 'project-a' }), /scopeId must be a ps1 scope id/);
@@ -98,6 +106,7 @@ function run(): void {
       runtimeId: 'codex',
       content: 'Done',
       terminalStatus: 'completed',
+      appliedThinkingEffort: null,
     },
   );
   resumable.continuations = { codex: descriptor() };

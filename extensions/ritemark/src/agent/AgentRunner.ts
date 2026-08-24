@@ -23,10 +23,12 @@ import type {
   AgentResult,
   AgentMetrics,
   FileAttachment,
+  ModelOption,
   QueryHandle,
   SDKMessage,
   SubagentProgress,
 } from './types';
+import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import * as path from 'path';
 import { traceClaude } from './agentTrace';
 
@@ -504,7 +506,7 @@ export class AgentSession {
   private _turnWaitedMs = 0;
 
   /** Called when SDK reports its available models (after session init) */
-  onModelsDiscovered: ((models: Array<{ id: string; label: string; description: string }>) => void) | null = null;
+  onModelsDiscovered: ((models: ModelOption[]) => void) | null = null;
 
   constructor(config: AgentSessionConfig) {
     this._workspacePath = config.workspacePath;
@@ -590,7 +592,19 @@ export class AgentSession {
    * subsequent calls feed into the existing warm process (~2-3s).
    */
   async sendMessage(options: AgentTurnOptions): Promise<AgentResult> {
-    const { prompt, attachments, activeFile, timeoutMinutes = DEFAULT_TIMEOUT_MINUTES, onProgress, onQuestion, onPlanApproval, onToolApproval, onDispatchAccepted } = options;
+    const {
+      prompt,
+      attachments,
+      activeFile,
+      timeoutMinutes = DEFAULT_TIMEOUT_MINUTES,
+      onProgress,
+      onQuestion,
+      onPlanApproval,
+      onToolApproval,
+      onDispatchAccepted,
+      thinkingEffort = 'auto',
+      onThinkingEffortApplied,
+    } = options;
 
     if (!prompt || prompt.trim() === '') {
       throw new Error('Agent prompt is empty');
@@ -665,9 +679,20 @@ export class AgentSession {
 
     if (!this._queryStream) {
       // First turn — start session with warm process
-      await this._startSession(userMsg);
+      await this._startSession(userMsg, thinkingEffort);
+      // The SDK accepted the flag, but only hook payloads expose a truthful
+      // post-downgrade level. Do not echo the requested value as provider fact.
+      onThinkingEffortApplied?.();
     } else {
       // Follow-up turn — feed into existing warm process
+      const applyFlagSettings = this._queryStream.applyFlagSettings;
+      if (!applyFlagSettings) {
+        throw new Error('Claude runtime does not support changing thinking effort on a warm session');
+      }
+      await applyFlagSettings.call(this._queryStream, {
+        effortLevel: thinkingEffort === 'auto' ? null : thinkingEffort,
+      });
+      onThinkingEffortApplied?.();
       this._emitProgress('init', `Continuing (${this._model || 'claude'})`);
       this._enqueueInput(userMsg);
     }
@@ -728,12 +753,24 @@ export class AgentSession {
     try {
       const qs = this._queryStream as any;
       if (qs && typeof qs.supportedModels === 'function') {
-        const models: Array<{ value: string; displayName: string; description: string }> = await qs.supportedModels();
+        const models: Array<{
+          value: string;
+          resolvedModel?: string;
+          displayName: string;
+          description: string;
+          supportsEffort?: boolean;
+          supportedEffortLevels?: ExplicitThinkingEffort[];
+          supportsAdaptiveThinking?: boolean;
+        }> = await qs.supportedModels();
         if (models?.length && this.onModelsDiscovered) {
           this.onModelsDiscovered(models.map(m => ({
             id: m.value,
             label: m.displayName,
             description: m.description,
+            resolvedModel: m.resolvedModel,
+            supportsEffort: m.supportsEffort,
+            supportedEffortLevels: m.supportedEffortLevels,
+            supportsAdaptiveThinking: m.supportsAdaptiveThinking,
           })));
         }
       }
@@ -879,7 +916,10 @@ export class AgentSession {
 
   // ── Session lifecycle ───────────────────────────────────────────────
 
-  private async _startSession(firstMsg: Record<string, unknown>) {
+  private async _startSession(
+    firstMsg: Record<string, unknown>,
+    thinkingEffort: AgentTurnOptions['thinkingEffort'],
+  ) {
     const query = await getQuery();
     const safetyAppend = buildClaudeSystemAppend(this._workspacePath, this._excludedFolders);
     const fullAppend = this._extraSystemPromptAppend
@@ -915,6 +955,7 @@ export class AgentSession {
       canUseTool: this._handleCanUseTool.bind(this),
       ...(this._mcpServers ? { mcpServers: this._mcpServers } : {}),
       ...(this._resumeSessionId ? { resume: this._resumeSessionId } : {}),
+      ...(thinkingEffort && thinkingEffort !== 'auto' ? { effort: thinkingEffort } : {}),
     };
 
     if (this._modelId) {

@@ -44,6 +44,17 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Codex optional `isBlocking` input metadata routes through the existing input contract; ACP 1.4.0 preserves the contained adapter boundary.
 - [x] Native darwin-x64 and win32-x64 exact SDK compile, runtime fetch/checksum/architecture, and three-binary version smoke pass on final commit `3ef9e0c` ([matrix run](https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388)).
 
+## Composer thinking effort (Sprint 112)
+
+- [x] Auto is the default, sends no initial override, and restores the captured runtime default after a warm manual choice.
+- [x] Claude, Codex execute/plan, and ACP `thought_level` adapters map only advertised explicit levels and record requested/applied evidence.
+- [x] Unsupported/unknown values are rejected; model changes invalidate an unavailable preference to Auto with user-visible copy.
+- [x] Preferences remain conversation/runtime-scoped; accepted and queued turns keep immutable effort snapshots across switching and reload.
+- [x] OpenCode remains lazy and exposes effort only after the live ACP session advertises compatible thought levels.
+- [x] Feature-flag OFF omits the control without deleting saved preferences.
+- [x] Native RunDev smoke: range drag, click/arrow operation, Auto checkbox, Escape/focus return, 300px sidebar collision, normal width, and 200% zoom geometry pass in `ritemark-demo` (2026-08-24).
+- [x] Native range/checkbox names, value text, keyboard semantics, live status copy, and reduced-motion CSS contract are present; no bespoke slider keyboard behavior is used.
+
 ## Automated gates
 
 - [x] Extension TypeScript compile and bundle.
@@ -53,9 +64,9 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] `./scripts/validate-qa.sh` on the final Sprint 110 branch (2026-08-23).
 - [x] Sprint 110 fresh-profile migration+resume canary.
 - [x] Sprint 111 exact-manifest validator, validator mutation tests, extension compile, focused runtime suites, and deterministic extension suite.
+- [x] Sprint 112 official QA, focused effort/runtime suites, conversation regressions, extension compile, and webview typecheck/build (2026-08-24).
 - [ ] Release preflight and final migration+resume canary after all v1.10.0 sprints merge.
 
 ## Remaining release scope
 
-- [ ] Sprint 112 Composer thinking-effort behavior and visual matrix.
 - [ ] Final macOS arm64/x64 and Windows candidate gates.

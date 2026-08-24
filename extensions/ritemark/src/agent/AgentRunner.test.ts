@@ -252,6 +252,49 @@ async function testSprint103KeepPlanningFeedbackDeny() {
   assert.equal(s._planFirst, true, 'plan-first STAYS on after Keep planning (D2)');
 }
 
+async function testWarmSessionThinkingEffortUpdatesBeforeInput(): Promise<void> {
+  // The warm Claude process must receive per-turn effort before the next user
+  // message is enqueued. Auto is an explicit reset (`null`), not a stale reuse
+  // of the prior manual value.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const session = new AgentSession({ workspacePath: process.cwd() }) as any;
+  const calls: Array<{ kind: string; value?: unknown }> = [];
+  session._queryStream = {
+    applyFlagSettings: async (settings: { effortLevel: string | null }) => {
+      calls.push({ kind: 'effort', value: settings.effortLevel });
+    },
+    interrupt: async () => {},
+    close: () => {},
+  };
+  session._enqueueInput = () => calls.push({ kind: 'input' });
+
+  const completeTurn = () => session._forceResolveTurn(session._turnId, {
+    text: 'ok',
+    filesModified: [],
+    metrics: { durationMs: 1, costUsd: null, model: null },
+  });
+
+  const manual = session.sendMessage({ prompt: 'manual', thinkingEffort: 'high' });
+  await new Promise((resolve) => setImmediate(resolve));
+  completeTurn();
+  await manual;
+  assert.deepEqual(calls.splice(0), [
+    { kind: 'effort', value: 'high' },
+    { kind: 'input' },
+  ], 'manual effort is applied before the warm-session input');
+
+  const auto = session.sendMessage({ prompt: 'auto', thinkingEffort: 'auto' });
+  await new Promise((resolve) => setImmediate(resolve));
+  completeTurn();
+  await auto;
+  assert.deepEqual(calls, [
+    { kind: 'effort', value: null },
+    { kind: 'input' },
+  ], 'Auto resets a prior manual effort before the next input');
+
+  session.close();
+}
+
 async function main() {
   testDefaultSettingSources();
   testDefaultToolsIncludePlanAndQuestionLifecycle();
@@ -264,6 +307,7 @@ async function main() {
   await testSprint103AutoModeAllowsFallthrough();
   await testSprint103ExitPlanModeApprovalCarriesModeSwitch();
   await testSprint103KeepPlanningFeedbackDeny();
+  await testWarmSessionThinkingEffortUpdatesBeforeInput();
   console.log('AgentRunner lifecycle tests passed.');
 }
 

@@ -20,7 +20,7 @@ Footer order:
 3. **Effort · value** trigger;
 4. existing context/actions and Send according to current layout.
 
-The trigger is a compact ghost control: 11–12px Sofia Sans, ink-muted at rest, ink-strong on hover, surface-soft hover, 6px radius, standard focus ring. Use text without a decorative icon; the label already explains the action.
+The trigger is a compact ghost control: 11–12px Sofia Sans, ink-muted at rest, ink-strong on hover, surface-soft hover, 6px radius, standard focus ring. Use **Effort** while the effort value is Auto, avoiding a visually duplicated Auto beside the separate Agent behavior selector; use **Effort · value** for a manual level. Use text without a decorative icon.
 
 ## Popover
 
@@ -28,31 +28,27 @@ The trigger is a compact ghost control: 11–12px Sofia Sans, ink-muted at rest,
 ┌────────────────────────────────────────┐
 │ Thinking effort                  Extra │
 │                                        │
-│ ( ) Auto   Let the model decide        │
-│                                        │
-│ Manual                                 │
 │ Faster                   More thorough │
-│   ○──────○──────○──────●──────○        │
-│  Low   Medium  High   Extra   Max      │
+│   ●━━━━━━●━━━━━━◉━━━━━━○━━━━━━○        │
 │                                        │
-│ Higher effort can take longer and use  │
-│ more provider quota.                   │
+│ [x] Auto                               │
 └────────────────────────────────────────┘
 ```
 
 - Width: 280–320px where space permits; never wider than the sidebar minus 16px.
 - Surface: `--r-surface`; hairline border; 10px radius; Ritemark medium/large shadow.
 - Header: 13px/500 **Thinking effort** and current value in ink-strong.
-- Auto is a normal radio option, separate from the ordered manual scale because it is not a point between Faster and More thorough.
+- Auto is a compact checkbox below the ordered manual scale because it enables or disables manual override; checking it restores runtime/model default behavior.
 - Manual scale renders only provider-supported levels. Do not leave unexplained disabled dots in the track.
-- Selected manual stop uses indigo plus a textual selected state; other stops use the ink/hairline ladder.
-- Help copy is 11–12px ink-muted. No “smarter,” cost promise, token count, sparkles, lightning bolt, gradient, or vendor color.
+- The scale is a native draggable range input styled as one compact pill track: indigo fill up to a large white thumb, neutral remainder, and small internal stops. Dragging, clicking the track, and keyboard arrows snap to the capability-filtered levels; it must not be a row of buttons merely styled like a slider.
+- Scale stops carry no persistent text labels. The current value is shown once in the header and every stop retains an accessible name plus a hover tooltip.
+- Auto leaves the last manual thumb visible at reduced emphasis so the control does not collapse visually; selecting any stop turns Auto off. No “smarter,” cost promise, token count, sparkles, lightning bolt, decorative gradient, or vendor color.
 
 ## States
 
 ### Auto
 
-Trigger: **Effort · Auto**. No provider override is sent.
+Trigger: **Effort**. The adjacent Agent behavior selector may independently say Auto; the effort popover/header and checked checkbox communicate effort Auto. No user-selected provider override is active.
 
 ### Explicit level
 
@@ -87,8 +83,8 @@ Do not launch a session to fill the popover. Before ACP advertises `thought_leve
 ## Keyboard Contract
 
 - Tab focuses the trigger.
-- Enter/Space opens the popover and focuses the selected radio choice.
-- Up/Down or Left/Right moves among available manual levels; Auto remains directly focusable.
+- Enter/Space opens the popover and focuses the selected manual stop or the Auto checkbox.
+- Up/Down or Left/Right moves among available manual levels; Auto remains directly focusable as a checkbox below the scale.
 - Enter/Space selects.
 - Escape closes without change and restores trigger focus.
 - Focus cannot escape behind the popover while using arrow-key interaction.
@@ -102,10 +98,10 @@ Do not launch a session to fill the popover. Before ACP advertises `thought_leve
 
 ## Phase 0 Design Gate
 
-- [ ] Jarmo approves the footer order and **Effort · value** trigger.
-- [ ] Jarmo approves Auto as a separate choice above the manual scale.
-- [ ] Jarmo approves Faster→More thorough and rejects “Smarter.”
-- [ ] Jarmo approves Auto/Low/Medium/High/Extra/Max labels with capability-filtered visibility.
-- [ ] Jarmo approves narrow-width wrapping and the unsupported/downgrade copy.
+- [x] Jarmo approves the footer order and compact **Effort** / **Effort · value** trigger (2026-08-24).
+- [x] Jarmo approves Auto as a checkbox below the manual scale (2026-08-24).
+- [x] Jarmo approves Faster→More thorough and rejects “Smarter” (2026-08-24).
+- [x] Jarmo approves Auto/Low/Medium/High/Extra/Max/Ultra labels with capability-filtered visibility (2026-08-24).
+- [x] Jarmo approves narrow-width wrapping and the unsupported/downgrade copy (2026-08-24).
 
 No implementation starts before this gate and the runtime capability audit are approved.

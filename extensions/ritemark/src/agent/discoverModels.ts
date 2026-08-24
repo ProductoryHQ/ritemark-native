@@ -95,7 +95,15 @@ export async function discoverClaudeModels(options: DiscoverOptions): Promise<Mo
       return null;
     }
 
-    const models: Array<{ value: string; displayName: string; description: string }> =
+    const models: Array<{
+      value: string;
+      resolvedModel?: string;
+      displayName: string;
+      description: string;
+      supportsEffort?: boolean;
+      supportedEffortLevels?: Array<'low' | 'medium' | 'high' | 'xhigh' | 'max'>;
+      supportsAdaptiveThinking?: boolean;
+    }> =
       await withTimeout(stream.supportedModels(), DISCOVERY_TIMEOUT_MS, 'supportedModels');
 
     if (!Array.isArray(models) || models.length === 0) {
@@ -111,6 +119,10 @@ export async function discoverClaudeModels(options: DiscoverOptions): Promise<Mo
       id: m.value,
       label: m.displayName,
       description: m.description,
+      resolvedModel: m.resolvedModel,
+      supportsEffort: m.supportsEffort,
+      supportedEffortLevels: m.supportedEffortLevels,
+      supportsAdaptiveThinking: m.supportsAdaptiveThinking,
     }));
   } catch (err) {
     traceClaude('sdk', 'discoverClaudeModels: failed', {

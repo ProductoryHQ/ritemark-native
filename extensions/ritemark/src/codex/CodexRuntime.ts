@@ -41,6 +41,8 @@ import {
   resolveRuntimeContinuation,
   transcriptRestoredState,
 } from '../runtime/continuation';
+import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
+import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 
 // ── Codex-specific constants ────────────────────────────────────────────────
 
@@ -162,6 +164,11 @@ export class CodexSession implements RuntimeSession {
    */
   private _threadApprovalKey = '';
 
+  /** Provider default captured before this session applies a manual override. */
+  private _defaultThinkingEffort: ExplicitThinkingEffort | null = null;
+  /** Auto only needs an explicit reset after a manual value changed the thread. */
+  private _manualThinkingEffortApplied = false;
+
   /** Approval/question request ids raised by this conversation and still open. */
   private readonly _openRequestIds = new Set<string>();
 
@@ -247,7 +254,7 @@ export class CodexSession implements RuntimeSession {
     if (!this._threadId) {
       const dynamicTools = browserToolsNeeded ? buildCodexBrowserDynamicTools() : undefined;
       const planDevInstructions = config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS;
-      let result: { thread: { id: string } } | null = null;
+      let result: { thread: { id: string }; reasoningEffort?: string | null } | null = null;
       if (continuation.kind === 'native') {
         config.onContinuationState?.({ mode: 'pending' });
         try {
@@ -288,6 +295,10 @@ export class CodexSession implements RuntimeSession {
         }, this.conversationId);
       }
       this._threadId = result.thread.id;
+      const providerDefault = result.reasoningEffort;
+      this._defaultThinkingEffort = isExplicitThinkingEffort(providerDefault)
+        ? providerDefault
+        : turn.thinkingEffortDefault ?? null;
       this._runtime._bindThread(result.thread.id, this);
       this._browserToolsEnabledForThread = Boolean(dynamicTools?.length);
       this._threadApprovalKey = approvalKey;
@@ -330,12 +341,17 @@ export class CodexSession implements RuntimeSession {
       useNativeContext ? config.continuation?.nativeDelta : config.continuation?.fallbackContext,
     );
 
+    const requestedThinkingEffort = turn.thinkingEffort ?? 'auto';
+    const effectiveThinkingEffort = requestedThinkingEffort === 'auto'
+      ? (this._manualThinkingEffortApplied ? this._defaultThinkingEffort ?? undefined : undefined)
+      : requestedThinkingEffort;
+
     const collaborationMode = shouldUsePlanMode
       ? {
           mode: 'plan' as const,
           settings: {
             model: resolvedModel ?? 'gpt-5.6-sol',
-            reasoning_effort: null,
+            reasoning_effort: effectiveThinkingEffort ?? null,
             developer_instructions: config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
           },
         }
@@ -356,7 +372,13 @@ export class CodexSession implements RuntimeSession {
       resolvedModel ?? undefined,
       imageDataUrls.length > 0 ? imageDataUrls : undefined,
       collaborationMode,
+      effectiveThinkingEffort,
     );
+    this._manualThinkingEffortApplied = requestedThinkingEffort !== 'auto';
+    config.onThinkingEffortApplied?.({
+      requested: requestedThinkingEffort,
+      adjusted: false,
+    });
     this._turnId = turnResult.turn.id;
     config.onDispatchAccepted?.();
     traceCodex('execution', 'turn start acknowledged', {
@@ -423,6 +445,8 @@ export class CodexSession implements RuntimeSession {
     if (this._threadId) this._runtime._unbindThread(this._threadId);
     this._threadId = null;
     this._turnId = null;
+    this._defaultThinkingEffort = null;
+    this._manualThinkingEffortApplied = false;
   }
 }
 

@@ -34,7 +34,7 @@ Primary files:
 Proposed shared shapes:
 
 ```ts
-type ThinkingEffort = 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+type ThinkingEffort = 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
 
 interface ThinkingEffortCapability {
   selectable: ThinkingEffort[];

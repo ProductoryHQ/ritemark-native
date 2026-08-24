@@ -84,6 +84,9 @@ import type {
   OnboardingInstallState,
   AcpProviderFlags,
   ByokModelOption,
+  RuntimeCapabilityFlags,
+  ThinkingEffort,
+  ThinkingEffortCapability,
 } from './types';
 
 export type { ConversationState, PendingRuntimeSelection } from './conversationState';
@@ -262,7 +265,13 @@ interface AISidebarState {
   byokProviderModels: Record<string, ByokModelOption[]> | undefined;
 
   // ── Sprint 103 R6: per-runtime capability map (APP-GLOBAL, host-provided) ──
-  runtimeCapabilities: Record<string, { planFirst: boolean; liveModeSwitch: boolean; structuredPlanSteps: boolean }>;
+  runtimeCapabilities: Record<string, RuntimeCapabilityFlags>;
+  /** Default-on host kill-switch; false removes UI and sends Auto. */
+  composerThinkingEffortEnabled: boolean;
+  /** Live session capabilities keyed by durable conversation and runtime. */
+  thinkingEffortCapabilities: Record<string, Partial<Record<AgentId, ThinkingEffortCapability>>>;
+  /** Concise non-blocking invalidation/downgrade notices, isolated by conversation. */
+  thinkingEffortNotices: Record<string, string>;
 
   // ── Chat history (APP-GLOBAL) ──
   savedConversations: SavedConversationV2[];
@@ -351,6 +360,8 @@ interface AISidebarState {
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
   setPendingRuntime: (partial: Partial<PendingRuntimeSelection>) => void;
+  setThinkingEffort: (effort: ThinkingEffort) => void;
+  clearThinkingEffortNotice: () => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
   /**
@@ -657,6 +668,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           id: nextId(),
           conversationId: item.conversationId,
           userPrompt: item.displayText,
+          thinkingEffort: item.thinkingEffort,
           activeFilePath: item.documentPath,
           attachments: item.attachments,
           activities: [],
@@ -686,6 +698,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
           approvalMode: item.autonomy,
           planFirst: item.planFirst,
+          thinkingEffort: item.thinkingEffort,
           skipActiveFile: item.skipActiveFile,
           skipBrowserContext: item.skipBrowserContext,
           mentionedAgentPaths: item.mentionedAgentPaths,
@@ -695,6 +708,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           id: nextId(),
           conversationId: item.conversationId,
           userPrompt: item.displayText,
+          thinkingEffort: item.thinkingEffort,
           runtime: item.runtimeId === 'opencode' ? 'opencode' : 'codex',
           requestedPlanMode: item.planFirst,
           activeFilePath: item.documentPath,
@@ -726,6 +740,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           model: item.modelId,
           approvalMode: item.autonomy,
           planFirst: item.planFirst,
+          thinkingEffort: item.thinkingEffort,
           skipActiveFile: item.skipActiveFile,
           skipBrowserContext: item.skipBrowserContext,
           attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
@@ -800,10 +815,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     // Mirrors src/runtime/capabilities.ts until the first agent:config arrives.
     runtimeCapabilities: {
-      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false },
-      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true },
-      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false },
+      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog' },
+      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog' },
+      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live' },
     },
+    composerThinkingEffortEnabled: true,
+    thinkingEffortCapabilities: {},
+    thinkingEffortNotices: {},
 
     savedConversations: [],
     showHistoryPanel: false,
@@ -1032,6 +1050,33 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       }));
     },
 
+    setThinkingEffort: (effort) => {
+      const state = get();
+      const conversation = activeConversation();
+      if (!conversation) return;
+      const runtimeId = conversation.pendingRuntime.runtimeId;
+      patchConversation(conversation.id, (current) => ({
+        thinkingEffortByRuntime: { ...current.thinkingEffortByRuntime, [runtimeId]: effort },
+      }));
+      const summary = state.hostConversations.find((item) => item.conversationId === conversation.id);
+      if (summary && state.conversationRolloutMode !== 'legacy') {
+        postConversationRequest({
+          type: 'conversation/set-composer-preference',
+          conversationId: conversation.id,
+          bindingGeneration: summary.bindingGeneration,
+          agentId: runtimeId,
+          thinkingEffort: effort,
+        });
+      }
+    },
+
+    clearThinkingEffortNotice: () => {
+      const conversationId = get().activeConversationId;
+      if (!conversationId) return;
+      const { [conversationId]: _removed, ...thinkingEffortNotices } = get().thinkingEffortNotices;
+      set({ thinkingEffortNotices });
+    },
+
     sendAgentMessage: (prompt, attachments?, options?) => {
       const state = get();
       const conversation = activeConversation();
@@ -1061,6 +1106,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         id: nextId(),
         conversationId: conversation.id,
         userPrompt: prompt,
+        thinkingEffort: state.composerThinkingEffortEnabled
+          ? conversation.thinkingEffortByRuntime['claude-code'] ?? 'auto'
+          : 'auto',
         activeFilePath: activeFile,
         attachments,
         activities: [],
@@ -1101,6 +1149,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         attachments: attachmentPayload,
         approvalMode: claudePolicy.autonomy,
         planFirst: claudePolicy.planFirst,
+        thinkingEffort: turn.thinkingEffort ?? 'auto',
         skipActiveFile: options?.skipActiveFile,
         skipBrowserContext: options?.skipBrowserContext,
         mentionedAgentPaths: options?.mentionedAgentPaths,
@@ -1401,6 +1450,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         id: nextId(),
         conversationId: conversation.id,
         userPrompt: prompt,
+        thinkingEffort: get().composerThinkingEffortEnabled
+          ? conversation.thinkingEffortByRuntime.codex ?? 'auto'
+          : 'auto',
         requestedPlanMode: codexPlanFirst,
         activeFilePath: skipActiveFile ? undefined : get().activeFilePath || undefined,
         attachments,
@@ -1434,6 +1486,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         // to the Codex approval policy, sandbox, and plan collaboration mode.
         approvalMode: codexAutonomy,
         planFirst: codexPlanFirst,
+        thinkingEffort: turn.thinkingEffort ?? 'auto',
         skipBrowserContext,
         skipActiveFile,
         attachments: attachments?.map((attachment) => ({
@@ -1478,6 +1531,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         conversationId: conversation.id,
         runtime: 'opencode',
         userPrompt: prompt,
+        thinkingEffort: get().composerThinkingEffortEnabled
+          ? conversation.thinkingEffortByRuntime.opencode ?? 'auto'
+          : 'auto',
         requestedPlanMode: false,
         activeFilePath: options?.skipActiveFile ? undefined : get().activeFilePath || undefined,
         attachments,
@@ -1510,6 +1566,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         displayPrompt: prompt,
         model,
         approvalMode: conversation.pendingRuntime.mode,
+        thinkingEffort: turn.thinkingEffort ?? 'auto',
         skipActiveFile: options?.skipActiveFile,
         attachments: attachments?.map((attachment) => ({
           id: attachment.id,
@@ -1574,6 +1631,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     approveCodexPlan: (turnId) => {
       const conversation = activeConversation();
       if (!conversation) return;
+      const approvedTurnEffort = conversation.codexConversation.find((turn) => turn.id === turnId)?.thinkingEffort ?? 'auto';
       const { conversation: nextTurns, prompt } = applyCodexPlanApproval(conversation.codexConversation, turnId, nextId);
       if (!prompt) {
         return;
@@ -1599,6 +1657,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         model: conversation.codexSelectedModel,
         approvalMode: policyOf(conversation.pendingRuntime).autonomy,
         planFirst: false,
+        thinkingEffort: approvedTurnEffort,
       });
       get().maybeDrainQueue(conversation.id);
     },
@@ -1948,13 +2007,53 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             agentConversation: stampConversationId(local.agentConversation, message.conversationId),
             codexConversation: stampConversationId(local.codexConversation, message.conversationId),
           };
+          const thinkingEffortCapabilities = { ...current.thinkingEffortCapabilities };
+          if (thinkingEffortCapabilities[message.clientConversationId]) {
+            thinkingEffortCapabilities[message.conversationId] = thinkingEffortCapabilities[message.clientConversationId];
+            delete thinkingEffortCapabilities[message.clientConversationId];
+          }
+          const thinkingEffortNotices = { ...current.thinkingEffortNotices };
+          if (thinkingEffortNotices[message.clientConversationId]) {
+            thinkingEffortNotices[message.conversationId] = thinkingEffortNotices[message.clientConversationId];
+            delete thinkingEffortNotices[message.clientConversationId];
+          }
           set({
             conversations,
             activeConversationId: current.activeConversationId === message.clientConversationId
               ? message.conversationId
               : current.activeConversationId,
             pinnedConversationIds: current.pinnedConversationIds.map((id) => id === message.clientConversationId ? message.conversationId : id),
+            thinkingEffortCapabilities,
+            thinkingEffortNotices,
           });
+          break;
+        }
+
+        case 'thinking-effort/capability': {
+          const targetId = routeInbound(message);
+          if (!targetId) break;
+          set({
+            thinkingEffortCapabilities: {
+              ...get().thinkingEffortCapabilities,
+              [targetId]: {
+                ...get().thinkingEffortCapabilities[targetId],
+                [message.runtimeId]: message.capability,
+              },
+            },
+          });
+          break;
+        }
+
+        case 'thinking-effort/status': {
+          const targetId = routeInbound(message);
+          if (targetId && message.message) {
+            set({
+              thinkingEffortNotices: {
+                ...get().thinkingEffortNotices,
+                [targetId]: message.message,
+              },
+            });
+          }
           break;
         }
 
@@ -2160,6 +2259,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             autonomy: policy.autonomy,
             planFirst: false,
             modelId: rt === 'codex' ? target?.codexSelectedModel : rt === 'opencode' ? target?.opencodeSelectedModel : undefined,
+            thinkingEffort: target?.thinkingEffortByRuntime[rt] ?? 'auto',
             prompt: message.prompt,
             displayText: message.prompt,
             source: 'comment',
@@ -2234,6 +2334,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           set({
             agenticEnabled: message.agenticEnabled,
             durableAgentConversationsEnabled: message.durableAgentConversations !== false,
+            composerThinkingEffortEnabled: message.composerThinkingEffortEnabled !== false,
             codexEnabled: message.codexEnabled ?? false,
             agents: message.agents,
             models: newClaudeModels,

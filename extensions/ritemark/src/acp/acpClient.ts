@@ -18,6 +18,8 @@ import { Writable, Readable } from 'stream';
 import type {
   InitializeResponse,
   NewSessionResponse,
+  ResumeSessionResponse,
+  SetSessionConfigOptionResponse,
   PromptResponse,
   RequestPermissionRequest,
   RequestPermissionResponse,
@@ -158,13 +160,14 @@ export class AcpClient {
   }
 
   /** session/resume — reconnect to an existing provider session without load replay. */
-  async resumeSession(sessionId: string, cwd: string, mcpServers?: unknown[]): Promise<void> {
+  async resumeSession(sessionId: string, cwd: string, mcpServers?: unknown[]): Promise<ResumeSessionResponse> {
     if (!this.sessionResumeAdvertised) {
       throw new Error('ACP agent does not advertise session/resume support');
     }
     const connection = this.requireConnection();
-    await connection.resumeSession({ sessionId, cwd, mcpServers: (mcpServers ?? []) as never });
+    const result = await connection.resumeSession({ sessionId, cwd, mcpServers: (mcpServers ?? []) as never });
     this.trace?.('client', 'resumeSession', { cwd, mcpServerCount: (mcpServers ?? []).length, sessionId });
+    return result;
   }
 
   /** session/prompt — send a user text message and await the turn result. */
@@ -184,14 +187,25 @@ export class AcpClient {
    * key is `configId` (a wrong `optionId` is silently dropped with -32602).
    * `providerModel` is the `<provider>/<model>` value form.
    */
-  async setModel(sessionId: string, providerModel: string): Promise<void> {
+  async setModel(sessionId: string, providerModel: string): Promise<SetSessionConfigOptionResponse> {
     const connection = this.requireConnection();
     this.trace?.('client', 'setModel', { sessionId, value: providerModel });
-    await connection.setSessionConfigOption({
+    return connection.setSessionConfigOption({
       sessionId,
       configId: 'model',
       value: providerModel,
     });
+  }
+
+  /** Set an advertised ACP session option using its runtime-provided id. */
+  async setSessionConfigOption(
+    sessionId: string,
+    configId: string,
+    value: string,
+  ): Promise<SetSessionConfigOptionResponse> {
+    const connection = this.requireConnection();
+    this.trace?.('client', 'setSessionConfigOption', { sessionId, configId, value });
+    return connection.setSessionConfigOption({ sessionId, configId, value });
   }
 
   /**

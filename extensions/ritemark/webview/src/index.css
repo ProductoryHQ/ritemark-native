@@ -368,6 +368,56 @@ body {
 }
 @keyframes rmBubbleIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .rm-bubble { animation: none; } }
+
+/* Sprint 112: native discrete Composer effort range. The visual track is a
+   sibling so this input stays transparent while retaining browser-native drag,
+   track click, focus, and arrow-key behavior. */
+.thinking-effort-range {
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+.thinking-effort-range::-webkit-slider-runnable-track {
+  height: 40px;
+  background: transparent;
+}
+.thinking-effort-range::-webkit-slider-thumb {
+  width: 32px;
+  height: 32px;
+  margin-top: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--r-hairline);
+  border-radius: 999px;
+  background: var(--r-surface);
+  box-shadow: 0 2px 7px rgba(26, 24, 67, 0.2);
+}
+.thinking-effort-range::-moz-range-track {
+  height: 40px;
+  background: transparent;
+}
+.thinking-effort-range::-moz-range-thumb {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--r-hairline);
+  border-radius: 999px;
+  background: var(--r-surface);
+  box-shadow: 0 2px 7px rgba(26, 24, 67, 0.2);
+}
+.thinking-effort-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+.thinking-effort-range:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-effort-range::-webkit-slider-thumb,
+  .thinking-effort-range::-moz-range-thumb {
+    transition: none;
+  }
+}
 .rm-bubble-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
 .rm-bubble-who { font-size: 12px; font-weight: 600; color: var(--ritemark-ink-strong, #1e1b4b); }
 .rm-agent-badge {

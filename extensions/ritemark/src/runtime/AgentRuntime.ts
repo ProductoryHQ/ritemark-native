@@ -4,6 +4,12 @@ import type {
   RuntimeContinuationRequest,
   RuntimeContinuationState,
 } from './continuation';
+import type {
+  ExplicitThinkingEffort,
+  ThinkingEffort,
+  ThinkingEffortApplied,
+  ThinkingEffortCapability,
+} from './thinkingEffort';
 
 export type { AgentId };
 export type {
@@ -14,6 +20,12 @@ export type {
   RuntimeContinuationRequest,
   RuntimeContinuationState,
 } from './continuation';
+export type {
+  ExplicitThinkingEffort,
+  ThinkingEffort,
+  ThinkingEffortApplied,
+  ThinkingEffortCapability,
+} from './thinkingEffort';
 
 export interface RuntimeTurnResult {
   text?: string;
@@ -94,6 +106,10 @@ export interface RuntimeSessionConfig {
   onContinuationState?: (state: RuntimeContinuationState) => void;
   /** First audit-approved positive signal that the current turn was accepted. */
   onDispatchAccepted?: () => void;
+  /** Session-local capability update (ACP discovers thought_level lazily). */
+  onThinkingEffortCapability?: (capability: ThinkingEffortCapability) => void;
+  /** Truthful requested/applied value, when the provider exposes it. */
+  onThinkingEffortApplied?: (result: ThinkingEffortApplied) => void;
   /**
    * Autonomy policy applied across all runtimes (Sprint 103 R1):
    * - 'auto'  — agents act without asking (no approval prompts)
@@ -145,6 +161,10 @@ export interface RuntimeTurnConfig {
   mode?: 'plan' | 'execute';
   /** Per-turn model override (Codex uses this; Claude Code ignores it) */
   model?: string;
+  /** Immutable accepted-turn snapshot. Auto restores the provider default. */
+  thinkingEffort?: ThinkingEffort;
+  /** Catalog/live default captured before any manual override. */
+  thinkingEffortDefault?: ExplicitThinkingEffort;
 }
 
 export interface UnifiedAttachment {

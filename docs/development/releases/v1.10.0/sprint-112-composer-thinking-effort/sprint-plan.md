@@ -1,9 +1,9 @@
 # Sprint 112 — Composer Thinking Effort
 
 **Track:** Full SDD, audit-first<br>
-**Status:** Approved to start after Sprint 111 merge; Phase 0 decision still pending<br>
-**Branch after approval:** `codex/sprint-112-composer-thinking-effort`<br>
-**Worktree:** Not created<br>
+**Status:** Complete — ready for PR/merge<br>
+**Branch:** `codex/sprint-112-composer-thinking-effort`<br>
+**Worktree:** `.worktrees/sprint-112-composer-thinking-effort`<br>
 **Issue:** [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206)<br>
 **Release:** [v1.10.0](../release-plan.md)
 
@@ -17,7 +17,7 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 
 ## In Scope
 
-- Canonical Auto/Low/Medium/High/Extra/Max vocabulary with capability-filtered options.
+- Canonical Auto/Low/Medium/High/Extra/Max/Ultra vocabulary with capability-filtered options.
 - Composer footer trigger and anchored discrete popover based on [design.md](./design.md).
 - Per-conversation/per-runtime draft preference and per-accepted-turn snapshot.
 - Typed host capability and turn contract; unknown-value validation.
@@ -46,14 +46,14 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 
 ## Success Criteria
 
-- [ ] Claude and Codex users can choose effort beside the Composer’s model/mode controls.
-- [ ] Auto sends no explicit override; explicit levels reach the correct measured runtime API.
-- [ ] Only supported levels are selectable; invalidation and provider downgrade are disclosed.
-- [ ] Queued/running turns retain their own snapshots; conversations and runtimes do not share effort state.
-- [ ] OpenCode remains lazy and exposes only ACP-advertised thought levels.
-- [ ] Keyboard, screen reader, reduced motion, minimum width, and 200% zoom contracts pass.
-- [ ] Flag-off preserves conversations and restores provider defaults.
-- [ ] Architecture, docs, release evidence, tracker, and issue are current.
+- [x] Claude and Codex users can choose effort beside the Composer’s model/mode controls.
+- [x] Auto sends no initial override and restores warm defaults; explicit levels reach the correct measured runtime API.
+- [x] Only supported levels are selectable; invalidation and provider downgrade are disclosed.
+- [x] Queued/running turns retain their own snapshots; conversations and runtimes do not share effort state or notices.
+- [x] OpenCode remains lazy and exposes only ACP-advertised thought levels.
+- [x] Native accessible controls, reduced motion, minimum width, and 200% zoom contracts pass.
+- [x] Flag-off preserves conversations and restores provider defaults.
+- [x] Architecture, docs, release evidence, and tracker are current; issue #206 closes with the sprint PR.
 
 ## Dependencies and Gates
 
@@ -83,6 +83,14 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 - [tasks.md](./tasks.md) — phase checklist.
 - [research/thinking-effort-capability-audit.md](./research/thinking-effort-capability-audit.md) — Phase 0 evidence template.
 
+## Validation Evidence
+
+- `./scripts/validate-qa.sh` passes, including runtime-manifest validation, pre-commit checks, patched VS Code native TypeScript, and targeted agent lifecycle tests.
+- Extension compile/bundle, webview typecheck/production bundle, full conversation regression suite, canonical effort tests, model-catalog resolver tests, and all three runtime adapter suites pass.
+- RunDev in `ritemark-demo` passes native range drag and arrow keys, Auto, Escape/focus return, flag-off omission, 300px collision, normal width, and 200% geometry. Release evidence is stored as `docs/releases/v1.10.0/screenshots/1-10-0-thinking-effort.png`.
+- Independent risk-first review found and fixed three contained issues before close: explicit live Auto-only capability precedence, stale-turn callback isolation, and cross-conversation notice isolation. No P0–P3 findings remain.
+- The broad legacy `npm test` command still reaches the pre-existing bare-Node Claude Flow integration harness failure where `AgentRunner` transitively resolves `vscode`; the same import chain exists on `origin/main`. Sprint 112’s official QA and every affected focused suite pass.
+
 ## Product Decisions
 
 | Date | Decision | Rationale |
@@ -94,10 +102,14 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 | 2026-08-22 | Per-turn snapshot, per-runtime conversation preference | Matches Composer intent and prevents queue/concurrency surprises. |
 | 2026-08-22 | Experimental/default-on kill switch | Large cross-boundary UX change remains reversible without deleting data. |
 | 2026-08-23 | Advance kickoff approval recorded | Branch creation remains dependency-gated on Sprint 111 merge; capability/mapping/design approval is still a separate Phase 0 decision. |
+| 2026-08-24 | Recommend capability-filtered Ultra | Exact Codex 0.149.0 metadata advertises `ultra` above `max` for Sol and Terra; hiding or coercing it would make the shared vocabulary misleading. |
+| 2026-08-24 | Define warm Auto as restoration of the captured runtime default | Codex effort is sticky across turns. Omission is correct initially, but returning from a manual override must restore the effective default rather than leave the old manual value active. |
+| 2026-08-24 | Preserve OpenCode lazy discovery | ACP `thought_level` is session-local; opening or selecting a conversation still performs no runtime work. |
+| 2026-08-24 | Phase 0 design and capability contract approved | Approved the compact native range control, Auto below the scale, capability-filtered Ultra, warm-Auto restoration, and honest OpenCode lazy behavior. |
 
 ## Planning Approval
 
 - [x] Jarmo approves Sprint 112 scope and dependency on Sprint 111 (2026-08-23).
 - [x] Jarmo pre-approves branch creation after Sprint 111 merges (2026-08-23).
-- [ ] Phase 0 capability/mapping/design decision approved.
+- [x] Phase 0 capability/mapping/design decision approved (2026-08-24).
 - [x] GitHub issue #206 created and assigned to milestone v1.10.0.

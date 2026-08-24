@@ -21,14 +21,21 @@ export interface RuntimeCapabilities {
   liveModeSwitch: boolean;
   /** Runtime may emit structured plan steps (turn/plan/updated) as enhancement. */
   structuredPlanSteps: boolean;
+  /** Where the Composer gets model/session-specific effort choices. */
+  thinkingEffortSource: 'model-catalog' | 'runtime-live';
 }
 
 export const RUNTIME_CAPABILITIES: Record<AgentId, RuntimeCapabilities> = {
-  'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false },
-  'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true },
-  'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false },
+  'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog' },
+  'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog' },
+  'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live' },
 };
 
 export function capabilitiesFor(agentId: AgentId): RuntimeCapabilities {
-  return RUNTIME_CAPABILITIES[agentId] ?? { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false };
+  return RUNTIME_CAPABILITIES[agentId] ?? {
+    planFirst: false,
+    liveModeSwitch: false,
+    structuredPlanSteps: false,
+    thinkingEffortSource: 'runtime-live',
+  };
 }

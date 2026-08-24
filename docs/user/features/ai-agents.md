@@ -241,6 +241,18 @@ The composer footer has two independent controls instead of the old three-button
 
 The Plan chip only appears for runtimes that can genuinely enforce it (Claude and Codex). OpenCode has no plan contract yet, so it shows no Plan control — by design, not omission.
 
+### Thinking effort
+
+> New in v1.10.0.
+
+For models that support it, **Effort** in the Composer opens a compact Faster → More thorough scale. Drag the handle, click a point, or use the arrow keys to choose the effort for the next message. **Auto** is the default and lets the selected model decide.
+
+- Available points follow the selected model's real capability; Ritemark does not show unsupported levels.
+- The choice is saved per conversation and agent, while every queued message keeps the effort it had when you accepted it.
+- Returning to Auto restores the model's default, including after a manual choice in a warm session.
+- OpenCode shows the control only after its live ACP session advertises compatible thought levels. Merely opening or selecting a conversation never starts OpenCode to discover them.
+- Higher effort can take longer and use more provider quota. It is a compute preference, not a promise of a better answer.
+
 ### Plan review
 
 When a plan is ready, a review card appears in the sidebar:

@@ -1,6 +1,6 @@
 # Release Plan — v1.10.0 Durable Agent Conversations
 
-**Status:** In development — Sprints 109 and 110 are merged; Sprint 110 shipped its product-approved continuation contract, lightweight handoff revision, live canary, independent review, official QA, and release evidence through [PR #211](https://github.com/ProductoryHQ/ritemark-native/pull/211); native Windows remains at the v1.10 candidate gate<br>
+**Status:** In development — Sprints 109–111 are merged; Sprint 111 refreshed and verified the exact Claude, Codex, OpenCode, and protocol SDK pins through [PR #214](https://github.com/ProductoryHQ/ritemark-native/pull/214); Sprint 112 implementation, approved RunDev design validation, focused regression matrix, code review, and official QA are complete; native Windows remains at the v1.10 candidate gate<br>
 **Target:** v1.10.0<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8) — created 2026-08-21<br>
 **Release type:** Full app distribution with extension-scoped implementation; deliberately not an `1.9.0-ext.N` lane<br>
@@ -19,7 +19,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 2. **Crash-safe local history** — accepted prompts are persisted before dispatch; close never means delete; no silent 50-item pruning.
 3. **Continue truthfully** — reopened conversations distinguish native session resume, transcript-context fallback, and unavailable context.
 4. **Current agent runtimes** — v1.10.0 pins and verifies refreshed Claude, Codex, OpenCode, and protocol SDK versions across all release platforms.
-5. **Choose thinking effort in the Composer** — Claude and Codex expose honest per-turn Auto/Low/Medium/High/Extra/Max choices; OpenCode participates only when ACP advertises compatible thought levels.
+5. **Choose thinking effort in the Composer** — Claude and Codex expose honest per-turn, model-filtered Auto/Low/Medium/High/Extra/Max/Ultra choices; OpenCode participates only when ACP advertises compatible thought levels.
 
 ## Product Contract
 
@@ -74,7 +74,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | [Sprint 109 — Durable Chat History](./sprint-109-durable-chat-history/sprint-plan.md) | [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) | Closed | `codex/sprint-109-durable-chat-history` | [#209](https://github.com/ProductoryHQ/ritemark-native/pull/209), [#210](https://github.com/ProductoryHQ/ritemark-native/pull/210) | PR #209 merged; final polish through PR #210 | Focused tests, compile/typecheck/build, official QA, and macOS `ritemark-demo` visual/accessibility evidence pass; native Windows retained at release candidate gate | Changelog, checklist, and three screenshots drafted | Final QA and approved rail-pin polish complete 2026-08-23 |
 | [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | Closed | `codex/sprint-110-agent-conversation-resume` | [#211](https://github.com/ProductoryHQ/ritemark-native/pull/211) | Merged as `64cfd8a`; authenticated runtime-upgrade/failure-injection checks remain in the final release matrix | Native adapters, bounded fallback, dispatch receipts, immediate draft-safe handoff with one inline boundary, fresh-profile cutover, Claude → Codex recall, restart canary, independent review, and official QA pass | v1.10.0 release notes, checklist, and exactly three final-state screenshots complete | Complete 2026-08-23 |
 | [Sprint 111 — Agent Runtime Refresh](./sprint-111-agent-runtime-refresh/sprint-plan.md) | [#207](https://github.com/ProductoryHQ/ritemark-native/issues/207) | Closes with PR | `codex/sprint-111-agent-runtime-refresh` | [#214](https://github.com/ProductoryHQ/ritemark-native/pull/214) | Ready to merge; full signed installers remain release gates | Exact 9-artifact gate, deterministic suite, official QA, arm64 behavior, native Intel/Windows matrix, code review, and release preflight pass | Runtime refresh section complete | Complete 2026-08-24 |
-| [Sprint 112 — Composer Thinking Effort](./sprint-112-composer-thinking-effort/sprint-plan.md) | [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206) | Open | `codex/sprint-112-composer-thinking-effort` | — | Kickoff pre-approved; depends on Sprint 111 merge | Not run | Not drafted | Approved to start after dependency clears |
+| [Sprint 112 — Composer Thinking Effort](./sprint-112-composer-thinking-effort/sprint-plan.md) | [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206) | Open | `codex/sprint-112-composer-thinking-effort` | — | Ready for PR/merge | Exact-pin capability probes, all-level adapter matrix, conversation regressions, live RunDev matrix, code review, and official QA pass | User docs, release notes, checklist, and one release screenshot complete | Complete 2026-08-24 |
 
 ## Feature-Complete Definition
 
@@ -131,8 +131,8 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | Risky migration ships broadly | Medium | Experimental/default-true kill switch, monotonic host-readable cutover, release-specific migration canary | Open |
 | Runtime refresh changes protocol or invalidates continuation | High | Exact audit, adapter contract fixtures, native-platform probes, rerun Sprint 110 matrix | Open — Sprint 111 |
 | Claude binary and SDK drift | High | Lockstep exact pins and hard parity check | Open — Sprint 111 |
-| Composer exposes unsupported effort or cross-binds queued turns | High | Host capability truth, turn snapshot before queue/dispatch, model/runtime/concurrency matrix | Open — Sprint 112 |
-| OpenCode effort requires eager runtime startup | High | Preserve lazy open/select; show controls only after ACP advertises `thought_level` | Open — Sprint 112 |
+| Composer exposes unsupported effort or cross-binds queued turns | High | Host capability truth, turn snapshot before queue/dispatch, model/runtime/concurrency matrix | Retired in Sprint 112 |
+| OpenCode effort requires eager runtime startup | High | Preserve lazy open/select; show controls only after ACP advertises `thought_level` | Retired in Sprint 112 |
 
 ## Documentation and Release Assets
 
@@ -163,7 +163,9 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | 2026-08-23 | Use one ChatGPT-style host title policy across all runtimes | Immediate prompt fallback keeps the UI responsive; an isolated first-response classifier improves scanability; manual Rename remains final authority. |
 | 2026-08-23 | Preserve unanswered user intent across runtime failure and switch | A durably saved prompt without a final answer is normalized handoff context even when provider acceptance is unknown; only the new handoff instruction is dispatched, while partial/tool state stays behind. |
 | 2026-08-23 | Start Sprint 111 audit-only Phase 0; pre-approve Sprints 112–114 | Sprint 111 may audit exact runtime pins now but cannot change manifests, dependencies, or adapters before its second decision. Sprint 112 remains blocked on Sprint 111 merge. Sprint 113/#208 and Sprint 114/#212 local draft plans must be promoted into the canonical release tracker before their branches start; evidence-dependent Phase 0 decisions remain separate. |
+| 2026-08-24 | Complete Sprint 112 runtime capability audit | Exact final-pin evidence supports Claude Low–Max, model-dependent Codex Low–Extra/Max/Ultra, and live ACP `thought_level`; product-code work awaits the separate capability/mapping/design decision. |
 | 2026-08-24 | Approve Sprint 111 exact pins and measured protocol plan | Codex 0.149.0, Claude 2.1.239/SDK 0.3.239, and OpenCode 1.18.21/ACP 1.4.0 passed Phase 0 evidence; implementation may proceed without Composer UI. |
+| 2026-08-24 | Approve Sprint 112 capability mapping and final Composer design | Ship the compact native range with Auto below it; capability-filter every runtime/model, preserve warm Auto defaults, and keep OpenCode discovery lazy. |
 
 ## Planning Approval
 
@@ -171,7 +173,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - [x] Jarmo approves Sprint 109 SDD artifacts and Phase 0 start (2026-08-22).
 - [x] Jarmo approves Sprint 110 SDD artifacts and Phase 0 decisions (2026-08-23).
 - [x] Jarmo approves Sprint 111 SDD artifacts, exact target pins, and protocol plan (2026-08-24).
-- [x] Jarmo pre-approves Sprint 112 scope and kickoff after Sprint 111 merge (2026-08-23); effort capability/mapping/design decision remains pending.
+- [x] Jarmo approves Sprint 112 scope, kickoff, capability mapping, and final Composer design (scope 2026-08-23; Phase 0/final design 2026-08-24).
 - [x] Jarmo pre-approves Sprint 113/#208 and Sprint 114/#212 scope/kickoff (2026-08-23); canonical draft promotion, dependencies, and evidence-specific decisions remain pending.
 - [x] GitHub milestone v1.10.0 created 2026-08-21.
 - [x] Sprint issues [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) and [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) created and linked 2026-08-21.

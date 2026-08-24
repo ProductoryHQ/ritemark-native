@@ -64,6 +64,16 @@ const mockManager = {
     return { stopReason: 'end_turn', usage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 } };
   },
   setModel: async (_sessionId: string, _model: string) => { calls.push('setModel'); },
+  getThinkingEffortCapability: () => ({
+    selectable: ['low', 'medium', 'high'],
+    defaultLevel: 'medium',
+    source: 'runtime-live',
+    supportsAppliedValue: true,
+  }),
+  setThinkingEffort: async (_sessionId: string, effort: string) => {
+    calls.push(`setThinkingEffort:${effort}`);
+    return effort === 'auto' ? 'medium' : effort;
+  },
   cancel: async (_sessionId: string) => { calls.push('cancel'); },
   closeSession: (_sessionId: string) => { calls.push('closeSession'); },
   dispose: () => { calls.push('dispose'); },
@@ -247,6 +257,58 @@ async function run() {
     assert.ok(calls.includes('setModel'), 'prompt() must call setModel when config.model is set');
     assert.ok(calls.includes('prompt'), 'prompt() must call manager.prompt()');
     console.log('✓ Test 6: prompt() calls setModel and manager.prompt()');
+  }
+
+  // Thinking effort is applied before the prompt, and Auto restores the live default.
+  {
+    const runtime = new AcpRuntime();
+    calls.length = 0;
+    const session = addSession(runtime, 'conv-effort');
+    await session.prompt({ prompt: 'thorough', thinkingEffort: 'high' });
+    await session.prompt({ prompt: 'default again', thinkingEffort: 'auto' });
+    assert.ok(calls.indexOf('setThinkingEffort:high') < calls.indexOf('prompt'));
+    assert.ok(calls.includes('setThinkingEffort:auto'), 'Auto restores the captured ACP default after a manual override');
+    console.log('✓ Test 6b: ACP effort applies before prompt and Auto restores the live default');
+  }
+
+  // A rejected live option falls back to Auto without dropping the user prompt.
+  {
+    const runtime = new AcpRuntime();
+    calls.length = 0;
+    const applied: Array<{ requested: string; adjusted: boolean }> = [];
+    const session = addSession(runtime, 'conv-effort-fallback', {
+      ...dummyConfig,
+      onThinkingEffortApplied: (result) => applied.push(result),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = {
+      ...mockManager,
+      setThinkingEffort: async (_sessionId: string, effort: string) => {
+        if (effort === 'high') throw new Error('option rejected');
+        return 'medium';
+      },
+    };
+    await session.prompt({ prompt: 'still send', thinkingEffort: 'high' });
+    assert.ok(calls.includes('prompt'), 'effort rejection must not drop the accepted prompt');
+    assert.equal(applied[0]?.adjusted, true);
+    console.log('✓ Test 6c: rejected ACP effort falls back to Auto and still prompts');
+  }
+
+  // ACP remains provider-driven, but every level actually advertised by the
+  // live option must be forwarded verbatim before its associated prompt.
+  {
+    const runtime = new AcpRuntime();
+    calls.length = 0;
+    const session = addSession(runtime, 'conv-effort-matrix');
+    const advertised = ['low', 'medium', 'high'] as const;
+    for (const effort of advertised) {
+      await session.prompt({ prompt: `Use ${effort}`, thinkingEffort: effort });
+    }
+    assert.deepStrictEqual(
+      calls.filter((call) => call.startsWith('setThinkingEffort:')),
+      advertised.map((effort) => `setThinkingEffort:${effort}`),
+    );
+    console.log('✓ Test 6d: every live-advertised ACP effort is forwarded unchanged');
   }
 
   // ── Test 7: C1 REGRESSION — two sessions must not share write-approval state.

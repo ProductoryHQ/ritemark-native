@@ -137,6 +137,22 @@ export class ConversationController {
         return result(request, { conversation: projectConversation(record) });
       }
       if (request.type === 'conversation/accept-turn') return this.acceptTurn(request);
+      if (request.type === 'conversation/set-composer-preference') {
+        const current = await this.requireCurrentScope(request.conversationId);
+        const updated = await this.dependencies.store.checkpoint({
+          conversationId: current.conversationId,
+          bindingGeneration: request.bindingGeneration,
+          expectedRevision: current.revision,
+          composerPreferences: {
+            thinkingEffortByRuntime: {
+              ...current.composerPreferences.thinkingEffortByRuntime,
+              [request.agentId]: request.thinkingEffort,
+            },
+          },
+        });
+        this.emitChanged(updated);
+        return result(request, { conversation: projectConversation(updated) });
+      }
       if (request.type === 'conversation/rename') {
         const current = await this.requireCurrentScope(request.conversationId);
         const title = normalizeManualTitle(request.title);
@@ -406,6 +422,7 @@ export class ConversationController {
     agentId: AgentId;
     text: string;
     mode?: string | null;
+    thinkingEffort?: import('../runtime/thinkingEffort').ThinkingEffort;
     attachments?: Array<{ name: string; kind: string; mediaType: string | null; sizeBytes: number | null }>;
   }): Promise<ConversationRecordV1> {
     const existing = input.conversationId && /^[0-9a-f]{8}-/i.test(input.conversationId)
@@ -419,6 +436,7 @@ export class ConversationController {
       agentId: input.agentId,
       text: input.text,
       mode: input.mode ?? null,
+      thinkingEffort: input.thinkingEffort ?? 'auto',
       attachments: (input.attachments ?? []).map((attachment, index) => ({
         id: `compat-${index}`,
         ...attachment,
@@ -435,6 +453,7 @@ export class ConversationController {
     text: string;
     status: 'completed' | 'failed' | 'cancelled';
     error?: string;
+    appliedThinkingEffort?: import('../runtime/thinkingEffort').ExplicitThinkingEffort | null;
     turnId?: string;
     generateTitle?: (request: FirstResponseTitleRequest) => Promise<string | null>;
   }): Promise<ConversationRecordV1> {
@@ -470,6 +489,7 @@ export class ConversationController {
               runtimeId: input.runtimeId,
               content: input.text,
               terminalStatus: input.status,
+              appliedThinkingEffort: input.appliedThinkingEffort ?? null,
             }]
           : [{
               kind: 'boundary' as const,
@@ -623,6 +643,7 @@ export class ConversationController {
       text: request.text,
       mode: request.mode ?? null,
       attachments: (request.attachments ?? []).map(({ name, kind, mediaType, sizeBytes }) => ({ name, kind, mediaType, sizeBytes })),
+      thinkingEffort: request.thinkingEffort ?? 'auto',
     };
     const receipt = {
       kind: 'dispatch-receipt' as const,
@@ -700,6 +721,12 @@ export class ConversationController {
         expectedRevision: current.revision,
         lifecycle: { state: 'working', activeTurnId: turnId },
         appendEvents: [...(transitionBoundary ? [transitionBoundary] : []), event, receipt],
+        composerPreferences: {
+          thinkingEffortByRuntime: {
+            ...current.composerPreferences.thinkingEffortByRuntime,
+            [request.agentId]: request.thinkingEffort ?? 'auto',
+          },
+        },
         ...(priorRuntime && current.continuations?.[priorRuntime]
           ? { continuationUpdate: { runtimeId: priorRuntime, descriptor: null } }
           : {}),
@@ -711,6 +738,9 @@ export class ConversationController {
         title: normalizeManualTitle(request.title ?? '') ?? fallbackTitleFromPrompt(request.text),
         lifecycle: { state: 'working', activeTurnId: turnId },
         events: [event, receipt],
+        composerPreferences: {
+          thinkingEffortByRuntime: { [request.agentId]: request.thinkingEffort ?? 'auto' },
+        },
       });
     }
 

@@ -14,7 +14,7 @@ And the scale is labeled Faster and More thorough
 ### Scenario: Auto is the safe default
 Given I start a new conversation
 When I send a prompt without changing effort
-Then the trigger says Effort · Auto
+Then the trigger says Effort
 And the host sends no explicit provider effort override
 
 ### Scenario: Popover closes without changing state
@@ -26,7 +26,7 @@ And High remains selected
 
 ### ★ Scenario: Keyboard and screen-reader operation
 Given I use only a keyboard and screen reader
-When I focus the trigger, open the radio group, move through levels, and select Extra
+When I focus the trigger, open the range control, move through levels, and select Extra
 Then every option and the current value are announced textually
 And unsupported options are absent from focus order
 And focus uses the standard Ritemark ring
