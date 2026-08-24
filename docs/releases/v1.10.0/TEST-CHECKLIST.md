@@ -42,7 +42,7 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Native darwin-arm64 fetch, version discovery, OpenCode permission gates, cancellation, and shared-process survival pass on the shipping pins.
 - [x] Codex, Claude, and OpenCode continuation/restart plus two-conversation isolation probes pass on the shipping pins.
 - [x] Codex optional `isBlocking` input metadata routes through the existing input contract; ACP 1.4.0 preserves the contained adapter boundary.
-- [ ] Native darwin-x64 and win32-x64 build/package jobs pass on the final Sprint 111 commit.
+- [x] Native darwin-x64 and win32-x64 exact SDK compile, runtime fetch/checksum/architecture, and three-binary version smoke pass on final commit `3ef9e0c` ([matrix run](https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388)).
 
 ## Automated gates
 
@@ -57,6 +57,5 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 
 ## Remaining release scope
 
-- [ ] Sprint 111 native darwin-x64 and win32-x64 CI evidence.
 - [ ] Sprint 112 Composer thinking-effort behavior and visual matrix.
 - [ ] Final macOS arm64/x64 and Windows candidate gates.

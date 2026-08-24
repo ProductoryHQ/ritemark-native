@@ -15,8 +15,10 @@
     "allNineArchiveChecksumsMatched": true,
     "allNineArchivePathsAndArchitecturesMatched": true,
     "nativeDarwinArm64VersionDiscovery": "PASS",
-    "nativeDarwinX64PendingCi": true,
-    "nativeWin32X64PendingCi": true
+    "nativeDarwinX64VersionDiscovery": "PASS",
+    "nativeWin32X64VersionDiscovery": "PASS",
+    "nativeMatrixRun": "https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388",
+    "nativeMatrixCommit": "3ef9e0ccceaf5438b4c1ae1aef895b4ad1555e34"
   },
   "codex": {
     "protocolProbe": "PASS",

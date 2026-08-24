@@ -29,7 +29,7 @@
 
 ## Phase 4: Platform and packaging evidence (R5, R8)
 - [x] Fetch and verify darwin-arm64 locally with `scripts/fetch-agent-runtimes.sh` and `scripts/verify-agent-runtimes.sh`.
-- [ ] Verify darwin-x64 and win32-x64 artifacts from their native CI paths.
+- [x] Verify darwin-x64 and win32-x64 artifacts from their native CI paths ([Agent Runtime Matrix 32701706388](https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388)).
 - [x] Verify extension build, retained production dependencies, binary placement, architecture, version output, and signing inputs locally; native CI rows remain above.
 - [x] Run release preflight and record any release-only blockers separately from sprint correctness (passed 2026-08-24; only expected pre-commit branch/dirty warnings).
 
@@ -37,5 +37,5 @@
 - [x] Execute every locally applicable scenario in `scenarios.md`; attach automated/live evidence for ★ cases. Native CI scenarios remain in Phase 4.
 - [x] Run focused runtime suites and `./scripts/validate-qa.sh`.
 - [x] Update `docs/development/architecture.md` with a Last updated date on/after branch creation.
-- [x] Update `docs/CHANGELOG.md`, v1.10.0 release notes/test checklist, and release tracker; issue #207 closeout follows native CI.
+- [x] Update `docs/CHANGELOG.md`, v1.10.0 release notes/test checklist, release tracker, PR #214, and issue #207 closeout evidence.
 - [x] Obtain QA validation before commit/push/PR or ready handoff (local QA passed 2026-08-24).
