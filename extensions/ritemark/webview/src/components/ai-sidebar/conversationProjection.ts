@@ -82,6 +82,10 @@ export function projectionToConversation(
       modelId: previous?.pendingRuntime.modelId ?? '',
       mode: previous?.pendingRuntime.mode ?? 'auto',
     },
+    thinkingEffortByRuntime: {
+      ...(previous?.thinkingEffortByRuntime ?? {}),
+      ...projection.composerPreferences.thinkingEffortByRuntime,
+    },
     transcriptBoundaries,
   });
 }

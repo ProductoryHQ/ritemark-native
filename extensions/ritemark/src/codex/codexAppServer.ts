@@ -206,7 +206,8 @@ export class CodexAppServer extends EventEmitter {
     message: string,
     model?: string,
     imageDataUrls?: string[],
-    collaborationMode?: CollaborationMode | null
+    collaborationMode?: CollaborationMode | null,
+    effort?: string,
   ): Promise<TurnStartResponse> {
     await this.ensureInitialized();
     const input: UserInput[] = [{
@@ -223,6 +224,7 @@ export class CodexAppServer extends EventEmitter {
       threadId,
       input,
       model: model || null,
+      ...(effort ? { effort } : {}),
       collaborationMode: collaborationMode ?? null,
     });
   }

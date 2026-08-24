@@ -55,6 +55,7 @@ import type { AgentProgress } from '../agent/types';
 // ── Mock CodexAppServer ──────────────────────────────────────────────────────
 
 const calls: string[] = [];
+const capturedTurnStarts: unknown[][] = [];
 
 /** Event listeners the runtime registered on the mock, so tests can fire them. */
 type Listener = (params: unknown) => void;
@@ -76,14 +77,16 @@ function makeMockAppServer(threadIds: string[] = ['thread-1']) {
     threadStart: async (_params: unknown, _conversationId?: string) => {
       calls.push('threadStart');
       const id = threadIds[Math.min(threadSeq++, threadIds.length - 1)];
-      return { thread: { id }, model: 'gpt-5' };
+      return { thread: { id }, model: 'gpt-5', reasoningEffort: 'medium' };
     },
     threadResume: async (params: { threadId: string }) => {
       calls.push(`threadResume:${params.threadId}`);
       return { thread: { id: params.threadId } };
     },
     threadRead: async (threadId: string) => ({ thread: { id: threadId } }),
-    turnStart: async (_threadId: string, _message: string) => {
+    turnStart: async (...args: unknown[]) => {
+      const _threadId = args[0] as string;
+      capturedTurnStarts.push(args);
       calls.push('turnStart');
       return { turn: { id: `turn-${_threadId}`, status: 'running' } };
     },
@@ -399,7 +402,49 @@ async function run() {
     console.log('✓ Test 13: Codex 0.149 request_user_input tolerates isBlocking');
   }
 
-  console.log('\nAll 13 CodexRuntime tests passed!');
+  // Sprint 112: effort is per turn/per conversation; plan mode keeps it and
+  // Auto restores the thread's captured default after a manual override.
+  {
+    const { runtime } = makeRuntime(['thread-effort-a', 'thread-effort-b', 'thread-effort-c']);
+    capturedTurnStarts.length = 0;
+    const a = new CodexSession('conv-effort-a', dummyConfig, runtime);
+    const b = new CodexSession('conv-effort-b', dummyConfig, runtime);
+    const c = new CodexSession('conv-effort-c', dummyConfig, runtime);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._sessions.set('conv-effort-a', a);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._sessions.set('conv-effort-b', b);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._sessions.set('conv-effort-c', c);
+    await a.prompt({ prompt: 'work deeply', thinkingEffort: 'high', thinkingEffortDefault: 'medium' });
+    await b.prompt({ prompt: 'answer quickly', thinkingEffort: 'low', thinkingEffortDefault: 'medium' });
+    await a.prompt({ prompt: 'back to default', thinkingEffort: 'auto', thinkingEffortDefault: 'medium' });
+    await c.prompt({ prompt: 'plan deeply', mode: 'plan', thinkingEffort: 'high', thinkingEffortDefault: 'medium' });
+
+    assert.equal(capturedTurnStarts[0]?.[5], 'high', 'manual effort reaches turn/start');
+    assert.equal(capturedTurnStarts[1]?.[5], 'low', 'a sibling conversation keeps its own effort');
+    assert.equal(capturedTurnStarts[2]?.[5], 'medium', 'Auto restores the captured provider default after a manual override');
+    assert.equal((capturedTurnStarts[3]?.[4] as { settings?: { reasoning_effort?: string } })?.settings?.reasoning_effort, 'high', 'plan collaboration keeps the same effort');
+    console.log('✓ Test 14: Codex effort is isolated, plan-safe, and Auto-restorable');
+  }
+
+  // Every effort advertised by the exact Codex pin must survive the adapter
+  // unchanged; in particular xhigh and ultra must never be coerced to a neighbour.
+  {
+    const { runtime } = makeRuntime(['thread-effort-matrix']);
+    capturedTurnStarts.length = 0;
+    const session = new CodexSession('conv-effort-matrix', dummyConfig, runtime);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._sessions.set('conv-effort-matrix', session);
+    const advertised = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const;
+    for (const effort of advertised) {
+      await session.prompt({ prompt: `Use ${effort}`, thinkingEffort: effort, thinkingEffortDefault: 'medium' });
+    }
+    assert.deepStrictEqual(capturedTurnStarts.map((args) => args[5]), advertised);
+    console.log('✓ Test 15: every advertised Codex effort reaches turn/start unchanged');
+  }
+
+  console.log('\nAll 15 CodexRuntime tests passed!');
 }
 
 run().then(

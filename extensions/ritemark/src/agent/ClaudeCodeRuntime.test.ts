@@ -14,6 +14,7 @@ import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime
 // ── Mock AgentSession ────────────────────────────────────────────────────────
 
 const calls: string[] = [];
+const capturedEfforts: string[] = [];
 
 const mockSession = {
   isActive: false,
@@ -25,8 +26,12 @@ const mockSession = {
     onProgress?: (p: { type: string; message: string; timestamp: number }) => void;
     onPlanApproval?: (r: unknown) => void;
     onQuestion?: (q: unknown) => void;
+    thinkingEffort?: string;
+    onThinkingEffortApplied?: (effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max') => void;
   }) => {
     calls.push('sendMessage');
+    capturedEfforts.push(opts.thinkingEffort ?? 'auto');
+    opts.onThinkingEffortApplied?.();
     opts.onProgress?.({ type: 'done', message: 'ok', timestamp: Date.now() });
     return { text: 'ok', filesModified: [], metrics: { durationMs: 0, costUsd: null, model: null } };
   },
@@ -163,7 +168,27 @@ async function run() {
     console.log('✓ Test 6: SDK result errors remain failed turns');
   }
 
-  console.log('\nAll 6 ClaudeCodeRuntime tests passed!');
+  // Sprint 112: the immutable turn effort reaches AgentSession and applied
+  // evidence is surfaced through the shared runtime callback.
+  {
+    capturedEfforts.length = 0;
+    const applied: Array<{ requested: string; applied?: string }> = [];
+    const session = makeSession('conv-effort');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (session as any)._config = {
+      ...dummyConfig,
+      onThinkingEffortApplied: (result: { requested: string; applied?: string }) => applied.push(result),
+    };
+    const advertised = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+    for (const effort of advertised) {
+      await session.prompt({ prompt: `Use ${effort}`, thinkingEffort: effort });
+    }
+    assert.deepStrictEqual(capturedEfforts, advertised);
+    assert.deepStrictEqual(applied, advertised.map((requested) => ({ requested, adjusted: false })));
+    console.log('✓ Test 7: every advertised Claude effort reaches the SDK without inventing an applied value');
+  }
+
+  console.log('\nAll 7 ClaudeCodeRuntime tests passed!');
 }
 
 run().then(

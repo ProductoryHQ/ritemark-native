@@ -7,6 +7,27 @@
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
 export type AgentId = 'claude-code' | 'codex' | 'opencode';
+export type ThinkingEffort = 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+export type ExplicitThinkingEffort = Exclude<ThinkingEffort, 'auto'>;
+
+export interface ModelThinkingEffort {
+  levels: ExplicitThinkingEffort[];
+  defaultLevel?: ExplicitThinkingEffort;
+}
+
+export interface ThinkingEffortCapability {
+  selectable: ExplicitThinkingEffort[];
+  defaultLevel?: ExplicitThinkingEffort;
+  source: 'model-catalog' | 'runtime-live';
+  supportsAppliedValue: boolean;
+}
+
+export interface RuntimeCapabilityFlags {
+  planFirst: boolean;
+  liveModeSwitch: boolean;
+  structuredPlanSteps: boolean;
+  thinkingEffortSource: 'model-catalog' | 'runtime-live';
+}
 
 export interface AgentInfo {
   id: AgentId;
@@ -20,6 +41,7 @@ export interface ModelOption {
   id: string;
   label: string;
   description: string;
+  thinkingEffort?: ModelThinkingEffort;
 }
 
 export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
@@ -204,6 +226,7 @@ export interface AgentConversationTurn {
    */
   conversationId?: string;
   userPrompt: string;
+  thinkingEffort?: ThinkingEffort;
   /** Active file path that was included as context (when not skipped) */
   activeFilePath?: string;
   attachments?: FileAttachment[];
@@ -316,6 +339,7 @@ export interface CodexConversationTurn {
    */
   runtime?: 'codex' | 'opencode';
   userPrompt: string;
+  thinkingEffort?: ThinkingEffort;
   requestedPlanMode?: boolean;
   /** Active file path that was included as context */
   activeFilePath?: string;
@@ -377,7 +401,9 @@ export type ExtensionMessage =
   | { type: 'connectivity-status'; isOnline: boolean }
   // Sprint 94 (#81): a comment assigned to an agent, relayed from the editor.
   | { type: 'comment:submit'; agentId: string; prompt: string; commentIds?: string[]; documentPath?: string }
-  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103 R6: per-runtime capability map. */ runtimeCapabilities?: Record<string, { planFirst: boolean; liveModeSwitch: boolean; structuredPlanSteps: boolean }> }
+  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; composerThinkingEffortEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103/112: per-runtime capability map. */ runtimeCapabilities?: Record<string, RuntimeCapabilityFlags> }
+  | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
+  | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }

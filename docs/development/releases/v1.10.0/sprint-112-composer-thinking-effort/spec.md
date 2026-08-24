@@ -20,19 +20,19 @@ Let users choose how much reasoning effort the selected Claude or Codex model sh
 As a user, I want one understandable scale across runtimes, so I do not have to learn three vendor-specific settings systems.
 
 Acceptance criteria:
-- The canonical requested values are `auto`, `low`, `medium`, `high`, `xhigh`, and `max`.
-- User-facing labels are **Auto**, **Low**, **Medium**, **High**, **Extra**, and **Max**; internal `xhigh` is never displayed.
+- The canonical requested values are `auto`, `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`.
+- User-facing labels are **Auto**, **Low**, **Medium**, **High**, **Extra**, **Max**, and **Ultra**; internal `xhigh` is never displayed. Ultra appears only where runtime metadata advertises it.
 - `Auto` is the default for a new conversation and omits an explicit override so the runtime/model chooses its normal behavior.
 - Only values supported by the selected runtime/model are selectable. A missing option is not fabricated or mapped to a different level.
-- The UI says higher effort can take longer and use more provider quota; it never labels the scale “smarter” or guarantees quality.
+- The UI never labels the scale “smarter” or guarantees quality; detailed latency/quota explanation stays out of the compact popover.
 
 ### R2: Composer placement and interaction
 
 As a user, I want effort next to the runtime/model and mode controls, so I can set it while composing the message it affects.
 
 Acceptance criteria:
-- A compact trigger appears in the Composer footer beside the runtime/model and Manual/Auto/Plan controls, labeled **Effort · Auto**, **Effort · High**, **Effort · Extra**, and so on.
-- Activating the trigger opens a small anchored popover titled **Thinking effort** with the current value, an Auto choice, and a discrete Faster→More thorough manual scale containing only supported levels.
+- A compact trigger appears in the Composer footer beside the runtime/model and Manual/Auto/Plan controls. It is labelled **Effort** when the effort setting is Auto, avoiding a duplicate adjacent Auto label, and **Effort · High**, **Effort · Extra**, and so on for manual levels.
+- Activating the trigger opens a small anchored popover titled **Thinking effort** with the current value, a discrete Faster→More thorough manual scale containing only supported levels, and an Auto checkbox below it.
 - The trigger and popover use existing Ritemark surface, ink, hairline, focus, radius, and motion tokens. No gradient, vendor blue/orange, oversized card, decorative icon, or off-system control is introduced.
 - Clicking outside or pressing Escape closes the popover and returns focus to the trigger without changing the selection.
 - The popover never obscures the Send action at supported sidebar widths; at narrow widths the footer may wrap predictably without clipping controls.
@@ -43,7 +43,7 @@ As a keyboard or assistive-technology user, I want the same control and context,
 
 Acceptance criteria:
 - The trigger is reachable in normal Composer tab order and announces the selected runtime/model plus current effort.
-- Auto and manual levels form one named radio group; arrow keys move among selectable manual levels, Enter/Space selects, and disabled/unsupported values are not focusable.
+- Manual levels use one named native range input; pointer drag, track click, and arrow keys snap among selectable stops, while disabled/unsupported values are unavailable. Auto is a separately labelled native checkbox after the scale.
 - Every point has a textual accessible name. Meaning is never conveyed by position or indigo alone.
 - Focus uses the standard Ritemark focus ring; reduced-motion mode removes thumb/track animation without removing state.
 - At 200% zoom and the minimum supported sidebar width, the control remains operable and labels do not overlap.
@@ -87,7 +87,7 @@ As a Codex user, I want my Composer choice sent as Codex reasoning effort, so Ag
 
 Acceptance criteria:
 - Supported levels come from the pinned Codex app-server’s model/protocol metadata measured after Sprint 111, not a generic constant copied from another runtime.
-- `auto` sends no explicit reasoning-effort override.
+- `auto` sends no explicit reasoning-effort override before any Ritemark manual override. On a warm sticky thread after manual effort, it restores the runtime/model default captured at session start or resume.
 - Explicit values are carried in the supported turn/collaboration setting for both execute and plan-first turns; plan mode never resets effort to `null` accidentally.
 - Changing model revalidates the draft choice. If the level is unavailable, Ritemark switches that draft to Auto and says **Extra isn’t available for this model. Using Auto.**
 - Two concurrent Codex conversations can use different effort levels without sharing or overwriting configuration.
@@ -130,9 +130,10 @@ Acceptance criteria:
 - **2026-08-22 — Composer, not Settings.** The choice is snapshotted per accepted turn and belongs beside model/mode.
 - **2026-08-22 — Ritemark vocabulary.** Use Auto/Low/Medium/High/Extra/Max and Faster/More thorough; do not clone “Smarter” language.
 - **2026-08-22 — Claude and Codex are first-class; OpenCode is capability-driven.** BYOK/provider diversity makes a universal OpenCode claim dishonest without ACP evidence.
+- **2026-08-24 — Phase 0 capability/mapping/design contract approved.** Add capability-filtered Ultra, restore captured defaults for warm Auto, preserve OpenCode laziness, and use the approved compact native range plus Auto checkbox.
 
-## Open Questions
+## Phase 0 Answers
 
-- Phase 0 must capture the exact Codex 0.149.0 field and model-level option metadata after Sprint 111 lands.
-- Phase 0 must decide whether Claude’s reported applied effort can be observed synchronously or only from hooks/result metadata.
-- Phase 0 must measure when OpenCode 1.18.21 publishes `thought_level` and whether a config change is guaranteed to apply before the immediately following prompt.
+- Codex 0.149.0 accepts top-level `turn/start.effort`; plan collaboration carries the same value in `reasoning_effort`, and supported values/defaults come from the captured model metadata.
+- Claude first-turn effort uses `Options.effort`; warm changes await `applyFlagSettings`. Requested value is stored, while applied value is recorded only when provider evidence exists—SDK acceptance is not presented as post-downgrade proof.
+- OpenCode 1.18.21 publishes `thought_level` through live ACP session config when the selected provider/model supports it. Ritemark awaits `session/set_config_option` before prompt dispatch and falls back without duplicate dispatch if the option rejects.

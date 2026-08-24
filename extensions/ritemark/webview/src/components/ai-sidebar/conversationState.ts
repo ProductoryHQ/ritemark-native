@@ -20,6 +20,7 @@ import type {
   ChatMessage,
   CodexConversationTurn,
   ConversationEntry,
+  ThinkingEffort,
 } from './types';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
 
@@ -100,6 +101,8 @@ export interface ConversationState {
   /** Full composite value: "opencode:<provider>/<model>". */
   opencodeSelectedModel: string;
   pendingRuntime: PendingRuntimeSelection;
+  /** Draft preference is isolated by runtime inside this conversation. */
+  thinkingEffortByRuntime: Partial<Record<AgentId, ThinkingEffort>>;
 
   // ── Per-thread UI state ──
   dismissedCurrentPlanKey: string | null;
@@ -131,6 +134,7 @@ export function createConversationState(
     codexSelectedModel: '',
     opencodeSelectedModel: '',
     pendingRuntime: { runtimeId: 'claude-code', modelId: '', mode: 'auto' },
+    thinkingEffortByRuntime: {},
     dismissedCurrentPlanKey: null,
     estimatedTokens: 0,
     contextUsagePercent: 0,

@@ -78,6 +78,14 @@ import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import { RUNTIME_CAPABILITIES, capabilitiesFor } from '../runtime/capabilities';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 import {
+  isThinkingEffort,
+  thinkingEffortLabel,
+  validateThinkingEffort,
+  type ExplicitThinkingEffort,
+  type ThinkingEffort,
+  type ThinkingEffortCapability,
+} from '../runtime/thinkingEffort';
+import {
   RUNTIME_CONTINUATION_ADAPTER_CONTRACT_VERSION,
   createRuntimeCompatibilityFingerprint,
   type RuntimeContinuationRequest,
@@ -118,6 +126,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private readonly _activeRuntimeTurnTokens = new Map<string, symbol>();
   private readonly _conversationCheckpointQueues = new Map<string, Promise<void>>();
   private readonly _runtimeSessionLastUsed = new Map<string, number>();
+  /** ACP thought_level is discovered only after the existing lazy session opens. */
+  private readonly _liveThinkingEffortCapabilities = new Map<string, Partial<Record<AgentId, ThinkingEffortCapability>>>();
   private _selectedConversationId: string | null = null;
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
@@ -305,6 +315,32 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // Sprint 99: every conversation-scoped message carries its conversation.
           // A missing id means a webview path that has not been migrated yet.
           const clientConversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
+          const requestedModel = typeof model === 'string' && model
+            ? model
+            : agentId === 'claude-code'
+              ? this._reconciledClaudeModel()
+              : undefined;
+          const effortCapability = this._thinkingEffortCapability(
+            clientConversationId,
+            agentId as AgentId,
+            requestedModel,
+          );
+          const requestedThinkingEffort: ThinkingEffort = isThinkingEffort(message.thinkingEffort)
+            ? message.thinkingEffort
+            : 'auto';
+          const thinkingEffort = isEnabled('composer-thinking-effort')
+            ? validateThinkingEffort(requestedThinkingEffort, effortCapability)
+            : 'auto';
+          if (thinkingEffort !== requestedThinkingEffort) {
+            void this._view?.webview.postMessage({
+              type: 'thinking-effort/status',
+              conversationId: clientConversationId,
+              runtimeId: agentId,
+              requested: requestedThinkingEffort,
+              applied: thinkingEffort,
+              message: `${thinkingEffortLabel(requestedThinkingEffort)} isn’t available for this model. Using Auto.`,
+            });
+          }
           let acceptedConversation: import('../conversations/types').ConversationRecordV1 | null = null;
           let hostConversationEnabled = false;
           try {
@@ -336,6 +372,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                       ? message.displayPrompt
                       : typeof message.prompt === 'string' ? message.prompt : '',
                     mode: message.approvalMode === 'ask' ? 'ask' : message.planFirst === true ? 'plan' : 'auto',
+                    thinkingEffort,
                     attachments: Array.isArray(attachments)
                       ? attachments.map((attachment: { name?: string; kind?: string; mediaType?: string; data?: string }) => ({
                           name: attachment.name ?? 'Attachment',
@@ -376,6 +413,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
           let terminalCheckpointWritten = false;
           let streamedResponseText = '';
+          let appliedThinkingEffort: ExplicitThinkingEffort | null = null;
           const skipActiveFile = message.skipActiveFile === true;
           const skipBrowserContext = message.skipBrowserContext === true;
           const mentionedAgentPaths: string[] | undefined = message.mentionedAgentPaths;
@@ -469,7 +507,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // the bundled CLI, which reads the USER'S personal ~/.claude.json /
           // settings and can silently run a different model than the UI shows.
           const pinnedModel = isClaudeCode
-            ? (typeof model === 'string' && model ? model : this._reconciledClaudeModel())
+            ? requestedModel
             : model;
           const titleGeneration = ({ userPrompt, assistantResponse }: { userPrompt: string; assistantResponse: string }) =>
             this._conversationTitleGenerator.generate({
@@ -607,6 +645,31 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   );
                 }
               : undefined,
+            onThinkingEffortCapability: (capability) => {
+              if (!isCurrentRuntimeTurn()) return;
+              const existing = this._liveThinkingEffortCapabilities.get(conversationId) ?? {};
+              this._liveThinkingEffortCapabilities.set(conversationId, { ...existing, [agentId as AgentId]: capability });
+              void this._view?.webview.postMessage({
+                type: 'thinking-effort/capability',
+                conversationId,
+                runtimeId: agentId,
+                capability,
+              });
+            },
+            onThinkingEffortApplied: (result) => {
+              if (!isCurrentRuntimeTurn()) return;
+              appliedThinkingEffort = result.applied ?? null;
+              void this._view?.webview.postMessage({
+                type: 'thinking-effort/status',
+                conversationId,
+                runtimeId: agentId,
+                requested: result.requested,
+                applied: result.applied ?? null,
+                message: result.adjusted && result.applied
+                  ? `Effort adjusted to ${thinkingEffortLabel(result.applied)} for this model.`
+                  : undefined,
+              });
+            },
             // Unified capability context (Sprint 101 #154): ONE source
             // (src/ai/capabilityContext.ts), delivered through each runtime's own
             // mechanism — Claude appends it, Codex uses it as base instructions,
@@ -670,6 +733,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   text: result.text ?? '',
                   status: result.error ? 'failed' : 'completed',
                   error: result.error,
+                  appliedThinkingEffort,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
               }
@@ -706,6 +770,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   text: streamedResponseText,
                   status: runtimeCompleted ? 'completed' : 'failed',
                   error: result.error,
+                  appliedThinkingEffort,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
                 if (!runtimeCompleted) this._disposeRuntimeSession(conversationId, agentId as AgentId);
@@ -798,7 +863,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               ));
             }
             if (isCurrentRuntimeTurn()) {
-              await session.prompt({ prompt, attachments: turnAttachments, activeFile, mode: codexTurnMode, model, timeoutMinutes: agentTimeout });
+              await session.prompt({
+                prompt,
+                attachments: turnAttachments,
+                activeFile,
+                mode: codexTurnMode,
+                model,
+                timeoutMinutes: agentTimeout,
+                thinkingEffort,
+                thinkingEffortDefault: effortCapability.defaultLevel,
+              });
             }
           } catch (err) {
             // Unhandled runtime error — surface it to the webview so the turn finishes
@@ -1199,6 +1273,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // so the flag has to cross the boundary or it cannot switch anything off.
     const parallelChatsEnabled = isEnabled('parallelChats');
     const durableAgentConversations = isEnabled('durableAgentConversations');
+    const composerThinkingEffortEnabled = isEnabled('composer-thinking-effort');
     const codexEnabled = isEnabled('codex-integration');
     const config = vscode.workspace.getConfiguration('ritemark.ai');
     const selectedAgent = config.get<string>('selectedAgent', 'claude-code');
@@ -1253,6 +1328,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       agenticEnabled,
       parallelChatsEnabled,
       durableAgentConversations,
+      composerThinkingEffortEnabled,
       codexEnabled,
       selectedAgent,
       selectedModel: reconciledModel,
@@ -1595,6 +1671,26 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** The UI-selected Claude model, reconciled against the resolved catalog. */
+  private _thinkingEffortCapability(
+    conversationId: string,
+    runtimeId: AgentId,
+    modelId: string | undefined,
+  ): ThinkingEffortCapability {
+    const live = this._liveThinkingEffortCapabilities.get(conversationId)?.[runtimeId];
+    if (live) return live;
+    if (runtimeId === 'opencode') {
+      return { selectable: [], source: 'runtime-live', supportsAppliedValue: false };
+    }
+    const provider = runtimeId === 'codex' ? 'codex' : 'anthropic';
+    const model = modelCatalog.getModels(provider).find((candidate) => candidate.id === modelId);
+    return {
+      selectable: [...(model?.thinkingEffort?.levels ?? [])],
+      ...(model?.thinkingEffort?.defaultLevel ? { defaultLevel: model.thinkingEffort.defaultLevel } : {}),
+      source: 'model-catalog',
+      supportsAppliedValue: false,
+    };
+  }
+
   private _reconciledClaudeModel(): string {
     const selected = vscode.workspace.getConfiguration('ritemark.ai')
       .get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code'));
@@ -1820,6 +1916,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const byAgent = this._runtimeSessions.get(conversationId);
     byAgent?.delete(agentId);
     if (byAgent?.size === 0) this._runtimeSessions.delete(conversationId);
+    const liveCapabilities = this._liveThinkingEffortCapabilities.get(conversationId);
+    if (liveCapabilities) {
+      delete liveCapabilities[agentId];
+      if (Object.keys(liveCapabilities).length === 0) {
+        this._liveThinkingEffortCapabilities.delete(conversationId);
+      }
+    }
   }
 
   /**
@@ -1867,6 +1970,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._runtimeSessions.delete(conversationId);
     this._runtimeSessionLastUsed.delete(conversationId);
     this._activeRuntimeTurnTokens.delete(conversationId);
+    this._liveThinkingEffortCapabilities.delete(conversationId);
   }
 
   private async _ensureRuntimeAttachmentCapacity(incomingConversationId: string): Promise<void> {
@@ -1908,6 +2012,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     for (const conversationId of Array.from(this._runtimeSessions.keys())) {
       this._disposeRuntimeSessions(conversationId);
     }
+    this._liveThinkingEffortCapabilities.clear();
   }
 
   private async _stopConversationSessions(conversationId: string): Promise<void> {

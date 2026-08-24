@@ -8,6 +8,7 @@ import {
   type ProjectScopeDescriptorV1,
 } from './types';
 import type { AgentId } from '../agent/types';
+import { isThinkingEffort, type ThinkingEffort } from '../runtime/thinkingEffort';
 import type { LegacyMigrationReportV1 } from './LegacyConversationMigrator';
 
 export const MAX_CONVERSATION_MESSAGE_BYTES = 25 * 1024 * 1024;
@@ -38,7 +39,15 @@ export type ConversationRequest =
       text: string;
       title?: string;
       mode?: string | null;
+      thinkingEffort?: ThinkingEffort;
       attachments?: ConversationTurnAttachment[];
+    })
+  | (RequestBase & {
+      type: 'conversation/set-composer-preference';
+      conversationId: string;
+      bindingGeneration: number;
+      agentId: AgentId;
+      thinkingEffort: ThinkingEffort;
     })
   | (RequestBase & { type: 'conversation/rename'; conversationId: string; bindingGeneration: number; title: string })
   | (RequestBase & { type: 'conversation/delete'; conversationId: string; bindingGeneration: number; stopRunning: boolean; recovery?: boolean })
@@ -90,6 +99,7 @@ const REQUEST_TYPES = new Set<ConversationRequest['type']>([
   'conversation/list',
   'conversation/get',
   'conversation/accept-turn',
+  'conversation/set-composer-preference',
   'conversation/rename',
   'conversation/delete',
   'conversation/undo-delete',
@@ -165,10 +175,13 @@ export function parseConversationRequest(value: unknown): ConversationRequest {
     return { type, requestId, conversationId: id(input, 'conversationId'), ...(input.recovery === true ? { recovery: true } : {}) };
   }
   if (type === 'conversation/accept-turn') {
-    exactKeys(input, ['type', 'requestId', 'conversationId', 'bindingGeneration', 'turnId', 'agentId', 'text', 'title', 'mode', 'attachments']);
+    exactKeys(input, ['type', 'requestId', 'conversationId', 'bindingGeneration', 'turnId', 'agentId', 'text', 'title', 'mode', 'thinkingEffort', 'attachments']);
     const agentId = requiredString(input, 'agentId', 32) as AgentId;
     if (!DISPATCHABLE_RUNTIME_IDS.has(agentId)) throw new ConversationProtocolError('agentId is unknown');
     const text = requiredString(input, 'text', 1_000_000);
+    if (input.thinkingEffort !== undefined && !isThinkingEffort(input.thinkingEffort)) {
+      throw new ConversationProtocolError('thinkingEffort is unknown');
+    }
     if (input.attachments !== undefined && !Array.isArray(input.attachments)) throw new ConversationProtocolError('attachments must be an array');
     const attachments = (input.attachments ?? []).map((value): ConversationTurnAttachment => {
       const attachment = object(value);
@@ -197,7 +210,22 @@ export function parseConversationRequest(value: unknown): ConversationRequest {
       text,
       ...(optionalString(input, 'title', 512) ? { title: optionalString(input, 'title', 512) } : {}),
       mode: input.mode === null ? null : optionalString(input, 'mode', 64),
+      thinkingEffort: input.thinkingEffort as ThinkingEffort | undefined,
       attachments,
+    };
+  }
+  if (type === 'conversation/set-composer-preference') {
+    exactKeys(input, ['type', 'requestId', 'conversationId', 'bindingGeneration', 'agentId', 'thinkingEffort']);
+    const agentId = requiredString(input, 'agentId', 32) as AgentId;
+    if (!DISPATCHABLE_RUNTIME_IDS.has(agentId)) throw new ConversationProtocolError('agentId is unknown');
+    if (!isThinkingEffort(input.thinkingEffort)) throw new ConversationProtocolError('thinkingEffort is unknown');
+    return {
+      type,
+      requestId,
+      conversationId: id(input, 'conversationId'),
+      bindingGeneration: integer(input, 'bindingGeneration'),
+      agentId,
+      thinkingEffort: input.thinkingEffort,
     };
   }
   if (type === 'conversation/rename') {

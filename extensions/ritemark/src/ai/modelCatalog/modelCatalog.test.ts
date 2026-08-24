@@ -52,6 +52,36 @@ test('validateCatalog throws on bad tier', () => {
   );
 });
 
+test('validateCatalog accepts canonical effort metadata and rejects invented levels', () => {
+  const valid = validateCatalog({
+    schemaVersion: 1,
+    updatedAt: 'x',
+    providers: {
+      codex: {
+        models: [{
+          id: 'effort-model', label: 'Effort', description: '', tier: 'high', deprecated: false, order: 0,
+          thinkingEffort: { levels: ['low', 'xhigh', 'ultra'], defaultLevel: 'low' },
+        }],
+        defaults: {},
+      },
+    },
+  });
+  assert.deepStrictEqual(valid.providers.codex?.models[0].thinkingEffort?.levels, ['low', 'xhigh', 'ultra']);
+  assert.throws(() => validateCatalog({
+    schemaVersion: 1,
+    updatedAt: 'x',
+    providers: {
+      codex: {
+        models: [{
+          id: 'bad', label: 'Bad', description: '', tier: 'high', deprecated: false, order: 0,
+          thinkingEffort: { levels: ['extreme'] },
+        }],
+        defaults: {},
+      },
+    },
+  }));
+});
+
 test('validateCatalog drops unknown provider keys (forward-compat)', () => {
   const v = validateCatalog({
     schemaVersion: 1,
@@ -88,9 +118,58 @@ test('live probe wins and is enriched with curated metadata', () => {
   assert.strictEqual(r.anthropic.source, 'live');
   const sonnet = r.anthropic.models.find((m) => m.id === 'claude-sonnet-5')!;
   assert.strictEqual(sonnet.label, 'Sonnet 5', 'known id enriched from catalog');
+  assert.deepStrictEqual(sonnet.thinkingEffort?.levels, ['low', 'medium', 'high', 'xhigh', 'max'], 'catalog effort is the offline floor');
   const future = r.anthropic.models.find((m) => m.id === 'claude-future-6')!;
   assert.strictEqual(future.label, 'Future', 'live-only id preserved');
   assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5', 'defaults from catalog');
+});
+
+test('live effort metadata overrides a stale curated capability', () => {
+  const discovery: DiscoveryResults = {
+    codex: [{
+      id: 'gpt-5.6-sol', label: 'live', description: '', tier: 'high', deprecated: false, order: 0,
+      thinkingEffort: { levels: ['low', 'high'], defaultLevel: 'high' },
+    }],
+  };
+  const r = resolveAll(discovery, null, null, BUNDLED_CATALOG, APP);
+  assert.deepStrictEqual(r.codex.models[0].thinkingEffort, { levels: ['low', 'high'], defaultLevel: 'high' });
+});
+
+test('live explicit Auto-only capability overrides the bundled effort floor', () => {
+  const discovery: DiscoveryResults = {
+    anthropic: [{
+      id: 'claude-sonnet-5', label: 'live', description: '', tier: 'medium', deprecated: false, order: 0,
+      thinkingEffort: { levels: [] },
+    }],
+  };
+  const r = resolveAll(discovery, null, null, BUNDLED_CATALOG, APP);
+  assert.deepStrictEqual(r.anthropic.models[0].thinkingEffort, { levels: [] });
+});
+
+test('live model keeps bundled effort when a newer remote catalog omits the field', () => {
+  const discovery: DiscoveryResults = {
+    codex: [{
+      id: 'gpt-5.6-sol', label: 'Live Sol', description: '', tier: 'high', deprecated: false, order: 0,
+    }],
+  };
+  const remote: ModelCatalog = {
+    schemaVersion: 1,
+    updatedAt: 'x',
+    providers: {
+      codex: {
+        models: [{
+          id: 'gpt-5.6-sol', label: 'Remote Sol', description: 'fresh copy',
+          tier: 'high', deprecated: false, order: 0,
+        }],
+        defaults: { codex: 'gpt-5.6-sol' },
+      },
+    },
+  };
+  const r = resolveAll(discovery, remote, null, BUNDLED_CATALOG, APP);
+  assert.deepStrictEqual(
+    r.codex.models[0].thinkingEffort,
+    { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' },
+  );
 });
 
 test('remote is used when no live probe, in preference to bundled', () => {
@@ -102,6 +181,29 @@ test('remote is used when no live probe, in preference to bundled', () => {
   const r = resolveAll({}, remote, null, BUNDLED_CATALOG, APP);
   assert.strictEqual(r.anthropic.source, 'remote');
   assert.strictEqual(r.anthropic.models[0].id, 'remote-only');
+});
+
+test('remote model keeps the exact-pin bundled effort floor when the remote schema predates it', () => {
+  const remote: ModelCatalog = {
+    schemaVersion: 1,
+    updatedAt: 'x',
+    providers: {
+      anthropic: {
+        models: [{
+          id: 'claude-sonnet-5', label: 'Remote Sonnet', description: 'fresh copy',
+          tier: 'medium', deprecated: false, order: 0,
+        }],
+        defaults: { 'claude-code': 'claude-sonnet-5' },
+      },
+    },
+  };
+  const r = resolveAll({}, remote, null, BUNDLED_CATALOG, APP);
+  assert.strictEqual(r.anthropic.models[0].label, 'Remote Sonnet', 'remote presentation remains authoritative');
+  assert.deepStrictEqual(
+    r.anthropic.models[0].thinkingEffort?.levels,
+    ['low', 'medium', 'high', 'xhigh', 'max'],
+    'bundled audited capability fills only the missing remote field',
+  );
 });
 
 test('cache is used when no live and no remote', () => {

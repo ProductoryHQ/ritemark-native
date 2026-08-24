@@ -87,6 +87,7 @@ async function run(): Promise<void> {
       turnId: 'ui-turn-1',
       agentId: 'codex',
       text: 'Create a durable first conversation',
+      thinkingEffort: 'high',
       attachments: [{ id: 'a1', name: 'brief.md', kind: 'text', mediaType: 'text/markdown', sizeBytes: 10, data: 'secret body' }],
     });
     assert.equal(first.ok, true);
@@ -99,11 +100,39 @@ async function run(): Promise<void> {
     assert.equal(JSON.stringify(firstRecord).includes('secret body'), false);
     assert.equal(firstRecord.events[0].turnId, 'ui-turn-1', 'host and webview share one turn identity');
     assert.equal(
+      firstRecord.events[0].kind === 'user-message' ? firstRecord.events[0].thinkingEffort : null,
+      'high',
+      'accepted turn persists its immutable effort snapshot',
+    );
+    assert.equal(firstRecord.composerPreferences.thinkingEffortByRuntime.codex, 'high');
+    assert.equal(
       firstRecord.events.some((event) => event.kind === 'dispatch-receipt'),
       false,
       'host-only dispatch certainty never crosses into the webview projection',
     );
     assert.deepEqual(dispatchOrder, [firstRecord.conversationId]);
+
+    const changedPreference = await controller.handle({
+      type: 'conversation/set-composer-preference',
+      requestId: 'set-effort-preference',
+      conversationId: firstRecord.conversationId,
+      bindingGeneration: firstRecord.bindingGeneration,
+      agentId: 'claude-code',
+      thinkingEffort: 'max',
+    });
+    assert.equal(changedPreference.ok, true);
+    if (!changedPreference.ok || !('conversation' in changedPreference.data)) throw new Error('missing preference projection');
+    assert.equal(changedPreference.data.conversation.composerPreferences.thinkingEffortByRuntime['claude-code'], 'max');
+
+    const unknownEffort = await controller.handle({
+      type: 'conversation/set-composer-preference',
+      requestId: 'bad-effort-preference',
+      conversationId: firstRecord.conversationId,
+      bindingGeneration: firstRecord.bindingGeneration,
+      agentId: 'codex',
+      thinkingEffort: 'enormous',
+    });
+    assert.equal(unknownEffort.ok, false, 'unknown effort values fail closed at the typed protocol boundary');
 
     await controller.markRuntimeDispatch({
       conversationId: firstRecord.conversationId,

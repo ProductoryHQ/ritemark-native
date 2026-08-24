@@ -5,7 +5,7 @@ conversation system you can trust. Your chats belong to the project, survive a
 restart, and can continue with another agent without making you reconstruct the
 discussion from memory.
 
-<!-- Draft through Sprint 111. Composer thinking effort is added in Sprint 112. -->
+<!-- Draft through Sprint 112. -->
 
 ## Conversations you can return to
 
@@ -51,6 +51,22 @@ as context. Another provider's private session identifier is never transferred,
 and late output from the previous agent cannot overwrite the handoff.
 
 ![A quiet Claude to Codex handoff inside the conversation](screenshots/1-10-0-agent-switch-boundary.png)
+
+## Choose how much thinking a message gets
+
+Supported Claude and Codex models now have an **Effort** control directly in
+the Composer. Leave it on **Auto** to use the model's default, or drag the
+compact Faster → More thorough scale when a task needs a deliberate effort
+level. Only choices the selected model actually supports are shown.
+
+The preference stays with that conversation and agent. Every accepted or
+queued message keeps its own snapshot, so switching chats or changing the
+Composer later cannot alter work already waiting to run. OpenCode exposes the
+same control only when its live ACP session advertises compatible thought
+levels; selecting a conversation does not start a runtime merely to discover
+them.
+
+![Thinking effort beside the message Composer](screenshots/1-10-0-thinking-effort.png)
 
 ## Refreshed built-in agents
 

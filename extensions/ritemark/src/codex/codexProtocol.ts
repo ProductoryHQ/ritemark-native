@@ -233,6 +233,8 @@ export interface TurnStartParams {
   threadId: string;
   input: UserInput[];
   model?: string | null;
+  /** Per-turn reasoning effort. Omitted to let Codex use its current default. */
+  effort?: string | null;
   collaborationMode?: CollaborationMode | null;
 }
 

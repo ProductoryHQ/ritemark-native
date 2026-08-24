@@ -28,6 +28,7 @@ function item(conversationId: string, over: Partial<QueueItem> = {}): QueueItem 
     runtimeId: 'claude-code',
     autonomy: 'auto',
     planFirst: false,
+    thinkingEffort: 'auto',
     prompt: `full prompt ${seq}`,
     displayText: `typed ${seq}`,
     source: 'composer',

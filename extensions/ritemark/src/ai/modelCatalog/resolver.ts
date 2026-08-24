@@ -64,15 +64,15 @@ function resolveProvider(
 
   if (live && live.length > 0) {
     source = 'live';
-    models = enrichLive(live, bestCatalog);
+    models = enrichLive(live, bestCatalog, bundledPC);
     defaults = bestCatalog?.defaults ?? {};
   } else if (remotePC) {
     source = 'remote';
-    models = remotePC.models;
+    models = enrichCatalogCapabilities(remotePC.models, bundledPC);
     defaults = remotePC.defaults;
   } else if (cachePC) {
     source = 'cache';
-    models = cachePC.models;
+    models = enrichCatalogCapabilities(cachePC.models, bundledPC);
     defaults = cachePC.defaults;
   } else if (bundledPC) {
     source = 'bundled';
@@ -84,9 +84,31 @@ function resolveProvider(
     defaults = {};
   }
 
-  const filtered = models.filter((m) => allowedByAppVersion(m, appVersion));
+  // Public resolver invariant: a newer source may add/remove models and replace
+  // presentation metadata, but it cannot accidentally erase an exact-pin
+  // capability that this build knows how to implement.
+  const filtered = enrichCatalogCapabilities(models, bundledPC)
+    .filter((m) => allowedByAppVersion(m, appVersion));
   const sorted = [...filtered].sort((a, b) => a.order - b.order);
   return { models: sorted, defaults, source };
+}
+
+/**
+ * Remote/cache catalogs can predate a capability field added by the shipping
+ * app. Preserve their provider-cadence model set and labels, but use the exact-
+ * pin bundled metadata as a floor for a known model. A remote capability, when
+ * present, remains authoritative.
+ */
+function enrichCatalogCapabilities(
+  models: ModelEntry[],
+  bundled: ProviderCatalog | null,
+): ModelEntry[] {
+  if (!bundled) return models;
+  const bundledById = new Map(bundled.models.map((model) => [model.id, model]));
+  return models.map((model) => ({
+    ...model,
+    thinkingEffort: model.thinkingEffort ?? bundledById.get(model.id)?.thinkingEffort,
+  }));
 }
 
 /**
@@ -98,12 +120,28 @@ function resolveProvider(
  *    appended, so a user who still has one selected sees it (flagged) rather than
  *    getting a silent reset (spec R2).
  */
-function enrichLive(live: ModelEntry[], catalog: ProviderCatalog | null): ModelEntry[] {
-  if (!catalog) return live;
-  const curatedById = new Map(catalog.models.map((m) => [m.id, m]));
+function enrichLive(
+  live: ModelEntry[],
+  catalog: ProviderCatalog | null,
+  bundled: ProviderCatalog | null,
+): ModelEntry[] {
+  if (!catalog && !bundled) return live;
+  const curatedById = new Map((catalog?.models ?? []).map((m) => [m.id, m]));
+  const bundledById = new Map((bundled?.models ?? []).map((m) => [m.id, m]));
   const liveIds = new Set(live.map((m) => m.id));
-  const enriched = live.map((m) => curatedById.get(m.id) ?? m);
-  const deprecatedExtras = catalog.models.filter((m) => m.deprecated && !liveIds.has(m.id));
+  const enriched = live.map((m) => {
+    const curated = curatedById.get(m.id);
+    const bundledEntry = bundledById.get(m.id);
+    if (!curated && !bundledEntry) return m;
+    return {
+      ...m,
+      ...curated,
+      // Live protocol metadata wins. A remote catalog may predate this field,
+      // so the exact-pin bundled capability remains the final offline floor.
+      thinkingEffort: m.thinkingEffort ?? curated?.thinkingEffort ?? bundledEntry?.thinkingEffort,
+    };
+  });
+  const deprecatedExtras = (catalog?.models ?? []).filter((m) => m.deprecated && !liveIds.has(m.id));
   return [...enriched, ...deprecatedExtras];
 }
 

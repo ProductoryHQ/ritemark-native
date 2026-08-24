@@ -7,6 +7,12 @@ import {
   CONVERSATION_IDENTITY_COLOR_SLOT_COUNT,
   isConversationIdentityColorSlot,
 } from './identityColor';
+import {
+  isExplicitThinkingEffort,
+  isThinkingEffort,
+  type ExplicitThinkingEffort,
+  type ThinkingEffort,
+} from '../runtime/thinkingEffort';
 
 export const CONVERSATION_SCHEMA_VERSION = 1 as const;
 export const CONVERSATION_INDEX_VERSION = 1 as const;
@@ -61,12 +67,16 @@ export interface UserMessageEventV1 extends ConversationEventBaseV1 {
   text: string;
   mode: string | null;
   attachments: ConversationAttachmentMetadataV1[];
+  /** Immutable accepted-turn snapshot. Missing in pre-Sprint-112 records = Auto. */
+  thinkingEffort?: ThinkingEffort;
 }
 
 export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
   kind: 'assistant-message';
   content: string;
   terminalStatus: 'completed' | 'failed' | 'cancelled' | null;
+  /** Provider-observed applied value; absent/null means the provider did not expose it. */
+  appliedThinkingEffort?: ExplicitThinkingEffort | null;
 }
 
 export interface ActivityEventV1 extends ConversationEventBaseV1 {
@@ -117,6 +127,10 @@ export interface MigrationProvenanceV1 {
   migratedAt: string;
 }
 
+export interface ConversationComposerPreferencesV1 {
+  thinkingEffortByRuntime: Partial<Record<AgentId, ThinkingEffort>>;
+}
+
 export interface ConversationRecordV1 {
   schemaVersion: typeof CONVERSATION_SCHEMA_VERSION;
   conversationId: string;
@@ -131,6 +145,7 @@ export interface ConversationRecordV1 {
   lifecycle: ConversationLifecycleV1;
   runtimeSummary: RuntimeId[];
   events: ConversationEventV1[];
+  composerPreferences: ConversationComposerPreferencesV1;
   continuations?: ContinuationDescriptorsV1;
   migration?: MigrationProvenanceV1;
 }
@@ -184,6 +199,7 @@ export interface ConversationCreateInputV1 {
   lastActivityAt?: string;
   lifecycle?: ConversationLifecycleV1;
   events?: ConversationEventV1[];
+  composerPreferences?: ConversationComposerPreferencesV1;
   continuations?: ContinuationDescriptorsV1;
   migration?: MigrationProvenanceV1;
 }
@@ -195,6 +211,7 @@ export interface ConversationCheckpointV1 {
   title?: string;
   lifecycle?: ConversationLifecycleV1;
   appendEvents?: ConversationEventV1[];
+  composerPreferences?: ConversationComposerPreferencesV1;
   continuationUpdate?: { runtimeId: AgentId; descriptor: RuntimeContinuationDescriptorV1 | null };
 }
 
@@ -347,6 +364,11 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
   const kind = enumAt(input.kind, `${path}.kind`, ['user-message', 'assistant-message', 'activity', 'attention', 'boundary', 'dispatch-receipt'] as const);
   if (kind === 'user-message') {
     if (!Array.isArray(input.attachments)) fail(`${path}.attachments`, 'an array');
+    const thinkingEffort = input.thinkingEffort === undefined
+      ? 'auto'
+      : isThinkingEffort(input.thinkingEffort)
+        ? input.thinkingEffort
+        : fail(`${path}.thinkingEffort`, 'a canonical thinking effort');
     return {
       ...base,
       kind,
@@ -361,9 +383,15 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
           sizeBytes: item.sizeBytes === null ? null : integerAt(item.sizeBytes, `${path}.attachments[${index}].sizeBytes`),
         };
       }),
+      thinkingEffort,
     };
   }
   if (kind === 'assistant-message') {
+    const appliedThinkingEffort = input.appliedThinkingEffort === undefined || input.appliedThinkingEffort === null
+      ? null
+      : isExplicitThinkingEffort(input.appliedThinkingEffort)
+        ? input.appliedThinkingEffort
+        : fail(`${path}.appliedThinkingEffort`, 'a canonical explicit thinking effort or null');
     return {
       ...base,
       kind,
@@ -371,6 +399,7 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
       terminalStatus: input.terminalStatus === null
         ? null
         : enumAt(input.terminalStatus, `${path}.terminalStatus`, ['completed', 'failed', 'cancelled'] as const),
+      appliedThinkingEffort,
     };
   }
   if (kind === 'activity') {
@@ -477,6 +506,21 @@ function decodeMigration(value: unknown, path: string): MigrationProvenanceV1 {
   };
 }
 
+function decodeComposerPreferences(value: unknown, path: string): ConversationComposerPreferencesV1 {
+  if (value === undefined) return { thinkingEffortByRuntime: {} };
+  const input = objectAt(value, path);
+  const raw = input.thinkingEffortByRuntime === undefined
+    ? {}
+    : objectAt(input.thinkingEffortByRuntime, `${path}.thinkingEffortByRuntime`);
+  const thinkingEffortByRuntime: Partial<Record<AgentId, ThinkingEffort>> = {};
+  for (const [key, effort] of Object.entries(raw)) {
+    const runtimeId = agentRuntimeAt(key, `${path}.thinkingEffortByRuntime.${key}`);
+    if (!isThinkingEffort(effort)) fail(`${path}.thinkingEffortByRuntime.${key}`, 'a canonical thinking effort');
+    thinkingEffortByRuntime[runtimeId] = effort;
+  }
+  return { thinkingEffortByRuntime };
+}
+
 function validateRecordRelationships(record: ConversationRecordV1): void {
   assertConversationId(record.conversationId);
   if (!SCOPE_ID_PATTERN.test(record.scopeId)) fail('scopeId', 'a ps1 scope id');
@@ -548,6 +592,7 @@ export function decodeConversationRecordV1(value: unknown): ConversationRecordV1
     lifecycle: decodeConversationLifecycleV1(input.lifecycle),
     runtimeSummary: input.runtimeSummary.map((runtime, index) => runtimeAt(runtime, `runtimeSummary[${index}]`)),
     events: input.events.map((event, index) => decodeConversationEventV1(event, `events[${index}]`)),
+    composerPreferences: decodeComposerPreferences(input.composerPreferences, 'composerPreferences'),
   };
   if (input.continuations !== undefined) {
     record.continuations = decodeContinuations(input.continuations, 'continuations');

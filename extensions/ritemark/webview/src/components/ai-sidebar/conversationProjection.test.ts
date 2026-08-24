@@ -15,6 +15,7 @@ const projection: ConversationProjectionV1 = {
   bindingGeneration: 0,
   lifecycle: { state: 'idle' },
   runtimeSummary: ['codex'],
+  composerPreferences: { thinkingEffortByRuntime: { codex: 'high' } },
   events: [
     {
       kind: 'user-message', eventId: 'user-1', turnId: 'turn-1', sequence: 0,

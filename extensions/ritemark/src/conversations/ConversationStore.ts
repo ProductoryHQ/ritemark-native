@@ -261,6 +261,7 @@ export class ConversationStore {
         lifecycle: input.lifecycle ?? { state: 'idle' },
         runtimeSummary: runtimeSummaryFor({ events: input.events ?? [] }),
         events: input.events ?? [],
+        composerPreferences: input.composerPreferences ?? { thinkingEffortByRuntime: {} },
         ...(input.continuations ? { continuations: input.continuations } : {}),
         ...(input.migration ? { migration: input.migration } : {}),
       });
@@ -297,6 +298,7 @@ export class ConversationStore {
         ...current,
         title: update.title ?? current.title,
         lifecycle: update.lifecycle ?? current.lifecycle,
+        composerPreferences: update.composerPreferences ?? current.composerPreferences,
         events,
         runtimeSummary: runtimeSummaryFor({ events }),
         revision: current.revision + 1,

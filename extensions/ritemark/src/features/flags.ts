@@ -49,12 +49,21 @@ export type FlagId =
   // Sprint 108: audio transcription workbench (Transcribe activity-bar app)
   | 'transcription-workbench'
   // Sprint 109: host-owned durable conversation archive + Conversations UI
-  | 'durableAgentConversations';
+  | 'durableAgentConversations'
+  // Sprint 112: per-turn Composer thinking effort across agent runtimes
+  | 'composer-thinking-effort';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  'composer-thinking-effort': {
+    id: 'composer-thinking-effort',
+    label: 'Composer Thinking Effort',
+    description: 'Choose a capability-supported thinking effort for the next Agent Chat message.',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   'durableAgentConversations': {
     id: 'durableAgentConversations',
     label: 'Durable Agent Conversations',

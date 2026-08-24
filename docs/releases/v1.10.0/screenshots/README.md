@@ -31,6 +31,16 @@ Exactly three Sprint 110 screenshots are retained. The probe phrase and workspac
 
 The superseded confirmation-dialog and large transcript-restored-banner screenshots are intentionally excluded.
 
+## Sprint 112 — Composer Thinking Effort
+
+Captured 2026-08-24 from an isolated Ritemark RunDev profile using the `ritemark-demo` workspace and Claude Sonnet.
+
+| File | Shows | Product-marketing use |
+| --- | --- | --- |
+| `1-10-0-thinking-effort.png` | The approved native range popover in the real Composer, with Auto below the Faster → More thorough scale | Primary visual for per-message thinking effort without implying guaranteed answer quality |
+
+The screenshot uses the live Sprint 112 extension bundle and contains no customer data. Native drag, keyboard, Auto, 300px-sidebar collision, and 200% geometry were verified alongside capture.
+
 ## Verified alongside capture
 
 - First-prompt fallback and 3–6-word AI title generation.
