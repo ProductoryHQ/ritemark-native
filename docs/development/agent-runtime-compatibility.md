@@ -1,4 +1,26 @@
-# Sprint 100 — Runtime Compatibility Matrix
+# Agent Runtime Compatibility Matrix
+
+## Sprint 111 shipping candidate — 2026-08-24
+
+**Shipping candidate:** Claude Code `2.1.239` (SDK `0.3.239`) · OpenCode `1.18.21` (ACP SDK `1.4.0`) · Codex app-server `0.149.0`.
+
+The exact darwin-arm64 binaries report `2.1.239 (Claude Code)`, `1.18.21`, and `codex-app-server 0.149.0`. All nine manifest archives fetched, matched the recorded SHA-256, extracted at the recorded path, and matched the target architecture. macOS x64 and Windows x64 execution remain native CI/release gates rather than inferred local passes.
+
+| Runtime | Protocol/SDK compatibility | Continuation and isolation | Permission/cancel evidence | Effort capability evidence |
+|---|---|---|---|---|
+| **Codex 0.149.0** | pass — current app-server lifecycle and `untrusted` policy accepted; `request_user_input.isBlocking` is additive/tolerated; focused compile/tests pass | pass — semantic resume across app-server restart, invalid descriptor rejection, and two-thread isolation | pass — existing unified approval/cancel routing tests; no policy default change | pass — live `model/list` advertises `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+| **Claude 2.1.239 / SDK 0.3.239** | pass — SDK declares exact binary parity; current extension compiles unchanged; hard checked against package/lock/manifest | pass — semantic resume across new subprocesses, invalid-session rejection, and two-session isolation | pass — existing permission/runtime adapter tests; tools denied during live probes | pass — SDK retains model support metadata and `low` through `max` effort types |
+| **OpenCode 1.18.21 / ACP 1.4.0** | pass — current adapter compiles unchanged; protocol v1 and session load/resume/list/fork/close advertised | pass — semantic resume, transcript replay, invalid-session rejection, and two-session isolation | pass — live write pauses, denial blocks, approval writes, cancel settles `cancelled`, shared process survives | changed-capability-by-model — no option on the default model; an eligible model exposes semantic category `thought_level` with `low`, `medium`, `high` |
+
+### Sprint 111 hard gates
+
+- `scripts/validate-agent-runtime-manifest.mjs` rejects incomplete platform matrices, floating/mismatched versions, stale vendor metadata, lockfile drift, and Claude binary/SDK patch drift before fetch/build.
+- `scripts/fetch-agent-runtimes.sh --all-platforms` passed for all nine exact archives.
+- `scripts/verify-agent-runtimes.sh` passed version discovery and all four OpenCode behavioral rows (`gate-pauses`, `gate-denies`, `gate-allows`, `cancel`).
+- Target-SDK TypeScript compile and focused Codex/Claude/OpenCode adapter tests pass.
+- Redacted live evidence and remaining native-platform boundaries are recorded in the [Sprint 111 audit](./releases/v1.10.0/sprint-111-agent-runtime-refresh/research/runtime-version-audit.md).
+
+## Sprint 100 historical baseline
 
 Evidence for issue #146. Every cell is pass / fail / **changed-behavior** with the evidence that
 produced it — not a checkmark. Empty cells are stated as untested rather than assumed.

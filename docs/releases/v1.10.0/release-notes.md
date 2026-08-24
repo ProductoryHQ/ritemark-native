@@ -5,7 +5,7 @@ conversation system you can trust. Your chats belong to the project, survive a
 restart, and can continue with another agent without making you reconstruct the
 discussion from memory.
 
-<!-- Draft through Sprints 109–110. Runtime refresh and Composer thinking effort are added in Sprints 111–112. -->
+<!-- Draft through Sprint 111. Composer thinking effort is added in Sprint 112. -->
 
 ## Conversations you can return to
 
@@ -51,6 +51,18 @@ as context. Another provider's private session identifier is never transferred,
 and late output from the previous agent cannot overwrite the handoff.
 
 ![A quiet Claude to Codex handoff inside the conversation](screenshots/1-10-0-agent-switch-boundary.png)
+
+## Refreshed built-in agents
+
+Ritemark 1.10.0 refreshes all three bundled agent engines: Codex 0.149.0,
+Claude Code 2.1.239, and OpenCode 1.18.21. Their matching SDK edges are pinned
+to Claude Agent SDK 0.3.239 and ACP SDK 1.4.0, so an app update cannot quietly
+combine an old client with a new engine.
+
+The release build now rejects incomplete platform sets, checksum mismatches,
+Claude binary/SDK drift, and stale runtime metadata before packaging. Existing
+conversation continuation, approvals, cancellation, and parallel-conversation
+isolation were rerun against this exact snapshot.
 
 > Native continuation is intentionally version- and configuration-specific. “Previous messages were included” means transcript fallback, not complete private model memory.
 

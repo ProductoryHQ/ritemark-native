@@ -343,7 +343,7 @@ async function run() {
     const compatibility = {
       runtimeId: 'opencode' as const,
       scopeId: `ps1-${'b'.repeat(40)}`,
-      runtimeVersion: '1.18.4',
+      runtimeVersion: '1.18.21',
       adapterContractVersion: 1,
       modelId: 'opencode:anthropic/claude-opus-4-1',
       compatibilityFingerprint: 'fingerprint',

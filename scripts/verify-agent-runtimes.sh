@@ -54,9 +54,14 @@ VERSIONS_ONLY=false
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) PLATDIR="darwin-arm64" ;;
   Darwin-x86_64) PLATDIR="darwin-x64" ;;
-  *) echo "ERROR: unsupported host $(uname -s)-$(uname -m); run on macOS" >&2; exit 1 ;;
+  MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) PLATDIR="win32-x64" ;;
+  *) echo "ERROR: unsupported host $(uname -s)-$(uname -m); run on supported macOS or Windows x64" >&2; exit 1 ;;
 esac
 BIN="$EXT/binaries/agents/$PLATDIR"
+EXE_SUFFIX=""
+[[ "$PLATDIR" == "win32-x64" ]] && EXE_SUFFIX=".exe"
+
+node "$ROOT/scripts/validate-agent-runtime-manifest.mjs" || exit 1
 
 echo "========================================"
 echo "Agent runtime verification — $PLATDIR"
@@ -77,17 +82,18 @@ manifest_version() {
 check_version() { # name binary-path expected-substring
   local name="$1" path="$2" want="$3"
   if [[ ! -x "$path" ]]; then skip "$name binary not installed ($path) — run fetch-agent-runtimes.sh"; return; fi
-  local out; out="$("$path" --version 2>&1 | head -1)"
+  local out matched; out="$("$path" --version 2>&1)"
   if [[ -z "$want" ]]; then skip "$name has no manifest version to compare against"; return; fi
   if [[ "$out" == *"$want"* ]]; then
-    pass "$name reports $out (manifest: $want)"
+    matched="$(printf '%s\n' "$out" | grep -F "$want" | head -1)"
+    pass "$name reports $matched (manifest: $want)"
   else
     fail "$name reports '$out' but the manifest pins $want"
   fi
 }
-check_version claude   "$BIN/claude"           "$(manifest_version claude)"
-check_version opencode "$BIN/opencode"         "$(manifest_version opencode)"
-check_version codex    "$BIN/codex-app-server" "$(manifest_version codex)"
+check_version claude   "$BIN/claude$EXE_SUFFIX"           "$(manifest_version claude)"
+check_version opencode "$BIN/opencode$EXE_SUFFIX"         "$(manifest_version opencode)"
+check_version codex    "$BIN/codex-app-server$EXE_SUFFIX" "$(manifest_version codex)"
 
 if $VERSIONS_ONLY; then
   echo; echo "(--versions: stopping before the behavioural checks)"
@@ -99,12 +105,12 @@ fi
 # extension uses, so a pass here means the shipped path works, not a mock of it.
 echo
 echo "--- OpenCode: permission gate (HARD GATE) and session/cancel ---"
-if [[ ! -x "$BIN/opencode" ]]; then
+if [[ ! -x "$BIN/opencode$EXE_SUFFIX" ]]; then
   skip "opencode binary not installed — permission gate and cancel unverified"
 elif [[ ! -d "$EXT/node_modules/@agentclientprotocol/sdk" ]]; then
   skip "@agentclientprotocol/sdk not installed — run npm install in extensions/ritemark"
 else
-  OUT="$(node "$ROOT/scripts/lib/verify-opencode.mjs" "$BIN/opencode" "$EXT" 2>&1)" || true
+  OUT="$(node "$ROOT/scripts/lib/verify-opencode.mjs" "$BIN/opencode$EXE_SUFFIX" "$EXT" 2>&1)" || true
   echo "$OUT" | sed 's/^/  /'
   echo "$OUT" | grep -q '^RESULT gate-pauses PASS'  && pass "a write pauses for host approval"      || fail "a write did NOT pause for host approval"
   echo "$OUT" | grep -q '^RESULT gate-denies PASS'  && pass "host denial blocks the write"          || fail "host denial did NOT block the write"

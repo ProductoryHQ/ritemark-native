@@ -1,80 +1,94 @@
 # Sprint 111 Runtime Version Audit
 
-**Status:** Planning snapshot; live artifact audit pending<br>
-**Snapshot date:** 2026-08-22
+**Status:** Phase 0 evidence complete; exact-pin/protocol decision pending<br>
+**Snapshot date:** 2026-08-23
 
 ## Objective
 
-Prove that the proposed runtime/SDK versions can replace the current pins without breaking Ritemark’s platform packaging, runtime adapters, conversation isolation, or Sprint 110 continuation contract.
+Prove that the proposed runtime/SDK versions can replace the current pins without breaking Ritemark’s platform packaging, runtime adapters, conversation isolation, or Sprint 110 continuation contract. This audit uses exact upstream versions; it does not authorize floating `latest` resolution.
 
-## Planning Snapshot
+## Exact Source Snapshot
 
-| Component | Current pin | Proposed pin | Official evidence | Key audit question |
+| Component | Current pin | Proposed pin | Official evidence | Published |
 |---|---:|---:|---|---|
-| Codex app-server | 0.144.4 | 0.149.0 | [GitHub release](https://github.com/openai/codex/releases/tag/rust-v0.149.0) | Do standalone app-server artifacts and current JSON-RPC contracts remain compatible? |
-| Claude Code | 2.1.217 | 2.1.239 | [GitHub release](https://github.com/anthropics/claude-code/releases/tag/v2.1.239) | Do platform packages, license terms, and binary behavior remain compatible? |
-| Claude Agent SDK | 0.3.217 | 0.3.239 | [npm](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk/v/0.3.239) | Does the package declare `claudeCodeVersion: 2.1.239`, and do peer/stub requirements still bundle? |
-| OpenCode | 1.18.4 | 1.18.21 | [GitHub release](https://github.com/anomalyco/opencode/releases/tag/v1.18.21) | Are ACP config, thought level, cancellation, and multi-session behavior stable? |
-| ACP TypeScript SDK | 0.22.1 | 1.4.0 | [npm](https://www.npmjs.com/package/@agentclientprotocol/sdk/v/1.4.0) | What migration is required across the 1.0 boundary? |
+| Codex app-server | 0.144.4 | 0.149.0 | [GitHub release](https://github.com/openai/codex/releases/tag/rust-v0.149.0) | 2026-08-20 21:04:55Z |
+| Claude Code | 2.1.217 | 2.1.239 | [GitHub release](https://github.com/anthropics/claude-code/releases/tag/v2.1.239) and official npm optional packages | GitHub 2026-08-21 19:54:23Z; npm darwin-arm64 17:24:35Z |
+| Claude Agent SDK | 0.3.217 | 0.3.239 | [npm](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk/v/0.3.239) | 2026-08-21 17:23:55Z |
+| OpenCode | 1.18.4 | 1.18.21 | [GitHub release](https://github.com/anomalyco/opencode/releases/tag/v1.18.21) and official npm optional packages | GitHub 2026-08-21 14:51:11Z; npm darwin-arm64 14:49:11Z |
+| ACP TypeScript SDK | 0.22.1 | 1.4.0 | [npm](https://www.npmjs.com/package/@agentclientprotocol/sdk/v/1.4.0) | 2026-08-20 23:00:39Z |
 
-Official registries reported these versions as latest stable on 2026-08-22. This table is evidence for the proposed pin, not permission to resolve `latest` during builds.
+The registries and release pages were queried directly on the snapshot date. The Claude SDK declares `claudeCodeVersion: 2.1.239`, so the proposed binary/SDK pair is exact.
 
 ## Artifact Matrix
 
-Fill before the Phase 0 decision:
+The nine target archives were downloaded from the upstream release/npm URLs into a temporary directory. SHA-256 is over the downloaded archive, before extraction.
 
-| Runtime | Platform | Upstream asset/package | SHA-256 | Archive path | Version output | Architecture/signature | Result |
-|---|---|---|---|---|---|---|---|
-| Codex 0.149.0 | darwin-arm64 | — | — | — | — | — | Pending |
-| Codex 0.149.0 | darwin-x64 | — | — | — | — | — | Pending |
-| Codex 0.149.0 | win32-x64 | — | — | — | — | — | Pending |
-| Claude 2.1.239 | darwin-arm64 | — | — | — | — | — | Pending |
-| Claude 2.1.239 | darwin-x64 | — | — | — | — | — | Pending |
-| Claude 2.1.239 | win32-x64 | — | — | — | — | — | Pending |
-| OpenCode 1.18.21 | darwin-arm64 | — | — | — | — | — | Pending |
-| OpenCode 1.18.21 | darwin-x64 | — | — | — | — | — | Pending |
-| OpenCode 1.18.21 | win32-x64 | — | — | — | — | — | Pending |
+| Runtime | Platform | Upstream asset/package | SHA-256 | Archive path | Version/architecture/signature evidence | Result |
+|---|---|---|---|---|---|---|
+| Codex 0.149.0 | darwin-arm64 | `codex-app-server-aarch64-apple-darwin.tar.gz` | `35892a576ec29edbbb766cfba002c57c7beea479c6c21715a134cab4a7352032` | `codex-app-server-aarch64-apple-darwin` | `codex-app-server 0.149.0`; Mach-O arm64; hardened signature, Team `2DC432GLL2` | Pass |
+| Codex 0.149.0 | darwin-x64 | `codex-app-server-x86_64-apple-darwin.tar.gz` | `12c4951f6e9c1acfb6c726a7cf59b3c9f152dd16e5b7475cfc2f435396fc3d1a` | `codex-app-server-x86_64-apple-darwin` | `0.149.0` under Rosetta; Mach-O x86_64; hardened signature, same Team | Artifact pass; native CI still required |
+| Codex 0.149.0 | win32-x64 | `codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz` | `a44add5edeef9cb074e51ec3583d4a368638ac789ff61717e1e855fe83fd5b6a` | `codex-app-server-x86_64-pc-windows-msvc.exe` | PE32+ x86-64 inspected on macOS | Artifact pass; native version/signature CI required |
+| Claude 2.1.239 | darwin-arm64 | `@anthropic-ai/claude-code-darwin-arm64@2.1.239` | `bd79fcb60c33caa45fb5ba32e1b25ec002fe3ea1bcff6a0948cd4be0f14a94ad` | `package/claude` | `2.1.239 (Claude Code)`; Mach-O arm64; hardened signature, Team `Q6L2SF6YDW` | Pass |
+| Claude 2.1.239 | darwin-x64 | `@anthropic-ai/claude-code-darwin-x64@2.1.239` | `180656a7c819d61725ca6d3b0f97e73bb39638758b31b1fbf96284115dea1a09` | `package/claude` | `2.1.239` under Rosetta; Mach-O x86_64; hardened signature, same Team | Artifact pass; native CI still required |
+| Claude 2.1.239 | win32-x64 | `@anthropic-ai/claude-code-win32-x64@2.1.239` | `12d45ab5d71b72406e94ff0959b9ac6cf8d1682c2c3f3f5750747f9a375573f5` | `package/claude.exe` | PE32+ x86-64 inspected on macOS | Artifact pass; native version/signature CI required |
+| OpenCode 1.18.21 | darwin-arm64 | `opencode-darwin-arm64@1.18.21` | `d29f9bb2e0a67d7d484d5a8262af99e34f58d747f3d1ce500dc81e38b4dba85f` | `package/bin/opencode` | `1.18.21`; Mach-O arm64; ad-hoc/linker signature | Pass |
+| OpenCode 1.18.21 | darwin-x64 | `opencode-darwin-x64@1.18.21` | `637661eed055dcd57bbe12693c1dc380b54884e1d0089d74b884d09a9d096886` | `package/bin/opencode` | `1.18.21` under Rosetta; Mach-O x86_64; upstream warns this CPU path lacks AVX | Artifact pass; native x64 CI required |
+| OpenCode 1.18.21 | win32-x64 | `opencode-windows-x64@1.18.21` | `6947a935fe0c62b8a072bd06626a0c8a7629eaeb85ff3012dc9236077711e9cf` | `package/bin/opencode.exe` | PE32+ x86-64 inspected on macOS | Artifact pass; native version/signature CI required |
 
-## Protocol Matrix
+Archive layouts preserve every current manifest source type and install name. Codex remains a direct standalone app-server; no CLI-wrapper migration is required.
 
-### Codex
+## SDK and Protocol Evidence
 
-- initialize and capabilities
-- model list and reasoning-effort metadata
-- thread start/read/resume and process restart
-- turn start, collaboration mode, cancellation
-- approval, user questions, plan updates, dynamic tools
-- two-thread event routing and unknown optional fields
+### Codex 0.149.0
 
-### Claude
+- Current core methods and fields used by Ritemark (`initialize`, `thread/start`, `thread/read`, `thread/resume`, `turn/start`, approval mode) remain available.
+- The release-note ambiguity around `untrusted` was tested live: `thread/start` still accepts `approvalPolicy: "untrusted"` with the current read-only contract.
+- `model/list` succeeds and advertises `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`; Ritemark must keep this capability-driven rather than hardcode the list for Sprint 112.
+- Upstream `ToolRequestUserInputParams` now includes required `isBlocking`; `autoResolutionMs` is deprecated. Ritemark currently ignores unknown fields, so the wire path remains compatible. The local protocol subset/fixture should add `isBlocking` as a tolerated field during implementation so the measured contract is explicit while system-runtime backward compatibility is preserved.
+- Source schema diff also adds optional model metadata (`modelSpecialty`, `multiAgentVersion`). No current parser depends on it.
+- The read-only [protocol probe](./codex-protocol-probe.mjs) passed. Sprint 110 semantic resume/process restart, invalid-descriptor rejection, and two-thread isolation all passed on the target binary.
 
-- SDK/binary patch parity and startup
-- auth methods, model discovery, adaptive thinking/effort type surface
-- permissions, plan mode, browser MCP, approvals/questions
-- callbacks, two sessions, cancellation, resume
+### Claude 2.1.239 / Agent SDK 0.3.239
 
-### OpenCode/ACP
+- Target SDK peer requirements are Node `>=18`, `zod ^4`, `@anthropic-ai/sdk >=0.93`, and `@modelcontextprotocol/sdk ^1.29`.
+- The current non-test extension TypeScript source compiles unchanged when module paths are replaced with SDK `0.3.239` and ACP SDK `1.4.0` declarations.
+- Effort remains typed as `low | medium | high | xhigh | max`; query options retain `thinking?: ThinkingConfig` and `effort?: EffortLevel`, and model metadata retains support/allowed-level discovery.
+- The target binary and SDK passed startup, semantic resume across new subprocesses, invalid-session rejection, and two-session isolation with tools denied.
+- No production adapter change is justified by Phase 0 evidence; dependency/parity/fixture changes are still required after approval.
 
-- SDK 1.4.0 compile/API migration
-- initialize, session creation, config option updates
-- semantic `model` and `thought_level` discovery
-- prompt stream, file operations, approvals, cancellation
-- two sessions, process shutdown/restart, provider/model errors
+### OpenCode 1.18.21 / ACP SDK 1.4.0
 
-## License and Distribution Checklist
+- ACP 1.4.0 retains the `ClientSideConnection` API used by Ritemark; current non-test extension TypeScript compiles unchanged against it.
+- Live initialize reports protocol version 1 plus load/resume/list/fork/close session capabilities and HTTP/SSE MCP support.
+- Thought effort is model-dependent. The default `opencode/big-pickle` session exposed no thought-level option. After selecting an effort-capable model, ACP exposed a select option with semantic category `thought_level`, values `low | medium | high`, and acknowledged an update to `high` before the next prompt. The observed option ID happened to be `effort`; Sprint 112 must key off the semantic category, not that vendor ID.
+- Semantic resume, transcript replay through `loadSession`, invalid-session rejection, and two-session isolation passed on the exact binary/SDK pair using a free model with edit, shell, and web tools denied.
+- The isolated audit harness required a writable `XDG_STATE_HOME`; this is normal OpenCode state behavior, not a Ritemark adapter regression.
 
-- [ ] Codex Apache-2.0 URL and artifact provenance rechecked.
-- [ ] Anthropic proprietary license/redistribution paper trail rechecked.
-- [ ] OpenCode repository/vendor identity and MIT notice updated from legacy `sst` URLs where needed.
-- [ ] ACP SDK Apache-2.0 dependency notice checked.
-- [ ] Platform packages contain no unrecorded bundled licenses requiring notice changes.
+## License and Distribution Evidence
 
-## Decision
+- [x] Codex remains Apache-2.0 with official OpenAI GitHub release provenance.
+- [x] Claude binary and SDK packages still contain the Anthropic notice pointing to the same public legal/compliance terms. Existing `LicenseRef-Anthropic-Proprietary` and the documented product-owner redistribution decision remain the applicable paper trail; this audit is not a new legal interpretation.
+- [x] OpenCode remains MIT, but the manifest’s legacy `github.com/sst/opencode` notice URLs are stale and must change to `github.com/anomalyco/opencode` with the approved pin.
+- [x] ACP SDK 1.4.0 contains Apache-2.0 and requires no new custom license reference.
+- [x] Claude archives include `LICENSE.md`; no additional license file appeared in the target OpenCode platform package. Native package/notices verification remains part of release packaging QA.
 
-Choose one after live audit:
+## Platform Gaps and Rollback
 
-- **Ship exact snapshot:** all required contracts and artifacts pass.
-- **Revise exact snapshot:** name the replacement pins and rerun every affected row.
-- **Block:** name the failing contract, last verified compatible version, and smallest safe next action.
+- The local host proves darwin-arm64 behavior and inspects/runs macOS x64 artifacts under Rosetta. It cannot replace native darwin-x64 or win32-x64 CI evidence. Those rows stay mandatory in Phase 4.
+- OpenCode x64 emitted an AVX warning under this Apple Silicon Rosetta host; validate the selected upstream x64 package on the native Intel runner before release readiness.
+- Windows Authenticode/version output, app packaging, cancellation, approval, browser, and failure-injection matrices are intentionally not claimed by Phase 0; they belong to Phases 3–4 after pins are approved.
+- Rollback is atomic: restore Codex `0.144.4`, Claude binary `2.1.217` plus SDK `0.3.217`, OpenCode `1.18.4` plus ACP SDK `0.22.1`, their old lockfile/manifest/checksums, and only the protocol fixtures/adaptations introduced by this sprint. Conversation storage and webview state do not change.
 
-**Jarmo decision:** Pending.
+## Recommendation
+
+**Ship the exact proposed snapshot**, subject to Jarmo’s decision and the later native-platform/release gates.
+
+Approved implementation plan:
+
+1. Preserve current artifact source types and install paths; write the nine measured SHA-256 values into the manifest.
+2. Pin Claude binary/SDK and OpenCode/ACP as atomic pairs and add the Claude parity failure check.
+3. Make only measured protocol changes: tolerate/fixture Codex `isBlocking`, retain open capability discovery, and contain any ACP dependency adjustments inside `src/acp/`.
+4. Update OpenCode vendor/license URLs; preserve the existing Claude proprietary paper trail.
+5. Do not add Composer effort UI in Sprint 111; pass the measured capability matrix to Sprint 112.
+
+**Jarmo decision:** Approved 2026-08-24 (“jätka”).

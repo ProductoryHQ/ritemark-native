@@ -9,6 +9,37 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
+// The executor deliberately writes through vscode.workspace.fs so Explorer is
+// notified. Standalone `tsx` tests run outside an extension host, therefore the
+// integration fixture supplies only that real-file-I/O boundary.
+const Module = require('module') as {
+  _resolveFilename: (request: string, parent: unknown, isMain: boolean) => string;
+};
+const originalResolve = Module._resolveFilename.bind(Module);
+Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]) {
+  if (request === 'vscode') return '__vscode_save_file_test_stub__';
+  return originalResolve(request, ...rest);
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(require as any).cache['__vscode_save_file_test_stub__'] = {
+  id: '__vscode_save_file_test_stub__',
+  filename: '__vscode_save_file_test_stub__',
+  loaded: true,
+  children: [],
+  paths: [],
+  exports: {
+    Uri: { file: (fsPath: string) => ({ fsPath }) },
+    workspace: {
+      fs: {
+        writeFile: async (uri: { fsPath: string }, data: Uint8Array) => {
+          await fs.promises.mkdir(path.dirname(uri.fsPath), { recursive: true });
+          await fs.promises.writeFile(uri.fsPath, data);
+        },
+      },
+    },
+  },
+};
+
 // Types
 interface FlowNode {
   id: string;
@@ -25,8 +56,9 @@ interface ExecutionContext {
   nodeLabels: Map<string, string>;
 }
 
-// Import the actual executor
-import { executeSaveFileNode } from './SaveFileNodeExecutor';
+// Import after installing the extension-host boundary stub.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { executeSaveFileNode } = require('./SaveFileNodeExecutor') as typeof import('./SaveFileNodeExecutor');
 
 function createTestNode(data: Record<string, unknown>): FlowNode {
   return {

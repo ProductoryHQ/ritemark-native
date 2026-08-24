@@ -3,7 +3,7 @@
  *
  * JSON-RPC 2.0 over stdio protocol for communicating with `codex app-server`.
  *
- * Generated from: codex app-server generate-ts (v0.106.0)
+ * Audited against: codex app-server generate-ts (v0.149.0)
  * Simplified to the subset used by Ritemark Native.
  */
 
@@ -321,6 +321,8 @@ export interface ToolRequestUserInputParams {
   turnId: string;
   itemId: string;
   questions: ToolRequestUserInputQuestion[];
+  /** Added in Codex 0.149.0. Optional locally for older system runtimes. */
+  isBlocking?: boolean;
 }
 
 export interface ToolRequestUserInputAnswer {
