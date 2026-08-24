@@ -76,6 +76,6 @@ Branch/worktree and Phase 0 decision gates satisfied 2026-08-24.
 - [x] Run focused host and webview tests plus builds (24/24 focused tests, extension compile, webview typecheck/build on 2026-08-24).
 - [x] Run `./scripts/validate-qa.sh` on the sprint branch (pass 2026-08-24).
 - [x] Complete adversarial QA/code review and resolve the initial-dirty, conflict-time queued edit, resolution-ACK, cross-field payload, stale edit-result, full-replacement Undo, and post-Compare focus findings.
-- [ ] Update Sprint 115 issue/tracker and link all evidence.
+- [x] Update Sprint 115 issue/tracker and link the implementation/QA evidence in [issue #221](https://github.com/ProductoryHQ/ritemark-native/issues/221#issuecomment-5400936217).
 - [ ] Merge the dedicated sprint PR before v1.10.0 release-candidate packaging.
 - [ ] Verify on the merged release candidate that agent writes are visible without reopen and no local edit can be timer-discarded.
