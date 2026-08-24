@@ -82,6 +82,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "associatewithfiles"; Description: "Associate with .md files"; GroupDescription: "File associations:"; Flags: unchecked
+Name: "addtopath"; Description: "Add to PATH"; GroupDescription: "Other:"; Flags: unchecked
 
 [Files]
 ; Copy everything from the built app, excluding deeply nested node_modules that exceed MAX_PATH (260 chars)
@@ -110,3 +111,19 @@ Root: HKCU; Subkey: "Software\Classes\Ritemark.md\shell\open\command"; ValueType
 
 ; Also associate .markdown files
 Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: associatewithfiles
+
+; Add to PATH
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\bin"; Tasks: addtopath; Check: NeedsAddPath('{app}\bin')
+
+[Code]
+function NeedsAddPath(Param: string): Boolean;
+var
+  OrigPath: string;
+begin
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OrigPath) then
+  begin
+    Result := True;
+    exit;
+  end;
+  Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+end;
