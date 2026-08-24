@@ -111,7 +111,7 @@ mv /tmp/codex-app-server-aarch64-apple-darwin \
 chmod +x extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server
 ```
 
-The fetch script automates this for all nine runtime entries and adds POSIX exec-bit / PE-header validation plus the manifest `validationArgs` smoke test. Before any download, `scripts/validate-agent-runtime-manifest.mjs` hard-fails incomplete platform rows, non-exact versions, stale vendor metadata, lockfile drift, or a Claude binary/SDK patch mismatch.
+The fetch script automates this for all nine runtime entries and adds POSIX exec-bit / PE-header validation plus the manifest `validationArgs` smoke test. Before any download, `scripts/validate-agent-runtime-manifest.mjs` hard-fails incomplete platform rows, non-exact versions, stale vendor metadata, lockfile drift, or a Claude binary/SDK patch mismatch. Pull requests that change this contract also run the native `Agent Runtime Matrix` on Intel macOS and Windows x64 before merge.
 
 ## Update process
 
