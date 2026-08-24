@@ -1,7 +1,7 @@
 # Sprint 113 — Transcribe Insights & Speaker Names
 
 **Track:** Full SDD, audit-first<br>
-**Status:** R6 implementation and live autocomplete smoke pass; independent review and PR update in progress<br>
+**Status:** Complete — owner approved merge and accepted the residual release-level manual matrix on 2026-08-24<br>
 **Branch:** `codex/sprint-113-transcribe-insights-output`, current `main@faba032` integrated at `38f0091`<br>
 **Worktree:** `.worktrees/sprint-113-transcribe-insights-output`<br>
 **Issue:** [#208](https://github.com/ProductoryHQ/ritemark-native/issues/208)<br>
@@ -48,16 +48,16 @@ The shipped **Add to document** action sends `workbench:save`, the same path use
 
 ## Success Criteria
 
-- [ ] The user can search or explicitly enter any audience language and generate/regenerate Insights independently from transcript language.
-- [ ] The normalized selected/resolved language reaches the prompt explicitly and persists across reload.
-- [ ] Quotes stay verbatim and existing timestamp/citation trust behavior passes.
-- [ ] The rail no longer sends `workbench:save` or labels its action **Add to document**.
-- [ ] Creating an Insights document asks for filename/location and writes a new Insights-only `.md` file.
-- [ ] Existing and primary transcript targets cannot be overwritten; success/cancel/collision/failure leave transcript bytes, mtime, link, and `session.exportPath` unchanged.
-- [ ] Primary transcript save, runtime readiness, regeneration, cancellation, accessibility, and responsive behavior pass.
-- [ ] Names such as `Jarmo Tuisk` can be typed, saved, reloaded, exported, and used in Insights without Space toggling playback.
-- [ ] Long names remain single-line and ellipsized in the gutter/chips, preserve transcript alignment, and expose the full accessible name.
-- [ ] Architecture, docs, v1.10.0 evidence, tracker, and issue #208 are current.
+- [x] The user can search or explicitly enter any audience language and generate/regenerate Insights independently from transcript language.
+- [x] The normalized selected/resolved language reaches the prompt explicitly and persists across reload.
+- [x] Quotes stay verbatim and existing timestamp/citation trust behavior passes.
+- [x] The rail no longer sends `workbench:save` or labels its action **Add to document**.
+- [x] Creating an Insights document asks for filename/location and writes a new Insights-only `.md` file.
+- [x] Existing and primary transcript targets cannot be overwritten; success/cancel/collision/failure leave transcript bytes, mtime, link, and `session.exportPath` unchanged.
+- [x] Primary transcript save, runtime readiness, regeneration, cancellation, accessibility, and responsive behavior pass through focused automated plus selected live evidence; the broader theme/spoken matrix remains a release checklist item by owner decision.
+- [x] Names such as `Jarmo Tuisk` can be typed, saved, reloaded, exported, and used in Insights without Space toggling playback.
+- [x] Long names remain single-line and ellipsized in the gutter/chips, preserve transcript alignment, and expose the full accessible name.
+- [x] Architecture, docs, v1.10.0 evidence, tracker, issue #208, and PR #217 are current.
 
 ## Dependencies and Gates
 
@@ -65,7 +65,7 @@ The shipped **Add to document** action sends `workbench:save`, the same path use
 - Jarmo approves this plan and a dedicated non-`main` branch before implementation.
 - The original Phase 0 language allowlist is superseded by Jarmo's 2026-08-24 R6 any-language decision; persistence, filename, collision, and post-save UX remain frozen.
 - Architecture Gate applies because new webview↔host message types cross the Transcribe subsystem boundary.
-- Sprint close requires focused Transcribe tests, manual known/custom-language evidence, and `./scripts/validate-qa.sh`.
+- Sprint close requires focused Transcribe tests, authenticated known-language evidence, explicit owner disposition of the custom/manual remainder, and `./scripts/validate-qa.sh`.
 
 ## Risks
 
@@ -102,6 +102,7 @@ The shipped **Add to document** action sends `workbench:save`, the same path use
 | 2026-08-24 | Approve parallel kickoff and the Phase 0 output contract | Sprint 113 has no product dependency on Sprint 112. Auto supports detected Estonian/English and falls back to English; legacy Insights retain English provenance; names derive from the linked transcript or recording; writes are exclusive and never overwrite; success offers Open without stealing focus. |
 | 2026-08-24 | Replace the fixed language allowlist with an any-language autocomplete (R6) | Insights language is only an output parameter. Auto stays available, catalog search speeds common choices, and explicit normalized custom input covers any language or dialect without sending raw query text. |
 | 2026-08-24 | Bound Insights extraction to low thinking effort (R7) | The authenticated Latvian run took about 3m44s and spent 15,836 output tokens for a ~2,900-character result. Keep the existing no-tools Claude path, but do not let a deterministic memo extraction use an open-ended coding-agent reasoning budget. |
+| 2026-08-24 | Approve Sprint 113 closure and merge | Authenticated known-language generation, separate snapshot creation, focused tests, repository QA, CI, and independent review pass. Jarmo accepted closing without another paid custom-language call or the remaining release-level spoken/theme/negative-dialog matrix; those unchecked release checklist rows remain truthful and are not claimed as executed. |
 
 ## Implementation Handoff — 2026-08-24
 
@@ -109,7 +110,7 @@ The shipped **Add to document** action sends `workbench:save`, the same path use
 - Extension compile, extension TypeScript, webview TypeScript, and the production webview build pass. The build retains the repository's standard large-chunk warning; extension esbuild retains the pre-existing duplicate `refresh` case warning in `src/ritemarkEditor.ts`.
 - Independent full QA completed after the exact quote-membership P1 fix; repository `./scripts/validate-qa.sh`, extension compile, webview typecheck/build, and focused Sprint 112–113 regressions pass with no remaining automated blocker.
 - The branch includes merged Sprint 112 and current `main@faba032` through merge commit `38f0091`; `extensions/ritemark/media/webview.js` is rebuilt from the combined source before each readiness handoff.
-- Manual authenticated known/custom-language generation, negative save-path cases, screen-reader spoken announcements, and the remaining theme/high-contrast matrix remain intentionally open. The sprint is not Done or merge-ready until that evidence and lifecycle approval are complete.
+- Authenticated known-language generation passed. Custom-language normalization/prompt/persistence is covered by focused tests; Jarmo explicitly approved closure without another paid custom-language call. Negative save-path behavior has automated coverage, while spoken screen-reader, theme/high-contrast, and the broad native negative-dialog matrix remain visible release-checklist work rather than claimed sprint evidence.
 - First draft PR #217 smoke failed DOM/tab order (**Regenerate** before language) and approximately 207% zoom containment (`innerWidth=354`, `scrollWidth=1080`). Minimal DOM reordering and responsive flex containment fixes were implemented with automated regressions; at that checkpoint manual PR retest remained pending and no manual pass was claimed.
 - The first responsive-fix rerun passed DOM/tab order, horizontal containment, column stacking, the wider zoom case, and long-name accessibility, but still failed the exact `354×300` gate because fixed chrome collapsed the Insights rail and focused controls remained clipped; **Regenerate** also showed a native orange outline. A viewport-bounded chrome/pane allocation, two-row narrow grid, bounded rail scroller, and standard 4 px indigo focus ring were then implemented locally with contract coverage; at that checkpoint another manual PR rerun remained pending and no manual pass was claimed.
 - The final Electron rerun passes the exact `354×300` / DPR `4.147200107574463` gate with zero document overflow, 150 px bounded chrome, two `74.9904px` pane rows, independent transcript/Insights scrolling, wholly visible language/**Regenerate**/**Create** focus targets, and the approved 4 px translucent indigo ring without a native orange outline. `654×300` high zoom, `1400×766` desktop, and long-name ellipsis/accessibility checks also pass. Authenticated model calls and the final **Create insights document** mutation were deliberately not performed and remain open.

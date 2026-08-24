@@ -23,13 +23,13 @@
 - [x] Add user filename/location selection with `.md` normalization and new-file-only validation.
 - [x] Reject collisions, primary transcript path, invalid Windows names, and unsafe/path-alias cases.
 - [x] Use exclusive write/cleanup behavior and actionable error messages.
-- [ ] Prove the flow does not call transcript save code or mutate `session.exportPath`.
+- [x] Prove with focused isolation tests that the flow does not call transcript save code or mutate `session.exportPath`.
 
 ## Phase 3: UI and Integration (R3, R4)
 
 - [x] Replace **Add to document** with **Create insights document**.
-- [ ] Verify compact rail layout, Ritemark tokens/primitives, keyboard focus, labels, light/dark/high contrast, narrow width, and 200% zoom.
-- [ ] Verify primary transcript Save/Save again, seek/citations, runtime readiness, regeneration, and cancellation regressions.
+- [x] Verify compact rail layout, tokens/primitives, keyboard focus, labels, exact narrow/high-zoom geometry, and desktop layout; retain the broad light/dark/high-contrast spoken matrix in the release checklist by owner decision.
+- [x] Verify primary transcript isolation, seek/citation contracts, runtime readiness, regeneration, and cancellation through automated plus selected live evidence; retain the broader native matrix in release QA.
 
 ## Phase 4: Speaker Names (R5, added 2026-08-22)
 
@@ -46,15 +46,15 @@
 - [x] Add DOM-order and narrow responsive-containment regressions for the two first-smoke failures.
 - [x] Add viewport-height allocation, bounded rail-scroller, and **Regenerate** focus-ring contracts after the exact `354×300` rerun failure.
 - [x] Re-test draft PR #217 language-selector tab order and the exact `354×300` / approximately 207% responsive geometry after the local fixes.
-- [ ] Run authenticated known/custom-language generation and regeneration.
+- [x] Run authenticated known-language generation/regeneration; accept custom-language focused contract coverage without another paid model call by explicit owner closure decision.
 - [x] Run the final **Create insights document** mutation and inspect the separate Estonian Markdown snapshot without adding it to source control.
-- [ ] Execute every scenario in `scenarios.md` and capture known/custom-language, file-isolation, full-name, and ellipsis evidence.
+- [x] Review the full scenario matrix and capture automated/live known-language, file-isolation, full-name, ellipsis, and performance evidence; defer the residual release-level manual rows explicitly rather than claiming them as executed.
 - [x] Run `./scripts/validate-qa.sh` using the repository QA workflow and complete independent full QA.
 - [x] Update `docs/development/architecture.md` for the new typed messages and language/save contract.
 - [x] Update `docs/user/features/transcribe.md`, `docs/CHANGELOG.md`, v1.10.0 release notes, and test checklist.
 - [x] Update the v1.10.0 release tracker.
-- [ ] Update issue #208 lifecycle state after the manual evidence gate.
-- [ ] Obtain review, commit, push, PR, and merge approval.
+- [x] Update issue #208 and PR #217 with implementation, QA, and measured performance evidence; merge closes the linked issue.
+- [x] Obtain independent review, commit, push, CI, and explicit owner merge approval.
 
 ## Phase 6: Any-Language Combobox (R6, added 2026-08-24)
 
@@ -71,4 +71,4 @@
 - [x] Pin the extraction turn to low thinking effort, remove all built-in tools, and skip coding-agent setting sources without introducing another AI stack or sharing chat context.
 - [x] Re-run focused tests, extension compile, webview build, and QA after the correction.
 - [x] Verify authenticated regeneration after the user approves the model call; record elapsed time without claiming a network-independent SLA (27.2 s and 15.2 s runs versus the 3m43.5s baseline).
-- [ ] Update architecture, user docs, changelog, release notes/checklist, issue #208, and PR #217 for the revised contract.
+- [x] Update architecture, user docs, changelog, release notes/checklist, issue #208, and PR #217 for the revised contract.
