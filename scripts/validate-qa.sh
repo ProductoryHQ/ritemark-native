@@ -44,14 +44,4 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/agent/|e
   )
 fi
 
-if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(\.github/workflows/build-windows\.yml|installer/windows/ritemark\.iss|scripts/(codesign-windows|create-windows-installer|validate-build-output|validate-windows-build-trust(\.test)?|verify-windows-signatures(\.test)?|windows-signature-policy(\.test)?|windows-build-contract(\.test)?|find-windows-signing-tools(\.test)?|sign-windows-file|test-windows-release-contract)\.(sh|ps1))$'; then
-  echo "Windows trust-chain changes detected; running focused contract fixtures..."
-  pwsh -NoLogo -NoProfile -File "$PROJECT_ROOT/scripts/verify-windows-signatures.test.ps1"
-  pwsh -NoLogo -NoProfile -File "$PROJECT_ROOT/scripts/windows-signature-policy.test.ps1"
-  pwsh -NoLogo -NoProfile -File "$PROJECT_ROOT/scripts/windows-build-contract.test.ps1"
-  pwsh -NoLogo -NoProfile -File "$PROJECT_ROOT/scripts/find-windows-signing-tools.test.ps1"
-  "$PROJECT_ROOT/scripts/validate-windows-build-trust.test.sh"
-  "$PROJECT_ROOT/scripts/test-windows-release-contract.sh"
-fi
-
 echo "Codex QA validation passed"

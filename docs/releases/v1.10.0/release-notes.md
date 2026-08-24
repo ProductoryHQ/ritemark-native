@@ -9,7 +9,7 @@ discussion from memory.
 
 ## Trusted Windows installation (pending certification)
 
-The Windows release path now inventories executable content rather than trusting filename extensions, signs Ritemark-owned payloads as **Productory Services OÜ**, and has Inno sign its setup and uninstaller components during compilation. A release build fails before canonical artifact upload if credentials, publisher, timestamp, any PE signature, silent install, installed payload, or uninstall verification fails.
+The Windows release path now inventories executable content rather than trusting filename extensions, signs Ritemark-owned payloads as **Productory Services OÜ**, and has Inno sign its setup and uninstaller components during compilation. The build stops before installer upload if credentials, signatures, standard-user installation, installed payload, or uninstall verification fails.
 
 After Microsoft Store certification, Store becomes the recommended Windows channel. The same verified installer remains on GitHub Release as the secondary direct download with a published SHA-256. This section is release-ready wording only after Partner Center certification and the clean Windows 11 Smart App Control-On matrix pass on the exact shipping hash.
 

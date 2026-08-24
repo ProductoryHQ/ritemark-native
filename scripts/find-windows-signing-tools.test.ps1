@@ -20,8 +20,8 @@ try {
     throw "Expected semantic SDK directory 10.0.26100.0, got $($result.windowsSdkVersion)."
   }
   if ($result.signToolPath -notmatch '10\.0\.26100\.0') { throw 'Selected SignTool path does not match SDK version.' }
-  if ($result.artifactSigningClientPackage -ne 'Microsoft.ArtifactSigning.Client.1.2.3') {
-    throw "Unexpected package evidence: $($result.artifactSigningClientPackage)"
+  if ($result.dlibPath -notmatch 'Microsoft\.ArtifactSigning\.Client\.1\.2\.3') {
+    throw "Selected Artifact Signing dlib path is wrong: $($result.dlibPath)"
   }
 
   Write-Host 'Windows signing-tool selection test passed'

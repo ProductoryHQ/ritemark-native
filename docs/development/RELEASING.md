@@ -32,11 +32,11 @@ This is the traditional process, and it happens roughly monthly (batched, not pe
 
 ### Windows shell-release gate
 
-Windows release candidates are produced only by the manually dispatched `Build Windows (x64)` workflow in `release` mode on the exact version tag. A branch may run `signed-canary` to prove Azure Artifact Signing and Inno integration, but its visibly non-release artifacts cannot be promoted.
+Windows installers are produced by the manually dispatched `Build Windows (x64)` workflow. It always signs and stops if Azure credentials or any signature check is missing.
 
-The release workflow must finish payload PE signing, Inno setup/uninstaller signing, exact publisher/timestamp verification, silent install, installed-tree verification, and uninstall before it uploads canonical artifacts. The expected publisher is `Productory Services OÜ`.
+The workflow must finish payload PE signing, Inno setup/uninstaller signing, publisher/timestamp verification, standard-user silent install, installed-tree/product-registration checks, and uninstall before it uploads the installer. The expected publisher is `Productory Services OÜ`.
 
-For v1.10.0, Partner Center ingests the immutable publisher-controlled URL `https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe`. GitHub Release retains the same bytes as a secondary direct download. Kristiina tests the exact hash on a clean Windows 11 machine with Smart App Control On; Jarmo's Gate 2 approval applies only to that hash. Any rebuild resets Windows evidence and approval.
+For v1.10.0, Partner Center ingests `https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe`. GitHub Release retains the same bytes as a secondary direct download. Kristiina tests that SHA-256 on a clean Windows 11 machine with Smart App Control On; Jarmo approves the same file for Gate 2.
 
 Operator commands and evidence requirements are in [Building and Verifying the Windows Installer](./building-windows-installer.md). Partner Center and clean-machine ownership are in the [Sprint 114 handoff](./releases/v1.10.0/sprint-114-trusted-windows-install/research/partner-center-and-sac-handoff.md).
 

@@ -1,92 +1,62 @@
-# Partner Center, Hosting, and SAC Handoff
+# Partner Center and Smart App Control handoff
 
-**Owners:** Jarmo (account, legal/listing approval, final submit/publish), engineering (candidate and evidence), Kristiina (clean Windows 11 validation)
-**Publisher/signing identity:** `Productory Services OÜ`
-**Status:** Partner Center setup, name reservation, immutable hosting, signed runner proof, and clean-machine evidence remain external gates.
+**Publisher:** `Productory Services OÜ`<br>
+**Owners:** Jarmo — Partner Center and final approval; engineering — signed installer; Kristiina — clean Windows 11 test
 
-## 1. Jarmo — Partner Center Setup and Name Reservation
+## Jarmo: set up the Store listing
 
-1. Enroll or confirm the organization account in Partner Center using the legal identity **Productory Services OÜ**. Complete business verification, payout/tax prompts only when Partner Center requires them, and give no broader account access than necessary.
-2. Confirm the public publisher/display name shown to customers is the approved Productory Services OÜ identity and matches the installer signature.
-3. Choose **New product → EXE or MSI app**, reserve **Ritemark**, and record the product ID plus reservation date. A reservation is time-limited if no submission follows, so track its expiry in the release plan.
-4. Complete availability/discoverability, pricing, category, privacy-policy URL, support URL/contact, age ratings, system requirements, and listing metadata. The listing must describe an x64 Windows desktop app and must not promise Store availability before certification passes.
-5. Prepare the required descriptions, logos, screenshots, license terms, and certification notes. Jarmo approves the customer-facing listing and performs the final submit/publish action.
+1. Sign in to Partner Center with the Productory organization account.
+2. Complete organization verification if Microsoft asks for it.
+3. Choose **New product → EXE or MSI app** and reserve **Ritemark**. If that exact name is unavailable, stop and choose a new name with Jarmo.
+4. Complete the listing: description, category, age rating, privacy-policy URL, support URL, icons, and screenshots.
+5. Add the x64 standalone EXE package:
+   - URL: `https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe`
+   - silent install: `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CURRENTUSER`
+   - publisher: `Productory Services OÜ`
+   - version: `1.10.0`
+6. Submit only after the URL returns the exact `Ritemark-Setup.exe` produced and tested by CI. Compare its SHA-256 with `Ritemark-Setup.sha256.txt`.
+7. Record Microsoft preprocessing or certification errors. If the binary changes, fix, rebuild, retest, publish it at a **new immutable candidate URL**, update Partner Center and the SHA-256, and resubmit. Never replace bytes at a URL that was already submitted.
 
-If the exact `Ritemark` name cannot be reserved, stop and bring the available names to Jarmo. Do not silently rename the product or publisher.
+GitHub Release may carry the same installer as the secondary direct download. It does not need to become the Store ingestion URL.
 
-## 2. Engineering — Immutable Candidate Contract
+## Engineering: prepare the file
 
-The Partner Center URL is publisher-controlled and versioned:
+Before handing the installer to Jarmo:
 
-```text
-https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe
-```
+- the Windows workflow is green;
+- every PE in the payload and installed tree has a valid signature;
+- Ritemark-owned files, installer, and uninstaller show `Productory Services OÜ` and a timestamp;
+- standard-user silent install/uninstall passed;
+- the versioned HTTPS URL downloads successfully;
+- the downloaded Store file and the direct-download file have the same SHA-256.
 
-Requirements before submission:
+The versioned URL is the Partner Center requirement. Once submitted, that URL is immutable. A rebuilt candidate uses a new path such as `/windows/v1.10.0-candidate-2/Ritemark-Setup.exe`; Sprint 114 does not build a new hosting or channel-management system.
 
-- HTTPS succeeds without redirects to a mutable or third-party `latest` object.
-- The object is write-once. If candidate bytes change, publish a new candidate path and update the submission; never overwrite an already submitted object.
-- Record URL, retrieval time, HTTP status, content length/type, ETag if available, SHA-256, workflow run, git ref, and commit.
-- The fetched bytes equal the workflow channel manifest and the secondary GitHub Release `Ritemark-Setup.exe` byte for byte.
-- Upload is allowed only for an exact-tag `release` workflow result that passed payload, installer, installed-tree, uninstaller, and silent-lifecycle verification.
-- Keep GitHub Release as the secondary direct-download/recovery source, not the Store ingestion URL.
+## Kristiina: clean Windows 11 SAC-On test
 
-Store package settings:
+Use a clean Windows 11 machine with current Defender updates. In **Windows Security → App & browser control → Smart App Control**, confirm the state is **On**.
 
-- installer type: standalone/offline EXE;
-- architecture: x64;
-- silent install parameters: `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-`;
-- declared version: exact `branding/product.json` release version;
-- publisher: `Productory Services OÜ`;
-- package URL: the immutable versioned URL above;
-- certification notes: state the silent switches, default install scope/location, launch behavior, and any test account or network prerequisites.
+1. Record the Windows version and installer SHA-256.
+2. In installer **Properties → Digital Signatures**, confirm **Productory Services OÜ** and a valid signature.
+3. Download and run the installer normally. Do not disable SmartScreen, Smart App Control, Defender, or organization policy.
+4. Launch Ritemark and open/edit/save a Markdown file.
+5. Exercise bundled agent/runtime paths available on the machine.
+6. Confirm there is one Ritemark app entry and one Ritemark Start-menu app shortcut.
+7. Uninstall Ritemark and confirm the app directory and Start-menu group are gone.
+8. Check Defender Protection History and **Event Viewer → Applications and Services Logs → Microsoft → Windows → CodeIntegrity → Operational** for Ritemark-related blocks.
 
-Record preprocessing and certification output. If certification changes require new bytes, build a new exact candidate, publish it at a new immutable path, and repeat every hash-bound test.
+Return the installer SHA-256, SAC-state screenshot, install/launch/uninstall result, and any warning or Code Integrity event. Any Ritemark block fails the candidate.
 
-## 3. Kristiina — Clean Windows 11 SAC-On Matrix
+## Final checklist
 
-Use a clean Windows 11 machine that has not run the candidate before. Smart App Control must read **On**, not Evaluation or Off, and Defender security intelligence must be current.
+- [ ] Ritemark is reserved and the listing is complete.
+- [ ] Store URL downloads the tested installer.
+- [ ] Store and direct files share one SHA-256.
+- [ ] Partner Center certification passes.
+- [ ] Kristiina's SAC-On test passes.
+- [ ] Jarmo approves that exact SHA-256 for release.
 
-Before installation, record:
-
-- Windows edition, version, OS build, and update state;
-- Smart App Control state and Defender security-intelligence version;
-- source channel (signed direct canary for runner proof; Store for final certification);
-- installer filename, size, SHA-256, signature status, timestamp, and publisher;
-- `citool.exe -lp`/Code Integrity policy state where available.
-
-Test in this order:
-
-1. Download or install the exact recorded candidate without weakening SmartScreen, SAC, Defender, or organization policy.
-2. Complete silent and ordinary installation, then launch Ritemark.
-3. Open a Markdown document and exercise representative bundled native/runtime paths: start Claude, Codex, and OpenCode setup/session paths as available, plus a native-module-backed feature included in the release matrix.
-4. Exercise update-sensitive behavior required by the v1.10.0 release process without substituting another build.
-5. Uninstall and confirm the generated uninstaller completes normally.
-6. Export **Microsoft-Windows-CodeIntegrity/Operational** events covering the whole test. Record any 3076 (audit) or 3077 (enforcement) event whose path or hash belongs to Ritemark.
-7. Check Defender Protection History. A malware/PUA detection is a Defender false-positive investigation, not a SmartScreen-reputation result.
-
-Return screenshots for SAC state and any visible warning, the Code Integrity export, install/uninstall logs, exact hash/signature output, and a short pass/fail note. Any Ritemark-attributable block, unsigned loaded PE, hash mismatch, or required path not exercised blocks the candidate.
-
-## 4. Two Evidence Stages
-
-1. **Signed canary runner proof:** proves Azure Artifact Signing action + SignTool/dlib + Inno repeated signing + silent lifecycle on the GitHub runner. It is visibly non-release and cannot be submitted or published.
-2. **Exact v1.10.0 candidate:** built from tag `v1.10.0` after Gate 1, uploaded immutably, submitted to Partner Center, certified, and installed from Store. Jarmo/Kristiina approval applies only to its exact SHA-256. Any rebuild resets approval.
-
-## Handoff Checklist
-
-- [ ] Jarmo confirms Partner Center organization enrollment and legal publisher.
-- [ ] `Ritemark` name is reserved; product ID/date/expiry are recorded privately.
-- [ ] Listing, privacy, support, category, age rating, screenshots, and certification notes are approved.
-- [ ] `downloads.ritemark.app` versioned path is provisioned with write-once controls.
-- [ ] Signed-canary runner proof passes and its evidence is reviewed.
-- [ ] GitHub `windows-signing` environment has required reviewers, environment-scoped Azure secrets, and allowed deployment refs limited to the approved canary branch and `vX.Y.Z` tags.
-- [ ] Exact-tag release candidate passes Windows workflow verification.
-- [ ] Hosted URL, GitHub asset, and manifest share one SHA-256.
-- [ ] Partner Center preprocessing and certification pass.
-- [ ] Kristiina's clean Windows 11 SAC-On direct and Store matrices pass.
-- [ ] Jarmo explicitly clears Windows Gate 2 for the exact hash.
-
-## Microsoft References
+## Microsoft references
 
 - [Reserve an app name](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msi/reserve-your-apps-name)
 - [Create an EXE/MSI submission](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msi/create-app-submission)

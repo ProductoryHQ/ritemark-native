@@ -2,19 +2,8 @@ name: Build Windows (x64)
 
 on:
   workflow_dispatch:
-    # This expensive larger-runner workflow stays manual. Canonical release mode
-    # is accepted only when the selected ref is the exact vX.Y.Z tag matching
-    # branding/product.json. Branch runs are always non-release canaries.
-    inputs:
-      build_mode:
-        description: Windows trust mode
-        required: true
-        default: signed-canary
-        type: choice
-        options:
-          - signed-canary
-          - unsigned-canary
-          - release
+    # This paid larger-runner workflow stays manual and always produces a
+    # fully signed installer. Missing credentials or any unsigned PE fails it.
 
 permissions:
   contents: read
@@ -28,10 +17,6 @@ jobs:
   build:
     runs-on: windows-8core
     timeout-minutes: 120
-    # Repository settings must configure this environment with required
-    # reviewers, environment-scoped Azure secrets, and deployment ref rules
-    # allowing this approved canary branch plus vX.Y.Z release tags only.
-    environment: windows-signing
 
     steps:
       - name: Configure Git for Windows
@@ -45,35 +30,23 @@ jobs:
         with:
           path: r
 
-      - name: Validate release or canary contract
-        id: contract
+      - name: Require signing credentials
+        id: release
         shell: pwsh
         working-directory: r
         env:
-          BUILD_MODE: ${{ inputs.build_mode }}
           AZURE_SIGNING_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
           AZURE_SIGNING_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
           AZURE_SIGNING_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content branding/product.json -Raw | ConvertFrom-Json).ritemarkVersion
-          $contract = ./scripts/windows-build-contract.ps1 `
-            -BuildMode $env:BUILD_MODE `
-            -Version $version `
-            -RefType $env:GITHUB_REF_TYPE `
-            -RefName $env:GITHUB_REF_NAME `
-            -TenantId $env:AZURE_SIGNING_TENANT_ID `
-            -ClientId $env:AZURE_SIGNING_CLIENT_ID `
-            -ClientSecret $env:AZURE_SIGNING_CLIENT_SECRET `
-            -RunId $env:GITHUB_RUN_ID | ConvertFrom-Json
-
-          "version=$($contract.version)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          "is_release=$($contract.isRelease.ToString().ToLowerInvariant())" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          "should_sign=$($contract.shouldSign.ToString().ToLowerInvariant())" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          "build_artifact=$($contract.buildArtifact)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          "installer_artifact=$($contract.installerArtifact)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          "installer_base=$($contract.installerBase)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          Write-Host "Windows contract: mode=$env:BUILD_MODE version=$version ref=$($env:GITHUB_REF)"
+          foreach ($name in 'AZURE_SIGNING_TENANT_ID','AZURE_SIGNING_CLIENT_ID','AZURE_SIGNING_CLIENT_SECRET') {
+            if ([string]::IsNullOrWhiteSpace((Get-Item "env:$name").Value)) {
+              throw "Required repository secret $name is missing."
+            }
+          }
+          "version=$version" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -483,26 +456,18 @@ jobs:
           fi
 
       - name: Patch Ritemark.exe icon (branding)
-        # rcedit modifies the PE binary, which invalidates any existing signature.
-        # This MUST run BEFORE the signing step.
         shell: bash
         working-directory: r
         run: |
           RCEDIT="vscode/node_modules/rcedit/bin/rcedit.exe"
-          if [ -f "$RCEDIT" ] && [ -f "branding/icons/icon.ico" ]; then
-            "$RCEDIT" "VSCode-win32-x64/Ritemark.exe" --set-icon "branding/icons/icon.ico"
-            echo "Ritemark.exe icon patched with branding/icons/icon.ico"
-          else
-            if [ "${{ steps.contract.outputs.should_sign }}" = "true" ]; then
-              echo "ERROR: release/signed-canary build cannot skip the final pre-sign icon patch" >&2
-              exit 1
-            fi
-            echo "WARNING: unsigned canary skipped the icon patch"
+          if [ ! -f "$RCEDIT" ] || [ ! -f "branding/icons/icon.ico" ]; then
+            echo "ERROR: rcedit or branding icon is missing; refusing to sign an unbranded binary." >&2
+            exit 1
           fi
+          "$RCEDIT" "VSCode-win32-x64/Ritemark.exe" --set-icon "branding/icons/icon.ico"
 
-      - name: Resolve and record Windows signing toolchain
+      - name: Resolve Windows signing tools
         id: signing-tools
-        if: ${{ steps.contract.outputs.should_sign == 'true' }}
         shell: pwsh
         working-directory: r
         run: |
@@ -519,63 +484,30 @@ jobs:
           $tools = ./scripts/find-windows-signing-tools.ps1 `
             -SdkBinRoot "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
             -ArtifactSigningClientRoot $clientRoot | ConvertFrom-Json
+
           $metadataPath = Join-Path $env:RUNNER_TEMP 'ritemark-artifact-signing-metadata.json'
           [ordered]@{
             Endpoint = 'https://neu.codesigning.azure.net'
             CodeSigningAccountName = 'ritemark-signing'
             CertificateProfileName = 'ritemark-public-trust'
-            CorrelationId = "ritemark-$($env:GITHUB_RUN_ID)-inno"
-            ExcludeCredentials = @(
-              'ManagedIdentityCredential', 'WorkloadIdentityCredential', 'SharedTokenCacheCredential',
-              'VisualStudioCredential', 'VisualStudioCodeCredential', 'AzureCliCredential',
-              'AzurePowerShellCredential', 'AzureDeveloperCliCredential', 'InteractiveBrowserCredential'
-            )
-          } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $metadataPath -Encoding utf8NoBOM
-
-          New-Item -ItemType Directory -Path windows-signing-evidence -Force | Out-Null
-          $signToolInfo = (Get-Item -LiteralPath $tools.signToolPath).VersionInfo
-          [ordered]@{
-            windowsSdkVersion = $tools.windowsSdkVersion
-            signToolPath = $tools.signToolPath
-            signToolFileVersionRaw = $signToolInfo.FileVersion
-            signToolProductVersionRaw = $signToolInfo.ProductVersion
-            artifactSigningAction = 'azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 (v2)'
-            artifactSigningClientPackage = $tools.artifactSigningClientPackage
-            artifactSigningDlibVersion = $tools.dlibFileVersion
-            nugetVersionOutput = @(& nuget.exe help 2>&1 | Select-Object -First 2)
-          } | ConvertTo-Json -Depth 4 | Set-Content windows-signing-evidence/toolchain.json -Encoding utf8NoBOM
+          } | ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding utf8NoBOM
 
           "signtool=$($tools.signToolPath)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
           "dlib=$($tools.dlibPath)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
           "metadata=$metadataPath" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 
-      - name: Prepare content-based PE signing catalog
-        if: ${{ steps.contract.outputs.should_sign == 'true' }}
+      - name: Find unsigned Windows binaries
         shell: pwsh
         working-directory: r
         run: |
-          New-Item -ItemType Directory -Path windows-signing-evidence -Force | Out-Null
           ./scripts/verify-windows-signatures.ps1 `
             -Mode PrepareSigning `
             -Root VSCode-win32-x64 `
             -CatalogPath windows-pe-signing-catalog.txt `
-            -ReportPath windows-signing-evidence/payload-baseline.json `
             -ExpectedPublisher $env:WINDOWS_PUBLISHER `
-            -OwnedPathPattern Ritemark.exe
+            -OwnedPathPattern 'Ritemark.exe'
 
-      - name: Inventory unsigned canary PEs
-        if: ${{ steps.contract.outputs.should_sign != 'true' }}
-        shell: pwsh
-        working-directory: r
-        run: |
-          New-Item -ItemType Directory -Path windows-signing-evidence -Force | Out-Null
-          ./scripts/verify-windows-signatures.ps1 `
-            -Mode Detect `
-            -Root VSCode-win32-x64 `
-            -ReportPath windows-signing-evidence/payload-unsigned-canary.json
-
-      - name: Sign catalogued Windows PEs (Azure Artifact Signing)
-        if: ${{ steps.contract.outputs.should_sign == 'true' }}
+      - name: Sign Windows binaries (Azure Artifact Signing)
         uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
         with:
           azure-tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
@@ -589,31 +521,20 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      - name: Verify complete payload PE trust
-        if: ${{ steps.contract.outputs.should_sign == 'true' }}
+      - name: Verify signed payload
         shell: pwsh
         working-directory: r
         run: |
           ./scripts/verify-windows-signatures.ps1 `
             -Mode Verify `
             -Root VSCode-win32-x64 `
-            -BaselineReportPath windows-signing-evidence/payload-baseline.json `
-            -ReportPath windows-signing-evidence/payload-verification.json `
             -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
-            -RawEvidenceDirectory windows-signing-evidence/payload-signtool-raw `
             -ExpectedPublisher $env:WINDOWS_PUBLISHER `
-            -OwnedPathPattern Ritemark.exe `
-            -RequireTimestamp
+            -OwnedPathPattern 'Ritemark.exe'
 
       - name: Validate build
         shell: bash
         working-directory: r
-        env:
-          RITEMARK_WINDOWS_TRUST_MODE: ${{ inputs.build_mode }}
-          RITEMARK_WINDOWS_SIGNTOOL_PATH: ${{ steps.signing-tools.outputs.signtool }}
-          RITEMARK_WINDOWS_SIGNATURE_REPORT: windows-signing-evidence/payload-post-build-verification.json
-          RITEMARK_WINDOWS_RAW_EVIDENCE_DIR: windows-signing-evidence/payload-post-build-signtool-raw
-          RITEMARK_WINDOWS_SIGNATURE_BASELINE: windows-signing-evidence/payload-baseline.json
         run: |
           BUILD_DIR="VSCode-win32-x64"
           EXT_PATH="$BUILD_DIR/resources/app/extensions/ritemark"
@@ -653,14 +574,6 @@ jobs:
             ERRORS=$((ERRORS + 1))
           fi
 
-          # Sprint 64 Phase D: delegate bundled-agent arch check to
-          # validate-build-output.sh which has Layer 2 fallback for file(1)
-          # output drift on Windows runners (PE32+ + x86-64 tokens + MZ magic
-          # bytes verification). The previous duplicate inline grep -qF
-          # approach was fragile to runner-specific file(1) format reordering
-          # like "PE32+ executable for MS Windows 6.00 (console), x86-64".
-          # See Commit D (7dc66e5) for the fallback logic; this delegation
-          # ensures Windows CI uses it (the inline check did not).
           if ! ./scripts/validate-build-output.sh win32-x64; then
             ERRORS=$((ERRORS + 1))
           fi
@@ -671,15 +584,11 @@ jobs:
           fi
           echo "Validation PASSED"
 
-      - name: Build Windows installer (Inno Setup)
+      - name: Build signed Windows installer (Inno Setup)
         id: installer
         shell: pwsh
         working-directory: r
         env:
-          BUILD_MODE: ${{ inputs.build_mode }}
-          SHOULD_SIGN: ${{ steps.contract.outputs.should_sign }}
-          IS_RELEASE: ${{ steps.contract.outputs.is_release }}
-          INSTALLER_BASE: ${{ steps.contract.outputs.installer_base }}
           SIGNTOOL_PATH: ${{ steps.signing-tools.outputs.signtool }}
           ARTIFACT_SIGNING_DLIB: ${{ steps.signing-tools.outputs.dlib }}
           ARTIFACT_SIGNING_METADATA: ${{ steps.signing-tools.outputs.metadata }}
@@ -689,162 +598,142 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           choco install innosetup -y --no-progress | Out-Null
-          $version = '${{ steps.contract.outputs.version }}'
+          $version = '${{ steps.release.outputs.version }}'
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          $toolchainPath = 'windows-signing-evidence/toolchain.json'
-          if ($env:SHOULD_SIGN -eq 'true') {
-            $toolchain = Get-Content -LiteralPath $toolchainPath -Raw | ConvertFrom-Json
-            $toolchain | Add-Member -NotePropertyName innoSetupFileVersionRaw -NotePropertyValue (Get-Item -LiteralPath $iscc).VersionInfo.FileVersion
-            $toolchain | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $toolchainPath -Encoding utf8NoBOM
-          }
-          $src = (Resolve-Path "VSCode-win32-x64").Path
+          $src = (Resolve-Path 'VSCode-win32-x64').Path
           $wrapper = (Resolve-Path 'scripts/sign-windows-file.ps1').Path
-          $evidenceDirectory = (New-Item -ItemType Directory -Path windows-signing-evidence -Force).FullName
-          $innoEvidence = Join-Path $evidenceDirectory 'inno-signing.jsonl'
-          if (Test-Path -LiteralPath installer-output) { Remove-Item -LiteralPath installer-output -Recurse -Force }
+          $signCommand = "pwsh.exe -NoLogo -NoProfile -File `$q$wrapper`$q -FilePath `$f -SignToolPath `$q$($env:SIGNTOOL_PATH)`$q -DlibPath `$q$($env:ARTIFACT_SIGNING_DLIB)`$q -MetadataPath `$q$($env:ARTIFACT_SIGNING_METADATA)`$q -ExpectedPublisher `$q$($env:WINDOWS_PUBLISHER)`$q"
 
-          $arguments = @("/DAppVersion=$version", "/DSourcePath=$src")
-          if ($env:SHOULD_SIGN -eq 'true') {
-            if (Test-Path -LiteralPath $innoEvidence) { Remove-Item -LiteralPath $innoEvidence -Force }
-            $signCommand = "pwsh.exe -NoLogo -NoProfile -File `$q$wrapper`$q -FilePath `$f -SignToolPath `$q$($env:SIGNTOOL_PATH)`$q -DlibPath `$q$($env:ARTIFACT_SIGNING_DLIB)`$q -MetadataPath `$q$($env:ARTIFACT_SIGNING_METADATA)`$q -EvidenceLogPath `$q$innoEvidence`$q -ExpectedPublisher `$q$($env:WINDOWS_PUBLISHER)`$q"
-            $arguments += '/DSign'
-            $arguments += "/Sazuresign=$signCommand"
+          if (Test-Path -LiteralPath installer-output) {
+            Remove-Item -LiteralPath installer-output -Recurse -Force
           }
-          if ($env:IS_RELEASE -eq 'true') { $arguments += '/DCanonicalRelease' }
-          $arguments += 'installer\windows\ritemark.iss'
-
-          & $iscc @arguments
+          & $iscc "/DAppVersion=$version" "/DSourcePath=$src" '/DSign' "/Sazuresign=$signCommand" 'installer\windows\ritemark.iss'
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE." }
-          $exe = "installer-output\$($env:INSTALLER_BASE).exe"
-          if (-not (Test-Path -LiteralPath $exe)) { throw "Installer missing: $exe" }
-          "installer_path=$($exe.Replace('\', '/'))" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          Write-Host "Installer built: $exe ($([math]::Round((Get-Item $exe).Length/1MB)) MB)"
 
-      - name: Verify signed installer, installed tree, and uninstaller
-        if: ${{ steps.contract.outputs.should_sign == 'true' }}
+          $versionedInstaller = "installer-output\Ritemark-$version-win32-x64-setup.exe"
+          if (-not (Test-Path -LiteralPath $versionedInstaller)) { throw "Installer missing: $versionedInstaller" }
+          $canonicalInstaller = 'installer-output\Ritemark-Setup.exe'
+          Move-Item -LiteralPath $versionedInstaller -Destination $canonicalInstaller
+          "installer_path=$($canonicalInstaller.Replace('\', '/'))" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Verify install and uninstall as a standard user
         shell: pwsh
         working-directory: r
         env:
           INSTALLER_PATH: ${{ steps.installer.outputs.installer_path }}
-          BUILD_MODE: ${{ inputs.build_mode }}
         run: |
           $ErrorActionPreference = 'Stop'
           $installer = (Resolve-Path -LiteralPath $env:INSTALLER_PATH).Path
-          $innoEvidencePath = 'windows-signing-evidence/inno-signing.jsonl'
-          if (-not (Test-Path -LiteralPath $innoEvidencePath)) { throw 'Inno signing evidence is missing.' }
-          $innoEvidence = @(Get-Content -LiteralPath $innoEvidencePath | ForEach-Object { $_ | ConvertFrom-Json })
-          if ($innoEvidence.Count -lt 2) {
-            throw "Expected Inno to sign setup and uninstaller components; recorded $($innoEvidence.Count) target(s)."
-          }
-          foreach ($entry in $innoEvidence) {
-            if ($entry.publisher -ne $env:WINDOWS_PUBLISHER -or $entry.signatureStatus -ne 'Valid' -or
-                -not $entry.signToolTrustVerificationObserved -or -not $entry.authenticodeTimestampCertificateObserved -or
-                $entry.configuredTimestampProtocol -ne 'RFC3161' -or $entry.configuredTimestampDigest -ne 'sha256' -or
-                -not (Test-Path -LiteralPath $entry.rawSignToolVerificationEvidence -PathType Leaf)) {
-              throw "Incomplete or invalid Inno signing evidence for '$($entry.path)'."
-            }
-          }
 
           ./scripts/verify-windows-signatures.ps1 `
             -Mode Verify `
             -Root installer-output `
-            -ReportPath windows-signing-evidence/installer-verification.json `
             -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
-            -RawEvidenceDirectory windows-signing-evidence/installer-signtool-raw `
             -ExpectedPublisher $env:WINDOWS_PUBLISHER `
-            -RequireExpectedPublisherForAll `
-            -RequireTimestamp
+            -OwnedPathPattern '*'
 
-          $installRoot = Join-Path $env:RUNNER_TEMP "ritemark-installed-$($env:GITHUB_RUN_ID)"
-          $installLog = Join-Path $env:RUNNER_TEMP "ritemark-install-$($env:GITHUB_RUN_ID).log"
-          $install = Start-Process -FilePath $installer -ArgumentList @(
-            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',
-            "/DIR=`"$installRoot`"", "/LOG=`"$installLog`""
-          ) -Wait -PassThru
-          if ($install.ExitCode -ne 0) { throw "Silent install failed ($($install.ExitCode)); log: $installLog" }
+          $userName = "ritemark-ci-$($env:GITHUB_RUN_ID)"
+          $plainPassword = "Ritemark!$([guid]::NewGuid().ToString('N'))"
+          $securePassword = ConvertTo-SecureString $plainPassword -AsPlainText -Force
+          $credential = [pscredential]::new("$env:COMPUTERNAME\$userName", $securePassword)
+          New-LocalUser -Name $userName -Password $securePassword -AccountNeverExpires | Out-Null
+          try {
+            $initializeProfile = Start-Process -FilePath 'cmd.exe' -Credential $credential -LoadUserProfile `
+              -ArgumentList '/c','exit 0' -Wait -PassThru
+            if ($initializeProfile.ExitCode -ne 0) { throw 'Could not initialize the standard-user profile.' }
+            $profileRoot = "C:\Users\$userName"
+            $installRoot = Join-Path $profileRoot 'AppData\Local\Programs\Ritemark'
 
-          ./scripts/verify-windows-signatures.ps1 `
-            -Mode Verify `
-            -Root $installRoot `
-            -ReportPath windows-signing-evidence/installed-tree-verification.json `
-            -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
-            -RawEvidenceDirectory windows-signing-evidence/installed-tree-signtool-raw `
-            -ExpectedPublisher $env:WINDOWS_PUBLISHER `
-            -OwnedPathPattern 'Ritemark.exe','unins*.exe' `
-            -RequireTimestamp
+            $hiveName = 'RitemarkCiUser'
+            & reg.exe load "HKU\$hiveName" (Join-Path $profileRoot 'NTUSER.DAT') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Could not load standard-user registry hive before install.' }
+            $uninstallKey = "Registry::HKEY_USERS\$hiveName\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+            $beforeKeys = @(Get-ChildItem $uninstallKey -ErrorAction SilentlyContinue | Select-Object -ExpandProperty PSChildName)
+            & reg.exe unload "HKU\$hiveName" | Out-Null
 
-          $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter 'unins*.exe' -File | Select-Object -First 1
-          if ($null -eq $uninstaller) { throw 'Signed uninstaller was not installed.' }
-          $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList @(
-            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
-          ) -Wait -PassThru
-          if ($uninstall.ExitCode -ne 0) { throw "Silent uninstall failed ($($uninstall.ExitCode))." }
+            $install = Start-Process -FilePath $installer -Credential $credential -LoadUserProfile -ArgumentList @(
+              '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
+              "/DIR=`"$installRoot`""
+            ) -Wait -PassThru
+            if ($install.ExitCode -ne 0) { throw "Standard-user silent install failed ($($install.ExitCode))." }
 
-          $installerInfo = Get-Item -LiteralPath $installer
-          $releaseEligible = '${{ steps.contract.outputs.is_release }}' -eq 'true'
-          [ordered]@{
-            schemaVersion = 1
-            mode = $env:BUILD_MODE
-            releaseEligible = $releaseEligible
-            version = '${{ steps.contract.outputs.version }}'
-            gitRef = $env:GITHUB_REF
-            gitSha = $env:GITHUB_SHA
-            fileName = $installerInfo.Name
-            size = $installerInfo.Length
-            sha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-            publisher = $env:WINDOWS_PUBLISHER
-            immutableStoreUrl = if ($releaseEligible) { "https://downloads.ritemark.app/windows/v${{ steps.contract.outputs.version }}/Ritemark-Setup.exe" } else { $null }
-            directRecoveryAsset = 'Ritemark-Setup.exe'
-          } | ConvertTo-Json | Set-Content -LiteralPath windows-signing-evidence/channel-manifest.json -Encoding utf8NoBOM
+            ./scripts/verify-windows-signatures.ps1 `
+              -Mode Verify `
+              -Root $installRoot `
+              -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
+              -ExpectedPublisher $env:WINDOWS_PUBLISHER `
+              -OwnedPathPattern 'Ritemark.exe','unins*.exe'
 
-      - name: Record unsigned canary manifest
-        if: ${{ steps.contract.outputs.should_sign != 'true' }}
-        shell: pwsh
-        working-directory: r
-        env:
-          INSTALLER_PATH: ${{ steps.installer.outputs.installer_path }}
-        run: |
-          $installer = Get-Item -LiteralPath $env:INSTALLER_PATH
-          [ordered]@{
-            schemaVersion = 1
-            mode = 'unsigned-canary'
-            releaseEligible = $false
-            fileName = $installer.Name
-            size = $installer.Length
-            sha256 = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          } | ConvertTo-Json | Set-Content -LiteralPath windows-signing-evidence/channel-manifest.json -Encoding utf8NoBOM
+            $startMenu = Join-Path $profileRoot 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Ritemark'
+            $appLinks = @(Get-ChildItem -LiteralPath $startMenu -Filter 'Ritemark.lnk' -File -ErrorAction Stop)
+            if ($appLinks.Count -ne 1) { throw "Expected one Ritemark Start menu entry, found $($appLinks.Count)." }
 
-      - name: Upload ZIP artifact
+            & reg.exe load "HKU\$hiveName" (Join-Path $profileRoot 'NTUSER.DAT') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Could not load standard-user registry hive.' }
+            try {
+              $afterEntries = @(Get-ChildItem $uninstallKey -ErrorAction SilentlyContinue)
+              $newEntries = @($afterEntries | Where-Object { $beforeKeys -notcontains $_.PSChildName })
+              if ($newEntries.Count -ne 1) {
+                throw "Installer created $($newEntries.Count) app registrations; expected exactly one and no bundleware."
+              }
+              $registration = Get-ItemProperty $newEntries[0].PSPath
+              $registrationKeyName = $newEntries[0].PSChildName
+              if ($registration.DisplayName -ne 'Ritemark') { throw 'The new app registration is not Ritemark.' }
+              if ($registration.Publisher -ne $env:WINDOWS_PUBLISHER -or
+                  $registration.DisplayVersion -ne '${{ steps.release.outputs.version }}') {
+                throw 'Installed ProductName, Publisher, or Version is incorrect.'
+              }
+            } finally {
+              [gc]::Collect()
+              & reg.exe unload "HKU\$hiveName" | Out-Null
+            }
+
+            $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter 'unins*.exe' -File | Select-Object -First 1
+            if ($null -eq $uninstaller) { throw 'Signed uninstaller was not installed.' }
+            $uninstall = Start-Process -FilePath $uninstaller.FullName -Credential $credential -LoadUserProfile -ArgumentList @(
+              '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+            ) -Wait -PassThru
+            if ($uninstall.ExitCode -ne 0) { throw "Standard-user silent uninstall failed ($($uninstall.ExitCode))." }
+            if (Test-Path -LiteralPath $installRoot) { throw 'Uninstall left the Ritemark install directory behind.' }
+            if (Test-Path -LiteralPath $startMenu) { throw 'Uninstall left the Ritemark Start menu group behind.' }
+
+            & reg.exe load "HKU\$hiveName" (Join-Path $profileRoot 'NTUSER.DAT') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Could not load standard-user registry hive after uninstall.' }
+            try {
+              if (Test-Path -LiteralPath "$uninstallKey\$registrationKeyName") {
+                throw 'Uninstall left the Ritemark app registration behind.'
+              }
+              $remainingRitemark = @(Get-ChildItem $uninstallKey -ErrorAction SilentlyContinue |
+                Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName -eq 'Ritemark' })
+              if ($remainingRitemark.Count -ne 0) { throw 'Uninstall left a Ritemark app registration behind.' }
+            } finally {
+              [gc]::Collect()
+              & reg.exe unload "HKU\$hiveName" | Out-Null
+            }
+          } finally {
+            Remove-LocalUser -Name $userName -ErrorAction SilentlyContinue
+          }
+
+          $sha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          @(
+            "installer=$([System.IO.Path]::GetFileName($installer))"
+            "sha256=$sha256"
+            "store_url=https://downloads.ritemark.app/windows/v${{ steps.release.outputs.version }}/Ritemark-Setup.exe"
+            'Partner Center must receive this same file and SHA-256.'
+          ) | Set-Content -LiteralPath installer-output/Ritemark-Setup.sha256.txt -Encoding utf8NoBOM
+
+      - name: Upload signed Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.contract.outputs.build_artifact }}
-          path: r/VSCode-win32-x64/
-          retention-days: 30
-
-      - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.contract.outputs.installer_artifact }}
+          name: ritemark-windows-installer
           path: |
             r/${{ steps.installer.outputs.installer_path }}
-            r/windows-signing-evidence/
+            r/installer-output/Ritemark-Setup.sha256.txt
           retention-days: 30
-
 
       - name: Build summary
         shell: bash
         working-directory: r
         run: |
-          echo "========================================"
-          echo "Windows Build Complete"
-          echo "========================================"
-          echo ""
-          echo "Build contents:"
-          ls -lh VSCode-win32-x64/ | head -10
-          echo ""
-          echo "Extension:"
-          ls -lh VSCode-win32-x64/resources/app/extensions/ritemark/ | head -10
-          echo ""
-          echo "Mode: ${{ inputs.build_mode }}"
-          echo "Build artifact: ${{ steps.contract.outputs.build_artifact }}"
-          echo "Installer artifact: ${{ steps.contract.outputs.installer_artifact }}"
+          echo "Windows build, Productory signing, standard-user install/uninstall, and SHA-256 checks passed."
+          ls -lh "${{ steps.installer.outputs.installer_path }}" installer-output/Ritemark-Setup.sha256.txt
