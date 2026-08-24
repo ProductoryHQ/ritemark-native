@@ -5,7 +5,13 @@ conversation system you can trust. Your chats belong to the project, survive a
 restart, and can continue with another agent without making you reconstruct the
 discussion from memory.
 
-<!-- Draft through Sprint 112. -->
+<!-- Draft through Sprint 114. Remove the Windows section unless its exact-hash Store + SAC gates pass. -->
+
+## Trusted Windows installation (pending certification)
+
+The Windows release path now inventories executable content rather than trusting filename extensions, signs Ritemark-owned payloads as **Productory Services OÜ**, and has Inno sign its setup and uninstaller components during compilation. The build stops before installer upload if credentials, signatures, standard-user installation, installed payload, or uninstall verification fails.
+
+After Microsoft Store certification, Store becomes the recommended Windows channel. The same verified installer remains on GitHub Release as the secondary direct download with a published SHA-256. This section is release-ready wording only after Partner Center certification and the clean Windows 11 Smart App Control-On matrix pass on the exact shipping hash.
 
 ## Conversations you can return to
 

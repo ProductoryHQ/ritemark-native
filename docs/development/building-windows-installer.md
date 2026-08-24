@@ -1,125 +1,57 @@
-# Building Windows Installer Locally
+# Building and verifying the Windows installer
 
-This guide explains how to build the Ritemark Windows installer (.exe) on a Windows machine.
+Distributed Windows installers are built by the manual **Build Windows (x64)** GitHub workflow. It has one path: build, sign, verify, install, uninstall, then upload.
 
-GitHub Actions builds the ZIP artifact automatically. The installer is built locally to avoid CI complexity with Inno Setup.
+## Run the workflow
 
-## Prerequisites
-
-### 1. Install Inno Setup 6
-
-Download and install from: https://jrsoftware.org/isdl.php
-
-Choose "Inno Setup 6" (not 5.x). Default installation path is fine:
-```
-C:\Program Files (x86)\Inno Setup 6\
+```bash
+gh workflow run build-windows.yml --ref <branch-or-tag>
 ```
 
-### 2. Download the Build Artifact
+The paid workflow always signs. It stops before artifact upload if any required repository secret is missing:
 
-1. Go to: https://github.com/jarmo-productory/ritemark-native/actions
-2. Click on the latest successful "Build Windows (x64)" run
-3. Download the `ritemark-windows-x64` artifact (ZIP file)
-4. Extract to a folder, e.g., `C:\Ritemark-Build\`
+- `AZURE_SIGNING_TENANT_ID`
+- `AZURE_SIGNING_CLIENT_ID`
+- `AZURE_SIGNING_CLIENT_SECRET`
 
-Your folder structure should look like:
-```
-C:\Ritemark-Build\
-└── VSCode-win32-x64\
-    ├── Code.exe
-    ├── resources\
-    │   └── app\
-    │       └── extensions\
-    │           └── ritemark\
-    └── ...
-```
+There is no unsigned release mode.
 
-## Building the Installer
+## What CI checks
 
-### Option A: Using the GUI
+1. Builds and brands the Windows payload.
+2. Finds every PE by its file header, including `.exe`, `.dll`, `.node`, and extensionless executables.
+3. Keeps valid vendor signatures and signs Ritemark-owned or unsigned PEs through Azure Artifact Signing.
+4. Verifies Authenticode plus `signtool verify /pa /all`. Productory-signed files must show `Productory Services OÜ` and a timestamp.
+5. Compiles Inno with `/DSign`. Its SignTool adapter signs the setup loader, outer installer, and generated uninstaller.
+6. Installs silently as a newly created standard Windows user.
+7. Verifies the installed tree, one Ritemark Start-menu app shortcut, one new Ritemark app registration with the right publisher/version, and no additional app registration.
+8. Silently uninstalls and confirms the install directory and Start-menu group are removed.
+9. Uploads the installer and one SHA-256 file.
 
-1. Open Inno Setup Compiler (search "Inno Setup" in Start menu)
-2. File → Open → navigate to your `ritemark-native` repo
-3. Open `installer\windows\ritemark.iss`
-4. **Important**: Edit line 60 to point to your extracted build:
-   ```
-   Source: "C:\Ritemark-Build\VSCode-win32-x64\*"; ...
-   ```
-5. Press F9 or click Compile
-6. Installer will be created in `installer-output\` folder
-
-### Option B: Using Command Line
-
-Open PowerShell or Command Prompt:
+## Verify a Windows tree manually
 
 ```powershell
-# Navigate to your ritemark-native repo
-cd C:\path\to\ritemark-native
-
-# Create output directory
-mkdir installer-output -Force
-
-# Run Inno Setup compiler
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-    /DSourcePath="C:\Ritemark-Build\VSCode-win32-x64" `
-    installer\windows\ritemark.iss
+./scripts/verify-windows-signatures.ps1 `
+  -Mode Verify `
+  -Root installer-output `
+  -SignToolPath 'C:\path\to\signtool.exe' `
+  -OwnedPathPattern '*'
 ```
 
-Or with CMD:
-```cmd
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ^
-    /DSourcePath="C:\Ritemark-Build\VSCode-win32-x64" ^
-    installer\windows\ritemark.iss
+The command fails on an unsigned or invalid PE, a Productory-owned file with the wrong publisher, a missing Productory timestamp, or a failed Windows trust-policy verification.
+
+## Local Docker installer
+
+`scripts/create-windows-installer.sh` remains a local packaging diagnostic. Docker/Wine cannot use the Azure signing setup, so its output is not suitable for distribution. Use the Windows workflow for every installer given to users or Partner Center.
+
+## Store and direct download
+
+Partner Center should fetch:
+
+```text
+https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe
 ```
 
-## Output
+Before submission, download that URL and compare its SHA-256 with the workflow's `Ritemark-Setup.sha256.txt`. The GitHub Release direct-download file must be the same installer with the same hash. No separate channel infrastructure is required.
 
-The installer will be created at:
-```
-installer-output\Ritemark-{version}-win32-x64-setup.exe
-```
-
-Example: `Ritemark-1.96.0-win32-x64-setup.exe`
-
-## Modifying the Installer Script
-
-If you need to pass the source path as a parameter, modify `ritemark.iss`:
-
-```iss
-; At the top, add:
-#ifndef SourcePath
-  #define SourcePath "..\..\VSCode-win32-x64"
-#endif
-
-; Then in [Files] section, change:
-Source: "{#SourcePath}\*"; DestDir: "{app}"; ...
-```
-
-This allows passing `/DSourcePath=...` from command line.
-
-## Troubleshooting
-
-### "File not found" errors
-- Ensure the ZIP was fully extracted
-- Check the Source path in ritemark.iss matches your folder
-
-### Long path errors
-- The installer script excludes deeply nested node_modules paths
-- If you still get errors, enable Windows long paths:
-  ```powershell
-  # Run as Administrator
-  New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
-      -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
-  ```
-
-### Version mismatch
-- Edit `#define AppVersion` in ritemark.iss to match your release version
-
-## Quick Reference
-
-| Task | Command |
-|------|---------|
-| Compile installer | `ISCC.exe installer\windows\ritemark.iss` |
-| Specify source | `/DSourcePath="C:\path\to\build"` |
-| Quiet mode | `/Qp` (shows progress only) |
-| Output directory | Already set to `installer-output\` in script |
+See the [Partner Center and SAC handoff](./releases/v1.10.0/sprint-114-trusted-windows-install/research/partner-center-and-sac-handoff.md).
