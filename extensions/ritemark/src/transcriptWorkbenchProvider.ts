@@ -25,7 +25,11 @@ import { trackEvent } from './analytics/posthog';
 import { saveTranscriptTo } from './speech/autoExport';
 import { generateInsights, insightsWorkspacePath } from './speech/insights';
 import { getSetupStatus } from './agent/setup';
-import { resolveInsightsLanguage, type InsightsLanguageSelection } from './speech/insightsLanguage';
+import {
+  coerceInsightsLanguageMetadata,
+  resolveInsightsLanguage,
+  type InsightsLanguageSelection,
+} from './speech/insightsLanguage';
 import {
   InsightsTargetError,
   insightsToMarkdown,
@@ -407,12 +411,22 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
       .list()
       .find((candidate) => candidate.audioPath === fsPath && isActive(candidate));
 
+    const projectedSession = session?.insights
+      ? {
+          ...session,
+          insights: {
+            ...session.insights,
+            language: coerceInsightsLanguageMetadata(session.insights.language),
+          },
+        }
+      : session;
+
     void panel.webview.postMessage({
       type: 'workbench:state',
       data: {
         audioUri: panel.webview.asWebviewUri(vscode.Uri.file(fsPath)).toString(),
         audioName: path.basename(fsPath),
-        session,
+        session: projectedSession,
         job: job ?? null,
         engines,
         savedDocument:

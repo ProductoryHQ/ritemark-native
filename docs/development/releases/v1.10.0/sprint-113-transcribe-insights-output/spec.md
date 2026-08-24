@@ -72,6 +72,32 @@ Acceptance criteria:
 - The full untruncated name remains available through a native tooltip and accessible name; rename input/popover content exposes the full editable value.
 - Full names, including spaces and non-ASCII letters, persist across reload and pass unchanged into transcript Markdown and Insights prompt speaker attribution.
 
+### R6: Search or enter any Insights language (added 2026-08-24; revises R1)
+
+As a user, I want to search for or enter the language my audience needs, so Insights are not limited to a small product-defined list.
+
+This requirement supersedes R1's fixed allowlisted-code restriction while preserving its separation from transcription language and its explicit Auto behavior.
+
+Acceptance criteria:
+- The fixed dropdown becomes one accessible editable combobox. `Auto` remains available and is the initial default.
+- Search matches a broad local language catalog by English name, native name, common alias, and ISO/BCP-47 code without case or diacritic sensitivity.
+- A user may explicitly choose a normalized custom language or dialect when the catalog has no exact result; the suggestion catalog is not an eligibility gate.
+- A custom value is committed only through the explicit **Use “…”** option or Enter. Escape and Tab discard an uncommitted query and preserve the prior selection.
+- Custom values are Unicode-normalized, whitespace-normalized, limited to 60 characters, and reject empty values, line breaks, control characters, or strings without a letter.
+- The typed wire contract distinguishes Auto, catalog languages, and custom language names. Raw search text is never sent to the host.
+- The prompt receives the committed canonical language as a quoted data value and explicitly treats it only as an output-language parameter, never as an instruction.
+- Keyboard behavior follows the ARIA editable-combobox pattern: DOM focus stays in the input; Arrow/Home/End navigate options; Enter commits; Escape closes; active options use `aria-activedescendant`.
+- The popup stays inside the viewport, works at the existing `354×300` high-zoom gate, uses no flags, and preserves the Ritemark 1 px input border plus 4 px indigo focus ring.
+
+### R7: Keep one-shot Insights generation practical (added 2026-08-24)
+
+As a user, I want Insights to complete like a focused AI extraction rather than a long-running coding task, so a meeting memo does not take several minutes without a product reason.
+
+- Insights keeps the existing authenticated Claude runtime, explicitly removes all built-in tools, and does not load user/project/local coding-agent settings.
+- The extraction requests low thinking effort explicitly; provider-controlled adaptive effort must not spend a coding-agent-scale reasoning budget on deterministic transcript summarization.
+- This correction adds no provider, API-key path, shared chat context, background queue, or runtime adapter.
+- Cancellation, parsing, citation validation, persistence, and the last-successful-result behavior remain unchanged.
+
 ## Non-Requirements
 
 - Re-transcribing or translating the raw transcript.
@@ -88,7 +114,8 @@ Acceptance criteria:
 - Verbatim quotes preserve source language even when surrounding prose uses another language.
 - The Architecture Gate applies because new typed webview↔host messages cross the Transcribe subsystem boundary.
 - Speaker names are stored as display labels, not identifiers; internal spaces are valid and every constrained display surface uses an ellipsis while preserving the full accessible value.
+- The 2026-08-24 scope correction makes the language catalog an autocomplete aid rather than an allowlist. Explicitly committed custom language names are valid prompt parameters after host-side normalization.
 
 ## Open Questions
 
-- Phase 0 must approve the language catalog, Auto fallback, and whether the save dialog initially suggests `<recording>-insights.md` or `<transcript>-insights.md`.
+- Whether the save dialog initially suggests `<recording>-insights.md` or `<transcript>-insights.md` remains governed by the approved file contract.

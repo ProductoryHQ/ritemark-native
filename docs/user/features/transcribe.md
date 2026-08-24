@@ -13,7 +13,7 @@ Turn a meeting, interview or workshop recording into a speaker-attributed transc
 - **Click any line to hear it** — verify a quote against the recording before you use it
 - **Name the speakers once** — full names and spaces are preserved everywhere; long labels stay neatly ellipsized
 - **See where the engine was unsure** — likely-misheard words are highlighted
-- **Pull out the summary, decisions, action items and quotes in Estonian or English** — each with a timestamp that plays the moment it came from
+- **Pull out the summary, decisions, action items and quotes in any language** — each with a timestamp that plays the moment it came from
 - **Create a separate Insights document** — choose its name and location without changing the transcript
 - **Save it as a document** — in a folder you pick, opened in Ritemark's editor
 
@@ -54,10 +54,11 @@ Amber, dotted-underlined words are ones the engine was not confident about — u
 
 ### 4. Insights
 
-Choose **Auto**, **Estonian**, or **English**, then **Generate insights**. Auto
-uses a detected Estonian or English transcript language and otherwise falls
-back to English. The choice affects Insights only; it never translates the raw
-transcript.
+Search for a language by its English name, native name, common alias, or code —
+or type any language or dialect and choose **Use …** — then select **Generate
+insights**. **Auto** follows the detected transcript language when Ritemark
+recognizes it and otherwise falls back to English. The choice affects Insights
+only; it never translates the raw transcript.
 
 Insights pull out:
 
@@ -69,7 +70,7 @@ Insights pull out:
 
 Every item carries a timestamp. Click it and the recording plays from there — so you can check any claim in a couple of seconds. Anything the model cannot tie to a real line in the transcript is discarded rather than shown to you. Generated prose uses the chosen language; quotes, speaker names, and timestamps stay verbatim.
 
-Insights use whichever AI runtime you already have set up. On a non-diarized transcript nothing is attributed to a named person, because the transcript does not know who spoke.
+Insights use whichever AI runtime you already have set up, but run as a focused extraction without coding tools or project instructions. On a non-diarized transcript nothing is attributed to a named person, because the transcript does not know who spoke.
 
 After generation, **Create insights document** asks for a filename and location.
 It creates a new Insights-only Markdown snapshot with provenance, timestamps,

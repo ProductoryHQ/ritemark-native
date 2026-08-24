@@ -14,7 +14,7 @@
 - [x] Add the accessible language selector to `InsightsRail.tsx` and state wiring to `Workbench.tsx`.
 - [x] Carry a validated language through `workbench:generateInsights` and `GenerateInsightsOptions`.
 - [x] Require resolved output language in `buildInsightsPrompt` while preserving verbatim quotes.
-- [ ] Add prompt, invalid-value, Auto, persistence, cancellation/failure, and legacy-session tests.
+- [x] Add prompt, invalid-value, Auto, persistence, cancellation/failure, and legacy-session tests.
 
 ## Phase 2: Separate Insights Document (R3)
 
@@ -37,7 +37,7 @@
 - [x] Normalize speaker labels without removing internal spaces or Unicode characters; reject empty results.
 - [x] Add one-line ellipsis and bounded width to transcript-gutter and speaker-chip labels.
 - [x] Preserve the full name in tooltips, accessible naming, rename input, stored session, transcript Markdown, and Insights prompt.
-- [ ] Add keyboard, normalization, persistence, export/prompt, narrow-width, and 200%-zoom regression coverage.
+- [x] Add keyboard, normalization, persistence, export/prompt, narrow-width, and 200%-zoom regression coverage.
 
 ## Phase 5: QA and Closeout
 
@@ -46,11 +46,29 @@
 - [x] Add DOM-order and narrow responsive-containment regressions for the two first-smoke failures.
 - [x] Add viewport-height allocation, bounded rail-scroller, and **Regenerate** focus-ring contracts after the exact `354×300` rerun failure.
 - [x] Re-test draft PR #217 language-selector tab order and the exact `354×300` / approximately 207% responsive geometry after the local fixes.
-- [ ] Run authenticated model generation/regeneration and the final **Create insights document** mutation; these were intentionally excluded from the read-only final responsive rerun.
-- [ ] Execute every scenario in `scenarios.md` and capture Estonian/English, file-isolation, full-name, and ellipsis evidence.
+- [ ] Run authenticated known/custom-language generation and regeneration.
+- [x] Run the final **Create insights document** mutation and inspect the separate Estonian Markdown snapshot without adding it to source control.
+- [ ] Execute every scenario in `scenarios.md` and capture known/custom-language, file-isolation, full-name, and ellipsis evidence.
 - [x] Run `./scripts/validate-qa.sh` using the repository QA workflow and complete independent full QA.
 - [x] Update `docs/development/architecture.md` for the new typed messages and language/save contract.
 - [x] Update `docs/user/features/transcribe.md`, `docs/CHANGELOG.md`, v1.10.0 release notes, and test checklist.
 - [x] Update the v1.10.0 release tracker.
 - [ ] Update issue #208 lifecycle state after the manual evidence gate.
 - [ ] Obtain review, commit, push, PR, and merge approval.
+
+## Phase 6: Any-Language Combobox (R6, added 2026-08-24)
+
+- [x] Replace the three-language allowlist with a legacy-compatible Auto/known/custom typed contract.
+- [x] Add local catalog/native-name/code search and safe custom-language normalization without a new dependency.
+- [x] Replace the fixed Select with an accessible editable Popover combobox and explicit commit/cancel behavior.
+- [x] Keep raw query text out of the wire contract and pass only committed normalized language data to the prompt.
+- [x] Add R6 unit/component/protocol/prompt/persistence/high-zoom tests and regenerate `media/webview.js`.
+- [x] Re-run focused tests, `./scripts/validate-qa.sh`, and the live RunDev language-selection matrix.
+
+## Phase 7: Insights latency correction (R7, added 2026-08-24)
+
+- [x] Capture authenticated evidence for the multi-minute Latvian generation and separate prompt/result size from model reasoning usage.
+- [x] Pin the extraction turn to low thinking effort, remove all built-in tools, and skip coding-agent setting sources without introducing another AI stack or sharing chat context.
+- [x] Re-run focused tests, extension compile, webview build, and QA after the correction.
+- [x] Verify authenticated regeneration after the user approves the model call; record elapsed time without claiming a network-independent SLA (27.2 s and 15.2 s runs versus the 3m43.5s baseline).
+- [ ] Update architecture, user docs, changelog, release notes/checklist, issue #208, and PR #217 for the revised contract.

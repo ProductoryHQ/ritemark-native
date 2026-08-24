@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Transcribe Insights in Estonian or English** — Auto follows a detected Estonian/English transcript and otherwise falls back to English, while quotes and speaker attribution remain verbatim.
+- **Transcribe Insights in any language** — search common languages or enter any language or dialect; Auto follows a recognized transcript language and otherwise falls back to English, while quotes and speaker attribution remain verbatim.
+- **Faster focused Insights generation** — transcript extraction no longer inherits coding-agent tools, project instructions, or an extra-high reasoning budget.
 - **Separate Insights documents** — name and create a new Insights-only Markdown snapshot with provenance and timestamps; existing files and the primary transcript are never overwritten or relinked.
 - **Durable Agent Conversations** — project-safe, crash-safe host storage with first-prompt-before-dispatch ordering, typed host/webview protocol, legacy migration, corrupt-record isolation, confirmed Delete and Undo.
 - **Conversations UI** — a permanent 56px rail with calm shared chat-bubble icons, optional Pin/Unpin, automatic working/needs-you/recent shortcuts, and one host-backed Conversations list that stays open beside the rail. Selecting a conversation changes only Current state and does not reorder Recents.

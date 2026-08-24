@@ -38,6 +38,50 @@ When the workbench opens
 Then it loads without migration failure
 And the selector uses the documented Auto fallback
 
+## Feature: Any-language autocomplete (R6)
+
+### Scenario: Search by English or native language name
+Given the prior selection is Auto
+When the user enters `eesti` or `Estonian` in the Insights language combobox
+Then Estonian is offered as the same canonical language
+And choosing it commits Estonian for the next generation
+
+### Scenario: Search by language code
+Given the language combobox is open
+When the user enters `cy`
+Then Welsh is offered with its canonical code and native label
+And selecting it sends the canonical catalog value rather than the query text
+
+### Scenario: Use a custom language or dialect
+Given no catalog result exactly matches `Sicilian Arabic`
+When the user chooses **Use “Sicilian Arabic”**
+Then that normalized custom value becomes the committed selection
+And the generation prompt treats it only as the output-language data value
+
+### Scenario: Cancel a partial search
+Given Estonian is the committed selection
+When the user types `Wel` but presses Escape or tabs away without committing
+Then the combobox closes
+And Estonian remains the committed selection
+
+### Scenario: Reject unsafe custom input
+Given the language query contains a line break, control character, more than 60 characters, or no letter
+When the results are shown
+Then no custom-language option is offered
+And the user is told to enter a language name such as `Welsh`
+
+### Scenario: Keyboard and screen-reader navigation
+Given the language combobox has matching results
+When the user navigates with Arrow, Home, End, Enter, and Escape
+Then DOM focus remains in the input
+And the active option, result count, expanded state, and committed value are exposed through standard combobox semantics
+
+### Scenario: High zoom language search stays usable
+Given the workbench viewport is `354×300` at approximately 207% zoom
+When the user opens and searches the language combobox
+Then the input and active option remain visible without document-level horizontal scrolling
+And the popup repositions or constrains its height inside the viewport
+
 ## Feature: Separate Insights Document (R3)
 
 ### Scenario: Create a named Insights file
@@ -142,6 +186,14 @@ Given the speaker is named `Jarmo Tuisk`
 When the transcript Markdown and Insights prompt are generated
 Then both use `Jarmo Tuisk` without joining, splitting, or truncating the stored name
 
+### Scenario: Insights does not use an open-ended coding reasoning budget
+
+Given a completed transcript is sent to the existing tool-free Insights runtime
+When Insights generation starts
+Then the runtime turn explicitly requests low thinking effort
+And cancellation, language, citation, and persistence contracts stay unchanged
+And no AI chat conversation is reused or polluted
+
 ## Manual Evidence Log
 
 ### 2026-08-24 — first draft PR #217 smoke
@@ -150,6 +202,13 @@ Then both use `Jarmo Tuisk` without joining, splitting, or truncating the stored
 - **Failed:** at approximately 207% zoom (`innerWidth=354`), the workbench reported `scrollWidth=1080` and clipped the transcript/editor surface.
 - **Fix implemented locally; PR retest pending at this checkpoint:** the selector now precedes **Regenerate** in DOM order. At narrow widths the transcript and Insights panes stack vertically, flex children opt into shrinking with `min-width: 0`, controls wrap where needed, and long labels retain ellipsis plus their full accessible names. No whole-document horizontal scrolling or overflow-hiding workaround was added.
 - Automated DOM-order and responsive-containment contracts passed, but this was not yet manual pass evidence. Keyboard order, approximately 207% zoom geometry, rail usability, and long-name accessibility still required a draft-PR rerun at this checkpoint.
+
+### 2026-08-24 — authenticated R7 timing rerun
+
+- **Baseline:** Latvian generation took 3m43.5s, with ~82k input/cache tokens and 15,836 output tokens.
+- **Passed after the focused runtime policy:** two authenticated regenerations completed in 27.2s and 15.2s.
+- **Passed:** the final 15.2s run persisted German as both selected and resolved language and produced German Insights; Jarmo confirmed the running UI was substantially faster.
+- The observed 14.7× improvement is regression evidence, not a provider/network SLA.
 
 ### 2026-08-24 — first draft PR #217 responsive-fix rerun
 
@@ -164,4 +223,4 @@ Then both use `Jarmo Tuisk` without joining, splitting, or truncating the stored
 - **Passed:** chrome was 150 px high with its own bounded scroller; the remaining 150 px pane grid resolved to two `74.9904px` rows. Transcript and Insights scrolled independently, with the Insights rail at 74 px and its inner scroller at 37 px for 727 px of content.
 - **Passed:** language, keyboard-reached **Regenerate**, and **Create insights document** were wholly visible after their bounded pane scrolling. **Regenerate** computed the approved `rgba(67, 56, 202, 0.1) 0 0 0 4px` indigo focus ring with a transparent outline and no native orange outline.
 - **Passed:** `654×300` at the same DPR retained the bounded two-row layout; `1400×766` at 100% retained side-by-side panes with a 288 px Insights rail. Long document and speaker names stayed ellipsized while their complete path/name remained in title and ARIA metadata.
-- **Unverified:** no authenticated model generation/regeneration was invoked, and the final read-only rerun focused but did not click **Create insights document**. Those model-quality and file-mutation scenarios remain open; earlier save-fixture coverage was not repeated.
+- **R6 follow-up:** the later live session successfully created a separate Estonian Insights Markdown snapshot and retained the workbench's primary **Save to document** action. Authenticated known/custom-language generation and the negative save-path matrix remain open.

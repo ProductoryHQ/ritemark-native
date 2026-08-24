@@ -8,7 +8,7 @@ const railSource = readFileSync(
   'utf-8',
 );
 
-const languageControl = railSource.indexOf('<Select\n');
+const languageControl = railSource.indexOf('<InsightsLanguageCombobox\n');
 const regenerate = railSource.indexOf('Regenerate');
 assert.ok(languageControl >= 0, 'the language selector is rendered');
 assert.ok(regenerate > languageControl, 'the language selector precedes Regenerate in DOM/tab order');

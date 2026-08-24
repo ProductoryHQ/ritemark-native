@@ -34,7 +34,10 @@ function session(overrides: Partial<TranscriptSession> = {}): TranscriptSession 
 const insights: TranscriptInsights = {
   generatedAt: '2026-08-24T10:00:00.000Z',
   model: 'claude-sonnet-5',
-  language: { selected: 'auto', resolved: 'et' },
+  language: {
+    selected: { kind: 'auto' },
+    resolved: { kind: 'known', code: 'et' },
+  },
   summary: 'Kohtumine käsitles aruandlust.',
   items: [
     { kind: 'decision', text: 'Raport valmib esmaspäeval.', at: 12 },

@@ -88,10 +88,11 @@ isolation were rerun against this exact snapshot.
 
 ## Transcribe Insights you can deliver
 
-Choose Auto, Estonian, or English before generating Transcribe Insights. Auto
-uses a detected Estonian or English transcript language and otherwise falls
-back to English. Summaries and action items use the chosen language while key
-quotes, names, and timestamps remain faithful to the recording.
+Search common languages or enter any language or dialect before generating
+Transcribe Insights. Auto follows a recognized transcript language and otherwise
+falls back to English. Summaries and action items use the chosen language. The
+focused extraction avoids loading coding-agent tools and project instructions;
+key quotes, names, and timestamps remain faithful to the recording.
 
 **Create insights document** now makes a separately named Markdown snapshot.
 It never overwrites an existing file, replaces the primary transcript, changes

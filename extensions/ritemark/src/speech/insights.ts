@@ -59,7 +59,13 @@ export async function generateInsights(options: GenerateInsightsOptions): Promis
     // like an instruction could get Bash/Write/Edit executed without an
     // approval ever being shown. This task needs no tools at all: the
     // transcript is in the prompt and the answer is text.
+    availableTools: [],
     allowedTools: [],
+    // This prompt is self-contained. Loading CLAUDE.md, plugins, project
+    // agents, and personal coding-agent effort defaults only adds unrelated
+    // context and made a real 48-minute transcript run consume ~82k input
+    // context tokens before producing its memo.
+    settingSources: [],
     approvalMode: 'auto',
     onProgress: () => undefined,
     onApprovalRequest: () => undefined,
@@ -81,6 +87,10 @@ export async function generateInsights(options: GenerateInsightsOptions): Promis
     await session.prompt({
       prompt: buildInsightsPrompt(options.session, options.language.resolved),
       timeoutMinutes: 5,
+      // This is deterministic extraction, not an open-ended coding task. With
+      // provider-controlled Auto a 48-minute transcript spent 15k+ output
+      // tokens (mostly reasoning) before returning a ~3k-character memo.
+      thinkingEffort: 'low',
     });
 
     const text = await finished;

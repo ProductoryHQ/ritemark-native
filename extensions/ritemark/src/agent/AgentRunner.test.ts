@@ -98,6 +98,15 @@ function testDefaultSettingSources() {
     ['project'],
     'custom setting sources should be preserved'
   );
+
+  const isolatedSession = new AgentSession({
+    workspacePath: process.cwd(),
+    settingSources: [],
+    tools: [],
+  }) as AgentSession & Record<string, unknown>;
+
+  assert.deepEqual(isolatedSession._settingSources, [], 'an explicit empty setting scope loads no settings');
+  assert.deepEqual(isolatedSession._tools, [], 'an explicit empty tool set removes built-in tools');
 }
 
 function testDefaultToolsIncludePlanAndQuestionLifecycle() {

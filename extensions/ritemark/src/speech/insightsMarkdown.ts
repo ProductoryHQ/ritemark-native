@@ -129,9 +129,9 @@ export async function writeInsightsDocumentExclusive(
 
 export function insightsToMarkdown(session: TranscriptSession, insights: TranscriptInsights): string {
   const provenance = insightsLanguageProvenance(insights.language);
-  const selected = provenance.selected === 'auto'
+  const selected = provenance.selected.kind === 'auto'
     ? `Auto · ${insightsLanguageLabel(provenance.resolved)}`
-    : insightsLanguageLabel(provenance.resolved);
+    : insightsLanguageLabel(provenance.selected);
   const groups: Array<{ kind: TranscriptInsights['items'][number]['kind']; heading: string }> = [
     { kind: 'decision', heading: 'Decisions' },
     { kind: 'action', heading: 'Action items' },

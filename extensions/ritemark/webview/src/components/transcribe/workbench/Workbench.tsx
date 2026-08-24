@@ -82,7 +82,7 @@ export function Workbench() {
   const [followPlayback, setFollowPlayback] = useState(true);
   const [insightsState, setInsightsState] = useState<InsightsState>('idle');
   const [insightsError, setInsightsError] = useState<string | null>(null);
-  const [insightsLanguage, setInsightsLanguage] = useState<InsightsLanguageSelection>('auto');
+  const [insightsLanguage, setInsightsLanguage] = useState<InsightsLanguageSelection>({ kind: 'auto' });
   const [insightsDocumentResultSerial, setInsightsDocumentResultSerial] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -111,7 +111,7 @@ export function Workbench() {
 
   useEffect(() => {
     if (!session) return;
-    setInsightsLanguage(session.insights?.language?.selected ?? 'auto');
+    setInsightsLanguage(session.insights?.language?.selected ?? { kind: 'auto' });
   }, [session?.id]);
 
   // Duration comes from the element once metadata loads; the session's stored

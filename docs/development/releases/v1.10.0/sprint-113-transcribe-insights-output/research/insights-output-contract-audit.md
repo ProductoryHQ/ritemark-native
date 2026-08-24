@@ -53,3 +53,19 @@
 - Verbatim quotes remain unchanged when generated prose uses another language.
 - Legacy sessions load without schema or UI failure.
 - `Jarmo Tuisk` can be typed with Space/arrow editing intact, persists through reload/export/Insights, and long labels stay ellipsized without moving timestamps or transcript text.
+
+## 2026-08-24 R6 Scope-Correction Addendum
+
+Jarmo superseded the initial fixed Auto/Estonian/English language decision after
+reviewing the running UI: Insights language is an output parameter and must not
+be limited to that list. The original audit above remains as historical evidence
+for the first approved contract; it is not the current product contract.
+
+The revised contract keeps Auto, replaces the dropdown with an editable
+autocomplete, searches a broad local catalog by English/native name, alias, and
+code, and offers an explicit **Use …** row for any normalized language or dialect.
+Uncommitted query text remains webview-local. Only a discriminated Auto/known/custom
+value crosses the bridge; the host revalidates it and quotes the resulting language
+name as JSON data in the prompt. Custom values use NFKC normalization, collapsed
+whitespace, a 60-code-point limit, at least one Unicode letter, and reject control
+or formatting characters. Legacy `auto | et | en` metadata remains readable.
