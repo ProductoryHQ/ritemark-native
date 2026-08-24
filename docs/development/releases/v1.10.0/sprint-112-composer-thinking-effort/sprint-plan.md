@@ -5,7 +5,7 @@
 **Branch:** `codex/sprint-112-composer-thinking-effort`<br>
 **Worktree:** `.worktrees/sprint-112-composer-thinking-effort`<br>
 **Issue:** [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206)<br>
-**PR:** [#215](https://github.com/ProductoryHQ/ritemark-native/pull/215)<br>
+**PRs:** [#215](https://github.com/ProductoryHQ/ritemark-native/pull/215), [#216](https://github.com/ProductoryHQ/ritemark-native/pull/216), [#219](https://github.com/ProductoryHQ/ritemark-native/pull/219)<br>
 **Release:** [v1.10.0](../release-plan.md)
 
 ## Goal
