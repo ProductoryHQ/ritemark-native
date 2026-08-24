@@ -1,8 +1,8 @@
 # Sprint 113 — Transcribe Insights & Speaker Names
 
 **Track:** Full SDD, audit-first<br>
-**Status:** Implementation handoff — automated Sprint 113 checks pass; independent QA, manual UI evidence, and post-Sprint-112 rebase remain<br>
-**Branch:** `codex/sprint-113-transcribe-insights-output` from `origin/main@db5c475`<br>
+**Status:** QA handoff — post-Sprint-112 rebase, combined bundle regeneration, and independent full QA complete; authenticated manual UI/accessibility evidence remains open<br>
+**Branch:** `codex/sprint-113-transcribe-insights-output`, rebased onto `origin/main@fb0d3a3`; implementation/bundle lineage `8752982`<br>
 **Worktree:** `.worktrees/sprint-113-transcribe-insights-output`<br>
 **Issue:** [#208](https://github.com/ProductoryHQ/ritemark-native/issues/208)<br>
 **Release:** [v1.10.0](../release-plan.md)
@@ -61,7 +61,7 @@ The shipped **Add to document** action sends `workbench:save`, the same path use
 
 ## Dependencies and Gates
 
-- There is no product dependency on Sprint 112; Jarmo approved parallel implementation in a dedicated worktree. After Sprint 112 merges, rebase this branch and regenerate the shared webview bundle before readiness review.
+- There is no product dependency on Sprint 112; Jarmo approved parallel implementation in a dedicated worktree. The branch is now rebased onto merged Sprint 112 plus review polish at `fb0d3a3`, and the shared webview bundle was regenerated from the combined source at `8752982`.
 - Jarmo approves this plan and a dedicated non-`main` branch before implementation.
 - Phase 0 approval freezes language/default, persistence, filename, collision, and post-save UX.
 - Architecture Gate applies because new webview↔host message types cross the Transcribe subsystem boundary.
@@ -105,9 +105,9 @@ The shipped **Add to document** action sends `workbench:save`, the same path use
 
 - Focused Sprint 113 extension/webview tests pass, including language allowlisting/resolution, legacy provenance, prompt language and quote fidelity, full Unicode speaker names, interactive-target keyboard guards, Markdown rendering, primary/existing target rejection, exclusive create, and partial-write cleanup.
 - Extension compile, extension TypeScript, webview TypeScript, and the production webview build pass. The build retains the repository's standard large-chunk warning; extension esbuild retains the pre-existing duplicate `refresh` case warning in `src/ritemarkEditor.ts`.
-- The full extension test chain passes through all unit, Transcribe, and free Save File integration coverage, then fails only in the existing authenticated `ClaudeCodeNodeExecutor.integration.test.ts` environment because the standalone runner cannot resolve the `vscode` module (5 failures, 1 expected error-path pass).
-- Independent repository QA and the manual Estonian/English, save-dialog, no-focus-steal, long-name, narrow-width, high-contrast, and 200%-zoom scenarios remain intentionally open.
-- Before merge readiness, rebase after Sprint 112 and regenerate `extensions/ritemark/media/webview.js`; do not hand-merge the generated bundle.
+- Independent full QA completed after the exact quote-membership P1 fix; repository `./scripts/validate-qa.sh`, extension compile, webview typecheck/build, and focused Sprint 112–113 regressions pass with no remaining automated blocker.
+- The branch was rebased onto merged Sprint 112 plus review polish at `fb0d3a3`; `extensions/ritemark/media/webview.js` was taken from the merged base during conflict resolution, rebuilt from combined source, and recorded at implementation commit `8752982`.
+- Manual authenticated Estonian/English generation, save-dialog/no-focus-steal behavior, long-name layout, keyboard/screen-reader labels, narrow width, high contrast, and 200%-zoom scenarios remain intentionally open. The sprint is not Done or merge-ready until that evidence and lifecycle approval are complete.
 
 ## Planning Approval
 

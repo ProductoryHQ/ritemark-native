@@ -42,9 +42,11 @@
 ## Phase 5: QA and Closeout
 
 - [x] Run focused extension and webview tests.
+- [x] Rebase onto merged Sprint 112 plus review polish at `fb0d3a3` and regenerate the shared webview bundle from the combined source (`8752982`).
 - [ ] Execute every scenario in `scenarios.md` and capture Estonian/English, file-isolation, full-name, and ellipsis evidence.
-- [ ] Run `./scripts/validate-qa.sh` using the repository QA workflow.
+- [x] Run `./scripts/validate-qa.sh` using the repository QA workflow and complete independent full QA.
 - [x] Update `docs/development/architecture.md` for the new typed messages and language/save contract.
 - [x] Update `docs/user/features/transcribe.md`, `docs/CHANGELOG.md`, v1.10.0 release notes, and test checklist.
-- [ ] Update issue #208 and the v1.10.0 release tracker.
+- [x] Update the v1.10.0 release tracker.
+- [ ] Update issue #208 lifecycle state after the manual evidence gate.
 - [ ] Obtain review, commit, push, PR, and merge approval.
