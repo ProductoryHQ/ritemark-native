@@ -15,6 +15,7 @@
  */
 
 import type { ModelCatalog } from './schema';
+import { CODEX_MODEL_IDS } from '../modelConfig';
 
 export const BUNDLED_CATALOG: ModelCatalog = {
   schemaVersion: 1,
@@ -52,15 +53,15 @@ export const BUNDLED_CATALOG: ModelCatalog = {
       ],
     },
     codex: {
-      defaults: { codex: 'gpt-5.6-sol' },
+      defaults: { codex: CODEX_MODEL_IDS.SOL },
       models: [
-        { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Latest flagship agentic coding model', tier: 'high', deprecated: false, order: 0, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
-        { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', description: 'Balanced', tier: 'medium', deprecated: false, order: 1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'medium' } },
-        { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', description: 'Fast & light', tier: 'low', deprecated: false, order: 2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'], defaultLevel: 'medium' } },
-        { id: 'gpt-5.5', label: 'GPT-5.5', description: 'Previous flagship agentic model', tier: 'high', deprecated: false, order: 3, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
-        { id: 'gpt-5.4', label: 'GPT-5.4', description: 'Strong everyday agentic model', tier: 'medium', deprecated: false, order: 4, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
-        { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini', description: 'Efficient smaller agentic model', tier: 'low', deprecated: false, order: 5, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
-        { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark', description: 'Fast coding-focused model', tier: 'low', deprecated: false, order: 6, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'high' } },
+        { id: CODEX_MODEL_IDS.SOL, label: 'GPT-5.6 Sol', description: 'Latest flagship agentic coding model', tier: 'high', deprecated: false, order: 0, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
+        { id: CODEX_MODEL_IDS.TERRA, label: 'GPT-5.6 Terra', description: 'Balanced', tier: 'medium', deprecated: false, order: 1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.LUNA, label: 'GPT-5.6 Luna', description: 'Fast & light', tier: 'low', deprecated: false, order: 2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.GPT_5_5, label: 'GPT-5.5', description: 'Previous flagship agentic model', tier: 'high', deprecated: false, order: 3, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.GPT_5_4, label: 'GPT-5.4', description: 'Strong everyday agentic model', tier: 'medium', deprecated: false, order: 4, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.GPT_5_4_MINI, label: 'GPT-5.4 Mini', description: 'Efficient smaller agentic model', tier: 'low', deprecated: false, order: 5, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.GPT_5_3_CODEX_SPARK, label: 'GPT-5.3 Codex Spark', description: 'Fast coding-focused model', tier: 'low', deprecated: false, order: 6, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'high' } },
       ],
     },
     // opencode is BYOK/multi-vendor: ids are composite `<vendor>/<model>`; consumers

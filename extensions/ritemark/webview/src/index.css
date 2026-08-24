@@ -382,9 +382,9 @@ body {
   background: transparent;
 }
 .thinking-effort-range::-webkit-slider-thumb {
-  width: 32px;
-  height: 32px;
-  margin-top: 4px;
+  width: 26px;
+  height: 26px;
+  margin-top: 7px;
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--r-hairline);
@@ -397,8 +397,8 @@ body {
   background: transparent;
 }
 .thinking-effort-range::-moz-range-thumb {
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--r-hairline);
   border-radius: 999px;
   background: var(--r-surface);

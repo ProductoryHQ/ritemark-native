@@ -192,11 +192,11 @@ export class ClaudeCodeSession implements RuntimeSession {
           config.onDispatchAccepted?.();
         },
         thinkingEffort: turn.thinkingEffort ?? 'auto',
-        onThinkingEffortApplied: (applied) => {
+        onThinkingEffortApplied: (applied, adjusted = false) => {
           config.onThinkingEffortApplied?.({
             requested: turn.thinkingEffort ?? 'auto',
             ...(applied ? { applied } : {}),
-            adjusted: false,
+            adjusted,
           });
         },
       });

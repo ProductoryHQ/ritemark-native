@@ -25,6 +25,7 @@ import { routeApprovalRequest, threadIdOf } from './codexApproval';
 import { traceCodex } from './codexTrace';
 import { emitCodexStatusInvalidated } from './codexStatusEvents';
 import { buildCodexBrowserDynamicTools } from '../browser/codexBrowserTools';
+import { CODEX_MODEL_IDS } from '../ai/modelConfig';
 import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
 import type {
@@ -350,7 +351,7 @@ export class CodexSession implements RuntimeSession {
       ? {
           mode: 'plan' as const,
           settings: {
-            model: resolvedModel ?? 'gpt-5.6-sol',
+            model: resolvedModel ?? CODEX_MODEL_IDS.SOL,
             reasoning_effort: effectiveThinkingEffort ?? null,
             developer_instructions: config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
           },

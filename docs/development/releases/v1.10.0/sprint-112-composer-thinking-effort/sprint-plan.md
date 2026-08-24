@@ -90,6 +90,8 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 - Extension compile/bundle, webview typecheck/production bundle, full conversation regression suite, canonical effort tests, model-catalog resolver tests, and all three runtime adapter suites pass.
 - RunDev in `ritemark-demo` passes native range drag and arrow keys, Auto, Escape/focus return, flag-off omission, 300px collision, normal width, and 200% geometry. Release evidence is stored as `docs/releases/v1.10.0/screenshots/1-10-0-thinking-effort.png`.
 - Independent risk-first review found and fixed three contained issues before close: explicit live Auto-only capability precedence, stale-turn callback isolation, and cross-conversation notice isolation. No P0–P3 findings remain.
+- The post-merge Codex review identified four follow-up defects now covered by regression tests: rapid range writes are atomic, queued turns no longer overwrite the current draft effort, Codex model IDs are centralized, and rejected warm Claude overrides reset to Auto without dropping the accepted message.
+- Review-polish RunDev confirms the approved control at a compact 28 px visible track/26 px thumb while retaining a 40 px native drag target; the filled track is rounded behind the thumb at both endpoints.
 - The broad legacy `npm test` command still reaches the pre-existing bare-Node Claude Flow integration harness failure where `AgentRunner` transitively resolves `vscode`; the same import chain exists on `origin/main`. Sprint 112’s official QA and every affected focused suite pass.
 
 ## Product Decisions
@@ -107,6 +109,7 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 | 2026-08-24 | Define warm Auto as restoration of the captured runtime default | Codex effort is sticky across turns. Omission is correct initially, but returning from a manual override must restore the effective default rather than leave the old manual value active. |
 | 2026-08-24 | Preserve OpenCode lazy discovery | ACP `thought_level` is session-local; opening or selecting a conversation still performs no runtime work. |
 | 2026-08-24 | Phase 0 design and capability contract approved | Approved the compact native range control, Auto below the scale, capability-filtered Ultra, warm-Auto restoration, and honest OpenCode lazy behavior. |
+| 2026-08-24 | Require a review-polish PR after the delayed Codex review | The original PR merged before the bot review arrived; all four findings and final visual feedback are handled on a dedicated follow-up that must receive fresh Codex review before merge. |
 
 ## Planning Approval
 

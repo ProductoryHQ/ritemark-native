@@ -27,7 +27,7 @@ const mockSession = {
     onPlanApproval?: (r: unknown) => void;
     onQuestion?: (q: unknown) => void;
     thinkingEffort?: string;
-    onThinkingEffortApplied?: (effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max') => void;
+    onThinkingEffortApplied?: (effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max', adjusted?: boolean) => void;
   }) => {
     calls.push('sendMessage');
     capturedEfforts.push(opts.thinkingEffort ?? 'auto');
