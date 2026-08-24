@@ -1,15 +1,14 @@
 import React from 'react'
 import { Icon } from '../ui/Icon'
 import { defaultSpreadsheetApp, isMac } from '../../hooks/usePlatform'
+import type { DocumentSyncAction } from './DocumentSyncAction'
 
 interface SpreadsheetToolbarProps {
   filename: string
   onOpenInExcel?: () => void
   onOpenInNumbers?: () => void
   hasExcel: boolean
-  onRefresh?: () => void
-  refreshDisabled?: boolean
-  hasFileChanged?: boolean // Show badge when file changed externally
+  syncAction?: DocumentSyncAction
 }
 
 /**
@@ -27,9 +26,7 @@ export function SpreadsheetToolbar({
   onOpenInExcel,
   onOpenInNumbers,
   hasExcel,
-  onRefresh,
-  refreshDisabled = false,
-  hasFileChanged = false,
+  syncAction,
 }: SpreadsheetToolbarProps) {
   const [showDropdown, setShowDropdown] = React.useState(false)
   const dropdownRef = React.useRef<HTMLDivElement>(null)
@@ -68,18 +65,20 @@ export function SpreadsheetToolbar({
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Refresh button - only shows when file changed externally (same as DocumentHeader) */}
-        {hasFileChanged && onRefresh && (
+        <span className="sr-only" role="status" aria-live="polite">
+          {syncAction?.label ?? ''}
+        </span>
+
+        {/* Derived action: absent while the rendered document matches host state. */}
+        {syncAction && (
           <button
-            className="refresh-button has-changes"
-            onClick={onRefresh}
-            disabled={refreshDisabled}
-            aria-label="File changed on disk - click to refresh"
-            title="File changed on disk - click to reload"
+            className={`refresh-button ${syncAction.kind}`}
+            onClick={syncAction.onClick}
+            aria-label={syncAction.label}
+            title={syncAction.title ?? syncAction.label}
           >
-            <Icon name="arrow-clockwise" size={16} />
-            <span className="refresh-text">Refresh</span>
-            <span className="refresh-badge" />
+            <Icon name={syncAction.kind === 'conflict' ? 'warning' : 'arrow-clockwise'} size={16} />
+            <span className="refresh-text">{syncAction.label}</span>
           </button>
         )}
 
@@ -295,8 +294,12 @@ export function SpreadsheetToolbar({
           cursor: not-allowed;
         }
 
-        .refresh-button.has-changes {
-          color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+        .refresh-button.conflict {
+          color: var(--r-warning);
+        }
+
+        .refresh-button.retry {
+          color: var(--r-error);
         }
 
         .refresh-text {
@@ -307,21 +310,6 @@ export function SpreadsheetToolbar({
           .refresh-text { display: none; }
         }
 
-        .refresh-badge {
-          position: absolute;
-          top: 4px;
-          right: 4px;
-          width: 8px;
-          height: 8px;
-          background: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
-          border-radius: 50%;
-          animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
       `}</style>
     </header>
   )

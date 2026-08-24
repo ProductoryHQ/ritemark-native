@@ -2,7 +2,7 @@
 
 ## Status and Gate
 
-This is an architecture proposal, not implementation authorization. The source audit, executable model, and compiler spike are complete; [research/phase-0-decision.md](./research/phase-0-decision.md) freezes the recommended protocol, retry, selection, comparison, recovery, and multi-view contract. Product-code work begins only after the remaining live evidence and Jarmo's separate Phase 0 decision on `codex/sprint-115-editor-disk-sync`.
+**Implemented on `codex/sprint-115-editor-disk-sync`; validation and release closeout remain.** Jarmo approved D1–D12 on 2026-08-24. The source audit, executable model, typed protocol, coordinator, webview application, conflict UX, and live folder-workspace evidence are complete; see [research/phase-1-live-smoke.md](./research/phase-1-live-smoke.md). Remaining candidate-level matrix rows stay explicit in `tasks.md` and the v1.10.0 test checklist.
 
 ## Architectural Decision
 
@@ -140,9 +140,9 @@ Unknown messages, mismatched URIs/epochs, stale revisions, and invalid payloads 
 
 ### Conflict snapshots
 
-For **Compare changes**, register a small read-only `TextDocumentContentProvider` under a `ritemark-sync:` scheme. It exposes immutable, revision-named local and disk snapshots to VS Code's diff command. Snapshot content is memory-only, scoped to the conflict, never saved automatically, and disposed after resolution/document close.
+For **Compare changes**, register a small read-only `TextDocumentContentProvider` under a `ritemark-sync:` scheme. It exposes immutable, revision-named local and disk snapshots to VS Code's diff command. Snapshot content is memory-only, scoped to the conflict, never saved automatically, and disposed after resolution/document close. Virtual inputs use a neutral `.txt` suffix so the comparison cannot recursively activate Ritemark's custom Markdown/CSV editor.
 
-**Keep my version** and **Use disk version** both re-read the strong disk validator before changing state. If the expected validator no longer matches, the coordinator creates a new conflict instead of writing. Use-disk is one undoable `WorkspaceEdit`; standard Undo restoring the exact local snapshot as dirty is a hard live acceptance test. Keep-local does not change the model, so normal editor Undo remains unchanged.
+**Keep my version** and **Use disk version** both re-read the strong disk validator before changing state. If the expected validator no longer matches, the coordinator creates a new conflict instead of writing. Use-disk is one undoable `WorkspaceEdit`; standard Undo restoring the exact local snapshot as dirty is a hard live acceptance test. VS Code's public `TextDocument.save()` correctly rejects the stale file etag after a conflict, so Keep-local uses the public `workspace.fs.writeFile` only after the exact validator check, verifies the bytes, and performs a same-content VS Code revert to refresh etag/clean state. Because the model value is unchanged, its Undo history remains intact; both recovery paths passed live.
 
 ## Webview Workstream
 
@@ -184,9 +184,9 @@ Expected implementation surface, subject to Phase 0 naming/compile verification:
 
 - `extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts` — state machine and serialized reconciliation.
 - `extensions/ritemark/src/editorSync/protocol.ts` — typed messages and validators without Node/VS Code imports.
-- `extensions/ritemark/src/editorSync/ConflictSnapshotProvider.ts` — immutable compare URIs.
+- `extensions/ritemark/src/editorSync/delivery.ts` — bounded retry schedule and exact-receipt matching.
 - `extensions/ritemark/src/ritemarkEditor.ts` — provider adapter and legacy-path removal.
-- `extensions/ritemark/webview/src/editorSync/syncState.ts` — pure view reducer/selectors.
+- `extensions/ritemark/webview/src/documentSyncReducer.ts` — pure view reducer/selectors.
 - `extensions/ritemark/webview/src/App.tsx` — typed message routing and derived header state.
 - `extensions/ritemark/webview/src/components/Editor.tsx` and CSV equivalent — revision application/ACK.
 - Document-header/conflict dialog components — truthful action and explicit resolution.

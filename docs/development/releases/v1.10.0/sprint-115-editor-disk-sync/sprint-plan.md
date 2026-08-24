@@ -1,7 +1,7 @@
 # Sprint 115 — Reliable Editor–Disk Synchronization
 
 **Track:** Full SDD, audit-first  
-**Status:** Phase 0 decision pending — exact v1.9.0 standalone reproduction, source audit, executable model, protocol spike, and D1–D12 candidate complete; broader implementation evidence remains
+**Status:** Phase 5 validation and closeout — D1–D12 implemented; release-candidate manual matrix remains
 **Branch:** `codex/sprint-115-editor-disk-sync`  
 **Worktree:** `.worktrees/sprint-115-editor-disk-sync`  
 **Issue:** [#221](https://github.com/ProductoryHQ/ritemark-native/issues/221) — linked to milestone v1.10.0  
@@ -50,23 +50,23 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 
 ## Success Criteria
 
-- [ ] A clean Codex/Claude/ACP or generic process write appears in an open focused editor without close/reopen.
-- [ ] The host never equates successful `postMessage` delivery with TipTap application; only a matching ACK advances the visible revision.
-- [ ] Continuous local typing and autosave lag never show an external-change action.
-- [ ] No timer, poll, retry, blur, or lifecycle event can discard unresolved local edits.
-- [ ] True local/disk divergence preserves both versions and offers **Compare changes**, **Keep my version**, and **Use disk version**.
-- [ ] Older, duplicate, previous-epoch, and cross-URI messages cannot replace a newer visible revision.
-- [ ] The header action remains visible only for an unresolved external apply/conflict and clears only after confirmed resolution.
+- [x] A clean Codex/Claude/ACP or generic process write appears in an open focused editor without close/reopen.
+- [x] The host never equates successful `postMessage` delivery with TipTap application; only a matching ACK advances the visible revision.
+- [x] Continuous local typing and autosave lag never show an external-change action.
+- [x] No timer, poll, retry, blur, or lifecycle event can discard unresolved local edits.
+- [x] True local/disk divergence preserves both versions and offers **Compare changes**, **Keep my version**, and **Use disk version**.
+- [x] Older, duplicate, previous-epoch, and cross-URI messages cannot replace a newer visible revision.
+- [x] The header action remains visible only for an unresolved external apply/conflict and clears only after confirmed resolution.
 - [ ] Markdown front matter/properties/comments/images and CSV rows/cells survive reconciliation unchanged except for the chosen revision.
 - [ ] Folder workspace, standalone-file, rapid-write, multiple-view, and close/reopen matrices pass.
-- [ ] `docs/development/architecture.md`, changelog, release notes, test evidence, focused tests, and `./scripts/validate-qa.sh` are complete.
+- [x] `docs/development/architecture.md`, changelog, release notes, test evidence, focused tests, and `./scripts/validate-qa.sh` are complete.
 
 ## Dependencies and Gates
 
-- Jarmo has approved the sprint plan/kickoff; the separate Phase 0 implementation contract remains open.
+- Jarmo approved the sprint plan/kickoff and the D1–D12 Phase 0 implementation contract on 2026-08-24.
 - Branch/worktree creation and the post-Sprint-113 rebase are complete; never implement on `main`.
 - Sprint 113 is merged and this branch is rebased onto `origin/main@18c6175`; Sprint 114 external Windows/Store release gates may continue independently.
-- Phase 0 requires a separate Jarmo decision on revision/ACK shape, retry deadline, conflict resolutions, selection fallback, protocol source location, and multi-view ownership.
+- The approved Phase 0 contract fixes revision/ACK shape, retry deadline, conflict resolutions, selection fallback, protocol source location, and multi-view ownership; any exception must return as an explicit decision.
 - Keep [#221](https://github.com/ProductoryHQ/ritemark-native/issues/221) aligned with scope, evidence, and decisions.
 - The Architecture Gate is unconditional because module structure, document state ownership, and webview messages change.
 - Use both `vscode-development` and `webview-development` during implementation; use `ritemark-design` for the conflict/header surface and `qa-validation` before ready handoff.
@@ -95,8 +95,9 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 - [tasks.md](./tasks.md) — gated phase checklist.
 - [research/current-state-sync-audit.md](./research/current-state-sync-audit.md) — v1.9.0 source evidence, failure sequence, and external-practice synthesis.
 - [research/v1.9.0-live-reproduction.md](./research/v1.9.0-live-reproduction.md) — exact released-binary evidence for the stale focused view, destructive timer, and false disk-change action.
-- [research/phase-0-decision.md](./research/phase-0-decision.md) — D1–D12 implementation contract candidate, retry/hash values, recovery semantics, and remaining live evidence.
+- [research/phase-0-decision.md](./research/phase-0-decision.md) — approved D1–D12 implementation contract, retry/hash values, and recovery semantics.
 - [research/phase0-sync-model.test.ts](./research/phase0-sync-model.test.ts) — executable legacy-failure and proposed-invariant model (7/7 pass).
+- [research/phase-1-live-smoke.md](./research/phase-1-live-smoke.md) — focused Markdown/CSV/multi-view/conflict/Undo evidence and the explicit release-candidate manual matrix.
 
 ## Product Decisions
 
@@ -113,10 +114,13 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 | 2026-08-24 | Rebased Sprint 115 kickoff onto merged Sprint 113 | `origin/main@18c6175` is the branch base; release-plan overlap was reconciled before product-code work. |
 | 2026-08-24 | Prepare the D1–D12 Phase 0 contract candidate | Official VS Code, TipTap, ProseMirror, Node, and conditional-write practices support per-URI ownership, exact view receipts, strong disk validators, three-way conflicts, and bounded retries; live timing/Undo evidence and Jarmo approval remain. |
 | 2026-08-24 | Confirm the three legacy failures on the exact v1.9.0 standalone build | Focused and blurred views stayed stale, local-only typing activated the disk-change action with unchanged disk bytes, and the timer replaced model work while stale rendered content concealed the loss. |
+| 2026-08-24 | Jarmo approved D1–D12 as the Sprint 115 implementation contract | Product-code work may proceed on the dedicated branch; failed hard acceptance rules return as named exceptions rather than silently weakening the contract. |
+| 2026-08-24 | Keep-local uses exact-validator recheck, public filesystem write, byte verification, and same-content VS Code revert | `TextDocument.save()` correctly rejects the stale etag after a true conflict; the selected path refreshes the model's clean/etag state while retaining the existing Undo history. |
+| 2026-08-24 | Treat residual theme/accessibility, forced live receipt-loss, rename/delete/save-as, multi-root, large-file, and exact agent-runtime repetitions as release-candidate QA | Focused implementation invariants, generic external writes, Markdown/CSV, multi-view, conflict safety, both recovery paths, and repository gates are sprint evidence; the broader platform/UI matrix remains explicitly visible rather than being overclaimed. |
 
 ## Planning Approval
 
 - [x] Jarmo approves Sprint 115 scope, release-blocker status, and delivery placement (2026-08-24).
 - [x] Jarmo approves branch/worktree creation (2026-08-24).
 - [x] GitHub issue [#221](https://github.com/ProductoryHQ/ritemark-native/issues/221) created, assigned to milestone v1.10.0, and linked here.
-- [ ] Phase 0 revision/conflict/UX decisions approved before implementation.
+- [x] Phase 0 revision/conflict/UX decisions approved before implementation (2026-08-24).

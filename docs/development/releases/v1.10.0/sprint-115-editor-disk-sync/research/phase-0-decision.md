@@ -1,6 +1,6 @@
-# Sprint 115 Phase 0 Decision Candidate
+# Sprint 115 Phase 0 Implementation Contract
 
-**Status:** Recommended contract; exact v1.9.0 standalone reproduction complete; ready for Jarmo's Phase 0 decision, not implementation authorization
+**Status:** Approved by Jarmo on 2026-08-24; implementation authorized on the dedicated Sprint 115 branch
 **Branch base:** `origin/main@18c6175`
 **Prepared:** 2026-08-24
 
@@ -141,7 +141,7 @@ Host-applied transactions carry sync metadata and cannot emit `document:edit`. T
 On true divergence, freeze immutable base/local/disk snapshots and stop automatic application. No retry, polling tick, timeout, focus change, or dialog dismissal resolves it.
 
 - **Compare changes** opens memory-backed `ritemark-sync:` virtual documents in VS Code's diff editor. It mutates nothing.
-- **Keep my version…** re-reads the exact disk validator immediately before save. A mismatch creates a refreshed conflict. After save, re-read and verify the disk equals the serialized model before disposing the conflict.
+- **Keep my version…** re-reads the exact disk validator immediately before writing. A mismatch creates a refreshed conflict. VS Code's public `TextDocument.save()` correctly rejects the stale etag after a true conflict, so the implementation writes through `workspace.fs.writeFile`, verifies the selected bytes, then performs a same-content VS Code revert to refresh etag/clean state without changing model content or its Undo stack.
 - **Use disk version…** re-reads the exact disk validator, then applies that snapshot to the `TextDocument` as one undoable `WorkspaceEdit`. Ctrl/Cmd-Z must restore the prior local snapshot as dirty; this is an acceptance test, not an assumption.
 - For Keep my version, the model did not change, so editor Undo is intentionally unchanged. The discarded disk snapshot remains available through the open diff until resolution verification completes, then the explicit choice is final.
 
@@ -174,7 +174,7 @@ No feature flag, new editor provider, VS Code patch, CRDT/OT layer, direct webvi
 
 The architecture document must change in the implementation sprint because module ownership and webview message contracts change.
 
-## Evidence Commands
+## Phase 0 Evidence Commands
 
 ```text
 npx tsx docs/development/releases/v1.10.0/sprint-115-editor-disk-sync/research/phase0-sync-model.test.ts
@@ -190,17 +190,18 @@ npx vite build --outDir /private/tmp/ritemark-sprint-115-runtime-protocol-spike 
   pass; 7,521 modules transformed
 ```
 
-## Remaining Live Evidence Before Product Code
+## Implementation Evidence
 
-- Add content-free host transition tracing and exercise folder mode; the exact released standalone-file behavior is already reproduced in focused and blurred states.
-- Record actual normal and large-document apply/ACK latency against the proposed 750 ms / 2.5 s / 5 s budget.
-- Prove ProseMirror structural selection mapping and the fallback with representative Markdown structures.
-- Prove Use-disk standard Undo restores the exact local snapshot as dirty.
-- Exercise CSV, split view, hide/show, delete/rename, and the former ten-second danger window in RunDev.
+- Content-free transition tracing and folder-workspace RunDev evidence are recorded in [phase-1-live-smoke.md](./phase-1-live-smoke.md).
+- Normal loaded-document ACKs were 5–75 ms; cold initialization was 337 ms in the final run and 1,426 ms in an earlier run, inside the approved retry budget.
+- Focused Markdown application, selection usability, CSV application, split views, dispose-one, hide/show, and conflict-time typing pass live.
+- Both explicit recovery paths pass: Use-disk Undo restores the exact prior local snapshot as dirty, while Keep-local converges disk/model/view and retains the existing Undo history.
+- Local-only and true-conflict states remain safe beyond the removed ten-second reload window.
+- The residual forced live receipt-loss, accessibility/theme, rename/delete/save-as, multi-root, large-file, previous-epoch, and exact agent-runtime rows are retained as release-candidate QA rather than overclaimed here.
 
 ## Approval Requested
 
-Approve D1–D12 as the Sprint 115 implementation contract. Product-code work remains blocked on this decision. The remaining implementation-dependent live evidence must confirm the values and acceptance rules before its corresponding phase can close; any failed hard acceptance rule returns as a named exception for a second decision.
+Jarmo approved D1–D12 as the Sprint 115 implementation contract on 2026-08-24. The remaining implementation-dependent live evidence must confirm the values and acceptance rules before its corresponding phase can close; any failed hard acceptance rule returns as a named exception for a second decision.
 
 ## Primary References
 

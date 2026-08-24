@@ -4,7 +4,7 @@ Tick `[x]` only when the artifact/evidence exists on `codex/sprint-115-editor-di
 
 > **Gate:** Implementation starts only after Jarmo approves the plan and the dedicated non-`main` branch exists. Phase 0 is audit, reproduction, and decision freeze only.
 
-Branch/worktree gate satisfied 2026-08-24. Phase 0 decision gate remains open.
+Branch/worktree and Phase 0 decision gates satisfied 2026-08-24.
 
 ## Phase 0 — Reproduce and Freeze the Contract (R1–R8)
 
@@ -18,42 +18,42 @@ Branch/worktree gate satisfied 2026-08-24. Phase 0 decision gate remains open.
 - [x] Freeze transactional ProseMirror selection mapping, clamped fallback, scroll behavior, and the read-only conflict snapshot/diff mechanism.
 - [x] Freeze **Keep my version** and **Use disk version** recovery/Undo semantics, with Use-disk Undo retained as a hard live acceptance test.
 - [x] Update `research/current-state-sync-audit.md` with executable/static evidence, exact released-binary evidence, official-practice synthesis, the model-bypass finding, and the split-view lifecycle finding.
-- [ ] **Jarmo Phase 0 gate:** approve protocol, state model, conflict UX, selection fallback, multi-view ownership, and implementation scope.
+- [x] **Jarmo Phase 0 gate:** protocol, state model, conflict UX, selection fallback, multi-view ownership, and implementation scope approved 2026-08-24.
 
 ## Phase 1 — Typed Protocol and Host Coordinator (R1, R2, R6, R7)
 
-- [ ] Add typed document update, sync-state, applied-ACK, edit, and conflict-action messages with runtime validation.
-- [ ] Add per-URI coordinator lifecycle and per-view epochs.
-- [ ] Add serialized transition processing and deterministic disk/model/base/view revision state.
-- [ ] Route watcher, document, save, and poll invalidations through one reconciliation entry point.
-- [ ] Implement idempotent send, bounded ACK retry, stale rejection, and apply-error state.
-- [ ] Implement clean-external, local-only, and true-conflict classification without the 20-hash heuristic.
-- [ ] Ensure multiple views share URI state and dispose independently.
-- [ ] Add content-free diagnostic transition logging.
+- [x] Add typed document update, sync-state, applied-ACK, edit, and conflict-action messages with runtime validation.
+- [x] Add per-URI coordinator lifecycle and per-view epochs.
+- [x] Add serialized transition processing and deterministic disk/model/base/view revision state.
+- [x] Route watcher, document, save, and poll invalidations through one reconciliation entry point.
+- [x] Implement idempotent send, bounded ACK retry, stale rejection, and apply-error state.
+- [x] Implement clean-external, local-only, and true-conflict classification without the 20-hash heuristic.
+- [x] Ensure multiple views share URI state and dispose independently.
+- [x] Add content-free diagnostic transition logging.
 - [ ] Add pure coordinator/protocol tests with fake disk, view, and clock.
 
 ## Phase 2 — Webview Apply and ACK (R2, R3, R7)
 
-- [ ] Add the pure webview sync reducer and derived selectors.
-- [ ] Replace the focused-editor early return with revision-aware application.
-- [ ] Preserve or safely clamp focus, selection, and scroll position.
-- [ ] Apply Markdown content, properties, front matter state, comments, and image mappings as one revision.
-- [ ] Apply CSV content under the same epoch/revision contract.
-- [ ] Emit `document:applied` only after serialized visible content matches the target identity.
-- [ ] Prevent host-applied revisions from echoing as local edit messages.
-- [ ] Reject duplicate, stale, previous-epoch, and cross-URI messages.
+- [x] Add the pure webview sync reducer and derived selectors.
+- [x] Replace the focused-editor early return with revision-aware application.
+- [x] Preserve or safely clamp focus, selection, and scroll position.
+- [x] Apply Markdown content, properties, front matter state, comments, and image mappings as one revision.
+- [x] Apply CSV content under the same epoch/revision contract.
+- [x] Emit `document:applied` only after serialized visible content matches the target identity.
+- [x] Prevent host-applied revisions from echoing as local edit messages.
+- [x] Reject duplicate, stale, previous-epoch, and cross-URI messages.
 - [ ] Add reducer/component tests for focused apply, partial payload prevention, ACK, retry, and stale ordering.
 
 ## Phase 3 — Conflict Resolution and Header Truth (R4, R5, R6)
 
-- [ ] Remove the independent `showFileChangeNotification` boolean and derive the header from sync state.
-- [ ] Keep the action hidden for synced and local-only/autosave states.
-- [ ] Implement **Retry document update**, **Review changes**, and apply-error states per `design.md`.
-- [ ] Add immutable local/disk conflict snapshots and open them through VS Code's diff view.
-- [ ] Implement compare-and-set **Keep my version**; recalculate if disk advanced.
-- [ ] Implement explicit **Use disk version** with confirmed local-discard behavior and ACK.
-- [ ] Remove the ten-second automatic reload and prove no replacement timer remains.
-- [ ] Remove `lastSentToWebview`/bounded self-hash behavior after coordinator coverage is complete.
+- [x] Remove the independent `showFileChangeNotification` boolean and derive the header from sync state.
+- [x] Keep the action hidden for synced and local-only/autosave states.
+- [x] Implement **Retry document update**, **Review changes**, and apply-error states per `design.md`.
+- [x] Add immutable local/disk conflict snapshots and open them through VS Code's diff view.
+- [x] Implement compare-and-set **Keep my version**; recalculate if disk advanced.
+- [x] Implement explicit **Use disk version** with confirmed local-discard behavior and ACK.
+- [x] Remove the ten-second automatic reload and prove no replacement timer remains.
+- [x] Remove `lastSentToWebview`/bounded self-hash behavior after coordinator coverage is complete.
 - [ ] Complete keyboard, screen-reader, tooltip, light/dark, high-contrast, and 200%-zoom checks.
 
 ## Phase 4 — Integration and Regression Matrix (R1–R8)
@@ -64,18 +64,18 @@ Branch/worktree gate satisfied 2026-08-24. Phase 0 decision gate remains open.
 - [ ] Test folder workspace, multi-root where applicable, and standalone-file windows.
 - [ ] Test initial open, panel hide/show, multiple views, dispose-one-view, close/reopen, and previous-epoch messages.
 - [ ] Verify front matter, properties, comments, relative images, CSV rows/cells, undo/recovery, and save semantics.
-- [ ] Wait beyond the former ten-second danger window during a true conflict and prove local bytes remain intact.
-- [ ] Run the Ritemark dev smoke workflow and attach screenshots/logs without document content.
+- [x] Wait beyond the former ten-second danger window during a true conflict and prove local bytes remain intact.
+- [x] Run the Ritemark dev smoke workflow and attach content-free evidence in [`research/phase-1-live-smoke.md`](./research/phase-1-live-smoke.md).
 
 ## Phase 5 — Documentation, QA, and Closeout (R8)
 
-- [ ] Update `docs/development/architecture.md` core file flow, `src/editorSync/`, revision ownership, typed messages, retries, conflicts, and #106 boundary.
-- [ ] Ensure the architecture `Last updated` date is not earlier than the Sprint 115 branch creation date.
-- [ ] Update `docs/CHANGELOG.md`, `docs/releases/v1.10.0/release-notes.md`, and the v1.10.0 test checklist/evidence.
-- [ ] Record that no feature flag, VS Code patch, new provider, dependency, or full bridge rewrite was added.
-- [ ] Run focused host and webview tests plus builds.
-- [ ] Run `./scripts/validate-qa.sh` on the sprint branch.
-- [ ] Complete QA review and resolve findings.
+- [x] Update `docs/development/architecture.md` core file flow, `src/editorSync/`, revision ownership, typed messages, retries, conflicts, and #106 boundary.
+- [x] Ensure the architecture `Last updated` date is not earlier than the Sprint 115 branch creation date.
+- [x] Update `docs/CHANGELOG.md`, `docs/releases/v1.10.0/release-notes.md`, and the v1.10.0 test checklist/evidence.
+- [x] Record that no feature flag, VS Code patch, new provider, dependency, or full bridge rewrite was added.
+- [x] Run focused host and webview tests plus builds (24/24 focused tests, extension compile, webview typecheck/build on 2026-08-24).
+- [x] Run `./scripts/validate-qa.sh` on the sprint branch (pass 2026-08-24).
+- [x] Complete adversarial QA/code review and resolve the initial-dirty, conflict-time queued edit, resolution-ACK, cross-field payload, stale edit-result, full-replacement Undo, and post-Compare focus findings.
 - [ ] Update Sprint 115 issue/tracker and link all evidence.
 - [ ] Merge the dedicated sprint PR before v1.10.0 release-candidate packaging.
 - [ ] Verify on the merged release candidate that agent writes are visible without reopen and no local edit can be timer-discarded.

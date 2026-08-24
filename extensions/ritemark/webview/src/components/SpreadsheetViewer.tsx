@@ -6,6 +6,8 @@ import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
 import { ConflictDialog } from './dialogs/ConflictDialog'
 import { Button } from './ui/button'
 import { sendToExtension, onMessage } from '../bridge'
+import type { DocumentSyncAction } from './header/DocumentSyncAction'
+import type { DocumentApplyTarget } from '../types/documentSync'
 
 export interface SpreadsheetViewerProps {
   content: string
@@ -16,6 +18,10 @@ export interface SpreadsheetViewerProps {
   // CSV: receives the serialized CSV text.
   // XLSX: receives the serialized workbook as base64.
   onChange?: (content: string) => void
+  syncEnabled?: boolean
+  syncAction?: DocumentSyncAction
+  syncTarget?: DocumentApplyTarget
+  onDocumentApplied?: (target: DocumentApplyTarget) => void
 }
 
 interface ParsedData {
@@ -85,6 +91,10 @@ export function SpreadsheetViewer({
   encoding,
   sizeBytes,
   onChange,
+  syncEnabled = false,
+  syncAction,
+  syncTarget,
+  onDocumentApplied,
 }: SpreadsheetViewerProps) {
   const [parsedData, setParsedData] = useState<ParsedData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -93,6 +103,7 @@ export function SpreadsheetViewer({
   const [selectedSheet, setSelectedSheet] = useState<string>('')
   const [cachedWorkbook, setCachedWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [hasExcel, setHasExcel] = useState(false)
+  const [parsedSyncTarget, setParsedSyncTarget] = useState<DocumentApplyTarget | undefined>()
 
   // Conflict detection state
   const [showConflictDialog, setShowConflictDialog] = useState(false)
@@ -110,18 +121,18 @@ export function SpreadsheetViewer({
   useEffect(() => {
     sendToExtension('checkExcel', {})
 
-    onMessage((message) => {
+    const unsubscribe = onMessage((message) => {
       if (message.type === 'excelStatus') {
         setHasExcel(message.hasExcel as boolean)
-      } else if (message.type === 'showConflictDialog') {
+      } else if (!syncEnabled && message.type === 'showConflictDialog') {
         // True conflict: local edits + disk changes
         setIsDiskConflict(true)
         setShowConflictDialog(true)
-      } else if (message.type === 'confirmDiscard') {
+      } else if (!syncEnabled && message.type === 'confirmDiscard') {
         // Simple discard: local edits only
         setIsDiskConflict(false)
         setShowDiscardWarning(true)
-      } else if (message.type === 'fileChanged') {
+      } else if (!syncEnabled && message.type === 'fileChanged') {
         // File changed externally - show badge on refresh button
         setHasFileChanged(true)
       } else if (message.type === 'fileDeleted') {
@@ -130,10 +141,8 @@ export function SpreadsheetViewer({
       }
     })
 
-    return () => {
-      // Cleanup if needed (onMessage doesn't return cleanup function)
-    }
-  }, [])
+    return unsubscribe
+  }, [syncEnabled])
 
   // Check file size before parsing
   useEffect(() => {
@@ -150,9 +159,16 @@ export function SpreadsheetViewer({
     if (fileType !== 'csv') return
     if (showSizeWarning && !proceedWithLargeFile) return
 
-    parseCSV(content)
+    setIsLoading(true)
+    parseCSV(content, syncTarget)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content, fileType, showSizeWarning, proceedWithLargeFile])
+  }, [content, fileType, showSizeWarning, proceedWithLargeFile, syncTarget])
+
+  useEffect(() => {
+    if (!parsedSyncTarget || !onDocumentApplied) return
+    const frame = requestAnimationFrame(() => onDocumentApplied(parsedSyncTarget))
+    return () => cancelAnimationFrame(frame)
+  }, [parsedSyncTarget, onDocumentApplied])
 
   // XLSX: parse the workbook ONCE per content change and cache it.
   //
@@ -201,7 +217,7 @@ export function SpreadsheetViewer({
     setIsLoading(false)
   }, [fileType, cachedWorkbook, selectedSheet])
 
-  const parseCSV = (csvContent: string) => {
+  const parseCSV = (csvContent: string, target?: DocumentApplyTarget) => {
     Papa.parse(csvContent, {
       header: true,
       skipEmptyLines: true,
@@ -215,6 +231,7 @@ export function SpreadsheetViewer({
         }
 
         setParsedData({ columns, rows })
+        setParsedSyncTarget(target)
         setIsLoading(false)
       },
       error: (error: Error) => {
@@ -483,6 +500,10 @@ export function SpreadsheetViewer({
     sendToExtension('refresh', {})
   }, [])
 
+  const toolbarSyncAction = syncAction ?? (hasFileChanged
+    ? { kind: 'retry' as const, label: 'Refresh', onClick: handleRefresh }
+    : undefined)
+
   // Handle opening in external apps
   const handleOpenInExcel = useCallback(() => {
     sendToExtension('openInExternalApp', { app: 'excel' })
@@ -567,11 +588,10 @@ export function SpreadsheetViewer({
         {/* Toolbar with external app actions */}
         <SpreadsheetToolbar
           filename={filename}
-          onRefresh={handleRefresh}
           onOpenInExcel={hasExcel ? handleOpenInExcel : undefined}
           onOpenInNumbers={handleOpenInNumbers}
           hasExcel={hasExcel}
-          hasFileChanged={hasFileChanged}
+          syncAction={toolbarSyncAction}
         />
 
       {/* Truncation warning — only rendered when a large file is cut off */}

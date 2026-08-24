@@ -13,6 +13,10 @@ import type {
   ConversationRequest,
   ConversationResultMessage,
 } from '../../src/conversations/protocol'
+import type {
+  DocumentSyncBootstrap,
+  DocumentViewMessage,
+} from '../../src/editorSync/protocol'
 
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void
@@ -24,6 +28,7 @@ declare function acquireVsCodeApi(): {
 declare global {
   interface Window {
     __vscodeApi?: ReturnType<typeof acquireVsCodeApi>;
+    __ritemarkDocumentSync?: DocumentSyncBootstrap;
   }
 }
 
@@ -58,6 +63,19 @@ export function sendToExtension(type: string, data: Record<string, unknown> = {}
   } else {
     console.log('[Bridge] Would send to extension:', { type, ...data })
   }
+}
+
+/** Typed, revision-aware document channel used by Markdown and CSV editors. */
+export function sendDocumentMessage(message: DocumentViewMessage) {
+  if (vscode) {
+    vscode.postMessage(message)
+  } else {
+    console.log('[Bridge] Would send document message:', message.type)
+  }
+}
+
+export function getDocumentSyncBootstrap(): DocumentSyncBootstrap | undefined {
+  return typeof window === 'undefined' ? undefined : window.__ritemarkDocumentSync
 }
 
 /** Typed Sprint 109 conversation channel; generic bridge messages remain legacy-compatible. */

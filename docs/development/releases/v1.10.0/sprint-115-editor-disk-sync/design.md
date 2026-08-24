@@ -23,18 +23,18 @@ The icon is 16px Phosphor regular through `components/ui/Icon.tsx`. Color alone 
 
 ## Conflict Dialog
 
-**Title:** This document changed in two places
+**Title:** Document changed in two places
 
-**Body:** Your edits and the version on disk both changed. Review them before choosing which version to keep.
+**Body:** Your edits and the disk version of this document both changed. Ritemark has preserved both versions. Compare them first, keep your version, or replace it with the disk version.
 
 Initial actions:
 
-- **Compare changes** — safe primary action; opens labeled, read-only local and disk snapshots.
-- **Cancel** — returns to the editor and leaves the conflict unresolved.
-- **Keep my version…** — explicit resolution with a confirmation that the current disk version will be replaced.
-- **Use disk version…** — explicit resolution with a confirmation that unsaved local edits will be discarded.
+- **Compare changes** — safe secondary action; opens labeled, read-only local and disk snapshots.
+- Close button or Escape — returns to the editor and leaves the conflict unresolved.
+- **Keep my version** — primary explicit resolution; the dialog itself is the confirmation that the current disk version will be replaced.
+- **Use disk version** — danger-styled explicit resolution; the dialog itself is the confirmation that unsaved local edits will be replaced.
 
-Neither destructive resolution is the default focused action. If disk changes again before confirmation, the dialog returns to the updated conflict rather than claiming success.
+Neither destructive resolution receives automatic focus. If disk changes again before the click is committed, the coordinator rejects the stale validator and returns to the updated conflict rather than claiming success.
 
 The dialog uses the existing Ritemark dialog primitive: 480px default maximum width, 10px radius, `--r-surface`, `--r-ink-*`, hairline divisions, Deep Space-tinted backdrop, and the standard 4px low-alpha indigo focus ring. Resolution controls remain usable at 200% zoom without horizontal scrolling.
 
@@ -42,8 +42,8 @@ The dialog uses the existing Ritemark dialog primitive: 480px default maximum wi
 
 Use VS Code's diff editor with immutable virtual documents rather than building a second diff algorithm in the webview.
 
-- Left label: `On disk — revision <n>`
-- Right label: `Your edits — based on revision <n>`
+- Left label: `My version — local <n>`
+- Right label: `Disk version — disk <n>`
 - Opening and closing compare changes no document state.
 - Returning to Ritemark preserves the conflict indicator and dialog state.
 - Snapshot titles use the filename and revision; document contents are never included in analytics or logs.

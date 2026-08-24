@@ -1,6 +1,6 @@
 # Ritemark 1.10.0 Test Checklist
 
-This checklist accumulates release evidence across Sprints 109–114.
+This checklist accumulates release evidence across Sprints 109–115.
 
 ## Trusted Windows installation (Sprint 114)
 
@@ -82,6 +82,21 @@ The first responsive-fix rerun passed keyboard order, horizontal containment, wi
 
 The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: document/body/root stay exactly viewport-sized with zero document overflow; chrome is 150 px; pane rows are `74.9904px`; transcript and Insights use bounded independent scrollers; language, **Regenerate**, and **Create insights document** focus rectangles are wholly visible; and **Regenerate** has the 4 px translucent indigo ring with no orange native outline. `654×300` high zoom, `1400×766` desktop, and long-name ellipsis/full accessible-name checks also pass. The later live R6 smoke successfully created `KUMi AI arutelu - Risto Raaperiga-insights.md` as a separate Estonian snapshot while the workbench still showed **Save to document**. Authenticated known-language generation later passed in German; custom-language generation and the broader negative save/spoken/theme matrix remain explicit release-QA rows by owner decision.
 
+## Reliable editor–disk synchronization (Sprint 115)
+
+- [x] A generic external write appears in a focused open Markdown editor without close/reopen; a normal loaded view acknowledges in 5–75 ms in the observed run.
+- [x] A visible CSV table applies a clean external write and acknowledges only after parsing/render scheduling, without a false header action.
+- [x] Local-only typing with autosave off stays visible and quiet beyond the former ten-second timer while disk bytes remain unchanged.
+- [x] True divergence preserves immutable local and disk snapshots beyond ten seconds and exposes only **Review changes**.
+- [x] **Compare changes** opens read-only in-memory text inputs without recursively activating the custom editor.
+- [x] **Use disk version** is one model edit; Cmd-Z restores the exact prior local snapshot as dirty while disk remains unchanged.
+- [x] **Keep my version** rechecks the exact disk validator, persists the final conflict-time local snapshot, refreshes clean/etag state, and retains Undo.
+- [x] Two visible views of one URI receive distinct epochs and both acknowledge; disposing one does not dispose the shared watcher/poll; a hidden view catches up when shown.
+- [x] Exact ACK, wrong receipt, bounded 750 ms / 2.5 s / 5 s retry, stale revision, cross-session validation, dirty-initial-open, EOL/BOM, conflict-time typing, and visible-view resolution invariants pass deterministically.
+- [ ] Force a real visible-webview receipt loss through the final release build and verify the five-second **Retry document update** path end to end.
+- [ ] Repeat light/dark/high-contrast, keyboard-only, spoken screen-reader, and 200% zoom checks on the final release build.
+- [ ] Repeat rename/delete/save-as, formatter, multi-root, rapid/large-file, previous-epoch, and exact Claude/Codex/ACP-origin write rows on the final release build.
+
 ## Automated gates
 
 - [x] Extension TypeScript compile and bundle.
@@ -92,9 +107,11 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] Sprint 110 fresh-profile migration+resume canary.
 - [x] Sprint 111 exact-manifest validator, validator mutation tests, extension compile, focused runtime suites, and deterministic extension suite.
 - [x] Sprint 112 official QA, focused effort/runtime suites, conversation regressions, extension compile, and webview typecheck/build (2026-08-24).
+- [x] Sprint 115 focused state/protocol/delivery/reducer suite (24/24), extension compile, webview typecheck, production bundle, final-bundle Compare→Keep-local→Undo smoke, and official repository QA (2026-08-24).
 - [ ] Release preflight and final migration+resume canary after all v1.10.0 sprints merge.
 
 ## Remaining release scope
 
 - [ ] Sprint 113 residual custom-language plus manual negative save-dialog, spoken screen-reader, and theme/high-contrast matrix; authenticated known-language generation and sprint closure already passed.
+- [ ] Sprint 115 forced live receipt-loss plus residual accessibility/theme/lifecycle/runtime-origin release matrix.
 - [ ] Final macOS arm64/x64 and Windows candidate gates.

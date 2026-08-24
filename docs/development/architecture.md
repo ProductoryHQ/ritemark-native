@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-24 (Sprints 112–113 — capability-driven thinking effort and focused Transcribe Insights runtime policy)
+**Last updated:** 2026-08-24 (Sprint 115 — reliable editor–disk synchronization)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -49,6 +49,8 @@ The load-bearing boundary. The TipTap editor cannot read files, make AI calls, o
 |---|---|---|
 | `sendToExtension(type, data)` | webview → host | request file ops, AI calls, navigation |
 | `onMessage(cb)` | host → webview | document content, AI streams, state pushes |
+| `sendDocumentMessage(message)` | webview → host | typed Markdown/CSV edit, visible-apply ACK, and conflict actions |
+| `getDocumentSyncBootstrap()` | host bootstrap → webview | URI, document session, and per-view epoch for the typed document channel |
 | `emitInternalEvent` / `onInternalEvent` | webview ↔ webview | UI-only events, no host round-trip |
 | `openExternalUrl` / `openInternalLink` | webview → host | external and cross-document links |
 
@@ -56,16 +58,50 @@ The load-bearing boundary. The TipTap editor cannot read files, make AI calls, o
 
 ### Core file editing flow
 
-```
-.md file opened
-  → host: onMessage("document", content)  → webview renders in TipTap
-  user edits
-  → webview: sendToExtension("save", markdown)  → host writes to disk
-  external change detected by file watcher
-  → host: onMessage("document", content)  → webview re-renders
+```text
+.md/.csv file opened
+  → host creates/joins one URI coordinator record
+  → webview sends document:ready with its view epoch
+  → host sends document:update(revision, complete payload, payloadHash)
+  → TipTap/table applies the payload and sends document:applied
+
+user edits
+  → webview sends document:edit(basedOnRevision, clientSequence, full editable payload)
+  → coordinator applies one version-sensitive WorkspaceEdit to TextDocument
+  → every visible view receives and acknowledges the new authoritative revision
+
+watcher / TextDocument / save / 3 s poll invalidates a URI
+  → coordinator compares disk, model, and retained base
+  → clean external: converge TextDocument first, then publish a revision
+  → local-only: keep quiet
+  → two-sided divergence: preserve both snapshots and require explicit resolution
 ```
 
-**Protocol type safety (AS IS):** `sendToExtension(type: string, data: Record<string, unknown>)` is stringly-typed. The host and webview agree on message names and payload shapes only by convention. A renamed `type` or changed payload field fails silently at runtime in a sandboxed context where it is hard to observe. See ARCH-9.
+**Protocol type safety (current boundary):** most legacy `sendToExtension(type, data)` traffic remains stringly typed; issue #106 tracks the broader migration. Sprint 115 deliberately types only the load-bearing editable-document slice in `src/editorSync/protocol.ts`. Both directions use discriminated unions plus exact-field runtime validation, while unrelated bridge messages remain compatible.
+
+### Editor–disk synchronization (Sprint 115)
+
+`src/editorSync/DocumentSyncCoordinator.ts` is the sole owner of Markdown/CSV synchronization state. `RitemarkEditorProvider` adapts VS Code lifecycle and payload serialization; it no longer infers visibility from `postMessage`, watcher timing, a bounded self-hash list, or a destructive reload timer. The webview owns rendering only and proves it with an exact receipt.
+
+Each URI record owns one `TextDocument`, one watcher, one three-second level-triggered fallback poll, one serialized transition queue, one document-session UUID, and zero or more independent view leases. Each view lease owns its epoch UUID, last client sequence, last acknowledged server revision, and one bounded delivery schedule. Hiding or closing one view never destroys another view's URI resources.
+
+The coordinator keeps three content identities separate:
+
+| Identity | Meaning |
+|---|---|
+| Exact disk SHA-256 | Lost-update validator for explicit conflict actions, including BOM/EOL byte differences. |
+| Logical text SHA-256 | Three-way disk/model/base classification after one UTF-8 BOM and CRLF/CR normalization. |
+| Canonical render-payload SHA-256 | Proof that body, properties/front matter, mappings, features, and CSV metadata belong to one applied revision. |
+
+The derived states are intentionally asymmetric. A model ahead of an unchanged disk is ordinary local-only/autosave state and has no header action. A disk-only change is imported into the `TextDocument` under version/hash preconditions and sent to focused views. A true two-sided change freezes local and disk evidence and shows **Review changes**. There is no background choice between versions.
+
+`document:update` is idempotently sent immediately and retried at 750 ms and 2.5 s. Five seconds without the exact session + epoch + revision + payload-hash `document:applied` receipt produces **Retry document update**; a newer revision cancels the old budget. Hidden/disposed leases are dormant and receive the newest snapshot when visible/ready again.
+
+Markdown applies the smallest valid ProseMirror structural transaction, maps selection through it, restores focus/scroll, and uses a clamped whole-document fallback only when structural application cannot reproduce the target. CSV acknowledges only after parsing and a committed render frame. Host-applied updates suppress normal edit feedback.
+
+Conflicts expose memory-only `ritemark-sync:` local/disk `.txt` snapshots through VS Code's read-only diff editor. The non-custom suffix prevents recursive Ritemark editor activation. **Use disk version** is one undoable `WorkspaceEdit`. **Keep my version** rechecks the exact disk validator, writes through the public VS Code filesystem API, and performs a same-content revert solely to refresh the text model's etag/clean marker; the no-op model resolve preserves the existing undo stack. Conflict evidence is cleared only after every currently visible view acknowledges the resolution revision. A hidden view does not block resolution and receives current state when it returns.
+
+This sprint adds no provider, feature flag, dependency, VS Code patch, direct webview filesystem access, or CRDT/OT layer. It advances only the editable-document slice of #106.
 
 **Comment callouts (Sprint 94, #81).** Editor-only comments live entirely in the editor webview (TipTap `CommentMark` for anchored highlights, an atom `CommentNode` for `///` notes, and a DOM-scanning `MarginCommentRail`); they round-trip through a scoped `marked` tokenizer + Turndown rules and are stripped at the shared export chokepoint (`export/v2/htmlPipeline.ts`). The one cross-subsystem seam is **Send-to-AI**: the editor and the AI sidebar are separate webviews, so an assigned comment relays across two new host messages — `comment:send-to-ai` (editor → `RitemarkEditorProvider`) and `comment:submit` (`UnifiedViewProvider` → sidebar, then the store's existing `sendAgentMessage`/`sendCodexMessage`/`sendOpenCodeMessage` → `agent-execute`). No `AgentRuntime` change. Gated by the `comment-callouts` experimental flag (default on). The comment webview.js bundle is now cache-busted via `?v=<mtime>` (was silently serving stale bundles across reloads).
 
@@ -97,6 +133,7 @@ extensions/ritemark/src/
 ├── flows/           Flow engine — scheduler, executor, storage, test runner
 ├── features/        Feature flags — flags.ts registry, featureGate.ts
 ├── conversations/   Durable project-scoped agent conversations, migration, typed protocol/controller
+├── editorSync/      Markdown/CSV disk-model-view coordinator, typed protocol, retry and three-way state
 ├── ai/              Shared AI utilities — modelConfig.ts, connectivity, analytics
 ├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
 ├── settings/        Settings page bridge
@@ -108,7 +145,7 @@ extensions/ritemark/src/
 └── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts, drawioEditorProvider.ts, transcriptWorkbenchProvider.ts
 ```
 
-Editor provider contracts: `ritemarkEditor.ts` is a `CustomTextEditorProvider` (markdown + CSV, editable). `excelEditorProvider.ts` is a full `CustomEditorProvider<ExcelDocument>` since Sprint 81 — .xlsx is editable (dirty tracking via `CustomDocumentContentChangeEvent`, save/save-as/revert/hot-exit backup; no undo-redo stack), .xls stays read-only. `docxEditorProvider.ts` and `pdfEditorProvider.ts` are read-only (`CustomReadonlyEditorProvider`), as is `transcriptWorkbenchProvider.ts` — whose document is the AUDIO file, with the transcript held as session state beside it (Sprint 108).
+Editor provider contracts: `ritemarkEditor.ts` is a `CustomTextEditorProvider` (Markdown + CSV, editable) with multiple views per `TextDocument`; `src/editorSync/` owns their shared URI state and per-view delivery. `excelEditorProvider.ts` is a full `CustomEditorProvider<ExcelDocument>` since Sprint 81 — .xlsx is editable (dirty tracking via `CustomDocumentContentChangeEvent`, save/save-as/revert/hot-exit backup; no undo-redo stack), .xls stays read-only. `docxEditorProvider.ts` and `pdfEditorProvider.ts` are read-only (`CustomReadonlyEditorProvider`), as is `transcriptWorkbenchProvider.ts` — whose document is the AUDIO file, with the transcript held as session state beside it (Sprint 108).
 
 Entry point `extension.ts` registers all providers, commands, and views.
 
