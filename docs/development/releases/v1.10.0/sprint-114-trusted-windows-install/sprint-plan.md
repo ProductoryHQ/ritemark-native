@@ -1,6 +1,6 @@
 # Sprint 114 — Trusted Windows Install
 
-**Status:** Active — implementation ready for signed Windows CI, Kristiina SAC-On test, and Store submission<br>
+**Status:** Implementation complete — engineering and local QA pass; ready to merge. The signed candidate, immutable download URL, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval are deferred to v1.10.0 release execution.<br>
 **Branch:** `codex/sprint-114-trusted-windows-install`<br>
 **Issue:** [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212)<br>
 **Release:** [v1.10.0](../release-plan.md)
@@ -31,19 +31,28 @@ A Windows user should be able to download, install, launch, and uninstall Ritema
 - MSIX conversion unless Partner Center rejects the signed EXE and Jarmo approves a later change.
 - Disabling Windows security, buying an EV certificate, Windows ARM64, commerce, or Intune packaging.
 
-## Done when
+## Sprint closeout
 
-- [ ] Manual Windows workflow produces one fully signed installer and fails closed when signing is unavailable.
-- [ ] Payload, installer, installed tree, and uninstaller signature checks pass.
-- [ ] Standard-user install/registration/uninstall checks pass.
-- [ ] Kristiina's clean Windows 11 SAC-On test passes for the exact SHA-256.
-- [ ] Partner Center accepts the same SHA-256 from `https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe`.
-- [ ] Microsoft Store is the primary Windows link and the direct installer remains the same signed file.
-- [ ] `./scripts/validate-qa.sh` passes.
+- [x] The manual Windows workflow implements always-on signing and blocks artifact upload when signing or verification fails.
+- [x] Payload, installer, installed-tree, uninstaller, and standard-user install/registration/uninstall checks are implemented.
+- [x] Focused local tests and `./scripts/validate-qa.sh` pass.
+- [x] Repo implementation and documentation are complete and may merge without producing a new Windows build now.
+
+## Deferred v1.10.0 release gates
+
+These checks require the final release-ready v1.10.0 bytes. They do not keep the Sprint 114 worktree or PR open; issue [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212) remains open as their release-gate tracker.
+
+- [ ] Build and verify the fully signed v1.10.0 Windows candidate.
+- [ ] Publish that exact candidate at `https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe` without later replacing its bytes.
+- [ ] Submit the same SHA-256 to Partner Center and pass certification.
+- [ ] Kristiina's clean Windows 11 SAC-On test passes for that exact SHA-256.
+- [ ] Microsoft Store becomes the primary Windows link; the direct installer remains the same signed file.
+- [ ] Jarmo gives Windows Gate 2 approval for that exact SHA-256.
 
 ## Decisions
 
 - Existing repository-level Azure signing secrets remain in use.
 - GitHub Release continues as the secondary direct-download location; no channel redesign is needed.
 - Jarmo handles Partner Center setup and final submission. Kristiina performs the clean-machine SAC-On test.
+- No Windows build is run for sprint closeout. Candidate signing, hosting, Store certification, SAC-On validation, and exact-hash approval happen once against the final v1.10.0 release-ready build.
 - No `docs/development/architecture.md` update is required because this sprint changes packaging and documentation only.
