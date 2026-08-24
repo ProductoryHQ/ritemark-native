@@ -1,0 +1,51 @@
+{
+  "evidenceVersion": 1,
+  "capturedAt": "2026-08-24",
+  "platform": "darwin-arm64",
+  "targets": {
+    "codex": "0.149.0",
+    "claudeBinary": "2.1.239",
+    "claudeSdk": "0.3.239",
+    "opencode": "1.18.21",
+    "acpSdk": "1.4.0"
+  },
+  "supplyChain": {
+    "manifestValidation": "PASS",
+    "allNineArchivesFetched": true,
+    "allNineArchiveChecksumsMatched": true,
+    "allNineArchivePathsAndArchitecturesMatched": true,
+    "nativeDarwinArm64VersionDiscovery": "PASS",
+    "nativeDarwinX64PendingCi": true,
+    "nativeWin32X64PendingCi": true
+  },
+  "codex": {
+    "protocolProbe": "PASS",
+    "untrustedApprovalPolicyAccepted": true,
+    "reasoningEfforts": ["low", "medium", "high", "xhigh", "max", "ultra"],
+    "restartAndResume": "PASS",
+    "invalidDescriptorRejected": true,
+    "twoConversationIsolation": "PASS"
+  },
+  "claude": {
+    "sdkBinaryParity": "PASS",
+    "restartAndResume": "PASS",
+    "invalidDescriptorRejected": true,
+    "twoConversationIsolation": "PASS"
+  },
+  "opencode": {
+    "acpInitialize": "PASS",
+    "sessionCapabilities": ["load", "resume", "list", "fork", "close"],
+    "thoughtLevelDiscovery": "PASS_MODEL_DEPENDENT",
+    "observedThoughtLevels": ["low", "medium", "high"],
+    "restartAndResume": "PASS",
+    "loadSessionReplay": "PASS",
+    "invalidDescriptorRejected": true,
+    "twoConversationIsolation": "PASS",
+    "permissionGatePauses": "PASS",
+    "permissionDenialBlocksWrite": "PASS",
+    "permissionApprovalAllowsWrite": "PASS",
+    "sessionCancel": "PASS",
+    "sharedProcessSurvivedCancel": true
+  },
+  "privacy": "No provider reference, credential, prompt body, response body, raw transcript, or conversation identifier is stored."
+}

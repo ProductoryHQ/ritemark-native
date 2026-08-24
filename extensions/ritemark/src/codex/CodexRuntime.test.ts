@@ -316,7 +316,7 @@ async function run() {
     const compatibility = {
       runtimeId: 'codex' as const,
       scopeId: `ps1-${'a'.repeat(40)}`,
-      runtimeVersion: '0.144.4',
+      runtimeVersion: '0.149.0',
       adapterContractVersion: 1,
       modelId: 'gpt-5.6-codex',
       compatibilityFingerprint: 'fingerprint',
@@ -366,7 +366,40 @@ async function run() {
     console.log('✓ Test 10: buildCodexBaseInstructions — context is the base, no silent replace');
   }
 
-  console.log('\nAll 12 CodexRuntime tests passed!');
+  // Codex 0.149.0 added `isBlocking` to request_user_input. Older system
+  // runtimes omit it, so Ritemark tolerates both while preserving routing.
+  {
+    const { runtime, mock } = makeRuntime(['thread-question']);
+    const received: Array<{ requestId: string | number; question: string }> = [];
+    await openTurn(runtime, 'conv-question', {
+      ...dummyConfig,
+      onCodexQuestion: (requestId, questions) => {
+        received.push({ requestId, question: questions[0]?.question ?? '' });
+      },
+    });
+    mock.emit('server-request', {
+      id: 149,
+      method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-question',
+        turnId: 'turn-thread-question',
+        itemId: 'item-question',
+        isBlocking: true,
+        questions: [{
+          id: 'choice',
+          header: 'Choice',
+          question: 'Continue?',
+          isOther: false,
+          isSecret: false,
+          options: null,
+        }],
+      },
+    });
+    assert.deepStrictEqual(received, [{ requestId: 149, question: 'Continue?' }]);
+    console.log('✓ Test 13: Codex 0.149 request_user_input tolerates isBlocking');
+  }
+
+  console.log('\nAll 13 CodexRuntime tests passed!');
 }
 
 run().then(

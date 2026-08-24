@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-23 (Sprint 110 — native runtime continuation, bounded transcript fallback and explicit handoff)
+**Last updated:** 2026-08-24 (Sprint 111 — exact bundled runtime baseline and manifest/SDK parity gate)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -139,6 +139,14 @@ Dispatch certainty is append-only host state: the store atomically saves user te
 ---
 
 ## Agent Runtime Architecture
+
+### Bundled runtime baseline (Sprint 111)
+
+The v1.10.0 host↔binary baseline is exact and reproducible: Codex app-server `0.149.0`, Claude Code `2.1.239` paired with Agent SDK `0.3.239`, and OpenCode `1.18.21` paired with ACP SDK `1.4.0`. `extensions/ritemark/binaries/agents/manifest.json` remains the single binary supply-chain contract with one row per runtime × supported platform (`darwin-arm64`, `darwin-x64`, `win32-x64`). Codex retains direct app-server GitHub assets; Claude and OpenCode retain official npm optional-package artifacts. This changes no `AgentRuntime` interface and adds no runtime kind.
+
+`scripts/validate-agent-runtime-manifest.mjs` is the hard pre-fetch/build gate. It rejects an incomplete nine-row platform matrix, floating or cross-platform version drift, malformed checksums/source URLs, stale OpenCode vendor identity, package-lock drift, and a Claude binary/SDK patch mismatch. It runs from fetch, runtime verification, and the repository QA gate. The manifest fetcher verifies archive SHA-256 before extraction, validates the recorded path/architecture, and runs `--version` on native targets. Native x64 and Windows execution/signature evidence remains a release-platform responsibility; a macOS cross-fetch proves bytes/layout, not native behavior.
+
+The measured protocol delta is deliberately narrow: Codex 0.149.0 adds `isBlocking` to `request_user_input`; Ritemark tolerates it as optional so older explicitly selected system runtimes still work. ACP 1.4.0 retains the client API used by `src/acp/`; OpenCode effort discovery stays semantic (`configOptions.category === "thought_level"`) and model-dependent. Composer effort UI belongs to Sprint 112, not this supply-chain baseline.
 
 ### Sessions (Sprint 99)
 
@@ -626,6 +634,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-08-24 | Sprint 111 | **Exact agent-runtime supply-chain baseline.** Bundled pins move atomically to Codex app-server 0.149.0, Claude Code 2.1.239 + Agent SDK 0.3.239, and OpenCode 1.18.21 + ACP SDK 1.4.0 across nine platform rows. New `validate-agent-runtime-manifest.mjs` makes platform completeness, exact pins, SHA/source shape, package-lock parity, Claude binary/SDK patch parity, and OpenCode vendor identity hard pre-fetch/QA failures. Codex’s additive `request_user_input.isBlocking` is tolerated for bundled 0.149 and older system runtimes. No new runtime, shared interface, message contract, or feature flag. |
 | 2026-08-23 | Sprint 110 | **Truthful agent conversation continuation.** `runtime/continuation.ts` adds one host-owned descriptor/compatibility/state contract across Claude SDK resume, Codex `thread/resume`, and capability-gated ACP `session/resume` (never `session/load`). `conversations/contextPack.ts` adds the shared deterministic 32 KB user/final-text fallback. Runtime-keyed opaque descriptors and append-only `not-sent → ambiguous → accepted` receipts stay out of webview projections; coverage advances only with an atomically saved assistant final. Explicit cross-runtime confirmation preserves drafts and unanswered user intent, while per-conversation execution tokens and lifecycle checks reject late old-runtime events. |
 | 2026-08-23 | Sprint 109 | **Durable conversation lifecycle completed.** Records persist a stable 24-slot project color identity; hidden runtime context is separated from display prompts; UI and host share turn IDs; same-turn assistant continuations project as one response; Project unknown records can be explicitly moved/deleted/undone; running Delete+Undo and extension shutdown restore as honest Interrupted boundaries. The old webview open-thread cap/storage path is removed. A host-side five-or-one live attachment pool protects Working/Needs-you/current contexts, releases LRU non-current idle sessions, and never limits durable conversations. |
 | 2026-08-23 | Sprint 109 | **Host-owned conversation titles.** New `conversations/ConversationTitlePolicy.ts` is the single fallback/generated/manual normalization authority for Claude, Codex, and OpenCode conversations. `ConversationTitleGenerator.ts` runs once after the first successful response through a fresh tool-free/read-only runtime made by `createRuntime(runtimeId)`; it never touches the live session. New exact-field `conversation/rename` lets the Conversations row dialog checkpoint a manual title, with controller-side fallback comparison ensuring a late AI result cannot overwrite user intent. Codex/ACP streamed assistant text is now included in the terminal durable checkpoint so those runtimes have the same first-response title input and restart transcript fidelity. |

@@ -121,6 +121,11 @@ if [[ ! -f "${MANIFEST}" ]]; then
   exit 1
 fi
 
+# Fail before network or extraction if runtime/platform pins, SDK pairings, or
+# the checked-in lockfile disagree. This keeps Claude binary/SDK drift and
+# incomplete platform matrices out of both local and CI builds.
+node "${SCRIPT_DIR}/validate-agent-runtime-manifest.mjs"
+
 # ---------------------------------------------------------------------------
 # Python interpreter detection
 # ---------------------------------------------------------------------------

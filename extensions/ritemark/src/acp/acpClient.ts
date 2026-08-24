@@ -210,7 +210,7 @@ export class AcpClient {
    * prompt.
    *
    * Still sent as a notification (`Connection.cancel` is `sendNotification` in
-   * @agentclientprotocol/sdk 0.22.1), so there is no response to await; the
+   * @agentclientprotocol/sdk 1.4.0), so there is no response to await; the
    * outcome is observed as the turn settling `cancelled`.
    */
   async cancel(sessionId: string): Promise<void> {

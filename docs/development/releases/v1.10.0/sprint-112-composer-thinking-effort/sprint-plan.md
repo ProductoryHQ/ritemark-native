@@ -1,7 +1,7 @@
 # Sprint 112 — Composer Thinking Effort
 
 **Track:** Full SDD, audit-first<br>
-**Status:** Planned; depends on Sprint 111 merge<br>
+**Status:** Approved to start after Sprint 111 merge; Phase 0 decision still pending<br>
 **Branch after approval:** `codex/sprint-112-composer-thinking-effort`<br>
 **Worktree:** Not created<br>
 **Issue:** [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206)<br>
@@ -93,10 +93,11 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 | 2026-08-22 | Claude/Codex first-class, OpenCode capability-driven | ACP/BYOK providers do not guarantee one universal effort vocabulary. |
 | 2026-08-22 | Per-turn snapshot, per-runtime conversation preference | Matches Composer intent and prevents queue/concurrency surprises. |
 | 2026-08-22 | Experimental/default-on kill switch | Large cross-boundary UX change remains reversible without deleting data. |
+| 2026-08-23 | Advance kickoff approval recorded | Branch creation remains dependency-gated on Sprint 111 merge; capability/mapping/design approval is still a separate Phase 0 decision. |
 
 ## Planning Approval
 
-- [ ] Jarmo approves Sprint 112 scope and dependency on Sprint 111.
-- [ ] Jarmo approves branch creation.
+- [x] Jarmo approves Sprint 112 scope and dependency on Sprint 111 (2026-08-23).
+- [x] Jarmo pre-approves branch creation after Sprint 111 merges (2026-08-23).
 - [ ] Phase 0 capability/mapping/design decision approved.
 - [x] GitHub issue #206 created and assigned to milestone v1.10.0.

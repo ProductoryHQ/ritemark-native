@@ -17,11 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calm agent handoff** — choosing another runtime applies immediately and preserves the composer draft. On the next Send, one quiet line between turns explains transcript fallback; unanswered user intent crosses as labelled context without transferring tool state, approvals, partial output, attachments, or another provider's private session ID.
 - **Crash-safe dispatch tracking** — accepted prompts are durably marked before transport and only treated as provider-accepted after runtime-specific evidence; ambiguous/no-final failures abandon unsafe native bindings so a retry cannot silently duplicate context.
 - **Stable conversation colors** — each project uses all eight base rainbow colors before deeper and softer variants; the same translucent-fill chat bubble follows a conversation across the rail, All conversations, restart, Rename, and Delete + Undo.
+- **Refreshed built-in agents** — Codex 0.149.0, Claude Code 2.1.239, and OpenCode 1.18.21 ship with exact matching SDK edges (Claude Agent SDK 0.3.239 and ACP SDK 1.4.0). A new hard gate rejects checksum/platform gaps, stale vendor metadata, or Claude binary/SDK drift before packaging.
 
 ### Changed
 - Agent transcripts are no longer owned by webview localStorage. Webview state retains only the selected canonical conversation, up to five Pin IDs, and harmless UI preferences.
 - Reopened Sprint 109 transcripts explicitly disclose that the next message starts with a new agent working context; native provider continuation remains Sprint 110 scope.
 - Live agent contexts are bounded in the host (five with parallel work, one otherwise). Ritemark releases only the least-recently-used non-current idle context; Working, Needs-you, and Current conversations are protected, while saved conversations remain unlimited.
+- Runtime fetch and verification now use the same exact manifest contract in local development, QA, and release packaging; Codex optional input metadata and OpenCode ACP 1.x capability discovery remain contained inside their runtime adapters.
 
 ## [1.9.0] — 2026-08-20
 

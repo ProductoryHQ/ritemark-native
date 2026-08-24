@@ -58,6 +58,8 @@ case "$(uname -s)-$(uname -m)" in
 esac
 BIN="$EXT/binaries/agents/$PLATDIR"
 
+node "$ROOT/scripts/validate-agent-runtime-manifest.mjs" || exit 1
+
 echo "========================================"
 echo "Agent runtime verification — $PLATDIR"
 echo "========================================"

@@ -1,6 +1,6 @@
 # Bundled Agent Runtimes
 
-Sprint 64 ships Codex and Claude agent runtimes inside the Ritemark `.app` (macOS) and Windows installer so a clean install has working app-owned runtimes without requiring the user to install Node, npm, or set `PATH`.
+Ritemark ships Codex, Claude, and OpenCode agent runtimes inside the Ritemark `.app` (macOS) and Windows installer so a clean install has working app-owned runtimes without requiring the user to install Node, npm, or set `PATH`.
 
 ## Layout
 
@@ -10,13 +10,16 @@ extensions/ritemark/binaries/agents/
 ├── README.md              ← this file (tracked)
 ├── darwin-arm64/          ← payloads, gitignored
 │   ├── codex-app-server
-│   └── claude
+│   ├── claude
+│   └── opencode
 ├── darwin-x64/            ← payloads, gitignored
 │   ├── codex-app-server
-│   └── claude
+│   ├── claude
+│   └── opencode
 └── win32-x64/             ← payloads, gitignored
     ├── codex-app-server.exe
-    └── claude.exe
+    ├── claude.exe
+    └── opencode.exe
 ```
 
 The platform subdirectories are populated by `scripts/fetch-agent-runtimes.sh` (Phase B). Binary payloads are listed in the root `.gitignore` and never committed.
@@ -25,14 +28,14 @@ The platform subdirectories are populated by `scripts/fetch-agent-runtimes.sh` (
 
 | Agent | Vendor | Version | Source | License |
 |---|---|---|---|---|
-| Codex | OpenAI | 0.144.4 (`rust-v0.144.4`) | GitHub Releases — `codex-app-server-*` archives | Apache-2.0 |
-| Claude | Anthropic | 2.1.217 (SDK pinned `0.3.217`) | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
-| OpenCode | sst | 1.18.4 | npm optional packages — `opencode-<platform>-<arch>` | MIT |
+| Codex | OpenAI | 0.149.0 (`rust-v0.149.0`) | GitHub Releases — `codex-app-server-*` archives | Apache-2.0 |
+| Claude | Anthropic | 2.1.239 (SDK pinned `0.3.239`) | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
+| OpenCode | anomalyco | 1.18.21 (ACP SDK pinned `1.4.0`) | npm optional packages — `opencode-<platform>-<arch>` | MIT |
 
 Versions are pinned in `manifest.json`. Updates ship inside Ritemark releases (Sprint 64, Q4 decision). A separate runtime update channel is not in scope for this sprint.
 
 **Claude is a two-part pin.** The bundled binary and `@anthropic-ai/claude-agent-sdk` must move
-together: Anthropic publishes them in lockstep (same patch number, same day — `2.1.217` ↔ `0.3.217`),
+together: Anthropic publishes them in lockstep (same patch number, same day — `2.1.239` ↔ `0.3.239`),
 and Ritemark runs the bundled binary *through* the SDK. The SDK is therefore declared as an exact
 version in `extensions/ritemark/package.json`, not a caret range. A caret let them drift once
 already: `^0.3.156` resolved to `0.3.159` against a bundled `2.1.156`. When bumping the binary, bump
@@ -48,7 +51,7 @@ If Anthropic's published terms change, this README and the manifest must be re-v
 
 ## Codex invocation contract
 
-Codex 0.130.0 publishes a standalone `codex-app-server` binary that is **not** the same as the `codex` CLI. The `manifest.json` records this as `invocationMode: "direct-app-server"`, which means Ritemark spawns the extracted binary directly:
+Codex 0.149.0 publishes a standalone `codex-app-server` binary that is **not** the same as the `codex` CLI. The `manifest.json` records this as `invocationMode: "direct-app-server"`, which means Ritemark spawns the extracted binary directly:
 
 ```text
 <binaries>/agents/<platform>-<arch>/codex-app-server[.exe]
@@ -73,12 +76,12 @@ Each entry in `runtimes`:
 
 | Field | Description |
 |---|---|
-| `agent` | `codex` or `claude`. |
-| `vendor` | `openai` or `anthropic`. |
+| `agent` | `codex`, `claude`, or `opencode`. |
+| `vendor` | `openai`, `anthropic`, or `anomalyco`. |
 | `version` | Pinned upstream version. Never `latest`. |
 | `platform` | `darwin` or `win32`. |
 | `arch` | `arm64` or `x64`. |
-| `sourceType` | `github-release` (Codex) or `npm-optional-package` (Claude). |
+| `sourceType` | `github-release` (Codex) or `npm-optional-package` (Claude/OpenCode). |
 | `sourceUrl` | Direct download URL for the archive. |
 | `npmPackage` | npm package name (only for `sourceType: npm-optional-package`). |
 | `archiveFilename` | Filename the archive is saved as locally. |
@@ -95,20 +98,20 @@ Each entry in `runtimes`:
 
 ## Fetch workflow
 
-Phase B will deliver `scripts/fetch-agent-runtimes.sh`. Until then, runtimes can be materialised manually for local testing by following the `sourceUrl` and `archivePath` fields in `manifest.json`. Sample one-shot for macOS arm64 Codex:
+`scripts/fetch-agent-runtimes.sh` materializes runtimes deterministically from the manifest. For diagnosis, the equivalent macOS arm64 Codex steps are:
 
 ```bash
 mkdir -p extensions/ritemark/binaries/agents/darwin-arm64
 curl -L -o /tmp/codex.tar.gz \
-  https://github.com/openai/codex/releases/download/rust-v0.130.0/codex-app-server-aarch64-apple-darwin.tar.gz
-echo "f4ba64ca358497c932306d35b3fd321261603f402b12ea726e29c986e4100714  /tmp/codex.tar.gz" | shasum -a 256 -c
+  https://github.com/openai/codex/releases/download/rust-v0.149.0/codex-app-server-aarch64-apple-darwin.tar.gz
+echo "35892a576ec29edbbb766cfba002c57c7beea479c6c21715a134cab4a7352032  /tmp/codex.tar.gz" | shasum -a 256 -c
 tar -xzf /tmp/codex.tar.gz -C /tmp
 mv /tmp/codex-app-server-aarch64-apple-darwin \
   extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server
 chmod +x extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server
 ```
 
-The fetch script (Phase B) automates this for all six runtime entries and adds POSIX exec-bit / PE-header validation plus the manifest `validationArgs` smoke test.
+The fetch script automates this for all nine runtime entries and adds POSIX exec-bit / PE-header validation plus the manifest `validationArgs` smoke test. Before any download, `scripts/validate-agent-runtime-manifest.mjs` hard-fails incomplete platform rows, non-exact versions, stale vendor metadata, lockfile drift, or a Claude binary/SDK patch mismatch.
 
 ## Update process
 
@@ -119,6 +122,7 @@ The fetch script (Phase B) automates this for all six runtime entries and adds P
 5. Update `archivePath` and `installName` only if upstream changes the artifact layout (rare).
 6. Re-verify `invocationMode` for Codex by inspecting the new tarball — do not assume it stayed the same.
 7. Bump `generated` to the new date.
-8. Ship a new Ritemark release; users get the new runtime via the standard Ritemark app update.
+8. Regenerate `extensions/ritemark/package-lock.json` and run `node scripts/validate-agent-runtime-manifest.mjs`.
+9. Ship a new Ritemark release; users get the new runtime via the standard Ritemark app update.
 
 A Settings "Check for updates" button (Sprint 64, Phase E) wires into Ritemark's existing app-update check — there is no separate runtime update channel.

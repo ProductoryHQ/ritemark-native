@@ -1,6 +1,6 @@
 # Ritemark 1.10.0 Test Checklist
 
-This checklist accumulates release evidence across Sprints 109–112. Sprint 110 adds the continuation and handoff rows below.
+This checklist accumulates release evidence across Sprints 109–112.
 
 ## Durable conversations (Sprint 109)
 
@@ -34,6 +34,16 @@ This checklist accumulates release evidence across Sprints 109–112. Sprint 110
 
 These two live rows are intentionally retained for the post-Sprint 111/final release matrix because Sprint 111 changes the exact runtime binaries. Sprint 110 covers their deterministic adapter/controller policy paths and does not claim unrun production-UI evidence.
 
+## Runtime refresh (Sprint 111)
+
+- [x] Exact Codex 0.149.0, Claude Code 2.1.239, Claude Agent SDK 0.3.239, OpenCode 1.18.21, and ACP SDK 1.4.0 pins are recorded with official sources and licenses.
+- [x] All nine darwin-arm64, darwin-x64, and win32-x64 runtime archives pass URL, SHA-256, archive-layout, and architecture validation.
+- [x] Claude binary/SDK drift and an incomplete platform matrix fail the hard manifest validator.
+- [x] Native darwin-arm64 fetch, version discovery, OpenCode permission gates, cancellation, and shared-process survival pass on the shipping pins.
+- [x] Codex, Claude, and OpenCode continuation/restart plus two-conversation isolation probes pass on the shipping pins.
+- [x] Codex optional `isBlocking` input metadata routes through the existing input contract; ACP 1.4.0 preserves the contained adapter boundary.
+- [ ] Native darwin-x64 and win32-x64 build/package jobs pass on the final Sprint 111 commit.
+
 ## Automated gates
 
 - [x] Extension TypeScript compile and bundle.
@@ -42,10 +52,11 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Complete conversation regression suite.
 - [x] `./scripts/validate-qa.sh` on the final Sprint 110 branch (2026-08-23).
 - [x] Sprint 110 fresh-profile migration+resume canary.
+- [x] Sprint 111 exact-manifest validator, validator mutation tests, extension compile, focused runtime suites, and deterministic extension suite.
 - [ ] Release preflight and final migration+resume canary after all v1.10.0 sprints merge.
 
 ## Remaining release scope
 
-- [ ] Sprint 111 final runtime/SDK refresh and native-platform continuation rerun.
+- [ ] Sprint 111 native darwin-x64 and win32-x64 CI evidence.
 - [ ] Sprint 112 Composer thinking-effort behavior and visual matrix.
 - [ ] Final macOS arm64/x64 and Windows candidate gates.

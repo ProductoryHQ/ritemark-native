@@ -1,9 +1,9 @@
 # Sprint 111 — Agent Runtime Refresh
 
 **Track:** Full SDD, audit-first<br>
-**Status:** Planned; kickoff and Phase 0 approval pending<br>
-**Branch after approval:** `codex/sprint-111-agent-runtime-refresh`<br>
-**Worktree:** Not created<br>
+**Status:** Local QA and release preflight passed; native x64/Windows CI pending<br>
+**Branch:** `codex/sprint-111-agent-runtime-refresh`<br>
+**Worktree:** `.worktrees/sprint-111-agent-runtime-refresh`<br>
 **Issue:** [#207](https://github.com/ProductoryHQ/ritemark-native/issues/207)<br>
 **Release:** [v1.10.0](../release-plan.md)
 
@@ -56,14 +56,14 @@ These are exact planning pins captured 2026-08-22. Any target change requires a 
 
 ## Success Criteria
 
-- [ ] Every target version and platform artifact is exact, checksummed, licensed, and reproducible.
-- [ ] Claude Code and Agent SDK cannot drift.
-- [ ] Codex and ACP protocol changes are measured and pinned by tests.
-- [ ] All existing Agent Chat runtime behaviors and two-conversation isolation pass.
-- [ ] Sprint 110 continuation truth is revalidated on final runtime versions.
-- [ ] One runtime failure does not damage others or durable conversation history.
+- [x] Every target version and platform artifact is exact, checksummed, licensed, and reproducible.
+- [x] Claude Code and Agent SDK cannot drift.
+- [x] Codex and ACP protocol changes are measured and pinned by tests.
+- [x] All existing Agent Chat runtime behaviors and two-conversation isolation pass.
+- [x] Sprint 110 continuation truth is revalidated on final runtime versions.
+- [x] One runtime failure does not damage others or durable conversation history.
 - [ ] Native-platform and packaging evidence exists for darwin-arm64, darwin-x64, and win32-x64.
-- [ ] Architecture, changelog, release notes, tracker, and issue are current.
+- [x] Architecture, changelog, release notes, and tracker are current; issue closeout follows native CI.
 
 ## Dependencies and Gates
 
@@ -99,10 +99,13 @@ These are exact planning pins captured 2026-08-22. Any target change requires a 
 | 2026-08-22 | Run refresh before Composer effort | Effort capability and mapping must be measured against the versions that ship. |
 | 2026-08-22 | Include ACP SDK 1.4.0 in the audit | OpenCode binary and ACP client are one compatibility boundary. |
 | 2026-08-22 | Exact snapshot, no floating latest | Reproducible release artifacts and deterministic rollback. |
+| 2026-08-23 | Start the dedicated branch and audit-only Phase 0 | Sprint 110 is merged; exact pins, manifest, dependencies, and adapters remain behind the separate Phase 0 decision. |
+| 2026-08-23 | Phase 0 recommends the proposed exact snapshot | All nine artifacts exist and match platform layouts; local target-SDK compile, capability probes, continuation, and isolation pass. Native x64/Windows and full behavior remain later gates. |
+| 2026-08-24 | Approve the exact Phase 0 pins and measured protocol plan | Jarmo said “jätka”; implementation may update manifests, dependencies, lockfile, parity validation, measured fixtures, and notices. |
 
 ## Planning Approval
 
-- [ ] Jarmo approves Sprint 111 scope and ordering.
-- [ ] Jarmo approves branch creation.
-- [ ] Phase 0 target/protocol decision approved.
+- [x] Jarmo approves Sprint 111 scope and ordering (2026-08-23).
+- [x] Jarmo approves branch creation (2026-08-23).
+- [x] Phase 0 target/protocol decision approved (2026-08-24).
 - [x] GitHub issue #207 created and assigned to milestone v1.10.0.

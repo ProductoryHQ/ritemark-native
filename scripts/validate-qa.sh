@@ -8,6 +8,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 echo "Running Codex QA validation..."
+node "$PROJECT_ROOT/scripts/validate-agent-runtime-manifest.mjs"
+node --test "$PROJECT_ROOT/scripts/validate-agent-runtime-manifest.test.mjs"
 "$PROJECT_ROOT/.claude/hooks/pre-commit-validator.sh"
 "$PROJECT_ROOT/scripts/validate-chrome-fast.sh"
 
