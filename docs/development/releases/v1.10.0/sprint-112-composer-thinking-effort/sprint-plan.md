@@ -91,7 +91,7 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 - RunDev in `ritemark-demo` passes native range drag and arrow keys, Auto, Escape/focus return, flag-off omission, 300px collision, normal width, and 200% geometry. Release evidence is stored as `docs/releases/v1.10.0/screenshots/1-10-0-thinking-effort.png`.
 - Independent risk-first review found and fixed three contained issues before close: explicit live Auto-only capability precedence, stale-turn callback isolation, and cross-conversation notice isolation. No P0–P3 findings remain.
 - The post-merge Codex review identified four follow-up defects now covered by regression tests: rapid range writes are atomic, queued turns no longer overwrite the current draft effort, Codex model IDs are centralized, and rejected warm Claude overrides reset to Auto without dropping the accepted message.
-- Review-polish RunDev confirms the approved control at a compact 28 px visible track/26 px thumb while retaining a 40 px native drag target; the filled track is rounded behind the thumb at both endpoints.
+- Review-polish RunDev confirms the approved control at a compact 28 px visible track/26 px thumb while retaining a 40 px native drag target; the filled track and stop geometry follow the real thumb centers, forming one continuous indigo envelope around the thumb at both endpoints.
 - The broad legacy `npm test` command still reaches the pre-existing bare-Node Claude Flow integration harness failure where `AgentRunner` transitively resolves `vscode`; the same import chain exists on `origin/main`. Sprint 112’s official QA and every affected focused suite pass.
 
 ## Product Decisions

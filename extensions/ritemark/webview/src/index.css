@@ -387,10 +387,10 @@ body {
   margin-top: 7px;
   appearance: none;
   -webkit-appearance: none;
-  border: 1px solid var(--r-hairline);
+  border: 1px solid var(--r-surface);
   border-radius: 999px;
   background: var(--r-surface);
-  box-shadow: 0 2px 7px rgba(26, 24, 67, 0.2);
+  box-shadow: 0 0 0 2px var(--r-accent), 0 2px 7px rgba(26, 24, 67, 0.2);
 }
 .thinking-effort-range::-moz-range-track {
   height: 40px;
@@ -399,10 +399,10 @@ body {
 .thinking-effort-range::-moz-range-thumb {
   width: 26px;
   height: 26px;
-  border: 1px solid var(--r-hairline);
+  border: 1px solid var(--r-surface);
   border-radius: 999px;
   background: var(--r-surface);
-  box-shadow: 0 2px 7px rgba(26, 24, 67, 0.2);
+  box-shadow: 0 0 0 2px var(--r-accent), 0 2px 7px rgba(26, 24, 67, 0.2);
 }
 .thinking-effort-range:focus-visible::-webkit-slider-thumb {
   outline: 2px solid var(--vscode-focusBorder);

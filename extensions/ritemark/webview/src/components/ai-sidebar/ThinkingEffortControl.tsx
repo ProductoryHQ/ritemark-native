@@ -16,6 +16,11 @@ const LABELS: Record<ThinkingEffort, string> = {
   ultra: 'Ultra',
 };
 
+// The range input is inset 12px and its 26px thumb contributes another 13px
+// to the endpoint center. The 2px accent ring makes the visible envelope 15px.
+const RANGE_ENDPOINT_CENTER_PX = 25;
+const RANGE_THUMB_ENVELOPE_RADIUS_PX = 15;
+
 interface ThinkingEffortControlProps {
   runtimeLabel: string;
   modelLabel: string;
@@ -105,10 +110,15 @@ export function ThinkingEffortControl({
               <div className="absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 overflow-hidden rounded-full border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]">
                 <div
                   className="h-full rounded-full bg-[var(--r-accent)]"
-                  style={{ width: `calc(12px + (100% - 24px) * ${fillPercent / 100})` }}
+                  style={{
+                    width: `calc(${RANGE_ENDPOINT_CENTER_PX + RANGE_THUMB_ENVELOPE_RADIUS_PX}px + (100% - ${RANGE_ENDPOINT_CENTER_PX * 2}px) * ${fillPercent / 100})`,
+                  }}
                 />
               </div>
-              <div className="pointer-events-none absolute inset-x-3 inset-y-0">
+              <div
+                className="pointer-events-none absolute inset-y-0"
+                style={{ insetInline: RANGE_ENDPOINT_CENTER_PX }}
+              >
                 {stopPositions.map(({ level, left }) => (
                   <span
                     key={level}
