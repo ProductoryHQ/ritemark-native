@@ -93,7 +93,7 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 - The post-merge Codex review identified four follow-up defects now covered by regression tests: rapid range writes are atomic, queued turns no longer overwrite the current draft effort, Codex model IDs are centralized, and rejected warm Claude overrides reset to Auto without dropping the accepted message.
 - Review-polish RunDev confirms the approved control at a compact 28 px visible track/26 px thumb while retaining a 40 px native drag target; the filled track and stop geometry follow the real thumb centers, forming one continuous indigo envelope around the thumb at both endpoints.
 - Final user-approved endpoint polish places the thumb's 2 px accent-ring edge flush with the visual track at Low and Max, extends non-maximum progress 8 px beyond the thumb center, and refreshes the single Sprint 112 release screenshot from the final live bundle.
-- PR #220 Codex review found one P3 singleton-capability geometry edge case; the centered zero-range state now has a focused regression test and the official QA gate passes after the fix.
+- PR #220 Codex review found one P3 singleton-capability geometry edge case; the centered zero-range state now has a focused regression test registered in `test:thinking-effort`, and the official QA gate passes after the fix.
 - The broad legacy `npm test` command still reaches the pre-existing bare-Node Claude Flow integration harness failure where `AgentRunner` transitively resolves `vscode`; the same import chain exists on `origin/main`. Sprint 112’s official QA and every affected focused suite pass.
 
 ## Product Decisions
