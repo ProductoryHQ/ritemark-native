@@ -74,6 +74,16 @@ async function run(): Promise<void> {
   assert.ok(markdown.endsWith('\n'), 'file ends with a newline');
   assert.ok(!markdown.includes('undefined'), 'no undefined leaked into the document');
 
+  const fullNames = sessionToMarkdown(baseSession({
+    speakers: [
+      { id: 'speaker_0', label: 'Jarmo Tuisk', colorIndex: 0 },
+      { id: 'speaker_1', label: 'Õie-Kärt Žuravljov', colorIndex: 1 },
+    ],
+  }));
+  assert.ok(fullNames.includes('speakers: [Jarmo Tuisk, "Õie-Kärt Žuravljov"]'));
+  assert.ok(fullNames.includes('**Jarmo Tuisk** · `00:14`'));
+  assert.ok(fullNames.includes('**Õie-Kärt Žuravljov** · `00:41`'));
+
   // ── non-diarized export states why ──
 
   const local = sessionToMarkdown(

@@ -86,6 +86,20 @@ Claude binary/SDK drift, and stale runtime metadata before packaging. Existing
 conversation continuation, approvals, cancellation, and parallel-conversation
 isolation were rerun against this exact snapshot.
 
+## Transcribe Insights you can deliver
+
+Search common languages or enter any language or dialect before generating
+Transcribe Insights. Auto follows a recognized transcript language and otherwise
+falls back to English. Summaries and action items use the chosen language. The
+focused extraction avoids loading coding-agent tools and project instructions;
+key quotes, names, and timestamps remain faithful to the recording.
+
+**Create insights document** now makes a separately named Markdown snapshot.
+It never overwrites an existing file, replaces the primary transcript, changes
+the transcript link, or silently updates an earlier snapshot. Speaker rename
+also accepts full Unicode names with spaces; long labels stay aligned and reveal
+their complete name on hover or focus.
+
 > Native continuation is intentionally version- and configuration-specific. “Previous messages were included” means transcript fallback, not complete private model memory.
 
 Conversation history remains local to this Ritemark installation and profile.

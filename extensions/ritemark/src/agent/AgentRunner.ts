@@ -245,9 +245,7 @@ function normalizeAgentQuestion(input: Record<string, unknown>, toolUseId: strin
 }
 
 function resolveSettingSources(settingSources?: AgentSettingSource[]): AgentSettingSource[] {
-  return settingSources && settingSources.length > 0
-    ? settingSources
-    : DEFAULT_SETTING_SOURCES;
+  return settingSources ?? DEFAULT_SETTING_SOURCES;
 }
 
 // ── One-shot execution (for Flows) ──────────────────────────────────
@@ -487,6 +485,7 @@ export class AgentSession {
   // Config
   private readonly _workspacePath: string;
   private readonly _excludedFolders: string[];
+  private readonly _tools: string[] | undefined;
   private _allowedTools: string[];
   private readonly _settingSources: AgentSettingSource[];
   private readonly _modelId: string | undefined;
@@ -511,6 +510,7 @@ export class AgentSession {
   constructor(config: AgentSessionConfig) {
     this._workspacePath = config.workspacePath;
     this._excludedFolders = config.excludedFolders || DEFAULT_EXCLUDED_FOLDERS;
+    this._tools = config.tools;
     this._allowedTools = config.allowedTools || DEFAULT_TOOLS;
     this._settingSources = resolveSettingSources(config.settingSources);
     this._modelId = config.model;
@@ -962,6 +962,7 @@ export class AgentSession {
       // native plan-mode enforcement (audit §4).
       permissionMode,
       planModeInstructions: PLAN_MODE_INSTRUCTIONS,
+      ...(this._tools !== undefined ? { tools: this._tools } : {}),
       allowedTools: sdkAllowedTools,
       canUseTool: this._handleCanUseTool.bind(this),
       ...(this._mcpServers ? { mcpServers: this._mcpServers } : {}),
@@ -988,6 +989,7 @@ export class AgentSession {
     traceClaude('execution', 'session started', {
       model: this._modelId ?? null,
       settingSources: this._settingSources,
+      tools: this._tools ?? null,
       allowedTools: this._allowedTools,
       workspacePath: this._workspacePath,
     });

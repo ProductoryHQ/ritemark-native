@@ -292,6 +292,8 @@ export interface AgentExecutionOptions {
 export interface AgentSessionConfig {
   workspacePath: string;
   excludedFolders?: string[];
+  /** Built-in Claude tools exposed to the model. Omitted keeps the SDK default; [] removes them. */
+  tools?: string[];
   allowedTools?: string[];
   settingSources?: AgentSettingSource[];
   model?: string;

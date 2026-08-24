@@ -64,6 +64,24 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Native RunDev smoke: range drag, click/arrow operation, Auto checkbox, Escape/focus return, 300px sidebar collision, normal width, and 200% zoom geometry pass in `ritemark-demo` (2026-08-24).
 - [x] Native range/checkbox names, value text, keyboard semantics, live status copy, and reduced-motion CSS contract are present; no bespoke slider keyboard behavior is used.
 
+## Transcribe Insights and speaker names (Sprint 113)
+
+- [x] Auto/known/custom language contract, catalog search, custom normalization, fallback, invalid-wire, data-only prompt language, quote-fidelity instruction, and legacy-English provenance tests pass.
+- [x] Insights-only Markdown, `.md` normalization, Windows-invalid names, primary/existing/case-alias rejection, exclusive-create race, write-failure cleanup, and transcript bytes/mtime isolation tests pass.
+- [x] Full-name normalization, Unicode, empty rejection, transcript export, Insights prompt attribution, and interactive-target playback guards pass.
+- [x] Runtime-policy tests confirm low extraction effort, no built-in SDK tools, no coding-agent setting sources, and unchanged default session behavior elsewhere.
+- [x] Post-fix authenticated timing runs against the same 48-minute transcript complete in 27.2s and 15.2s versus the 3m43.5s baseline; the final run persists German output correctly. Timestamp-seek regression remains covered separately below.
+- [ ] Manual custom-language generation preserves verbatim source quotes and working timestamp seeks; authenticated known-language German generation already passed, and Jarmo deferred this remaining custom call to release QA.
+- [x] Manual save-dialog success creates a separate Estonian Insights Markdown snapshot and leaves the workbench primary action as **Save to document**.
+- [ ] Manual save-dialog cancel, collision, primary-path refusal, optional Open action, and broader transcript-link isolation matrix pass.
+- [ ] Manual keyboard, screen-reader labels, narrow rail, 200% zoom, light/dark/high-contrast, speaker-chip/gutter ellipsis, and full-name tooltip pass.
+
+First draft PR #217 smoke on 2026-08-24 failed two checks: **Regenerate** preceded the language selector in DOM/tab order, and approximately 207% zoom produced `innerWidth=354` with `scrollWidth=1080`, clipping the editor. Local DOM-order and responsive-containment fixes plus automated regressions were completed; manual PR retest was still pending at that checkpoint, so the rows remained unchecked.
+
+The first responsive-fix rerun passed keyboard order, horizontal containment, wider zoom, and long-name checks, but the exact `354×300` case still collapsed Insights to `clientHeight=0`, clipped focused rail controls, and showed a native orange **Regenerate** outline. A second local fix then bounded the upper chrome and rail scrollers, reserved two equal narrow pane rows, and applied the approved 4 px translucent indigo ring. Another manual rerun was still required at that checkpoint; the rows remained unchecked.
+
+The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: document/body/root stay exactly viewport-sized with zero document overflow; chrome is 150 px; pane rows are `74.9904px`; transcript and Insights use bounded independent scrollers; language, **Regenerate**, and **Create insights document** focus rectangles are wholly visible; and **Regenerate** has the 4 px translucent indigo ring with no orange native outline. `654×300` high zoom, `1400×766` desktop, and long-name ellipsis/full accessible-name checks also pass. The later live R6 smoke successfully created `KUMi AI arutelu - Risto Raaperiga-insights.md` as a separate Estonian snapshot while the workbench still showed **Save to document**. Authenticated known-language generation later passed in German; custom-language generation and the broader negative save/spoken/theme matrix remain explicit release-QA rows by owner decision.
+
 ## Automated gates
 
 - [x] Extension TypeScript compile and bundle.
@@ -78,4 +96,5 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 
 ## Remaining release scope
 
+- [ ] Sprint 113 residual custom-language plus manual negative save-dialog, spoken screen-reader, and theme/high-contrast matrix; authenticated known-language generation and sprint closure already passed.
 - [ ] Final macOS arm64/x64 and Windows candidate gates.

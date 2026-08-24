@@ -11,9 +11,10 @@ Turn a meeting, interview or workshop recording into a speaker-attributed transc
 - **Transcribe an audio file** — `.m4a`, `.mp3`, `.wav`, `.flac`, `.ogg`, `.aac`
 - **Choose where the audio goes** — on-device (private, free) or ElevenLabs (separates speakers, costs about $0.22 per hour)
 - **Click any line to hear it** — verify a quote against the recording before you use it
-- **Name the speakers once** — the rename applies to every line and to the saved document
+- **Name the speakers once** — full names and spaces are preserved everywhere; long labels stay neatly ellipsized
 - **See where the engine was unsure** — likely-misheard words are highlighted
-- **Pull out the summary, decisions, action items and quotes** — each with a timestamp that plays the moment it came from
+- **Pull out the summary, decisions, action items and quotes in any language** — each with a timestamp that plays the moment it came from
+- **Create a separate Insights document** — choose its name and location without changing the transcript
 - **Save it as a document** — in a folder you pick, opened in Ritemark's editor
 
 ---
@@ -47,13 +48,19 @@ The recording opens in the **Transcript Workbench**:
 - **Click a line** — the audio jumps there and plays, and the line highlights as it goes
 - **Click the waveform** — seek anywhere
 - **1×** — cycle through 1×, 1.25×, 1.5×, 2×
-- **Click a speaker chip** — rename that speaker everywhere. The chip tells you how many segments it will change
+- **Click a speaker chip** — rename that speaker everywhere. Full names such as `Jarmo Tuisk` work normally; Space and arrow keys edit the name instead of controlling playback
 
 Amber, dotted-underlined words are ones the engine was not confident about — usually names, product terms, or a switch between languages. Click the line to hear what was actually said.
 
 ### 4. Insights
 
-**Generate insights** reads the transcript and pulls out:
+Search for a language by its English name, native name, common alias, or code —
+or type any language or dialect and choose **Use …** — then select **Generate
+insights**. **Auto** follows the detected transcript language when Ritemark
+recognizes it and otherwise falls back to English. The choice affects Insights
+only; it never translates the raw transcript.
+
+Insights pull out:
 
 - a summary
 - decisions
@@ -61,15 +68,25 @@ Amber, dotted-underlined words are ones the engine was not confident about — u
 - open questions
 - key quotes, verbatim
 
-Every item carries a timestamp. Click it and the recording plays from there — so you can check any claim in a couple of seconds. Anything the model cannot tie to a real line in the transcript is discarded rather than shown to you.
+Every item carries a timestamp. Click it and the recording plays from there — so you can check any claim in a couple of seconds. Anything the model cannot tie to a real line in the transcript is discarded rather than shown to you. Generated prose uses the chosen language; quotes, speaker names, and timestamps stay verbatim.
 
-Insights use whichever AI runtime you already have set up. On a non-diarized transcript nothing is attributed to a named person, because the transcript does not know who spoke.
+Insights use whichever AI runtime you already have set up, but run as a focused extraction without coding tools or project instructions. On a non-diarized transcript nothing is attributed to a named person, because the transcript does not know who spoke.
+
+After generation, **Create insights document** asks for a filename and location.
+It creates a new Insights-only Markdown snapshot with provenance, timestamps,
+language, and model attribution. Existing files and the primary transcript are
+never replacement targets. Cancelling or a failed write creates nothing; later
+regeneration does not update a snapshot you already created.
 
 ### 5. Save it
 
 **Save to document** asks which folder, then writes Markdown with front matter, speaker headings and timestamps — and opens it in Ritemark's editor. The document stays linked in the workbench header.
 
 From there it is an ordinary Ritemark document: edit it, export it to PDF or Word, or ask the AI sidebar about it. With the workbench open, the sidebar treats the saved transcript as the active file.
+
+The transcript Save action and **Create insights document** are deliberately
+separate. Saving the transcript keeps its established link in the workbench;
+creating an Insights document never changes that link.
 
 ---
 

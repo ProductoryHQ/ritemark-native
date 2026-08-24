@@ -55,6 +55,8 @@ export interface Speaker {
 export interface TranscriptInsights {
   generatedAt: string;
   model: string;
+  /** Optional so Sprint 108 sessions remain loadable without migration. */
+  language?: import('./insightsLanguage').InsightsLanguageMetadata;
   summary?: string;
   items: Array<{
     kind: 'decision' | 'action' | 'quote' | 'question';

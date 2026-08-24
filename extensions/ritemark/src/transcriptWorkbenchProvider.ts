@@ -25,9 +25,28 @@ import { trackEvent } from './analytics/posthog';
 import { saveTranscriptTo } from './speech/autoExport';
 import { generateInsights, insightsWorkspacePath } from './speech/insights';
 import { getSetupStatus } from './agent/setup';
+import {
+  coerceInsightsLanguageMetadata,
+  resolveInsightsLanguage,
+  type InsightsLanguageSelection,
+} from './speech/insightsLanguage';
+import {
+  InsightsTargetError,
+  insightsToMarkdown,
+  normalizeInsightsTargetPath,
+  suggestedInsightsFileName,
+  validateInsightsTargetPath,
+  writeInsightsDocumentExclusive,
+} from './speech/insightsMarkdown';
+import { normalizeSpeakerLabel } from './speech/speakerNames';
+import {
+  parseTranscriptWorkbenchRequest,
+  type InsightsDocumentResult,
+} from './speech/workbenchProtocol';
 
 /** Remembers the folder chosen last time, so Save opens where they were. */
 const LAST_SAVE_DIR_KEY = 'speech:lastSaveDir';
+const LAST_INSIGHTS_SAVE_DIR_KEY = 'speech:lastInsightsSaveDir';
 
 class AudioDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -83,13 +102,24 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
     };
     panel.webview.html = this._getHtml(panel.webview, document.uri);
 
-    panel.webview.onDidReceiveMessage(async (message) => {
+    panel.webview.onDidReceiveMessage(async (rawMessage) => {
+      let message;
+      try {
+        message = parseTranscriptWorkbenchRequest(rawMessage);
+      } catch (error) {
+        void panel.webview.postMessage({
+          type: 'workbench:insightsState',
+          state: 'failed',
+          message: error instanceof Error ? error.message : 'Invalid workbench request.',
+        });
+        return;
+      }
       switch (message.type) {
         case 'workbench:ready':
           await this._push(fsPath, panel);
           break;
         case 'workbench:transcribe':
-          await this._startTranscription(fsPath, panel, message.engineId as EngineId);
+          await this._startTranscription(fsPath, panel, message.engineId);
           break;
         case 'workbench:renameSpeaker':
           await this._renameSpeaker(fsPath, message.speakerId, message.label);
@@ -101,10 +131,13 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
           await this._openDocument(fsPath, panel);
           break;
         case 'workbench:generateInsights':
-          await this._generateInsights(fsPath, panel);
+          await this._generateInsights(fsPath, panel, message.language);
           break;
         case 'workbench:cancelInsights':
           this._insightRuns.get(fsPath)?.abort();
+          break;
+        case 'workbench:createInsightsDocument':
+          await this._createInsightsDocument(fsPath, panel);
           break;
         case 'workbench:openSettings':
           await vscode.commands.executeCommand('ritemark.aiSettings');
@@ -125,13 +158,13 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
     const session = await this._store.get(sessionIdForPath(fsPath));
     if (!session) return;
 
-    const trimmed = String(label ?? '').trim();
-    if (!trimmed) return;
+    const normalized = normalizeSpeakerLabel(label);
+    if (!normalized) return;
 
     await this._store.save({
       ...session,
       speakers: session.speakers.map((speaker) =>
-        speaker.id === speakerId ? { ...speaker, label: trimmed } : speaker,
+        speaker.id === speakerId ? { ...speaker, label: normalized } : speaker,
       ),
     });
 
@@ -191,7 +224,11 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
    * Runs on the existing agent runtime and stores the result on the session, so
    * it survives reopening and reaches the saved document.
    */
-  private async _generateInsights(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
+  private async _generateInsights(
+    fsPath: string,
+    panel: vscode.WebviewPanel,
+    selectedLanguage: InsightsLanguageSelection,
+  ): Promise<void> {
     if (this._insightRuns.has(fsPath)) return;
 
     const session = await this._store.get(sessionIdForPath(fsPath));
@@ -205,6 +242,10 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
       const insights = await generateInsights({
         session,
         workspacePath: insightsWorkspacePath(session),
+        language: {
+          selected: selectedLanguage,
+          resolved: resolveInsightsLanguage(selectedLanguage, session.language),
+        },
         anthropicApiKey: await this._context.secrets.get('anthropic-api-key'),
         signal: controller.signal,
       });
@@ -216,13 +257,87 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
     } catch (error) {
       void panel.webview.postMessage({
         type: 'workbench:insightsState',
-        state: 'failed',
-        message: error instanceof Error ? error.message : 'Could not generate insights.',
+        state: controller.signal.aborted ? 'idle' : 'failed',
+        ...(controller.signal.aborted
+          ? {}
+          : { message: error instanceof Error ? error.message : 'Could not generate insights.' }),
       });
     } finally {
       this._insightRuns.delete(fsPath);
       await this._push(fsPath, panel);
     }
+  }
+
+  /** R3: create an Insights snapshot without entering the transcript save path. */
+  private async _createInsightsDocument(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {
+    const session = await this._store.get(sessionIdForPath(fsPath));
+    if (!session?.insights) return;
+
+    const remembered = this._context.globalState.get<string>(LAST_INSIGHTS_SAVE_DIR_KEY);
+    const linkedDir = session.exportPath ? path.dirname(session.exportPath) : undefined;
+    const fallback = linkedDir
+      ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+      ?? path.dirname(fsPath);
+    const defaultDir = remembered && fs.existsSync(remembered) ? remembered : fallback;
+    const suggestedName = suggestedInsightsFileName(session);
+
+    for (;;) {
+      const picked = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(path.join(defaultDir, suggestedName)),
+        filters: { Markdown: ['md'] },
+        saveLabel: 'Create insights document',
+        title: 'Create insights document',
+      });
+      if (!picked) {
+        this._postInsightsDocumentResult(panel, 'cancelled');
+        return;
+      }
+
+      let target: string;
+      try {
+        target = normalizeInsightsTargetPath(picked.fsPath);
+        await validateInsightsTargetPath(target, session.exportPath);
+        await writeInsightsDocumentExclusive(target, insightsToMarkdown(session, session.insights));
+      } catch (error) {
+        if (
+          error instanceof InsightsTargetError ||
+          (error as NodeJS.ErrnoException).code === 'EEXIST'
+        ) {
+          await vscode.window.showWarningMessage(
+            error instanceof InsightsTargetError
+              ? error.message
+              : 'Choose a new filename. Insights documents do not replace existing files.',
+          );
+          continue;
+        }
+        void vscode.window.showErrorMessage(
+          `Could not create the Insights document: ${error instanceof Error ? error.message : 'Unknown write error.'}`,
+        );
+        this._postInsightsDocumentResult(panel, 'failed');
+        return;
+      }
+
+      await this._context.globalState.update(LAST_INSIGHTS_SAVE_DIR_KEY, path.dirname(target));
+      this._postInsightsDocumentResult(panel, 'success');
+      void vscode.window.showInformationMessage(
+        `Insights saved to ${path.basename(target)}.`,
+        'Open',
+      ).then((choice) => {
+        if (choice === 'Open') {
+          return vscode.commands.executeCommand('vscode.open', vscode.Uri.file(target), { preview: false });
+        }
+        return undefined;
+      });
+      return;
+    }
+  }
+
+  private _postInsightsDocumentResult(
+    panel: vscode.WebviewPanel,
+    status: InsightsDocumentResult['status'],
+  ): void {
+    const message: InsightsDocumentResult = { type: 'workbench:insightsDocumentResult', status };
+    void panel.webview.postMessage(message);
   }
 
   /**
@@ -296,12 +411,22 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
       .list()
       .find((candidate) => candidate.audioPath === fsPath && isActive(candidate));
 
+    const projectedSession = session?.insights
+      ? {
+          ...session,
+          insights: {
+            ...session.insights,
+            language: coerceInsightsLanguageMetadata(session.insights.language),
+          },
+        }
+      : session;
+
     void panel.webview.postMessage({
       type: 'workbench:state',
       data: {
         audioUri: panel.webview.asWebviewUri(vscode.Uri.file(fsPath)).toString(),
         audioName: path.basename(fsPath),
-        session,
+        session: projectedSession,
         job: job ?? null,
         engines,
         savedDocument:

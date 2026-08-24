@@ -82,6 +82,8 @@ export class ClaudeCodeSession implements RuntimeSession {
       excludedFolders: config.excludedFolders,
       extraSystemPromptAppend: config.extraSystemPrompt,
       mcpServers: config.mcpServers,
+      tools: config.availableTools,
+      settingSources: config.settingSources,
       allowedTools: config.allowedTools,
       approvalMode: config.approvalMode ?? 'auto',
       planFirst: config.planFirst === true,

@@ -19,6 +19,7 @@ import { InsightsRail, type Insights, type InsightsState } from './InsightsRail'
 import {
   activeSegmentIndex,
   formatClock,
+  isInteractivePlaybackTarget,
   isLowConfidence,
   segmentsForSpeaker,
   speakerColor,
@@ -27,6 +28,12 @@ import {
   type WorkbenchSpeaker,
   type WorkbenchWord,
 } from './playback';
+import {
+  resolveInsightsLanguage,
+  type InsightsLanguageSelection,
+} from '../../../../../src/speech/insightsLanguage';
+import { normalizeSpeakerLabel } from '../../../../../src/speech/speakerNames';
+import { WORKBENCH_LAYOUT_CLASSES } from './layout';
 
 interface EngineStatus {
   id: string;
@@ -75,6 +82,8 @@ export function Workbench() {
   const [followPlayback, setFollowPlayback] = useState(true);
   const [insightsState, setInsightsState] = useState<InsightsState>('idle');
   const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [insightsLanguage, setInsightsLanguage] = useState<InsightsLanguageSelection>({ kind: 'auto' });
+  const [insightsDocumentResultSerial, setInsightsDocumentResultSerial] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -87,6 +96,8 @@ export function Workbench() {
       } else if (event.data?.type === 'workbench:insightsState') {
         setInsightsState(event.data.state as InsightsState);
         setInsightsError(event.data.message ?? null);
+      } else if (event.data?.type === 'workbench:insightsDocumentResult') {
+        setInsightsDocumentResultSerial((value) => value + 1);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -97,6 +108,11 @@ export function Workbench() {
   const session = state?.session ?? null;
   const segments = session?.segments ?? [];
   const activeIndex = useMemo(() => activeSegmentIndex(segments, currentTime), [segments, currentTime]);
+
+  useEffect(() => {
+    if (!session) return;
+    setInsightsLanguage(session.insights?.language?.selected ?? { kind: 'auto' });
+  }, [session?.id]);
 
   // Duration comes from the element once metadata loads; the session's stored
   // value can be 0 when the length could not be probed before transcribing.
@@ -122,6 +138,7 @@ export function Workbench() {
   // Keyboard: space toggles, arrows skip. Bound on the container rather than
   // the document so it cannot fight the editor's own shortcuts.
   const onKeyDown = (event: React.KeyboardEvent) => {
+    if (isInteractivePlaybackTarget(event.target)) return;
     if (event.key === ' ') {
       event.preventDefault();
       togglePlay();
@@ -153,7 +170,7 @@ export function Workbench() {
   const lowConfidenceEngine = session.engine;
 
   return (
-    <div className="flex h-full flex-col outline-none" tabIndex={0} onKeyDown={onKeyDown}>
+    <div className={WORKBENCH_LAYOUT_CLASSES.root} tabIndex={0} onKeyDown={onKeyDown}>
       <audio
         ref={audioRef}
         src={state.audioUri}
@@ -164,8 +181,9 @@ export function Workbench() {
         onPause={() => setPlaying(false)}
       />
 
-      <header className="shrink-0 border-b border-hairline bg-surface-muted px-5 py-3">
-        <div className="flex items-start gap-3">
+      <div className={WORKBENCH_LAYOUT_CLASSES.chrome} data-workbench-chrome>
+      <header className="min-w-0 shrink-0 border-b border-hairline bg-surface-muted px-3 py-3 sm:px-5">
+        <div className="flex min-w-0 flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-base font-semibold tracking-tight">{state.audioName}</h1>
             <div className="mt-0.5 text-[11px] text-ink-muted">
@@ -180,12 +198,12 @@ export function Workbench() {
 
           {/* Saving is the act that makes this the user's — so they choose the
               folder, and the document they made stays linked here afterwards. */}
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
             {state.savedDocument && (
               <button
                 type="button"
                 onClick={() => vscode.postMessage({ type: 'workbench:openDocument' })}
-                className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft"
+                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft sm:max-w-[16rem]"
                 title={`Open ${state.savedDocument.path}`}
               >
                 <Icon name="file-text" size={14} />
@@ -202,7 +220,7 @@ export function Workbench() {
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex min-w-0 items-center gap-2 sm:gap-3">
           <Button
             size="icon"
             className="shrink-0 rounded-full"
@@ -254,18 +272,21 @@ export function Workbench() {
         onChangeRename={setRenameValue}
         onCancelRename={() => setRenaming(null)}
         onCommitRename={(speakerId) => {
-          vscode.postMessage({ type: 'workbench:renameSpeaker', speakerId, label: renameValue });
+          const normalized = normalizeSpeakerLabel(renameValue);
+          if (!normalized) return;
+          vscode.postMessage({ type: 'workbench:renameSpeaker', speakerId, label: normalized });
           setRenaming(null);
         }}
       />
+      </div>
 
-      <div className="flex min-h-0 flex-1">
+      <div className={WORKBENCH_LAYOUT_CLASSES.panes} data-workbench-panes>
         <div
           ref={transcriptRef}
-          className="flex-1 overflow-y-auto px-5 py-4"
+          className={WORKBENCH_LAYOUT_CLASSES.transcript}
           onWheel={() => setFollowPlayback(false)}
         >
-          <div className="mx-auto max-w-3xl">
+          <div className="mx-auto min-w-0 max-w-3xl">
             {segments.map((segment, index) => (
               <SegmentRow
                 key={segment.id}
@@ -286,7 +307,15 @@ export function Workbench() {
           state={insightsState}
           error={insightsError}
           runtimeReady={state.runtimeReady !== false}
-          savedDocumentName={state.savedDocument?.name ?? null}
+          selectedLanguage={insightsLanguage}
+          resolvedLanguage={resolveInsightsLanguage(insightsLanguage, session.language)}
+          documentResultSerial={insightsDocumentResultSerial}
+          onLanguageChange={setInsightsLanguage}
+          onGenerate={() => vscode.postMessage({
+            type: 'workbench:generateInsights',
+            language: insightsLanguage,
+          })}
+          onCreateDocument={() => vscode.postMessage({ type: 'workbench:createInsightsDocument' })}
           onSeek={(seconds) => seek(seconds, true)}
         />
       </div>
@@ -372,9 +401,9 @@ function SpeakerBar({
   if (session.speakerSeparation === 'none') {
     const cloud = engines.find((engine) => !engine.isLocal);
     return (
-      <div className="flex shrink-0 items-center gap-2 border-b border-hairline px-5 py-2">
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-2 sm:px-5">
         <Icon name="info" size={14} className="shrink-0 text-ink-faint" />
-        <span className="text-[11px] text-ink-muted">
+        <span className="min-w-0 flex-1 text-[11px] text-ink-muted">
           On-device transcription cannot separate speakers.
         </span>
         {cloud?.readiness.ready && (
@@ -393,23 +422,24 @@ function SpeakerBar({
   const unattributed = session.segments.filter((segment) => !segment.speaker).length;
 
   return (
-    <div className="relative flex shrink-0 flex-wrap items-center gap-1.5 border-b border-hairline px-5 py-2">
+    <div className="relative flex min-w-0 shrink-0 flex-wrap items-center gap-1.5 border-b border-hairline px-3 py-2 sm:px-5">
       {session.speakers.map((speaker) => {
         const color = speakerColor(speaker.colorIndex);
         const isRenaming = renaming === speaker.id;
         return (
-          <div key={speaker.id} className="relative">
+          <div key={speaker.id} className="relative min-w-0">
             <button
               type="button"
               onClick={() => onStartRename(speaker)}
               className={[
-                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                'inline-flex max-w-48 min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
                 isRenaming ? 'border-accent ring-[3px] ring-[var(--r-accent-soft)]' : 'border-hairline hover:border-accent-fainter',
               ].join(' ')}
-              title="Rename this speaker everywhere"
+              title={`Rename ${speaker.label}`}
+              aria-label={`Rename ${speaker.label}`}
             >
-              <span className="size-2 rounded-full" style={{ background: color.dot }} />
-              {speaker.label}
+              <span className="size-2 shrink-0 rounded-full" style={{ background: color.dot }} />
+              <span className="min-w-0 truncate">{speaker.label}</span>
             </button>
 
             {isRenaming && (
@@ -426,6 +456,8 @@ function SpeakerBar({
                     if (event.key === 'Escape') onCancelRename();
                   }}
                   className="w-full rounded-md border border-accent px-2 py-1.5 text-xs text-ink-strong outline-none ring-[3px] ring-[var(--r-accent-soft)]"
+                  aria-label={`Full name for ${speaker.label}`}
+                  aria-invalid={normalizeSpeakerLabel(renameValue) ? undefined : true}
                 />
                 <p className="mt-2 text-[11px] leading-relaxed text-ink-muted">
                   Applies to all {segmentsForSpeaker(session.segments, speaker.id)} segments spoken by{' '}
@@ -435,7 +467,11 @@ function SpeakerBar({
                   <Button variant="secondary" size="sm" onClick={onCancelRename}>
                     Cancel
                   </Button>
-                  <Button size="sm" onClick={() => onCommitRename(speaker.id)}>
+                  <Button
+                    size="sm"
+                    disabled={!normalizeSpeakerLabel(renameValue)}
+                    onClick={() => onCommitRename(speaker.id)}
+                  >
                     Rename
                   </Button>
                 </div>
@@ -483,20 +519,26 @@ const SegmentRow = forwardRef<HTMLDivElement, SegmentRowProps>(function SegmentR
       ref={ref}
       onClick={onSeek}
       className={[
-        'group flex cursor-pointer gap-3 rounded-lg border-l-2 px-3 py-2 transition-colors',
+        'group flex min-w-0 cursor-pointer gap-3 rounded-lg border-l-2 px-3 py-2 transition-colors',
         active ? 'border-accent bg-accent-soft/40' : 'border-transparent hover:bg-surface-muted',
       ].join(' ')}
       title="Click to play from here"
     >
-      <div className="w-20 shrink-0 text-right">
+      <div className="w-20 min-w-0 shrink-0 text-right">
         {showSpeaker && (
-          <div className="text-[11px] font-bold leading-tight" style={color ? { color: color.text } : undefined}>
+          <div
+            className="block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold leading-tight"
+            style={color ? { color: color.text } : undefined}
+            title={label ?? undefined}
+            aria-label={label ?? undefined}
+            tabIndex={0}
+          >
             {label}
           </div>
         )}
         <div className="mt-0.5 text-[10px] tabular-nums text-ink-faint">{formatClock(segment.start)}</div>
       </div>
-      <p className={['flex-1 text-sm leading-relaxed', active ? 'text-ink-strong' : 'text-ink-body'].join(' ')}>
+      <p className={['min-w-0 flex-1 break-words text-sm leading-relaxed', active ? 'text-ink-strong' : 'text-ink-body'].join(' ')}>
         <SegmentText segment={segment} engine={engine} />
       </p>
     </div>

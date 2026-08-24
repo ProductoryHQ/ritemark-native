@@ -1,4 +1,4 @@
-import type { AgentId, AgentProgress, AgentQuestion, AgentQuestionItem, ActiveFileContext } from '../agent/types';
+import type { AgentId, AgentProgress, AgentQuestion, AgentQuestionItem, AgentSettingSource, ActiveFileContext } from '../agent/types';
 import type {
   RuntimeContinuationDescriptorV1,
   RuntimeContinuationRequest,
@@ -93,6 +93,10 @@ export interface RuntimeSessionConfig {
   excludedFolders?: string[];
   extraSystemPrompt?: string;
   mcpServers?: Record<string, unknown>;
+  /** Built-in tools exposed to the model. Omitted keeps the runtime default; [] removes them. */
+  availableTools?: string[];
+  /** Provider setting scopes to load. Omitted keeps defaults; [] loads none. */
+  settingSources?: AgentSettingSource[];
   allowedTools?: string[];
   /** API key for Claude Code (api-key auth method) */
   anthropicApiKey?: string;

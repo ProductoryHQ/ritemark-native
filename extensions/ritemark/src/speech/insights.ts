@@ -15,12 +15,14 @@ import { createRuntime } from '../runtime';
 import * as modelCatalog from '../ai/modelCatalog';
 import { buildInsightsPrompt, parseInsightsResponse } from './insightsParsing';
 import type { TranscriptInsights, TranscriptSession } from './types';
+import type { InsightsLanguageMetadata } from './insightsLanguage';
 
 export * from './insightsParsing';
 
 export interface GenerateInsightsOptions {
   session: TranscriptSession;
   workspacePath: string;
+  language: InsightsLanguageMetadata;
   /**
    * BYOK key for users authenticated by API key rather than a Claude.ai login.
    * The AI sidebar threads this through too; without it those users get a
@@ -57,7 +59,13 @@ export async function generateInsights(options: GenerateInsightsOptions): Promis
     // like an instruction could get Bash/Write/Edit executed without an
     // approval ever being shown. This task needs no tools at all: the
     // transcript is in the prompt and the answer is text.
+    availableTools: [],
     allowedTools: [],
+    // This prompt is self-contained. Loading CLAUDE.md, plugins, project
+    // agents, and personal coding-agent effort defaults only adds unrelated
+    // context and made a real 48-minute transcript run consume ~82k input
+    // context tokens before producing its memo.
+    settingSources: [],
     approvalMode: 'auto',
     onProgress: () => undefined,
     onApprovalRequest: () => undefined,
@@ -77,12 +85,19 @@ export async function generateInsights(options: GenerateInsightsOptions): Promis
 
   try {
     await session.prompt({
-      prompt: buildInsightsPrompt(options.session),
+      prompt: buildInsightsPrompt(options.session, options.language.resolved),
       timeoutMinutes: 5,
+      // This is deterministic extraction, not an open-ended coding task. With
+      // provider-controlled Auto a 48-minute transcript spent 15k+ output
+      // tokens (mostly reasoning) before returning a ~3k-character memo.
+      thinkingEffort: 'low',
     });
 
     const text = await finished;
-    return parseInsightsResponse(text, options.session.segments, model, new Date().toISOString());
+    return {
+      ...parseInsightsResponse(text, options.session.segments, model, new Date().toISOString()),
+      language: options.language,
+    };
   } finally {
     options.signal?.removeEventListener('abort', onAbort);
     session.dispose();
