@@ -5,6 +5,10 @@ import type {
   ThinkingEffort,
   ThinkingEffortCapability,
 } from './types';
+import {
+  getThinkingEffortFillWidth,
+  THINKING_EFFORT_ENDPOINT_CENTER_PX,
+} from './thinkingEffortGeometry';
 
 const LABELS: Record<ThinkingEffort, string> = {
   auto: 'Auto',
@@ -15,11 +19,6 @@ const LABELS: Record<ThinkingEffort, string> = {
   max: 'Max',
   ultra: 'Ultra',
 };
-
-// The 26px thumb contributes 13px and its 2px accent ring another 2px.
-// Insetting the input by 2px makes the ring's outer edge flush with the track.
-const RANGE_ENDPOINT_CENTER_PX = 15;
-const PROGRESS_OVERHANG_PX = 8;
 
 interface ThinkingEffortControlProps {
   runtimeLabel: string;
@@ -54,10 +53,7 @@ export function ThinkingEffortControl({
 
   const manual = value === 'auto' ? lastManual ?? fallbackManual : value;
   const selectedIndex = Math.max(0, manual ? levels.indexOf(manual) : 0);
-  const fillPercent = levels.length <= 1 ? 0 : (selectedIndex / (levels.length - 1)) * 100;
-  const fillWidth = selectedIndex === levels.length - 1
-    ? '100%'
-    : `calc(${RANGE_ENDPOINT_CENTER_PX + PROGRESS_OVERHANG_PX}px + (100% - ${RANGE_ENDPOINT_CENTER_PX * 2}px) * ${fillPercent / 100})`;
+  const fillWidth = getThinkingEffortFillWidth(levels.length, selectedIndex);
   const disabledReason = capability?.source === 'runtime-live'
     ? 'Thinking effort becomes available after OpenCode advertises supported levels for this conversation.'
     : 'This model chooses its own thinking effort.';
@@ -118,7 +114,7 @@ export function ThinkingEffortControl({
               </div>
               <div
                 className="pointer-events-none absolute inset-y-0"
-                style={{ insetInline: RANGE_ENDPOINT_CENTER_PX }}
+                style={{ insetInline: THINKING_EFFORT_ENDPOINT_CENTER_PX }}
               >
                 {stopPositions.map(({ level, left }) => (
                   <span
