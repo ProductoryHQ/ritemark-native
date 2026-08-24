@@ -1,6 +1,16 @@
 # Ritemark 1.10.0 Test Checklist
 
-This checklist accumulates release evidence across Sprints 109–112.
+This checklist accumulates release evidence across Sprints 109–114.
+
+## Trusted Windows installation (Sprint 114)
+
+- [ ] Signed-canary Windows runner proof passes content-based payload inventory, Azure Artifact Signing, Inno SignTool+dlib setup/uninstaller signing, silent install, installed-tree verification, and uninstall.
+- [ ] Exact-tag release workflow emits the canonical installer and channel manifest only after all trust checks pass.
+- [ ] Installer, hosted Store URL, and GitHub Release direct asset have one recorded SHA-256 and publisher `Productory Services OÜ`.
+- [ ] Partner Center preprocessing and certification pass against the immutable `downloads.ritemark.app/windows/v1.10.0/` object.
+- [ ] Kristiina's clean Windows 11 machine has Smart App Control On and no Ritemark-attributable Code Integrity 3076/3077 blocks through install, launch, representative native paths, and uninstall.
+- [ ] Store-origin clean install passes; direct download remains secondary and documents signature/hash without security-bypass instructions.
+- [ ] Jarmo explicitly clears Windows Gate 2 for the exact shipping hash; any rebuild resets this section.
 
 ## Durable conversations (Sprint 109)
 

@@ -69,10 +69,10 @@ echo "  ✓ Bundled agent runtimes present"
 # Defer to validate-build-output.sh for full Check 5 (manifest-driven arch
 # verification). Skip if the host doesn't have python3/file (older macOS).
 if command -v python3 >/dev/null 2>&1 && command -v file >/dev/null 2>&1; then
-    if ! "$SCRIPT_DIR/validate-build-output.sh" win32-x64 >/dev/null 2>&1; then
+    if ! RITEMARK_WINDOWS_TRUST_MODE=unsigned-canary "$SCRIPT_DIR/validate-build-output.sh" win32-x64 >/dev/null 2>&1; then
         echo -e "${YELLOW}WARNING: validate-build-output.sh win32-x64 reported issues${NC}"
         echo "  Re-running with full output for diagnosis:"
-        "$SCRIPT_DIR/validate-build-output.sh" win32-x64 || true
+        RITEMARK_WINDOWS_TRUST_MODE=unsigned-canary "$SCRIPT_DIR/validate-build-output.sh" win32-x64 || true
         echo ""
         echo -e "${RED}ERROR: bundled runtime validation failed${NC}"
         exit 1
@@ -122,8 +122,9 @@ docker run --rm \
     "/DSourcePath=Z:\\work\\VSCode-win32-x64" \
     "installer/windows/ritemark-build.iss"
 
-# Check if installer was created
-INSTALLER_NAME="Ritemark-${VERSION}-win32-x64-setup.exe"
+# Docker/Wine cannot use the release SignTool integration. The .iss contract
+# therefore emits a visibly non-release filename whenever /DSign is absent.
+INSTALLER_NAME="Ritemark-${VERSION}-win32-x64-setup-UNSIGNED-NON-RELEASE.exe"
 # Inno writes to installer-output/ (iss OutputDir); publish location is dist/
 BUILT_PATH="$PROJECT_ROOT/installer-output/$INSTALLER_NAME"
 INSTALLER_PATH="$DIST_DIR/$INSTALLER_NAME"
@@ -151,7 +152,7 @@ CHECKSUM=$(cat "$CHECKSUM_PATH")
 # Summary
 echo
 echo "========================================"
-echo -e "${GREEN}✓ Windows installer created!${NC}"
+echo -e "${GREEN}✓ Unsigned Windows test installer created${NC}"
 echo "========================================"
 echo
 echo "Output:"
@@ -162,6 +163,7 @@ echo "Details:"
 echo "  Version:  $VERSION"
 echo "  Size:     $(du -h "$INSTALLER_PATH" | cut -f1)"
 echo "  SHA256:   $CHECKSUM"
+echo "  Channel:  NON-RELEASE — cannot be uploaded as Ritemark-Setup.exe"
 echo
 echo "To test:"
 echo "  1. Copy installer to Windows machine"

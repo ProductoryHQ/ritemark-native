@@ -8,6 +8,8 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -331,40 +333,27 @@ echo "  open \"$APP_PATH\""
 echo ""
 
 # -----------------------------------------------------------------------------
-# Check 7: Windows Code Signing Verification (win32 only, opt-in)
+# Check 7: Windows PE trust verification (win32 only, explicit mode)
 # -----------------------------------------------------------------------------
 if [[ "$TARGET" == "win32-x64" ]]; then
-  if [[ "${RITEMARK_SKIP_SIGNING_CHECK:-1}" == "1" ]]; then
-    echo "Signing check: SKIPPED (RITEMARK_SKIP_SIGNING_CHECK=1, default)"
-    echo "  Set RITEMARK_SKIP_SIGNING_CHECK=0 to enforce signature verification."
-    echo ""
-  else
-    echo "Checking Authenticode signatures..."
-    SIGNTOOL=$(find "/c/Program Files (x86)/Windows Kits/10/bin" -path "*/x64/signtool.exe" 2>/dev/null | sort -V | tail -1)
-    if [[ -z "$SIGNTOOL" ]]; then
-      echo -e "  ${YELLOW}WARN${NC}: signtool.exe not found — cannot verify signatures"
-      WARNINGS=$((WARNINGS + 1))
-    else
-      SIGN_TARGETS=("$BUILD_DIR/Ritemark.exe")
-      AGENTS_SIGN_DIR="$EXT_PATH/binaries/agents/win32-x64"
-      if [[ -d "$AGENTS_SIGN_DIR" ]]; then
-        for exe in "$AGENTS_SIGN_DIR"/*.exe; do
-          [[ -f "$exe" ]] && SIGN_TARGETS+=("$exe")
-        done
+  WINDOWS_TRUST_MODE="${RITEMARK_WINDOWS_TRUST_MODE:-}"
+  case "$WINDOWS_TRUST_MODE" in
+    release|signed-canary)
+      echo "Checking content-based Windows PE trust ($WINDOWS_TRUST_MODE)..."
+      if ! "$SCRIPT_DIR/validate-windows-build-trust.sh" "$APP_PATH"; then
+        ERRORS=$((ERRORS + 1))
       fi
-
-      for stgt in "${SIGN_TARGETS[@]}"; do
-        echo -n "  $(basename "$stgt")... "
-        if "$SIGNTOOL" verify /pa "$stgt" > /dev/null 2>&1; then
-          echo -e "${GREEN}OK${NC} (signed)"
-        else
-          echo -e "${RED}FAIL${NC} (not signed or invalid signature)"
-          ERRORS=$((ERRORS + 1))
-        fi
-      done
-    fi
-    echo ""
-  fi
+      ;;
+    unsigned-canary)
+      echo -e "Signing check: ${YELLOW}INTENTIONALLY UNSIGNED NON-RELEASE CANARY${NC}"
+      ;;
+    *)
+      echo -e "  ${RED}FAIL${NC}: RITEMARK_WINDOWS_TRUST_MODE must be release, signed-canary, or unsigned-canary"
+      echo "  Windows validation never skips trust checks implicitly."
+      ERRORS=$((ERRORS + 1))
+      ;;
+  esac
+  echo ""
 fi
 
 # -----------------------------------------------------------------------------

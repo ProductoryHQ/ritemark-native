@@ -21,9 +21,9 @@
 ; Overridable from the command line: ISCC.exe /DAppVersion="1.8.2" ...
 ; (scripts/create-windows-installer.sh also sed-replaces this default.)
 #ifndef AppVersion
-  #define AppVersion "1.8.4"
+  #define AppVersion "1.9.0"
 #endif
-#define AppPublisher "Productory"
+#define AppPublisher "Productory Services OÜ"
 #define AppURL "https://ritemark.app"
 #define AppExeName "Ritemark.exe"
 #define AppMutex "ritemarknative"
@@ -41,7 +41,17 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
 OutputDir=..\..\installer-output
+#ifdef CanonicalRelease
 OutputBaseFilename=Ritemark-{#AppVersion}-win32-x64-setup
+#else
+; Canary/local output is intentionally non-canonical and cannot be mistaken
+; for a public release asset, whether the canary is signed or unsigned.
+#ifdef Sign
+OutputBaseFilename=Ritemark-{#AppVersion}-win32-x64-setup-SIGNED-CANARY-NON-RELEASE
+#else
+OutputBaseFilename=Ritemark-{#AppVersion}-win32-x64-setup-UNSIGNED-NON-RELEASE
+#endif
+#endif
 Compression=lzma2
 SolidCompression=yes
 ; Use modern wizard style
@@ -62,8 +72,8 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
 ; --- Code signing (Azure Trusted Signing) — #130 Smart App Control fix ---
-; Only active when the build passes /DSign and registers a "azuresign" sign
-; tool via ISCC's /Sazuresign="<signtool cmd> $f". This REQUIRES a native
+; Only active when the build passes /DSign and registers an "azuresign" sign
+; tool via ISCC's /Sazuresign="<signing command containing $f>". This REQUIRES a native
 ; Windows ISCC with signtool.exe + the Trusted Signing dlib — it does NOT work
 ; in the Docker/Linux build (scripts/create-windows-installer.sh), which has no
 ; signtool and therefore produces an UNSIGNED installer for local dev only.
@@ -72,7 +82,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ; pieces Smart App Control rejects when unsigned (#130). See
 ; .claude/skills/windows-installer/SKILL.md "Code signing".
 #ifdef Sign
-SignTool=azuresign $f
+SignTool=azuresign
 SignedUninstaller=yes
 #endif
 

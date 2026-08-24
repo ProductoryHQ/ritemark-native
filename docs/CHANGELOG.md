@@ -19,12 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stable conversation colors** — each project uses all eight base rainbow colors before deeper and softer variants; the same translucent-fill chat bubble follows a conversation across the rail, All conversations, restart, Rename, and Delete + Undo.
 - **Refreshed built-in agents** — Codex 0.149.0, Claude Code 2.1.239, and OpenCode 1.18.21 ship with exact matching SDK edges (Claude Agent SDK 0.3.239 and ACP SDK 1.4.0). A new hard gate rejects checksum/platform gaps, stale vendor metadata, or Claude binary/SDK drift before packaging.
 - **Thinking effort in the Composer** — supported Claude and Codex models expose a compact Auto/Faster→More thorough control beside the message field; OpenCode participates only when its live ACP session advertises compatible thought levels. The selection is model-filtered, durable per conversation/runtime, and snapshotted for every accepted or queued turn.
+- **Trusted Windows release pipeline (pending Windows certification)** — content-based PE inventory, Productory Services OÜ signing, Inno setup/uninstaller signing, and silent lifecycle verification now gate canonical Windows artifacts. Microsoft Store becomes the recommended channel only after exact-hash Partner Center certification and Smart App Control-On evidence pass.
 
 ### Changed
 - Agent transcripts are no longer owned by webview localStorage. Webview state retains only the selected canonical conversation, up to five Pin IDs, and harmless UI preferences.
 - Reopened Sprint 109 transcripts explicitly disclose that the next message starts with a new agent working context; native provider continuation remains Sprint 110 scope.
 - Live agent contexts are bounded in the host (five with parallel work, one otherwise). Ritemark releases only the least-recently-used non-current idle context; Working, Needs-you, and Current conversations are protected, while saved conversations remain unlimited.
 - Runtime fetch and verification now use the same exact manifest contract in local development, QA, and release packaging; Codex optional input metadata and OpenCode ACP 1.x capability discovery remain contained inside their runtime adapters.
+- Windows canaries are explicitly non-release; only a manually dispatched exact-version tag may produce canonical installer names and a Store channel manifest. GitHub Release remains the same-hash secondary direct-download/recovery channel.
 
 ## [1.9.0] — 2026-08-20
 

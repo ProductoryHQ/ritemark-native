@@ -1,125 +1,87 @@
-# Building Windows Installer Locally
+# Building and Verifying the Windows Installer
 
-This guide explains how to build the Ritemark Windows installer (.exe) on a Windows machine.
+Canonical Windows installers are built on GitHub's Windows runner. The runner owns the complete order: build and brand the payload, inventory Portable Executables by content, preserve valid vendor signatures, sign Ritemark-owned or unsigned PEs, verify the payload, compile Inno with its `SignTool`, install and verify the result, uninstall it, and only then upload artifacts.
 
-GitHub Actions builds the ZIP artifact automatically. The installer is built locally to avoid CI complexity with Inno Setup.
+Local and branch builds are canaries. They cannot use the canonical artifact names or become a release without a new exact-tag release run.
 
-## Prerequisites
+## Workflow Modes
 
-### 1. Install Inno Setup 6
+`.github/workflows/build-windows.yml` is manual and accepts one required `build_mode`:
 
-Download and install from: https://jrsoftware.org/isdl.php
+| Mode | Ref | Signing | Release eligible |
+|---|---|---|---|
+| `signed-canary` | non-tag branch | Required | No |
+| `unsigned-canary` | non-tag branch | Intentionally skipped | No |
+| `release` | exact `vX.Y.Z` tag matching `branding/product.json` | Required | Yes |
 
-Choose "Inno Setup 6" (not 5.x). Default installation path is fine:
-```
-C:\Program Files (x86)\Inno Setup 6\
-```
+The workflow fails closed when the mode/ref contract, credentials, PE inventory, publisher, timestamp, Inno signing, silent lifecycle test, or post-install verification fails. A non-release installer includes `SIGNED-CANARY-NON-RELEASE` or `UNSIGNED-NON-RELEASE` in its filename.
 
-### 2. Download the Build Artifact
+Azure credentials belong to the GitHub `windows-signing` environment, not unprotected repository secrets. Repository settings must require a reviewer and restrict deployment refs to the approved signed-canary branch plus release tags matching `vX.Y.Z`. A workflow YAML declaration cannot create or verify those GitHub-side protection rules; confirm them before the first signed run.
 
-1. Go to: https://github.com/jarmo-productory/ritemark-native/actions
-2. Click on the latest successful "Build Windows (x64)" run
-3. Download the `ritemark-windows-x64` artifact (ZIP file)
-4. Extract to a folder, e.g., `C:\Ritemark-Build\`
+## Runner Proof Before Merge
 
-Your folder structure should look like:
-```
-C:\Ritemark-Build\
-└── VSCode-win32-x64\
-    ├── Code.exe
-    ├── resources\
-    │   └── app\
-    │       └── extensions\
-    │           └── ritemark\
-    └── ...
+After local QA and after the branch is committed and pushed, run the signed canary explicitly:
+
+```bash
+gh workflow run build-windows.yml \
+  --ref codex/sprint-114-trusted-windows-install \
+  -f build_mode=signed-canary
 ```
 
-## Building the Installer
+This is a paid external CI action. Record the run URL and retain both workflow artifacts. A signed-canary proves the Windows runner integration; it is not a Store or release candidate.
 
-### Option A: Using the GUI
+## Release Candidate
 
-1. Open Inno Setup Compiler (search "Inno Setup" in Start menu)
-2. File → Open → navigate to your `ritemark-native` repo
-3. Open `installer\windows\ritemark.iss`
-4. **Important**: Edit line 60 to point to your extracted build:
-   ```
-   Source: "C:\Ritemark-Build\VSCode-win32-x64\*"; ...
-   ```
-5. Press F9 or click Compile
-6. Installer will be created in `installer-output\` folder
+The release candidate is allowed only after the shell release's technical Gate 1 and exact tag exist:
 
-### Option B: Using Command Line
+```bash
+gh workflow run build-windows.yml \
+  --ref v1.10.0 \
+  -f build_mode=release
+```
 
-Open PowerShell or Command Prompt:
+Replace `v1.10.0` with the release being built. The tag must exactly match `branding/product.json`. Never dispatch release mode from a branch, and never rename a canary artifact into a canonical release artifact.
+
+The release run emits:
+
+- the packaged Windows application tree;
+- the versioned installer;
+- payload baseline and verification reports;
+- Inno signing evidence for setup/uninstaller components;
+- installer and installed-tree verification reports;
+- a channel manifest with version, ref, commit, size, SHA-256, publisher, and Store URL.
+- raw per-PE `signtool verify /pa /all /v` output plus structured signer, issuer, thumbprint, chain, SHA-256 signature digest, and RFC 3161 timestamp signer/digest evidence;
+- a toolchain record containing the selected semantic Windows SDK version and observed SignTool, Artifact Signing client/dlib, NuGet, and Inno versions.
+
+Verify that the channel manifest names `Productory Services OÜ` and the exact immutable Store URL. Any rebuilt byte creates a new candidate and resets Windows approval.
+
+## Local Unsigned Installer
+
+`scripts/create-windows-installer.sh` exists only for local diagnostics. It validates the payload under the explicit `unsigned-canary` trust mode and produces an `UNSIGNED-NON-RELEASE` filename. It must never be uploaded to a canonical release or Store path.
+
+On Windows, an equivalent manual compile must omit `/DCanonicalRelease` and `/DSign` unless the approved Azure Artifact Signing dlib command is fully configured. Do not use the Inno GUI to make a release installer.
+
+## Signature Verification
+
+On Windows, verify an unpacked tree or installer-output directory with:
 
 ```powershell
-# Navigate to your ritemark-native repo
-cd C:\path\to\ritemark-native
-
-# Create output directory
-mkdir installer-output -Force
-
-# Run Inno Setup compiler
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-    /DSourcePath="C:\Ritemark-Build\VSCode-win32-x64" `
-    installer\windows\ritemark.iss
+./scripts/verify-windows-signatures.ps1 `
+  -Mode Verify `
+  -Root installer-output `
+  -ExpectedPublisher 'Productory Services OÜ' `
+  -RequireExpectedPublisherForAll `
+  -RequireTimestamp
 ```
 
-Or with CMD:
-```cmd
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ^
-    /DSourcePath="C:\Ritemark-Build\VSCode-win32-x64" ^
-    installer\windows\ritemark.iss
+The verifier identifies PE content from its headers, not only `.exe` filenames, so DLLs, native `.node` modules, and extensionless executables are included. Valid third-party signatures may remain vendor-signed; Ritemark-owned files must match the expected publisher.
+
+## Store and Direct Channels
+
+The Store package URL for v1.10.0 is:
+
+```text
+https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe
 ```
 
-## Output
-
-The installer will be created at:
-```
-installer-output\Ritemark-{version}-win32-x64-setup.exe
-```
-
-Example: `Ritemark-1.96.0-win32-x64-setup.exe`
-
-## Modifying the Installer Script
-
-If you need to pass the source path as a parameter, modify `ritemark.iss`:
-
-```iss
-; At the top, add:
-#ifndef SourcePath
-  #define SourcePath "..\..\VSCode-win32-x64"
-#endif
-
-; Then in [Files] section, change:
-Source: "{#SourcePath}\*"; DestDir: "{app}"; ...
-```
-
-This allows passing `/DSourcePath=...` from command line.
-
-## Troubleshooting
-
-### "File not found" errors
-- Ensure the ZIP was fully extracted
-- Check the Source path in ritemark.iss matches your folder
-
-### Long path errors
-- The installer script excludes deeply nested node_modules paths
-- If you still get errors, enable Windows long paths:
-  ```powershell
-  # Run as Administrator
-  New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
-      -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
-  ```
-
-### Version mismatch
-- Edit `#define AppVersion` in ritemark.iss to match your release version
-
-## Quick Reference
-
-| Task | Command |
-|------|---------|
-| Compile installer | `ISCC.exe installer\windows\ritemark.iss` |
-| Specify source | `/DSourcePath="C:\path\to\build"` |
-| Quiet mode | `/Qp` (shows progress only) |
-| Output directory | Already set to `installer-output\` in script |
+That object is write-once. GitHub Release retains a same-hash `Ritemark-Setup.exe` as the secondary direct-download and recovery channel. See the Sprint 114 Partner Center handoff before hosting or submitting a candidate.
