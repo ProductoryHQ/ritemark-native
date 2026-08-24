@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stable conversation colors** — each project uses all eight base rainbow colors before deeper and softer variants; the same translucent-fill chat bubble follows a conversation across the rail, All conversations, restart, Rename, and Delete + Undo.
 - **Refreshed built-in agents** — Codex 0.149.0, Claude Code 2.1.239, and OpenCode 1.18.21 ship with exact matching SDK edges (Claude Agent SDK 0.3.239 and ACP SDK 1.4.0). A new hard gate rejects checksum/platform gaps, stale vendor metadata, or Claude binary/SDK drift before packaging.
 - **Thinking effort in the Composer** — supported Claude and Codex models expose a compact Auto/Faster→More thorough control beside the message field; OpenCode participates only when its live ACP session advertises compatible thought levels. The selection is model-filtered, durable per conversation/runtime, and snapshotted for every accepted or queued turn.
+- **Trusted Windows installer (pending Windows certification)** — every executable payload is checked and signed, Inno signs its setup and uninstaller components, and standard-user install/uninstall is tested before upload. Microsoft Store becomes the recommended channel after Partner Center and Smart App Control-On testing pass.
 
 ### Changed
 - Transcribe speaker rename now accepts real full names and Unicode spacing without playback shortcuts intercepting editing. Long speaker labels stay bounded and expose their complete accessible name.

@@ -1,11 +1,11 @@
 # Sprint 112 — Composer Thinking Effort
 
 **Track:** Full SDD, audit-first<br>
-**Status:** Complete — ready for PR/merge<br>
+**Status:** Complete — merged through final endpoint polish PR #220<br>
 **Branch:** `codex/sprint-112-composer-thinking-effort`<br>
 **Worktree:** `.worktrees/sprint-112-composer-thinking-effort`<br>
 **Issue:** [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206)<br>
-**PR:** [#215](https://github.com/ProductoryHQ/ritemark-native/pull/215)<br>
+**PRs:** [#215](https://github.com/ProductoryHQ/ritemark-native/pull/215), [#216](https://github.com/ProductoryHQ/ritemark-native/pull/216), [#219](https://github.com/ProductoryHQ/ritemark-native/pull/219), [#220](https://github.com/ProductoryHQ/ritemark-native/pull/220)<br>
 **Release:** [v1.10.0](../release-plan.md)
 
 ## Goal
@@ -91,7 +91,10 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 - RunDev in `ritemark-demo` passes native range drag and arrow keys, Auto, Escape/focus return, flag-off omission, 300px collision, normal width, and 200% geometry. Release evidence is stored as `docs/releases/v1.10.0/screenshots/1-10-0-thinking-effort.png`.
 - Independent risk-first review found and fixed three contained issues before close: explicit live Auto-only capability precedence, stale-turn callback isolation, and cross-conversation notice isolation. No P0–P3 findings remain.
 - The post-merge Codex review identified four follow-up defects now covered by regression tests: rapid range writes are atomic, queued turns no longer overwrite the current draft effort, Codex model IDs are centralized, and rejected warm Claude overrides reset to Auto without dropping the accepted message.
-- Review-polish RunDev confirms the approved control at a compact 28 px visible track/26 px thumb while retaining a 40 px native drag target; the filled track is rounded behind the thumb at both endpoints.
+- Review-polish RunDev confirms the approved control at a compact 28 px visible track/26 px thumb while retaining a 40 px native drag target; the filled track and stop geometry follow the real thumb centers, forming one continuous indigo envelope around the thumb at both endpoints.
+- Final user-approved endpoint polish places the thumb's 2 px accent-ring edge flush with the visual track at Low and Max, extends non-maximum progress 8 px beyond the thumb center, and refreshes the single Sprint 112 release screenshot from the final live bundle.
+- PR #220 Codex review found one P3 singleton-capability geometry edge case; the centered zero-range state now has a focused regression test registered in `test:thinking-effort`, and the official QA gate passes after the fix.
+- Final Codex review on commit `251a89e` found no major issues; the darwin-x64 and win32-x64 native runtime matrix checks also pass.
 - The broad legacy `npm test` command still reaches the pre-existing bare-Node Claude Flow integration harness failure where `AgentRunner` transitively resolves `vscode`; the same import chain exists on `origin/main`. Sprint 112’s official QA and every affected focused suite pass.
 
 ## Product Decisions
@@ -110,6 +113,7 @@ Thinking effort crosses Composer UX, durable conversation state, queue semantics
 | 2026-08-24 | Preserve OpenCode lazy discovery | ACP `thought_level` is session-local; opening or selecting a conversation still performs no runtime work. |
 | 2026-08-24 | Phase 0 design and capability contract approved | Approved the compact native range control, Auto below the scale, capability-filtered Ultra, warm-Auto restoration, and honest OpenCode lazy behavior. |
 | 2026-08-24 | Require a review-polish PR after the delayed Codex review | The original PR merged before the bot review arrived; all four findings and final visual feedback are handled on a dedicated follow-up that must receive fresh Codex review before merge. |
+| 2026-08-24 | Approve final slider endpoint geometry | The thumb itself forms the visual Low/Max endpoint; intermediate progress extends 8 px behind the thumb center, while Max remains flush with the right track edge. |
 
 ## Planning Approval
 

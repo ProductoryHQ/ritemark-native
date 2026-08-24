@@ -21,9 +21,9 @@
 ; Overridable from the command line: ISCC.exe /DAppVersion="1.8.2" ...
 ; (scripts/create-windows-installer.sh also sed-replaces this default.)
 #ifndef AppVersion
-  #define AppVersion "1.8.4"
+  #define AppVersion "1.9.0"
 #endif
-#define AppPublisher "Productory"
+#define AppPublisher "Productory Services OÜ"
 #define AppURL "https://ritemark.app"
 #define AppExeName "Ritemark.exe"
 #define AppMutex "ritemarknative"
@@ -62,17 +62,17 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
 ; --- Code signing (Azure Trusted Signing) — #130 Smart App Control fix ---
-; Only active when the build passes /DSign and registers a "azuresign" sign
-; tool via ISCC's /Sazuresign="<signtool cmd> $f". This REQUIRES a native
+; Active when CI passes /DSign and registers an "azuresign" sign tool via
+; ISCC's /Sazuresign="<signing command containing $f>". This REQUIRES a native
 ; Windows ISCC with signtool.exe + the Trusted Signing dlib — it does NOT work
-; in the Docker/Linux build (scripts/create-windows-installer.sh), which has no
-; signtool and therefore produces an UNSIGNED installer for local dev only.
-; Release installers MUST be built on Windows with /DSign so that Inno signs
+; in the Docker/Linux build (scripts/create-windows-installer.sh), which remains
+; a local development helper. Distributed installers are built by Windows CI
+; with /DSign so that Inno signs
 ; the Setup.exe, its extracted temp loader, AND the uninstaller — the exact
 ; pieces Smart App Control rejects when unsigned (#130). See
 ; .claude/skills/windows-installer/SKILL.md "Code signing".
 #ifdef Sign
-SignTool=azuresign $f
+SignTool=azuresign
 SignedUninstaller=yes
 #endif
 
@@ -81,8 +81,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "associatewithfiles"; Description: "Associate with .md files"; GroupDescription: "File associations:"
-Name: "addtopath"; Description: "Add to PATH"; GroupDescription: "Other:"
+Name: "associatewithfiles"; Description: "Associate with .md files"; GroupDescription: "File associations:"; Flags: unchecked
+Name: "addtopath"; Description: "Add to PATH"; GroupDescription: "Other:"; Flags: unchecked
 
 [Files]
 ; Copy everything from the built app, excluding deeply nested node_modules that exceed MAX_PATH (260 chars)
@@ -104,13 +104,13 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; F
 
 [Registry]
 ; Associate .md files with Ritemark
-Root: HKCU; Subkey: "Software\Classes\.md"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\.md"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md"; ValueType: string; ValueName: ""; ValueData: "Markdown File"; Flags: uninsdeletekey; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""; Tasks: associatewithfiles
 
 ; Also associate .markdown files
-Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: associatewithfiles
 
 ; Add to PATH
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\bin"; Tasks: addtopath; Check: NeedsAddPath('{app}\bin')

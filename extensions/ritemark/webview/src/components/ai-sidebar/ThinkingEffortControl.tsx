@@ -5,6 +5,10 @@ import type {
   ThinkingEffort,
   ThinkingEffortCapability,
 } from './types';
+import {
+  getThinkingEffortFillWidth,
+  THINKING_EFFORT_ENDPOINT_CENTER_PX,
+} from './thinkingEffortGeometry';
 
 const LABELS: Record<ThinkingEffort, string> = {
   auto: 'Auto',
@@ -49,7 +53,7 @@ export function ThinkingEffortControl({
 
   const manual = value === 'auto' ? lastManual ?? fallbackManual : value;
   const selectedIndex = Math.max(0, manual ? levels.indexOf(manual) : 0);
-  const fillPercent = levels.length <= 1 ? 0 : (selectedIndex / (levels.length - 1)) * 100;
+  const fillWidth = getThinkingEffortFillWidth(levels.length, selectedIndex);
   const disabledReason = capability?.source === 'runtime-live'
     ? 'Thinking effort becomes available after OpenCode advertises supported levels for this conversation.'
     : 'This model chooses its own thinking effort.';
@@ -105,10 +109,13 @@ export function ThinkingEffortControl({
               <div className="absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 overflow-hidden rounded-full border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]">
                 <div
                   className="h-full rounded-full bg-[var(--r-accent)]"
-                  style={{ width: `calc(12px + (100% - 24px) * ${fillPercent / 100})` }}
+                  style={{ width: fillWidth }}
                 />
               </div>
-              <div className="pointer-events-none absolute inset-x-3 inset-y-0">
+              <div
+                className="pointer-events-none absolute inset-y-0"
+                style={{ insetInline: THINKING_EFFORT_ENDPOINT_CENTER_PX }}
+              >
                 {stopPositions.map(({ level, left }) => (
                   <span
                     key={level}
@@ -121,7 +128,7 @@ export function ThinkingEffortControl({
               </div>
               <input
                 type="range"
-                className="thinking-effort-range absolute inset-x-3 inset-y-0 cursor-grab touch-none bg-transparent active:cursor-grabbing"
+                className="thinking-effort-range absolute inset-x-[2px] inset-y-0 cursor-grab touch-none bg-transparent active:cursor-grabbing"
                 min={0}
                 max={Math.max(0, levels.length - 1)}
                 step={1}

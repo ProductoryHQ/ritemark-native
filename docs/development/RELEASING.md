@@ -30,6 +30,16 @@ This is the traditional process, and it happens roughly monthly (batched, not pe
 4. Claude waits ~60 minutes (a safety window — late-surfacing bugs get one more chance to show up) before notarizing and publishing.
 5. For a release affecting both macOS and Windows, this repeats once more for the second platform (Gate 2).
 
+### Windows shell-release gate
+
+Windows installers are produced by the manually dispatched `Build Windows (x64)` workflow. It always signs and stops if Azure credentials or any signature check is missing.
+
+The workflow must finish payload PE signing, Inno setup/uninstaller signing, publisher/timestamp verification, standard-user silent install, installed-tree/product-registration checks, and uninstall before it uploads the installer. The expected publisher is `Productory Services OÜ`.
+
+For v1.10.0, Partner Center ingests `https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe`. GitHub Release retains the same bytes as a secondary direct download. Kristiina tests that SHA-256 on a clean Windows 11 machine with Smart App Control On; Jarmo approves the same file for Gate 2.
+
+Operator commands and evidence requirements are in [Building and Verifying the Windows Installer](./building-windows-installer.md). Partner Center and clean-machine ownership are in the [Sprint 114 handoff](./releases/v1.10.0/sprint-114-trusted-windows-install/research/partner-center-and-sac-handoff.md).
+
 This is the slower path on purpose — it's changing the actual signed app, so it gets the full test-then-harden-then-publish treatment.
 
 ## How to tell which one is happening
