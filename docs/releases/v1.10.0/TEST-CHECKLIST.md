@@ -64,6 +64,12 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [ ] Manual save-dialog success, cancel, collision, primary-path refusal, Open action, and transcript-link isolation pass.
 - [ ] Manual keyboard, screen-reader labels, narrow rail, 200% zoom, light/dark/high-contrast, speaker-chip/gutter ellipsis, and full-name tooltip pass.
 
+First draft PR #217 smoke on 2026-08-24 failed two checks: **Regenerate** preceded the language selector in DOM/tab order, and approximately 207% zoom produced `innerWidth=354` with `scrollWidth=1080`, clipping the editor. Local DOM-order and responsive-containment fixes plus automated regressions were completed; manual PR retest was still pending at that checkpoint, so the rows remained unchecked.
+
+The first responsive-fix rerun passed keyboard order, horizontal containment, wider zoom, and long-name checks, but the exact `354×300` case still collapsed Insights to `clientHeight=0`, clipped focused rail controls, and showed a native orange **Regenerate** outline. A second local fix then bounded the upper chrome and rail scrollers, reserved two equal narrow pane rows, and applied the approved 4 px translucent indigo ring. Another manual rerun was still required at that checkpoint; the rows remained unchecked.
+
+The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: document/body/root stay exactly viewport-sized with zero document overflow; chrome is 150 px; pane rows are `74.9904px`; transcript and Insights use bounded independent scrollers; language, **Regenerate**, and **Create insights document** focus rectangles are wholly visible; and **Regenerate** has the 4 px translucent indigo ring with no orange native outline. `654×300` high zoom, `1400×766` desktop, and long-name ellipsis/full accessible-name checks also pass. Authenticated model calls and the final Create mutation were not run, so the broader manual rows remain unchecked.
+
 ## Automated gates
 
 - [x] Extension TypeScript compile and bundle.

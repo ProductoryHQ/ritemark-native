@@ -93,7 +93,7 @@ export function Waveform({
     return (
       <div
         ref={wrapRef}
-        className="h-9 flex-1 cursor-pointer select-none py-3.5"
+        className="h-9 min-w-0 flex-1 cursor-pointer select-none py-3.5"
         onClick={seekFromEvent}
         title="Seek"
       >
@@ -105,8 +105,8 @@ export function Waveform({
   }
 
   return (
-    <div ref={wrapRef} className="h-9 flex-1 cursor-pointer select-none" onClick={seekFromEvent} title="Seek">
-      <canvas ref={canvasRef} className="block h-full w-full" />
+    <div ref={wrapRef} className="h-9 min-w-0 flex-1 cursor-pointer select-none" onClick={seekFromEvent} title="Seek">
+      <canvas ref={canvasRef} className="block h-full min-w-0 w-full" />
     </div>
   );
 }

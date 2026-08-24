@@ -141,3 +141,27 @@ And its rename action and full accessible name remain available
 Given the speaker is named `Jarmo Tuisk`
 When the transcript Markdown and Insights prompt are generated
 Then both use `Jarmo Tuisk` without joining, splitting, or truncating the stored name
+
+## Manual Evidence Log
+
+### 2026-08-24 — first draft PR #217 smoke
+
+- **Failed:** the actual Insights rail DOM/tab order placed **Regenerate** before the language selector.
+- **Failed:** at approximately 207% zoom (`innerWidth=354`), the workbench reported `scrollWidth=1080` and clipped the transcript/editor surface.
+- **Fix implemented locally; PR retest pending at this checkpoint:** the selector now precedes **Regenerate** in DOM order. At narrow widths the transcript and Insights panes stack vertically, flex children opt into shrinking with `min-width: 0`, controls wrap where needed, and long labels retain ellipsis plus their full accessible names. No whole-document horizontal scrolling or overflow-hiding workaround was added.
+- Automated DOM-order and responsive-containment contracts passed, but this was not yet manual pass evidence. Keyboard order, approximately 207% zoom geometry, rail usability, and long-name accessibility still required a draft-PR rerun at this checkpoint.
+
+### 2026-08-24 — first draft PR #217 responsive-fix rerun
+
+- **Passed:** actual language → **Regenerate** keyboard order, zero horizontal overflow at `innerWidth=354`, column stacking, the wider `innerWidth=654` zoom layout, and long recording/document/speaker accessible-name plus ellipsis checks.
+- **Failed:** at the exact `354×300` viewport with Explorer visible, fixed chrome consumed almost all available height. The Insights rail collapsed to `clientHeight=0`, its content scroller was only 24 px high, and focusing language or **Create insights document** left the control clipped below the viewport.
+- **Failed:** **Regenerate** retained a native 1 px orange outline instead of the approved 4 px translucent indigo focus-visible ring.
+- **Next fix implemented locally; another PR retest pending at this checkpoint:** narrow chrome is bounded to half the viewport with its own scroller; the remaining height is split deterministically between transcript and Insights with two `minmax(0, 1fr)` grid rows; Insights retains its own bounded content scroller; **Regenerate** now uses the standard indigo ring. This was automated contract evidence only, not a manual pass.
+
+### 2026-08-24 — final responsive UI rerun
+
+- **Passed:** at the exact `354×300` viewport and DPR `4.147200107574463` (approximately 207%) with Explorer visible, document, body, and `#root` all remained exactly `354×300` with zero horizontal or vertical document overflow and document/body `scrollTop=0` during inner scrolling and focus.
+- **Passed:** chrome was 150 px high with its own bounded scroller; the remaining 150 px pane grid resolved to two `74.9904px` rows. Transcript and Insights scrolled independently, with the Insights rail at 74 px and its inner scroller at 37 px for 727 px of content.
+- **Passed:** language, keyboard-reached **Regenerate**, and **Create insights document** were wholly visible after their bounded pane scrolling. **Regenerate** computed the approved `rgba(67, 56, 202, 0.1) 0 0 0 4px` indigo focus ring with a transparent outline and no native orange outline.
+- **Passed:** `654×300` at the same DPR retained the bounded two-row layout; `1400×766` at 100% retained side-by-side panes with a 288 px Insights rail. Long document and speaker names stayed ellipsized while their complete path/name remained in title and ARIA metadata.
+- **Unverified:** no authenticated model generation/regeneration was invoked, and the final read-only rerun focused but did not click **Create insights document**. Those model-quality and file-mutation scenarios remain open; earlier save-fixture coverage was not repeated.

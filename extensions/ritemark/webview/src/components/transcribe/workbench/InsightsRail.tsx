@@ -21,6 +21,7 @@ import {
 } from '../../ui/select';
 import { vscode } from '../../../lib/vscode';
 import { formatClock } from './playback';
+import { WORKBENCH_LAYOUT_CLASSES } from './layout';
 import {
   INSIGHTS_LANGUAGE_OPTIONS,
   insightsLanguageLabel,
@@ -87,22 +88,16 @@ export function InsightsRail({
   }, [documentResultSerial]);
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-l border-hairline bg-surface-muted">
-      <div className="flex items-center gap-2 border-b border-hairline px-4 py-2.5">
+    <aside className={WORKBENCH_LAYOUT_CLASSES.insights} data-insights-rail>
+      <div className="flex min-w-0 items-center gap-2 border-b border-hairline px-4 py-2.5">
         <Icon name="sparkle" size={14} className="text-accent" />
         <span className="text-[11px] font-bold uppercase tracking-wider text-ink-body">Insights</span>
-        {insights && state !== 'generating' && (
-          <button
-            type="button"
-            className="ml-auto text-[10.5px] font-semibold text-accent hover:underline"
-            onClick={onGenerate}
-          >
-            Regenerate
-          </button>
-        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3">
+      <div
+        className={WORKBENCH_LAYOUT_CLASSES.insightsScroller}
+        data-insights-scroller
+      >
         <div className="mb-3">
           <label htmlFor="insights-language" className="mb-1.5 block text-[11px] font-medium text-ink-body">
             Insights language
@@ -132,6 +127,17 @@ export function InsightsRail({
               ? `Auto · ${insightsLanguageLabel(resolvedLanguage)}`
               : `Output · ${insightsLanguageLabel(resolvedLanguage)}`}
           </p>
+          {insights && state !== 'generating' && (
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                className={WORKBENCH_LAYOUT_CLASSES.regenerate}
+                onClick={onGenerate}
+              >
+                Regenerate
+              </button>
+            </div>
+          )}
         </div>
 
         {state === 'generating' && (

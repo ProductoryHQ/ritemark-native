@@ -43,6 +43,10 @@
 
 - [x] Run focused extension and webview tests.
 - [x] Rebase onto merged Sprint 112 plus review polish at `fb0d3a3` and regenerate the shared webview bundle from the combined source (`8752982`).
+- [x] Add DOM-order and narrow responsive-containment regressions for the two first-smoke failures.
+- [x] Add viewport-height allocation, bounded rail-scroller, and **Regenerate** focus-ring contracts after the exact `354×300` rerun failure.
+- [x] Re-test draft PR #217 language-selector tab order and the exact `354×300` / approximately 207% responsive geometry after the local fixes.
+- [ ] Run authenticated model generation/regeneration and the final **Create insights document** mutation; these were intentionally excluded from the read-only final responsive rerun.
 - [ ] Execute every scenario in `scenarios.md` and capture Estonian/English, file-isolation, full-name, and ellipsis evidence.
 - [x] Run `./scripts/validate-qa.sh` using the repository QA workflow and complete independent full QA.
 - [x] Update `docs/development/architecture.md` for the new typed messages and language/save contract.
