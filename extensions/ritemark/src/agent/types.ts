@@ -350,7 +350,7 @@ export interface AgentTurnOptions {
   /** Immutable Composer effort captured when this turn was accepted. */
   thinkingEffort?: ThinkingEffort;
   /** Called after the SDK query/config accepted the requested effort. */
-  onThinkingEffortApplied?: (applied?: ExplicitThinkingEffort) => void;
+  onThinkingEffortApplied?: (applied?: ExplicitThinkingEffort, adjusted?: boolean) => void;
 }
 
 /**

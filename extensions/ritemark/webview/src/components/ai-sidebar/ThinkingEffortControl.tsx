@@ -102,9 +102,9 @@ export function ThinkingEffortControl({
             </div>
 
             <div className={`relative mt-2 h-10 ${value === 'auto' ? 'opacity-60' : ''}`}>
-              <div className="absolute inset-0 overflow-hidden rounded-full border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]">
+              <div className="absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 overflow-hidden rounded-full border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]">
                 <div
-                  className="h-full rounded-l-full bg-[var(--r-accent)]"
+                  className="h-full rounded-full bg-[var(--r-accent)]"
                   style={{ width: `calc(12px + (100% - 24px) * ${fillPercent / 100})` }}
                 />
               </div>

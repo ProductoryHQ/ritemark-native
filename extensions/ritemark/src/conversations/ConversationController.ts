@@ -138,17 +138,12 @@ export class ConversationController {
       }
       if (request.type === 'conversation/accept-turn') return this.acceptTurn(request);
       if (request.type === 'conversation/set-composer-preference') {
-        const current = await this.requireCurrentScope(request.conversationId);
-        const updated = await this.dependencies.store.checkpoint({
-          conversationId: current.conversationId,
+        const updated = await this.dependencies.store.setComposerThinkingEffort({
+          conversationId: request.conversationId,
+          scopeId: this.dependencies.currentScope().scopeId,
           bindingGeneration: request.bindingGeneration,
-          expectedRevision: current.revision,
-          composerPreferences: {
-            thinkingEffortByRuntime: {
-              ...current.composerPreferences.thinkingEffortByRuntime,
-              [request.agentId]: request.thinkingEffort,
-            },
-          },
+          agentId: request.agentId,
+          thinkingEffort: request.thinkingEffort,
         });
         this.emitChanged(updated);
         return result(request, { conversation: projectConversation(updated) });
@@ -656,80 +651,72 @@ export class ConversationController {
     };
     let record: ConversationRecordV1;
     if (request.conversationId) {
-      const current = await this.requireCurrentScope(request.conversationId);
       if (request.bindingGeneration === undefined) throw new ConversationProtocolError('bindingGeneration is required for an existing conversation');
-      const priorTurnId = current.lifecycle.state === 'working' || current.lifecycle.state === 'needs-user'
-        ? current.lifecycle.activeTurnId
-        : null;
-      const priorUser = priorTurnId
-        ? [...current.events].reverse().find(
-            (candidate) => candidate.kind === 'user-message' && candidate.turnId === priorTurnId,
-          )
-        : undefined;
-      const priorRuntime = priorUser?.runtimeId === 'claude-code'
-        || priorUser?.runtimeId === 'codex'
-        || priorUser?.runtimeId === 'opencode'
-        ? priorUser.runtimeId
-        : null;
-      const latestUser = [...current.events].reverse().find(
-        (candidate) => candidate.kind === 'user-message',
-      );
-      const latestRuntime = latestUser?.runtimeId === 'claude-code'
-        || latestUser?.runtimeId === 'codex'
-        || latestUser?.runtimeId === 'opencode'
-        ? latestUser.runtimeId
-        : null;
-      const runtimeChanged = latestRuntime !== null && latestRuntime !== request.agentId;
-      // R9: runtime selection itself is intentionally quiet. Persist exactly
-      // one boundary when the first message is actually sent with the newly
-      // selected runtime. This cannot depend on an adapter later reporting
-      // `transcript-restored`: a compatible native session may still receive
-      // a normalized delta, and the user deserves the same honest disclosure.
-      const transitionBoundary = runtimeChanged
-        ? {
-            kind: 'boundary' as const,
-            eventId: this.randomId(),
-            turnId,
-            sequence: (current.events[current.events.length - 1]?.sequence ?? -1) + 1,
-            occurredAt: now,
-            runtimeId: request.agentId,
-            boundaryKind: 'context-restored' as const,
-            message: [
-              `Continuing with ${AGENTS[request.agentId].label}. Previous messages were included as context.`,
-              ...(priorTurnId && priorTurnId !== turnId
-                ? ['The previous agent did not return a saved answer.']
-                : []),
-            ].join(' '),
-          }
-        : priorTurnId && priorTurnId !== turnId
+      record = await this.mutateLatest(request.conversationId, request.bindingGeneration, (current) => {
+        const priorTurnId = current.lifecycle.state === 'working' || current.lifecycle.state === 'needs-user'
+          ? current.lifecycle.activeTurnId
+          : null;
+        const priorUser = priorTurnId
+          ? [...current.events].reverse().find(
+              (candidate) => candidate.kind === 'user-message' && candidate.turnId === priorTurnId,
+            )
+          : undefined;
+        const priorRuntime = priorUser?.runtimeId === 'claude-code'
+          || priorUser?.runtimeId === 'codex'
+          || priorUser?.runtimeId === 'opencode'
+          ? priorUser.runtimeId
+          : null;
+        const latestUser = [...current.events].reverse().find(
+          (candidate) => candidate.kind === 'user-message',
+        );
+        const latestRuntime = latestUser?.runtimeId === 'claude-code'
+          || latestUser?.runtimeId === 'codex'
+          || latestUser?.runtimeId === 'opencode'
+          ? latestUser.runtimeId
+          : null;
+        const runtimeChanged = latestRuntime !== null && latestRuntime !== request.agentId;
+        // R9: runtime selection itself is intentionally quiet. Persist exactly
+        // one boundary when the first message is actually sent with the newly
+        // selected runtime. This cannot depend on an adapter later reporting
+        // `transcript-restored`: a compatible native session may still receive
+        // a normalized delta, and the user deserves the same honest disclosure.
+        const transitionBoundary = runtimeChanged
           ? {
               kind: 'boundary' as const,
               eventId: this.randomId(),
-              turnId: priorTurnId,
+              turnId,
               sequence: (current.events[current.events.length - 1]?.sequence ?? -1) + 1,
               occurredAt: now,
-              runtimeId: priorUser?.runtimeId ?? 'legacy-ritemark' as const,
-              boundaryKind: 'interrupted' as const,
-              message: 'The previous agent did not return a saved answer before the next request.',
+              runtimeId: request.agentId,
+              boundaryKind: 'context-restored' as const,
+              message: [
+                `Continuing with ${AGENTS[request.agentId].label}. Previous messages were included as context.`,
+                ...(priorTurnId && priorTurnId !== turnId
+                  ? ['The previous agent did not return a saved answer.']
+                  : []),
+              ].join(' '),
             }
-          : null;
-      event.sequence = (transitionBoundary?.sequence ?? (current.events[current.events.length - 1]?.sequence ?? -1)) + 1;
-      receipt.sequence = event.sequence + 1;
-      record = await this.dependencies.store.checkpoint({
-        conversationId: current.conversationId,
-        bindingGeneration: request.bindingGeneration,
-        expectedRevision: current.revision,
-        lifecycle: { state: 'working', activeTurnId: turnId },
-        appendEvents: [...(transitionBoundary ? [transitionBoundary] : []), event, receipt],
-        composerPreferences: {
-          thinkingEffortByRuntime: {
-            ...current.composerPreferences.thinkingEffortByRuntime,
-            [request.agentId]: request.thinkingEffort ?? 'auto',
-          },
-        },
-        ...(priorRuntime && current.continuations?.[priorRuntime]
-          ? { continuationUpdate: { runtimeId: priorRuntime, descriptor: null } }
-          : {}),
+          : priorTurnId && priorTurnId !== turnId
+            ? {
+                kind: 'boundary' as const,
+                eventId: this.randomId(),
+                turnId: priorTurnId,
+                sequence: (current.events[current.events.length - 1]?.sequence ?? -1) + 1,
+                occurredAt: now,
+                runtimeId: priorUser?.runtimeId ?? 'legacy-ritemark' as const,
+                boundaryKind: 'interrupted' as const,
+                message: 'The previous agent did not return a saved answer before the next request.',
+              }
+            : null;
+        event.sequence = (transitionBoundary?.sequence ?? (current.events[current.events.length - 1]?.sequence ?? -1)) + 1;
+        receipt.sequence = event.sequence + 1;
+        return {
+          lifecycle: { state: 'working', activeTurnId: turnId },
+          appendEvents: [...(transitionBoundary ? [transitionBoundary] : []), event, receipt],
+          ...(priorRuntime && current.continuations?.[priorRuntime]
+            ? { continuationUpdate: { runtimeId: priorRuntime, descriptor: null } }
+            : {}),
+        };
       });
     } else {
       record = await this.dependencies.store.create({

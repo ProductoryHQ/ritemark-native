@@ -665,8 +665,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 runtimeId: agentId,
                 requested: result.requested,
                 applied: result.applied ?? null,
-                message: result.adjusted && result.applied
-                  ? `Effort adjusted to ${thinkingEffortLabel(result.applied)} for this model.`
+                message: result.adjusted
+                  ? result.applied
+                    ? `Effort adjusted to ${thinkingEffortLabel(result.applied)} for this model.`
+                    : 'Requested effort is unavailable. Using Auto for this turn.'
                   : undefined,
               });
             },

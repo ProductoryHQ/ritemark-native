@@ -295,6 +295,43 @@ async function testWarmSessionThinkingEffortUpdatesBeforeInput(): Promise<void> 
   session.close();
 }
 
+async function testWarmSessionUnsupportedEffortFallsBackToAuto(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const session = new AgentSession({ workspacePath: process.cwd() }) as any;
+  const calls: Array<{ kind: string; value?: unknown }> = [];
+  session._queryStream = {
+    applyFlagSettings: async (settings: { effortLevel: string | null }) => {
+      calls.push({ kind: 'effort', value: settings.effortLevel });
+      if (settings.effortLevel === 'max') throw new Error('unsupported for this account');
+    },
+    interrupt: async () => {},
+    close: () => {},
+  };
+  session._enqueueInput = () => calls.push({ kind: 'input' });
+  const applied: Array<{ effort?: string; adjusted?: boolean }> = [];
+
+  const turn = session.sendMessage({
+    prompt: 'keep this accepted turn',
+    thinkingEffort: 'max',
+    onThinkingEffortApplied: (effort?: string, adjusted?: boolean) => applied.push({ effort, adjusted }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  session._forceResolveTurn(session._turnId, {
+    text: 'ok',
+    filesModified: [],
+    metrics: { durationMs: 1, costUsd: null, model: null },
+  });
+  await turn;
+
+  assert.deepEqual(calls, [
+    { kind: 'effort', value: 'max' },
+    { kind: 'effort', value: null },
+    { kind: 'input' },
+  ], 'unsupported manual effort resets to Auto before the accepted input is enqueued');
+  assert.deepEqual(applied, [{ effort: undefined, adjusted: true }]);
+  session.close();
+}
+
 async function main() {
   testDefaultSettingSources();
   testDefaultToolsIncludePlanAndQuestionLifecycle();
@@ -308,6 +345,7 @@ async function main() {
   await testSprint103ExitPlanModeApprovalCarriesModeSwitch();
   await testSprint103KeepPlanningFeedbackDeny();
   await testWarmSessionThinkingEffortUpdatesBeforeInput();
+  await testWarmSessionUnsupportedEffortFallsBackToAuto();
   console.log('AgentRunner lifecycle tests passed.');
 }
 

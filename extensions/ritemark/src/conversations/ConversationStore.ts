@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
+import type { AgentId } from '../agent/types';
+import type { ThinkingEffort } from '../runtime/thinkingEffort';
 import {
   allocateConversationIdentityColorSlot,
   isConversationIdentityColorSlot,
@@ -304,6 +306,54 @@ export class ConversationStore {
         revision: current.revision + 1,
         lastActivityAt: this.timestamp(),
         ...(Object.keys(continuations).length > 0 ? { continuations } : { continuations: undefined }),
+      });
+
+      await this.writeRecord(next);
+      await this.updateIndexBestEffort();
+      return next;
+    });
+  }
+
+  /**
+   * Persist the latest Composer preference atomically. Range input can emit
+   * several changes before an earlier disk write completes, so this mutation
+   * must read and merge the record inside the store's serialization boundary.
+   */
+  setComposerThinkingEffort(input: {
+    conversationId: string;
+    scopeId: string;
+    bindingGeneration: number;
+    agentId: AgentId;
+    thinkingEffort: ThinkingEffort;
+  }): Promise<ConversationRecordV1> {
+    return this.serialized(async () => {
+      await this.ensureInitialized();
+      await this.reconcile();
+      assertConversationId(input.conversationId);
+      if (await this.readTombstone(input.conversationId)) {
+        throw new ConversationStoreError('deleted', 'Conversation was deleted');
+      }
+      const current = await this.readRecord(input.conversationId);
+      if (!current) throw new ConversationStoreError('not-found', 'Conversation does not exist');
+      if (current.scopeId !== input.scopeId) {
+        throw new ConversationStoreError('not-found', 'Conversation does not belong to the current project');
+      }
+      if (current.bindingGeneration !== input.bindingGeneration) {
+        throw new ConversationStoreError('stale-binding', 'Conversation binding generation is stale');
+      }
+
+      const next = decodeConversationRecordV1({
+        ...current,
+        composerPreferences: {
+          thinkingEffortByRuntime: {
+            ...current.composerPreferences.thinkingEffortByRuntime,
+            [input.agentId]: input.thinkingEffort,
+          },
+        },
+        revision: current.revision + 1,
+        // Draft controls are not conversation activity and must not reorder
+        // the user's recent-chat rail.
+        lastActivityAt: current.lastActivityAt,
       });
 
       await this.writeRecord(next);

@@ -506,6 +506,29 @@ async function run(): Promise<void> {
     assert.equal(moved.data.conversation.scopeId, scope.scopeId);
     assert.notEqual(moved.data.conversation.identityColorSlot, firstRecord.identityColorSlot, 'moving into a project avoids an occupied identity color');
 
+    const preferenceRequests = ['medium', 'low'] as const;
+    const preferenceResults = await Promise.all(preferenceRequests.map((thinkingEffort, index) => controller.handle({
+      type: 'conversation/set-composer-preference',
+      requestId: `rapid-effort-${index}`,
+      conversationId: moved.data.conversation.conversationId,
+      bindingGeneration: moved.data.conversation.bindingGeneration,
+      agentId: 'codex',
+      thinkingEffort,
+    })));
+    assert.ok(preferenceResults.every((preferenceResult) => preferenceResult.ok), 'rapid range changes serialize without stale-revision loss');
+    const afterRapidChanges = await store.get(moved.data.conversation.conversationId);
+    assert.equal(afterRapidChanges?.composerPreferences.thinkingEffortByRuntime.codex, 'low', 'the final range position wins');
+
+    const queuedTurn = await controller.acceptRuntimeTurn({
+      conversationId: moved.data.conversation.conversationId,
+      agentId: 'codex',
+      text: 'Run the effort captured when this turn was queued',
+      thinkingEffort: 'high',
+    });
+    const queuedUserEvent = [...queuedTurn.events].reverse().find((event) => event.kind === 'user-message');
+    assert.equal(queuedUserEvent?.kind === 'user-message' ? queuedUserEvent.thinkingEffort : null, 'high', 'queued turn keeps its immutable effort snapshot');
+    assert.equal(queuedTurn.composerPreferences.thinkingEffortByRuntime.codex, 'low', 'dispatching a queued turn does not overwrite the current Composer draft preference');
+
     const unknownToDelete = await store.create({
       scopeId: unknownScope.scopeId,
       scope: unknownScope.descriptor,

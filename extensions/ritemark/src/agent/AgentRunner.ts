@@ -686,13 +686,24 @@ export class AgentSession {
     } else {
       // Follow-up turn — feed into existing warm process
       const applyFlagSettings = this._queryStream.applyFlagSettings;
+      let adjustedToAuto = false;
       if (!applyFlagSettings) {
         throw new Error('Claude runtime does not support changing thinking effort on a warm session');
+      } else {
+        try {
+          await applyFlagSettings.call(this._queryStream, {
+            effortLevel: thinkingEffort === 'auto' ? null : thinkingEffort,
+          });
+        } catch (error) {
+          if (thinkingEffort === 'auto') throw error;
+          // Account/model capability may change while a Claude session is warm.
+          // Reset to provider default before enqueueing instead of dropping the
+          // already accepted user turn.
+          await applyFlagSettings.call(this._queryStream, { effortLevel: null });
+          adjustedToAuto = true;
+        }
       }
-      await applyFlagSettings.call(this._queryStream, {
-        effortLevel: thinkingEffort === 'auto' ? null : thinkingEffort,
-      });
-      onThinkingEffortApplied?.();
+      onThinkingEffortApplied?.(undefined, adjustedToAuto);
       this._emitProgress('init', `Continuing (${this._model || 'claude'})`);
       this._enqueueInput(userMsg);
     }
