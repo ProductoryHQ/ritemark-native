@@ -11,6 +11,7 @@ import {
   activeSegmentIndex,
   confidenceThreshold,
   formatClock,
+  isInteractivePlaybackTarget,
   isLowConfidence,
   resamplePeaks,
   segmentsForSpeaker,
@@ -78,6 +79,18 @@ async function run(): Promise<void> {
   assert.equal(speakerColor(0), SPEAKER_COLORS[0]);
   assert.equal(speakerColor(SPEAKER_COLORS.length), SPEAKER_COLORS[0], 'the palette wraps');
   assert.ok(speakerColor(37), 'any index yields a colour');
+
+  // Sprint 113 R5: playback shortcuts never consume editing/control keys.
+  const element = (
+    tagName: string,
+    parentElement: unknown = null,
+    attrs: Record<string, string> = {},
+  ) => ({ tagName, parentElement, getAttribute: (name: string) => attrs[name] ?? null });
+  assert.equal(isInteractivePlaybackTarget(element('INPUT')), true);
+  assert.equal(isInteractivePlaybackTarget(element('SPAN', element('BUTTON'))), true, 'button descendants are guarded');
+  assert.equal(isInteractivePlaybackTarget(element('DIV', null, { contenteditable: 'true' })), true);
+  assert.equal(isInteractivePlaybackTarget(element('DIV', null, { role: 'slider' })), true);
+  assert.equal(isInteractivePlaybackTarget(element('DIV')), false, 'the workbench surface keeps shortcuts');
 
   // ── confidence ──
 

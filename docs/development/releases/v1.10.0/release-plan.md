@@ -11,7 +11,7 @@
 
 Agent conversations become a durable, project-safe product object instead of an accidental merge of webview history and open runtime tabs. A user can find every non-empty conversation in the current project, open it after a restart, and continue it with an honest statement of how much agent context was restored.
 
-The release does not ship after the persistence sprint alone. Sprint 109 establishes trustworthy storage and UX semantics; Sprint 110 completes the continuation promise; Sprint 111 refreshes and revalidates the bundled runtime baseline; Sprint 112 adds a capability-driven thinking-effort control to the Composer against those final runtime versions.
+The release does not ship after the persistence sprint alone. Sprint 109 establishes trustworthy storage and UX semantics; Sprint 110 completes the continuation promise; Sprint 111 refreshes and revalidates the bundled runtime baseline; Sprint 112 adds a capability-driven thinking-effort control to the Composer against those final runtime versions; Sprint 113 makes Transcribe Insights language-aware and safely exportable as a separate Markdown artifact.
 
 ## User-Facing Headlines
 
@@ -20,6 +20,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 3. **Continue truthfully** — reopened conversations distinguish native session resume, transcript-context fallback, and unavailable context.
 4. **Current agent runtimes** — v1.10.0 pins and verifies refreshed Claude, Codex, OpenCode, and protocol SDK versions across all release platforms.
 5. **Choose thinking effort in the Composer** — Claude and Codex expose honest per-turn, model-filtered Auto/Low/Medium/High/Extra/Max/Ultra choices; OpenCode participates only when ACP advertises compatible thought levels.
+6. **Create useful Transcribe Insights artifacts** — choose Auto, Estonian, or English, retain full Unicode speaker names, and create a separate no-overwrite Markdown document without changing the transcript.
 
 ## Product Contract
 
@@ -37,6 +38,8 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - Runtime continuation never implies memory the agent did not actually receive.
 - Thinking effort is a next-turn Composer choice. Auto preserves the selected runtime/model default; explicit choices are offered only when supported and are snapshotted before dispatch.
 - Requested and applied effort are distinct metadata. Ritemark discloses a measured downgrade and never exposes hidden chain-of-thought content.
+- Insights language is explicit provenance: Auto resolves Estonian/English from the transcript and falls back to English, while legacy Insights remain identified as English.
+- Creating an Insights document is a separate snapshot action: it never overwrites an existing file or the primary transcript, and it never changes the transcript link.
 
 ## Scope Envelope
 
@@ -55,6 +58,8 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - Exact refreshed pins for the bundled Codex, Claude Code/Agent SDK, OpenCode, and ACP SDK compatibility surface, with native-platform verification.
 - Composer thinking-effort control, durable per-runtime draft preference, queue-time turn snapshot, typed host/runtime contract, Claude/Codex mappings, and ACP capability-driven OpenCode behavior.
 - Experimental/default-on `composer-thinking-effort` kill switch that restores provider defaults without deleting metadata.
+- Shared Auto/Estonian/English Insights language selection, stored selected/resolved provenance, and deterministic language instructions that preserve names, quotes, and timestamps.
+- A host-validated, exclusive-create `-insights.md` snapshot action plus full Unicode speaker-name handling across rename, prompts, and exports.
 
 ### Explicitly out of scope
 
@@ -66,6 +71,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - Sharing history with scheduled tasks or Ritemark Flows.
 - Thinking-effort controls for Flows, scheduled tasks, legacy single-shot AI, agent frontmatter, or raw chain-of-thought/token-budget display.
 - A floating runtime `latest` dependency, separate in-app runtime updater, runtime marketplace, or fourth runtime.
+- Translating raw transcript text, generating multiple Insights languages in one action, or silently updating previously created Insights snapshots.
 
 ## Sprint Map
 
@@ -75,10 +81,11 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | [Sprint 110 — Agent Conversation Resume](./sprint-110-agent-conversation-resume/sprint-plan.md) | [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) | Closed | `codex/sprint-110-agent-conversation-resume` | [#211](https://github.com/ProductoryHQ/ritemark-native/pull/211) | Merged as `64cfd8a`; authenticated runtime-upgrade/failure-injection checks remain in the final release matrix | Native adapters, bounded fallback, dispatch receipts, immediate draft-safe handoff with one inline boundary, fresh-profile cutover, Claude → Codex recall, restart canary, independent review, and official QA pass | v1.10.0 release notes, checklist, and exactly three final-state screenshots complete | Complete 2026-08-23 |
 | [Sprint 111 — Agent Runtime Refresh](./sprint-111-agent-runtime-refresh/sprint-plan.md) | [#207](https://github.com/ProductoryHQ/ritemark-native/issues/207) | Closes with PR | `codex/sprint-111-agent-runtime-refresh` | [#214](https://github.com/ProductoryHQ/ritemark-native/pull/214) | Ready to merge; full signed installers remain release gates | Exact 9-artifact gate, deterministic suite, official QA, arm64 behavior, native Intel/Windows matrix, code review, and release preflight pass | Runtime refresh section complete | Complete 2026-08-24 |
 | [Sprint 112 — Composer Thinking Effort](./sprint-112-composer-thinking-effort/sprint-plan.md) | [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206) | Closes with PR | `codex/sprint-112-composer-thinking-effort` | [#215](https://github.com/ProductoryHQ/ritemark-native/pull/215) | Ready to merge | Exact-pin capability probes, all-level adapter matrix, conversation regressions, live RunDev matrix, code review, and official QA pass | User docs, release notes, checklist, and one release screenshot complete | Complete 2026-08-24 |
+| [Sprint 113 — Transcribe Insights Output](./sprint-113-transcribe-insights-output/sprint-plan.md) | [#208](https://github.com/ProductoryHQ/ritemark-native/issues/208) | Open | `codex/sprint-113-transcribe-insights-output` | — | Parallel implementation explicitly approved; rebase/regenerate shared bundle after Sprint 112 merge | Focused tests, extension/webview typechecks, and webview build pass; full QA and manual UI evidence pending | Changelog, release notes, checklist, user docs, and architecture docs drafted | In development |
 
 ## Feature-Complete Definition
 
-- [ ] Sprint 109–112 issues are Done, linked to milestone v1.10.0, and their PRs are merged or explicitly deferred in the tracker.
+- [ ] Sprint 109–113 issues are Done, linked to milestone v1.10.0, and their PRs are merged or explicitly deferred in the tracker.
 - [ ] No unresolved release blocker remains; every exception is named, justified, and explicitly deferred.
 - [ ] Restart, reload, immediate-quit, delete, migration, corrupt-record, multi-project, multi-root, and no-folder matrices pass.
 - [ ] No conversation is silently lost, duplicated, pruned, or exposed in another project.
@@ -88,9 +95,10 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - [ ] The permanent conversation rail keeps New / Pinned / automatic active-and-recent / otherwise-absent current / All conversations order, a selection-neutral deduplicated canonical-ID union, 56:40 rail-to-target proportion, shared chat-bubble visuals, explicit Pin/Unpin, and reliable full-title tooltips through Sprint 110 resume/fallback.
 - [ ] Final exact runtime/SDK pins, checksums, licenses, native-platform artifacts, existing behavior, and Sprint 110 continuation conclusions are verified after Sprint 111.
 - [ ] Composer effort uses Auto by default, sends only supported explicit levels, snapshots queued/running turns correctly, preserves conversation isolation, and remains honest for OpenCode capability gaps.
-- [ ] `docs/development/architecture.md` documents `src/conversations/`, typed protocols, runtime continuation, final runtime/SDK baseline, and the shared thinking-effort contract.
-- [ ] User documentation, changelog, v1.10.0 release notes, test checklist, runtime-version evidence, effort visual evidence, and migration canary evidence are complete.
-- [ ] `./scripts/validate-qa.sh` and the release-specific migration+resume+runtime+effort canary pass on merged release scope.
+- [ ] Transcribe Insights resolves Auto/Estonian/English honestly, preserves full Unicode speaker names and source quotes, and creates collision-safe separate Markdown snapshots without mutating the transcript.
+- [ ] `docs/development/architecture.md` documents `src/conversations/`, typed protocols, runtime continuation, final runtime/SDK baseline, the shared thinking-effort contract, and the Transcribe Insights output boundary.
+- [ ] User documentation, changelog, v1.10.0 release notes, test checklist, runtime-version evidence, effort visual evidence, Insights evidence, and migration canary evidence are complete.
+- [ ] `./scripts/validate-qa.sh` and the release-specific migration+resume+runtime+effort+Insights canary pass on merged release scope.
 
 ## Delivery Sequence and Gates
 
@@ -100,12 +108,13 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 4. **Sprint 110 Phase 0 and implementation:** audit pinned Claude SDK, Codex app-server, and bundled ACP/OpenCode capabilities; obtain the Phase 0 decision approval; then implement continuation, complete cross-runtime QA, PR, and merge.
 5. **Sprint 111:** after Sprint 110 merges, approve kickoff and create its dedicated branch; audit the exact runtime/SDK snapshot, obtain the Phase 0 pin/protocol decision, update pins/adapters, rerun native-platform behavior and Sprint 110 continuation matrices, QA, PR, and merge.
 6. **Sprint 112:** after Sprint 111 merges, approve kickoff and create its dedicated branch; audit final effort capabilities and approve `design.md`, then implement Composer state/UI plus shared runtime mappings, cross-runtime QA, PR, and merge.
-7. **Feature complete:** close/defer every release item explicitly; complete QA, docs, and the migration+resume+runtime+effort canary.
-8. **Release candidate:** rerun release preflight on clean, synchronized `main`; bump both branding/app and bundled extension versions; push the version commit before any tag.
-9. **arm64 candidate:** build/sign the arm64 DMG without notarizing it and generate the test checklist; Jarmo installs/tests that exact un-notarized DMG and explicitly approves it. Wait at least 60 minutes from its build with no new bug; any rebuild resets the arm64 clock and approval.
-10. **Gate 1 and tag:** notarize/staple the approved arm64 DMG, verify notarization, signature, and mounted-app hard checks, then clear technical Gate 1. Make the development repository private before pushing the tag. Only after Gate 1 may the already-pushed version commit be tagged/pushed to start x64/Windows CI.
-11. **x64/Windows candidate:** download/sign/package the x64 DMG without notarizing it and prepare the Windows installer; after x64/Windows CI completes, restore the development repository to public. Jarmo tests both platform candidates and gives final Gate 2 approval. Wait at least 60 minutes from the x64 DMG build with no new bug; any x64 rebuild resets its clock and Gate 2 approval.
-12. **Final verification and publication:** notarize/staple/verify the Gate 2-approved x64 DMG, including signature and mounted-app hard checks; verify the Windows installer and all release assets; then regenerate, verify, and publish the canonical update feed together with the matching binaries. No publication occurs before final Gate 2 approval and verification.
+7. **Sprint 113:** in the explicitly approved parallel worktree, implement the approved Auto/Estonian/English, provenance, full-speaker-name, and separate exclusive-create Insights contract; after Sprint 112 merges, rebase and regenerate the shared webview bundle before QA, PR, and merge.
+8. **Feature complete:** close/defer every release item explicitly; complete QA, docs, and the migration+resume+runtime+effort+Insights canary.
+9. **Release candidate:** rerun release preflight on clean, synchronized `main`; bump both branding/app and bundled extension versions; push the version commit before any tag.
+10. **arm64 candidate:** build/sign the arm64 DMG without notarizing it and generate the test checklist; Jarmo installs/tests that exact un-notarized DMG and explicitly approves it. Wait at least 60 minutes from its build with no new bug; any rebuild resets the arm64 clock and approval.
+11. **Gate 1 and tag:** notarize/staple the approved arm64 DMG, verify notarization, signature, and mounted-app hard checks, then clear technical Gate 1. Make the development repository private before pushing the tag. Only after Gate 1 may the already-pushed version commit be tagged/pushed to start x64/Windows CI.
+12. **x64/Windows candidate:** download/sign/package the x64 DMG without notarizing it and prepare the Windows installer; after x64/Windows CI completes, restore the development repository to public. Jarmo tests both platform candidates and gives final Gate 2 approval. Wait at least 60 minutes from the x64 DMG build with no new bug; any x64 rebuild resets its clock and Gate 2 approval.
+13. **Final verification and publication:** notarize/staple/verify the Gate 2-approved x64 DMG, including signature and mounted-app hard checks; verify the Windows installer and all release assets; then regenerate, verify, and publish the canonical update feed together with the matching binaries. No publication occurs before final Gate 2 approval and verification.
 
 ## Dependencies and Blockers
 
@@ -114,6 +123,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - Native continuation behavior is version-specific external protocol behavior; Phase 0 can reduce scope but cannot be skipped.
 - Sprint 111 depends on Sprint 110 merge and must rerun continuation evidence after changing runtime versions.
 - Sprint 112 depends on Sprint 111’s exact final pins and effort capability audit; it also depends on Sprint 109 durable metadata and Sprint 110 no-duplicate ambiguous-dispatch behavior.
+- Sprint 113 has no product dependency on Sprint 112 and was approved to implement in parallel. Because both branches touch shared extension/webview artifacts, Sprint 113 must rebase after Sprint 112 merges and regenerate `media/webview.js`; it must not hand-merge that bundle.
 - The ACP SDK `0.22.1` → `1.4.0` jump is a major compatibility gate; production pins do not change before the audit and Jarmo decision.
 - Folder rename/move cannot be inferred safely from a path alone. The release must provide an explicit relink/recovery path instead of probabilistic project matching.
 - Preflight snapshot 2026-08-21 passed with warnings: the working tree was dirty and origin synchronization could not be verified, so preflight must be rerun on clean synchronized `main`; no Developer ID certificate was available, which blocks signed Gate 1 artifacts outright. Planning is not blocked.
@@ -133,12 +143,15 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | Claude binary and SDK drift | High | Lockstep exact pins and hard parity check | Open — Sprint 111 |
 | Composer exposes unsupported effort or cross-binds queued turns | High | Host capability truth, turn snapshot before queue/dispatch, model/runtime/concurrency matrix | Retired in Sprint 112 |
 | OpenCode effort requires eager runtime startup | High | Preserve lazy open/select; show controls only after ACP advertises `thought_level` | Retired in Sprint 112 |
+| Insights snapshot aliases or overwrites the transcript/existing content | High | Canonical host validation, Windows filename rules, exclusive create, partial-write cleanup, and deterministic collision tests | Automated evidence passes — Sprint 113; manual UI pending |
+| Language choice corrupts quotes, timestamps, or full Unicode speaker names | High | Shared allowlist/provenance, explicit prompt constraints, normalized full-name path, and Estonian/English fixture coverage | Automated evidence passes — Sprint 113; manual UI pending |
 
 ## Documentation and Release Assets
 
 - Update `docs/user/features/ai-agents.md` with Conversations, delete, local-only scope, continuation labels, and Composer thinking effort.
 - Update `docs/development/architecture.md` in every sprint whose architectural contract lands; Sprints 111/112 must add the final runtime baseline and effort path.
-- Add and maintain `docs/releases/v1.10.0/release-notes.md` and `TEST-CHECKLIST.md` through Sprint 112 closeout.
+- Add and maintain `docs/releases/v1.10.0/release-notes.md` and `TEST-CHECKLIST.md` through Sprint 113 closeout.
+- Update `docs/user/features/transcribe.md` for Insights language, full speaker names, and separate snapshot behavior; capture the selector, long-name, collision, cancel, and successful-create evidence.
 - Capture visual evidence for empty/current/working/needs-you/restored/error/migration states and effort Auto/explicit/unsupported/downgrade states.
 - Record final runtime versions, SDK pins, checksums, licenses, native-platform verification, and refreshed continuation results.
 - Do not market “pick up exactly where you left off” unless the runtime matrix proves native resume for that path.
@@ -166,6 +179,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | 2026-08-24 | Complete Sprint 112 runtime capability audit | Exact final-pin evidence supports Claude Low–Max, model-dependent Codex Low–Extra/Max/Ultra, and live ACP `thought_level`; product-code work awaits the separate capability/mapping/design decision. |
 | 2026-08-24 | Approve Sprint 111 exact pins and measured protocol plan | Codex 0.149.0, Claude 2.1.239/SDK 0.3.239, and OpenCode 1.18.21/ACP 1.4.0 passed Phase 0 evidence; implementation may proceed without Composer UI. |
 | 2026-08-24 | Approve Sprint 112 capability mapping and final Composer design | Ship the compact native range with Auto below it; capability-filter every runtime/model, preserve warm Auto defaults, and keep OpenCode discovery lazy. |
+| 2026-08-24 | Approve Sprint 113 Phase 0 contract and parallel implementation | Auto resolves Estonian/English with English fallback; legacy provenance is English; snapshots use `-insights.md`, exclusive no-overwrite host validation, and no focus steal; full Unicode names remain intact. Sprint 113 may proceed independently, then rebase/regenerate shared artifacts after Sprint 112. |
 
 ## Planning Approval
 
@@ -174,10 +188,12 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - [x] Jarmo approves Sprint 110 SDD artifacts and Phase 0 decisions (2026-08-23).
 - [x] Jarmo approves Sprint 111 SDD artifacts, exact target pins, and protocol plan (2026-08-24).
 - [x] Jarmo approves Sprint 112 scope, kickoff, capability mapping, and final Composer design (scope 2026-08-23; Phase 0/final design 2026-08-24).
-- [x] Jarmo pre-approves Sprint 113/#208 and Sprint 114/#212 scope/kickoff (2026-08-23); canonical draft promotion, dependencies, and evidence-specific decisions remain pending.
+- [x] Jarmo approves Sprint 113/#208 SDD artifacts, exact Phase 0 contract, dedicated parallel worktree, and implementation (2026-08-24); post-Sprint-112 rebase/bundle regeneration remains required before merge readiness.
+- [x] Jarmo pre-approves Sprint 114/#212 scope/kickoff (2026-08-23); canonical draft promotion, dependencies, and evidence-specific decisions remain pending.
 - [x] GitHub milestone v1.10.0 created 2026-08-21.
 - [x] Sprint issues [#205](https://github.com/ProductoryHQ/ritemark-native/issues/205) and [#204](https://github.com/ProductoryHQ/ritemark-native/issues/204) created and linked 2026-08-21.
 - [x] Sprint issues [#207](https://github.com/ProductoryHQ/ritemark-native/issues/207) and [#206](https://github.com/ProductoryHQ/ritemark-native/issues/206) created and linked 2026-08-22.
+- [x] Sprint issue [#208](https://github.com/ProductoryHQ/ritemark-native/issues/208) is linked to Sprint 113 and milestone v1.10.0.
 - [x] v1.9.0 canonical release plan and milestone reconciled to shipped Transcribe scope 2026-08-21.
 - [x] Sprint 109 branch created after approval (2026-08-22).
 - [x] Jarmo approved Sprint 110 SDD/audit-first scope and Phase 0 start (2026-08-23).

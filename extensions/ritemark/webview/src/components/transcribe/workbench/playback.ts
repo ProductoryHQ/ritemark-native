@@ -26,6 +26,31 @@ export interface WorkbenchSpeaker {
   colorIndex: number;
 }
 
+interface PlaybackEventTarget {
+  tagName?: string;
+  isContentEditable?: boolean;
+  parentElement?: PlaybackEventTarget | null;
+  getAttribute?: (name: string) => string | null;
+}
+
+/** Sprint 113 R5: editor controls own Space/arrows before the player does. */
+export function isInteractivePlaybackTarget(target: unknown): boolean {
+  const interactiveTags = new Set(['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'A']);
+  const interactiveRoles = new Set(['button', 'link', 'textbox', 'combobox', 'slider', 'spinbutton']);
+  let current = target as PlaybackEventTarget | null;
+
+  for (let depth = 0; current && depth < 20; depth++) {
+    if (current.tagName && interactiveTags.has(current.tagName.toUpperCase())) return true;
+    if (current.isContentEditable) return true;
+    const contentEditable = current.getAttribute?.('contenteditable');
+    if (contentEditable !== null && contentEditable !== undefined && contentEditable !== 'false') return true;
+    const role = current.getAttribute?.('role');
+    if (role && interactiveRoles.has(role)) return true;
+    current = current.parentElement ?? null;
+  }
+  return false;
+}
+
 /**
  * Which segment is playing at `time`.
  *

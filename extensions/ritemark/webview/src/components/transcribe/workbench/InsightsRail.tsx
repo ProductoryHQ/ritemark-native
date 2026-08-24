@@ -9,10 +9,26 @@
  *   2. The rail says out loud that a model wrote this, and which one.
  */
 
+import { useEffect, useRef } from 'react';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../ui/select';
 import { vscode } from '../../../lib/vscode';
 import { formatClock } from './playback';
+import {
+  INSIGHTS_LANGUAGE_OPTIONS,
+  insightsLanguageLabel,
+  insightsLanguageProvenance,
+  type InsightsLanguageMetadata,
+  type InsightsLanguageSelection,
+  type InsightsOutputLanguage,
+} from '../../../../../src/speech/insightsLanguage';
 
 export interface InsightItem {
   kind: 'decision' | 'action' | 'quote' | 'question';
@@ -24,6 +40,7 @@ export interface InsightItem {
 export interface Insights {
   generatedAt: string;
   model: string;
+  language?: InsightsLanguageMetadata;
   summary?: string;
   items: InsightItem[];
 }
@@ -42,16 +59,33 @@ export function InsightsRail({
   state,
   error,
   runtimeReady,
-  savedDocumentName,
+  selectedLanguage,
+  resolvedLanguage,
+  documentResultSerial,
+  onLanguageChange,
+  onGenerate,
+  onCreateDocument,
   onSeek,
 }: {
   insights: Insights | null;
   state: InsightsState;
   error: string | null;
   runtimeReady: boolean;
-  savedDocumentName: string | null;
+  selectedLanguage: InsightsLanguageSelection;
+  resolvedLanguage: InsightsOutputLanguage;
+  documentResultSerial: number;
+  onLanguageChange: (language: InsightsLanguageSelection) => void;
+  onGenerate: () => void;
+  onCreateDocument: () => void;
   onSeek: (seconds: number) => void;
 }) {
+  const createButtonRef = useRef<HTMLButtonElement | null>(null);
+  const provenance = insights ? insightsLanguageProvenance(insights.language) : null;
+
+  useEffect(() => {
+    if (documentResultSerial > 0) createButtonRef.current?.focus();
+  }, [documentResultSerial]);
+
   return (
     <aside className="flex w-72 shrink-0 flex-col border-l border-hairline bg-surface-muted">
       <div className="flex items-center gap-2 border-b border-hairline px-4 py-2.5">
@@ -61,7 +95,7 @@ export function InsightsRail({
           <button
             type="button"
             className="ml-auto text-[10.5px] font-semibold text-accent hover:underline"
-            onClick={() => vscode.postMessage({ type: 'workbench:generateInsights' })}
+            onClick={onGenerate}
           >
             Regenerate
           </button>
@@ -69,6 +103,37 @@ export function InsightsRail({
       </div>
 
       <div className="flex-1 overflow-y-auto p-3">
+        <div className="mb-3">
+          <label htmlFor="insights-language" className="mb-1.5 block text-[11px] font-medium text-ink-body">
+            Insights language
+          </label>
+          <Select
+            value={selectedLanguage}
+            disabled={state === 'generating'}
+            onValueChange={(value) => onLanguageChange(value as InsightsLanguageSelection)}
+          >
+            <SelectTrigger
+              id="insights-language"
+              aria-label="Insights language"
+              className="h-8 rounded-md bg-surface px-2.5 text-xs focus:border-accent focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {INSIGHTS_LANGUAGE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value} className="text-xs">
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-ink-faint">
+            {selectedLanguage === 'auto'
+              ? `Auto · ${insightsLanguageLabel(resolvedLanguage)}`
+              : `Output · ${insightsLanguageLabel(resolvedLanguage)}`}
+          </p>
+        </div>
+
         {state === 'generating' && (
           <div className="rounded-lg border border-hairline bg-surface p-3">
             <div className="flex items-center gap-2 text-xs text-ink-body">
@@ -93,7 +158,7 @@ export function InsightsRail({
               variant="secondary"
               size="sm"
               className="mt-2.5 w-full"
-              onClick={() => vscode.postMessage({ type: 'workbench:generateInsights' })}
+              onClick={onGenerate}
             >
               Try again
             </Button>
@@ -110,7 +175,7 @@ export function InsightsRail({
                 <Button
                   size="sm"
                   className="mt-3 w-full"
-                  onClick={() => vscode.postMessage({ type: 'workbench:generateInsights' })}
+                  onClick={onGenerate}
                 >
                   Generate insights
                 </Button>
@@ -183,20 +248,23 @@ export function InsightsRail({
               </p>
             )}
 
-            {/* The insights are part of the saved document, but that is not
-                obvious from here — so the action lives where the user is
-                looking when they decide they want to keep them. */}
             <Button
+              ref={createButtonRef}
               variant="secondary"
               size="sm"
               className="mt-1 w-full"
-              onClick={() => vscode.postMessage({ type: 'workbench:save' })}
+              onClick={onCreateDocument}
             >
-              {savedDocumentName ? 'Add to document' : 'Save to document'}
+              Create insights document
             </Button>
 
+            <p className="mt-2 px-1 text-[10px] leading-relaxed text-ink-muted">
+              Creates a new Markdown file. Your transcript is not changed.
+            </p>
+
             <p className="mt-2 px-1 text-[10px] leading-relaxed text-ink-faint">
-              Generated by {insights.model} from the transcript. Click a timestamp to hear the moment it came from.
+              Generated by {insights.model} in {insightsLanguageLabel(provenance?.resolved ?? 'en')}
+              {provenance?.legacy ? ' (legacy)' : ''} from the transcript. Click a timestamp to hear the moment it came from.
             </p>
           </>
         )}

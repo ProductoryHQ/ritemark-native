@@ -1,6 +1,6 @@
 # Ritemark 1.10.0 Test Checklist
 
-This checklist accumulates release evidence across Sprints 109–112.
+This checklist accumulates release evidence across Sprints 109–113.
 
 ## Durable conversations (Sprint 109)
 
@@ -55,6 +55,15 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Native RunDev smoke: range drag, click/arrow operation, Auto checkbox, Escape/focus return, 300px sidebar collision, normal width, and 200% zoom geometry pass in `ritemark-demo` (2026-08-24).
 - [x] Native range/checkbox names, value text, keyboard semantics, live status copy, and reduced-motion CSS contract are present; no bespoke slider keyboard behavior is used.
 
+## Transcribe Insights and speaker names (Sprint 113)
+
+- [x] Auto/Estonian/English allowlist, fallback, invalid-wire, prompt-language, quote-fidelity instruction, and legacy-English provenance tests pass.
+- [x] Insights-only Markdown, `.md` normalization, Windows-invalid names, primary/existing/case-alias rejection, exclusive-create race, write-failure cleanup, and transcript bytes/mtime isolation tests pass.
+- [x] Full-name normalization, Unicode, empty rejection, transcript export, Insights prompt attribution, and interactive-target playback guards pass.
+- [ ] Manual Estonian and English generation preserves verbatim source quotes and working timestamp seeks.
+- [ ] Manual save-dialog success, cancel, collision, primary-path refusal, Open action, and transcript-link isolation pass.
+- [ ] Manual keyboard, screen-reader labels, narrow rail, 200% zoom, light/dark/high-contrast, speaker-chip/gutter ellipsis, and full-name tooltip pass.
+
 ## Automated gates
 
 - [x] Extension TypeScript compile and bundle.
@@ -69,4 +78,5 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 
 ## Remaining release scope
 
+- [ ] Sprint 113 authenticated generation and manual visual/save-flow matrix.
 - [ ] Final macOS arm64/x64 and Windows candidate gates.

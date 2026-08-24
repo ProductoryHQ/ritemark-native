@@ -5,7 +5,7 @@ conversation system you can trust. Your chats belong to the project, survive a
 restart, and can continue with another agent without making you reconstruct the
 discussion from memory.
 
-<!-- Draft through Sprint 112. -->
+<!-- Draft through Sprint 113. -->
 
 ## Conversations you can return to
 
@@ -79,6 +79,19 @@ The release build now rejects incomplete platform sets, checksum mismatches,
 Claude binary/SDK drift, and stale runtime metadata before packaging. Existing
 conversation continuation, approvals, cancellation, and parallel-conversation
 isolation were rerun against this exact snapshot.
+
+## Transcribe Insights you can deliver
+
+Choose Auto, Estonian, or English before generating Transcribe Insights. Auto
+uses a detected Estonian or English transcript language and otherwise falls
+back to English. Summaries and action items use the chosen language while key
+quotes, names, and timestamps remain faithful to the recording.
+
+**Create insights document** now makes a separately named Markdown snapshot.
+It never overwrites an existing file, replaces the primary transcript, changes
+the transcript link, or silently updates an earlier snapshot. Speaker rename
+also accepts full Unicode names with spaces; long labels stay aligned and reveal
+their complete name on hover or focus.
 
 > Native continuation is intentionally version- and configuration-specific. “Previous messages were included” means transcript fallback, not complete private model memory.
 

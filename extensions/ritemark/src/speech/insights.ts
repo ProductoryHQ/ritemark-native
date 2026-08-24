@@ -15,12 +15,14 @@ import { createRuntime } from '../runtime';
 import * as modelCatalog from '../ai/modelCatalog';
 import { buildInsightsPrompt, parseInsightsResponse } from './insightsParsing';
 import type { TranscriptInsights, TranscriptSession } from './types';
+import type { InsightsLanguageMetadata } from './insightsLanguage';
 
 export * from './insightsParsing';
 
 export interface GenerateInsightsOptions {
   session: TranscriptSession;
   workspacePath: string;
+  language: InsightsLanguageMetadata;
   /**
    * BYOK key for users authenticated by API key rather than a Claude.ai login.
    * The AI sidebar threads this through too; without it those users get a
@@ -77,12 +79,15 @@ export async function generateInsights(options: GenerateInsightsOptions): Promis
 
   try {
     await session.prompt({
-      prompt: buildInsightsPrompt(options.session),
+      prompt: buildInsightsPrompt(options.session, options.language.resolved),
       timeoutMinutes: 5,
     });
 
     const text = await finished;
-    return parseInsightsResponse(text, options.session.segments, model, new Date().toISOString());
+    return {
+      ...parseInsightsResponse(text, options.session.segments, model, new Date().toISOString()),
+      language: options.language,
+    };
   } finally {
     options.signal?.removeEventListener('abort', onAbort);
     session.dispose();

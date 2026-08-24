@@ -19,6 +19,7 @@ import { InsightsRail, type Insights, type InsightsState } from './InsightsRail'
 import {
   activeSegmentIndex,
   formatClock,
+  isInteractivePlaybackTarget,
   isLowConfidence,
   segmentsForSpeaker,
   speakerColor,
@@ -27,6 +28,11 @@ import {
   type WorkbenchSpeaker,
   type WorkbenchWord,
 } from './playback';
+import {
+  resolveInsightsLanguage,
+  type InsightsLanguageSelection,
+} from '../../../../../src/speech/insightsLanguage';
+import { normalizeSpeakerLabel } from '../../../../../src/speech/speakerNames';
 
 interface EngineStatus {
   id: string;
@@ -75,6 +81,8 @@ export function Workbench() {
   const [followPlayback, setFollowPlayback] = useState(true);
   const [insightsState, setInsightsState] = useState<InsightsState>('idle');
   const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [insightsLanguage, setInsightsLanguage] = useState<InsightsLanguageSelection>('auto');
+  const [insightsDocumentResultSerial, setInsightsDocumentResultSerial] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -87,6 +95,8 @@ export function Workbench() {
       } else if (event.data?.type === 'workbench:insightsState') {
         setInsightsState(event.data.state as InsightsState);
         setInsightsError(event.data.message ?? null);
+      } else if (event.data?.type === 'workbench:insightsDocumentResult') {
+        setInsightsDocumentResultSerial((value) => value + 1);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -97,6 +107,11 @@ export function Workbench() {
   const session = state?.session ?? null;
   const segments = session?.segments ?? [];
   const activeIndex = useMemo(() => activeSegmentIndex(segments, currentTime), [segments, currentTime]);
+
+  useEffect(() => {
+    if (!session) return;
+    setInsightsLanguage(session.insights?.language?.selected ?? 'auto');
+  }, [session?.id]);
 
   // Duration comes from the element once metadata loads; the session's stored
   // value can be 0 when the length could not be probed before transcribing.
@@ -122,6 +137,7 @@ export function Workbench() {
   // Keyboard: space toggles, arrows skip. Bound on the container rather than
   // the document so it cannot fight the editor's own shortcuts.
   const onKeyDown = (event: React.KeyboardEvent) => {
+    if (isInteractivePlaybackTarget(event.target)) return;
     if (event.key === ' ') {
       event.preventDefault();
       togglePlay();
@@ -254,7 +270,9 @@ export function Workbench() {
         onChangeRename={setRenameValue}
         onCancelRename={() => setRenaming(null)}
         onCommitRename={(speakerId) => {
-          vscode.postMessage({ type: 'workbench:renameSpeaker', speakerId, label: renameValue });
+          const normalized = normalizeSpeakerLabel(renameValue);
+          if (!normalized) return;
+          vscode.postMessage({ type: 'workbench:renameSpeaker', speakerId, label: normalized });
           setRenaming(null);
         }}
       />
@@ -286,7 +304,15 @@ export function Workbench() {
           state={insightsState}
           error={insightsError}
           runtimeReady={state.runtimeReady !== false}
-          savedDocumentName={state.savedDocument?.name ?? null}
+          selectedLanguage={insightsLanguage}
+          resolvedLanguage={resolveInsightsLanguage(insightsLanguage, session.language)}
+          documentResultSerial={insightsDocumentResultSerial}
+          onLanguageChange={setInsightsLanguage}
+          onGenerate={() => vscode.postMessage({
+            type: 'workbench:generateInsights',
+            language: insightsLanguage,
+          })}
+          onCreateDocument={() => vscode.postMessage({ type: 'workbench:createInsightsDocument' })}
           onSeek={(seconds) => seek(seconds, true)}
         />
       </div>
@@ -398,18 +424,19 @@ function SpeakerBar({
         const color = speakerColor(speaker.colorIndex);
         const isRenaming = renaming === speaker.id;
         return (
-          <div key={speaker.id} className="relative">
+          <div key={speaker.id} className="relative min-w-0">
             <button
               type="button"
               onClick={() => onStartRename(speaker)}
               className={[
-                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                'inline-flex max-w-48 min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
                 isRenaming ? 'border-accent ring-[3px] ring-[var(--r-accent-soft)]' : 'border-hairline hover:border-accent-fainter',
               ].join(' ')}
-              title="Rename this speaker everywhere"
+              title={`Rename ${speaker.label}`}
+              aria-label={`Rename ${speaker.label}`}
             >
-              <span className="size-2 rounded-full" style={{ background: color.dot }} />
-              {speaker.label}
+              <span className="size-2 shrink-0 rounded-full" style={{ background: color.dot }} />
+              <span className="min-w-0 truncate">{speaker.label}</span>
             </button>
 
             {isRenaming && (
@@ -426,6 +453,8 @@ function SpeakerBar({
                     if (event.key === 'Escape') onCancelRename();
                   }}
                   className="w-full rounded-md border border-accent px-2 py-1.5 text-xs text-ink-strong outline-none ring-[3px] ring-[var(--r-accent-soft)]"
+                  aria-label={`Full name for ${speaker.label}`}
+                  aria-invalid={normalizeSpeakerLabel(renameValue) ? undefined : true}
                 />
                 <p className="mt-2 text-[11px] leading-relaxed text-ink-muted">
                   Applies to all {segmentsForSpeaker(session.segments, speaker.id)} segments spoken by{' '}
@@ -435,7 +464,11 @@ function SpeakerBar({
                   <Button variant="secondary" size="sm" onClick={onCancelRename}>
                     Cancel
                   </Button>
-                  <Button size="sm" onClick={() => onCommitRename(speaker.id)}>
+                  <Button
+                    size="sm"
+                    disabled={!normalizeSpeakerLabel(renameValue)}
+                    onClick={() => onCommitRename(speaker.id)}
+                  >
                     Rename
                   </Button>
                 </div>
@@ -488,9 +521,15 @@ const SegmentRow = forwardRef<HTMLDivElement, SegmentRowProps>(function SegmentR
       ].join(' ')}
       title="Click to play from here"
     >
-      <div className="w-20 shrink-0 text-right">
+      <div className="w-20 min-w-0 shrink-0 text-right">
         {showSpeaker && (
-          <div className="text-[11px] font-bold leading-tight" style={color ? { color: color.text } : undefined}>
+          <div
+            className="block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold leading-tight"
+            style={color ? { color: color.text } : undefined}
+            title={label ?? undefined}
+            aria-label={label ?? undefined}
+            tabIndex={0}
+          >
             {label}
           </div>
         )}

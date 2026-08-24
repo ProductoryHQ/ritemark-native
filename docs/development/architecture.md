@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-24 (Sprint 112 — capability-driven per-turn thinking effort)
+**Last updated:** 2026-08-24 (Sprints 112–113 — capability-driven thinking effort and typed Transcribe Insights boundary)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -517,6 +517,10 @@ src/speech/
 ├── segmentFolding.ts        word stream → segments (majority-vote speaker)
 ├── insights.ts              one-shot extraction on the existing agent runtime
 ├── insightsParsing.ts       prompt + citation resolution (pure, unit-tested)
+├── insightsLanguage.ts      Auto/Estonian/English allowlist + legacy provenance
+├── insightsMarkdown.ts      Insights snapshots + exclusive new-file writes
+├── speakerNames.ts          full-name whitespace normalization
+├── workbenchProtocol.ts     typed/validated webview → host requests
 ├── transcriptMarkdown.ts    session → document
 ├── exportTranscript.ts      where the document lands
 └── activeTranscript.ts      resolver so the AI sidebar gets the transcript, not the .m4a
@@ -531,6 +535,18 @@ src/speech/
 2. **On-device Whisper is macOS-only** (`binaries/darwin-arm64/`, #133). Transcribe
    still ships on Windows with ElevenLabs; the registry reports the gap so the UI
    can explain it rather than the feature silently shrinking.
+
+**Insights output contract (Sprint 113).** The sandboxed workbench sends only an
+allowlisted `auto | et | en` choice. The host resolves Auto, passes the resolved
+language explicitly to the prompt, and persists selected/resolved metadata only
+with a successful result. Pre-Sprint-113 Insights retain English provenance
+because their prompt was implicitly English. The separate
+`workbench:createInsightsDocument` request never enters the primary transcript
+save path: the host validates filename/path aliases and uses exclusive creation
+for an Insights-only Markdown snapshot. It never changes transcript bytes, the
+workbench link, or `session.exportPath`. Speaker labels remain ordinary Unicode
+strings; normalization preserves word boundaries while the webview alone
+ellipsizes long display labels.
 
 **Engine facts worth not rediscovering** (measured in the Phase 0 audits, see
 `docs/development/sprints/sprint-108-transcription-workbench/research/`):
@@ -640,6 +656,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-08-24 | Sprint 113 | **Typed Transcribe Insights output boundary.** The sandboxed workbench sends an allowlisted Auto/Estonian/English selection through one validated protocol; the host records selected/resolved language provenance, preserves legacy English provenance, validates primary-path aliases and cross-platform filenames, and exclusively creates separate Insights-only Markdown snapshots. Full Unicode speaker labels remain intact through storage, prompts, and exports while webview layout alone truncates their display. |
 | 2026-08-24 | Sprint 112 | **Capability-driven Composer thinking effort.** One canonical Auto–Ultra contract crosses the durable conversation draft, accepted/queued turn snapshot, typed host bridge, and all three existing `AgentRuntime` adapters. Claude uses SDK effort plus warm flag updates; Codex keeps execute/plan values aligned and restores captured defaults; OpenCode remains lazy and exposes only live ACP `thought_level` choices. Requested/applied evidence stays metadata, model/UI capability is truthful, and the default-on experimental flag provides rollback without data loss. |
 | 2026-08-24 | Sprint 111 | **Exact agent-runtime supply-chain baseline.** Bundled pins move atomically to Codex app-server 0.149.0, Claude Code 2.1.239 + Agent SDK 0.3.239, and OpenCode 1.18.21 + ACP SDK 1.4.0 across nine platform rows. New `validate-agent-runtime-manifest.mjs` makes platform completeness, approved exact pins, SHA/source shape, package-lock/optional-package parity, and vendor identity hard pre-fetch/QA failures; `agent-runtime-matrix.yml` adds native Intel macOS and Windows x64 PR evidence. Codex’s additive `request_user_input.isBlocking` is tolerated for bundled 0.149 and older system runtimes. No new runtime, shared interface, message contract, or feature flag. |
 | 2026-08-23 | Sprint 110 | **Truthful agent conversation continuation.** `runtime/continuation.ts` adds one host-owned descriptor/compatibility/state contract across Claude SDK resume, Codex `thread/resume`, and capability-gated ACP `session/resume` (never `session/load`). `conversations/contextPack.ts` adds the shared deterministic 32 KB user/final-text fallback. Runtime-keyed opaque descriptors and append-only `not-sent → ambiguous → accepted` receipts stay out of webview projections; coverage advances only with an atomically saved assistant final. Explicit cross-runtime confirmation preserves drafts and unanswered user intent, while per-conversation execution tokens and lifecycle checks reject late old-runtime events. |
