@@ -16,10 +16,10 @@ const LABELS: Record<ThinkingEffort, string> = {
   ultra: 'Ultra',
 };
 
-// The range input is inset 12px and its 26px thumb contributes another 13px
-// to the endpoint center. The 2px accent ring makes the visible envelope 15px.
-const RANGE_ENDPOINT_CENTER_PX = 25;
-const RANGE_THUMB_ENVELOPE_RADIUS_PX = 15;
+// The 26px thumb contributes 13px and its 2px accent ring another 2px.
+// Insetting the input by 2px makes the ring's outer edge flush with the track.
+const RANGE_ENDPOINT_CENTER_PX = 15;
+const PROGRESS_OVERHANG_PX = 8;
 
 interface ThinkingEffortControlProps {
   runtimeLabel: string;
@@ -55,6 +55,9 @@ export function ThinkingEffortControl({
   const manual = value === 'auto' ? lastManual ?? fallbackManual : value;
   const selectedIndex = Math.max(0, manual ? levels.indexOf(manual) : 0);
   const fillPercent = levels.length <= 1 ? 0 : (selectedIndex / (levels.length - 1)) * 100;
+  const fillWidth = selectedIndex === levels.length - 1
+    ? '100%'
+    : `calc(${RANGE_ENDPOINT_CENTER_PX + PROGRESS_OVERHANG_PX}px + (100% - ${RANGE_ENDPOINT_CENTER_PX * 2}px) * ${fillPercent / 100})`;
   const disabledReason = capability?.source === 'runtime-live'
     ? 'Thinking effort becomes available after OpenCode advertises supported levels for this conversation.'
     : 'This model chooses its own thinking effort.';
@@ -110,9 +113,7 @@ export function ThinkingEffortControl({
               <div className="absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 overflow-hidden rounded-full border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]">
                 <div
                   className="h-full rounded-full bg-[var(--r-accent)]"
-                  style={{
-                    width: `calc(${RANGE_ENDPOINT_CENTER_PX + RANGE_THUMB_ENVELOPE_RADIUS_PX}px + (100% - ${RANGE_ENDPOINT_CENTER_PX * 2}px) * ${fillPercent / 100})`,
-                  }}
+                  style={{ width: fillWidth }}
                 />
               </div>
               <div
@@ -131,7 +132,7 @@ export function ThinkingEffortControl({
               </div>
               <input
                 type="range"
-                className="thinking-effort-range absolute inset-x-3 inset-y-0 cursor-grab touch-none bg-transparent active:cursor-grabbing"
+                className="thinking-effort-range absolute inset-x-[2px] inset-y-0 cursor-grab touch-none bg-transparent active:cursor-grabbing"
                 min={0}
                 max={Math.max(0, levels.length - 1)}
                 step={1}
