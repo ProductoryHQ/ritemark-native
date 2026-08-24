@@ -632,7 +632,10 @@ jobs:
             -ExpectedPublisher $env:WINDOWS_PUBLISHER `
             -OwnedPathPattern '*'
 
-          $userName = "ritemark-ci-$($env:GITHUB_RUN_ID)"
+          $runId = [string]$env:GITHUB_RUN_ID
+          $runIdSuffix = if ($runId.Length -gt 15) { $runId.Substring($runId.Length - 15) } else { $runId }
+          $userName = "rmci-$runIdSuffix"
+          if ($userName.Length -gt 20) { throw "Generated Windows test username exceeds 20 characters: $userName" }
           $plainPassword = "Ritemark!$([guid]::NewGuid().ToString('N'))"
           $securePassword = ConvertTo-SecureString $plainPassword -AsPlainText -Force
           $credential = [pscredential]::new("$env:COMPUTERNAME\$userName", $securePassword)
