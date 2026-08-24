@@ -37,7 +37,7 @@ After acknowledgement, the document shows the new content without close/reopen a
 
 When disk and local content diverge from the same base, synchronization enters a true conflict state. The ten-second forced reload path is removed. No retry, poll, watcher event, blur, autosave, or panel disposal may choose a version for the user.
 
-The user receives non-destructive **Review changes**, **Keep my version**, and **Use disk version** paths. Both write-producing resolutions use compare-and-set semantics: if disk advances again before confirmation, the conflict is recalculated instead of overwriting the new revision.
+The user receives non-destructive **Review changes**, **Keep my version**, and **Use disk version** paths. Both write-producing resolutions recheck the exact disk validator immediately before changing state: if disk has already advanced, the conflict is recalculated instead of overwriting that observed revision. Public local-filesystem APIs do not provide atomic content-hash CAS, so **Keep my version** remains an explicit overwrite with a named residual compare→write interval.
 
 ### R5 — Truthful, derived file-change affordance
 

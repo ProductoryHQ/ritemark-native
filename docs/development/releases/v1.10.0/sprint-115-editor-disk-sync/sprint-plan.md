@@ -26,7 +26,7 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 - Focus-safe clean external updates with bounded ACK retry and stale-message rejection.
 - Removal of the fixed 20-hash heuristic and ten-second forced reload.
 - Truthful derived header states: quiet for synced/local-only, retry for failed apply, **Review changes** for true conflict.
-- Read-only local-versus-disk comparison and explicit compare-and-set resolution.
+- Read-only local-versus-disk comparison and explicit strong-validator-guarded resolution.
 - Markdown and CSV behavior, multiple views, folder workspace, and standalone-file mode.
 - Regression tests, dev smoke evidence, architecture docs, changelog, release notes, and release checklist.
 

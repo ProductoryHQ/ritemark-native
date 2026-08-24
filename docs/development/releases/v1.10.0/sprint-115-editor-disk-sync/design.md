@@ -34,7 +34,7 @@ Initial actions:
 - **Keep my version** — primary explicit resolution; the dialog itself is the confirmation that the current disk version will be replaced.
 - **Use disk version** — danger-styled explicit resolution; the dialog itself is the confirmation that unsaved local edits will be replaced.
 
-Neither destructive resolution receives automatic focus. If disk changes again before the click is committed, the coordinator rejects the stale validator and returns to the updated conflict rather than claiming success.
+Neither destructive resolution receives automatic focus. If disk changes again before the resolution's immediate pre-write validator check, the coordinator rejects the stale validator and returns to the updated conflict rather than claiming success. The public local-filesystem API cannot make that check and write atomic, so **Keep my version** is deliberately worded and tested as an explicit overwrite.
 
 The dialog uses the existing Ritemark dialog primitive: 480px default maximum width, 10px radius, `--r-surface`, `--r-ink-*`, hairline divisions, Deep Space-tinted backdrop, and the standard 4px low-alpha indigo focus ring. Resolution controls remain usable at 200% zoom without horizontal scrolling.
 

@@ -59,6 +59,7 @@ No log line included Markdown text, front matter values, or CSV cell data.
 - Inject a real visible-webview receipt loss and verify the five-second **Retry document update** surface end to end. The deterministic fake-clock and reducer paths pass; the live webview normally acknowledges too quickly to reach it.
 - Repeat the final candidate on light, dark, and high-contrast themes, keyboard-only navigation, a screen reader, and 200% zoom.
 - Repeat rename/delete/save-as, formatter, multi-root, rapid large-file, and previous-epoch lifecycle rows on the merged release candidate.
+- Inject a non-cooperating write during the Keep-local validator→write interval and record the unavoidable last-writer behavior; the public local-filesystem API has no atomic content-hash CAS, so the product must keep this action explicit and must never claim stronger protection than pre-check plus post-verification.
 - Repeat agent-origin writes through each available Claude/Codex/ACP runtime on the exact release build; the sync path itself is source-agnostic and generic process writes pass.
 
 These remaining rows are explicit release QA. They do not weaken the verified no-reopen, no-false-local-action, no-timer-loss, exact-ACK, Markdown/CSV, conflict-recovery, and multi-view behaviors above.

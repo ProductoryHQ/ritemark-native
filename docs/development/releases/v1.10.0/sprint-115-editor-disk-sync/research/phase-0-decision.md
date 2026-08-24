@@ -65,7 +65,7 @@ Use separate identities for separate questions:
 | View epoch | random UUID sent by each webview bootstrap | Reject receipts/messages from a reloaded or disposed view. |
 | Server revision | monotonic safe integer per document session | Order authoritative model payloads. |
 | Client sequence | monotonic safe integer per view epoch | Order optimistic webview edits and correlate acceptance/rejection. |
-| Strong disk validator | SHA-256 of exact disk bytes | Compare-and-set/lost-update protection. |
+| Strong disk validator | SHA-256 of exact disk bytes | Resolution precondition and lost-update mitigation; not an atomic filesystem CAS primitive. |
 | Logical text hash | SHA-256 of UTF-8 text with one BOM removed and CRLF/CR normalized to LF | Three-way content classification without false EOL-only visual conflicts. |
 | Render payload hash | SHA-256 of canonical, key-sorted JSON for the complete Markdown/CSV render payload | Prove that all view-owned fields belong to one revision. |
 

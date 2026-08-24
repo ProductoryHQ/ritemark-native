@@ -96,6 +96,7 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [ ] Force a real visible-webview receipt loss through the final release build and verify the five-second **Retry document update** path end to end.
 - [ ] Repeat light/dark/high-contrast, keyboard-only, spoken screen-reader, and 200% zoom checks on the final release build.
 - [ ] Repeat rename/delete/save-as, formatter, multi-root, rapid/large-file, previous-epoch, and exact Claude/Codex/ACP-origin write rows on the final release build.
+- [ ] Inject a non-cooperating write during Keep-local resolution and record/accept the explicit last-writer boundary; local filesystem APIs provide no atomic content-hash CAS beyond the implemented immediate validator check and post-write verification.
 
 ## Automated gates
 

@@ -19,7 +19,7 @@ This deliberately advances only the document-sync slice of architectural debt is
 | R1 | Per-URI coordinator, view epochs, serialized state model |
 | R2 | Typed update/ACK protocol and retry lifecycle |
 | R3 | Revision-aware focused application and selection restoration |
-| R4 | Conflict snapshots and compare-and-set resolution |
+| R4 | Conflict snapshots and exact-validator-guarded resolution |
 | R5 | Pure webview reducer and derived header state |
 | R6 | Deterministic reconciliation, coalescing, and stale rejection |
 | R7 | Markdown/CSV payload parity and multi-view leases |
@@ -143,6 +143,8 @@ Unknown messages, mismatched URIs/epochs, stale revisions, and invalid payloads 
 For **Compare changes**, register a small read-only `TextDocumentContentProvider` under a `ritemark-sync:` scheme. It exposes immutable, revision-named local and disk snapshots to VS Code's diff command. Snapshot content is memory-only, scoped to the conflict, never saved automatically, and disposed after resolution/document close. Virtual inputs use a neutral `.txt` suffix so the comparison cannot recursively activate Ritemark's custom Markdown/CSV editor.
 
 **Keep my version** and **Use disk version** both re-read the strong disk validator before changing state. If the expected validator no longer matches, the coordinator creates a new conflict instead of writing. Use-disk is one undoable `WorkspaceEdit`; standard Undo restoring the exact local snapshot as dirty is a hard live acceptance test. VS Code's public `TextDocument.save()` correctly rejects the stale file etag after a conflict, so Keep-local uses the public `workspace.fs.writeFile` only after the exact validator check, verifies the bytes, and performs a same-content VS Code revert to refresh etag/clean state. Because the model value is unchanged, its Undo history remains intact; both recovery paths passed live.
+
+**Known filesystem boundary:** the public local-filesystem APIs do not expose an atomic “write only if this SHA-256 still matches” primitive. The immediate pre-write validator check plus post-write verification narrows the race and prevents a false success when a later writer wins, but a non-cooperating writer can still change the file between compare and write and be overwritten when Ritemark wins last. **Keep my version** is therefore an explicit user-authorized overwrite, not a portable atomic CAS claim. Eliminating that final interval would require a cooperating write broker/lock or platform-specific primitive outside this sprint; the release matrix retains an adversarial concurrent-resolution row.
 
 ## Webview Workstream
 

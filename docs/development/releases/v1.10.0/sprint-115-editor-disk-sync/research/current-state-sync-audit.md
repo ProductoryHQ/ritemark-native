@@ -88,7 +88,7 @@ The correct indicator rule is not `viewHash !== diskHash`: ordinary local edits 
 - ProseMirror collaboration uses ordered versions and rejects or rebases stale work. Sprint 115 adopts the version/base principle without adopting full collaborative editing. See [ProseMirror collaboration guide](https://prosemirror.net/docs/guide/#collab).
 - ProseMirror transactions map selections through document steps; Sprint 115 uses that mechanism for focused external updates and keeps whole-document replacement only as a clamped fallback. See [ProseMirror transactions](https://prosemirror.net/docs/guide/#state.transactions).
 - Node documents that file-watcher behavior varies by platform and can be unreliable on network/virtualized filesystems, supporting watcher-as-invalidation plus level polling rather than watcher-as-truth. See [Node.js watcher caveats](https://nodejs.org/api/fs.html#fswatchfilename-options-listener).
-- HTTP `If-Match` provides the compare-and-set analogy: a state-changing operation must fail when its strong validator is no longer current, preventing the lost-update problem. See [RFC 9110 conditional requests](https://www.rfc-editor.org/rfc/rfc9110.html#section-13).
+- HTTP `If-Match` provides the validator-precondition analogy: a state-changing operation fails when its strong validator is no longer current. Unlike HTTP conditional writes, public local-filesystem APIs do not atomically combine the hash check and write, so Sprint 115 can narrow and verify—but cannot eliminate—the last-writer interval without a cooperating broker/lock. See [RFC 9110 conditional requests](https://www.rfc-editor.org/rfc/rfc9110.html#section-13).
 
 ## Phase 0 Evidence Still Required
 

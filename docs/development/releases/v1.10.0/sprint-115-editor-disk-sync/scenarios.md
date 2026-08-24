@@ -56,7 +56,7 @@ These scenarios are acceptance contracts. Each one maps to the stable requiremen
 **And** shows **Review changes**  
 **And** waiting, polling, focus changes, or panel lifecycle events never choose a version.
 
-## S7 — Keep my version uses compare-and-set (R4, R6)
+## S7 — Keep my version validates the observed disk revision (R4, R6)
 
 **Given** a true conflict between local content and disk revision B  
 **When** the user explicitly chooses **Keep my version**  
@@ -66,6 +66,8 @@ These scenarios are acceptance contracts. Each one maps to the stable requiremen
 **And** hides the action only after convergence  
 **But when** disk has advanced to C  
 **Then** no overwrite occurs and the conflict is recalculated against C.
+
+The public filesystem API cannot make the content-hash check and write one atomic operation. A non-cooperating write inside that final interval is a named last-writer boundary and receives a separate release-candidate injection row; this scenario does not claim HTTP-style atomic CAS.
 
 ## S8 — Use disk version is explicit and acknowledged (R2, R4)
 

@@ -50,7 +50,7 @@ Branch/worktree and Phase 0 decision gates satisfied 2026-08-24.
 - [x] Keep the action hidden for synced and local-only/autosave states.
 - [x] Implement **Retry document update**, **Review changes**, and apply-error states per `design.md`.
 - [x] Add immutable local/disk conflict snapshots and open them through VS Code's diff view.
-- [x] Implement compare-and-set **Keep my version**; recalculate if disk advanced.
+- [x] Implement exact-validator-guarded **Keep my version**; recalculate if disk already advanced and name the public-filesystem atomic-CAS boundary.
 - [x] Implement explicit **Use disk version** with confirmed local-discard behavior and ACK.
 - [x] Remove the ten-second automatic reload and prove no replacement timer remains.
 - [x] Remove `lastSentToWebview`/bounded self-hash behavior after coordinator coverage is complete.
