@@ -2,6 +2,13 @@
 
 This checklist accumulates release evidence across Sprints 109–115.
 
+## Current candidate record — 2026-08-25
+
+- Source: `codex/v1.10.0-rc-prep@3640aa3`.
+- Repository QA, release preflight, exact arm64 runtime verification, production build, bundled-extension checks, and Developer ID app signing pass.
+- Canonical signed/un-notarized DMG: **not yet produced** — Finder AppleEvent timed out during `./scripts/create-dmg.sh`; Gate 1 has not started.
+- Production dependency security: **open triage** — see `PRE-RELEASE-AUDIT.md`; any dependency change requires a rebuild and resets the candidate.
+
 ## Trusted Windows installation (Sprint 114)
 
 - [ ] Manual Windows workflow passes content-based payload inventory, Productory signing, Inno setup/uninstaller signing, standard-user install, installed-tree/app-registration verification, and uninstall.
