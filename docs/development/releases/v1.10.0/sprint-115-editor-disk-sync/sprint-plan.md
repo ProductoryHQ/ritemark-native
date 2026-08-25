@@ -1,7 +1,7 @@
 # Sprint 115 — Reliable Editor–Disk Synchronization
 
 **Track:** Full SDD, audit-first  
-**Status:** PR ready — D1–D12 and post-review stale-edit hardening implemented; 26/26 focused tests and official QA pass; PR #222 merge plus release-candidate manual matrix remain  
+**Status:** Repository scope complete — PR #222 admin-merged as `b889dcd` after Jarmo's explicit authorization; release-candidate manual matrix remains
 **Branch:** `codex/sprint-115-editor-disk-sync`  
 **Worktree:** `.worktrees/sprint-115-editor-disk-sync`  
 **Issue:** [#221](https://github.com/ProductoryHQ/ritemark-native/issues/221) — linked to milestone v1.10.0  
@@ -117,6 +117,7 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 | 2026-08-24 | Jarmo approved D1–D12 as the Sprint 115 implementation contract | Product-code work may proceed on the dedicated branch; failed hard acceptance rules return as named exceptions rather than silently weakening the contract. |
 | 2026-08-24 | Keep-local uses exact-validator recheck, public filesystem write, byte verification, and same-content VS Code revert | `TextDocument.save()` correctly rejects the stale etag after a true conflict; the selected path refreshes the model's clean/etag state while retaining the existing Undo history. |
 | 2026-08-24 | Treat residual theme/accessibility, forced live receipt-loss, rename/delete/save-as, multi-root, large-file, and exact agent-runtime repetitions as release-candidate QA | Focused implementation invariants, generic external writes, Markdown/CSV, multi-view, conflict safety, both recovery paths, and repository gates are sprint evidence; the broader platform/UI matrix remains explicitly visible rather than being overclaimed. |
+| 2026-08-25 | Admin-merge reviewed Sprint 115 through protected `main` | Jarmo explicitly authorized the override after post-review stale-edit/keep-local hardening and the 26/26 focused, compile, typecheck, build, and repository QA gates passed; PR #222 merged as `b889dcd` and closed #221. |
 
 ## Planning Approval
 
