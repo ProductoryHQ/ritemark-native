@@ -3,12 +3,14 @@
 **Publisher:** `Productory Services OÜ`<br>
 **Owners:** Jarmo — Partner Center and final approval; engineering — signed installer; Kristiina — clean Windows 11 test
 
+Use the copy/paste-ready [Microsoft Store submission worksheet](./store-submission-worksheet.md). Its blocker table is authoritative for the current v1.10.0 package, hosting, legal URLs, media, and certification state.
+
 ## Jarmo: set up the Store listing
 
 1. Sign in to Partner Center with the Productory organization account.
 2. Complete organization verification if Microsoft asks for it.
 3. Choose **New product → EXE or MSI app** and reserve **Ritemark**. If that exact name is unavailable, stop and choose a new name with Jarmo.
-4. Complete the listing: description, category, age rating, privacy-policy URL, support URL, icons, and screenshots.
+4. Complete the listing: description, category, age rating, privacy-policy URL, public license terms, support URL, icons, and screenshots.
 5. Add the x64 standalone EXE package:
    - URL: `https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe`
    - silent install: `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CURRENTUSER`
@@ -50,6 +52,8 @@ Return the installer SHA-256, SAC-state screenshot, install/launch/uninstall res
 ## Final checklist
 
 - [ ] Ritemark is reserved and the listing is complete.
+- [ ] Stable public Ritemark privacy-policy and license/terms URLs return HTTP 200 and match current product behavior.
+- [ ] `downloads.ritemark.app` resolves over HTTPS.
 - [ ] Store URL downloads the tested installer.
 - [ ] Store and direct files share one SHA-256.
 - [ ] Partner Center certification passes.

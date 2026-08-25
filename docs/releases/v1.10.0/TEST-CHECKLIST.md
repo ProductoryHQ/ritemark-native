@@ -2,6 +2,13 @@
 
 This checklist accumulates release evidence across Sprints 109–115.
 
+## Current candidate record — 2026-08-25
+
+- Source under review: `codex/v1.10.0-rc-prep` / PR #223; the Gate 1 artifact must be rebuilt from its merged `main` commit.
+- Repository QA, release preflight, exact arm64 runtime verification, production build, bundled-extension checks, and Developer ID preview-app signing pass.
+- Signed/un-notarized Gate 1 DMG: **not yet produced**. Finder's decorative layout timed out; the recorded deterministic `ditto`/`hdiutil` path is approved if Finder remains unresponsive, subject to every mounted-image hard check.
+- Production dependency security: **pass** — extension and webview `npm audit --omit=dev` each report zero findings; SheetJS is pinned to the official `0.20.3` tarball and targeted spreadsheet/Markdown/Mermaid checks pass.
+
 ## Trusted Windows installation (Sprint 114)
 
 - [ ] Manual Windows workflow passes content-based payload inventory, Productory signing, Inno setup/uninstaller signing, standard-user install, installed-tree/app-registration verification, and uninstall.

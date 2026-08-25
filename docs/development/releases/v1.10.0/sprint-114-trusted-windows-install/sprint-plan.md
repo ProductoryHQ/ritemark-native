@@ -1,6 +1,6 @@
 # Sprint 114 — Trusted Windows Install
 
-**Status:** Implementation complete — engineering and local QA pass; ready to merge. The signed candidate, immutable download URL, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval are deferred to v1.10.0 release execution.<br>
+**Status:** Repository scope merged through PR #218 as `faba032`; the Store submission worksheet is prepared. The signed candidate, immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
 **Branch:** `codex/sprint-114-trusted-windows-install`<br>
 **Issue:** [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212)<br>
 **Release:** [v1.10.0](../release-plan.md)
@@ -55,4 +55,5 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - GitHub Release continues as the secondary direct-download location; no channel redesign is needed.
 - Jarmo handles Partner Center setup and final submission. Kristiina performs the clean-machine SAC-On test.
 - No Windows build is run for sprint closeout. Candidate signing, hosting, Store certification, SAC-On validation, and exact-hash approval happen once against the final v1.10.0 release-ready build.
+- The 2026-08-25 Store worksheet records the exact package fields, draft listing copy, media inventory, and current blockers; it does not authorize a pre-Gate-1 Windows dispatch or submission.
 - No `docs/development/architecture.md` update is required because this sprint changes packaging and documentation only.
