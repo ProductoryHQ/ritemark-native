@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live agent contexts are bounded in the host (five with parallel work, one otherwise). Ritemark releases only the least-recently-used non-current idle context; Working, Needs-you, and Current conversations are protected, while saved conversations remain unlimited.
 - Runtime fetch and verification now use the same exact manifest contract in local development, QA, and release packaging; Codex optional input metadata and OpenCode ACP 1.x capability discovery remain contained inside their runtime adapters.
 
+### Fixed
+- **Agent and external edits appear in the open document without a reopen.** Markdown and CSV now use one per-file revision coordinator, and the host advances visible state only after the matching editor view acknowledges the exact payload it applied.
+- **The file-changed action now means a real unresolved problem.** Ordinary local typing/autosave lag stays quiet; a true local-versus-disk conflict preserves both versions and exposes explicit Compare, Keep my version, and Use disk version choices.
+- **No timer can replace unresolved local work.** The former ten-second forced reload, bounded self-hash heuristic, and competing webview booleans are removed; multi-view delivery is epoch-scoped, retry-bounded, and stale-message safe.
+
 ## [1.9.0] — 2026-08-20
 
 Sprint 108 — Transcribe.

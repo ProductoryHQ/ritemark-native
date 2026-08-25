@@ -5,7 +5,7 @@ conversation system you can trust. Your chats belong to the project, survive a
 restart, and can continue with another agent without making you reconstruct the
 discussion from memory.
 
-<!-- Draft through Sprint 114. Remove the Windows section unless its exact-hash Store + SAC gates pass. -->
+<!-- Draft through Sprint 115. Remove the Windows section unless its exact-hash Store + SAC gates pass. -->
 
 ## Trusted Windows installation (pending certification)
 
@@ -99,6 +99,19 @@ It never overwrites an existing file, replaces the primary transcript, changes
 the transcript link, or silently updates an earlier snapshot. Speaker rename
 also accepts full Unicode names with spaces; long labels stay aligned and reveal
 their complete name on hover or focus.
+
+## Agent edits appear without reopening the file
+
+When Codex, Claude, OpenCode, a formatter, or another tool changes an open
+Markdown or CSV file, Ritemark now applies that revision to the visible editor
+and confirms what the view actually rendered. Successful message delivery alone
+no longer counts as a visible update.
+
+Your own unsaved typing stays quiet while it legitimately leads the disk. If
+both your version and the disk changed from the same base, Ritemark preserves
+both and offers **Compare changes**, **Keep my version**, and **Use disk
+version**. The old always-on file-changed control and its automatic ten-second
+reload are gone; no background timer resolves a conflict for you.
 
 > Native continuation is intentionally version- and configuration-specific. “Previous messages were included” means transcript fallback, not complete private model memory.
 

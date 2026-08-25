@@ -94,6 +94,7 @@ const DialogHeader = ({
     {onClose && (
       <DialogPrimitive.Close
         onClick={onClose}
+        aria-label="Close dialog"
         className="flex items-center justify-center w-7 h-7 rounded-md border-none bg-transparent text-ink-muted cursor-pointer transition-colors hover:bg-surface-soft hover:text-ink-strong"
       >
         <Icon name="x" size={16} />

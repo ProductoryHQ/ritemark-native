@@ -1,5 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { onMessage, sendToExtension, onInternalEvent, InternalEvent } from './bridge'
+import { useState, useEffect, useCallback, useReducer, useRef } from 'react'
+import {
+  getDocumentSyncBootstrap,
+  onMessage,
+  sendDocumentMessage,
+  sendToExtension,
+  onInternalEvent,
+  InternalEvent,
+} from './bridge'
 import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from './components/Editor'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
@@ -20,6 +27,20 @@ import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { DocumentProperties } from './components/properties'
+import { DocumentConflictDialog } from './components/dialogs/DocumentConflictDialog'
+import type { DocumentSyncAction } from './components/header/DocumentSyncAction'
+import type { DocumentApplyTarget } from './types/documentSync'
+import {
+  initialDocumentViewSyncState,
+  reduceDocumentViewSync,
+  selectDocumentSyncAction,
+} from './documentSyncReducer'
+import {
+  isDocumentHostMessage,
+  type DocumentEditPayload,
+  type DocumentRenderPayload,
+} from '../../src/editorSync/protocol'
+import { canonicalJson } from '../../src/editorSync/state'
 
 type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf' | 'docx'
 type SidePanel = 'none' | 'toc' | 'properties' | 'agent'
@@ -91,6 +112,8 @@ interface Features {
 }
 
 function App() {
+  const documentSyncRef = useRef(getDocumentSyncBootstrap())
+  const documentSync = documentSyncRef.current
   const [content, setContent] = useState<string>('')
   const [fileType, setFileType] = useState<FileType>('markdown')
   const [filename, setFilename] = useState<string>('')
@@ -151,13 +174,120 @@ function App() {
   const [editorReady, setEditorReady] = useState(false)
   // inlineTocEnabled is now derived from activePanel (see side panel state above)
 
-  // File change notification state
-  const [showFileChangeNotification, setShowFileChangeNotification] = useState(false)
-  const [_fileChangeData, setFileChangeData] = useState({ filename: '', isDirty: false })
+  // One revision-aware document channel replaces the former load/change/refresh
+  // booleans. The action is rendered only for a real conflict or apply failure.
+  const currentRevisionRef = useRef(0)
+  const clientSequenceRef = useRef(0)
+  const pendingClientSequenceRef = useRef<number | undefined>()
+  const inFlightEditRef = useRef<DocumentEditPayload | undefined>()
+  const queuedEditRef = useRef<DocumentEditPayload | undefined>()
+  const contentRef = useRef('')
+  const propertiesRef = useRef<DocumentProperties>({})
+  const syncTargetRef = useRef<DocumentApplyTarget | undefined>()
+  const [syncTarget, setSyncTarget] = useState<DocumentApplyTarget | undefined>()
+  const [documentViewSync, dispatchDocumentViewSync] = useReducer(
+    reduceDocumentViewSync,
+    initialDocumentViewSyncState,
+  )
+  const [showConflictDialog, setShowConflictDialog] = useState(false)
+
+  const postDocumentEdit = useCallback((payload: DocumentEditPayload) => {
+    if (!documentSync) return
+    clientSequenceRef.current += 1
+    pendingClientSequenceRef.current = clientSequenceRef.current
+    inFlightEditRef.current = payload
+    sendDocumentMessage({
+      type: 'document:edit',
+      ...documentSync,
+      basedOnRevision: currentRevisionRef.current,
+      clientSequence: clientSequenceRef.current,
+      payload,
+    })
+  }, [documentSync])
 
   useEffect(() => {
-    // Listen for messages from VS Code extension
-    onMessage((message) => {
+    const applyRenderPayload = (payload: DocumentRenderPayload) => {
+      contentRef.current = payload.content
+      setContent(payload.content)
+      setFileType(payload.fileType)
+      setFilename(payload.filename)
+      if (payload.fileType === 'csv') {
+        setSizeBytes(payload.sizeBytes)
+        return
+      }
+      propertiesRef.current = payload.properties as DocumentProperties
+      setProperties(payload.properties as DocumentProperties)
+      setHasProperties(payload.hasProperties)
+      setImageMappings(payload.imageMappings)
+      setFeatures({
+        voiceDictation: payload.features.voiceDictation,
+        markdownExport: payload.features.markdownExport,
+        saveAsMarkdownFromPreview: payload.features.saveAsMarkdownFromPreview ?? false,
+        commentCallouts: payload.features.commentCallouts,
+      })
+      if (payload.isAgentMode) {
+        setIsAgentMode(true)
+        setAgentFrontmatter((payload.agentFrontmatter as AgentFrontmatter) || {})
+        setAgentFlows(payload.agentFlows || [])
+        setAgentSkills((payload.agentSkills as AgentSkill[]) || [])
+        setActivePanel('agent')
+      }
+    }
+
+    const unsubscribe = onMessage((message) => {
+      if (documentSync && isDocumentHostMessage(message)) {
+        if (message.uri !== documentSync.uri
+          || message.documentSessionId !== documentSync.documentSessionId
+          || message.viewEpoch !== documentSync.viewEpoch) return
+
+        if (message.type === 'document:update') {
+          if (message.revision < currentRevisionRef.current) return
+          dispatchDocumentViewSync(message)
+          const optimisticEditPending = pendingClientSequenceRef.current !== undefined || queuedEditRef.current !== undefined
+          const payloadMatchesOptimisticView = message.payload.content === contentRef.current
+            && (message.payload.fileType === 'csv'
+              || canonicalJson(message.payload.properties) === canonicalJson(propertiesRef.current))
+          if (optimisticEditPending && !payloadMatchesOptimisticView) return
+          // Outgoing edits may only name a revision whose payload this view
+          // actually owns. A preceding sync-state message proves host state,
+          // not visible application.
+          currentRevisionRef.current = message.revision
+          const target = { revision: message.revision, payloadHash: message.payloadHash }
+          syncTargetRef.current = target
+          setSyncTarget(target)
+          applyRenderPayload(message.payload)
+          setIsReady(true)
+        } else if (message.type === 'document:sync-state') {
+          dispatchDocumentViewSync(message)
+          if (message.state === 'synced') setShowConflictDialog(false)
+        } else if (message.type === 'document:edit-result') {
+          dispatchDocumentViewSync(message)
+          // A late/duplicate result for an older optimistic edit must not clear
+          // or replay the currently in-flight edit.
+          if (pendingClientSequenceRef.current !== message.clientSequence) return
+          pendingClientSequenceRef.current = undefined
+          inFlightEditRef.current = undefined
+          if (message.status === 'rejected') {
+            queuedEditRef.current = undefined
+          } else {
+            if (message.status === 'accepted') {
+              // The optimistic payload already visible in this view now owns
+              // the accepted canonical revision.
+              currentRevisionRef.current = Math.max(currentRevisionRef.current, message.revision)
+            }
+            const queued = queuedEditRef.current
+            queuedEditRef.current = undefined
+            // Never replay a stale full-document payload against a newer
+            // revision: doing so can silently overwrite an external change.
+            const nextEdit = message.status === 'accepted' ? queued : undefined
+            if (nextEdit) postDocumentEdit(nextEdit)
+          }
+        } else {
+          dispatchDocumentViewSync(message)
+        }
+        return
+      }
+
       switch (message.type) {
         case 'load':
           setContent(message.content as string)
@@ -207,28 +337,6 @@ function App() {
           }
           break
 
-        case 'fileChanged':
-          // External edit while user has unsaved local changes — surface the
-          // refresh button so they can decide whether to discard their work.
-          setFileChangeData({
-            filename: (message.filename as string) || '',
-            isDirty: (message.isDirty as boolean) || false
-          })
-          setShowFileChangeNotification(true)
-          break
-
-        case 'externalChange':
-          // External edit, document was clean → silently swap in the new
-          // content (same payload shape as 'load'). Mirrors how collaborative
-          // editors apply remote changes without prompting.
-          setContent(message.content as string)
-          setProperties((message.properties as DocumentProperties) || {})
-          setHasProperties(message.hasProperties as boolean || false)
-          setImageMappings((message.imageMappings as Record<string, string>) || {})
-          // Clear any stale refresh banner from a previous dirty-state event.
-          setShowFileChangeNotification(false)
-          break
-
         case 'agentFlowsUpdated':
           setAgentFlows((message.flows as string[]) || [])
           break
@@ -262,9 +370,13 @@ function App() {
       }
     })
 
-    // Tell extension we're ready
-    sendToExtension('ready', {})
-  }, [])
+    if (documentSync) {
+      sendDocumentMessage({ type: 'document:ready', ...documentSync })
+    } else {
+      sendToExtension('ready', {})
+    }
+    return unsubscribe
+  }, [documentSync, postDocumentEdit])
 
   // CMD+F keyboard shortcut to open find bar (or advance to next match if already open)
   // Only intercept in markdown mode — let PDF/DOCX/Spreadsheet viewers handle their own find
@@ -370,16 +482,30 @@ function App() {
     }
   }, [selection])
 
+  const sendDocumentEdit = useCallback((payload: DocumentEditPayload) => {
+    if (!documentSync) return false
+    if (pendingClientSequenceRef.current !== undefined) queuedEditRef.current = payload
+    else postDocumentEdit(payload)
+    return true
+  }, [documentSync, postDocumentEdit])
+
   const handleContentChange = (newContent: string) => {
+    contentRef.current = newContent
     setContent(newContent)
-    sendToExtension('contentChanged', { content: newContent, properties })
+    const currentProperties = propertiesRef.current
+    if (!sendDocumentEdit({ fileType: 'markdown', content: newContent, properties: currentProperties })) {
+      sendToExtension('contentChanged', { content: newContent, properties: currentProperties })
+    }
   }
 
   const handlePropertiesChange = useCallback((newProperties: DocumentProperties) => {
+    propertiesRef.current = newProperties
     setProperties(newProperties)
     setHasProperties(Object.keys(newProperties).length > 0)
-    sendToExtension('propertiesChanged', { properties: newProperties })
-  }, [])
+    if (!sendDocumentEdit({ fileType: 'markdown', content: contentRef.current, properties: newProperties })) {
+      sendToExtension('propertiesChanged', { properties: newProperties })
+    }
+  }, [sendDocumentEdit])
 
   const handleSelectionChange = useCallback((sel: EditorSelection) => {
     setSelection(sel)
@@ -394,9 +520,12 @@ function App() {
 
   // Handle CSV content changes (must be before any early returns!)
   const handleCSVChange = useCallback((newContent: string) => {
+    contentRef.current = newContent
     setContent(newContent)
-    sendToExtension('contentChanged', { content: newContent })
-  }, [])
+    if (!sendDocumentEdit({ fileType: 'csv', content: newContent })) {
+      sendToExtension('contentChanged', { content: newContent })
+    }
+  }, [sendDocumentEdit])
 
   // Handle Excel content changes — newContent is the serialized workbook
   // as base64. Updating local content keeps the viewer's parsed workbook in
@@ -405,6 +534,49 @@ function App() {
     setContent(newContent)
     sendToExtension('contentChanged', { content: newContent })
   }, [])
+
+  const handleDocumentApplied = useCallback((target: DocumentApplyTarget) => {
+    if (!documentSync) return
+    const expected = syncTargetRef.current
+    if (!expected || expected.revision !== target.revision || expected.payloadHash !== target.payloadHash) return
+    sendDocumentMessage({
+      type: 'document:applied',
+      ...documentSync,
+      revision: target.revision,
+      payloadHash: target.payloadHash,
+    })
+    syncTargetRef.current = undefined
+    setSyncTarget(undefined)
+  }, [documentSync])
+
+  const sendConflictAction = useCallback((action: 'compare' | 'keep-local' | 'use-disk') => {
+    if (!documentSync || !documentViewSync.conflict) return
+    sendDocumentMessage({
+      type: 'document:conflict-action',
+      ...documentSync,
+      conflictRevision: documentViewSync.conflict.conflictRevision,
+      diskHash: documentViewSync.conflict.diskHash,
+      action,
+    })
+    setShowConflictDialog(false)
+  }, [documentSync, documentViewSync.conflict])
+
+  const retryDocumentApply = useCallback(() => {
+    if (!documentSync) return
+    sendDocumentMessage({ type: 'document:conflict-action', ...documentSync, action: 'retry-apply' })
+  }, [documentSync])
+
+  const selectedSyncAction = selectDocumentSyncAction(documentViewSync)
+  const syncAction: DocumentSyncAction | undefined = selectedSyncAction === 'conflict'
+    ? { kind: 'conflict', label: 'Review changes', onClick: () => setShowConflictDialog(true) }
+    : selectedSyncAction === 'retry'
+      ? {
+          kind: 'retry',
+          label: documentViewSync.state === 'failed' ? 'Document update failed' : 'Retry document update',
+          title: documentViewSync.message,
+          onClick: retryDocumentApply,
+        }
+      : undefined
 
   // Side panel toggle helper — TOC / Properties / Agent share one slot, mutually exclusive.
   // 'agent' is intentionally not restored from localStorage on init (it's auto-pinned on
@@ -587,14 +759,28 @@ function App() {
     // .xlsx is editable; legacy .xls stays read-only (saving would re-encode it as xlsx)
     const isXlsxEditable = fileType === 'xlsx' && filename.toLowerCase().endsWith('.xlsx')
     return (
-      <SpreadsheetViewer
-        content={content}
-        filename={filename}
-        fileType={fileType}
-        encoding={encoding}
-        sizeBytes={sizeBytes}
-        onChange={fileType === 'csv' ? handleCSVChange : (isXlsxEditable ? handleExcelChange : undefined)}
-      />
+      <>
+        <SpreadsheetViewer
+          content={content}
+          filename={filename}
+          fileType={fileType}
+          encoding={encoding}
+          sizeBytes={sizeBytes}
+          onChange={fileType === 'csv' ? handleCSVChange : (isXlsxEditable ? handleExcelChange : undefined)}
+          syncEnabled={fileType === 'csv' && !!documentSync}
+          syncAction={fileType === 'csv' ? syncAction : undefined}
+          syncTarget={fileType === 'csv' ? syncTarget : undefined}
+          onDocumentApplied={fileType === 'csv' ? handleDocumentApplied : undefined}
+        />
+        <DocumentConflictDialog
+          isOpen={showConflictDialog && !!documentViewSync.conflict}
+          filename={documentViewSync.conflict?.filename || filename}
+          onClose={() => setShowConflictDialog(false)}
+          onCompare={() => sendConflictAction('compare')}
+          onKeepLocal={() => sendConflictAction('keep-local')}
+          onUseDisk={() => sendConflictAction('use-disk')}
+        />
+      </>
     )
   }
 
@@ -619,11 +805,7 @@ function App() {
         agentActive={agentPanelShown}
         onAgentClick={isAgentMode ? handleAgentPanelClick : undefined}
         commentsSlot={features.commentCallouts !== false ? <CommentsMenuButton getEditor={() => editorRef.current} /> : undefined}
-        hasFileChanged={showFileChangeNotification}
-        onRefresh={() => {
-          setShowFileChangeNotification(false)
-          sendToExtension('refresh')
-        }}
+        syncAction={syncAction}
         features={features}
       />
 
@@ -676,6 +858,8 @@ function App() {
             className="h-full"
             imageMappings={imageMappings}
             commentCallouts={features.commentCallouts}
+            syncTarget={syncTarget}
+            onExternalApplied={handleDocumentApplied}
           />
         </div>
       </div>
@@ -696,6 +880,15 @@ function App() {
         onExportWord={handleExportWord}
         onCopyAsMarkdown={handleCopyAsMarkdown}
         anchorElement={exportButtonRef.current}
+      />
+
+      <DocumentConflictDialog
+        isOpen={showConflictDialog && !!documentViewSync.conflict}
+        filename={documentViewSync.conflict?.filename || filename}
+        onClose={() => setShowConflictDialog(false)}
+        onCompare={() => sendConflictAction('compare')}
+        onKeepLocal={() => sendConflictAction('keep-local')}
+        onUseDisk={() => sendConflictAction('use-disk')}
       />
 
     </div>

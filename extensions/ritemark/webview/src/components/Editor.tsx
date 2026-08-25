@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor } from '@tiptap/react'
 import { DOMSerializer } from '@tiptap/pm/model'
+import { Fragment } from '@tiptap/pm/model'
+import { TextSelection } from '@tiptap/pm/state'
+import { createNodeFromContent } from '@tiptap/core'
 import { sendToExtension, onMessage } from '../bridge'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -32,6 +35,7 @@ import { CommentMark } from '../extensions/comment/CommentMark'
 import { CommentNode } from '../extensions/comment/CommentNode'
 import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
 import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
+import type { DocumentApplyTarget } from '../types/documentSync'
 
 // Initialize Turndown for HTML to Markdown conversion.
 // Base config + GFM plugins + pipe-escape rule live in utils/turndownService;
@@ -332,6 +336,8 @@ interface EditorProps {
   imageMappings?: Record<string, string>
   /** Sprint 94 (#81): gate the comment-callout extensions (kill-switch flag). */
   commentCallouts?: boolean
+  syncTarget?: DocumentApplyTarget
+  onExternalApplied?: (target: DocumentApplyTarget) => void
 }
 
 export function Editor({
@@ -343,6 +349,8 @@ export function Editor({
   onSelectionChange,
   imageMappings = {},
   commentCallouts = false,
+  syncTarget,
+  onExternalApplied,
 }: EditorProps) {
   // Register the comment `marked` tokenizer before initialContent is parsed on
   // mount — only when the flag is on (see ensureCommentMarkedPipeline above).
@@ -764,8 +772,8 @@ export function Editor({
     }
   }, [editor]) // Don't include onEditorReady to avoid re-calling when callback changes
 
-  // Update editor content when value prop changes (e.g., when loading a file)
-  // Skip updates during active editing to prevent bubble menus from closing
+  // Apply host revisions even while focused. A structural transaction preserves
+  // unaffected nodes and maps the selection; setContent is only a guarded fallback.
   useEffect(() => {
     if (!editor) return
 
@@ -791,17 +799,11 @@ export function Editor({
     if (isExternalChange || currentMarkdown === '' || imageMappingsChanged) {
       // Update the ref
       lastImageMappingsRef.current = imageMappings
-      // CURSOR JUMP BUG FIX: Don't update content if editor is focused
-      // This prevents cursor from jumping during autosave cycles
-      if (editor.isFocused) {
-        // Skip update - user is actively editing
-        return
-      }
-
       // Check if value is HTML (starts with common HTML tags)
       // Only check for actual HTML block tags, not random < > characters
       const isHTML = /^<(p|div|h[1-6]|ul|ol|li|blockquote|pre|table|strong|em|code)[\s>]/i.test(value.trim())
 
+      let processedContent: string
       if (!isHTML && value.trim()) {
         // Treat all non-HTML text as markdown (including plain text)
         // marked.js will handle plain text gracefully, converting line breaks to <p> tags
@@ -813,21 +815,77 @@ export function Editor({
           processedHtml = preprocessImageHTML(processedHtml)
           // Apply image mappings to convert relative paths to webview URIs
           processedHtml = applyImageMappings(processedHtml, imageMappings)
-          editor.commands.setContent(processedHtml, false) // emitUpdate: false to prevent loops
+          processedContent = processedHtml
         } catch (error) {
           console.error('Markdown conversion error:', error)
           // Fallback: treat as plain text
-          editor.commands.setContent(`<p>${value.replace(/\n/g, '</p><p>')}</p>`, false)
+          processedContent = `<p>${value.replace(/\n/g, '</p><p>')}</p>`
         }
       } else {
         // Already HTML or empty - still apply image mappings
-        const processedValue = applyImageMappings(value, imageMappings)
-        editor.commands.setContent(processedValue, false) // emitUpdate: false to prevent loops
+        processedContent = applyImageMappings(value, imageMappings)
+      }
+
+      const wasFocused = editor.isFocused
+      const { anchor, head } = editor.state.selection
+      const scrollTop = scrollContainer?.scrollTop
+      lastOnChangeValue.current = value
+
+      try {
+        const parsed = createNodeFromContent(processedContent, editor.schema, {
+          slice: false,
+          parseOptions: { preserveWhitespace: 'full' },
+          errorOnInvalidContent: true,
+        })
+        const nextDoc = parsed instanceof Fragment
+          ? editor.schema.topNodeType.create(null, parsed)
+          : parsed
+        const currentDoc = editor.state.doc
+        const start = currentDoc.content.findDiffStart(nextDoc.content)
+        if (start !== null) {
+          const end = currentDoc.content.findDiffEnd(nextDoc.content)
+          if (!end) throw new Error('Could not determine the document update range.')
+          let transaction = editor.state.tr.replace(
+            start,
+            end.a,
+            nextDoc.slice(start, end.b),
+          )
+          const mappedAnchor = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(anchor)))
+          const mappedHead = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(head)))
+          transaction = transaction
+            .setSelection(TextSelection.between(transaction.doc.resolve(mappedAnchor), transaction.doc.resolve(mappedHead)))
+            .setMeta('addToHistory', false)
+            .setMeta('preventUpdate', true)
+            .setMeta('ritemarkDocumentRevision', syncTarget?.revision)
+          if (!transaction.doc.eq(nextDoc)) throw new Error('Structural update did not reproduce the host document.')
+          editor.view.dispatch(transaction)
+        }
+      } catch {
+        console.warn('[EditorSync] structural apply fell back to full replacement')
+        editor.chain()
+          .setContent(processedContent, false)
+          .setMeta('addToHistory', false)
+          .setMeta('ritemarkDocumentRevision', syncTarget?.revision)
+          .run()
+        const position = Math.max(0, Math.min(editor.state.doc.content.size, anchor))
+        editor.view.dispatch(editor.state.tr
+          .setSelection(TextSelection.near(editor.state.doc.resolve(position)))
+          .setMeta('addToHistory', false)
+          .setMeta('preventUpdate', true))
       }
 
       lastExternalValue.current = value
+      requestAnimationFrame(() => {
+        if (scrollContainer && scrollTop !== undefined) scrollContainer.scrollTop = scrollTop
+        if (wasFocused) editor.view.focus()
+        if (syncTarget) onExternalApplied?.(syncTarget)
+      })
+    } else if (syncTarget) {
+      // The source view already rendered its own accepted edit. It still owes
+      // the host an acknowledgement for the matching canonical revision.
+      requestAnimationFrame(() => onExternalApplied?.(syncTarget))
     }
-  }, [editor, value, imageMappings])
+  }, [editor, value, imageMappings, scrollContainer, syncTarget, onExternalApplied])
 
   // Calculate word count - simple approach using editor state
   const [_wordCount, setWordCount] = useState(0)

@@ -2,6 +2,7 @@ import React from 'react'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { VoiceDictationButton } from '../VoiceDictationButton'
+import type { DocumentSyncAction } from './DocumentSyncAction'
 
 interface Features {
   voiceDictation: boolean
@@ -17,8 +18,7 @@ interface DocumentHeaderProps {
   propertiesActive?: boolean
   agentActive?: boolean
   onAgentClick?: () => void
-  hasFileChanged?: boolean
-  onRefresh?: () => void
+  syncAction?: DocumentSyncAction
   /** Sprint 105 (#164): document-level comments entry (button + overview). */
   commentsSlot?: React.ReactNode
   features: Features
@@ -33,8 +33,7 @@ export function DocumentHeader({
   propertiesActive = false,
   agentActive = false,
   onAgentClick,
-  hasFileChanged = false,
-  onRefresh,
+  syncAction,
   commentsSlot,
   features
 }: DocumentHeaderProps) {
@@ -94,17 +93,23 @@ export function DocumentHeader({
         <div className="flex items-center gap-1.5">
           {features.voiceDictation && <VoiceDictationButton />}
 
-          {hasFileChanged && onRefresh && (
+          <span className="sr-only" role="status" aria-live="polite">
+            {syncAction?.label ?? ''}
+          </span>
+
+          {syncAction && (
             <Button
               variant="toolbar"
-              size="icon-sm"
-              onClick={onRefresh}
-              aria-label="File changed on disk - click to refresh"
-              title="File changed on disk - click to reload"
-              className="relative text-[var(--vscode-notificationsInfoIcon-foreground,#3794ff)]"
+              size="sm"
+              onClick={syncAction.onClick}
+              aria-label={syncAction.label}
+              title={syncAction.title ?? syncAction.label}
+              className={syncAction.kind === 'conflict'
+                ? 'text-[var(--r-warning)] border-[var(--r-warning)]'
+                : 'text-[var(--r-error)] border-[var(--r-error-soft)]'}
             >
-              <Icon name="arrows-clockwise" size={14} tone="active" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--vscode-notificationsInfoIcon-foreground,#3794ff)] rounded-full animate-pulse" />
+              <Icon name={syncAction.kind === 'conflict' ? 'warning' : 'arrows-clockwise'} size={14} tone="active" />
+              <span>{syncAction.label}</span>
             </Button>
           )}
 
