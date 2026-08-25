@@ -1,7 +1,7 @@
 # Sprint 115 — Reliable Editor–Disk Synchronization
 
 **Track:** Full SDD, audit-first  
-**Status:** Phase 5 validation and closeout — D1–D12 implemented; release-candidate manual matrix remains
+**Status:** PR ready — D1–D12 and post-review stale-edit hardening implemented; 26/26 focused tests and official QA pass; PR #222 merge plus release-candidate manual matrix remain  
 **Branch:** `codex/sprint-115-editor-disk-sync`  
 **Worktree:** `.worktrees/sprint-115-editor-disk-sync`  
 **Issue:** [#221](https://github.com/ProductoryHQ/ritemark-native/issues/221) — linked to milestone v1.10.0  
