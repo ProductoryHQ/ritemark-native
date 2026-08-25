@@ -38,6 +38,20 @@ test('only conflict and exhausted application states expose an action', () => {
   assert.equal(selectDocumentSyncAction({ revision: 2, state: 'failed' }), 'retry')
 })
 
+test('a stale optimistic edit becomes a visible recovery state instead of a silent replay', () => {
+  const stale: DocumentHostMessage = {
+    type: 'document:edit-result',
+    ...identity,
+    clientSequence: 3,
+    status: 'stale',
+    revision: 4,
+    message: 'The document advanced before this edit arrived.',
+  }
+  const next = reduceDocumentViewSync(initialDocumentViewSyncState, stale)
+  assert.equal(next.state, 'failed')
+  assert.equal(selectDocumentSyncAction(next), 'retry')
+})
+
 test('a successful state clears conflict evidence only after host resolution', () => {
   const conflict: DocumentHostMessage = {
     type: 'document:conflict',

@@ -117,7 +117,7 @@ type DocumentConflictActionMessage = {
 }
 ```
 
-Unknown messages, mismatched URIs/epochs, stale revisions, and invalid payloads are rejected with content-free diagnostic logs.
+Unknown messages, mismatched URIs/epochs, stale host updates, and invalid payloads are rejected with content-free diagnostic logs. A full-document edit based on an older visible revision is never replayed blindly against a newer model: when the newer model still equals disk, the coordinator preserves the stale view as the local side of an explicit conflict; when a newer dirty/peer model also exists, the edit is rejected without pushing that model over the optimistic source view.
 
 ## Host Workstream
 
@@ -129,6 +129,7 @@ Unknown messages, mismatched URIs/epochs, stale revisions, and invalid payloads 
 - Coalesces rapid observations to the newest confirmed disk revision.
 - Sends idempotent updates immediately, retries at 750 ms and 2.5 s, and exposes apply failure at 5 s without claiming success.
 - Detects local-only, clean external, and true conflict states without a bounded self-hash history.
+- Gives every explicit resolution a fresh server revision, even when Keep-local leaves model text unchanged, so an older identical-content ACK cannot satisfy a new resolution receipt.
 - Disposes watchers/polls only after the last view/document lease ends.
 
 ### `RitemarkEditorProvider`

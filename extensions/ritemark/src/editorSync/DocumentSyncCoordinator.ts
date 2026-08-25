@@ -19,6 +19,7 @@ import {
   canCompleteViewResolution,
   canonicalJson,
   classifyAcceptedModelEdit,
+  classifyStaleViewEdit,
   classifyThreeWay,
   initializeThreeWayState,
   normalizeLogicalText,
@@ -263,12 +264,6 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       return;
     }
     source.lastClientSequence = message.clientSequence;
-    if (message.basedOnRevision !== record.revision) {
-      this.sendEditResult(record, source, message.clientSequence, 'stale', 'The document advanced before this edit arrived.');
-      await this.sendCurrent(record, source, 'peer-edit');
-      return;
-    }
-
     let fullContent: string;
     try {
       fullContent = this.adapter.serializeEdit(record.document, message.payload);
@@ -277,6 +272,10 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       return;
     }
     const nextHash = logicalHash(fullContent);
+    if (message.basedOnRevision !== record.revision) {
+      await this.handleStaleEdit(record, source, message.clientSequence, fullContent, nextHash);
+      return;
+    }
     if (nextHash !== record.modelHash) {
       const applied = await this.applyText(record.document, fullContent);
       if (applied === 'stale') {
@@ -322,6 +321,77 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     await this.broadcast(record, 'peer-edit');
     if (record.conflict) this.sendAllStates(record);
     this.log(record, 'webview-edit');
+  }
+
+  private async handleStaleEdit(
+    record: DocumentRecord,
+    source: ViewLease,
+    clientSequence: number,
+    fullContent: string,
+    nextHash: string,
+  ): Promise<void> {
+    const disk = await this.readDisk(record.document);
+    const modelHash = logicalHash(record.document.getText());
+    const disposition = classifyStaleViewEdit(modelHash, disk?.logicalHash, nextHash);
+
+    if (disposition === 'already-current') {
+      record.modelHash = modelHash;
+      const payloadHash = payloadHashFor(this.adapter.buildPayload(record.document, source.webview));
+      this.sendEditResult(record, source, clientSequence, 'accepted', undefined, payloadHash);
+      await this.sendCurrent(record, source, 'peer-edit');
+      return;
+    }
+
+    if (disposition === 'reject' || !disk) {
+      // Never replay a stale full-document payload on top of a newer dirty
+      // model: that can erase a peer edit. Keep the optimistic source view
+      // intact and expose a recoverable error instead of pushing the newer
+      // model over it automatically.
+      this.sendEditResult(
+        record,
+        source,
+        clientSequence,
+        'rejected',
+        'The document changed in another editor before this edit arrived. Your visible edit was not overwritten.',
+      );
+      return;
+    }
+
+    const applied = await this.applyText(record.document, fullContent, {
+      version: record.document.version,
+      logicalHash: modelHash,
+    });
+    if (applied !== 'applied') {
+      this.sendEditResult(
+        record,
+        source,
+        clientSequence,
+        applied === 'stale' ? 'stale' : 'rejected',
+        applied === 'stale'
+          ? 'The document advanced again while preserving this edit.'
+          : 'VS Code rejected the stale document edit.',
+      );
+      return;
+    }
+
+    record.modelHash = logicalHash(record.document.getText());
+    record.revision += 1;
+    record.conflictSequence += 1;
+    record.conflict = {
+      revision: record.conflictSequence,
+      diskValidator: disk.validator,
+      diskHash: disk.logicalHash,
+      diskContent: disk.content,
+      localContent: record.document.getText(),
+    };
+    record.resolutionRevision = undefined;
+    record.state = 'conflict';
+    const payloadHash = payloadHashFor(this.adapter.buildPayload(record.document, source.webview));
+    this.sendEditResult(record, source, clientSequence, 'accepted', undefined, payloadHash);
+    for (const target of record.views.values()) this.sendConflict(record, target);
+    await this.broadcast(record, 'peer-edit');
+    this.sendAllStates(record);
+    this.log(record, 'stale-view-edit:conflict');
   }
 
   private async conflictAction(record: DocumentRecord, view: ViewLease, message: ConflictActionMessage): Promise<void> {
@@ -406,6 +476,10 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     }
     this.setBase(record, verified, localHash);
     record.state = 'synced';
+    // Keep-local does not change model text, but it is still a new canonical
+    // synchronization event. A fresh revision prevents a view's older ACK for
+    // identical content from satisfying this resolution receipt.
+    record.revision += 1;
     record.resolutionRevision = record.revision;
     await this.broadcast(record, 'resolution');
     this.log(record, 'keep-local');
@@ -593,7 +667,9 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     const delivered = await view.webview.postMessage(pending.message);
     if (!delivered) {
       this.clearPending(view);
-      this.sendState(record, view);
+      view.applyError = true;
+      this.sendState(record, view, 'apply-error', attempt, 'The editor could not receive this document update.');
+      this.logDelivery(record, view, 'apply-error', pending.message.revision, attempt, Date.now() - pending.startedAt);
     }
     else {
       this.sendState(record, view, 'applying', attempt);

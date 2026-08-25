@@ -19,6 +19,25 @@ export interface ViewResolutionReceipt {
   acknowledgedRevision: number;
 }
 
+export type StaleViewEditDisposition = 'already-current' | 'materialize-conflict' | 'reject';
+
+/**
+ * Decide whether a full-document edit from an older visible revision can be
+ * preserved safely. If the current model still equals disk, the stale view and
+ * disk are the two independent descendants and can be materialized as a normal
+ * conflict. A dirty/current model means a third version exists, so replacing it
+ * would lose peer or local work and must be rejected.
+ */
+export function classifyStaleViewEdit(
+  currentModelHash: string,
+  currentDiskHash: string | undefined,
+  staleViewHash: string,
+): StaleViewEditDisposition {
+  if (staleViewHash === currentModelHash) return 'already-current';
+  if (currentDiskHash !== undefined && currentModelHash === currentDiskHash) return 'materialize-conflict';
+  return 'reject';
+}
+
 export function normalizeLogicalText(content: string): string {
   return content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
 }

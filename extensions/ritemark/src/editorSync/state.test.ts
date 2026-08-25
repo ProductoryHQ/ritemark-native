@@ -4,6 +4,7 @@ import {
   canCompleteViewResolution,
   canonicalJson,
   classifyAcceptedModelEdit,
+  classifyStaleViewEdit,
   classifyThreeWay,
   initializeThreeWayState,
   normalizeLogicalText,
@@ -51,6 +52,13 @@ test('a clean model lagging disk is initialized for external import', () => {
 test('typing during conflict extends the local snapshot instead of dropping the edit', () => {
   assert.equal(classifyAcceptedModelEdit('base', 'local-next', true, false), 'conflict');
   assert.equal(classifyAcceptedModelEdit('base', 'local-next', true, true), 'local-only');
+});
+
+test('a stale full-document edit never overwrites a newer dirty model', () => {
+  assert.equal(classifyStaleViewEdit('disk-b', 'disk-b', 'local-c'), 'materialize-conflict');
+  assert.equal(classifyStaleViewEdit('peer-c', 'disk-b', 'local-d'), 'reject');
+  assert.equal(classifyStaleViewEdit('same', 'disk-b', 'same'), 'already-current');
+  assert.equal(classifyStaleViewEdit('model-a', undefined, 'local-b'), 'reject');
 });
 
 test('resolution waits for every visible view but not dormant views', () => {

@@ -23,12 +23,14 @@ export function reduceDocumentViewSync(
     return { ...current, revision: message.revision }
   }
   if (message.type === 'document:edit-result') {
-    return message.status === 'rejected'
+    return message.status === 'rejected' || message.status === 'stale'
       ? {
           ...current,
           revision: message.revision,
           state: 'failed',
-          message: message.message || 'Ritemark could not apply this edit.',
+          message: message.message || (message.status === 'stale'
+            ? 'The document advanced before Ritemark could preserve this edit.'
+            : 'Ritemark could not apply this edit.'),
         }
       : { ...current, revision: message.revision }
   }

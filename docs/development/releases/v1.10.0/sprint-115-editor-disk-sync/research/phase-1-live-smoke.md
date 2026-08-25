@@ -39,7 +39,7 @@ apply-error: 5,000 ms
 
 Wrong revision or payload hash receipts do not clear the budget; an exact receipt and a superseding revision do. The state/protocol/reducer suite also covers logical EOL/BOM equality, initial dirty versus clean-lagging attachment, local-only/external/converged/conflict classification, conflict-time typing, visible-view resolution ACKs, exact message fields, stale host revisions, and truthful action selection.
 
-The final focused suite is 24/24, extension compile and webview typecheck/production build pass, and `./scripts/validate-qa.sh` passes on the Sprint 115 branch.
+The final focused suite is 26/26, including stale full-document edit classification and visible recovery, and extension compile plus webview typecheck/production build pass. `./scripts/validate-qa.sh` passes on the Sprint 115 branch; the post-review rerun is dated 2026-08-25.
 
 ## Diagnostics observed
 

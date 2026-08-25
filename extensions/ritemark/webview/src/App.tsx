@@ -242,37 +242,44 @@ function App() {
 
         if (message.type === 'document:update') {
           if (message.revision < currentRevisionRef.current) return
-          currentRevisionRef.current = message.revision
           dispatchDocumentViewSync(message)
           const optimisticEditPending = pendingClientSequenceRef.current !== undefined || queuedEditRef.current !== undefined
           const payloadMatchesOptimisticView = message.payload.content === contentRef.current
             && (message.payload.fileType === 'csv'
               || canonicalJson(message.payload.properties) === canonicalJson(propertiesRef.current))
           if (optimisticEditPending && !payloadMatchesOptimisticView) return
+          // Outgoing edits may only name a revision whose payload this view
+          // actually owns. A preceding sync-state message proves host state,
+          // not visible application.
+          currentRevisionRef.current = message.revision
           const target = { revision: message.revision, payloadHash: message.payloadHash }
           syncTargetRef.current = target
           setSyncTarget(target)
           applyRenderPayload(message.payload)
           setIsReady(true)
         } else if (message.type === 'document:sync-state') {
-          currentRevisionRef.current = Math.max(currentRevisionRef.current, message.revision)
           dispatchDocumentViewSync(message)
           if (message.state === 'synced') setShowConflictDialog(false)
         } else if (message.type === 'document:edit-result') {
-          currentRevisionRef.current = Math.max(currentRevisionRef.current, message.revision)
           dispatchDocumentViewSync(message)
           // A late/duplicate result for an older optimistic edit must not clear
           // or replay the currently in-flight edit.
           if (pendingClientSequenceRef.current !== message.clientSequence) return
           pendingClientSequenceRef.current = undefined
-          const sentEdit = inFlightEditRef.current
           inFlightEditRef.current = undefined
           if (message.status === 'rejected') {
             queuedEditRef.current = undefined
           } else {
+            if (message.status === 'accepted') {
+              // The optimistic payload already visible in this view now owns
+              // the accepted canonical revision.
+              currentRevisionRef.current = Math.max(currentRevisionRef.current, message.revision)
+            }
             const queued = queuedEditRef.current
             queuedEditRef.current = undefined
-            const nextEdit = queued ?? (message.status === 'stale' ? sentEdit : undefined)
+            // Never replay a stale full-document payload against a newer
+            // revision: doing so can silently overwrite an external change.
+            const nextEdit = message.status === 'accepted' ? queued : undefined
             if (nextEdit) postDocumentEdit(nextEdit)
           }
         } else {
