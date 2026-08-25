@@ -57,7 +57,7 @@
     "lowlight": "^3.1.0",
     "mammoth": "^1.12.0",
     "marked": "^9.1.0",
-    "mermaid": "^11.13.0",
+    "mermaid": "11.17.1",
     "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -68,8 +68,13 @@
     "tiptap-extension-global-drag-handle": "^0.1.18",
     "turndown": "^7.1.0",
     "turndown-plugin-gfm": "^1.0.2",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.2"
+  },
+  "overrides": {
+    "dompurify": "3.4.14",
+    "linkify-it": "6.1.0",
+    "markdown-it": "15.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

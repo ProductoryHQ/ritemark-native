@@ -795,8 +795,13 @@
     "posthog-node": "^5.28.8",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.0.0"
+  },
+  "overrides": {
+    "fast-uri": "3.1.5",
+    "js-yaml": "3.15.1",
+    "nanoid": "5.1.16"
   },
   "devDependencies": {
     "@phosphor-icons/core": "^2.1.1",
