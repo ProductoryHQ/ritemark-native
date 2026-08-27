@@ -33,8 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Claude models no longer appear twice or report a false mismatch.** Runtime aliases such as `default` and `opus[1m]` now resolve to one canonical picker row; the provider default is marked with a restrained `*`, and diagnostics compare the actual resolved model instead of comparing it with an alias.
-- **Compact AI sidebars prioritize the selected model.** At narrow widths the closed permission control now keeps only its mode icon, leaving the model name the available footer space; the full permission labels remain in the open menu and at wider widths.
-- **Conversation rail controls no longer drift apart.** New conversation, open conversation, and history buttons now use a continuous zero-gap vertical stack.
+- **Compact AI sidebars prioritize the selected model.** At narrow widths the closed permission control keeps only its mode icon and thinking effort becomes a level-aware icon, leaving the model name the available footer space; full labels remain available in opened controls, tooltips, and wider layouts.
+- **Conversation rail controls keep a compact rhythm.** New conversation, open conversation, and history buttons now use a consistent 4 px vertical gap; the pinned divider keeps the same 4 px clearance on each side.
 - **Agent and external edits appear in the open document without a reopen.** Markdown and CSV now use one per-file revision coordinator, and the host advances visible state only after the matching editor view acknowledges the exact payload it applied.
 - **The file-changed action now means a real unresolved problem.** Ordinary local typing/autosave lag stays quiet; a true local-versus-disk conflict preserves both versions and exposes explicit Compare, Keep my version, and Use disk version choices.
 - **No timer can replace unresolved local work.** The former ten-second forced reload, bounded self-hash heuristic, and competing webview booleans are removed; multi-view delivery is epoch-scoped, retry-bounded, and stale-message safe.

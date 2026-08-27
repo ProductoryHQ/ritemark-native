@@ -9,6 +9,7 @@ import {
   getThinkingEffortFillWidth,
   THINKING_EFFORT_ENDPOINT_CENTER_PX,
 } from './thinkingEffortGeometry';
+import { Icon, type PhosphorIconName } from '../ui/Icon';
 
 const LABELS: Record<ThinkingEffort, string> = {
   auto: 'Auto',
@@ -18,6 +19,16 @@ const LABELS: Record<ThinkingEffort, string> = {
   xhigh: 'Extra',
   max: 'Max',
   ultra: 'Ultra',
+};
+
+const COMPACT_ICONS: Record<ThinkingEffort, PhosphorIconName> = {
+  auto: 'sparkle',
+  low: 'cell-signal-low',
+  medium: 'cell-signal-medium',
+  high: 'cell-signal-high',
+  xhigh: 'cell-signal-full',
+  max: 'cell-signal-full',
+  ultra: 'cell-signal-full',
 };
 
 interface ThinkingEffortControlProps {
@@ -80,9 +91,10 @@ export function ThinkingEffortControl({
           onClick={(event) => {
             if (!supported) event.preventDefault();
           }}
-          className="h-6 shrink-0 whitespace-nowrap rounded-md border border-transparent bg-transparent px-1.5 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)] aria-disabled:cursor-default aria-disabled:opacity-55 aria-disabled:hover:bg-transparent"
+          className="flex h-6 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-transparent bg-transparent px-1.5 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)] aria-disabled:cursor-default aria-disabled:opacity-55 aria-disabled:hover:bg-transparent max-[360px]:w-6 max-[360px]:px-1"
         >
-          {triggerLabel}
+          <span className="max-[360px]:hidden">{triggerLabel}</span>
+          <Icon name={COMPACT_ICONS[value]} size={14} tone="inherit" className="hidden max-[360px]:block" />
         </button>
       </Popover.Trigger>
 
