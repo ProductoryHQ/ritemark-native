@@ -79,7 +79,7 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] The default row contains one visual `*` plus explicit screen-reader and tooltip copy.
 - [x] At a 299 px AI-sidebar viewport, the closed permission control shows only its mode icon and the selected model receives the freed width; reopening the control still shows every full mode label.
 - [x] At a 299 px AI-sidebar viewport, thinking effort shows only its level-aware icon; tooltip and accessible name retain the exact effort value and the opened control retains its full labels.
-- [x] New conversation, conversation, and history buttons in the thread rail have a measured vertical gap of 4 px; a pinned divider has 4 px clearance before and after its 1 px line.
+- [x] New conversation, conversation, and history buttons in the thread rail have a measured vertical gap of 4 px, including when the rail has no visible conversations; a pinned divider has 4 px clearance before and after its 1 px line.
 - [ ] Verify the one-row picker and absence of a false mismatch in the final packaged release candidate.
 
 ## Transcribe Insights and speaker names (Sprint 113)

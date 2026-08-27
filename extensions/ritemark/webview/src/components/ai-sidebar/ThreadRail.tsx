@@ -82,27 +82,29 @@ export function ThreadRail() {
 
   return (
     <aside className="relative z-[60] w-[56px] shrink-0 border-l border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-2 py-3" aria-label="Conversations">
-      <div className="flex h-full min-h-0 flex-col items-center overflow-y-auto overflow-x-hidden pb-2">
+      <div className="flex h-full min-h-0 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden pb-2">
         <ConversationTooltip label="New conversation">
-          <button type="button" aria-label="New conversation" onClick={requestNew} className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[var(--r-accent)] text-white shadow-md transition-transform motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] focus-visible:ring-offset-2">
+          <button type="button" aria-label="New conversation" onClick={requestNew} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[var(--r-accent)] text-white shadow-md transition-transform motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] focus-visible:ring-offset-2">
             <Icon name="plus" size={16} tone="inherit" />
           </button>
         </ConversationTooltip>
 
-        <div className="flex w-full flex-col items-center">
-          <div className="flex w-full flex-col items-center gap-1">
-            {pinnedRailIds.map(renderEntry)}
+        {ids.length > 0 && (
+          <div className="flex w-full flex-col items-center">
+            <div className="flex w-full flex-col items-center gap-1">
+              {pinnedRailIds.map(renderEntry)}
+            </div>
+            {pinnedRailIds.length > 0 && automaticRailIds.length > 0 && (
+              <div aria-hidden="true" className="my-1 h-px w-6 shrink-0 bg-[var(--r-hairline-strong)]" />
+            )}
+            <div className="flex w-full flex-col items-center gap-1">
+              {automaticRailIds.map(renderEntry)}
+            </div>
           </div>
-          {pinnedRailIds.length > 0 && automaticRailIds.length > 0 && (
-            <div aria-hidden="true" className="my-1 h-px w-6 shrink-0 bg-[var(--r-hairline-strong)]" />
-          )}
-          <div className="flex w-full flex-col items-center gap-1">
-            {automaticRailIds.map(renderEntry)}
-          </div>
-        </div>
+        )}
 
         <ConversationTooltip label={allConversationsLabel}>
-          <button type="button" aria-label={allConversationsLabel} aria-pressed={showPanel} onClick={togglePanel} className={`relative mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-[var(--r-ink-muted)] outline-none transition-colors motion-reduce:transition-none hover:text-[var(--r-ink-strong)] focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${showPanel ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent)]' : 'hover:bg-[var(--r-surface-soft)]'}`}>
+          <button type="button" aria-label={allConversationsLabel} aria-pressed={showPanel} onClick={togglePanel} className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-[var(--r-ink-muted)] outline-none transition-colors motion-reduce:transition-none hover:text-[var(--r-ink-strong)] focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${showPanel ? 'bg-[var(--r-accent-soft)] text-[var(--r-accent)]' : 'hover:bg-[var(--r-surface-soft)]'}`}>
             <Icon name="clock-counter-clockwise" size={16} tone="inherit" />
             {needsYouCount > 0 && <span className="absolute bottom-[3px] right-[3px] h-2 w-2 rounded-full bg-[var(--r-warning)] ring-2 ring-[var(--r-surface-muted)]" aria-hidden="true" />}
             {needsYouCount === 0 && workingCount > 0 && <span className="absolute bottom-[3px] right-[3px] h-2 w-2 animate-pulse rounded-full bg-[var(--r-accent)] ring-2 ring-[var(--r-surface-muted)] motion-reduce:animate-none" aria-hidden="true" />}
