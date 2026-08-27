@@ -94,9 +94,7 @@ export function ThreadRail() {
             {pinnedRailIds.map(renderEntry)}
           </div>
           {pinnedRailIds.length > 0 && automaticRailIds.length > 0 && (
-            <div aria-hidden="true" className="relative h-1 w-6 shrink-0">
-              <span className="absolute inset-x-0 top-0.5 h-px bg-[var(--r-hairline-strong)]" />
-            </div>
+            <div aria-hidden="true" className="my-1 h-px w-6 shrink-0 bg-[var(--r-hairline-strong)]" />
           )}
           <div className="flex w-full flex-col items-center gap-1">
             {automaticRailIds.map(renderEntry)}
