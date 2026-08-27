@@ -77,6 +77,7 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Persisted request aliases and canonical resolved IDs reconcile to the representative explicit request ID.
 - [x] Alias-equivalent init identity stays quiet; a genuinely different actual model still produces **Model mismatch**.
 - [x] The default row contains one visual `*` plus explicit screen-reader and tooltip copy.
+- [x] At a 299 px AI-sidebar viewport, the closed permission control shows only its mode icon and the selected model receives the freed width; reopening the control still shows every full mode label.
 - [ ] Verify the one-row picker and absence of a false mismatch in the final packaged release candidate.
 
 ## Transcribe Insights and speaker names (Sprint 113)

@@ -90,6 +90,9 @@ Claude's runtime can expose `default` and an explicit model name as two request
 aliases for the same actual model. Ritemark now shows that model once, marks the
 provider default with a restrained `*`, and verifies the resolved runtime model
 without producing a false **Model mismatch** warning for equivalent aliases.
+In a compact AI sidebar, the selected model also gets priority in the composer
+footer: the closed permission control reduces to its icon while its full choices
+remain available when opened.
 
 ## Transcribe Insights you can deliver
 

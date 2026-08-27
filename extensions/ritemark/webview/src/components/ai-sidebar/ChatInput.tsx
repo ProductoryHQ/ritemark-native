@@ -950,11 +950,12 @@ export function ChatInput() {
     : pendingRuntime.runtimeId === 'codex'
       ? `codex:${currentCodexModel?.id || codexSelectedModel}`
       : `claude-code:${currentClaudeModel?.id || selectedModel}`;
-  const runtimeFooterLabel = isOpenCode
-    ? `OpenCode · ${(currentOpenCodeEntry || openCodeModels[0])?.label || 'Select a model…'}`
+  const runtimeModelLabel = isOpenCode
+    ? (currentOpenCodeEntry || openCodeModels[0])?.label || 'Select a model…'
     : pendingRuntime.runtimeId === 'codex'
-      ? `Codex · ${currentCodexModel?.label || codexSelectedModel || 'Model'}`
-      : `Claude · ${currentClaudeModel?.label || selectedModel || 'Model'}`;
+      ? currentCodexModel?.label || codexSelectedModel || 'Model'
+      : currentClaudeModel?.label || selectedModel || 'Model';
+  const runtimeFooterLabel = `${isOpenCode ? 'OpenCode' : pendingRuntime.runtimeId === 'codex' ? 'Codex' : 'Claude'} · ${runtimeModelLabel}`;
   // 2026-08-05 Jarmo: no "N context" here — the context chips above the
   // composer already show exactly what's included; counting them again is noise.
   const contextSummary = [
@@ -1245,14 +1246,15 @@ export function ChatInput() {
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent">
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent max-[360px]:gap-1 max-[360px]:px-1">
           <Select value={runtimeSelectValue} onValueChange={handleRuntimeChange}>
             <SelectTrigger
-              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0"
+              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[360px]:w-auto max-[360px]:max-w-none max-[360px]:flex-1 max-[360px]:px-1 max-[360px]:[&>svg]:hidden"
               title={runtimeFooterLabel}
             >
               <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
-                {runtimeFooterLabel}
+                <span className="max-[360px]:hidden">{runtimeFooterLabel}</span>
+                <span className="hidden max-[360px]:inline">{runtimeModelLabel}</span>
               </div>
             </SelectTrigger>
             <SelectContent
@@ -1393,7 +1395,8 @@ export function ChatInput() {
             }}
           >
             <SelectTrigger
-              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0"
+              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0 max-[360px]:w-6 max-[360px]:justify-center max-[360px]:gap-0 max-[360px]:px-1 max-[360px]:[&>svg]:hidden"
+              aria-label={`Permission mode: ${composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}`}
               title={composerPolicy.planFirst && planCapable
                 ? 'Plan only — the agent plans and waits for your approval. Turns off when a plan is approved.'
                 : composerPolicy.autonomy === 'ask'
@@ -1407,7 +1410,9 @@ export function ChatInput() {
                   name={composerPolicy.planFirst && planCapable ? 'clipboard-text' : composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'}
                   size={12}
                 />
-                {composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
+                <span className="max-[360px]:sr-only">
+                  {composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
+                </span>
               </div>
             </SelectTrigger>
             <SelectContent>
@@ -1477,7 +1482,7 @@ export function ChatInput() {
             </span>
           )}
 
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-1.5 max-[360px]:gap-1 max-[360px]:[&>button]:h-6 max-[360px]:[&>button]:w-6">
             <AIInformationButton onOpen={() => aiInformation.setOpen(true)} />
             {isAgentMode && (
               <>
