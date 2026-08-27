@@ -89,8 +89,62 @@ function resolveProvider(
   // capability that this build knows how to implement.
   const filtered = enrichCatalogCapabilities(models, bundledPC)
     .filter((m) => allowedByAppVersion(m, appVersion));
-  const sorted = [...filtered].sort((a, b) => a.order - b.order);
+  const canonical = source === 'live' ? canonicalizeModelAliases(filtered) : filtered;
+  const sorted = [...canonical].sort((a, b) => a.order - b.order);
   return { models: sorted, defaults, source };
+}
+
+/**
+ * Collapse live request aliases only when the provider reports the exact same
+ * resolved identity. Labels are never used as identity: two similarly named
+ * models must remain distinct unless the runtime explicitly equates them.
+ */
+export function canonicalizeModelAliases(models: ModelEntry[]): ModelEntry[] {
+  const groups = new Map<string, ModelEntry[]>();
+  const order: string[] = [];
+
+  for (const model of models) {
+    const key = model.resolvedModel ? `resolved:${model.resolvedModel}` : `id:${model.id}`;
+    const group = groups.get(key);
+    if (group) {
+      group.push(model);
+    } else {
+      groups.set(key, [model]);
+      order.push(key);
+    }
+  }
+
+  return order.map((key) => {
+    const group = groups.get(key)!;
+    if (group.length === 1 && group[0].id !== 'default') return group[0];
+
+    const representative = group.find((model) => model.id !== 'default') ?? group[0];
+    const aliases = group
+      .map((model) => model.id)
+      .filter((id) => id !== representative.id);
+    const fallbackEffort = group.find((model) => model.thinkingEffort)?.thinkingEffort;
+
+    return {
+      ...representative,
+      order: Math.min(...group.map((model) => model.order)),
+      ...(representative.resolvedModel ? { resolvedModel: representative.resolvedModel } : {}),
+      ...(aliases.length > 0 ? { aliases } : {}),
+      ...(group.some((model) => model.id === 'default') ? { isDefault: true } : {}),
+      ...(representative.thinkingEffort || !fallbackEffort
+        ? {}
+        : { thinkingEffort: fallbackEffort }),
+    };
+  });
+}
+
+/** Find a resolved picker row by its representative id or a retained alias. */
+export function findModelEntry(models: ModelEntry[], id: string | undefined): ModelEntry | undefined {
+  if (!id) return undefined;
+  return models.find((model) => (
+    model.id === id
+    || model.resolvedModel === id
+    || model.aliases?.includes(id)
+  ));
 }
 
 /**

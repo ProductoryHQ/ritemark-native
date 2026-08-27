@@ -1281,11 +1281,18 @@ export function ChatInput() {
                       <SelectItem
                         key={model.id}
                         value={`claude-code:${model.id}`}
+                        title={model.isDefault ? `${primary} — Claude default` : undefined}
                         className="items-start py-1.5"
                       >
                         <div className="block w-full">
                           <div className="text-[13px] font-medium text-[var(--r-ink-strong)] leading-tight">
                             {primary}
+                            {model.isDefault && (
+                              <>
+                                <span aria-hidden="true" className="text-[var(--r-ink-muted)]"> *</span>
+                                <span className="sr-only"> (Claude default)</span>
+                              </>
+                            )}
                           </div>
                           {tagline && (
                             <div className="text-[11px] text-[var(--r-ink-muted)] leading-snug mt-0.5">

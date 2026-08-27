@@ -297,6 +297,8 @@ export interface AgentSessionConfig {
   allowedTools?: string[];
   settingSources?: AgentSettingSource[];
   model?: string;
+  /** Canonical model identity expected from the SDK init event. */
+  expectedResolvedModel?: string;
   anthropicApiKey?: string;
   pathToClaudeCodeExecutable?: string;
   /**

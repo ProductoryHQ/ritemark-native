@@ -30,6 +30,12 @@ export interface ModelThinkingEffort {
 export interface ModelEntry {
   /** Provider model id (bare, e.g. `claude-sonnet-5`; composite for opencode, e.g. `google/gemini-3.1-pro-preview`). */
   id: string;
+  /** Runtime-reported canonical identity for a live request alias. */
+  resolvedModel?: string;
+  /** Other request ids that the live runtime resolves to this same model. */
+  aliases?: string[];
+  /** The live runtime exposed `default` as an alias of this model. */
+  isDefault?: boolean;
   /** Short display label for the row. */
   label: string;
   /** One-line description (curated — the live `/v1/models` probe does not return this). */

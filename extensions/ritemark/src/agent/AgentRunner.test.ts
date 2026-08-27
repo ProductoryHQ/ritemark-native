@@ -4,7 +4,26 @@ import {
   buildClaudeSystemAppend,
   buildClaudeTurnPrompt,
   DEFAULT_SETTING_SOURCES,
+  modelMatchesExpectedIdentity,
 } from './AgentRunner';
+
+function testCanonicalModelIdentityMatching(): void {
+  assert.equal(
+    modelMatchesExpectedIdentity('default', 'claude-opus-5[1m]', 'claude-opus-5[1m]'),
+    true,
+    'a request alias must match the canonical identity reported by the runtime',
+  );
+  assert.equal(
+    modelMatchesExpectedIdentity('opus[1m]', 'claude-opus-5[1m]', 'claude-sonnet-5'),
+    false,
+    'a genuinely different canonical identity must still warn',
+  );
+  assert.equal(
+    modelMatchesExpectedIdentity('claude-opus-5', undefined, 'claude-opus-5[1m]'),
+    true,
+    'legacy direct ids retain the existing 1M suffix compatibility',
+  );
+}
 
 async function testSynchronousPlanApprovalAnswer() {
   const session = new AgentSession({
@@ -342,6 +361,7 @@ async function testWarmSessionUnsupportedEffortFallsBackToAuto(): Promise<void> 
 }
 
 async function main() {
+  testCanonicalModelIdentityMatching();
   testDefaultSettingSources();
   testDefaultToolsIncludePlanAndQuestionLifecycle();
   testClaudeLifecycleInstructionsAreIncluded();

@@ -41,6 +41,9 @@ export interface ModelOption {
   id: string;
   label: string;
   description: string;
+  resolvedModel?: string;
+  aliases?: string[];
+  isDefault?: boolean;
   thinkingEffort?: ModelThinkingEffort;
 }
 

@@ -43,6 +43,7 @@ export class ClaudeCodeSession implements RuntimeSession {
   private readonly _binaryPath: string | undefined;
   /** Model of the live session — used to decide reuse vs recreate. */
   private _activeModel: string | undefined;
+  private _activeResolvedModel: string | undefined;
 
   /**
    * Pending question requests, so respondToApproval() can look them up.
@@ -63,6 +64,7 @@ export class ClaudeCodeSession implements RuntimeSession {
     this._config = config;
     this._binaryPath = binaryPath;
     this._activeModel = config.model;
+    this._activeResolvedModel = config.expectedResolvedModel;
     this._session = ClaudeCodeSession._build(config, binaryPath);
   }
 
@@ -78,6 +80,7 @@ export class ClaudeCodeSession implements RuntimeSession {
     return new AgentSession({
       workspacePath: config.workspacePath,
       model: config.model,
+      expectedResolvedModel: config.expectedResolvedModel,
       pathToClaudeCodeExecutable: binaryPath,
       excludedFolders: config.excludedFolders,
       extraSystemPromptAppend: config.extraSystemPrompt,
@@ -120,7 +123,9 @@ export class ClaudeCodeSession implements RuntimeSession {
   applyConfig(config: RuntimeSessionConfig, binaryPath: string | undefined): void {
     this._config = config;
 
-    if (this._session.isActive && this._activeModel === config.model) {
+    if (this._session.isActive
+      && this._activeModel === config.model
+      && this._activeResolvedModel === config.expectedResolvedModel) {
       this._session.setApprovalMode(config.approvalMode ?? 'auto', config.planFirst === true);
       return;
     }
@@ -129,6 +134,7 @@ export class ClaudeCodeSession implements RuntimeSession {
     this._session.close();
     this._pendingQuestions.clear();
     this._activeModel = config.model;
+    this._activeResolvedModel = config.expectedResolvedModel;
     this._session = ClaudeCodeSession._build(config, binaryPath);
     if (hadLiveSession) {
       config.onProgress({

@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-24 (Sprint 115 — reliable editor–disk synchronization)
+**Last updated:** 2026-08-27 (v1.10.0 RC — canonical Claude model aliases)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -634,8 +634,16 @@ resolving model lists + per-surface defaults for every runtime and view:
 | Cache | last good remote fetch in `globalState` (offline survival) |
 | Bundled | `bundledCatalog.ts` typed baseline shipped in the VSIX (offline floor) |
 
-Public API: `getModels(provider)`, `getDefault(provider, surface)`, `onUpdate(cb)`, `refresh()`.
+Public API: `getModels(provider)`, `getModel(provider, id)`, `getDefault(provider, surface)`, `onUpdate(cb)`, `refresh()`.
 Gated by the `remote-model-catalog` flag (off → bundled/cache floor only). Default Claude model: `claude-sonnet-5`.
+
+Live runtimes may expose several request aliases for one actual model. The catalog
+preserves the provider's `resolvedModel`, groups only exact equal resolved identities,
+and exposes one selectable representative plus retained aliases and provider-default
+metadata. Persisted aliases reconcile at this boundary; the webview never deduplicates
+by label. Claude sessions receive the request id and expected resolved identity
+separately, so init diagnostics compare like with like while genuine model drift still
+surfaces. A provider-default row uses one accessible trailing `*` in the picker.
 
 `src/ai/modelConfig.ts` is **retained but narrowed** — only OpenAI/Gemini image arrays,
 `DEFAULT_MODELS` (image defaults), and the `ModelConfig` types remain. Deleted: `CLAUDE_MODELS`,
