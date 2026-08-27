@@ -14,6 +14,11 @@ class MemoryStorage {
 
 const { useAISidebarStore } = await import('./store');
 const { createConversationState } = await import('./conversationState');
+const React = await import('react');
+(globalThis as typeof globalThis & { React: typeof React }).React = React;
+const { createElement } = React;
+const { renderToStaticMarkup } = await import('react-dom/server');
+const { ThreadRail } = await import('./ThreadRail');
 
 const conversations = Object.fromEntries(Array.from({ length: 5 }, (_, index) => {
   const id = `conversation-${index}`;
@@ -44,5 +49,25 @@ useAISidebarStore.getState().requestNewThread();
 
 assert.equal(Object.keys(useAISidebarStore.getState().conversations).length, 6, 'New is never limited by runtime attachment capacity');
 assert.notEqual(useAISidebarStore.getState().activeConversationId, 'conversation-0');
+
+useAISidebarStore.setState({
+  hostConversations: [],
+  pinnedConversationIds: [],
+  activeConversationId: null,
+  conversations: {},
+  showHistoryPanel: false,
+});
+
+const emptyRailMarkup = renderToStaticMarkup(createElement(ThreadRail));
+assert.match(
+  emptyRailMarkup,
+  /class="flex h-full min-h-0 flex-col items-center gap-1 overflow-y-auto/,
+  'An empty rail applies the four-pixel gap once on the common controls container',
+);
+assert.doesNotMatch(
+  emptyRailMarkup,
+  /\b(?:mb|mt)-1\b/,
+  'An empty rail does not double the gap with adjacent button margins',
+);
 
 console.log('threadRail.test.ts: all assertions passed');
