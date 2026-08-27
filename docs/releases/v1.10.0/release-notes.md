@@ -93,8 +93,8 @@ without producing a false **Model mismatch** warning for equivalent aliases.
 In a compact AI sidebar, the selected model also gets priority in the composer
 footer: the closed permission control reduces to its icon while its full choices
 remain available when opened.
-The adjacent conversation rail also keeps its action buttons in a compact,
-zero-gap vertical stack.
+The adjacent conversation rail also keeps a compact, consistent 4 px gap
+between its action buttons.
 
 ## Transcribe Insights you can deliver
 

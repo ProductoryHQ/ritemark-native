@@ -78,7 +78,7 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Alias-equivalent init identity stays quiet; a genuinely different actual model still produces **Model mismatch**.
 - [x] The default row contains one visual `*` plus explicit screen-reader and tooltip copy.
 - [x] At a 299 px AI-sidebar viewport, the closed permission control shows only its mode icon and the selected model receives the freed width; reopening the control still shows every full mode label.
-- [x] New conversation, conversation, and history buttons in the thread rail have a measured vertical gap of 0 px.
+- [x] New conversation, conversation, and history buttons in the thread rail have a measured vertical gap of 4 px.
 - [ ] Verify the one-row picker and absence of a false mismatch in the final packaged release candidate.
 
 ## Transcribe Insights and speaker names (Sprint 113)
