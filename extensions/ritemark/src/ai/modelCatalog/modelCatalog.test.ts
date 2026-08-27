@@ -6,7 +6,13 @@
 import * as assert from 'assert';
 import { validateCatalog, type ModelCatalog } from './schema';
 import { BUNDLED_CATALOG } from './bundledCatalog';
-import { resolveAll, versionLt, type DiscoveryResults } from './resolver';
+import {
+  canonicalizeModelAliases,
+  findModelEntry,
+  resolveAll,
+  versionLt,
+  type DiscoveryResults,
+} from './resolver';
 
 let failures = 0;
 function test(name: string, fn: () => void): void {
@@ -122,6 +128,42 @@ test('live probe wins and is enriched with curated metadata', () => {
   const future = r.anthropic.models.find((m) => m.id === 'claude-future-6')!;
   assert.strictEqual(future.label, 'Future', 'live-only id preserved');
   assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5', 'defaults from catalog');
+});
+
+test('live aliases with one resolved identity collapse to one explicit default-marked row', () => {
+  const models = canonicalizeModelAliases([
+    {
+      id: 'default', label: 'Default', description: 'Opus 5 with 1M context · Best for complex tasks',
+      resolvedModel: 'claude-opus-5[1m]', tier: 'medium', deprecated: false, order: 0,
+      thinkingEffort: { levels: ['low', 'medium', 'high'] },
+    },
+    {
+      id: 'opus[1m]', label: 'Opus (1M context)', description: 'Opus 5 with 1M context · Best for complex tasks',
+      resolvedModel: 'claude-opus-5[1m]', tier: 'medium', deprecated: false, order: 1,
+      thinkingEffort: { levels: ['low', 'medium', 'high'] },
+    },
+    {
+      id: 'sonnet', label: 'Sonnet', description: 'Sonnet 5 · Efficient',
+      resolvedModel: 'claude-sonnet-5', tier: 'medium', deprecated: false, order: 2,
+    },
+  ]);
+
+  assert.equal(models.length, 2);
+  assert.equal(models[0].id, 'opus[1m]', 'explicit alias remains the deterministic request id');
+  assert.equal(models[0].resolvedModel, 'claude-opus-5[1m]');
+  assert.deepStrictEqual(models[0].aliases, ['default']);
+  assert.equal(models[0].isDefault, true);
+  assert.equal(findModelEntry(models, 'default')?.id, 'opus[1m]', 'persisted default alias reconciles');
+  assert.equal(findModelEntry(models, 'opus[1m]')?.id, 'opus[1m]');
+  assert.equal(findModelEntry(models, 'claude-opus-5[1m]')?.id, 'opus[1m]', 'canonical ids reconcile too');
+});
+
+test('matching labels without resolved identity are never merged', () => {
+  const models = canonicalizeModelAliases([
+    { id: 'a', label: 'Same', description: '', tier: 'medium', deprecated: false, order: 0 },
+    { id: 'b', label: 'Same', description: '', tier: 'medium', deprecated: false, order: 1 },
+  ]);
+  assert.deepStrictEqual(models.map((model) => model.id), ['a', 'b']);
 });
 
 test('live effort metadata overrides a stale curated capability', () => {

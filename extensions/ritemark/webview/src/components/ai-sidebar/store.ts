@@ -203,6 +203,14 @@ function firstAvailableOpenCodeModel(
   return '';
 }
 
+function reconciledModelId(models: ModelOption[], id: string): string | undefined {
+  return models.find((model) => (
+    model.id === id
+    || model.resolvedModel === id
+    || model.aliases?.includes(id)
+  ))?.id;
+}
+
 function getCodexCompatibilityNoticeKey(status: CodexSidebarStatus): string | null {
   const compatibility = status.compatibility;
   if (status.state !== 'ready' || !compatibility || compatibility.state === 'compatible') {
@@ -2307,9 +2315,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             const candidateClaude = conversation.id === activeId
               ? (message.selectedModel || conversation.selectedModel)
               : conversation.selectedModel;
-            const selectedModel = newClaudeModels.some((m: { id: string }) => m.id === candidateClaude)
-              ? candidateClaude
-              : (newClaudeModels[0]?.id || candidateClaude);
+            const selectedModel = reconciledModelId(newClaudeModels, candidateClaude)
+              ?? (newClaudeModels[0]?.id || candidateClaude);
             const isActive = conversation.id === activeId;
             conversations[conversation.id] = {
               ...conversation,

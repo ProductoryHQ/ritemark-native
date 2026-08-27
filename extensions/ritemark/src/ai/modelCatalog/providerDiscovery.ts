@@ -19,8 +19,24 @@ import { isExplicitThinkingEffort } from '../../runtime/thinkingEffort';
 
 const PROBE_TIMEOUT_MS = 8_000;
 
-function entry(id: string, label: string, order: number, description = '', thinkingEffort?: ModelThinkingEffort): ModelEntry {
-  return { id, label, description, tier: 'medium', deprecated: false, order, ...(thinkingEffort ? { thinkingEffort } : {}) };
+function entry(
+  id: string,
+  label: string,
+  order: number,
+  description = '',
+  thinkingEffort?: ModelThinkingEffort,
+  resolvedModel?: string,
+): ModelEntry {
+  return {
+    id,
+    label,
+    description,
+    tier: 'medium',
+    deprecated: false,
+    order,
+    ...(thinkingEffort ? { thinkingEffort } : {}),
+    ...(resolvedModel ? { resolvedModel } : {}),
+  };
 }
 
 async function fetchJson(url: string, headers: Record<string, string>): Promise<unknown | null> {
@@ -75,6 +91,7 @@ export async function discoverAnthropic(opts: {
         m.supportsEffort === undefined
           ? undefined
           : { levels: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [] },
+        m.resolvedModel,
       ));
     }
   }

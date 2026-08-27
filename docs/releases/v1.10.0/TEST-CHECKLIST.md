@@ -1,6 +1,6 @@
 # Ritemark 1.10.0 Test Checklist
 
-This checklist accumulates release evidence across Sprints 109–115.
+This checklist accumulates release evidence across Sprints 109–115 and focused release-candidate bug fixes.
 
 ## Current candidate record — 2026-08-25
 
@@ -70,6 +70,14 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Feature-flag OFF omits the control without deleting saved preferences.
 - [x] Native RunDev smoke: range drag, click/arrow operation, Auto checkbox, Escape/focus return, 300px sidebar collision, normal width, and 200% zoom geometry pass in `ritemark-demo` (2026-08-24).
 - [x] Native range/checkbox names, value text, keyboard semantics, live status copy, and reduced-motion CSS contract are present; no bespoke slider keyboard behavior is used.
+
+## Claude model identity (RC bug fix)
+
+- [x] Live Claude 2.1.239 discovery resolves `default` and `opus[1m]` to one `claude-opus-5[1m]` catalog row while Fable, Sonnet, and Haiku remain distinct.
+- [x] Persisted request aliases and canonical resolved IDs reconcile to the representative explicit request ID.
+- [x] Alias-equivalent init identity stays quiet; a genuinely different actual model still produces **Model mismatch**.
+- [x] The default row contains one visual `*` plus explicit screen-reader and tooltip copy.
+- [ ] Verify the one-row picker and absence of a false mismatch in the final packaged release candidate.
 
 ## Transcribe Insights and speaker names (Sprint 113)
 

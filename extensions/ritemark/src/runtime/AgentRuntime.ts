@@ -89,7 +89,10 @@ export interface RuntimeSession {
 
 export interface RuntimeSessionConfig {
   workspacePath: string;
+  /** Provider request id sent to the runtime. */
   model?: string;
+  /** Canonical identity the provider reports after resolving that request id. */
+  expectedResolvedModel?: string;
   excludedFolders?: string[];
   extraSystemPrompt?: string;
   mcpServers?: Record<string, unknown>;

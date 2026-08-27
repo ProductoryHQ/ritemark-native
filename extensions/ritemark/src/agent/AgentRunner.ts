@@ -137,6 +137,21 @@ const MUTATING_TOOLS = new Set(['Bash', 'Write', 'Edit', 'NotebookEdit']);
  */
 const NEVER_AUTO_ALLOWED = new Set([...MUTATING_TOOLS, 'ExitPlanMode']);
 const DEFAULT_TIMEOUT_MINUTES = 15;
+
+/**
+ * Compare values from the same identity layer. Claude request aliases such as
+ * `default` are not expected to equal the canonical model reported at init.
+ */
+export function modelMatchesExpectedIdentity(
+  requestedModel: string | undefined,
+  expectedResolvedModel: string | undefined,
+  actualModel: string,
+): boolean {
+  if (!requestedModel || !actualModel) return true;
+  if (expectedResolvedModel) return actualModel === expectedResolvedModel;
+  return actualModel === requestedModel || actualModel.replace(/\[1m\]$/, '') === requestedModel;
+}
+
 // Sprint 103 R2/R4 (audit F4): no ExitPlanMode/plan-mode nudges outside plan
 // mode — the always-on reminder made Claude plan autonomously in Auto mode.
 // Plan-mode behavior now comes from the SDK's native plan mode +
@@ -489,6 +504,7 @@ export class AgentSession {
   private _allowedTools: string[];
   private readonly _settingSources: AgentSettingSource[];
   private readonly _modelId: string | undefined;
+  private readonly _expectedResolvedModel: string | undefined;
   private readonly _anthropicApiKey: string | undefined;
   private readonly _pathToClaudeCodeExecutable: string | undefined;
   private readonly _resumeSessionId: string | undefined;
@@ -514,6 +530,7 @@ export class AgentSession {
     this._allowedTools = config.allowedTools || DEFAULT_TOOLS;
     this._settingSources = resolveSettingSources(config.settingSources);
     this._modelId = config.model;
+    this._expectedResolvedModel = config.expectedResolvedModel;
     this._anthropicApiKey = config.anthropicApiKey;
     this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
     this._resumeSessionId = config.resumeSessionId;
@@ -1031,8 +1048,11 @@ export class AgentSession {
           // and got another, say so in the transcript — silent drift between
           // the UI label and the running model is never acceptable.
           const actualModel = (message.model || '') as string;
-          const normalizedActual = actualModel.replace(/\[1m\]$/, '');
-          if (this._modelId && actualModel && normalizedActual !== this._modelId) {
+          if (!modelMatchesExpectedIdentity(
+            this._modelId,
+            this._expectedResolvedModel,
+            actualModel,
+          )) {
             this._emitProgress?.('init',
               `Model mismatch — running on ${actualModel}, but ${this._modelId} was requested. The runtime could not apply the requested model.`);
           } else {

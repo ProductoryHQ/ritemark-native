@@ -302,7 +302,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'ai-select-model':
-          await vscode.workspace.getConfiguration('ritemark.ai').update('selectedModel', message.modelId, vscode.ConfigurationTarget.Global);
+          await vscode.workspace.getConfiguration('ritemark.ai').update(
+            'selectedModel',
+            modelCatalog.getModel('anthropic', message.modelId)?.id
+              ?? modelCatalog.getDefault('anthropic', 'claude-code'),
+            vscode.ConfigurationTarget.Global,
+          );
           this._runtimeRegistry.get('claude-code')?.dispose();
           break;
 
@@ -315,11 +320,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // Sprint 99: every conversation-scoped message carries its conversation.
           // A missing id means a webview path that has not been migrated yet.
           const clientConversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
-          const requestedModel = typeof model === 'string' && model
+          const requestedModelInput = typeof model === 'string' && model
             ? model
             : agentId === 'claude-code'
               ? this._reconciledClaudeModel()
               : undefined;
+          const requestedClaudeModel = agentId === 'claude-code'
+            ? modelCatalog.getModel('anthropic', requestedModelInput)
+            : undefined;
+          const requestedModel = requestedClaudeModel?.id ?? requestedModelInput;
           const effortCapability = this._thinkingEffortCapability(
             clientConversationId,
             agentId as AgentId,
@@ -590,6 +599,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const sessionConfig: RuntimeSessionConfig = {
             workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
             model: pinnedModel,
+            expectedResolvedModel: isClaudeCode ? requestedClaudeModel?.resolvedModel : undefined,
             byokEnv: buildByokEnv(byokKeys),
             excludedFolders,
             anthropicApiKey,
@@ -1321,9 +1331,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const claudeModels = modelCatalog.getModels('anthropic');
     // Reconcile a persisted-but-stale selection against the resolved list so the
     // sidebar never shows or runs a model id that no longer exists (Sprint 89 #109).
-    const reconciledModel = claudeModels.some((m) => m.id === selectedModel)
-      ? selectedModel
-      : modelCatalog.getDefault('anthropic', 'claude-code');
+    const reconciledModel = modelCatalog.getModel('anthropic', selectedModel)?.id
+      ?? modelCatalog.getDefault('anthropic', 'claude-code');
 
     this._view?.webview.postMessage({
       type: 'agent:config',
@@ -1684,7 +1693,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return { selectable: [], source: 'runtime-live', supportsAppliedValue: false };
     }
     const provider = runtimeId === 'codex' ? 'codex' : 'anthropic';
-    const model = modelCatalog.getModels(provider).find((candidate) => candidate.id === modelId);
+    const model = modelCatalog.getModel(provider, modelId);
     return {
       selectable: [...(model?.thinkingEffort?.levels ?? [])],
       ...(model?.thinkingEffort?.defaultLevel ? { defaultLevel: model.thinkingEffort.defaultLevel } : {}),
@@ -1696,9 +1705,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _reconciledClaudeModel(): string {
     const selected = vscode.workspace.getConfiguration('ritemark.ai')
       .get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code'));
-    return modelCatalog.getModels('anthropic').some((m) => m.id === selected)
-      ? selected
-      : modelCatalog.getDefault('anthropic', 'claude-code');
+    return modelCatalog.getModel('anthropic', selected)?.id
+      ?? modelCatalog.getDefault('anthropic', 'claude-code');
   }
 
   private _sendActiveFile() {

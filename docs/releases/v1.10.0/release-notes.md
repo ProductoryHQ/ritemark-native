@@ -86,6 +86,11 @@ Claude binary/SDK drift, and stale runtime metadata before packaging. Existing
 conversation continuation, approvals, cancellation, and parallel-conversation
 isolation were rerun against this exact snapshot.
 
+Claude's runtime can expose `default` and an explicit model name as two request
+aliases for the same actual model. Ritemark now shows that model once, marks the
+provider default with a restrained `*`, and verifies the resolved runtime model
+without producing a false **Model mismatch** warning for equivalent aliases.
+
 ## Transcribe Insights you can deliver
 
 Search common languages or enter any language or dialect before generating

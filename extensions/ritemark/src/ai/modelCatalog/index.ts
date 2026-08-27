@@ -15,7 +15,7 @@ import * as vscode from 'vscode';
 import { isEnabled } from '../../features/featureGate';
 import { BUNDLED_CATALOG } from './bundledCatalog';
 import { fetchRemoteCatalog, getCachedCatalog, shouldRefetch } from './remoteSource';
-import { resolveAll, type DiscoveryResults, type ResolvedProvider } from './resolver';
+import { findModelEntry, resolveAll, type DiscoveryResults, type ResolvedProvider } from './resolver';
 import type { ModelCatalog, ModelEntry, Provider, Surface } from './schema';
 
 export type { ModelEntry, Provider, Surface } from './schema';
@@ -94,10 +94,16 @@ export function getModels(provider: Provider): ModelEntry[] {
   return current()[provider].models;
 }
 
+/** Resolve either a representative request id or one of its live aliases. */
+export function getModel(provider: Provider, id: string | undefined): ModelEntry | undefined {
+  return findModelEntry(getModels(provider), id);
+}
+
 /** The default model id for a surface; falls back to the first model, then ''. */
 export function getDefault(provider: Provider, surface: Surface): string {
   const rp = current()[provider];
-  return rp.defaults[surface] ?? rp.models[0]?.id ?? '';
+  const configured = rp.defaults[surface];
+  return findModelEntry(rp.models, configured)?.id ?? rp.models[0]?.id ?? '';
 }
 
 export function getResolved(): Resolved {

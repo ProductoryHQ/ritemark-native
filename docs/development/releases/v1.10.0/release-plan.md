@@ -1,6 +1,6 @@
 # Release Plan — v1.10.0 Durable Agent Conversations + Reliable Editing
 
-**Status:** Release candidate preparation — Sprints 109–115 repository work are merged; reviewed release hardening now pins SheetJS 0.20.3 and closes all production npm findings. The earlier signed arm64 app is preview-only; a fresh clean-`main` build, signed/un-notarized Gate 1 DMG, Sprint 114 immutable hosting/Store/SAC-On/exact-hash work, and residual release-level manual validation remain open.<br>
+**Status:** Release candidate preparation — Sprints 109–115 repository work are merged; reviewed dependency hardening closes all production npm findings, and the focused Claude model-alias RC bug fix has passed automated validation before the candidate rebuild. The earlier signed arm64 app is preview-only; a fresh clean-`main` build, signed/un-notarized Gate 1 DMG, Sprint 114 immutable hosting/Store/SAC-On/exact-hash work, and residual release-level manual validation remain open.<br>
 **Target:** v1.10.0<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8) — created 2026-08-21<br>
 **Release type:** Full app distribution with extension-scoped implementation; deliberately not an `1.9.0-ext.N` lane<br>
@@ -163,6 +163,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | A stale optimistic full-document edit replays over a newer external or peer revision | Critical | Bind edits to the actually visible revision; materialize clean-current stale edits as explicit conflicts; reject rather than replay over a newer dirty model; require a fresh revision for every resolution ACK | Mitigated in Sprint 115 post-review; deterministic stale-edit and recovery coverage passes |
 | Production parser/render dependencies carry current high npm advisories | High | Exact compatible transitive overrides; official SheetJS 0.20.3 tarball pin; compile/typecheck/build and spreadsheet/Markdown/Mermaid regressions; production-only audit | Retired 2026-08-25 — both production trees report zero findings; dev-only Vite-major migration deferred |
 | A non-cooperating writer changes disk during the explicit Keep-local validator→write interval | Medium | Immediate strong-validator recheck, post-write verification, explicit overwrite wording, and release-candidate race injection; do not claim atomic filesystem CAS | Named residual — public portable filesystem APIs cannot close the final interval without a cooperating broker/lock |
+| Claude aliases appear as duplicate models and trigger a false mismatch | High | Canonicalize exact provider-resolved identity, retain aliases, and compare the runtime against the resolved model | Mitigated on `codex/fix-claude-model-aliases`; focused regressions and full QA pass, packaged-RC check remains |
 
 ## Documentation and Release Assets
 
@@ -207,6 +208,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 | 2026-08-25 | Prepare v1.10.0 RC and Microsoft Store worksheet without dispatching Windows | Version commit `3640aa3` is pushed; arm64 build/signing and runtime checks pass. Canonical DMG creation is blocked by Finder AppleEvent timeout, and production npm advisories require explicit security disposition before Gate 1. |
 | 2026-08-25 | Pin SheetJS, close production advisories, and accept the proven Finder-free DMG path | Jarmo explicitly chose the XLSX pin and delegated the remaining technical release decisions. SheetJS uses the official 0.20.3 tarball; reviewed exact pins/overrides make both production audits clean. If Finder layout AppleEvents remain unresponsive, use the v1.8.2/v1.8.6 `ditto`/`hdiutil` precedent, then require the same signature, mount, architecture, content, Gatekeeper, and checksum gates. |
 | 2026-08-24 | Keep-local uses exact disk validation plus public write and same-content model refresh | VS Code correctly rejects normal save after a true disk conflict; the selected public-API path verifies the selected bytes, refreshes clean/etag state, and retains Undo. |
+| 2026-08-27 | Treat duplicate Claude aliases as a focused RC bug fix, not a new sprint | The provider exposes two request spellings for one resolved model; the correction is contained to catalog identity, runtime verification, picker projection, and regressions. |
 
 ## Planning Approval
 
