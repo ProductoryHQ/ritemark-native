@@ -1,7 +1,7 @@
 # Ritemark v1.10.0 pre-release audit
 
-**Audit date:** 2026-08-25  
-**Source:** `codex/v1.10.0-rc-prep` / PR #223<br>
+**Audit date:** 2026-08-29<br>
+**Source:** clean merged `main` after focused RC fixes and release-gate reconciliation; record the exact commit when the Gate 1 build starts<br>
 **Latest public release:** v1.9.0  
 **Next valid version:** v1.10.0  
 **Verdict:** **RELEASE HARDENING PASSED; fresh `main` build and Gate 1 candidate still required**
@@ -10,7 +10,7 @@
 
 - Sprints 109–115 are merged into `main`; Sprint 114 repository work is merged and its external gates remain tracked in #212.
 - `./scripts/validate-qa.sh` passes on the consolidated release scope.
-- Full `./scripts/release-preflight.sh` passes with only the expected release-branch/uncommitted-state warnings before the version commits were pushed.
+- Full `./scripts/release-preflight.sh` passes with zero errors and zero warnings on clean synchronized merged `main` (2026-08-29); the Developer ID certificate is present.
 - Branding, extension, lockfile, and Windows installer defaults agree on `1.10.0`.
 - The arm64 runtime matrix passes without skips: Claude Code 2.1.239, OpenCode 1.18.21, and Codex app-server 0.149.0 report the manifest versions; OpenCode write pause/deny/allow and cancel all pass.
 - The arm64 production build passes the bundled-extension and post-build checks. The app contains `ritemarkVersion: 1.10.0`, an 8,304,024-byte webview bundle, a 5,743,238-byte extension bundle, 233 packaged dependency manifests, and the three correct-architecture agent binaries. No zero-byte JavaScript output exists.
@@ -28,7 +28,7 @@ The signed app above was built before dependency hardening and from the RC branc
 
 `./scripts/create-dmg.sh` mounted the image and reached its canonical Finder-layout step, but Finder stopped answering AppleEvents and returned `-1712` (`AppleEvent timed out`). Restarting Finder did not restore AppleEvent responsiveness. The failed 2.8 GB `rw.*.dmg` temporary image was removed; the signed app bundle remains intact.
 
-This is a packaging-session limitation, not an app-integrity failure. v1.8.2 and v1.8.6 already shipped through the repository's recorded Finder-free `ditto` + `hdiutil create` + compressed-convert path. Jarmo authorized the technically strongest release route on 2026-08-25. For v1.10.0, retrying the decorative Finder layout is optional; a deterministic Finder-free image is accepted when it is DMG-signed and passes the same signature, version, architecture, bundled-runtime, mount/content, zero-byte, Gatekeeper, and checksum checks. It remains signed and **un-notarized** for Jarmo's Gate 1 test.
+This is a packaging-session limitation, not an app-integrity failure. v1.8.2 and v1.8.6 already shipped through the repository's recorded Finder-free `ditto` + `hdiutil create` + compressed-convert path. Jarmo authorized the technically strongest release route on 2026-08-25. For v1.10.0, retrying the decorative Finder layout is optional; a deterministic Finder-free image is accepted only when it is DMG-signed, notarized, stapled, and passes the same signature, version, architecture, bundled-runtime, mount/content, zero-byte, Gatekeeper, and checksum checks. Jarmo's Gate 1 test uses those exact final verified bytes; no notarization or other artifact mutation occurs after approval.
 
 ### R2 — Production dependency advisories are closed
 
@@ -46,15 +46,15 @@ The full webview audit still reports development-only toolchain advisories under
 
 ## Release-time gates still open
 
-- Merge PR #223, rerun QA/preflight on clean synchronized `main`, and build/sign/package a fresh arm64 candidate from that exact commit.
+- Merge the release-gate reconciliation PR, synchronize clean `main`, and build/sign/package/notarize/staple a fresh arm64 candidate from the exact resulting merge commit.
 - Residual v1.10.0 manual feature/regression rows in `TEST-CHECKLIST.md`.
-- Jarmo's test of the exact signed, un-notarized arm64 DMG and the 60-minute no-new-bug hardening period.
+- Jarmo's test of the exact signed/notarized/stapled and technically verified arm64 DMG plus the 60-minute no-new-bug hardening period from its final bytes.
 - Signed x64 macOS and Windows CI candidates, Windows SAC-On test, and Gate 2.
 - Immutable Windows hosting, Microsoft Store certification, exact-hash approval, and canonical update-feed publication.
 
 ## Smallest safe next actions
 
-1. Merge the reviewed release-prep changes, synchronize clean `main`, and rerun release preflight.
-2. Build and sign arm64 from `main`; package with the Finder layout if responsive, otherwise use the recorded deterministic `ditto`/`hdiutil` route.
-3. Sign, mount, and run every hard check against the exact DMG before asking Jarmo to test it.
-4. Record the candidate hash and timestamp. Any rebuild resets the candidate timestamp and Gate 1 evidence.
+1. Merge the reviewed release-gate reconciliation, synchronize clean `main`, and confirm release preflight remains clean.
+2. Build and sign arm64 from `main`; package with the Finder layout if responsive, otherwise use the explicitly approved deterministic `ditto`/`hdiutil` route.
+3. Sign, notarize, staple, mount, and run every hard check against the exact final DMG before asking Jarmo to test it.
+4. Record the final candidate hash and timestamp. Any rebuild or post-test mutation resets the candidate timestamp and Gate 1 evidence.
