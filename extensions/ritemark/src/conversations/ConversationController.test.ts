@@ -422,6 +422,7 @@ async function run(): Promise<void> {
     const hidden = await controller.handle({ type: 'conversation/get', requestId: 'hidden', conversationId: other.conversationId });
     assert.equal(hidden.ok, false, 'the host rejects cross-project IDs');
 
+    const currentBeforeDeletion = await store.get(firstRecord.conversationId);
     const deletion = await controller.handle({
       type: 'conversation/delete',
       requestId: 'delete',
@@ -431,6 +432,7 @@ async function run(): Promise<void> {
     });
     assert.equal(deletion.ok, true);
     if (!deletion.ok || !('undoToken' in deletion.data)) throw new Error('missing undo token');
+    assert.equal(deletion.data.title, currentBeforeDeletion?.title, 'delete result carries the current host-owned title for the native Undo notification');
     await assert.rejects(
       controller.checkpoint({
         conversationId: firstRecord.conversationId,

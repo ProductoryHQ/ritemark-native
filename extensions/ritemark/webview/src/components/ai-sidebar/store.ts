@@ -291,7 +291,6 @@ interface AISidebarState {
   earlierConversations: ConversationSummaryV1[];
   pinnedConversationIds: string[];
   conversationStoreNotice: string | null;
-  pendingUndo: { undoToken: string; title: string; recovery: boolean } | null;
 
   // ── Composer state, keyed per thread (Sprint 99 R14 / E5) ──
   /**
@@ -440,7 +439,6 @@ interface AISidebarState {
   renameHostConversation: (id: string, title: string) => void;
   moveEarlierConversation: (id: string) => void;
   deleteHostConversation: (id: string, stopRunning?: boolean, recovery?: boolean) => void;
-  undoDeleteConversation: () => void;
 
   // ── Internal: message handler ──
   handleExtensionMessage: (message: ExtensionMessage) => void;
@@ -839,7 +837,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     earlierConversations: [],
     pinnedConversationIds: [],
     conversationStoreNotice: null,
-    pendingUndo: null,
 
     promptQueues: {},
     commentTasks: {},
@@ -1957,16 +1954,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       });
     },
 
-    undoDeleteConversation: () => {
-      const pending = get().pendingUndo;
-      if (!pending) return;
-      postConversationRequest({
-        type: 'conversation/undo-delete',
-        undoToken: pending.undoToken,
-        ...(pending.recovery ? { recovery: true } : {}),
-      });
-    },
-
     /**
      * `/clear` — explicitly throw the current thread away.
      *
@@ -2187,7 +2174,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if ((message.operation === 'conversation/get' || message.operation === 'conversation/undo-delete') && data.conversation) {
             if (data.recovery === true) {
               postConversationRequest({ type: 'conversation/list' });
-              set({ conversationStoreNotice: null, pendingUndo: null });
+              set({ conversationStoreNotice: null });
               break;
             }
             const projection = data.conversation as ConversationProjectionV1;
@@ -2200,7 +2187,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               activeConversationId,
               showHistoryPanel: false,
               conversationStoreNotice: null,
-              ...(message.operation === 'conversation/undo-delete' ? { pendingUndo: null } : {}),
             });
             focusComposerSoon();
             postConversationRequest({ type: 'conversation/list' });
@@ -2210,8 +2196,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (message.operation === 'conversation/delete' && typeof data.conversationId === 'string' && typeof data.undoToken === 'string') {
             const current = get();
             const recovery = data.recovery === true;
-            const source = recovery ? current.earlierConversations : current.hostConversations;
-            const title = source.find((item) => item.conversationId === data.conversationId)?.title ?? 'Conversation';
             const conversations = { ...current.conversations };
             delete conversations[data.conversationId];
             const nextSummary = recovery ? undefined : current.hostConversations.find((item) => item.conversationId !== data.conversationId);
@@ -2220,7 +2204,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               conversations,
               activeConversationId: current.activeConversationId === data.conversationId ? nextOpenId : current.activeConversationId,
               pinnedConversationIds: current.pinnedConversationIds.filter((id) => id !== data.conversationId),
-              pendingUndo: { undoToken: data.undoToken, title, recovery },
             });
             postConversationRequest({ type: 'conversation/list' });
             if (!nextOpenId && nextSummary) postConversationRequest({ type: 'conversation/get', conversationId: nextSummary.conversationId });

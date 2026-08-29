@@ -97,6 +97,7 @@ import { LegacyConversationMigrator } from '../conversations/LegacyConversationM
 import { isConversationRequestMessage } from '../conversations/protocol';
 import { resolveProjectScope } from '../conversations/projectScope';
 import { ConversationTitleGenerator } from '../conversations/ConversationTitleGenerator';
+import { showConversationDeleteNotification } from '../conversations/conversationDeleteNotification';
 import {
   decideRuntimeAttachmentCapacity,
   PARALLEL_RUNTIME_ATTACHMENT_LIMIT,
@@ -216,7 +217,38 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (message) => {
       if (isConversationRequestMessage(message)) {
         const response = await this._conversationController.handle(message);
-        await webviewView.webview.postMessage(response);
+        try {
+          await webviewView.webview.postMessage(response);
+        } finally {
+          if (message.type === 'conversation/delete'
+            && response.ok
+            && 'undoToken' in response.data
+            && 'title' in response.data) {
+            const deletion = response.data;
+            void showConversationDeleteNotification({
+              undoToken: deletion.undoToken,
+              title: deletion.title,
+              recovery: deletion.recovery === true,
+            }, {
+              showInformationMessage: (text, action) => vscode.window.showInformationMessage(text, action),
+              showWarningMessage: (text) => vscode.window.showWarningMessage(text),
+              restore: (undoToken, recovery) => this._conversationController.handle({
+                type: 'conversation/undo-delete',
+                requestId: `native-undo-${randomBytes(12).toString('hex')}`,
+                undoToken,
+                ...(recovery ? { recovery: true } : {}),
+              }),
+              dismiss: (undoToken) => this._conversationController.dismissDeleteUndo(undoToken),
+              deliver: async (restoreResponse) => {
+                await this._view?.webview.postMessage(restoreResponse);
+              },
+            }).catch((error: unknown) => {
+              void vscode.window.showWarningMessage(
+                `Could not offer Undo for the deleted conversation: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            });
+          }
+        }
         return;
       }
       switch (message.type) {

@@ -89,6 +89,10 @@ export class ConversationController {
   private readonly randomId: () => string;
   private disposed = false;
 
+  dismissDeleteUndo(undoToken: string): void {
+    this.dependencies.store.dismissUndo(undoToken);
+  }
+
   constructor(private readonly dependencies: ConversationControllerDependencies) {
     this.now = dependencies.now ?? (() => new Date());
     this.randomId = dependencies.randomId ?? randomUUID;
@@ -174,7 +178,11 @@ export class ConversationController {
           revision: record.revision,
           bindingGeneration: record.bindingGeneration,
         });
-        return result(request, { ...deleted, ...(request.recovery === true ? { recovery: true } : {}) });
+        return result(request, {
+          ...deleted,
+          title: record.title,
+          ...(request.recovery === true ? { recovery: true } : {}),
+        });
       }
       if (request.type === 'conversation/undo-delete') {
         const expectedScopeId = request.recovery === true
