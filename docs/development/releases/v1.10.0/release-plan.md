@@ -147,7 +147,7 @@ These are not hidden feature-complete exceptions. They require the exact candida
 - Sprint 115 is product-independent from Sprints 109–114 and was rebased onto Sprint 113 because both touch the webview bundle and release documents. Jarmo approved its D1–D12 contract; implementation, focused live evidence, review hardening, and PR #222 merge are complete, while the named release-candidate manual matrix remains a gate.
 - The ACP SDK `0.22.1` → `1.4.0` jump is a major compatibility gate; production pins do not change before the audit and Jarmo decision.
 - Folder rename/move cannot be inferred safely from a path alone. The release must provide an explicit relink/recovery path instead of probabilistic project matching.
-- Preflight snapshot 2026-08-21 passed with warnings: the working tree was dirty and origin synchronization could not be verified, so preflight must be rerun on clean synchronized `main`; no Developer ID certificate was available, which blocks signed Gate 1 artifacts outright. Planning is not blocked.
+- The 2026-08-21 preflight warnings are retired: `./scripts/release-preflight.sh` passed on clean synchronized merged `main` on 2026-08-29 with the Developer ID signing certificate present. Exact-artifact signing, packaging, and mounted-DMG verification remain Gate 1 work.
 
 ## Risk Register
 

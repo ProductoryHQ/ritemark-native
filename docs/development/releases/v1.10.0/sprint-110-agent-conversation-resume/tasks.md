@@ -65,7 +65,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Save fresh-profile Claude → Codex handoff/restart evidence and list the remaining unexercised live matrix explicitly.
 - [x] Verify every checked task against branch code/diff and demote unsupported `[x]`.
 - [x] Run `./scripts/validate-qa.sh` on the final Sprint 110 branch.
-- [ ] Run release preflight on clean synchronized `main` after all v1.10 sprints merge.
+- [x] Run release preflight on clean synchronized `main` after all v1.10 sprints merge (passed 2026-08-29 after focused RC fixes merged).
 - [x] Update `docs/development/architecture.md` with `Last updated` on/after branch creation date, plus user docs, `docs/CHANGELOG.md`, v1.10.0 release notes and test checklist.
 - [x] Run the Sprint 110 fresh-profile migration+resume canary and retain three release screenshots.
 - [x] Update the release tracker and Sprint 110 issue #204 with PR #211, QA, review, and explicit release-matrix deferrals.
