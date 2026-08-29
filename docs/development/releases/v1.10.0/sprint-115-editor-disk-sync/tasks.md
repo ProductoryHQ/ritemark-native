@@ -11,8 +11,8 @@ Branch/worktree and Phase 0 decision gates satisfied 2026-08-24.
 - [x] Reproduce the invisible focused-editor agent write on the exact v1.9.0 binary; capture disk bytes, inferred model state through Save, visible bytes, focus state, and timestamps in [`research/v1.9.0-live-reproduction.md`](./research/v1.9.0-live-reproduction.md).
 - [x] Reproduce ordinary local typing/autosave lag and confirm the current external-change action activates while disk bytes remain unchanged; preserve the evidence in [`research/v1.9.0-live-reproduction.md`](./research/v1.9.0-live-reproduction.md).
 - [x] Prove both in the exact released binary and the legacy transition model that the former ten-second auto-reload can replace unsaved work; preserve only disposable evidence and the safe executable fixture in [`research/phase0-sync-model.test.ts`](./research/phase0-sync-model.test.ts), never real user data.
-- [ ] Trace watcher, `onDidChangeTextDocument`, poll, autosave, host send, webview receive, TipTap apply, and ACK timing in folder and standalone-file modes.
-- [ ] Audit Markdown, CSV, multiple-view, panel hide/show, and close/reopen lifecycles.
+- [ ] **Gate 1 deferral:** repeat watcher, `onDidChangeTextDocument`, poll, autosave, host send, webview receive, TipTap apply, and ACK timing on the exact packaged candidate in folder and standalone-file modes; deterministic and focused live paths already pass.
+- [ ] **Gate 1 deferral:** repeat the Markdown, CSV, multiple-view, panel hide/show, and close/reopen lifecycle matrix on the exact packaged candidate; focused dev evidence is retained in [`research/phase-1-live-smoke.md`](./research/phase-1-live-smoke.md).
 - [x] Spike the Node-free shared protocol location and runtime validator; verify host TypeScript, webview TypeScript, and a production Vite build. The temporary source spike was removed after evidence capture.
 - [x] Freeze the recommended epoch/revision identity, 750 ms / 2.5 s / 5 s ACK budget, three-second poll fallback, and three distinct hash rules in [`research/phase-0-decision.md`](./research/phase-0-decision.md).
 - [x] Freeze transactional ProseMirror selection mapping, clamped fallback, scroll behavior, and the read-only conflict snapshot/diff mechanism.
@@ -30,7 +30,7 @@ Branch/worktree and Phase 0 decision gates satisfied 2026-08-24.
 - [x] Implement clean-external, local-only, and true-conflict classification without the 20-hash heuristic.
 - [x] Ensure multiple views share URI state and dispose independently.
 - [x] Add content-free diagnostic transition logging.
-- [ ] Add pure coordinator/protocol tests with fake disk, view, and clock.
+- [x] Add pure coordinator/protocol tests with fake disk, view, and clock (`state.test.ts`, `protocol.test.ts`, and `delivery.test.ts`; included in the 26/26 focused pass).
 
 ## Phase 2 — Webview Apply and ACK (R2, R3, R7)
 
@@ -42,7 +42,7 @@ Branch/worktree and Phase 0 decision gates satisfied 2026-08-24.
 - [x] Emit `document:applied` only after serialized visible content matches the target identity.
 - [x] Prevent host-applied revisions from echoing as local edit messages.
 - [x] Reject duplicate, stale, previous-epoch, and cross-URI messages.
-- [ ] Add reducer/component tests for focused apply, partial payload prevention, ACK, retry, and stale ordering.
+- [x] Add reducer/component tests for focused apply, partial payload prevention, ACK, retry, and stale ordering (`documentSyncReducer.test.ts` plus host delivery/protocol coverage; included in the 26/26 focused pass).
 
 ## Phase 3 — Conflict Resolution and Header Truth (R4, R5, R6)
 
@@ -54,16 +54,16 @@ Branch/worktree and Phase 0 decision gates satisfied 2026-08-24.
 - [x] Implement explicit **Use disk version** with confirmed local-discard behavior and ACK.
 - [x] Remove the ten-second automatic reload and prove no replacement timer remains.
 - [x] Remove `lastSentToWebview`/bounded self-hash behavior after coordinator coverage is complete.
-- [ ] Complete keyboard, screen-reader, tooltip, light/dark, high-contrast, and 200%-zoom checks.
+- [ ] **Gate 1 deferral:** repeat keyboard, screen-reader, tooltip, light/dark, high-contrast, and 200%-zoom checks on the exact packaged candidate.
 
 ## Phase 4 — Integration and Regression Matrix (R1–R8)
 
-- [ ] Run all scenarios in `scenarios.md` for Markdown and CSV.
-- [ ] Test external writes from Codex, Claude/ACP where available, a generic process, and a formatter.
-- [ ] Test focused/blurred editors, continuous typing, delayed autosave, burst writes, duplicate messages, lost ACK, and retry exhaustion.
-- [ ] Test folder workspace, multi-root where applicable, and standalone-file windows.
-- [ ] Test initial open, panel hide/show, multiple views, dispose-one-view, close/reopen, and previous-epoch messages.
-- [ ] Verify front matter, properties, comments, relative images, CSV rows/cells, undo/recovery, and save semantics.
+- [ ] **Gate 1 deferral:** repeat every applicable `scenarios.md` Markdown and CSV row on the exact packaged candidate; the focused deterministic and RunDev matrix passes.
+- [ ] **Gate 1 deferral:** repeat exact Codex, Claude/ACP, generic-process, and formatter-origin writes on the packaged candidate.
+- [ ] **Gate 1 deferral:** inject focused/blurred, continuous typing, delayed autosave, burst writes, real lost ACK/retry exhaustion, and rapid/large-file cases on the packaged candidate.
+- [ ] **Gate 1 deferral:** repeat folder, multi-root, and standalone-file windows on the packaged candidate.
+- [ ] **Gate 1 deferral:** repeat initial open, panel hide/show, multiple views, dispose-one-view, close/reopen, and previous-epoch cases on the packaged candidate.
+- [ ] **Gate 1 deferral:** repeat front matter, properties, comments, relative images, CSV rows/cells, Undo/recovery, rename/delete/save-as, formatter, and save semantics on the packaged candidate.
 - [x] Wait beyond the former ten-second danger window during a true conflict and prove local bytes remain intact.
 - [x] Run the Ritemark dev smoke workflow and attach content-free evidence in [`research/phase-1-live-smoke.md`](./research/phase-1-live-smoke.md).
 
@@ -77,5 +77,5 @@ Branch/worktree and Phase 0 decision gates satisfied 2026-08-24.
 - [x] Run `./scripts/validate-qa.sh` on the sprint branch (pass 2026-08-24).
 - [x] Complete adversarial QA/code review and resolve the initial-dirty, conflict-time queued edit, unique resolution-ACK, stale full-document replay, cross-field payload, stale edit-result, full-replacement Undo, and post-Compare focus findings.
 - [x] Update Sprint 115 issue/tracker and link the implementation/QA evidence in [issue #221](https://github.com/ProductoryHQ/ritemark-native/issues/221#issuecomment-5400936217).
-- [ ] Merge the dedicated sprint PR before v1.10.0 release-candidate packaging.
-- [ ] Verify on the merged release candidate that agent writes are visible without reopen and no local edit can be timer-discarded.
+- [x] Merge the dedicated sprint PR before v1.10.0 release-candidate packaging (PR #222 admin-merged as `b889dcd` on 2026-08-25).
+- [ ] **Gate 1 deferral:** verify on the exact merged packaged candidate that agent writes are visible without reopen and no local edit can be timer-discarded.

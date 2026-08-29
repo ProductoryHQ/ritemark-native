@@ -2,11 +2,11 @@
 
 This checklist accumulates release evidence across Sprints 109–115 and focused release-candidate bug fixes.
 
-## Current candidate record — 2026-08-25
+## Current candidate record — 2026-08-29
 
-- Source under review: `codex/v1.10.0-rc-prep` / PR #223; the Gate 1 artifact must be rebuilt from its merged `main` commit.
+- Source under review: clean merged `main` after focused RC fixes and release-gate reconciliation; record the exact merge commit when the Gate 1 build starts.
 - Repository QA, release preflight, exact arm64 runtime verification, production build, bundled-extension checks, and Developer ID preview-app signing pass.
-- Signed/un-notarized Gate 1 DMG: **not yet produced**. Finder's decorative layout timed out; the recorded deterministic `ditto`/`hdiutil` path is approved if Finder remains unresponsive, subject to every mounted-image hard check.
+- Signed/unnotarized Gate 1 DMG: **not yet produced**. Finder's decorative layout timed out previously; the recorded deterministic `ditto`/`hdiutil` path is approved if Finder remains unresponsive. Before human testing, the DMG must pass Developer ID signature, mount, content, architecture, version, timestamp, and hash checks. After Jarmo approves it and the full 60-minute no-new-bug window elapses, notarize/staple the same build and complete final notarization, Gatekeeper, mount, and published-hash verification.
 - Production dependency security: **pass** — extension and webview `npm audit --omit=dev` each report zero findings; SheetJS is pinned to the official `0.20.3` tarball and targeted spreadsheet/Markdown/Mermaid checks pass.
 
 ## Trusted Windows installation (Sprint 114)
@@ -48,6 +48,7 @@ This checklist accumulates release evidence across Sprints 109–115 and focused
 - [x] Live restart: the same canonical Claude + Codex transcript and context-restored boundary reappeared after a full desktop restart.
 - [ ] Live authenticated restart: verify native semantic recall through the production UI for each available runtime.
 - [ ] Failure injection: auth loss/runtime unavailable and ambiguous crash after transport but before final checkpoint.
+- [ ] Verify reduced-motion conversation continuation and boundary UI on the exact packaged arm64 Gate 1 candidate.
 
 These two live rows are intentionally retained for the post-Sprint 111/final release matrix because Sprint 111 changes the exact runtime binaries. Sprint 110 covers their deterministic adapter/controller policy paths and does not claim unrun production-UI evidence.
 
@@ -114,7 +115,8 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] Exact ACK, wrong receipt, bounded 750 ms / 2.5 s / 5 s retry, stale revision, cross-session validation, dirty-initial-open, EOL/BOM, conflict-time typing, and visible-view resolution invariants pass deterministically.
 - [ ] Force a real visible-webview receipt loss through the final release build and verify the five-second **Retry document update** path end to end.
 - [ ] Repeat light/dark/high-contrast, keyboard-only, spoken screen-reader, and 200% zoom checks on the final release build.
-- [ ] Repeat rename/delete/save-as, formatter, multi-root, rapid/large-file, previous-epoch, and exact Claude/Codex/ACP-origin write rows on the final release build.
+- [ ] Repeat rename/delete/save-as, generic-process and formatter writes, focused/blurred editors, continuous typing, delayed autosave, burst writes, multi-root/standalone, rapid/large-file, previous-epoch, and exact Claude/Codex/ACP-origin rows on the final release build.
+- [ ] Verify front matter, properties, comments, relative images, CSV rows/cells, Undo/recovery, and save semantics remain intact through packaged-candidate reconciliation.
 - [ ] Inject a non-cooperating write during Keep-local resolution and record/accept the explicit last-writer boundary; local filesystem APIs provide no atomic content-hash CAS beyond the implemented immediate validator check and post-write verification.
 
 ## Automated gates
@@ -128,7 +130,8 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] Sprint 111 exact-manifest validator, validator mutation tests, extension compile, focused runtime suites, and deterministic extension suite.
 - [x] Sprint 112 official QA, focused effort/runtime suites, conversation regressions, extension compile, and webview typecheck/build (2026-08-24).
 - [x] Sprint 115 focused state/protocol/delivery/reducer suite (26/26), extension compile, webview typecheck, production bundle, final-bundle Compare→Keep-local→Undo smoke, and official repository QA (final post-review automation rerun 2026-08-25).
-- [ ] Release preflight and final migration+resume canary after all v1.10.0 sprints merge.
+- [x] Release preflight passes on clean synchronized `main` after all v1.10.0 sprints and focused RC fixes merge (2026-08-29).
+- [ ] Final packaged migration+resume canary passes on the exact arm64 Gate 1 candidate.
 
 ## Remaining release scope
 

@@ -1,6 +1,6 @@
 # Release Plan — v1.10.0 Durable Agent Conversations + Reliable Editing
 
-**Status:** Release candidate preparation — Sprints 109–115 repository work are merged; reviewed dependency hardening closes all production npm findings, and the focused Claude model-alias RC bug fix has passed automated validation before the candidate rebuild. The earlier signed arm64 app is preview-only; a fresh clean-`main` build, signed/un-notarized Gate 1 DMG, Sprint 114 immutable hosting/Store/SAC-On/exact-hash work, and residual release-level manual validation remain open.<br>
+**Status:** Release candidate — Sprints 109–115 and the focused RC bug fixes are merged; reviewed dependency hardening closes all production npm findings; merged `main` passes repository QA and release preflight. The earlier signed arm64 app is preview-only. A fresh clean-`main` build, signed/unnotarized Gate 1 DMG, mounted-image verification, human validation, the 60-minute hardening period, post-approval notarization/stapling, and Sprint 114 immutable hosting/Store/SAC-On/exact-hash work remain open under the explicit gate deferrals below.<br>
 **Target:** v1.10.0<br>
 **GitHub milestone:** [v1.10.0](https://github.com/ProductoryHQ/ritemark-native/milestone/8) — created 2026-08-21<br>
 **Release type:** Full app distribution with extension-scoped implementation; deliberately not an `1.9.0-ext.N` lane<br>
@@ -94,21 +94,30 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 ## Feature-Complete Definition
 
 - [x] Sprint 109–115 issues are Done and merged, except #212 which intentionally remains open as the Sprint 114 external release-gate tracker; all are linked to milestone v1.10.0.
-- [ ] No unresolved release blocker remains; every exception is named, justified, and explicitly deferred.
-- [ ] Restart, reload, immediate-quit, delete, migration, corrupt-record, multi-project, multi-root, and no-folder matrices pass.
-- [ ] No conversation is silently lost, duplicated, pruned, or exposed in another project.
-- [ ] Monotonic migration cutover keeps host-only conversations readable on flag-off; no dual-write split-brain exists.
-- [ ] Reopen distinguishes native runtime resume from transcript restoration and context unavailable.
-- [ ] Claude, Codex, and bundled OpenCode have measured continuation decisions; unsupported paths use tested fallback behavior.
-- [ ] The permanent conversation rail keeps New / Pinned / automatic active-and-recent / otherwise-absent current / All conversations order, a selection-neutral deduplicated canonical-ID union, 56:40 rail-to-target proportion, shared chat-bubble visuals, explicit Pin/Unpin, and reliable full-title tooltips through Sprint 110 resume/fallback.
-- [ ] Final exact runtime/SDK pins, checksums, licenses, native-platform artifacts, existing behavior, and Sprint 110 continuation conclusions are verified after Sprint 111.
-- [ ] Composer effort uses Auto by default, sends only supported explicit levels, snapshots queued/running turns correctly, preserves conversation isolation, and remains honest for OpenCode capability gaps.
-- [ ] Transcribe Insights accepts any explicitly committed audience language, resolves Auto honestly, preserves full Unicode speaker names and source quotes, and creates collision-safe separate Markdown snapshots without mutating the transcript.
-- [ ] Agent/external writes become visible in an open focused Markdown or CSV editor without close/reopen, and only a matching view ACK marks the revision applied.
-- [ ] Local autosave lag never shows an external-change action; conflicts preserve both versions and no timer can discard local edits.
-- [ ] `docs/development/architecture.md` documents `src/conversations/`, typed protocols, runtime continuation, final runtime/SDK baseline, the shared thinking-effort contract, the Transcribe Insights output boundary, and editor–disk synchronization.
-- [ ] User documentation, changelog, v1.10.0 release notes, test checklist, runtime-version evidence, effort visual evidence, Insights evidence, editor-sync evidence, and migration canary evidence are complete.
-- [ ] `./scripts/validate-qa.sh` and the release-specific migration+resume+runtime+effort+Insights+editor-sync canary pass on merged release scope.
+- [x] No unresolved repository implementation blocker remains; packaged-candidate, platform, and Store exceptions are named and explicitly deferred to the gates below.
+- [x] Restart, reload, immediate-quit, delete, migration, corrupt-record, multi-project, multi-root, and no-folder automated matrices plus the documented live canaries pass.
+- [x] No conversation is silently lost, duplicated, pruned, or exposed in another project in the deterministic and live evidence retained by Sprints 109–110.
+- [x] Monotonic migration cutover keeps host-only conversations readable on flag-off; no dual-write split-brain exists.
+- [x] Reopen distinguishes native runtime resume from transcript restoration and context unavailable.
+- [x] Claude, Codex, and bundled OpenCode have measured continuation decisions; unsupported paths use tested fallback behavior.
+- [x] The permanent conversation rail keeps New / Pinned / automatic active-and-recent / otherwise-absent current / All conversations order, a selection-neutral deduplicated canonical-ID union, 56:40 rail-to-target proportion, shared chat-bubble visuals, explicit Pin/Unpin, and reliable full-title tooltips through Sprint 110 resume/fallback.
+- [x] Final exact runtime/SDK pins, checksums, licenses, native-platform artifacts, existing behavior, and Sprint 110 continuation conclusions are verified after Sprint 111.
+- [x] Composer effort uses Auto by default, sends only supported explicit levels, snapshots queued/running turns correctly, preserves conversation isolation, and remains honest for OpenCode capability gaps.
+- [x] Transcribe Insights accepts any explicitly committed audience language, resolves Auto honestly, preserves full Unicode speaker names and source quotes, and creates collision-safe separate Markdown snapshots without mutating the transcript.
+- [x] Agent/external writes become visible in an open focused Markdown or CSV editor without close/reopen, and only a matching view ACK marks the revision applied.
+- [x] Local autosave lag never shows an external-change action; conflicts preserve both versions and no timer can discard local edits.
+- [x] `docs/development/architecture.md` documents `src/conversations/`, typed protocols, runtime continuation, final runtime/SDK baseline, the shared thinking-effort contract, the Transcribe Insights output boundary, and editor–disk synchronization.
+- [x] User documentation, changelog, v1.10.0 release notes, test checklist, runtime-version evidence, effort visual evidence, Insights evidence, editor-sync evidence, and migration canary evidence are present; the checklist keeps final packaged-candidate evidence open until it is executed.
+- [x] `./scripts/validate-qa.sh` and release-specific automated migration/resume/runtime/effort/Insights/editor-sync suites pass on merged release scope; packaged live replay remains a Gate 1 check.
+
+### Explicit RC Gate Deferrals
+
+These are not hidden feature-complete exceptions. They require the exact candidate artifact and therefore remain open in [`docs/releases/v1.10.0/TEST-CHECKLIST.md`](../../../releases/v1.10.0/TEST-CHECKLIST.md):
+
+- **Gate 1 / arm64:** packaged Claude picker/mismatch replay; authenticated restart and failure injection; reduced-motion visual verification; residual Insights positive custom-language generation plus negative/accessibility/theme rows; editor-sync receipt-loss, focused/blurred, continuous typing, delayed autosave, burst writes, front-matter/properties/comments/images/CSV integrity, accessibility/theme/zoom, generic-process/formatter/exact-runtime origins, multi-root/standalone, rapid/large-file, lifecycle, previous-epoch, and non-cooperating Keep-local race-injection rows; signed/unnotarized DMG install, signature, mount, content, architecture, version, timestamp, and hash verification. Jarmo tests that signed/unnotarized candidate; only after approval and the full 60-minute no-new-bug window may it be notarized/stapled and receive final Gatekeeper verification.
+- **Gate 2 / x64 + Windows:** signed/unnotarized Intel DMG and verified Windows installer testing from the exact approved source commit. Only after approval and the full x64 60-minute no-new-bug window may the x64 DMG be notarized/stapled; any rebuild resets the corresponding clock and approval.
+- **Sprint 114 external gate:** immutable download hosting, Partner Center preprocessing/certification, Kristiina's Smart App Control On run, Store-origin install, and Jarmo's exact-hash approval remain tracked in [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212). They are part of Windows Gate 2 and block final publication, not construction or arm64 Gate 1 testing of the macOS candidate.
+- **Publication:** GitHub release and canonical update-feed publication remain blocked until [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212) is closed by the complete Sprint 114 external matrix, Jarmo gives final Gate 2 approval for the exact hashes, and all artifacts pass final verification.
 
 ## Delivery Sequence and Gates
 
@@ -122,10 +131,10 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 8. **Sprint 115:** rebase the dedicated branch onto merged Sprint 113; freeze the revision/conflict contract; implement host coordination, view ACK, and non-destructive resolution; complete Markdown/CSV QA and architecture docs; PR and merge.
 9. **Feature complete:** close/defer every release item explicitly; complete QA, docs, and the migration+resume+runtime+effort+Insights+editor-sync canary.
 10. **Release candidate:** rerun release preflight on clean, synchronized `main`; bump both branding/app and bundled extension versions; push the version commit before any tag.
-11. **arm64 candidate:** build/sign the arm64 DMG without notarizing it and generate the test checklist; Jarmo installs/tests that exact un-notarized DMG and explicitly approves it. Wait at least 60 minutes from its build with no new bug; any rebuild resets the arm64 clock and approval.
-12. **Gate 1 and tag:** notarize/staple the approved arm64 DMG, verify notarization, signature, and mounted-app hard checks, then clear technical Gate 1. Make the development repository private before pushing the tag. Only after Gate 1 may the already-pushed version commit be tagged and pushed.
-13. **x64/Windows candidate:** manually dispatch the x64 and Windows workflows against that exact tag, then download/sign/package the x64 DMG without notarizing it and prepare the Windows installer. After both workflows complete, restore the development repository to public. Jarmo tests both platform candidates and gives final Gate 2 approval. Wait at least 60 minutes from the x64 DMG build with no new bug; any x64 rebuild resets its clock and Gate 2 approval.
-14. **Final verification and publication:** notarize/staple/verify the Gate 2-approved x64 DMG, including signature and mounted-app hard checks; verify the Windows installer and all release assets; then regenerate, verify, and publish the canonical update feed together with the matching binaries. No publication occurs before final Gate 2 approval and verification.
+11. **arm64 candidate and Gate 1:** build/sign the arm64 app and DMG without notarizing it; mount and verify app/DMG signatures, content, architecture, version, timestamps, and SHA-256; then generate/finalize the test checklist. The 60-minute hardening clock starts from those signed DMG bytes. Jarmo installs/tests that exact signed/unnotarized candidate and explicitly approves it; any rebuild resets the clock and approval.
+12. **arm64 hardening, notarization, and CI dispatch:** only after Gate 1 approval and the full 60-minute no-new-bug window have both completed, notarize/staple that arm64 build and verify notarization, signatures, Gatekeeper, mounted content, version, architecture, timestamps, and the new final SHA-256. Then make the development repository private and manually dispatch the `build-macos-x64.yml` and `build-windows.yml` workflows against the exact approved source commit; tag pushes do not trigger these workflows.
+13. **x64/Windows candidate, Sprint 114 external matrix, and Gate 2:** download/sign/package the x64 DMG without notarizing it and verify the signed Windows installer; after the Windows workflow completes, restore the development repository to public. The 60-minute x64 hardening clock starts from the signed DMG bytes. Publish the exact verified Windows bytes at the immutable versioned URL, submit that same SHA-256 to Partner Center, pass preprocessing/certification, Kristiina's clean Windows 11 SAC-On and Store-origin install matrix, and record the Store/direct-download hash match in [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212). Jarmo tests the exact signed/unnotarized Intel DMG and verified Windows installer and approves those candidates. Only after the full x64 no-new-bug window elapses may #212 close and final Gate 2 approval be recorded; any rebuild resets the corresponding clock, external evidence, and approval.
+14. **Final notarization and publication:** only after #212 is closed and final Gate 2 approval is recorded, notarize/staple the x64 DMG and verify notarization, signatures, Gatekeeper, mounted content, version, architecture, timestamps, and final SHA-256. Tag the already-pushed source commit, then regenerate, verify, and publish the canonical update feed together with the matching GitHub release assets. No publication occurs before the complete Sprint 114 external matrix, hardening windows, exact-hash approvals, and final verification.
 
 ## Dependencies and Blockers
 
@@ -136,23 +145,23 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - Sprint 112 depends on Sprint 111’s exact final pins and effort capability audit; it also depends on Sprint 109 durable metadata and Sprint 110 no-duplicate ambiguous-dispatch behavior.
 - Sprint 113 had no product dependency on Sprint 112 and was approved to implement in parallel. It merged at `18c6175` with the combined webview bundle regenerated. Authenticated known-language generation, measured latency, Create mutation, QA, CI, and review pass; residual broad manual accessibility/theme/negative-dialog rows remain release QA by explicit owner decision.
 - Sprint 115 is product-independent from Sprints 109–114 and was rebased onto Sprint 113 because both touch the webview bundle and release documents. Jarmo approved its D1–D12 contract; implementation, focused live evidence, review hardening, and PR #222 merge are complete, while the named release-candidate manual matrix remains a gate.
-- The ACP SDK `0.22.1` → `1.4.0` jump is a major compatibility gate; production pins do not change before the audit and Jarmo decision.
+- The ACP SDK `0.22.1` → `1.4.0` compatibility gate was retired in Sprint 111 by the approved exact-pin audit, adapter tests, and native-platform matrix.
 - Folder rename/move cannot be inferred safely from a path alone. The release must provide an explicit relink/recovery path instead of probabilistic project matching.
-- Preflight snapshot 2026-08-21 passed with warnings: the working tree was dirty and origin synchronization could not be verified, so preflight must be rerun on clean synchronized `main`; no Developer ID certificate was available, which blocks signed Gate 1 artifacts outright. Planning is not blocked.
+- The 2026-08-21 preflight warnings are retired: `./scripts/release-preflight.sh` passed on clean synchronized merged `main` on 2026-08-29 with the Developer ID signing certificate present. Exact-artifact signing, packaging, and mounted-DMG verification remain Gate 1 work.
 
 ## Risk Register
 
 | Risk | Severity | Retirement plan | Status |
 |---|---|---|---|
-| Irreversible or cross-project legacy migration | High | Copy-first, idempotent migration; quarantine ambiguous records; preserve legacy source until verification | Open — Sprint 109 |
-| Accepted prompt lost on crash | High | Persist before runtime dispatch; lifecycle checkpoint tests with forced disposal | Open — Sprint 109 |
+| Irreversible or cross-project legacy migration | High | Copy-first, idempotent migration; quarantine ambiguous records; preserve legacy source until verification | Mitigated in Sprint 109; deterministic migration matrix passes and the packaged migration canary remains Gate 1 |
+| Accepted prompt lost on crash | High | Persist before runtime dispatch; lifecycle checkpoint tests with forced disposal | Retired in Sprint 109 by persist-before-dispatch and immediate-quit/lifecycle coverage |
 | Native provider session expired or invalid | High | Capability audit, validated resume descriptor, bounded disclosed fallback | Retired in Sprint 110; reverify after Sprint 111 runtime refresh |
 | UI claims continuation while runtime forgot | High | Explicit continuation state and inline context boundary | Retired in Sprint 110; final runtime matrix retained |
-| Attachment/tool history causes storage or prompt growth | Medium | Persist attachment metadata only; omit binaries/tool traces from fallback context | Open |
-| Concurrent writes corrupt index/records | Medium | Serialized store operations, temp write + atomic rename, corrupt-record isolation | Open — Sprint 109 |
-| Risky migration ships broadly | Medium | Experimental/default-true kill switch, monotonic host-readable cutover, release-specific migration canary | Open |
-| Runtime refresh changes protocol or invalidates continuation | High | Exact audit, adapter contract fixtures, native-platform probes, rerun Sprint 110 matrix | Open — Sprint 111 |
-| Claude binary and SDK drift | High | Lockstep exact pins and hard parity check | Open — Sprint 111 |
+| Attachment/tool history causes storage or prompt growth | Medium | Persist attachment metadata only; omit binaries/tool traces from fallback context | Retired in Sprint 110 by bounded context-pack and attachment/tool exclusion coverage |
+| Concurrent writes corrupt index/records | Medium | Serialized store operations, temp write + atomic rename, corrupt-record isolation | Mitigated in Sprint 109; serialization, atomic-write, and corrupt-record tests pass |
+| Risky migration ships broadly | Medium | Experimental/default-true kill switch, monotonic host-readable cutover, release-specific migration canary | Mitigated in Sprint 109; packaged migration canary remains Gate 1 |
+| Runtime refresh changes protocol or invalidates continuation | High | Exact audit, adapter contract fixtures, native-platform probes, rerun Sprint 110 matrix | Retired in Sprint 111 by approved exact pins, adapter suites, and arm64/x64/Windows matrix |
+| Claude binary and SDK drift | High | Lockstep exact pins and hard parity check | Retired in Sprint 111 by manifest parity validator and native-platform matrix |
 | Composer exposes unsupported effort or cross-binds queued turns | High | Host capability truth, turn snapshot before queue/dispatch, model/runtime/concurrency matrix | Retired in Sprint 112 |
 | OpenCode effort requires eager runtime startup | High | Preserve lazy open/select; show controls only after ACP advertises `thought_level` | Retired in Sprint 112 |
 | Insights snapshot aliases or overwrites the transcript/existing content | High | Canonical host validation, Windows filename rules, exclusive create, partial-write cleanup, and deterministic collision tests | Automated evidence passes — Sprint 113; manual UI pending |
@@ -212,7 +221,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 
 ## Planning Approval
 
-- [ ] Jarmo approves the expanded release thesis and seven-sprint sequence.
+- [x] Jarmo approves the expanded release thesis, seven-sprint sequence, and RC execution mandate (latest confirmation 2026-08-29).
 - [x] Jarmo approves Sprint 109 SDD artifacts and Phase 0 start (2026-08-22).
 - [x] Jarmo approves Sprint 110 SDD artifacts and Phase 0 decisions (2026-08-23).
 - [x] Jarmo approves Sprint 111 SDD artifacts, exact target pins, and protocol plan (2026-08-24).
