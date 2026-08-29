@@ -57,8 +57,8 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 - [x] True local/disk divergence preserves both versions and offers **Compare changes**, **Keep my version**, and **Use disk version**.
 - [x] Older, duplicate, previous-epoch, and cross-URI messages cannot replace a newer visible revision.
 - [x] The header action remains visible only for an unresolved external apply/conflict and clears only after confirmed resolution.
-- [ ] Markdown front matter/properties/comments/images and CSV rows/cells survive reconciliation unchanged except for the chosen revision.
-- [ ] Folder workspace, standalone-file, rapid-write, multiple-view, and close/reopen matrices pass.
+- [ ] **Gate 1 deferral:** on the exact packaged candidate, verify Markdown front matter/properties/comments/images and CSV rows/cells survive reconciliation unchanged except for the chosen revision; focused deterministic/dev evidence already passes.
+- [ ] **Gate 1 deferral:** on the exact packaged candidate, repeat folder workspace, standalone-file, rapid-write, multiple-view, and close/reopen matrices.
 - [x] `docs/development/architecture.md`, changelog, release notes, test evidence, focused tests, and `./scripts/validate-qa.sh` are complete.
 
 ## Dependencies and Gates
