@@ -398,9 +398,9 @@ export class ConversationStore {
         }
         throw this.storageError(`Could not remove conversation ${conversationId}`, error);
       }
-      // The webview exposes one Undo snackbar. Expire the previous token when a
-      // newer deletion replaces it so memory and reserved color slots stay
-      // bounded to the action the user can actually recover.
+      // The host exposes one reversible native deletion notification at a time.
+      // Expire the previous token when a newer deletion replaces it so memory
+      // and reserved color slots stay bounded to the recoverable action.
       this.undo.clear();
       this.undo.set(undoToken, { record, tombstone });
       await this.updateIndexBestEffort();

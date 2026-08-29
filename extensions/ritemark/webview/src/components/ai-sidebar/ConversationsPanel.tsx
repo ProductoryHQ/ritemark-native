@@ -48,6 +48,10 @@ interface DeleteTarget {
   recovery: boolean;
 }
 
+// Radix portals into the full webview, which also contains the permanent 56px rail.
+// Offset by half the rail and reserve 16px margins inside the conversation pane.
+const CONVERSATION_DIALOG_LAYOUT = 'left-[calc(50%_-_28px)] w-[calc(100%_-_88px)] max-w-[320px]';
+
 function ConversationRow({
   summary,
   pinned,
@@ -137,7 +141,7 @@ function RenameConversationDialog({
 }) {
   return (
     <Dialog open={target !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-[320px]">
+      <DialogContent className={CONVERSATION_DIALOG_LAYOUT}>
         <form onSubmit={(event) => { event.preventDefault(); onSave(); }}>
           <DialogHeader><DialogTitle>Rename conversation</DialogTitle></DialogHeader>
           <DialogBody>
@@ -174,10 +178,10 @@ function DeleteConversationDialog({
   const isRunning = target?.summary.lifecycle.state === 'working' || target?.summary.lifecycle.state === 'needs-user';
   return (
     <Dialog open={target !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-[320px]">
+      <DialogContent className={CONVERSATION_DIALOG_LAYOUT}>
         <DialogHeader><DialogTitle>Delete conversation?</DialogTitle></DialogHeader>
-        <DialogBody>
-          <DialogDescription>“{target?.summary.title}” will be removed from {target?.recovery ? 'earlier conversations' : 'this project'}.</DialogDescription>
+        <DialogBody className="min-w-0">
+          <DialogDescription className="break-words">“{target?.summary.title}” will be removed from {target?.recovery ? 'earlier conversations' : 'this project'}.</DialogDescription>
         </DialogBody>
         <DialogFooter>
           <DialogButton type="button" variant="secondary" onClick={onClose}>Cancel</DialogButton>
@@ -203,8 +207,6 @@ export function ConversationsPanel() {
   const remove = useAISidebarStore((state) => state.deleteHostConversation);
   const toggle = useAISidebarStore((state) => state.toggleHistoryPanel);
   const notice = useAISidebarStore((state) => state.conversationStoreNotice);
-  const undo = useAISidebarStore((state) => state.pendingUndo);
-  const undoDelete = useAISidebarStore((state) => state.undoDeleteConversation);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [renameTarget, setRenameTarget] = useState<ConversationSummaryV1 | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
@@ -264,7 +266,6 @@ export function ConversationsPanel() {
         {activeRecent.length > 0 && <div className="mb-4"><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Active &amp; recent</div>{renderRows(activeRecent)}</div>}
         {earlier.length > 0 && <div><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Project unknown</div>{renderEarlierRows()}</div>}
       </div>
-      {undo && <div role="status" aria-live="polite" className="absolute bottom-3 left-3 right-3 flex items-center gap-2 rounded-[10px] bg-[var(--r-ink-strong)] px-3 py-2 text-[12px] text-[var(--r-surface)] shadow-lg"><span className="min-w-0 flex-1 truncate">Deleted {undo.title}</span><button type="button" onClick={undoDelete} className="font-semibold text-[var(--r-accent-soft)]">Undo</button></div>}
       <RenameConversationDialog target={renameTarget} title={renameTitle} onTitleChange={setRenameTitle} onClose={() => setRenameTarget(null)} onSave={saveRename} />
       <DeleteConversationDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete} />
     </section>

@@ -70,7 +70,7 @@ export type ConversationResultData =
   | ConversationInitializeResult
   | { conversations: ConversationSummaryV1[]; earlierConversations: ConversationSummaryV1[] }
   | { conversation: ConversationProjectionV1 | null; dispatched?: boolean; recovery?: boolean }
-  | { conversationId: string; undoToken: string; deletedAt: string; recovery?: boolean }
+  | { conversationId: string; undoToken: string; deletedAt: string; title: string; recovery?: boolean }
   | { diagnostics: ConversationStoreDiagnostics }
   | { accepted: boolean; migration?: LegacyMigrationReportV1 };
 

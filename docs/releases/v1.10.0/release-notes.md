@@ -26,6 +26,11 @@ After Microsoft Store certification, Store becomes the recommended Windows chann
 - **Titles become useful automatically.** A new conversation starts with a
   shortened version of the first prompt, gets a concise title after the first
   answer, and can always be renamed by you.
+- **Delete and Undo now follow the rest of Ritemark.** Deleting a conversation
+  starts with a confirmation that fits the narrow Conversations pane, then uses
+  the standard VS Code notification instead of a custom snackbar that could
+  remain stuck over the conversation list. Undo remains available even after
+  the Conversations panel closes.
 
 ![Durable project conversations in the permanent rail](screenshots/1-10-0-conversation-reopened.png)
 

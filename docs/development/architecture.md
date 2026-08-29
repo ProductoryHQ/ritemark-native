@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-27 (v1.10.0 RC — canonical Claude model aliases)
+**Last updated:** 2026-08-29 (v1.10.0 RC — native conversation deletion notifications)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -153,7 +153,7 @@ Entry point `extension.ts` registers all providers, commands, and views.
 
 ### Durable Agent Conversations (Sprint 109)
 
-`src/conversations/` is the canonical owner of non-empty agent conversations. `ConversationStore` writes versioned records atomically under extension global storage, maintains a rebuildable index, isolates corrupt records, and protects deletion with tombstones plus one ephemeral process-lifetime Undo token matching the webview's single Undo snackbar. `projectScope.ts` derives a stable project identity for single-root, multi-root, workspace-file, no-folder, and unassigned legacy records.
+`src/conversations/` is the canonical owner of non-empty agent conversations. `ConversationStore` writes versioned records atomically under extension global storage, maintains a rebuildable index, isolates corrupt records, and protects deletion with tombstones plus one ephemeral process-lifetime Undo token. The extension host owns the transient deletion feedback through a native VS Code information notification and executes its Undo action even when the Conversations webview is closed; the webview owns only contextual persistent notices such as degraded storage state. `projectScope.ts` derives a stable project identity for single-root, multi-root, workspace-file, no-folder, and unassigned legacy records.
 
 The sandbox boundary uses the exact-field `conversation/*` request/result/event union in `protocol.ts`. `ConversationController` alone enforces scope, canonical UUIDs, binding generations, persist-before-dispatch ordering, delete/Undo, migration, and runtime lifecycle checkpoints. User events carry a display-only prompt separately from the runtime prompt so hidden context never leaks into restored transcripts; one webview turn ID is preserved across runtime continuations. `UnifiedViewProvider` composes this controller, forwards typed messages, and owns only the bounded live-session pool, never durable storage rules.
 

@@ -174,7 +174,11 @@ export class ConversationController {
           revision: record.revision,
           bindingGeneration: record.bindingGeneration,
         });
-        return result(request, { ...deleted, ...(request.recovery === true ? { recovery: true } : {}) });
+        return result(request, {
+          ...deleted,
+          title: record.title,
+          ...(request.recovery === true ? { recovery: true } : {}),
+        });
       }
       if (request.type === 'conversation/undo-delete') {
         const expectedScopeId = request.recovery === true
