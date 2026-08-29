@@ -48,6 +48,7 @@ This checklist accumulates release evidence across Sprints 109–115 and focused
 - [x] Live restart: the same canonical Claude + Codex transcript and context-restored boundary reappeared after a full desktop restart.
 - [ ] Live authenticated restart: verify native semantic recall through the production UI for each available runtime.
 - [ ] Failure injection: auth loss/runtime unavailable and ambiguous crash after transport but before final checkpoint.
+- [ ] Verify reduced-motion conversation continuation and boundary UI on the exact packaged arm64 Gate 1 candidate.
 
 These two live rows are intentionally retained for the post-Sprint 111/final release matrix because Sprint 111 changes the exact runtime binaries. Sprint 110 covers their deterministic adapter/controller policy paths and does not claim unrun production-UI evidence.
 

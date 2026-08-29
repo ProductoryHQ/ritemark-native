@@ -1,7 +1,8 @@
 # Ritemark v1.10.0 pre-release audit
 
 **Audit date:** 2026-08-29<br>
-**Source:** clean merged `main` after focused RC fixes and release-gate reconciliation; record the exact commit when the Gate 1 build starts<br>
+**Audit source:** pre-reconciliation clean `main` at `ee77eb0` plus PR #230<br>
+**Gate 1 source:** not fixed yet; build only after PR #230 merges, then record the exact resulting `main` commit before the build starts<br>
 **Latest public release:** v1.9.0  
 **Next valid version:** v1.10.0  
 **Verdict:** **RELEASE HARDENING PASSED; fresh `main` build and Gate 1 candidate still required**
