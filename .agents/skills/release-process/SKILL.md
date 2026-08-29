@@ -109,10 +109,11 @@ Binaries without matching update feed metadata are not a complete release.
 Use only when changes are confined to `extensions/ritemark/`.
 
 1. Bump `extensions/ritemark/package.json` to `X.Y.Z-ext.N`.
-2. Run `./scripts/release-extension.sh X.Y.Z-ext.N`; its preflight verifies release tier, compilation, bundle freshness, and `minimumAppVersion`, then stages the individual update files and canonical metadata under `release-staging/upload/`.
-3. Review the staged files and the printed `gh release create` command. This repository does not ship extension updates as `.vsix` files.
-4. Light gate: Jarmo tests the in-app **Relaunch to update** path or a local dev install on the changed surfaces.
-5. Only after approval, create the GitHub release with the individual staged files and matching canonical update metadata. Full-app notarization, platform CI, and the 60-minute hardening window do not apply to this lane.
+2. Build extension and webview.
+3. Package `.vsix`.
+4. Verify bundle integrity and `minimumAppVersion`.
+5. Gate 1: Jarmo tests on a current Ritemark install.
+6. GitHub release with `.vsix` and extension-only update metadata.
 
 ## Platform Rules
 
