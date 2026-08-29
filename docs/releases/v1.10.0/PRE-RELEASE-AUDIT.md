@@ -29,7 +29,7 @@ The signed app above was built before dependency hardening and from the RC branc
 
 `./scripts/create-dmg.sh` mounted the image and reached its canonical Finder-layout step, but Finder stopped answering AppleEvents and returned `-1712` (`AppleEvent timed out`). Restarting Finder did not restore AppleEvent responsiveness. The failed 2.8 GB `rw.*.dmg` temporary image was removed; the signed app bundle remains intact.
 
-This is a packaging-session limitation, not an app-integrity failure. v1.8.2 and v1.8.6 already shipped through the repository's recorded Finder-free `ditto` + `hdiutil create` + compressed-convert path. Jarmo authorized the technically strongest release route on 2026-08-25. For v1.10.0, retrying the decorative Finder layout is optional; a deterministic Finder-free image is accepted only when it is DMG-signed, notarized, stapled, and passes the same signature, version, architecture, bundled-runtime, mount/content, zero-byte, Gatekeeper, and checksum checks. Jarmo's Gate 1 test uses those exact final verified bytes; no notarization or other artifact mutation occurs after approval.
+This is a packaging-session limitation, not an app-integrity failure. v1.8.2 and v1.8.6 already shipped through the repository's recorded Finder-free `ditto` + `hdiutil create` + compressed-convert path. Jarmo authorized the technically strongest release route on 2026-08-25. For v1.10.0, retrying the decorative Finder layout is optional; a deterministic Finder-free image is accepted for Gate 1 only when it is Developer ID signed and passes the same signature, version, architecture, bundled-runtime, mount/content, zero-byte, timestamp, and checksum checks. Jarmo tests that signed/unnotarized DMG. Notarization/stapling and Gatekeeper verification happen only after his approval and the full 60-minute no-new-bug window; a rebuild resets both the clock and Gate 1.
 
 ### R2 — Production dependency advisories are closed
 
@@ -47,9 +47,9 @@ The full webview audit still reports development-only toolchain advisories under
 
 ## Release-time gates still open
 
-- Merge the release-gate reconciliation PR, synchronize clean `main`, and build/sign/package/notarize/staple a fresh arm64 candidate from the exact resulting merge commit.
+- Merge the release-gate reconciliation PR, synchronize clean `main`, and build/sign/package a fresh unnotarized arm64 candidate from the exact resulting merge commit.
 - Residual v1.10.0 manual feature/regression rows in `TEST-CHECKLIST.md`.
-- Jarmo's test of the exact signed/notarized/stapled and technically verified arm64 DMG plus the 60-minute no-new-bug hardening period from its final bytes.
+- Jarmo's test of the exact signed/unnotarized and technically verified arm64 DMG plus the 60-minute no-new-bug hardening period from its build timestamp, followed by notarization/stapling and final Gatekeeper verification.
 - Signed x64 macOS and Windows CI candidates, Windows SAC-On test, and Gate 2.
 - Immutable Windows hosting, Microsoft Store certification, exact-hash approval, and canonical update-feed publication.
 
@@ -57,5 +57,5 @@ The full webview audit still reports development-only toolchain advisories under
 
 1. Merge the reviewed release-gate reconciliation, synchronize clean `main`, and confirm release preflight remains clean.
 2. Build and sign arm64 from `main`; package with the Finder layout if responsive, otherwise use the explicitly approved deterministic `ditto`/`hdiutil` route.
-3. Sign, notarize, staple, mount, and run every hard check against the exact final DMG before asking Jarmo to test it.
-4. Record the final candidate hash and timestamp. Any rebuild or post-test mutation resets the candidate timestamp and Gate 1 evidence.
+3. Sign, mount, and run the pre-notarization signature/content/version/architecture checks before asking Jarmo to test the signed/unnotarized DMG.
+4. Record that candidate's hash and build timestamp. Any rebuild resets the candidate timestamp and Gate 1 evidence; notarize/staple only after approval and the full 60-minute window, then run the final notarization/Gatekeeper/mount checks and record the published hash.

@@ -6,7 +6,7 @@ This checklist accumulates release evidence across Sprints 109–115 and focused
 
 - Source under review: clean merged `main` after focused RC fixes and release-gate reconciliation; record the exact merge commit when the Gate 1 build starts.
 - Repository QA, release preflight, exact arm64 runtime verification, production build, bundled-extension checks, and Developer ID preview-app signing pass.
-- Final signed/notarized/stapled Gate 1 DMG: **not yet produced**. Finder's decorative layout timed out previously; the recorded deterministic `ditto`/`hdiutil` path is approved if Finder remains unresponsive, but the resulting exact DMG must pass notarization, stapling, signatures, Gatekeeper, mount, content, architecture, version, timestamp, and hash checks before human testing.
+- Signed/unnotarized Gate 1 DMG: **not yet produced**. Finder's decorative layout timed out previously; the recorded deterministic `ditto`/`hdiutil` path is approved if Finder remains unresponsive. Before human testing, the DMG must pass Developer ID signature, mount, content, architecture, version, timestamp, and hash checks. After Jarmo approves it and the full 60-minute no-new-bug window elapses, notarize/staple the same build and complete final notarization, Gatekeeper, mount, and published-hash verification.
 - Production dependency security: **pass** — extension and webview `npm audit --omit=dev` each report zero findings; SheetJS is pinned to the official `0.20.3` tarball and targeted spreadsheet/Markdown/Mermaid checks pass.
 
 ## Trusted Windows installation (Sprint 114)
