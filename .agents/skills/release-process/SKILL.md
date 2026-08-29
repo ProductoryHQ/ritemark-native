@@ -86,7 +86,7 @@ Mount the DMG and verify the mounted `Ritemark.app`, not only the source app bun
 
 - `Contents/Resources/app/extensions/ritemark` exists.
 - `media/webview.js` is greater than 500 KB.
-- `out/extension.js` and `out/ritemarkEditor.js` exist and are non-trivial.
+- `out/extension.js` is non-trivial and contains the `resolveCustomTextEditor` sentinel. Since Sprint 92, editor code is bundled into this entrypoint; a standalone `out/ritemarkEditor.js` is neither produced nor required.
 - `extensions/ritemark/node_modules` exists and has runtime dependencies; do not strip it.
 - `product.json` contains the target `ritemarkVersion`. Do not use `Info.plist CFBundleShortVersionString` as Ritemark version; it is the VS Code base version.
 - App and DMG signatures are Developer ID signed, not ad hoc.
