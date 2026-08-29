@@ -89,6 +89,10 @@ export class ConversationController {
   private readonly randomId: () => string;
   private disposed = false;
 
+  dismissDeleteUndo(undoToken: string): void {
+    this.dependencies.store.dismissUndo(undoToken);
+  }
+
   constructor(private readonly dependencies: ConversationControllerDependencies) {
     this.now = dependencies.now ?? (() => new Date());
     this.randomId = dependencies.randomId ?? randomUUID;

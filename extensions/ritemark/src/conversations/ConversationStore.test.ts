@@ -246,13 +246,30 @@ async function run(): Promise<void> {
       title: 'Created while Undo is available',
     });
     assert.notEqual(createdDuringUndo.identityColorSlot, queued?.identityColorSlot, 'an Undo-reserved color is not reallocated');
+    const secondDeleted = await queueStore.delete(createdDuringUndo.conversationId, createdDuringUndo.bindingGeneration);
     const restored = await queueStore.restore(deleted.undoToken);
     assert.equal(restored.conversationId, queueId);
     assert.equal(restored.bindingGeneration, 1);
     assert.equal(restored.identityColorSlot, queued?.identityColorSlot, 'Undo preserves conversation color identity');
+    const secondRestored = await queueStore.restore(secondDeleted.undoToken);
+    assert.equal(secondRestored.conversationId, createdDuringUndo.conversationId, 'a newer delete does not invalidate an older actionable Undo token');
     await assert.rejects(
       queueStore.checkpoint({ conversationId: queueId, bindingGeneration: 0, title: 'Pre-delete generation' }),
       (error: unknown) => error instanceof ConversationStoreError && error.code === 'stale-binding',
+    );
+
+    const dismissedRecord = await queueStore.create({
+      conversationId: uuid(104),
+      scopeId: scope.scopeId,
+      scope: scope.descriptor,
+      title: 'Dismissed Undo',
+    });
+    const dismissedDelete = await queueStore.delete(dismissedRecord.conversationId, dismissedRecord.bindingGeneration);
+    queueStore.dismissUndo(dismissedDelete.undoToken);
+    await assert.rejects(
+      queueStore.restore(dismissedDelete.undoToken),
+      (error: unknown) => error instanceof ConversationStoreError && error.code === 'not-found',
+      'dismissing a native notification releases the corresponding Undo record',
     );
 
     const migrationDir = path.join(temp, 'identity-color-migration');

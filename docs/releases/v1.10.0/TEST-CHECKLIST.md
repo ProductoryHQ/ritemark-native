@@ -23,7 +23,7 @@ This checklist accumulates release evidence across Sprints 109–115 and focused
 - [x] New, Pinned, automatic active/recent/current, and All conversations rail order is stable.
 - [x] Selecting a conversation does not reorder Recents.
 - [x] Pin/Unpin, Rename, Delete, confirmation, and Undo preserve canonical identity.
-- [x] The Delete confirmation stays inside the narrow Conversations pane with wrapped copy and visible actions; deletion shows one native VS Code notification with no custom in-panel snackbar, the toast auto-hides, and Undo from Notifications restores after the panel closes (RunDev + screenshots, 2026-08-29).
+- [x] The Delete confirmation stays inside the narrow Conversations pane with wrapped copy and actions that stack at extra-narrow widths; deletion shows native VS Code notifications with no custom in-panel snackbar, the toast auto-hides, and each displayed Undo remains valid after the panel closes (RunDev + screenshots, 2026-08-29).
 - [x] Host-backed history remains current-project-only and survives reload.
 
 ## Conversation continuation (Sprint 110)

@@ -51,6 +51,8 @@ interface DeleteTarget {
 // Radix portals into the full webview, which also contains the permanent 56px rail.
 // Offset by half the rail and reserve 16px margins inside the conversation pane.
 const CONVERSATION_DIALOG_LAYOUT = 'left-[calc(50%_-_28px)] w-[calc(100%_-_88px)] max-w-[320px]';
+const CONVERSATION_DIALOG_FOOTER_LAYOUT = 'flex-col gap-2 px-4 min-[280px]:flex-row min-[280px]:gap-2.5 min-[280px]:px-5';
+const CONVERSATION_DIALOG_ACTION_LAYOUT = 'w-full min-[280px]:w-auto';
 
 function ConversationRow({
   summary,
@@ -156,9 +158,9 @@ function RenameConversationDialog({
               className="mt-1.5 w-full rounded-[6px] border border-[var(--r-hairline-strong)] bg-[var(--r-surface)] px-3 py-2 text-[13px] text-[var(--r-ink-strong)] outline-none focus:border-[var(--r-accent)] focus:ring-4 focus:ring-[var(--r-ring-color)]"
             />
           </DialogBody>
-          <DialogFooter>
-            <DialogButton type="button" variant="secondary" onClick={onClose}>Cancel</DialogButton>
-            <DialogButton type="submit" disabled={!title.trim()}>Save</DialogButton>
+          <DialogFooter className={CONVERSATION_DIALOG_FOOTER_LAYOUT}>
+            <DialogButton type="button" variant="secondary" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={onClose}>Cancel</DialogButton>
+            <DialogButton type="submit" className={CONVERSATION_DIALOG_ACTION_LAYOUT} disabled={!title.trim()}>Save</DialogButton>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -183,9 +185,9 @@ function DeleteConversationDialog({
         <DialogBody className="min-w-0">
           <DialogDescription className="break-words">“{target?.summary.title}” will be removed from {target?.recovery ? 'earlier conversations' : 'this project'}.</DialogDescription>
         </DialogBody>
-        <DialogFooter>
-          <DialogButton type="button" variant="secondary" onClick={onClose}>Cancel</DialogButton>
-          <DialogButton type="button" variant="danger" onClick={onConfirm}>{isRunning ? 'Stop and delete' : 'Delete'}</DialogButton>
+        <DialogFooter className={CONVERSATION_DIALOG_FOOTER_LAYOUT}>
+          <DialogButton type="button" variant="secondary" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={onClose}>Cancel</DialogButton>
+          <DialogButton type="button" variant="danger" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={onConfirm}>{isRunning ? 'Stop and delete' : 'Delete'}</DialogButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

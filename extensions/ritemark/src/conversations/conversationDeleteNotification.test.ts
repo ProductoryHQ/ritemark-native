@@ -25,6 +25,7 @@ function ports(overrides: Partial<ConversationDeleteNotificationPorts> = {}) {
     information: [] as Array<[string, string]>,
     warning: [] as string[],
     restore: [] as Array<[string, boolean]>,
+    dismissed: [] as string[],
     delivered: [] as ConversationResultMessage[],
   };
   const implementation: ConversationDeleteNotificationPorts = {
@@ -37,6 +38,7 @@ function ports(overrides: Partial<ConversationDeleteNotificationPorts> = {}) {
       calls.restore.push([undoToken, recovery]);
       return restoredResponse;
     },
+    dismiss: (undoToken) => { calls.dismissed.push(undoToken); },
     deliver: async (response) => { calls.delivered.push(response); },
     ...overrides,
   };
@@ -50,6 +52,7 @@ async function run(): Promise<void> {
     assert.equal(outcome, 'dismissed');
     assert.deepEqual(test.calls.information, [[`Deleted ${deletion.title}`, CONVERSATION_DELETE_UNDO_ACTION]]);
     assert.deepEqual(test.calls.restore, [], 'dismissing the native notification does not restore the conversation');
+    assert.deepEqual(test.calls.dismissed, [deletion.undoToken], 'dismissing the notification releases its host Undo token');
     assert.deepEqual(test.calls.delivered, []);
   }
 
@@ -64,6 +67,7 @@ async function run(): Promise<void> {
     assert.equal(outcome, 'restored');
     assert.deepEqual(test.calls.restore, [[deletion.undoToken, false]]);
     assert.deepEqual(test.calls.delivered, [restoredResponse]);
+    assert.deepEqual(test.calls.dismissed, [], 'a successful restore consumes its own token in ConversationStore');
     assert.deepEqual(test.calls.warning, []);
   }
 
@@ -88,6 +92,7 @@ async function run(): Promise<void> {
     const outcome = await showConversationDeleteNotification(deletion, test.implementation);
     assert.equal(outcome, 'failed');
     assert.deepEqual(test.calls.delivered, [], 'a failed restore is never projected into the webview');
+    assert.deepEqual(test.calls.dismissed, [deletion.undoToken], 'a failed action cannot leave an unreachable token reserved');
     assert.deepEqual(test.calls.warning, [`Could not restore ${deletion.title}: Undo token is unknown or expired`]);
   }
 

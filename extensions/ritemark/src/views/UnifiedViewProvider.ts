@@ -238,6 +238,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 undoToken,
                 ...(recovery ? { recovery: true } : {}),
               }),
+              dismiss: (undoToken) => this._conversationController.dismissDeleteUndo(undoToken),
               deliver: async (restoreResponse) => {
                 await this._view?.webview.postMessage(restoreResponse);
               },
