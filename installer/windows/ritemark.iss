@@ -89,7 +89,8 @@ Name: "addtopath"; Description: "Add to PATH"; GroupDescription: "Other:"; Flags
 ; NOTE: docx\build IS needed for Word export - do NOT exclude it
 ; Sprint 64 Phase D: this wildcard + recursesubdirs also covers the bundled
 ; agent runtimes at resources\app\extensions\ritemark\binaries\agents\win32-x64\
-; (codex-app-server.exe, claude.exe). Do NOT tighten the include pattern or
+; (including codex-app-server.exe and its codex-code-mode-host.exe sibling).
+; Do NOT tighten the include pattern or
 ; add an exclude that filters them out. The pre-flight in
 ; scripts\create-windows-installer.sh asserts they exist before ISCC runs.
 Source: "{#SourcePath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*\node_modules\*\node_modules\*\node_modules\*"

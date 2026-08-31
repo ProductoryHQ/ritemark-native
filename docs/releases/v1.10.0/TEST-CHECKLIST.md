@@ -2,11 +2,11 @@
 
 This checklist accumulates release evidence across Sprints 109–115 and focused release-candidate bug fixes.
 
-## Current candidate record — 2026-08-29
+## Current candidate record — 2026-08-31
 
-- Source under review: clean merged `main` after focused RC fixes and release-gate reconciliation; record the exact merge commit when the Gate 1 build starts.
-- Repository QA, release preflight, exact arm64 runtime verification, production build, bundled-extension checks, and Developer ID preview-app signing pass.
-- Signed/unnotarized Gate 1 DMG: **not yet produced**. Finder's decorative layout timed out previously; the recorded deterministic `ditto`/`hdiutil` path is approved if Finder remains unresponsive. Before human testing, the DMG must pass Developer ID signature, mount, content, architecture, version, timestamp, and hash checks. After Jarmo approves it and the full 60-minute no-new-bug window elapses, notarize/staple the same build and complete final notarization, Gatekeeper, mount, and published-hash verification.
+- Invalidated candidate: `dist/Ritemark-1.10.0-darwin-arm64.dmg` from merged `main` commit `3f01ef5` passed static packaging/signature checks but omitted Codex 0.149.0's required `codex-code-mode-host` sibling. A real Codex file-tool turn failed with `No such file or directory`, so this DMG is not a Gate 1 candidate and must not be notarized or published.
+- Correction under review: `codex/fix-codex-code-mode-host-packaging`. Manifest schema 2 requires the Codex app-server and code-mode-host matrices for every release target; all twelve exact archives pass local checksum, extraction-path, and architecture verification, and both arm64 Codex components start.
+- Replacement signed/unnotarized Gate 1 DMG: **not yet produced**. It must be built from the merged correction on clean synchronized `main`, pass static packaging/signature/mount checks, and complete a real packaged Codex file create/edit/read canary before human testing. Any rebuild resets Gate 1 evidence and the 60-minute clock.
 - Production dependency security: **pass** — extension and webview `npm audit --omit=dev` each report zero findings; SheetJS is pinned to the official `0.20.3` tarball and targeted spreadsheet/Markdown/Mermaid checks pass.
 
 ## Trusted Windows installation (Sprint 114)
@@ -55,12 +55,13 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 ## Runtime refresh (Sprint 111)
 
 - [x] Exact Codex 0.149.0, Claude Code 2.1.239, Claude Agent SDK 0.3.239, OpenCode 1.18.21, and ACP SDK 1.4.0 pins are recorded with official sources and licenses.
-- [x] All nine darwin-arm64, darwin-x64, and win32-x64 runtime archives pass URL, SHA-256, archive-layout, and architecture validation.
-- [x] Claude binary/SDK drift and an incomplete platform matrix fail the hard manifest validator.
+- [x] All twelve darwin-arm64, darwin-x64, and win32-x64 runtime-component archives pass URL, SHA-256, archive-layout, and architecture validation, including Codex app-server plus code-mode host on every target.
+- [x] Claude binary/SDK drift, an incomplete component/platform matrix, duplicate or noncanonical install names, and an unsupported component smoke argument fail the hard manifest validator.
 - [x] Native darwin-arm64 fetch, version discovery, OpenCode permission gates, cancellation, and shared-process survival pass on the shipping pins.
 - [x] Codex, Claude, and OpenCode continuation/restart plus two-conversation isolation probes pass on the shipping pins.
 - [x] Codex optional `isBlocking` input metadata routes through the existing input contract; ACP 1.4.0 preserves the contained adapter boundary.
-- [x] Native darwin-x64 and win32-x64 exact SDK compile, runtime fetch/checksum/architecture, and three-binary version smoke pass on final commit `3ef9e0c` ([matrix run](https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388)).
+- [ ] Native darwin-x64 and win32-x64 exact SDK compile, runtime fetch/checksum/architecture, and required-component smoke pass on the final RC correction commit. The earlier three-runtime baseline passed on `3ef9e0c` ([matrix run](https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388)) but did not assert Codex's code-mode host.
+- [ ] The exact signed arm64 replacement candidate completes a real Codex file create/edit/read canary without a missing-host log error.
 
 ## Composer thinking effort (Sprint 112)
 
@@ -134,6 +135,7 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] Sprint 115 focused state/protocol/delivery/reducer suite (26/26), extension compile, webview typecheck, production bundle, final-bundle Compare→Keep-local→Undo smoke, and official repository QA (final post-review automation rerun 2026-08-25).
 - [x] RC editor corrections: delayed local-save receipt tests, empty-heading reconciliation tests, extension compile, webview typecheck/build, and live empty-H1 plus 20-cycle rapid-save smoke pass (2026-08-31).
 - [x] Release preflight passes on clean synchronized `main` after all v1.10.0 sprints and focused RC fixes merge (2026-08-29).
+- [ ] RC runtime-component correction passes repository QA, release preflight, native runtime CI, signed-package component checks, and the packaged Codex file-tool canary on its final merged commit.
 - [ ] Final packaged migration+resume canary passes on the exact arm64 Gate 1 candidate.
 
 ## Remaining release scope

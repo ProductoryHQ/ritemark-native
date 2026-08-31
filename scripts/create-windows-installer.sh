@@ -50,14 +50,40 @@ echo "  ✓ Windows build found"
 
 # Sprint 64 Phase D: pre-flight bundled agent runtime check.
 # The GH Actions Windows build is responsible for fetching and embedding the
-# win32-x64 Codex + Claude binaries via fetch-agent-runtimes.sh. If the
-# downloaded artifact is missing them, the resulting installer would ship
-# without app-owned agent runtimes — block here rather than discover at
+# win32-x64 runtime components via fetch-agent-runtimes.sh. If the downloaded
+# artifact is missing any manifest-required component, the resulting installer
+# would ship a partially working agent — block here rather than discover at
 # runtime on a user's machine.
 WIN_AGENTS="$WIN_BUILD/resources/app/extensions/ritemark/binaries/agents/win32-x64"
-if [ ! -f "$WIN_AGENTS/codex-app-server.exe" ] || [ ! -f "$WIN_AGENTS/claude.exe" ]; then
+WIN_AGENT_MANIFEST="$WIN_BUILD/resources/app/extensions/ritemark/binaries/agents/manifest.json"
+if [ ! -f "$WIN_AGENT_MANIFEST" ]; then
+    echo -e "${RED}ERROR: bundled agent runtime manifest missing from build artifact${NC}"
+    echo "  Expected: $WIN_AGENT_MANIFEST"
+    exit 1
+fi
+
+MISSING_WIN_AGENTS=()
+if ! REQUIRED_WIN_AGENTS=$(node -e "
+    const manifest = require(process.argv[1]);
+    const names = manifest.runtimes
+        .filter((runtime) => runtime.platform === 'win32' && runtime.arch === 'x64')
+        .map((runtime) => runtime.installName);
+    if (names.length === 0) process.exit(2);
+    process.stdout.write(names.join('\\n'));
+" "$WIN_AGENT_MANIFEST"); then
+    echo -e "${RED}ERROR: bundled agent runtime manifest has no valid win32-x64 component list${NC}"
+    exit 1
+fi
+
+while IFS= read -r install_name; do
+    if [ ! -f "$WIN_AGENTS/$install_name" ]; then
+        MISSING_WIN_AGENTS+=("$install_name")
+    fi
+done <<< "$REQUIRED_WIN_AGENTS"
+
+if [ ${#MISSING_WIN_AGENTS[@]} -gt 0 ]; then
     echo -e "${RED}ERROR: bundled agent runtimes missing from build artifact${NC}"
-    echo "  Expected: $WIN_AGENTS/{codex-app-server.exe, claude.exe}"
+    echo "  Missing from $WIN_AGENTS: ${MISSING_WIN_AGENTS[*]}"
     echo ""
     echo "This means the GH Actions build that produced this artifact did not"
     echo "run the Sprint 64 fetch step. Re-run build-windows.yml on a commit"

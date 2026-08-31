@@ -75,7 +75,7 @@ echo "--- version discovery ---"
 manifest_version() {
   node -e "
     const m=require('$EXT/binaries/agents/manifest.json');
-    const r=m.runtimes.find(x=>x.agent==='$1');
+    const r=m.runtimes.find(x=>x.agent==='$1' && x.component==='$2');
     process.stdout.write(r ? r.version : '');
   " 2>/dev/null
 }
@@ -91,9 +91,28 @@ check_version() { # name binary-path expected-substring
     fail "$name reports '$out' but the manifest pins $want"
   fi
 }
-check_version claude   "$BIN/claude$EXE_SUFFIX"           "$(manifest_version claude)"
-check_version opencode "$BIN/opencode$EXE_SUFFIX"         "$(manifest_version opencode)"
-check_version codex    "$BIN/codex-app-server$EXE_SUFFIX" "$(manifest_version codex)"
+check_codex_code_mode_host() { # app-server-path code-mode-host-path
+  local app_server="$1" code_mode_host="$2"
+  if [[ ! -x "$app_server" ]]; then
+    skip "codex app-server is not installed, so its code-mode host cannot be checked"
+    return
+  fi
+  if [[ ! -x "$code_mode_host" ]]; then
+    fail "codex app-server is installed but required code-mode host is missing ($code_mode_host)"
+    return
+  fi
+  if "$code_mode_host" --help >/dev/null 2>&1; then
+    pass "codex code-mode host is installed beside app-server and starts"
+  else
+    fail "codex code-mode host exists but its --help smoke test fails"
+  fi
+}
+check_version claude   "$BIN/claude$EXE_SUFFIX"           "$(manifest_version claude runtime)"
+check_version opencode "$BIN/opencode$EXE_SUFFIX"         "$(manifest_version opencode runtime)"
+check_version codex    "$BIN/codex-app-server$EXE_SUFFIX" "$(manifest_version codex app-server)"
+check_codex_code_mode_host \
+  "$BIN/codex-app-server$EXE_SUFFIX" \
+  "$BIN/codex-code-mode-host$EXE_SUFFIX"
 
 if $VERSIONS_ONLY; then
   echo; echo "(--versions: stopping before the behavioural checks)"

@@ -86,10 +86,13 @@ Claude Code 2.1.239, and OpenCode 1.18.21. Their matching SDK edges are pinned
 to Claude Agent SDK 0.3.239 and ACP SDK 1.4.0, so an app update cannot quietly
 combine an old client with a new engine.
 
-The release build now rejects incomplete platform sets, checksum mismatches,
-Claude binary/SDK drift, and stale runtime metadata before packaging. Existing
-conversation continuation, approvals, cancellation, and parallel-conversation
-isolation were rerun against this exact snapshot.
+The release build now rejects incomplete runtime-component or platform sets,
+checksum mismatches, Claude binary/SDK drift, and stale runtime metadata before
+packaging. Codex's version-matched file-tools host ships beside its app-server
+on Apple Silicon, Intel macOS, and Windows, so a package cannot start Codex chat
+while leaving file actions unavailable. Existing conversation continuation,
+approvals, cancellation, and parallel-conversation isolation were rerun against
+this exact snapshot.
 
 Claude's runtime can expose `default` and an explicit model name as two request
 aliases for the same actual model. Ritemark now shows that model once, marks the
