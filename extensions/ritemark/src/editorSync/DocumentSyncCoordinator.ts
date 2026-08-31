@@ -15,6 +15,7 @@ import {
   type DocumentViewMessage,
 } from './protocol';
 import { DocumentDeliverySchedule } from './delivery';
+import { readRitemarkSavedLogicalHash } from './saveReceipt';
 import {
   canCompleteViewResolution,
   canonicalJson,
@@ -109,10 +110,9 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
         const record = this.records.get(document.uri.toString());
         if (!record) return;
         // A successful save is the only authoritative local-write receipt.
-        // Read the just-written bytes synchronously: the live TextDocument may
-        // already contain newer dirty typing, and onWillSave content may be
-        // changed or canceled by save participants.
-        const saveHash = this.readCompletedSaveHash(document);
+        // The shell binds this hash to the exact snapshot handed to write();
+        // neither the live model nor a later path read can prove that identity.
+        const saveHash = readRitemarkSavedLogicalHash(document);
         if (saveHash) this.recordLocalSaveHash(record, saveHash);
         this.enqueue(record, () => this.reconcile(record, 'save-complete'));
       }),
@@ -915,17 +915,6 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       return snapshot(fs.readFileSync(document.uri.fsPath));
     } catch {
       return snapshot(Buffer.from(document.getText(), 'utf8'));
-    }
-  }
-
-  private readCompletedSaveHash(document: vscode.TextDocument): string | undefined {
-    if (!this.isDiskBacked(document)) return undefined;
-    try {
-      return snapshot(fs.readFileSync(document.uri.fsPath)).logicalHash;
-    } catch {
-      // Do not manufacture a local-write receipt from the live model when the
-      // completed save cannot be verified on disk.
-      return undefined;
     }
   }
 

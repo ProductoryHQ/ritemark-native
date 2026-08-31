@@ -133,7 +133,7 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] Sprint 111 exact-manifest validator, validator mutation tests, extension compile, focused runtime suites, and deterministic extension suite.
 - [x] Sprint 112 official QA, focused effort/runtime suites, conversation regressions, extension compile, and webview typecheck/build (2026-08-24).
 - [x] Sprint 115 focused state/protocol/delivery/reducer suite (26/26), extension compile, webview typecheck, production bundle, final-bundle Compare→Keep-local→Undo smoke, and official repository QA (final post-review automation rerun 2026-08-25).
-- [x] RC editor corrections: delayed local-save receipt tests, empty-heading reconciliation tests, extension compile, webview typecheck/build, and live empty-H1 plus 20-cycle rapid-save smoke pass (2026-08-31).
+- [x] RC editor corrections: 36/36 focused editor-sync tests, exact save-receipt shell compile plus 15/15 targeted VS Code save tests, extension compile, webview typecheck/build, and live empty-H1 plus 20-cycle rapid-save smoke pass (2026-08-31).
 - [x] Release preflight passes on clean synchronized `main` after all v1.10.0 sprints and focused RC fixes merge (2026-08-29).
 - [ ] RC runtime-component correction passes repository QA, release preflight, native runtime CI, signed-package component checks, and the packaged Codex file-tool canary on its final merged commit.
 - [ ] Final packaged migration+resume canary passes on the exact arm64 Gate 1 candidate.

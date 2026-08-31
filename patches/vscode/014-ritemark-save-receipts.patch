@@ -1,0 +1,229 @@
+# RiteMark Patch: exact save receipts
+#
+# Purpose: Bind Ritemark's local-save receipt to the exact logical text snapshot handed to the file service.
+#
+# Why: Reading the file path from onDidSave can race with an external writer and suppress a real two-writer conflict.
+#
+# File(s): src/vs/workbench/api/browser/mainThreadDocuments.ts, src/vs/workbench/api/common/extHost.protocol.ts, src/vs/workbench/api/common/extHostDocumentData.ts, src/vs/workbench/api/common/extHostDocuments.ts, src/vs/workbench/services/textfile/common/textFileEditorModel.ts, src/vs/workbench/services/textfile/common/textfiles.ts, src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
+# Created: 2026-08-31
+#
+diff --git a/src/vs/workbench/api/browser/mainThreadDocuments.ts b/src/vs/workbench/api/browser/mainThreadDocuments.ts
+index 9827a1a573f..5affedfb204 100644
+--- a/src/vs/workbench/api/browser/mainThreadDocuments.ts
++++ b/src/vs/workbench/api/browser/mainThreadDocuments.ts
+@@ -153,7 +153,7 @@ export class MainThreadDocuments extends Disposable implements MainThreadDocumen
+ 
+ 		this._store.add(_textFileService.files.onDidSave(e => {
+ 			if (this._shouldHandleFileEvent(e.model.resource)) {
+-				this._proxy.$acceptModelSaved(e.model.resource);
++				this._proxy.$acceptModelSaved(e.model.resource, e.ritemarkSavedLogicalHash);
+ 			}
+ 		}));
+ 		this._store.add(_textFileService.files.onDidChangeDirty(m => {
+diff --git a/src/vs/workbench/api/common/extHost.protocol.ts b/src/vs/workbench/api/common/extHost.protocol.ts
+index 4634caf814a..b4d84c60f5f 100644
+--- a/src/vs/workbench/api/common/extHost.protocol.ts
++++ b/src/vs/workbench/api/common/extHost.protocol.ts
+@@ -2253,7 +2253,7 @@ export interface IModelAddedData {
+ }
+ export interface ExtHostDocumentsShape {
+ 	$acceptModelLanguageChanged(strURL: UriComponents, newLanguageId: string): void;
+-	$acceptModelSaved(strURL: UriComponents): void;
++	$acceptModelSaved(strURL: UriComponents, ritemarkSavedLogicalHash?: string): void;
+ 	$acceptDirtyStateChanged(strURL: UriComponents, isDirty: boolean): void;
+ 	$acceptEncodingChanged(strURL: UriComponents, encoding: string): void;
+ 	$acceptModelChanged(strURL: UriComponents, e: ISerializedModelContentChangedEvent, isDirty: boolean): void;
+diff --git a/src/vs/workbench/api/common/extHostDocumentData.ts b/src/vs/workbench/api/common/extHostDocumentData.ts
+index 2f4217c569f..6c570fa3e42 100644
+--- a/src/vs/workbench/api/common/extHostDocumentData.ts
++++ b/src/vs/workbench/api/common/extHostDocumentData.ts
+@@ -16,6 +16,7 @@ import { Position } from './extHostTypes/position.js';
+ import { Range } from './extHostTypes/range.js';
+ 
+ const _languageId2WordDefinition = new Map<string, RegExp>();
++const RITEMARK_SAVED_LOGICAL_HASH = Symbol.for('ritemark.savedLogicalHash');
+ export function setWordDefinitionFor(languageId: string, wordDefinition: RegExp | undefined): void {
+ 	if (!wordDefinition) {
+ 		_languageId2WordDefinition.delete(languageId);
+@@ -36,6 +37,7 @@ export class ExtHostDocumentData extends MirrorTextModel {
+ 
+ 	private _document?: vscode.TextDocument;
+ 	private _isDisposed: boolean = false;
++	private _ritemarkSavedLogicalHash: string | undefined;
+ 
+ 	constructor(
+ 		private readonly _proxy: IExtHostDocumentSaveDelegate,
+@@ -84,10 +86,11 @@ export class ExtHostDocumentData extends MirrorTextModel {
+ 				validateRange(ran) { return that._validateRange(ran); },
+ 				validatePosition(pos) { return that._validatePosition(pos); },
+ 				getWordRangeAtPosition(pos, regexp?) { return that._getWordRangeAtPosition(pos, regexp); },
++				get [RITEMARK_SAVED_LOGICAL_HASH]() { return that._ritemarkSavedLogicalHash; },
+ 				[Symbol.for('debug.description')]() {
+ 					return `TextDocument(${that._uri.toString()})`;
+ 				}
+-			};
++			} as vscode.TextDocument;
+ 		}
+ 		return Object.freeze(this._document);
+ 	}
+@@ -107,6 +110,10 @@ export class ExtHostDocumentData extends MirrorTextModel {
+ 		this._encoding = encoding;
+ 	}
+ 
++	_acceptRitemarkSavedLogicalHash(hash: string | undefined): void {
++		this._ritemarkSavedLogicalHash = hash;
++	}
++
+ 	private _save(): Promise<boolean> {
+ 		if (this._isDisposed) {
+ 			return Promise.reject(new Error('Document has been closed'));
+diff --git a/src/vs/workbench/api/common/extHostDocuments.ts b/src/vs/workbench/api/common/extHostDocuments.ts
+index 517568ceb6d..c6b34ed5d93 100644
+--- a/src/vs/workbench/api/common/extHostDocuments.ts
++++ b/src/vs/workbench/api/common/extHostDocuments.ts
+@@ -127,14 +127,21 @@ export class ExtHostDocuments implements ExtHostDocumentsShape {
+ 		this._onDidAddDocument.fire(data.document);
+ 	}
+ 
+-	public $acceptModelSaved(uriComponents: UriComponents): void {
++	public $acceptModelSaved(uriComponents: UriComponents, ritemarkSavedLogicalHash?: string): void {
+ 		const uri = URI.revive(uriComponents);
+ 		const data = this._documentsAndEditors.getDocument(uri);
+ 		if (!data) {
+ 			throw new Error('unknown document');
+ 		}
+-		this.$acceptDirtyStateChanged(uriComponents, false);
+-		this._onDidSaveDocument.fire(data.document);
++		data._acceptRitemarkSavedLogicalHash(ritemarkSavedLogicalHash);
++		try {
++			this.$acceptDirtyStateChanged(uriComponents, false);
++			this._onDidSaveDocument.fire(data.document);
++		} finally {
++			// The receipt belongs only to this save event. Keeping it attached would
++			// let later code mistake an older successful save for a new one.
++			data._acceptRitemarkSavedLogicalHash(undefined);
++		}
+ 	}
+ 
+ 	public $acceptDirtyStateChanged(uriComponents: UriComponents, isDirty: boolean): void {
+diff --git a/src/vs/workbench/services/textfile/common/textFileEditorModel.ts b/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
+index d7058ab3947..5ee757c16b5 100644
+--- a/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
++++ b/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
+@@ -18,7 +18,7 @@ import { IModelService } from '../../../../editor/common/services/model.js';
+ import { timeout, TaskSequentializer } from '../../../../base/common/async.js';
+ import { ITextBufferFactory, ITextModel } from '../../../../editor/common/model.js';
+ import { ILogService } from '../../../../platform/log/common/log.js';
+-import { basename } from '../../../../base/common/path.js';
++import { basename, extname } from '../../../../base/common/path.js';
+ import { IWorkingCopyService } from '../../workingCopy/common/workingCopyService.js';
+ import { IWorkingCopyBackup, WorkingCopyCapabilities, NO_TYPE_ID, IWorkingCopyBackupMeta } from '../../workingCopy/common/workingCopy.js';
+ import { IFilesConfigurationService } from '../../filesConfiguration/common/filesConfigurationService.js';
+@@ -45,6 +45,20 @@ interface IBackupMetaData extends IWorkingCopyBackupMeta {
+ 	orphaned: boolean;
+ }
+ 
++const RITEMARK_EDITABLE_EXTENSIONS = new Set(['.csv', '.md', '.markdown', '.mdown', '.mkd']);
++
++function needsRitemarkSaveReceipt(resource: URI): boolean {
++	const extension = extname(resource.path).toLowerCase();
++	return extension === '' || RITEMARK_EDITABLE_EXTENSIONS.has(extension);
++}
++
++async function computeRitemarkLogicalHash(content: string): Promise<string> {
++	const normalized = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
++	const encoded = new TextEncoder().encode(normalized);
++	const digest = await crypto.subtle.digest('SHA-256', encoded);
++	return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
++}
++
+ /**
+  * The text file editor model listens to changes to its underlying code editor model and saves these changes through the file service back to the disk.
+  */
+@@ -933,8 +947,19 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+ 			const lastResolvedFileStat = assertReturnsDefined(this.lastResolvedFileStat);
+ 			const resolvedTextFileEditorModel = this;
+ 			return this.saveSequentializer.run(versionId, (async () => {
++				// Capture the receipt and the write snapshot in the same synchronous
++				// turn. Finish the hash before write() so the successful-save event can
++				// carry its receipt immediately, without a watcher-visible post-write gap.
++				const ritemarkSavedLogicalHashPromise = needsRitemarkSaveReceipt(lastResolvedFileStat.resource)
++					? computeRitemarkLogicalHash(resolvedTextFileEditorModel.textEditorModel.getValue()).catch(error => {
++						this.logService.warn(`[text file model] could not compute Ritemark save receipt: ${error.toString()}`, this.resource.toString());
++						return undefined;
++					})
++					: Promise.resolve(undefined);
++				const writeSnapshot = resolvedTextFileEditorModel.createSnapshot();
++				const ritemarkSavedLogicalHash = await ritemarkSavedLogicalHashPromise;
+ 				try {
+-					const stat = await this.textFileService.write(lastResolvedFileStat.resource, resolvedTextFileEditorModel.createSnapshot(), {
++					const stat = await this.textFileService.write(lastResolvedFileStat.resource, writeSnapshot, {
+ 						mtime: lastResolvedFileStat.mtime,
+ 						encoding: this.getEncoding(),
+ 						etag: (options.ignoreModifiedSince || !this.filesConfigurationService.preventSaveConflicts(lastResolvedFileStat.resource, resolvedTextFileEditorModel.getLanguageId())) ? ETAG_DISABLED : lastResolvedFileStat.etag,
+@@ -942,7 +967,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+ 						writeElevated: options.writeElevated
+ 					});
+ 
+-					this.handleSaveSuccess(stat, versionId, options);
++					this.handleSaveSuccess(stat, versionId, options, ritemarkSavedLogicalHash);
+ 				} catch (error) {
+ 					this.handleSaveError(error, versionId, options);
+ 				}
+@@ -950,7 +975,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+ 		})(), () => saveCancellation.cancel());
+ 	}
+ 
+-	private handleSaveSuccess(stat: IFileStatWithMetadata, versionId: number, options: ITextFileSaveAsOptions): void {
++	private handleSaveSuccess(stat: IFileStatWithMetadata, versionId: number, options: ITextFileSaveAsOptions, ritemarkSavedLogicalHash: string | undefined): void {
+ 
+ 		// Updated resolved stat with updated stat
+ 		this.updateLastResolvedFileStat(stat);
+@@ -967,7 +992,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+ 		this.setOrphaned(false);
+ 
+ 		// Emit Save Event
+-		this._onDidSave.fire({ reason: options.reason, stat, source: options.source });
++		this._onDidSave.fire({ reason: options.reason, stat, source: options.source, ritemarkSavedLogicalHash });
+ 	}
+ 
+ 	private handleSaveError(error: Error, versionId: number, options: ITextFileSaveAsOptions): void {
+diff --git a/src/vs/workbench/services/textfile/common/textfiles.ts b/src/vs/workbench/services/textfile/common/textfiles.ts
+index 84c90a5581b..a48b0d557db 100644
+--- a/src/vs/workbench/services/textfile/common/textfiles.ts
++++ b/src/vs/workbench/services/textfile/common/textfiles.ts
+@@ -536,6 +536,13 @@ export interface ITextFileEditorModelSaveEvent extends IWorkingCopySaveEvent {
+ 	 * The resolved stat from the save operation.
+ 	 */
+ 	readonly stat: IFileStatWithMetadata;
++
++	/**
++	 * Ritemark-private identity of the logical text snapshot that completed the
++	 * save. Undefined for document types that Ritemark does not edit or when the
++	 * runtime cannot compute the receipt.
++	 */
++	readonly ritemarkSavedLogicalHash?: string;
+ }
+ 
+ export interface ITextFileEditorModel extends ITextEditorModel, IEncodingSupport, ILanguageSupport, IWorkingCopy {
+diff --git a/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts b/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
+index 5bdb6860d65..9d078167ced 100644
+--- a/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
++++ b/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
+@@ -91,7 +91,7 @@ suite('Files - TextFileEditorModel', () => {
+ 	});
+ 
+ 	test('save', async function () {
+-		const model: TextFileEditorModel = instantiationService.createInstance(TextFileEditorModel, toResource.call(this, '/path/index_async.txt'), 'utf8', undefined);
++		const model: TextFileEditorModel = instantiationService.createInstance(TextFileEditorModel, toResource.call(this, '/path/index_async.md'), 'utf8', undefined);
+ 
+ 		await model.resolve();
+ 
+@@ -131,6 +131,7 @@ suite('Files - TextFileEditorModel', () => {
+ 		assert.ok((savedEvent as ITextFileEditorModelSaveEvent).stat);
+ 		assert.strictEqual((savedEvent as ITextFileEditorModelSaveEvent).reason, SaveReason.AUTO);
+ 		assert.strictEqual((savedEvent as ITextFileEditorModelSaveEvent).source, source);
++		assert.strictEqual((savedEvent as ITextFileEditorModelSaveEvent).ritemarkSavedLogicalHash, 'fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9');
+ 		assert.ok(workingCopyEvent);
+ 
+ 		assert.strictEqual(accessor.workingCopyService.dirtyCount, 0);

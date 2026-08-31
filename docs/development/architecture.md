@@ -72,7 +72,7 @@ user edits
 
 watcher / TextDocument / save / 3 s poll invalidates a URI
   → coordinator compares disk, model, and retained base
-  → an exact pre-save receipt identifies the user's own delayed disk write
+  → a save-scoped shell receipt identifies the exact snapshot VS Code wrote
   → clean external: converge TextDocument first, then publish a revision
   → local-only: keep quiet
   → two-sided divergence: preserve both snapshots and require explicit resolution
@@ -96,7 +96,9 @@ The coordinator keeps three content identities separate:
 
 The derived states are intentionally asymmetric. A model ahead of an unchanged disk is ordinary local-only/autosave state and has no header action. A disk-only change is imported into the `TextDocument` under version/hash preconditions and sent to focused views. A true two-sided change freezes local and disk evidence and shows **Review changes**. There is no background choice between versions.
 
-Save lag is classified by identity and ordering, not time. Only successful `onDidSaveTextDocument` completion creates a local-write receipt; the coordinator synchronously hashes the just-written disk bytes rather than the live model, which may already contain newer typing. This also captures format-on-save and code-action output exactly, while a canceled or failed `onWillSave` attempt creates no receipt. Each confirmed receipt gets a monotonic sequence, and each disk read records the latest sequence that existed when the read began. A matching disk snapshot is accepted only when no later save was already confirmed at read start; it then consumes through the newest valid match and can advance the common ancestor while newer model text remains local-only. An unmatched or superseded match retires only receipts old enough for that observation to invalidate; receipts created while the read was in flight survive. This prevents stale successful receipts or old matching content from masking a later external write, without letting older reads erase newer saves. A disk hash that matches no ordered confirmed local receipt still follows the normal three-way path and can produce a true conflict.
+Save lag is classified by identity and ordering, not time. Patch `014-ritemark-save-receipts.patch` captures the Ritemark logical SHA-256 input and the write snapshot in the same synchronous turn after save participants, finishes that hash before handing the snapshot to the file service, and emits it only after the write succeeds. This ordering prevents either the file watcher or the save event from observing a completed local write before its receipt exists. The main-thread/ext-host bridge exposes the hash through `Symbol.for('ritemark.savedLogicalHash')` only for the synchronous `onDidSaveTextDocument` delivery. The extension never infers a receipt from the newer live model or by rereading a path that an external writer may already have replaced; a missing or malformed shell receipt remains conservative and cannot suppress a conflict. This also captures format-on-save and code-action output exactly, while a canceled or failed save creates no receipt.
+
+Each confirmed receipt gets a monotonic sequence, and each disk read records the latest sequence that existed when the read began. A matching disk snapshot is accepted only when no later save was already confirmed at read start; it then consumes through the newest valid match and can advance the common ancestor while newer model text remains local-only. An unmatched or superseded match retires only receipts old enough for that observation to invalidate; receipts created while the read was in flight survive. This prevents stale successful receipts or old matching content from masking a later external write, without letting older reads erase newer saves. A disk hash that matches no ordered confirmed local receipt still follows the normal three-way path and can produce a true conflict.
 
 `document:update` is idempotently sent immediately and retried at 750 ms and 2.5 s. Five seconds without the exact session + epoch + revision + payload-hash `document:applied` receipt produces **Retry document update**; a newer revision cancels the old budget. Hidden/disposed leases are dormant and receive the newest snapshot when visible/ready again.
 
@@ -108,7 +110,7 @@ Conflicts expose memory-only `ritemark-sync:` local/disk `.txt` snapshots throug
 
 The strong validator is an immediate precondition and post-write verification identity, not an atomic filesystem CAS claim: public portable local-filesystem APIs cannot combine “SHA still matches” and write as one operation. A non-cooperating writer inside that final interval follows unavoidable last-writer semantics. The user must explicitly choose **Keep my version**, and release QA retains a race-injection row; stronger guarantees would require a cooperating broker/lock or platform-specific primitive.
 
-This sprint adds no provider, feature flag, dependency, VS Code patch, direct webview filesystem access, or CRDT/OT layer. It advances only the editable-document slice of #106.
+The original Sprint 115 implementation added no provider, feature flag, dependency, direct webview filesystem access, or CRDT/OT layer. The RC audit subsequently proved that public `onDidSaveTextDocument` cannot identify the completed snapshot when the live model advances or another writer replaces the path before a reread. Patch 014 is the narrow shell-tier exception: one private, save-scoped hash receipt, with no new public VS Code API and conservative behavior when absent.
 
 **Comment callouts (Sprint 94, #81).** Editor-only comments live entirely in the editor webview (TipTap `CommentMark` for anchored highlights, an atom `CommentNode` for `///` notes, and a DOM-scanning `MarginCommentRail`); they round-trip through a scoped `marked` tokenizer + Turndown rules and are stripped at the shared export chokepoint (`export/v2/htmlPipeline.ts`). The one cross-subsystem seam is **Send-to-AI**: the editor and the AI sidebar are separate webviews, so an assigned comment relays across two new host messages — `comment:send-to-ai` (editor → `RitemarkEditorProvider`) and `comment:submit` (`UnifiedViewProvider` → sidebar, then the store's existing `sendAgentMessage`/`sendCodexMessage`/`sendOpenCodeMessage` → `agent-execute`). No `AgentRuntime` change. Gated by the `comment-callouts` experimental flag (default on). The comment webview.js bundle is now cache-busted via `?v=<mtime>` (was silently serving stale bundles across reloads).
 
@@ -453,7 +455,7 @@ interface UnifiedAttachment {
 ```
 tsc --noEmit + esbuild  extension host: 2 bundles (out/extension.js + out/browser/browserMcpAdapter.js)  [Sprint 92 #105]
 Vite → media/webview.js webview bundle: ~7.6 MB IIFE
-apply-patches.sh        applies patches/vscode/001–010.patch to /vscode submodule
+apply-patches.sh        applies patches/vscode/001–014.patch to /vscode submodule
 gulp darwin-arm64-min   VS Code full build against submodule
 codesign                Apple Developer ID + Hardened Runtime + agent binary re-signing (JKBSC3ZDT5)
 xcrun notarytool        Apple notarization (pull log with --id before assuming outage)

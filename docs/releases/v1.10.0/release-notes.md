@@ -132,7 +132,9 @@ both and offers **Compare changes**, **Keep my version**, and **Use disk
 version**. The old always-on file-changed control and its automatic ten-second
 reload are gone; no background timer resolves a conflict for you. Rapidly
 continuing to type after Save also stays quiet: the later disk event is matched
-to that exact local save instead of being mistaken for another writer.
+to the exact snapshot that VS Code successfully wrote instead of being mistaken
+for another writer. A genuinely independent write still follows the conflict
+path even if it lands immediately after Save.
 
 Blank Markdown documents also keep the normal `# ` shortcut on the first line,
 so you can begin with a title without adding body text first.
