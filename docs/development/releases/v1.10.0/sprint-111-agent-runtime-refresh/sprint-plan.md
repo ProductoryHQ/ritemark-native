@@ -103,6 +103,7 @@ These are exact planning pins captured 2026-08-22. Any target change requires a 
 | 2026-08-23 | Phase 0 recommends the proposed exact snapshot | All nine artifacts exist and match platform layouts; local target-SDK compile, capability probes, continuation, and isolation pass. Native x64/Windows and full behavior remain later gates. |
 | 2026-08-24 | Approve the exact Phase 0 pins and measured protocol plan | Jarmo said “jätka”; implementation may update manifests, dependencies, lockfile, parity validation, measured fixtures, and notices. |
 | 2026-08-24 | Use a public-repo native runtime matrix instead of changing repository visibility for the Windows release build | Intel macOS and standard Windows runners verify the exact SDK compile, native fetch, and binary startup on every runtime-supply-chain PR; signed/full installers remain the release gate. |
+| 2026-08-31 | Correct the Sprint 111 one-binary-per-runtime assumption without opening a new sprint | Gate 1 exposed that Codex 0.149.0 file tools require a separate version-matched `codex-code-mode-host`. Treat it as a focused RC completeness correction, expand the manifest to required components, and supersede the old nine-artifact completeness claim. |
 
 ## Closeout Evidence
 
@@ -111,6 +112,7 @@ These are exact planning pins captured 2026-08-22. Any target change requires a 
 - Deterministic extension suite: PASS; six authenticated Claude API integration cases intentionally skipped and covered by separate exact-version live probes.
 - Native runtime matrix: [run 32701706388](https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388) — PASS on `darwin-x64` and `win32-x64` for commit `3ef9e0c`.
 - Code review: no remaining findings; the review-found snapshot/optional-package validator gap was fixed before PR readiness.
+- RC correction: the original matrix proved nine primary artifacts but did not model Codex's required file-tools host. The 2026-08-31 addendum in `research/runtime-version-audit.md` records the three additional official artifacts and the replacement Gate 1 requirements.
 
 ## Planning Approval
 

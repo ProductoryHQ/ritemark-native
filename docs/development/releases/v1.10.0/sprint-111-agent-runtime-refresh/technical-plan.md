@@ -30,7 +30,7 @@ Primary files:
 - `scripts/lib/verify-opencode.mjs`
 
 Implementation:
-- Update all nine runtime×platform records with exact versioned URLs, archive paths, SHA-256 values, architecture patterns, validation args, vendor/repository identity, and license notices.
+- Update all nine then-modeled runtime×platform records with exact versioned URLs, archive paths, SHA-256 values, architecture patterns, validation args, vendor/repository identity, and license notices. RC correction 2026-08-31 supersedes this cardinality with twelve required runtime-component rows after Codex's separate file-tools host was discovered.
 - Keep `schemaVersion` stable unless the actual manifest shape changes; always update `generated`.
 - Inspect Codex artifacts before retaining `direct-app-server`.
 - Add/extend a Claude SDK↔binary parity assertion and ensure failure output names expected and actual values.

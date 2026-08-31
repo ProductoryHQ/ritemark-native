@@ -13,6 +13,24 @@ const EXPECTED_TARGETS = [
   'win32-x64',
 ];
 
+const EXPECTED_COMPONENTS = {
+  codex: ['app-server', 'code-mode-host'],
+  claude: ['runtime'],
+  opencode: ['runtime'],
+};
+
+const EXPECTED_INSTALL_STEMS = {
+  codex: {
+    'app-server': 'codex-app-server',
+    'code-mode-host': 'codex-code-mode-host',
+  },
+  claude: { runtime: 'claude' },
+  opencode: { runtime: 'opencode' },
+};
+
+const EXPECTED_RUNTIME_ROWS = Object.values(EXPECTED_COMPONENTS)
+  .reduce((total, components) => total + components.length * EXPECTED_TARGETS.length, 0);
+
 const APPROVED_RUNTIMES = {
   codex: { vendor: 'openai', version: '0.149.0' },
   claude: { vendor: 'anthropic', version: '2.1.239' },
@@ -42,37 +60,67 @@ export function validateAgentRuntimeManifest(manifest, packageJson, packageLock)
   const errors = [];
   const runtimes = Array.isArray(manifest?.runtimes) ? manifest.runtimes : [];
   const byAgent = new Map();
+  const runtimeKeys = new Set();
+  const installKeys = new Set();
 
-  if (runtimes.length !== 9) errors.push(`manifest must contain 9 runtime rows; found ${runtimes.length}`);
+  if (manifest?.schemaVersion !== '2') errors.push(`manifest schemaVersion must be 2; found ${manifest?.schemaVersion ?? '<missing>'}`);
+  if (runtimes.length !== EXPECTED_RUNTIME_ROWS) {
+    errors.push(`manifest must contain ${EXPECTED_RUNTIME_ROWS} runtime component rows; found ${runtimes.length}`);
+  }
 
   for (const runtime of runtimes) {
     const target = `${runtime.platform}-${runtime.arch}`;
+    const runtimeKey = `${runtime.agent}/${runtime.component}/${target}`;
+    const installKey = `${target}/${runtime.installName}`;
     if (!byAgent.has(runtime.agent)) byAgent.set(runtime.agent, []);
     byAgent.get(runtime.agent).push(runtime);
 
-    if (!isExactVersion(runtime.version)) errors.push(`${runtime.agent}/${target} version is not exact: ${runtime.version}`);
-    if (!/^[a-f0-9]{64}$/.test(runtime.sha256 ?? '')) errors.push(`${runtime.agent}/${target} has an invalid SHA-256`);
-    if (!runtime.sourceUrl?.includes(runtime.version)) errors.push(`${runtime.agent}/${target} sourceUrl does not contain ${runtime.version}`);
-    if (!runtime.validationArgs?.includes('--version')) errors.push(`${runtime.agent}/${target} must validate with --version`);
+    if (runtimeKeys.has(runtimeKey)) errors.push(`${runtimeKey} is duplicated`);
+    runtimeKeys.add(runtimeKey);
+    if (installKeys.has(installKey)) errors.push(`${installKey} installName is duplicated`);
+    installKeys.add(installKey);
+
+    if (!isExactVersion(runtime.version)) errors.push(`${runtimeKey} version is not exact: ${runtime.version}`);
+    if (!/^[a-f0-9]{64}$/.test(runtime.sha256 ?? '')) errors.push(`${runtimeKey} has an invalid SHA-256`);
+    if (!runtime.sourceUrl?.includes(runtime.version)) errors.push(`${runtimeKey} sourceUrl does not contain ${runtime.version}`);
+    const installStem = EXPECTED_INSTALL_STEMS[runtime.agent]?.[runtime.component];
+    const expectedInstallName = installStem ? `${installStem}${runtime.platform === 'win32' ? '.exe' : ''}` : null;
+    if (expectedInstallName && runtime.installName !== expectedInstallName) {
+      errors.push(`${runtimeKey} installName must be ${expectedInstallName}; found ${runtime.installName ?? '<missing>'}`);
+    }
+    const validationArg = runtime.component === 'code-mode-host' ? '--help' : '--version';
+    if (!runtime.validationArgs?.includes(validationArg)) errors.push(`${runtimeKey} must validate with ${validationArg}`);
   }
 
   for (const agent of Object.keys(APPROVED_RUNTIMES)) {
     const rows = byAgent.get(agent) ?? [];
-    const targets = rows.map((row) => `${row.platform}-${row.arch}`).sort();
     const versions = [...new Set(rows.map((row) => row.version))];
-    if (JSON.stringify(targets) !== JSON.stringify(EXPECTED_TARGETS)) {
-      errors.push(`${agent} targets must be ${EXPECTED_TARGETS.join(', ')}; found ${targets.join(', ') || '<none>'}`);
+    const expectedComponents = EXPECTED_COMPONENTS[agent];
+    const components = [...new Set(rows.map((row) => row.component))];
+    for (const component of components) {
+      if (!expectedComponents.includes(component)) errors.push(`${agent} has an unknown component: ${component}`);
     }
-    if (versions.length !== 1) errors.push(`${agent} platform rows must share one version; found ${versions.join(', ')}`);
+    for (const component of expectedComponents) {
+      const componentRows = rows.filter((row) => row.component === component);
+      const targets = componentRows.map((row) => `${row.platform}-${row.arch}`).sort();
+      if (JSON.stringify(targets) !== JSON.stringify(EXPECTED_TARGETS)) {
+        errors.push(`${agent}/${component} targets must be ${EXPECTED_TARGETS.join(', ')}; found ${targets.join(', ') || '<none>'}`);
+      }
+    }
+    if (versions.length !== 1) errors.push(`${agent} component rows must share one version; found ${versions.join(', ')}`);
     for (const row of rows) {
       const approved = APPROVED_RUNTIMES[agent];
       if (row.version !== approved.version) {
-        errors.push(`${agent}/${row.platform}-${row.arch} version must be approved snapshot ${approved.version}; found ${row.version}`);
+        errors.push(`${agent}/${row.component}/${row.platform}-${row.arch} version must be approved snapshot ${approved.version}; found ${row.version}`);
       }
       if (row.vendor !== approved.vendor) {
-        errors.push(`${agent}/${row.platform}-${row.arch} vendor must be ${approved.vendor}; found ${row.vendor}`);
+        errors.push(`${agent}/${row.component}/${row.platform}-${row.arch} vendor must be ${approved.vendor}; found ${row.vendor}`);
       }
     }
+  }
+
+  for (const agent of byAgent.keys()) {
+    if (!(agent in APPROVED_RUNTIMES)) errors.push(`manifest contains an unapproved agent: ${agent}`);
   }
 
   const claudeRows = byAgent.get('claude') ?? [];

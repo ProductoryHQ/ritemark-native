@@ -171,8 +171,8 @@ trap 'rm -rf "${TMPDIR_RUN}"' EXIT
 
 # ---------------------------------------------------------------------------
 # Parse manifest with python3 into a pipe-delimited stream for shell iteration
-# Fields: agent|platform|arch|sourceUrl|archiveFilename|sha256|archivePath|
-#         installName|validationArgs|expectedFileArchPattern|archiveFormat
+# Fields: agent|component|platform|arch|sourceUrl|archiveFilename|sha256|
+#         archivePath|installName|validationArgs|expectedFileArchPattern|archiveFormat
 # validationArgs is space-joined (e.g. "--help" or "--version")
 #
 # CRLF defense (layer 1): the python heredoc below calls
@@ -193,6 +193,7 @@ for rt in data["runtimes"]:
     validation_args = " ".join(rt.get("validationArgs", []))
     row = "|".join([
         rt["agent"],
+        rt["component"],
         rt["platform"],
         rt["arch"],
         rt["sourceUrl"],
@@ -219,7 +220,7 @@ fi
 EXIT_CODE=0
 
 while IFS="|" read -r \
-    entry_agent entry_platform entry_arch \
+    entry_agent entry_component entry_platform entry_arch \
     entry_source_url entry_archive_filename entry_sha256 \
     entry_archive_path entry_install_name \
     entry_validation_args entry_expected_arch_pattern entry_archive_format
@@ -228,6 +229,7 @@ do
   # for the layer-1 stdout reconfigure above. Covers any future caller that
   # pipes CRLF text into this loop (Windows-authored fixtures, etc.).
   entry_agent="${entry_agent%$'\r'}"
+  entry_component="${entry_component%$'\r'}"
   entry_platform="${entry_platform%$'\r'}"
   entry_arch="${entry_arch%$'\r'}"
   entry_source_url="${entry_source_url%$'\r'}"
@@ -248,7 +250,7 @@ do
     [[ "${entry_agent}" == "${OPT_AGENT}" ]] || continue
   fi
 
-  LABEL="[${entry_agent}/${entry_platform}-${entry_arch}]"
+  LABEL="[${entry_agent}/${entry_component}/${entry_platform}-${entry_arch}]"
   INSTALL_DIR="${REPO_ROOT}/extensions/ritemark/binaries/agents/${entry_platform}-${entry_arch}"
   INSTALL_DEST="${INSTALL_DIR}/${entry_install_name}"
   SIDECAR="${INSTALL_DEST}.sha256"
@@ -321,7 +323,7 @@ do
 
   # --- Extraction ---
   echo "${LABEL} extracting..."
-  TMP_EXTRACT="${TMPDIR_RUN}/extract-${entry_agent}-${entry_platform}-${entry_arch}"
+  TMP_EXTRACT="${TMPDIR_RUN}/extract-${entry_agent}-${entry_component}-${entry_platform}-${entry_arch}"
   mkdir -p "${TMP_EXTRACT}"
 
   case "${entry_archive_format}" in
