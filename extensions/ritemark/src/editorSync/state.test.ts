@@ -46,7 +46,8 @@ test('collapsed saves consume through the newest matching local snapshot', () =>
   });
 });
 
-test('an unrecognized disk snapshot is still eligible for real conflict classification', () => {
+test('an unconfirmed or canceled save attempt cannot hide a real external conflict', () => {
+  assert.equal(consumeLocalSaveEcho([], 'canceled-attempt', 'newer-local'), undefined);
   assert.equal(consumeLocalSaveEcho(['local-b'], 'external-d', 'local-c'), undefined);
 });
 

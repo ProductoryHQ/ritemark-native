@@ -103,18 +103,15 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     private readonly adapter: DocumentSyncAdapter,
   ) {
     this.disposables.push(
-      vscode.workspace.onWillSaveTextDocument(event => {
-        const record = this.records.get(event.document.uri.toString());
-        if (!record) return;
-        this.recordLocalSaveReceipt(record, event.document.getText());
-      }),
       vscode.workspace.onDidSaveTextDocument(document => {
         const record = this.records.get(document.uri.toString());
         if (!record) return;
-        // Save participants may change the document after onWillSave. The
-        // completion event supplies the post-participant model snapshot that
-        // VS Code just saved, so retain it alongside the early receipt.
-        this.recordLocalSaveReceipt(record, document.getText());
+        // A successful save is the only authoritative local-write receipt.
+        // Read the just-written bytes synchronously: the live TextDocument may
+        // already contain newer dirty typing, and onWillSave content may be
+        // changed or canceled by save participants.
+        const saveHash = this.readCompletedSaveHash(document);
+        if (saveHash) this.recordLocalSaveHash(record, saveHash);
         this.enqueue(record, () => this.reconcile(record, 'save-complete'));
       }),
       vscode.workspace.onDidChangeTextDocument(event => {
@@ -802,8 +799,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     record.pendingLocalSaveHashes = [];
   }
 
-  private recordLocalSaveReceipt(record: DocumentRecord, content: string): void {
-    const saveHash = logicalHash(content);
+  private recordLocalSaveHash(record: DocumentRecord, saveHash: string): void {
     if (record.pendingLocalSaveHashes[record.pendingLocalSaveHashes.length - 1] !== saveHash) {
       record.pendingLocalSaveHashes.push(saveHash);
     }
@@ -912,6 +908,17 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       return snapshot(fs.readFileSync(document.uri.fsPath));
     } catch {
       return snapshot(Buffer.from(document.getText(), 'utf8'));
+    }
+  }
+
+  private readCompletedSaveHash(document: vscode.TextDocument): string | undefined {
+    if (!this.isDiskBacked(document)) return undefined;
+    try {
+      return snapshot(fs.readFileSync(document.uri.fsPath)).logicalHash;
+    } catch {
+      // Do not manufacture a local-write receipt from the live model when the
+      // completed save cannot be verified on disk.
+      return undefined;
     }
   }
 

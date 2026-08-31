@@ -108,7 +108,7 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] A generic external write appears in a focused open Markdown editor without close/reopen; a normal loaded view acknowledges in 5–75 ms in the observed run.
 - [x] A visible CSV table applies a clean external write and acknowledges only after parsing/render scheduling, without a false header action.
 - [x] Local-only typing with autosave off stays visible and quiet beyond the former ten-second timer while disk bytes remain unchanged.
-- [x] Twenty rapid type → save → continue-typing cycles keep the view quiet, retain every visible suffix, and end byte-equivalent to disk; deterministic receipts cover ordinary and format-on-save post-participant content while an unknown disk snapshot still routes to true conflict classification (2026-08-31 RC correction).
+- [x] Twenty rapid type → save → continue-typing cycles keep the view quiet, retain every visible suffix, and end byte-equivalent to disk; deterministic receipts cover successful ordinary and format-on-save disk content, while canceled/unconfirmed attempts and unknown snapshots still route to true conflict classification (2026-08-31 RC correction).
 - [x] An empty Markdown document accepts `# ` as the first input rule, renders the following text as H1, saves as `# …`, and shows no conflict surface (2026-08-31 live dev smoke plus focused regression).
 - [x] True divergence preserves immutable local and disk snapshots beyond ten seconds and exposes only **Review changes**.
 - [x] **Compare changes** opens read-only in-memory text inputs without recursively activating the custom editor.
