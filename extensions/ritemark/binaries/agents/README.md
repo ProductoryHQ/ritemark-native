@@ -10,14 +10,17 @@ extensions/ritemark/binaries/agents/
 ├── README.md              ← this file (tracked)
 ├── darwin-arm64/          ← payloads, gitignored
 │   ├── codex-app-server
+│   ├── codex-code-mode-host
 │   ├── claude
 │   └── opencode
 ├── darwin-x64/            ← payloads, gitignored
 │   ├── codex-app-server
+│   ├── codex-code-mode-host
 │   ├── claude
 │   └── opencode
 └── win32-x64/             ← payloads, gitignored
     ├── codex-app-server.exe
+    ├── codex-code-mode-host.exe
     ├── claude.exe
     └── opencode.exe
 ```
@@ -28,7 +31,7 @@ The platform subdirectories are populated by `scripts/fetch-agent-runtimes.sh` (
 
 | Agent | Vendor | Version | Source | License |
 |---|---|---|---|---|
-| Codex | OpenAI | 0.149.0 (`rust-v0.149.0`) | GitHub Releases — `codex-app-server-*` archives | Apache-2.0 |
+| Codex | OpenAI | 0.149.0 (`rust-v0.149.0`) | GitHub Releases — `codex-app-server-*` and `codex-code-mode-host-*` archives | Apache-2.0 |
 | Claude | Anthropic | 2.1.239 (SDK pinned `0.3.239`) | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
 | OpenCode | anomalyco | 1.18.21 (ACP SDK pinned `1.4.0`) | npm optional packages — `opencode-<platform>-<arch>` | MIT |
 
@@ -59,6 +62,13 @@ Codex 0.149.0 publishes a standalone `codex-app-server` binary that is **not** t
 
 Ritemark must **not** invoke `codex app-server` as a subcommand; the `codex` CLI is not bundled.
 
+Codex 0.149.0 also enables Code Mode file tools through a sibling
+`codex-code-mode-host[.exe]` process. The app-server resolves that executable
+next to itself, so both version-matched components are mandatory packaging
+inputs. Shipping only `codex-app-server` lets chat start but makes file tools
+fail at first use. The manifest validator therefore requires a complete
+app-server and code-mode-host platform matrix.
+
 If a future Codex release reorganises this (for example, merges the app-server back into the main `codex` binary as a subcommand), the manifest entry's `invocationMode` field flips to `cli-subcommand` and the extension code reads the manifest to pick the spawn strategy. The wrong value here will silently break runtime startup, so it is derived from inspecting the actual upstream artifact, not from documentation.
 
 ## Manifest schema (`manifest.json`)
@@ -70,13 +80,14 @@ Top-level:
 | `schemaVersion` | Manifest schema version. Bump when the structure changes. |
 | `generated` | ISO date the manifest entries were last verified. |
 | `description` | Human-readable purpose. |
-| `runtimes` | Array of runtime entries (one per agent × platform × arch). |
+| `runtimes` | Array of runtime component entries (one per required component × platform × arch). |
 
 Each entry in `runtimes`:
 
 | Field | Description |
 |---|---|
 | `agent` | `codex`, `claude`, or `opencode`. |
+| `component` | Component identity. Codex requires `app-server` and `code-mode-host`; Claude and OpenCode use `runtime`. |
 | `vendor` | `openai`, `anthropic`, or `anomalyco`. |
 | `version` | Pinned upstream version. Never `latest`. |
 | `platform` | `darwin` or `win32`. |
@@ -111,7 +122,7 @@ mv /tmp/codex-app-server-aarch64-apple-darwin \
 chmod +x extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server
 ```
 
-The fetch script automates this for all nine runtime entries and adds POSIX exec-bit / PE-header validation plus the manifest `validationArgs` smoke test. Before any download, `scripts/validate-agent-runtime-manifest.mjs` hard-fails incomplete platform rows, non-exact versions, stale vendor metadata, lockfile drift, or a Claude binary/SDK patch mismatch. Pull requests that change this contract also run the native `Agent Runtime Matrix` on Intel macOS and Windows x64 before merge.
+The fetch script automates this for all twelve runtime component entries and adds POSIX exec-bit / PE-header validation plus the manifest `validationArgs` smoke test. Before any download, `scripts/validate-agent-runtime-manifest.mjs` hard-fails incomplete component/platform rows, duplicate or noncanonical install names, non-exact versions, stale vendor metadata, lockfile drift, or a Claude binary/SDK patch mismatch. Pull requests that change this contract also run the native `Agent Runtime Matrix` on Intel macOS and Windows x64 before merge.
 
 ## Update process
 
@@ -120,7 +131,7 @@ The fetch script automates this for all nine runtime entries and adds POSIX exec
 3. Recompute and update each `sha256`.
 4. Update `expectedFileArchPattern` only if upstream rebuilds with different toolchain output.
 5. Update `archivePath` and `installName` only if upstream changes the artifact layout (rare).
-6. Re-verify `invocationMode` for Codex by inspecting the new tarball — do not assume it stayed the same.
+6. Re-verify `invocationMode` for Codex and confirm whether the matching release still requires `codex-code-mode-host` — do not assume either contract stayed the same.
 7. Bump `generated` to the new date.
 8. Regenerate `extensions/ritemark/package-lock.json` and run `node scripts/validate-agent-runtime-manifest.mjs`.
 9. Ship a new Ritemark release; users get the new runtime via the standard Ritemark app update.

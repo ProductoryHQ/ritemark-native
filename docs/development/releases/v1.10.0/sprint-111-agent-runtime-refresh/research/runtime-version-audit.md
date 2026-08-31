@@ -3,6 +3,27 @@
 **Status:** Phase 0 evidence complete; exact-pin/protocol decision pending<br>
 **Snapshot date:** 2026-08-23
 
+## RC completeness correction — 2026-08-31
+
+The original audit treated each agent/platform as one runnable artifact. A real
+signed-candidate Codex file-tool turn disproved that assumption: Codex 0.149.0
+starts through `codex-app-server`, then launches a version-matched sibling
+`codex-code-mode-host` for Code Mode. The first candidate omitted the sibling
+and failed with `No such file or directory` at its expected packaged path.
+
+OpenAI's same official release contains these additional required artifacts:
+
+| Component | Platform | Upstream asset | SHA-256 | Archive path | Evidence |
+|---|---|---|---|---|---|
+| Codex code-mode host 0.149.0 | darwin-arm64 | `codex-code-mode-host-aarch64-apple-darwin.tar.gz` | `ed6a6a089c50e727ef1f0642ee7c0611ba611d76d72029316a0513be91bfb244` | `codex-code-mode-host-aarch64-apple-darwin` | Mach-O arm64; `--help` starts successfully |
+| Codex code-mode host 0.149.0 | darwin-x64 | `codex-code-mode-host-x86_64-apple-darwin.tar.gz` | `1e9c8695fcd280d1ea039c662bd0f6393a202a7c583ffe9cc97d135e075d61fd` | `codex-code-mode-host-x86_64-apple-darwin` | Mach-O x86_64; native CI required |
+| Codex code-mode host 0.149.0 | win32-x64 | `codex-code-mode-host-x86_64-pc-windows-msvc.exe.tar.gz` | `0d49e410c48fdd4bd1b132055dc9a35e634afd17564617c8716a35c361a2f60d` | `codex-code-mode-host-x86_64-pc-windows-msvc.exe` | PE32+ console x86-64; native CI required |
+
+Manifest schema 2 supersedes the nine-artifact completeness claim below. It
+requires twelve component rows: two Codex components and one component for
+each other runtime across all three targets. A packaged Codex file-tool canary
+is now mandatory before Gate 1 human testing.
+
 ## Objective
 
 Prove that the proposed runtime/SDK versions can replace the current pins without breaking Ritemark’s platform packaging, runtime adapters, conversation isolation, or Sprint 110 continuation contract. This audit uses exact upstream versions; it does not authorize floating `latest` resolution.
@@ -21,7 +42,7 @@ The registries and release pages were queried directly on the snapshot date. The
 
 ## Artifact Matrix
 
-The nine target archives were downloaded from the upstream release/npm URLs into a temporary directory. SHA-256 is over the downloaded archive, before extraction.
+The nine primary target archives below were downloaded from the upstream release/npm URLs into a temporary directory. SHA-256 is over the downloaded archive, before extraction. The RC addendum above adds the three Codex sidecar archives required for the complete shipping set.
 
 | Runtime | Platform | Upstream asset/package | SHA-256 | Archive path | Version/architecture/signature evidence | Result |
 |---|---|---|---|---|---|---|

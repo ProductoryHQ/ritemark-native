@@ -1,10 +1,33 @@
 # Agent Runtime Compatibility Matrix
 
+## v1.10.0 release-candidate correction — 2026-08-31
+
+The first signed arm64 candidate exposed a packaging gap that the original
+Sprint 111 matrix could not detect: Codex chat started through
+`codex-app-server`, but its file tools failed because the version-matched
+`codex-code-mode-host` sibling was not bundled. Installed-app renderer logs
+recorded `No such file or directory` at the expected sibling path.
+
+OpenAI's official `rust-v0.149.0` release publishes separate
+`codex-code-mode-host` archives for darwin-arm64, darwin-x64, and win32-x64.
+Manifest schema 2 models required runtime components explicitly. Codex now has
+complete `app-server` and `code-mode-host` matrices; Claude and OpenCode each
+retain one `runtime` matrix. The validator rejects a missing component, a
+duplicate per-target install name, a mismatched version, or an unsupported
+smoke argument before any build begins.
+
+All twelve pinned archives fetched on 2026-08-31, matched their recorded
+SHA-256, extracted at the recorded path, and matched the target architecture.
+On darwin-arm64, `codex-app-server 0.149.0` reports its pinned version and the
+adjacent code-mode host starts successfully with its supported `--help` probe.
+Native darwin-x64 and win32-x64 execution, signed-package validation, and one
+real packaged Codex file edit remain release gates.
+
 ## Sprint 111 shipping candidate — 2026-08-24
 
 **Shipping candidate:** Claude Code `2.1.239` (SDK `0.3.239`) · OpenCode `1.18.21` (ACP SDK `1.4.0`) · Codex app-server `0.149.0`.
 
-The exact darwin-arm64 binaries report `2.1.239 (Claude Code)`, `1.18.21`, and `codex-app-server 0.149.0`. All nine manifest archives fetched, matched the recorded SHA-256, extracted at the recorded path, and matched the target architecture. macOS x64 and Windows x64 execution remain native CI/release gates rather than inferred local passes.
+The exact darwin-arm64 binaries report `2.1.239 (Claude Code)`, `1.18.21`, and `codex-app-server 0.149.0`. All nine then-modeled manifest archives fetched, matched the recorded SHA-256, extracted at the recorded path, and matched the target architecture. This evidence is retained as the historical Sprint 111 baseline; the RC correction above supersedes its runtime-component completeness claim.
 
 | Runtime | Protocol/SDK compatibility | Continuation and isolation | Permission/cancel evidence | Effort capability evidence |
 |---|---|---|---|---|
@@ -15,7 +38,7 @@ The exact darwin-arm64 binaries report `2.1.239 (Claude Code)`, `1.18.21`, and `
 ### Sprint 111 hard gates
 
 - `scripts/validate-agent-runtime-manifest.mjs` rejects incomplete platform matrices, floating/mismatched versions, stale vendor metadata, lockfile drift, and Claude binary/SDK patch drift before fetch/build.
-- `scripts/fetch-agent-runtimes.sh --all-platforms` passed for all nine exact archives.
+- `scripts/fetch-agent-runtimes.sh --all-platforms` passed for all nine then-modeled exact archives (historical; superseded by the twelve-component RC gate above).
 - `scripts/verify-agent-runtimes.sh` passed version discovery and all four OpenCode behavioral rows (`gate-pauses`, `gate-denies`, `gate-allows`, `cancel`).
 - Target-SDK TypeScript compile and focused Codex/Claude/OpenCode adapter tests pass.
 - Redacted live evidence and remaining native-platform boundaries are recorded in the [Sprint 111 audit](./releases/v1.10.0/sprint-111-agent-runtime-refresh/research/runtime-version-audit.md).
