@@ -36,6 +36,7 @@ import { CommentNode } from '../extensions/comment/CommentNode'
 import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
 import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
 import type { DocumentApplyTarget } from '../types/documentSync'
+import { shouldApplyIncomingEditorValue } from '../editorValueReconciliation'
 
 // Initialize Turndown for HTML to Markdown conversion.
 // Base config + GFM plugins + pipe-escape rule live in utils/turndownService;
@@ -780,23 +781,27 @@ export function Editor({
     // Convert current editor HTML back to markdown to compare with incoming value
     const currentMarkdown = turndownService.turndown(editor.getHTML())
 
-    // On initial mount, always process the value
-    if (isInitialMount.current) {
+    // Initial mount is an explicit reconciliation reason. Do not infer it from
+    // an empty Markdown projection: an empty heading created by `# ` also
+    // serializes to an empty string until the first title character arrives.
+    const initialMount = isInitialMount.current
+    if (initialMount) {
       isInitialMount.current = false
       lastExternalValue.current = value
       lastOnChangeValue.current = value
-      // Don't return - let it process the initial content below
     }
-
-    // Only update if value changed externally (not from editor's own onChange)
-    // This prevents the editor from updating during typing/formatting
-    const isExternalChange = value !== currentMarkdown && value !== lastOnChangeValue.current
 
     // Check if imageMappings changed - need to re-apply them
     const imageMappingsChanged = Object.keys(imageMappings).length > 0 &&
       Object.keys(imageMappings).length !== Object.keys(lastImageMappingsRef.current).length
 
-    if (isExternalChange || currentMarkdown === '' || imageMappingsChanged) {
+    if (shouldApplyIncomingEditorValue({
+      initialMount,
+      incomingValue: value,
+      currentMarkdown,
+      lastOnChangeValue: lastOnChangeValue.current,
+      imageMappingsChanged,
+    })) {
       // Update the ref
       lastImageMappingsRef.current = imageMappings
       // Check if value is HTML (starts with common HTML tags)

@@ -15,6 +15,7 @@ import {
   type DocumentViewMessage,
 } from './protocol';
 import { DocumentDeliverySchedule } from './delivery';
+import { readRitemarkSavedLogicalHash } from './saveReceipt';
 import {
   canCompleteViewResolution,
   canonicalJson,
@@ -23,6 +24,8 @@ import {
   classifyThreeWay,
   initializeThreeWayState,
   normalizeLogicalText,
+  observeLocalSaveReceipts,
+  type LocalSaveReceipt,
 } from './state';
 
 const POLL_INTERVAL_MS = 3000;
@@ -82,6 +85,8 @@ interface DocumentRecord {
   conflict?: ConflictSnapshot;
   resolutionRevision?: number;
   conflictSequence: number;
+  localSaveSequence: number;
+  pendingLocalSaveReceipts: LocalSaveReceipt[];
   views: Map<string, ViewLease>;
   panels: Map<vscode.Webview, vscode.WebviewPanel>;
   watcher?: vscode.FileSystemWatcher;
@@ -101,13 +106,19 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     private readonly adapter: DocumentSyncAdapter,
   ) {
     this.disposables.push(
+      vscode.workspace.onDidSaveTextDocument(document => {
+        const record = this.records.get(document.uri.toString());
+        if (!record) return;
+        // A successful save is the only authoritative local-write receipt.
+        // The shell binds this hash to the exact snapshot handed to write();
+        // neither the live model nor a later path read can prove that identity.
+        const saveHash = readRitemarkSavedLogicalHash(document);
+        if (saveHash) this.recordLocalSaveHash(record, saveHash);
+        this.enqueue(record, () => this.reconcile(record, 'save-complete'));
+      }),
       vscode.workspace.onDidChangeTextDocument(event => {
         const record = this.records.get(event.document.uri.toString());
         if (record) this.enqueue(record, () => this.reconcile(record, 'model-change'));
-      }),
-      vscode.workspace.onDidSaveTextDocument(document => {
-        const record = this.records.get(document.uri.toString());
-        if (record) this.enqueue(record, () => this.reconcile(record, 'save'));
       }),
       vscode.workspace.registerTextDocumentContentProvider('ritemark-sync', {
         provideTextDocumentContent: uri => this.virtualDocuments.get(uri.toString()) ?? '',
@@ -210,6 +221,8 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       lastObservedDiskValidator: disk.validator,
       state: initial.state,
       conflictSequence: 0,
+      localSaveSequence: 0,
+      pendingLocalSaveReceipts: [],
       views: new Map(),
       panels: new Map(),
       queue: Promise.resolve(),
@@ -487,13 +500,24 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
 
   private async reconcile(record: DocumentRecord, reason: string): Promise<void> {
     if (record.disposed || !this.isDiskBacked(record.document)) return;
+    // Receipts created after this point are newer than the disk read and must
+    // survive an unmatched result from that in-flight observation.
+    const observedThroughLocalSaveSequence = record.localSaveSequence;
     const disk = await this.readDisk(record.document);
     if (!disk) return;
-    if (reason === 'poll' && disk.validator === record.lastObservedDiskValidator) return;
+    const diskValidatorUnchanged = disk.validator === record.lastObservedDiskValidator;
     record.lastObservedDiskValidator = disk.validator;
     const modelContent = record.document.getText();
     const modelHash = logicalHash(modelContent);
     const modelVersion = record.document.version;
+    const localSaveObservation = observeLocalSaveReceipts(
+      record.pendingLocalSaveReceipts,
+      disk.logicalHash,
+      modelHash,
+      observedThroughLocalSaveSequence,
+    );
+    record.pendingLocalSaveReceipts = localSaveObservation.remainingReceipts;
+    if (reason === 'poll' && diskValidatorUnchanged && localSaveObservation.state === undefined) return;
 
     // An unresolved conflict freezes its evidence. Polling and watcher hints
     // may observe later changes, but only an explicit stale resolution attempt
@@ -503,6 +527,27 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       record.modelHash = modelHash;
       record.state = 'conflict';
       this.sendAllStates(record);
+      return;
+    }
+    if (localSaveObservation.state) {
+      const changed = modelHash !== record.modelHash;
+      record.modelHash = modelHash;
+      // The disk snapshot is a logical-content receipt for an exact local model
+      // state confirmed after a successful save. Advance the common logical
+      // base while preserving any newer visible model as local-only.
+      record.baseDiskHash = disk.validator;
+      record.baseDiskLogicalHash = disk.logicalHash;
+      record.baseModelHash = disk.logicalHash;
+      record.conflict = undefined;
+      record.resolutionRevision = undefined;
+      record.state = localSaveObservation.state;
+      if (changed) {
+        record.revision += 1;
+        await this.broadcast(record, 'undo-redo');
+      } else {
+        this.sendAllStates(record);
+      }
+      this.log(record, `${reason}:local-save-echo`);
       return;
     }
     const classification = classifyThreeWay({
@@ -756,6 +801,15 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     record.baseDiskHash = disk.validator;
     record.baseDiskLogicalHash = disk.logicalHash;
     record.baseModelHash = modelHash;
+    // A new authoritative base retires every older local-save receipt. The
+    // local-save-echo branch deliberately updates the base inline instead so
+    // later saves that are still in flight remain pending.
+    record.pendingLocalSaveReceipts = [];
+  }
+
+  private recordLocalSaveHash(record: DocumentRecord, saveHash: string): void {
+    record.localSaveSequence += 1;
+    record.pendingLocalSaveReceipts.push({ sequence: record.localSaveSequence, hash: saveHash });
   }
 
   private async openDiff(record: DocumentRecord, conflict: ConflictSnapshot): Promise<void> {

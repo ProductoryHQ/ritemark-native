@@ -21,6 +21,54 @@ export interface ViewResolutionReceipt {
 
 export type StaleViewEditDisposition = 'already-current' | 'materialize-conflict' | 'reject';
 
+export interface LocalSaveReceipt {
+  sequence: number;
+  hash: string;
+}
+
+export interface LocalSaveReceiptObservation {
+  remainingReceipts: LocalSaveReceipt[];
+  state?: 'synced' | 'local-only';
+}
+
+/**
+ * Match a disk snapshot to a confirmed successful local save. The model may
+ * already have advanced again by the time those bytes are reconciled; that is
+ * save lag, not a two-writer conflict.
+ *
+ * Use the newest matching occurrence so a collapsed sequence of saves retires
+ * every older pending snapshot while preserving any later save still in flight.
+ */
+export function observeLocalSaveReceipts(
+  pendingReceipts: readonly LocalSaveReceipt[],
+  diskHash: string,
+  modelHash: string,
+  observedThroughSequence: number,
+): LocalSaveReceiptObservation {
+  let matchIndex = -1;
+  for (let index = pendingReceipts.length - 1; index >= 0; index -= 1) {
+    if (pendingReceipts[index].hash === diskHash) {
+      matchIndex = index;
+      break;
+    }
+  }
+  const hasLaterObservedReceipt = matchIndex >= 0
+    && pendingReceipts.slice(matchIndex + 1).some(receipt => receipt.sequence <= observedThroughSequence);
+  if (matchIndex < 0 || hasLaterObservedReceipt) {
+    return {
+      // A confirmed receipt becomes stale once a later disk observation does
+      // not match it, or once the match predates another save already complete
+      // when this read began. Preserve only receipts created while this read
+      // was in flight; that disk snapshot cannot speak about those newer saves.
+      remainingReceipts: pendingReceipts.filter(receipt => receipt.sequence > observedThroughSequence),
+    };
+  }
+  return {
+    remainingReceipts: pendingReceipts.slice(matchIndex + 1),
+    state: diskHash === modelHash ? 'synced' : 'local-only',
+  };
+}
+
 /**
  * Decide whether a full-document edit from an older visible revision can be
  * preserved safely. If the current model still equals disk, the stale view and

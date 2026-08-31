@@ -77,7 +77,7 @@ The release does not ship after the persistence sprint alone. Sprint 109 establi
 - Thinking-effort controls for Flows, scheduled tasks, legacy single-shot AI, agent frontmatter, or raw chain-of-thought/token-budget display.
 - A floating runtime `latest` dependency, separate in-app runtime updater, runtime marketplace, or fourth runtime.
 - Translating raw transcript text, generating multiple Insights languages in one action, or silently updating previously created Insights snapshots.
-- Full bridge type migration, CRDT/OT collaboration, a new editor provider, direct webview filesystem access, or a VS Code OSS patch for editor synchronization.
+- Full bridge type migration, CRDT/OT collaboration, a new editor provider, direct webview filesystem access, or any broader VS Code OSS editor-sync API beyond the narrow private save-receipt patch.
 
 ## Sprint Map
 
@@ -219,6 +219,7 @@ These are not hidden feature-complete exceptions. They require the exact candida
 | 2026-08-24 | Keep-local uses exact disk validation plus public write and same-content model refresh | VS Code correctly rejects normal save after a true disk conflict; the selected public-API path verifies the selected bytes, refreshes clean/etag state, and retains Undo. |
 | 2026-08-27 | Treat duplicate Claude aliases as a focused RC bug fix, not a new sprint | The provider exposes two request spellings for one resolved model; the correction is contained to catalog identity, runtime verification, picker projection, and regressions. |
 | 2026-08-31 | Treat the missing Codex code-mode host as a focused RC packaging correction under the existing release plan | The bug is a completeness failure in Sprint 111's runtime manifest, not a new product feature. Model required runtime components explicitly, invalidate the affected candidate, and restart Gate 1 after merge. |
+| 2026-08-31 | Treat empty-first-H1 and delayed local-save conflict handling as focused RC corrections, not a new sprint | Both are regressions inside the existing editor and Sprint 115 contracts. A private shell receipt binds the exact successful write snapshot to its `onDidSaveTextDocument` event, distinguishing the user's own delayed disk write from an independent writer without a timing heuristic or racy path reread; empty structural TipTap blocks no longer masquerade as initial mount. |
 
 ## Planning Approval
 
