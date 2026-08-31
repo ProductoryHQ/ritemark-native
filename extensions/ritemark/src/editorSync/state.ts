@@ -52,11 +52,14 @@ export function observeLocalSaveReceipts(
       break;
     }
   }
-  if (matchIndex < 0) {
+  const hasLaterObservedReceipt = matchIndex >= 0
+    && pendingReceipts.slice(matchIndex + 1).some(receipt => receipt.sequence <= observedThroughSequence);
+  if (matchIndex < 0 || hasLaterObservedReceipt) {
     return {
       // A confirmed receipt becomes stale once a later disk observation does
-      // not match it. Preserve only receipts created while this read was in
-      // flight; that disk snapshot cannot speak about those newer saves.
+      // not match it, or once the match predates another save already complete
+      // when this read began. Preserve only receipts created while this read
+      // was in flight; that disk snapshot cannot speak about those newer saves.
       remainingReceipts: pendingReceipts.filter(receipt => receipt.sequence > observedThroughSequence),
     };
   }

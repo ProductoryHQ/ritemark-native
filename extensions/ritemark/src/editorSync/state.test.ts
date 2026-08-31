@@ -42,9 +42,12 @@ test('collapsed saves consume through the newest matching local snapshot', () =>
     { sequence: 3, hash: 'local-b' },
     { sequence: 4, hash: 'local-d' },
   ];
-  assert.deepEqual(observeLocalSaveReceipts(receipts, 'local-b', 'local-e', 4), {
+  assert.deepEqual(observeLocalSaveReceipts(receipts, 'local-b', 'local-e', 3), {
     remainingReceipts: [{ sequence: 4, hash: 'local-d' }],
     state: 'local-only',
+  });
+  assert.deepEqual(observeLocalSaveReceipts(receipts, 'local-b', 'local-e', 4), {
+    remainingReceipts: [],
   });
   assert.deepEqual(observeLocalSaveReceipts([{ sequence: 1, hash: 'local-b' }], 'local-b', 'local-b', 1), {
     remainingReceipts: [],
