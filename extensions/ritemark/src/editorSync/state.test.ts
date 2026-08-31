@@ -28,6 +28,13 @@ test('a delayed local save remains local-only when the model has advanced', () =
   });
 });
 
+test('post-participant save content is recognized after format-on-save', () => {
+  assert.deepEqual(consumeLocalSaveEcho(['pre-format', 'post-format'], 'post-format', 'newer-local'), {
+    remainingHashes: [],
+    state: 'local-only',
+  });
+});
+
 test('collapsed saves consume through the newest matching local snapshot', () => {
   assert.deepEqual(consumeLocalSaveEcho(['local-b', 'local-c', 'local-b', 'local-d'], 'local-b', 'local-e'), {
     remainingHashes: ['local-d'],

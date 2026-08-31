@@ -106,10 +106,16 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       vscode.workspace.onWillSaveTextDocument(event => {
         const record = this.records.get(event.document.uri.toString());
         if (!record) return;
-        const saveHash = logicalHash(event.document.getText());
-        if (record.pendingLocalSaveHashes[record.pendingLocalSaveHashes.length - 1] !== saveHash) {
-          record.pendingLocalSaveHashes.push(saveHash);
-        }
+        this.recordLocalSaveReceipt(record, event.document.getText());
+      }),
+      vscode.workspace.onDidSaveTextDocument(document => {
+        const record = this.records.get(document.uri.toString());
+        if (!record) return;
+        // Save participants may change the document after onWillSave. The
+        // completion event supplies the post-participant model snapshot that
+        // VS Code just saved, so retain it alongside the early receipt.
+        this.recordLocalSaveReceipt(record, document.getText());
+        this.enqueue(record, () => this.reconcile(record, 'save-complete'));
       }),
       vscode.workspace.onDidChangeTextDocument(event => {
         const record = this.records.get(event.document.uri.toString());
@@ -794,6 +800,13 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     // local-save-echo branch deliberately updates the base inline instead so
     // later saves that are still in flight remain pending.
     record.pendingLocalSaveHashes = [];
+  }
+
+  private recordLocalSaveReceipt(record: DocumentRecord, content: string): void {
+    const saveHash = logicalHash(content);
+    if (record.pendingLocalSaveHashes[record.pendingLocalSaveHashes.length - 1] !== saveHash) {
+      record.pendingLocalSaveHashes.push(saveHash);
+    }
   }
 
   private async openDiff(record: DocumentRecord, conflict: ConflictSnapshot): Promise<void> {
