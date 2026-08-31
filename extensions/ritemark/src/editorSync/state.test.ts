@@ -6,7 +6,7 @@ import {
   classifyAcceptedModelEdit,
   classifyStaleViewEdit,
   classifyThreeWay,
-  consumeLocalSaveEcho,
+  observeLocalSaveReceipts,
   initializeThreeWayState,
   normalizeLogicalText,
 } from './state';
@@ -22,33 +22,55 @@ test('three-way classifier distinguishes external-only, converged, and conflict'
 });
 
 test('a delayed local save remains local-only when the model has advanced', () => {
-  assert.deepEqual(consumeLocalSaveEcho(['local-b'], 'local-b', 'local-c'), {
-    remainingHashes: [],
+  assert.deepEqual(observeLocalSaveReceipts([{ sequence: 1, hash: 'local-b' }], 'local-b', 'local-c', 1), {
+    remainingReceipts: [],
     state: 'local-only',
   });
 });
 
 test('post-participant save content is recognized after format-on-save', () => {
-  assert.deepEqual(consumeLocalSaveEcho(['pre-format', 'post-format'], 'post-format', 'newer-local'), {
-    remainingHashes: [],
+  assert.deepEqual(observeLocalSaveReceipts([{ sequence: 1, hash: 'post-format' }], 'post-format', 'newer-local', 1), {
+    remainingReceipts: [],
     state: 'local-only',
   });
 });
 
 test('collapsed saves consume through the newest matching local snapshot', () => {
-  assert.deepEqual(consumeLocalSaveEcho(['local-b', 'local-c', 'local-b', 'local-d'], 'local-b', 'local-e'), {
-    remainingHashes: ['local-d'],
+  const receipts = [
+    { sequence: 1, hash: 'local-b' },
+    { sequence: 2, hash: 'local-c' },
+    { sequence: 3, hash: 'local-b' },
+    { sequence: 4, hash: 'local-d' },
+  ];
+  assert.deepEqual(observeLocalSaveReceipts(receipts, 'local-b', 'local-e', 4), {
+    remainingReceipts: [{ sequence: 4, hash: 'local-d' }],
     state: 'local-only',
   });
-  assert.deepEqual(consumeLocalSaveEcho(['local-b'], 'local-b', 'local-b'), {
-    remainingHashes: [],
+  assert.deepEqual(observeLocalSaveReceipts([{ sequence: 1, hash: 'local-b' }], 'local-b', 'local-b', 1), {
+    remainingReceipts: [],
     state: 'synced',
   });
 });
 
 test('an unconfirmed or canceled save attempt cannot hide a real external conflict', () => {
-  assert.equal(consumeLocalSaveEcho([], 'canceled-attempt', 'newer-local'), undefined);
-  assert.equal(consumeLocalSaveEcho(['local-b'], 'external-d', 'local-c'), undefined);
+  assert.deepEqual(observeLocalSaveReceipts([], 'canceled-attempt', 'newer-local', 0), {
+    remainingReceipts: [],
+  });
+});
+
+test('an unmatched disk observation retires only receipts it can order after', () => {
+  assert.deepEqual(observeLocalSaveReceipts(
+    [{ sequence: 1, hash: 'local-b' }],
+    'external-d',
+    'local-c',
+    1,
+  ), { remainingReceipts: [] });
+  assert.deepEqual(observeLocalSaveReceipts(
+    [{ sequence: 2, hash: 'local-b' }],
+    'older-disk-a',
+    'local-c',
+    1,
+  ), { remainingReceipts: [{ sequence: 2, hash: 'local-b' }] });
 });
 
 test('logical normalization ignores one BOM and EOL representation', () => {
