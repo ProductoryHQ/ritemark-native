@@ -21,6 +21,7 @@ import {
   classifyAcceptedModelEdit,
   classifyStaleViewEdit,
   classifyThreeWay,
+  consumeLocalSaveEcho,
   initializeThreeWayState,
   normalizeLogicalText,
 } from './state';
@@ -82,6 +83,7 @@ interface DocumentRecord {
   conflict?: ConflictSnapshot;
   resolutionRevision?: number;
   conflictSequence: number;
+  pendingLocalSaveHashes: string[];
   views: Map<string, ViewLease>;
   panels: Map<vscode.Webview, vscode.WebviewPanel>;
   watcher?: vscode.FileSystemWatcher;
@@ -101,6 +103,14 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     private readonly adapter: DocumentSyncAdapter,
   ) {
     this.disposables.push(
+      vscode.workspace.onWillSaveTextDocument(event => {
+        const record = this.records.get(event.document.uri.toString());
+        if (!record) return;
+        const saveHash = logicalHash(event.document.getText());
+        if (record.pendingLocalSaveHashes[record.pendingLocalSaveHashes.length - 1] !== saveHash) {
+          record.pendingLocalSaveHashes.push(saveHash);
+        }
+      }),
       vscode.workspace.onDidChangeTextDocument(event => {
         const record = this.records.get(event.document.uri.toString());
         if (record) this.enqueue(record, () => this.reconcile(record, 'model-change'));
@@ -210,6 +220,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       lastObservedDiskValidator: disk.validator,
       state: initial.state,
       conflictSequence: 0,
+      pendingLocalSaveHashes: [],
       views: new Map(),
       panels: new Map(),
       queue: Promise.resolve(),
@@ -505,6 +516,29 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       this.sendAllStates(record);
       return;
     }
+    const localSaveEcho = consumeLocalSaveEcho(record.pendingLocalSaveHashes, disk.logicalHash, modelHash);
+    if (localSaveEcho) {
+      const changed = modelHash !== record.modelHash;
+      record.pendingLocalSaveHashes = localSaveEcho.remainingHashes;
+      record.modelHash = modelHash;
+      // The disk snapshot is a logical-content receipt for an exact local model
+      // state captured by onWillSave. Advance the common logical base to that
+      // saved ancestor while preserving any newer visible model as local-only.
+      record.baseDiskHash = disk.validator;
+      record.baseDiskLogicalHash = disk.logicalHash;
+      record.baseModelHash = disk.logicalHash;
+      record.conflict = undefined;
+      record.resolutionRevision = undefined;
+      record.state = localSaveEcho.state;
+      if (changed) {
+        record.revision += 1;
+        await this.broadcast(record, 'undo-redo');
+      } else {
+        this.sendAllStates(record);
+      }
+      this.log(record, `${reason}:local-save-echo`);
+      return;
+    }
     const classification = classifyThreeWay({
       baseDiskHash: record.baseDiskLogicalHash,
       baseModelHash: record.baseModelHash,
@@ -756,6 +790,10 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     record.baseDiskHash = disk.validator;
     record.baseDiskLogicalHash = disk.logicalHash;
     record.baseModelHash = modelHash;
+    // A new authoritative base retires every older local-save receipt. The
+    // local-save-echo branch deliberately updates the base inline instead so
+    // later saves that are still in flight remain pending.
+    record.pendingLocalSaveHashes = [];
   }
 
   private async openDiff(record: DocumentRecord, conflict: ConflictSnapshot): Promise<void> {

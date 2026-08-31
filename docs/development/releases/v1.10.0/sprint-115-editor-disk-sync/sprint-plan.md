@@ -79,7 +79,7 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 |---|---|---|
 | Timer/retry overwrites unsaved local content | Critical | Delete forced reload; immutable conflict snapshots; explicit resolution; wait-past-10s regression. |
 | Host ACKs send instead of visible apply | High | Revisioned `document:applied`, bounded retry, stale rejection, missing-ACK tests. |
-| Local autosave lag is misclassified as external change | High | Explicit base/model/disk state; remove bounded self-hash guessing; continuous-typing test. |
+| Local autosave lag is misclassified as external change | High | Explicit base/model/disk state; exact `onWillSaveTextDocument` content receipts; no time-window guessing; continuous-typing and rapid save-and-continue tests. |
 | Focus-safe update causes cursor/selection regressions | Medium | Apply while focused, capture/restore or clamp selection, component and smoke evidence. |
 | Rapid writes or multiple views reorder revisions | High | Per-URI serialization, view epochs, idempotent revisions, disposal/reference-count tests. |
 | Markdown metadata or CSV data comes from mixed revisions | High | One full typed payload per revision; ACK only after atomic view application; parity fixtures. |
@@ -118,6 +118,7 @@ Sprint 115 introduces a host sync subsystem and a revision/ACK message contract,
 | 2026-08-24 | Keep-local uses exact-validator recheck, public filesystem write, byte verification, and same-content VS Code revert | `TextDocument.save()` correctly rejects the stale etag after a true conflict; the selected path refreshes the model's clean/etag state while retaining the existing Undo history. |
 | 2026-08-24 | Treat residual theme/accessibility, forced live receipt-loss, rename/delete/save-as, multi-root, large-file, and exact agent-runtime repetitions as release-candidate QA | Focused implementation invariants, generic external writes, Markdown/CSV, multi-view, conflict safety, both recovery paths, and repository gates are sprint evidence; the broader platform/UI matrix remains explicitly visible rather than being overclaimed. |
 | 2026-08-25 | Admin-merge reviewed Sprint 115 through protected `main` | Jarmo explicitly authorized the override after post-review stale-edit/keep-local hardening and the 26/26 focused, compile, typecheck, build, and repository QA gates passed; PR #222 merged as `b889dcd` and closed #221. |
+| 2026-08-31 | Match delayed disk snapshots to exact local save receipts | A user can type again before the previous save becomes observable on disk. Capturing the logical content hash in `onWillSaveTextDocument` lets that disk snapshot advance the common base while preserving newer model text as local-only; an unknown disk hash still takes the normal three-way conflict path. |
 
 ## Planning Approval
 

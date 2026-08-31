@@ -218,6 +218,7 @@ These are not hidden feature-complete exceptions. They require the exact candida
 | 2026-08-25 | Pin SheetJS, close production advisories, and accept the proven Finder-free DMG path | Jarmo explicitly chose the XLSX pin and delegated the remaining technical release decisions. SheetJS uses the official 0.20.3 tarball; reviewed exact pins/overrides make both production audits clean. If Finder layout AppleEvents remain unresponsive, use the v1.8.2/v1.8.6 `ditto`/`hdiutil` precedent, then require the same signature, mount, architecture, content, Gatekeeper, and checksum gates. |
 | 2026-08-24 | Keep-local uses exact disk validation plus public write and same-content model refresh | VS Code correctly rejects normal save after a true disk conflict; the selected public-API path verifies the selected bytes, refreshes clean/etag state, and retains Undo. |
 | 2026-08-27 | Treat duplicate Claude aliases as a focused RC bug fix, not a new sprint | The provider exposes two request spellings for one resolved model; the correction is contained to catalog identity, runtime verification, picker projection, and regressions. |
+| 2026-08-31 | Treat empty-first-H1 and delayed local-save conflict handling as focused RC corrections, not a new sprint | Both are regressions inside the existing editor and Sprint 115 contracts. Exact pre-save content receipts distinguish the user's own delayed disk write from an independent writer without a timing heuristic; empty structural TipTap blocks no longer masquerade as initial mount. |
 
 ## Planning Approval
 

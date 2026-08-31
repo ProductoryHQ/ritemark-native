@@ -107,6 +107,8 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] A generic external write appears in a focused open Markdown editor without close/reopen; a normal loaded view acknowledges in 5–75 ms in the observed run.
 - [x] A visible CSV table applies a clean external write and acknowledges only after parsing/render scheduling, without a false header action.
 - [x] Local-only typing with autosave off stays visible and quiet beyond the former ten-second timer while disk bytes remain unchanged.
+- [x] Twenty rapid type → save → continue-typing cycles keep the view quiet, retain every visible suffix, and end byte-equivalent to disk; the deterministic save-receipt suite still routes an unknown disk snapshot to true conflict classification (2026-08-31 RC correction).
+- [x] An empty Markdown document accepts `# ` as the first input rule, renders the following text as H1, saves as `# …`, and shows no conflict surface (2026-08-31 live dev smoke plus focused regression).
 - [x] True divergence preserves immutable local and disk snapshots beyond ten seconds and exposes only **Review changes**.
 - [x] **Compare changes** opens read-only in-memory text inputs without recursively activating the custom editor.
 - [x] **Use disk version** is one model edit; Cmd-Z restores the exact prior local snapshot as dirty while disk remains unchanged.
@@ -130,6 +132,7 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] Sprint 111 exact-manifest validator, validator mutation tests, extension compile, focused runtime suites, and deterministic extension suite.
 - [x] Sprint 112 official QA, focused effort/runtime suites, conversation regressions, extension compile, and webview typecheck/build (2026-08-24).
 - [x] Sprint 115 focused state/protocol/delivery/reducer suite (26/26), extension compile, webview typecheck, production bundle, final-bundle Compare→Keep-local→Undo smoke, and official repository QA (final post-review automation rerun 2026-08-25).
+- [x] RC editor corrections: delayed local-save receipt tests, empty-heading reconciliation tests, extension compile, webview typecheck/build, and live empty-H1 plus 20-cycle rapid-save smoke pass (2026-08-31).
 - [x] Release preflight passes on clean synchronized `main` after all v1.10.0 sprints and focused RC fixes merge (2026-08-29).
 - [ ] Final packaged migration+resume canary passes on the exact arm64 Gate 1 candidate.
 

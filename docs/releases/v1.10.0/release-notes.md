@@ -127,7 +127,12 @@ Your own unsaved typing stays quiet while it legitimately leads the disk. If
 both your version and the disk changed from the same base, Ritemark preserves
 both and offers **Compare changes**, **Keep my version**, and **Use disk
 version**. The old always-on file-changed control and its automatic ten-second
-reload are gone; no background timer resolves a conflict for you.
+reload are gone; no background timer resolves a conflict for you. Rapidly
+continuing to type after Save also stays quiet: the later disk event is matched
+to that exact local save instead of being mistaken for another writer.
+
+Blank Markdown documents also keep the normal `# ` shortcut on the first line,
+so you can begin with a title without adding body text first.
 
 > Native continuation is intentionally version- and configuration-specific. “Previous messages were included” means transcript fallback, not complete private model memory.
 

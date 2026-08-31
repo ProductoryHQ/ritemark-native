@@ -21,6 +21,32 @@ export interface ViewResolutionReceipt {
 
 export type StaleViewEditDisposition = 'already-current' | 'materialize-conflict' | 'reject';
 
+export interface LocalSaveEcho {
+  remainingHashes: string[];
+  state: 'synced' | 'local-only';
+}
+
+/**
+ * Match a disk snapshot to content captured by VS Code immediately before a
+ * local save. The model may already have advanced again by the time those bytes
+ * become observable on disk; that is save lag, not a two-writer conflict.
+ *
+ * Use the newest matching occurrence so a collapsed sequence of saves retires
+ * every older pending snapshot while preserving any later save still in flight.
+ */
+export function consumeLocalSaveEcho(
+  pendingHashes: readonly string[],
+  diskHash: string,
+  modelHash: string,
+): LocalSaveEcho | undefined {
+  const matchIndex = pendingHashes.lastIndexOf(diskHash);
+  if (matchIndex < 0) return undefined;
+  return {
+    remainingHashes: pendingHashes.slice(matchIndex + 1),
+    state: diskHash === modelHash ? 'synced' : 'local-only',
+  };
+}
+
 /**
  * Decide whether a full-document edit from an older visible revision can be
  * preserved safely. If the current model still equals disk, the stale view and

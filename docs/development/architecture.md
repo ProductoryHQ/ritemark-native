@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-29 (v1.10.0 RC — native conversation deletion notifications)
+**Last updated:** 2026-08-31 (v1.10.0 RC — exact local-save receipts and empty-heading reconciliation)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -72,6 +72,7 @@ user edits
 
 watcher / TextDocument / save / 3 s poll invalidates a URI
   → coordinator compares disk, model, and retained base
+  → an exact pre-save receipt identifies the user's own delayed disk write
   → clean external: converge TextDocument first, then publish a revision
   → local-only: keep quiet
   → two-sided divergence: preserve both snapshots and require explicit resolution
@@ -81,7 +82,7 @@ watcher / TextDocument / save / 3 s poll invalidates a URI
 
 ### Editor–disk synchronization (Sprint 115)
 
-`src/editorSync/DocumentSyncCoordinator.ts` is the sole owner of Markdown/CSV synchronization state. `RitemarkEditorProvider` adapts VS Code lifecycle and payload serialization; it no longer infers visibility from `postMessage`, watcher timing, a bounded self-hash list, or a destructive reload timer. The webview owns rendering only and proves it with an exact receipt.
+`src/editorSync/DocumentSyncCoordinator.ts` is the sole owner of Markdown/CSV synchronization state. `RitemarkEditorProvider` adapts VS Code lifecycle and payload serialization; it no longer infers visibility from `postMessage`, watcher timing, a time-bounded self-write heuristic, or a destructive reload timer. The webview owns rendering only and proves it with an exact receipt.
 
 Each URI record owns one `TextDocument`, one watcher, one three-second level-triggered fallback poll, one serialized transition queue, one document-session UUID, and zero or more independent view leases. Each view lease owns its epoch UUID, last client sequence, last acknowledged server revision, and one bounded delivery schedule. Hiding or closing one view never destroys another view's URI resources.
 
@@ -95,9 +96,13 @@ The coordinator keeps three content identities separate:
 
 The derived states are intentionally asymmetric. A model ahead of an unchanged disk is ordinary local-only/autosave state and has no header action. A disk-only change is imported into the `TextDocument` under version/hash preconditions and sent to focused views. A true two-sided change freezes local and disk evidence and shows **Review changes**. There is no background choice between versions.
 
+Save lag is classified by identity, not time. Immediately before VS Code saves a tracked document, the coordinator records that model's normalized logical hash. If a later disk snapshot matches one of those exact pending receipts while the model has already advanced, the disk snapshot becomes the new common ancestor and the newer model remains local-only. Receipts are consumed through the newest match and retired whenever another authoritative base is established. A disk hash that matches no local receipt still follows the normal three-way path and can produce a true conflict.
+
 `document:update` is idempotently sent immediately and retried at 750 ms and 2.5 s. Five seconds without the exact session + epoch + revision + payload-hash `document:applied` receipt produces **Retry document update**; a newer revision cancels the old budget. Hidden/disposed leases are dormant and receive the newest snapshot when visible/ready again.
 
 Markdown applies the smallest valid ProseMirror structural transaction, maps selection through it, restores focus/scroll, and uses a clamped whole-document fallback only when structural application cannot reproduce the target. CSV acknowledges only after parsing and a committed render frame. Host-applied updates suppress normal edit feedback.
+
+The React-to-TipTap value reconciler uses explicit causes (initial mount, a genuinely external value, or image-mapping refresh). It never infers initial mount from an empty Markdown projection: an empty H1 created by the `# ` input rule is valid editor structure even though Turndown serializes it as an empty string until the first title character arrives.
 
 Conflicts expose memory-only `ritemark-sync:` local/disk `.txt` snapshots through VS Code's read-only diff editor. The non-custom suffix prevents recursive Ritemark editor activation. **Use disk version** is one undoable `WorkspaceEdit`. **Keep my version** rechecks the exact disk validator, writes through the public VS Code filesystem API, and performs a same-content revert solely to refresh the text model's etag/clean marker; the no-op model resolve preserves the existing undo stack. Conflict evidence is cleared only after every currently visible view acknowledges the resolution revision. A hidden view does not block resolution and receives current state when it returns.
 

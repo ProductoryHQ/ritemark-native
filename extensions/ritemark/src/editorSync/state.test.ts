@@ -6,6 +6,7 @@ import {
   classifyAcceptedModelEdit,
   classifyStaleViewEdit,
   classifyThreeWay,
+  consumeLocalSaveEcho,
   initializeThreeWayState,
   normalizeLogicalText,
 } from './state';
@@ -18,6 +19,28 @@ test('three-way classifier distinguishes external-only, converged, and conflict'
   assert.equal(classifyThreeWay({ baseDiskHash: 'a', baseModelHash: 'a', diskHash: 'b', modelHash: 'a' }), 'external-only');
   assert.equal(classifyThreeWay({ baseDiskHash: 'a', baseModelHash: 'a', diskHash: 'b', modelHash: 'b' }), 'converged');
   assert.equal(classifyThreeWay({ baseDiskHash: 'a', baseModelHash: 'a', diskHash: 'b', modelHash: 'c' }), 'conflict');
+});
+
+test('a delayed local save remains local-only when the model has advanced', () => {
+  assert.deepEqual(consumeLocalSaveEcho(['local-b'], 'local-b', 'local-c'), {
+    remainingHashes: [],
+    state: 'local-only',
+  });
+});
+
+test('collapsed saves consume through the newest matching local snapshot', () => {
+  assert.deepEqual(consumeLocalSaveEcho(['local-b', 'local-c', 'local-b', 'local-d'], 'local-b', 'local-e'), {
+    remainingHashes: ['local-d'],
+    state: 'local-only',
+  });
+  assert.deepEqual(consumeLocalSaveEcho(['local-b'], 'local-b', 'local-b'), {
+    remainingHashes: [],
+    state: 'synced',
+  });
+});
+
+test('an unrecognized disk snapshot is still eligible for real conflict classification', () => {
+  assert.equal(consumeLocalSaveEcho(['local-b'], 'external-d', 'local-c'), undefined);
 });
 
 test('logical normalization ignores one BOM and EOL representation', () => {

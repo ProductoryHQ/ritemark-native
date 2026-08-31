@@ -44,4 +44,12 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/agent/|e
   )
 fi
 
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/editorSync/|extensions/ritemark/webview/src/(components/Editor\.tsx|documentSyncReducer|editorValueReconciliation))'; then
+  echo "Editor synchronization changes detected; running targeted editor tests..."
+  (
+    cd "$PROJECT_ROOT/extensions/ritemark"
+    npm run test:editor-sync
+  )
+fi
+
 echo "Codex QA validation passed"
