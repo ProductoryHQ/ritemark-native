@@ -222,7 +222,7 @@ export function AISidebar() {
         <div className="mx-3 mt-3 rounded-[10px] border border-[var(--r-warning)] bg-[var(--r-warning-soft)] p-3" role="alert">
           <div className="flex items-start gap-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--r-surface)] text-[var(--r-warning)]">
-              <Icon name="warning" size={17} />
+              <Icon name="warning" size={16} />
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="text-xs font-semibold text-[var(--r-ink-strong)]">Could not check {runtimeLabel}</h2>

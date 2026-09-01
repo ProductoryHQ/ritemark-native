@@ -1,4 +1,5 @@
 import type { ModelOption } from './types';
+import { modelDisplayName } from './modelPresentation';
 
 export const AI_DISCLOSURE_STORAGE_KEY = 'ritemark.ai-disclosure.acknowledged.v1';
 
@@ -69,8 +70,11 @@ const PROVIDERS: Record<string, { label: string; informationUrl: string }> = {
   },
 };
 
-function modelLabel(models: ModelOption[] | undefined, id: string): string {
-  return models?.find((model) => model.id === id)?.label || id || 'Not selected';
+function modelLabel(models: ModelOption[] | undefined, id: string, preferDescriptionVersion = false): string {
+  return modelDisplayName(
+    models?.find((model) => model.id === id),
+    preferDescriptionVersion,
+  ) || id || 'Not selected';
 }
 
 function modelIdForRuntime(
@@ -136,7 +140,7 @@ export function resolveAIIdentity(input: ResolveAIIdentityInput): AIIdentity {
     providerId: 'anthropic',
     providerLabel: PROVIDERS.anthropic.label,
     modelId,
-    modelLabel: modelLabel(input.claudeModels, modelId),
+    modelLabel: modelLabel(input.claudeModels, modelId, true),
     providerInformationUrl: PROVIDERS.anthropic.informationUrl,
   };
 }

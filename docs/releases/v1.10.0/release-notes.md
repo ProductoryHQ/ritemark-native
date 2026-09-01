@@ -103,6 +103,11 @@ any runtime or account check can finish. Slow Claude/Codex startup, a locked
 keychain, workspace discovery, or a stale cached sidebar bundle can no longer
 leave the composer at a permanent `Model` placeholder; those checks report and
 retry independently without removing the available model choices.
+Large conversation archives and a full legacy webview-storage quota are also
+isolated from this startup path: Ritemark commits the model selector first,
+then lets the host choose the conversation authority without duplicating the
+old archive. History-storage problems can no longer prevent Agent Chat itself
+from opening, and the original legacy records remain available for migration.
 In a compact AI sidebar, the selected model also gets priority in the composer
 footer: the closed permission control reduces to its icon and thinking effort
 uses a level-aware icon, while full labels remain available in opened controls,

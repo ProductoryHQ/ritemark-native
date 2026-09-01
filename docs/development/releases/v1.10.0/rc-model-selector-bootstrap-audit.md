@@ -1,6 +1,6 @@
 # RC correction audit: Agent Chat model bootstrap
 
-**Status:** Architecture and repository QA passed; merge/release preflight pending  
+**Status:** prior RC invalidated; correction passes source and RunDev quota gates; replacement RC not built
 **Release:** v1.10.0  
 **Observed:** 2026-09-01 in the signed RC installed at `/Applications/Ritemark.app`  
 **Scope:** Bug fix / RC correction, not a new sprint
@@ -19,6 +19,85 @@ The UI state is internally contradictory:
 - the global model arrays and the active conversation's selected model are still
   empty;
 - the model selector therefore has neither a label nor selectable rows.
+
+## 2026-09-01 packaged-RC escape: full legacy storage
+
+The first replacement RC built from merged commit `b811a18` is **invalid**. A
+real upgraded profile with a large legacy conversation inventory renders
+**Agent Chat could not start**. The packaged webview console proves the
+deterministic failure:
+
+```text
+[chatHistoryStorage] Migration failed: QuotaExceededError
+Uncaught QuotaExceededError: setItem('ritemark-chat-migrated-…') exceeded the quota
+```
+
+This was not covered by the fresh-profile and stale-model-alias evidence below.
+The tested profiles had enough empty `localStorage` capacity, so they validated
+model/bootstrap ordering while missing a startup dependency that becomes fatal
+only for upgraded users with real history.
+
+The exact causal chain is:
+
+1. the host sends the otherwise atomic `agent:bootstrap` payload;
+2. the webview handles it by calling `setWorkspaceContext()` before committing
+   `ready/models`;
+3. `setWorkspaceContext()` synchronously calls the old writable
+   global-to-workspace `localStorage` migration while the host conversation
+   rollout mode is still `unknown`;
+4. the migration copies full conversation records, temporarily duplicating
+   large data and exhausting quota;
+5. its bulk-copy failure is caught, but the final migration-marker `setItem()`
+   is outside that `try/catch` and throws again;
+6. the uncaught exception aborts the bootstrap message handler before the
+   Zustand store commits `ready: true` and the model catalogs.
+
+This violates the architecture in two ways: the critical bootstrap path still
+has synchronous writable storage side effects, and legacy storage is mutated
+before the host has declared whether it is authoritative or read-only.
+
+### Corrected architecture (validated before implementation)
+
+The bootstrap boundary and conversation-storage boundary are separate state
+machines. Neither may synchronously enter the other:
+
+```text
+agent:bootstrap
+  -> validate + commit catalogs/selection/ready       (no storage I/O)
+  -> request conversation/initialize                 (independent hydration)
+
+conversation/initialize result
+  -> host-canonical / host-compat: make legacy storage read-only, inventory only
+  -> legacy: use legacy presentation without a write-on-bootstrap migration
+```
+
+Locked invariants for the correction:
+
+- `setWorkspaceContext()` is a pure in-memory context setter;
+- no `localStorage.getItem/setItem/removeItem` is reachable before the atomic
+  bootstrap commit;
+- host-canonical and host-compat modes never write legacy conversation storage;
+- legacy discovery inventories original records read-only; it does not first
+  duplicate them under workspace-prefixed keys;
+- quota, malformed JSON, or an unavailable storage implementation can degrade
+  conversation history only; they cannot clear catalogs, block the model
+  selector, or throw out of the host-message listener;
+- no recovery path deletes or overwrites the original legacy records;
+- storage-full and storage-throwing profiles are mandatory packaged-app release
+  rows, alongside fresh and stale-alias profiles.
+
+### New pre-implementation proof gates
+
+Before production code changes, tests must fail on the merged RC source and
+prove both boundaries independently:
+
+1. a quota-throwing `Storage` implementation proves `setWorkspaceContext()` is
+   side-effect-free and preserves the original inventory;
+2. a real store bootstrap under the same storage proves `handleExtensionMessage`
+   does not throw and still commits the selected model/catalog/`ready` state;
+3. host-canonical initialization proves zero legacy writes;
+4. the legacy-mode path proves read failures are contained and original records
+   remain untouched.
 
 ## Current causal chain
 
@@ -298,6 +377,34 @@ The design is not accepted until all rows are executable tests or RunDev proof.
   environment, and Developer ID identity pass. The two warnings are deliberate
   until merge: uncommitted changes and the non-`main` bugfix branch. Public
   releases stop at v1.9.0, so v1.10.0 remains the next valid version.
+- **2026-09-01 — the packaged-RC quota failure was reproduced as two red source
+  tests before the correction.** `chatHistoryStorageQuota.test.ts` threw from
+  the same legacy-copy/marker path shown in the user's packaged console, and
+  `bootstrapStorageIsolation.test.ts` proved the exception prevented the real
+  store from committing `ready/models`. Both tests now run in the mandatory
+  agent-lifecycle QA gate.
+- **2026-09-01 — corrected storage boundary passed a real full-quota RunDev
+  canary.** `scripts/qa/agent-chat-storage-canary.cjs` first verified an isolated
+  `quota-canary` profile, then stored a 2,000,147-byte legacy conversation and
+  201 filler blocks until Chromium returned `QuotaExceededError`. After a full
+  workbench reload, the Agent Chat remained usable, displayed `Sonnet 5`, logged
+  no quota/bootstrap error, retained the legacy record byte-for-byte, and
+  created neither a scoped copy nor a migration marker. The canary refuses to
+  clear storage unless the workbench title contains `quota-canary`.
+- **2026-09-01 — live-model label drift was caught by the canary and fixed before
+  merge.** A live SDK row used request label `Sonnet` but picker primary text
+  `Sonnet 5`; the closed selector and disclosure now use the same primary-name
+  function as the open row. The first canary run failed on this invariant, the
+  new source test was red before implementation, and the second run passed.
+  Visual evidence: `research/screenshots/agent-bootstrap-quota-full.png` and
+  `research/screenshots/agent-bootstrap-quota-full-models.png`. The open picker
+  contains one row each for Opus 5, Fable 5, Sonnet 5, and Haiku 4.5; the default
+  is marked with `*` rather than rendered as a duplicate.
+- **2026-09-01 — post-correction repository QA passed.**
+  `./scripts/validate-qa.sh` passed after the quota, malformed-record, atomic
+  bootstrap, and consistent-model-name regressions were added to required test
+  scripts. A malformed record preceding a valid record no longer hides the
+  valid host-import candidate.
 
 ## Post-implementation release gate
 
@@ -306,4 +413,7 @@ The design is not accepted until all rows are executable tests or RunDev proof.
 - the AI sidebar is tested in a new window and a second simultaneous window;
 - runtime and SecretStorage failures are injected independently;
 - screenshots are captured and visually inspected at normal and narrow widths;
-- the replacement RC is rebuilt only after this evidence is recorded.
+- the replacement RC is rebuilt from merged `main` only after this evidence is
+  recorded;
+- the mounted packaged app must pass the same guarded full-quota canary before
+  the replacement RC is handed to Gate 1.

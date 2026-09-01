@@ -115,6 +115,7 @@ export function normalizeMetadata(raw: SavedConversation | SavedConversationV2):
 // ── Workspace scoping ────────────────────────────────────────────────
 
 let _workspacePath: string | undefined;
+let _legacyStorageScope: 'workspace' | 'global' = 'workspace';
 
 /**
  * Simple hash of workspace path for localStorage key scoping.
@@ -131,7 +132,7 @@ function hashWorkspacePath(path: string): string {
 }
 
 function getStoragePrefix(): string {
-  if (_workspacePath) {
+  if (_workspacePath && _legacyStorageScope === 'workspace') {
     return `${GLOBAL_PREFIX}${hashWorkspacePath(_workspacePath)}-`;
   }
   return GLOBAL_PREFIX;
@@ -142,74 +143,45 @@ function getMetadataKey(): string {
 }
 
 /**
- * Set the workspace path for per-project history scoping.
- * Called once when the webview receives workspace info from the extension.
- * Automatically migrates legacy global conversations on first use.
+ * Set the workspace path for per-project history scoping. This critical
+ * bootstrap operation is intentionally side-effect-free; the host rollout
+ * result decides later whether legacy storage is authoritative at all.
  */
 export function setWorkspaceContext(workspacePath: string | undefined): void {
+  if (_workspacePath === workspacePath) return;
   _workspacePath = workspacePath;
-  if (workspacePath) {
-    migrateGlobalConversations();
-  }
+  _legacyStorageScope = workspacePath ? 'workspace' : 'global';
 }
 
-const MIGRATION_DONE_KEY = 'ritemark-chat-migrated';
-
 /**
- * One-time migration: copy conversations from the old global prefix
- * into the current workspace-scoped prefix.
+ * Select the existing legacy authority after the host has explicitly kept the
+ * webview in pre-cutover legacy mode. This is deliberately read-only: copying
+ * full records during bootstrap can temporarily double storage and exhaust the
+ * webview quota. Existing scoped data wins; otherwise an existing global store
+ * remains readable/writable for rollback compatibility. A brand-new store uses
+ * workspace scope.
  */
-function migrateGlobalConversations(): void {
-  if (_legacyStorageReadOnly) return;
-  const scopedMetaKey = getMetadataKey();
-
-  // Skip if this workspace already has data or was already migrated
-  const alreadyMigrated = localStorage.getItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`) === '1';
-  if (alreadyMigrated) return;
-
-  const existingScoped = localStorage.getItem(scopedMetaKey);
-  if (existingScoped) {
-    // Already has workspace-scoped data — mark done and skip
-    localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
-    return;
+export function selectLegacyStorageScope(): 'workspace' | 'global' {
+  if (_legacyStorageReadOnly || !_workspacePath) {
+    _legacyStorageScope = _workspacePath ? 'workspace' : 'global';
+    return _legacyStorageScope;
   }
-
-  // Read old global metadata
-  const globalMetaKey = `${GLOBAL_PREFIX}metadata`;
-  const globalRaw = localStorage.getItem(globalMetaKey);
-  if (!globalRaw) {
-    localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
-    return;
-  }
-
   try {
-    const globalMeta = JSON.parse(globalRaw) as (SavedConversation | SavedConversationV2)[];
-    if (globalMeta.length === 0) {
-      localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
-      return;
+    const scopedMetadataKey = `${GLOBAL_PREFIX}${hashWorkspacePath(_workspacePath)}-metadata`;
+    if (localStorage.getItem(scopedMetadataKey)) {
+      _legacyStorageScope = 'workspace';
+    } else if (localStorage.getItem(`${GLOBAL_PREFIX}metadata`)) {
+      _legacyStorageScope = 'global';
+    } else {
+      _legacyStorageScope = 'workspace';
     }
-
-    // Copy each conversation to workspace-scoped keys
-    const migratedMeta: SavedConversationV2[] = [];
-    for (const meta of globalMeta) {
-      const oldKey = `${GLOBAL_PREFIX}${meta.id}`;
-      const data = localStorage.getItem(oldKey);
-      if (data) {
-        localStorage.setItem(getConversationKey(meta.id), data);
-        migratedMeta.push(normalizeMetadata(meta));
-      }
-    }
-
-    // Save workspace-scoped metadata
-    if (migratedMeta.length > 0) {
-      localStorage.setItem(scopedMetaKey, JSON.stringify(migratedMeta));
-      console.log(`[chatHistoryStorage] Migrated ${migratedMeta.length} conversations to workspace scope`);
-    }
-  } catch (err) {
-    console.warn('[chatHistoryStorage] Migration failed:', err);
+  } catch (error) {
+    // Storage availability is optional UI state. Keep a deterministic scope and
+    // let the existing guarded read helpers surface an empty legacy list.
+    _legacyStorageScope = 'workspace';
+    console.warn('[chatHistoryStorage] Could not select legacy storage scope:', error);
   }
-
-  localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
+  return _legacyStorageScope;
 }
 
 // ── Storage Functions ─────────────────────────────────────────────────
@@ -237,36 +209,45 @@ function getConversationKey(id: string): string {
 export function discoverLegacyConversationCandidates(): LegacyConversationCandidateV1[] {
   const candidates: LegacyConversationCandidateV1[] = [];
   const seen = new Set<string>();
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const metadataKey = localStorage.key(index);
-    if (!metadataKey?.startsWith(GLOBAL_PREFIX) || !metadataKey.endsWith('metadata')) continue;
-    try {
-      const raw = localStorage.getItem(metadataKey);
-      const metadata = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(metadata)) continue;
-      const prefix = metadataKey.slice(0, -'metadata'.length);
-      for (const value of metadata) {
-        if (!value || typeof value !== 'object') continue;
-        const meta = value as Record<string, unknown>;
-        if (typeof meta.id !== 'string') continue;
-        const sourceKey = `${prefix}${meta.id}`;
-        if (seen.has(sourceKey)) continue;
-        const sourceRaw = localStorage.getItem(sourceKey);
-        if (!sourceRaw) continue;
-        seen.add(sourceKey);
-        candidates.push({
-          sourceKey,
-          sourceId: meta.id,
-          ...(typeof meta.title === 'string' ? { title: meta.title } : {}),
-          ...(typeof meta.agentId === 'string' ? { agentId: meta.agentId } : {}),
-          ...(typeof meta.createdAt === 'number' ? { createdAt: meta.createdAt } : {}),
-          ...(typeof meta.updatedAt === 'number' ? { updatedAt: meta.updatedAt } : {}),
-          data: JSON.parse(sourceRaw),
-        });
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const metadataKey = localStorage.key(index);
+      if (!metadataKey?.startsWith(GLOBAL_PREFIX) || !metadataKey.endsWith('metadata')) continue;
+      try {
+        const raw = localStorage.getItem(metadataKey);
+        const metadata = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(metadata)) continue;
+        const prefix = metadataKey.slice(0, -'metadata'.length);
+        for (const value of metadata) {
+          if (!value || typeof value !== 'object') continue;
+          const meta = value as Record<string, unknown>;
+          if (typeof meta.id !== 'string') continue;
+          const sourceKey = `${prefix}${meta.id}`;
+          if (seen.has(sourceKey)) continue;
+          try {
+            const sourceRaw = localStorage.getItem(sourceKey);
+            if (!sourceRaw) continue;
+            const data = JSON.parse(sourceRaw);
+            seen.add(sourceKey);
+            candidates.push({
+              sourceKey,
+              sourceId: meta.id,
+              ...(typeof meta.title === 'string' ? { title: meta.title } : {}),
+              ...(typeof meta.agentId === 'string' ? { agentId: meta.agentId } : {}),
+              ...(typeof meta.createdAt === 'number' ? { createdAt: meta.createdAt } : {}),
+              ...(typeof meta.updatedAt === 'number' ? { updatedAt: meta.updatedAt } : {}),
+              data,
+            });
+          } catch (error) {
+            console.warn('[chatHistoryStorage] Skipped malformed legacy record:', sourceKey, error);
+          }
+        }
+      } catch (error) {
+        console.warn('[chatHistoryStorage] Skipped malformed legacy inventory:', metadataKey, error);
       }
-    } catch (error) {
-      console.warn('[chatHistoryStorage] Skipped malformed legacy inventory:', metadataKey, error);
     }
+  } catch (error) {
+    console.warn('[chatHistoryStorage] Legacy inventory unavailable:', error);
   }
   return candidates;
 }
