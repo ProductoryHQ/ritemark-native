@@ -707,7 +707,10 @@ the selected model. `ai-key-status` is credential data only and never marks the
 sidebar configured. The legacy `agent:config` receiver remains temporarily for
 older bundles. A host emits that compatibility shape only when it receives the
 old bundle's `ready` request, and derives it from the same pure bootstrap data;
-the removed monolithic runtime/credential probe is never revived.
+the removed monolithic runtime/credential probe is never revived. Filesystem
+discovery still runs after that core response; a legacy view receives its later
+agent/command result as a second `agent:config`, while a current view receives
+the typed `agent:discovery` domain message.
 
 The Agent Chat HTML versions `media/webview.js` with the bundle mtime, matching
 the editor provider. A host update must never reuse an unversioned cached

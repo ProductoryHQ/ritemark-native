@@ -103,7 +103,11 @@ import {
   SINGLE_RUNTIME_ATTACHMENT_LIMIT,
 } from '../conversations/runtimeAttachmentPolicy';
 import { buildNormalizedContextPack } from '../conversations/contextPack';
-import { buildAgentSidebarBootstrap, AgentSidebarBootstrapError } from './agentSidebarBootstrap';
+import {
+  buildAgentSidebarBootstrap,
+  buildLegacyAgentSidebarConfig,
+  AgentSidebarBootstrapError,
+} from './agentSidebarBootstrap';
 import { versionedWebviewAssetUri } from './webviewAssetUri';
 
 /**
@@ -123,6 +127,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   private _viewGeneration = 0;
   private _hydratedViewGeneration = 0;
+  private _legacySidebarViewGeneration = 0;
   private readonly _sidebarStatusRevisions: Record<AgentId | 'discovery', number> = {
     'claude-code': 0,
     codex: 0,
@@ -219,6 +224,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   ) {
     this._view = webviewView;
     const viewGeneration = ++this._viewGeneration;
+    this._legacySidebarViewGeneration = 0;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -268,6 +274,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       switch (message.type) {
         case 'ready': // Compatibility request from an older webview bundle.
         case 'agent:bootstrap/request': {
+          if (message.type === 'ready') this._legacySidebarViewGeneration = viewGeneration;
           const delivered = await this._sendAgentBootstrap(
             webviewView.webview,
             viewGeneration,
@@ -1185,6 +1192,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       if (this._isCurrentSidebarView(webviewView.webview, viewGeneration)) {
         this._view = undefined;
         this._hydratedViewGeneration = 0;
+        this._legacySidebarViewGeneration = 0;
       }
     });
     this._refreshBrowserContextPolling();
@@ -1435,6 +1443,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     webview: vscode.Webview,
     generation: number,
     responseType: 'agent:bootstrap' | 'agent:config' = 'agent:bootstrap',
+    legacyDiscovery?: { agents: ReturnType<typeof discoverAgents>; commands: ReturnType<typeof discoverCommands> },
   ): Promise<boolean> {
     if (!this._isCurrentSidebarView(webview, generation)) return false;
 
@@ -1473,7 +1482,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       // answer in the shape it understands — from the same pure atomic data,
       // never by reviving the removed monolithic runtime probe.
       const response = responseType === 'agent:config'
-        ? { ...message, type: 'agent:config' as const }
+        ? buildLegacyAgentSidebarConfig(message, legacyDiscovery)
         : message;
       return this._postCurrentSidebarMessage({ webview, generation }, response, 'bootstrap');
     } catch (error) {
@@ -1522,6 +1531,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         agents,
         commands,
       }, 'discovery');
+      if (this._legacySidebarViewGeneration === target.generation) {
+        await this._sendAgentBootstrap(target.webview, target.generation, 'agent:config', { agents, commands });
+      }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       console.error('[Agent Chat discovery] Could not discover agents or commands:', error);
@@ -1535,6 +1547,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         commands: [],
         error: detail,
       }, 'discovery');
+      if (this._legacySidebarViewGeneration === target.generation) {
+        await this._sendAgentBootstrap(target.webview, target.generation, 'agent:config', { agents: [], commands: [] });
+      }
     }
   }
 

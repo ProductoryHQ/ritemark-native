@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { AGENTS } from '../agent/types';
 import { RUNTIME_CAPABILITIES } from '../runtime/capabilities';
-import { buildAgentSidebarBootstrap } from './agentSidebarBootstrap';
+import { buildAgentSidebarBootstrap, buildLegacyAgentSidebarConfig } from './agentSidebarBootstrap';
 
 const claudeModels = [
   {
@@ -46,6 +46,36 @@ function main(): void {
   assert.equal(bootstrap.generation, 7);
   assert.equal(bootstrap.selectedModel, 'claude-opus-5[1m]', 'persisted alias must resolve atomically');
   assert.equal(bootstrap.models.length, 2);
+
+  const legacy = buildLegacyAgentSidebarConfig(bootstrap, {
+    agents: [{
+      id: 'project:researcher',
+      name: 'researcher',
+      description: 'Research agent',
+      filePath: '/tmp/.claude/agents/researcher.md',
+      scope: 'project',
+      hasFrontmatter: true,
+      isMainAgent: false,
+      modifiedAt: 1,
+      icon: 'magnifying-glass',
+      color: 'indigo',
+    }],
+    commands: [{
+      id: 'project:summarize',
+      name: 'summarize',
+      description: 'Summarize',
+      source: 'commands',
+      filePath: '/tmp/.claude/commands/summarize.md',
+      scope: 'project',
+      hasFrontmatter: true,
+      modifiedAt: 1,
+      icon: 'file-text',
+      color: 'indigo',
+    }],
+  });
+  assert.equal(legacy.type, 'agent:config');
+  assert.equal(legacy.discoveredAgents[0].name, 'researcher');
+  assert.equal(legacy.discoveredCommands[0].name, 'summarize');
 
   const stale = buildAgentSidebarBootstrap({ ...input(), persistedClaudeModel: 'removed-model' });
   assert.equal(stale.selectedModel, 'claude-opus-5[1m]', 'stale id must use the canonical default');

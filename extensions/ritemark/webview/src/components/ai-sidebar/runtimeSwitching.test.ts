@@ -412,6 +412,25 @@ function testOpenCodeTransmitsAttachmentsAndHonoursActiveFileRemoval() {
   }
 }
 
+function testSelectingCodexHasOneHostOwnedRefreshPath() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    seedActiveConversation({ selectedAgent: 'claude-code' });
+    useAISidebarStore.getState().selectAgent('codex');
+
+    assert.deepEqual(posted, [{
+      type: 'ai-select-agent',
+      agentId: 'codex',
+      conversationId: 'conv-active',
+    }], 'the host selection handler owns the one runtime-status refresh');
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
 
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
@@ -425,6 +444,7 @@ function main() {
   testFailedRuntimeCanBeStoppedAndHandedToAnotherAgent();
   testOpenCodeLeavesCanonicalHandoffContextToHost();
   testOpenCodeTransmitsAttachmentsAndHonoursActiveFileRemoval();
+  testSelectingCodexHasOneHostOwnedRefreshPath();
   console.log('Runtime switching tests passed.');
 }
 

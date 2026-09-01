@@ -260,7 +260,9 @@ The design is not accepted until all rows are executable tests or RunDev proof.
   `Claude · Model` indefinitely. After building the same source and reloading the
   mtime-versioned script, both the workspace window and a second simultaneous
   no-workspace window rendered `Codex · OpenAI · GPT-5.6-Sol`; their DOMs loaded
-  the same `webview.js?v=1788271695012`. Visual evidence:
+  the same review-final `webview.js?v=1788272930071`. The workspace capture also
+  proves the selected model remains visible while Codex is checking and after it
+  reaches ready. Visual evidence:
   `research/screenshots/agent-bootstrap-workspace-window.png` and
   `research/screenshots/agent-bootstrap-second-window.png`.
 - **2026-09-01 — operational ordering reviewed.** Initial Claude and Codex
@@ -272,8 +274,15 @@ The design is not accepted until all rows are executable tests or RunDev proof.
 - **2026-09-01 — compatibility path reviewed.** The current bundle requests and
   consumes `agent:bootstrap`. If a prior bundle still sends its legacy `ready`
   handshake, the host answers with `agent:config` derived from the same pure
-  atomic bootstrap data; it does not reintroduce the old runtime/keychain-bound
-  config builder.
+  atomic bootstrap data, then projects the independently completed discovery
+  result through a later compatibility `agent:config` update. It does not
+  reintroduce the old runtime/keychain-bound config builder.
+- **2026-09-01 — PR review findings closed in source.** Review identified that a
+  legacy view would otherwise miss new-format discovery results and that Codex
+  selection still requested two overlapping status probes. The compatibility
+  projection now includes discovered agents/commands after the non-blocking
+  core response, and `ai-select-agent` is the sole host-owned runtime refresh;
+  focused regressions cover both contracts.
 - **2026-09-01 — repository QA passed.** `./scripts/validate-qa.sh` passed the
   runtime manifest, pre-commit checks, patch state, product icon metadata,
   native VS Code TypeScript check, agent lifecycle coverage, Codex approval

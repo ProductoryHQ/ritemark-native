@@ -3,6 +3,7 @@ import type { ModelEntry } from '../ai/modelCatalog';
 import { findModelEntry } from '../ai/modelCatalog/resolver';
 import type { RuntimeCapabilities } from '../runtime/capabilities';
 import type { AgentSidebarBootstrapMessage } from './agentSidebarProtocol';
+import type { DiscoveredAgent, DiscoveredCommand } from '../agent/discovery';
 
 export interface AgentSidebarBootstrapInput {
   generation: number;
@@ -30,6 +31,28 @@ export class AgentSidebarBootstrapError extends Error {
     super(message);
     this.name = 'AgentSidebarBootstrapError';
   }
+}
+
+export interface LegacyAgentSidebarConfigMessage extends Omit<AgentSidebarBootstrapMessage, 'type'> {
+  type: 'agent:config';
+  discoveredAgents: DiscoveredAgent[];
+  discoveredCommands: DiscoveredCommand[];
+}
+
+/**
+ * Compatibility projection for a pre-bootstrap webview. Discovery can arrive
+ * in a later config update so filesystem scanning never delays model catalogs.
+ */
+export function buildLegacyAgentSidebarConfig(
+  bootstrap: AgentSidebarBootstrapMessage,
+  discovery: { agents: DiscoveredAgent[]; commands: DiscoveredCommand[] } = { agents: [], commands: [] },
+): LegacyAgentSidebarConfigMessage {
+  return {
+    ...bootstrap,
+    type: 'agent:config',
+    discoveredAgents: discovery.agents,
+    discoveredCommands: discovery.commands,
+  };
 }
 
 /**
