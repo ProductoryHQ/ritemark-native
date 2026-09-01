@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-01 (v1.10.0 RC — atomic Agent Chat bootstrap)
+**Last updated:** 2026-09-01 (v1.10.0 RC — storage-isolated Agent Chat bootstrap)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -717,6 +717,19 @@ the editor provider. A host update must never reuse an unversioned cached
 webview script from an earlier release, because that would silently split the
 two halves of the protocol across versions.
 
+Conversation persistence is a post-bootstrap hydration domain. Applying
+`agent:bootstrap` commits catalogs, selection, and readiness before requesting
+`conversation/initialize`; no legacy transcript read or write is reachable from
+that atomic commit. `setWorkspaceContext()` changes only in-memory key context.
+After the host response, host-canonical/host-compat modes make legacy storage
+monotonically read-only and inventory the original records without copying
+them. Pre-cutover legacy mode selects an already-scoped archive when present,
+otherwise reads the existing global archive in place; a brand-new archive uses
+workspace scope. This avoids the temporary double-storage peak of the removed
+global-to-workspace copy migration. Quota, corrupt JSON, or unavailable webview
+storage may degrade History but can neither throw out of bootstrap nor hide the
+model selector, and original legacy records remain untouched for rollback.
+
 `src/ai/modelConfig.ts` is **retained but narrowed** — only OpenAI/Gemini image arrays,
 `DEFAULT_MODELS` (image defaults), and the `ModelConfig` types remain. Deleted: `CLAUDE_MODELS`,
 `DEFAULT_MODEL`, `BYOK_PROVIDER_MODELS`, `ClaudeModelOption`, `ByokProvider`/`ByokModelOption`/
@@ -786,6 +799,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-01 | v1.10.0 RC bugfix | **Storage-isolated Agent Chat bootstrap.** A packaged upgraded profile exposed that the pre-Sprint-109 global→workspace localStorage copier still ran synchronously inside `agent:bootstrap`; quota exhaustion aborted the handler before catalogs committed. Workspace selection is now side-effect-free, host rollout selects storage authority after bootstrap, host modes inventory legacy data read-only, and legacy rollback reads existing global data in place without duplicating it. Quota-full regressions are mandatory bootstrap/conversation QA. |
 | 2026-09-01 | v1.10.0 RC bugfix | **Atomic Agent Chat bootstrap.** The model/agent selector now hydrates from synchronous local authorities before any SecretStorage, runtime, process, network, or filesystem-discovery probe. Per-domain generation/revision guards reject stale window and out-of-order results; operational failures remain recoverable without erasing or hiding the bundled model floor. |
 | 2026-08-24 | Sprint 113 | **Typed Transcribe Insights output boundary.** The sandboxed workbench sends a validated Auto/known/custom language selection through one protocol; autocomplete search remains local UI state and any explicitly committed normalized language or dialect can be used. The host records selected/resolved provenance, passes the language as quoted prompt data, preserves legacy English provenance, validates primary-path aliases and cross-platform filenames, and exclusively creates separate Insights-only Markdown snapshots. Full Unicode speaker labels remain intact through storage, prompts, and exports while webview layout alone truncates their display. |
 | 2026-08-24 | Sprint 113 R7 | **Focused Insights runtime policy.** An authenticated 48-minute run exposed 3m43s latency, ~82k coding-context input/cache tokens, and 15,836 output tokens for a ~3k-character memo. The existing Claude adapter now accepts explicit available-tool and setting-source policies; Insights supplies empty lists for both, keeps `allowedTools: []` as defense in depth, and requests low turn effort. AI chat sessions and other runtime defaults remain unchanged. |

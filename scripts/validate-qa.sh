@@ -41,6 +41,9 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/agent/|e
     npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts
     npx tsx webview/src/components/ai-sidebar/conversationModel.test.ts
     npx tsx webview/src/components/ai-sidebar/runtimeSwitching.test.ts
+    npx tsx webview/src/components/ai-sidebar/bootstrapStorageIsolation.test.ts
+    npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts
+    npx tsx webview/src/components/ai-sidebar/chatHistoryStorageQuota.test.ts
   )
 fi
 

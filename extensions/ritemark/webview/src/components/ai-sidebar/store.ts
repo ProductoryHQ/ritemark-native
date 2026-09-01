@@ -20,6 +20,7 @@ import {
   generateId,
   generateTitle,
   setWorkspaceContext,
+  selectLegacyStorageScope,
   setLegacyStorageReadOnly,
   discoverLegacyConversationCandidates,
   buildLegacyMigrationBatches,
@@ -2154,6 +2155,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (message.operation === 'conversation/initialize') {
             const initialized = message.data as ConversationInitializeResult;
             setLegacyStorageReadOnly(initialized.rolloutMode !== 'legacy');
+            if (initialized.rolloutMode === 'legacy') {
+              selectLegacyStorageScope();
+            }
             set({
               conversationRolloutMode: initialized.rolloutMode,
               hostConversations: initialized.conversations,
@@ -2346,17 +2350,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const bootstrap = message.type === 'agent:bootstrap' ? message : null;
           const legacyConfig = message.type === 'agent:config' ? message : null;
           if (bootstrap && bootstrap.generation < get().bootstrapGeneration) break;
-          // Set workspace context for per-project history scoping, then immediately
-          // initialize the authoritative rollout mode before choosing legacy or
-          // host storage. The host cutover state, not the flag alone, owns this.
-          if (message.workspacePath) {
-            setWorkspaceContext(message.workspacePath);
-          }
-          if (get().conversationRolloutMode === 'unknown') {
-            postConversationRequest({ type: 'conversation/initialize' });
-          } else {
-            get().loadConversationList();
-          }
           const newCodexModels = message.codexModels || [];
           const newClaudeModels = message.models || [];
           const incomingAgent = (message.selectedAgent as AgentId) || 'claude-code';
@@ -2451,6 +2444,23 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             runtimeCapabilities: message.runtimeCapabilities ?? get().runtimeCapabilities,
             conversations,
           });
+
+          // Conversation persistence is an independent hydration domain. The
+          // atomic catalog/model commit above must remain complete even when
+          // legacy webview storage is full, corrupt, or unavailable.
+          try {
+            if (message.workspacePath) {
+              setWorkspaceContext(message.workspacePath);
+            }
+            if (get().conversationRolloutMode === 'unknown') {
+              postConversationRequest({ type: 'conversation/initialize' });
+            } else {
+              get().loadConversationList();
+            }
+          } catch (error) {
+            console.error('[Agent Chat conversations] Initialization failed after bootstrap:', error);
+            set({ conversationStoreNotice: 'Conversation history could not be loaded. Agent Chat is still available.' });
+          }
           break;
         }
 

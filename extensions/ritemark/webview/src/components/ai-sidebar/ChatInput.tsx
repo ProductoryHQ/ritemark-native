@@ -25,6 +25,7 @@ import {
   useAIInformationDisclosure,
 } from './AIInformation';
 import { resolveAIIdentity } from './aiDisclosure';
+import { modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
 import { QueuePanel } from './QueuePanel';
@@ -47,32 +48,6 @@ const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',
 
 /** Max text file size (500KB — larger files should be read by the agent from disk) */
 const MAX_TEXT_SIZE = 512 * 1024;
-
-/**
- * Split a Claude SDK model description into two parts so the dropdown can
- * mirror Claude Desktop's layout: large version line on top, short purpose
- * tagline underneath.
- *
- * Input examples from the SDK's `supportedModels()`:
- *   "Opus 4.8 with 1M context · Most capable"
- *   "Sonnet 4.6 · Best for everyday tasks"
- *   "Haiku 4.5 · Fastest for quick answers"
- *
- * For Codex (no " · " separator) the whole string is the tagline and the
- * version line stays empty — Codex labels already carry the version.
- */
-function parseModelDescription(description: string | undefined): {
-  versionLine: string | null;
-  tagline: string;
-} {
-  if (!description) return { versionLine: null, tagline: '' };
-  const sep = description.indexOf(' · ');
-  if (sep < 0) return { versionLine: null, tagline: description.trim() };
-  return {
-    versionLine: description.slice(0, sep).trim(),
-    tagline: description.slice(sep + 3).trim(),
-  };
-}
 
 /** Dropped file path chip */
 interface PathChip {
@@ -962,8 +937,8 @@ export function ChatInput() {
   const runtimeModelLabel = isOpenCode
     ? (currentOpenCodeEntry || openCodeModels[0])?.label || 'Select a model…'
     : pendingRuntime.runtimeId === 'codex'
-      ? currentCodexModel?.label || codexSelectedModel || 'Model'
-      : currentClaudeModel?.label || selectedModel || 'Model';
+      ? modelDisplayName(currentCodexModel) || codexSelectedModel || 'Model'
+      : modelDisplayName(currentClaudeModel, true) || selectedModel || 'Model';
   const runtimeFooterLabel = `${isOpenCode ? 'OpenCode' : pendingRuntime.runtimeId === 'codex' ? 'Codex' : 'Claude'} · ${runtimeModelLabel}`;
   // 2026-08-05 Jarmo: no "N context" here — the context chips above the
   // composer already show exactly what's included; counting them again is noise.
