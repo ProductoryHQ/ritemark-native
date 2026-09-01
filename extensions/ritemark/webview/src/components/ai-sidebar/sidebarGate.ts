@@ -9,6 +9,8 @@ export type SidebarView = 'onboarding' | 'claude-setup' | 'codex-setup' | 'openc
 
 export interface SidebarGateInput {
   ready: boolean;
+  /** The active transcript already contains the recovery action for its failed turn. */
+  inlineRecoveryAvailable: boolean;
   /** First run, no agent ready yet, wizard not dismissed. */
   onboardingNeeded: boolean;
   /** Claude selected and its binary/auth is not ready (broken, missing, needs sign-in). */
@@ -18,6 +20,11 @@ export interface SidebarGateInput {
 }
 
 export function sidebarGate(i: SidebarGateInput): SidebarView {
+  // A recoverable failure belongs beside the turn that failed. A setup-status
+  // refresh must not flash that card and immediately replace it with a
+  // full-sidebar wizard. Starting a new conversation removes this condition,
+  // so first-run and empty-thread setup still use the dedicated wizard.
+  if (i.ready && i.inlineRecoveryAvailable) return 'chat';
   if (i.ready && i.onboardingNeeded) return 'onboarding';
   if (i.ready && i.needsSetup) return 'claude-setup';
   if (i.ready && i.showCodexSetup) return 'codex-setup';

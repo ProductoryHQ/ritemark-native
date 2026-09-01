@@ -408,10 +408,18 @@ async function run(): Promise<void> {
       runtimeId: 'claude-code',
       text: '',
       status: 'failed',
-      error: 'runtime unavailable',
+      error: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
+      failureKind: 'api-key-authentication',
     });
     assert.equal(failedSecond.continuations?.['claude-code'], undefined, 'a no-final failure invalidates only that runtime descriptor');
     assert.ok(failedSecond.continuations?.codex === undefined, 'failure does not synthesize descriptors for other runtimes');
+    const failedBoundary = failedSecond.events.at(-1);
+    assert.equal(failedBoundary?.kind, 'boundary');
+    assert.equal(
+      failedBoundary?.kind === 'boundary' ? failedBoundary.failureKind : undefined,
+      'api-key-authentication',
+      'the canonical failed boundary persists the recovery category across reloads',
+    );
 
     const other = await store.create({
       conversationId: uuid(800),

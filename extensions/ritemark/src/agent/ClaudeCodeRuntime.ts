@@ -33,6 +33,7 @@ import {
   resolveRuntimeContinuation,
   transcriptRestoredState,
 } from '../runtime/continuation';
+import { classifyClaudeAuthenticationError } from '../runtime/runtimeErrorPresentation';
 
 /** One conversation's Claude Code session. */
 export class ClaudeCodeSession implements RuntimeSession {
@@ -236,10 +237,13 @@ export class ClaudeCodeSession implements RuntimeSession {
         filesModified: result.filesModified,
         metrics: result.metrics,
         error: result.error,
+        failureKind: classifyClaudeAuthenticationError(result.error, Boolean(config.anthropicApiKey)),
       });
     } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
       config.onComplete?.({
-        error: err instanceof Error ? err.message : String(err),
+        error,
+        failureKind: classifyClaudeAuthenticationError(error, Boolean(config.anthropicApiKey)),
       });
     }
   }

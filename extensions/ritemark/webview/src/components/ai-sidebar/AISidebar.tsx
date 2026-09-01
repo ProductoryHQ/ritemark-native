@@ -123,6 +123,10 @@ export function AISidebar() {
   const isOpenCode = selectedAgent === 'opencode';
   const needsSetup = isClaudeCode && setupStatus !== null
     && setupStatus.state !== 'ready';
+  const latestClaudeTurn = agentConversation[agentConversation.length - 1];
+  const inlineRecoveryAvailable = isClaudeCode
+    && (latestClaudeTurn?.result?.failureKind === 'authentication'
+      || latestClaudeTurn?.result?.failureKind === 'api-key-authentication');
   const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
   const showWelcome = isClaudeCode && setupStatus !== null
     && setupStatus.state === 'ready' && !hasSeenWelcome && !hasAnyRuntimeConversation;
@@ -142,6 +146,7 @@ export function AISidebar() {
     && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
   const sidebarView = sidebarGate({
     ready,
+    inlineRecoveryAvailable,
     onboardingNeeded: Boolean(onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed),
     needsSetup,
     showCodexSetup: Boolean(showCodexSetup),

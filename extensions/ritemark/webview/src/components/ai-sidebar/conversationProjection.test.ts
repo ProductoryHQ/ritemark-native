@@ -54,4 +54,31 @@ assert.deepEqual(restored.transcriptBoundaries, [{
   message: 'Continuing with Codex. Previous messages were included as context.',
 }]);
 
+const authProjection = structuredClone(projection);
+authProjection.revision += 2;
+authProjection.lifecycle = { state: 'interrupted', turnId: 'turn-auth', reason: 'failed' };
+authProjection.runtimeSummary.push('claude-code');
+authProjection.events.push(
+  {
+    kind: 'user-message', eventId: 'user-auth', turnId: 'turn-auth', sequence: 4,
+    occurredAt: '2026-08-23T10:04:00.000Z', runtimeId: 'claude-code',
+    text: 'Continue with Claude', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'boundary', eventId: 'boundary-auth', turnId: 'turn-auth', sequence: 5,
+    occurredAt: '2026-08-23T10:04:01.000Z', runtimeId: 'claude-code',
+    boundaryKind: 'failed',
+    message: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
+    failureKind: 'api-key-authentication',
+  },
+);
+const restoredAuth = projectionToConversation(authProjection);
+const restoredAuthTurn = restoredAuth.agentConversation[restoredAuth.agentConversation.length - 1];
+assert.equal(restoredAuthTurn?.result?.failureKind, 'api-key-authentication');
+assert.equal(
+  restoredAuthTurn?.result?.error,
+  'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
+  'reload restores the friendly error and API-key recovery category from the canonical boundary',
+);
+
 console.log('conversationProjection.test.ts: all tests passed');

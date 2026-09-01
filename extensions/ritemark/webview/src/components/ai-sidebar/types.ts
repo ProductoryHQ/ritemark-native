@@ -7,6 +7,7 @@
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
 export type AgentId = 'claude-code' | 'codex' | 'opencode';
+export type RuntimeFailureKind = 'authentication' | 'api-key-authentication';
 export type ThinkingEffort = 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
 export type ExplicitThinkingEffort = Exclude<ThinkingEffort, 'auto'>;
 
@@ -241,6 +242,7 @@ export interface AgentConversationTurn {
     filesModified: string[];
     metrics: AgentMetrics;
     error?: string;
+    failureKind?: RuntimeFailureKind;
   };
   isRunning: boolean;
   /** Turn ended with a plan that needs user approval */
@@ -420,7 +422,7 @@ export type ExtensionMessage =
   | ({ type: 'agent-progress'; progress: AgentProgress } & ConversationScopedMessage)
   | ({ type: 'agent-question'; question: AgentQuestion } & ConversationScopedMessage)
   | ({ type: 'agent-plan-approval'; request: AgentPlanApprovalRequest } & ConversationScopedMessage)
-  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string } & ConversationScopedMessage)
+  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind } & ConversationScopedMessage)
   | ({ type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string } & ConversationScopedMessage)
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus }

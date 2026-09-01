@@ -105,6 +105,19 @@ tooltips, and wider layouts.
 The adjacent conversation rail also keeps a compact, consistent 4 px gap
 between its action buttons and on each side of the pinned divider.
 
+If Claude's saved sign-in expires, the conversation no longer exposes the
+provider's OAuth error. It explains that Claude needs you to sign in again and
+offers **Sign in to Claude** in the same card. The action uses the same browser
+flow as Settings; Ritemark closes its stale Claude sessions before the new login
+is used, so an old background conversation cannot immediately reuse the invalid
+credential.
+
+If the conversation uses an Anthropic API key instead, the card directs you to
+**Update API key** in AI Settings. Ritemark keeps OAuth and API-key recovery
+separate, even when the provider returns the same generic authentication text.
+The recovery card remains available after reloading the window or leaving and
+returning to the failed conversation.
+
 ## Transcribe Insights you can deliver
 
 Search common languages or enter any language or dialect before generating

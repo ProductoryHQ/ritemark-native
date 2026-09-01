@@ -10,6 +10,7 @@ import type {
   ThinkingEffortApplied,
   ThinkingEffortCapability,
 } from './thinkingEffort';
+import type { RuntimeFailureKind } from './runtimeErrorPresentation';
 
 export type { AgentId };
 export type {
@@ -32,6 +33,8 @@ export interface RuntimeTurnResult {
   filesModified?: string[];
   metrics?: { durationMs: number; costUsd: number | null; model: string | null };
   error?: string;
+  /** Stable, auth-method-aware recovery category; provider text stays diagnostic-only. */
+  failureKind?: RuntimeFailureKind;
 }
 
 /**
