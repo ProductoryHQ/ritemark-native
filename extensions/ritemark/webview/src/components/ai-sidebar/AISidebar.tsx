@@ -10,7 +10,7 @@ import { useAISidebarStore, useActiveConversation } from './store';
 import { vscode } from '../../lib/vscode';
 import { OfflineBanner } from './OfflineBanner';
 import { OnboardingWizard } from './OnboardingWizard';
-import { sidebarGate } from './sidebarGate';
+import { hasUndismissedInlineRecovery, sidebarGate } from './sidebarGate';
 import { SetupWizard } from './SetupWizard';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
@@ -55,6 +55,13 @@ export function AISidebar() {
       if (Array.isArray(savedState.pinnedConversationIds)) {
         store.setPinnedConversationIds(savedState.pinnedConversationIds.filter((id): id is string => typeof id === 'string'));
       }
+      if (Array.isArray(savedState.dismissedAuthRecoveryTurnIds)) {
+        useAISidebarStore.setState({
+          dismissedAuthRecoveryTurnIds: savedState.dismissedAuthRecoveryTurnIds
+            .filter((id): id is string => typeof id === 'string')
+            .slice(-100),
+        });
+      }
       if (typeof savedState.currentConversationId === 'string' && /^[0-9a-f]{8}-/i.test(savedState.currentConversationId)) {
         sendConversationRequest({ type: 'conversation/get', requestId: `restore-${Date.now()}`, conversationId: savedState.currentConversationId });
       }
@@ -76,6 +83,7 @@ export function AISidebar() {
       vscode.setState({
         currentConversationId: state.activeConversationId,
         pinnedConversationIds: state.pinnedConversationIds,
+        dismissedAuthRecoveryTurnIds: state.dismissedAuthRecoveryTurnIds,
       });
       if (state.activeConversationId !== selectedConversationId) {
         selectedConversationId = state.activeConversationId;
@@ -89,6 +97,7 @@ export function AISidebar() {
   const onboardingStatus = useAISidebarStore((s) => s.onboardingStatus);
   const onboardingDismissed = useAISidebarStore((s) => s.onboardingDismissed);
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
+  const dismissedAuthRecoveryTurnIds = useAISidebarStore((s) => s.dismissedAuthRecoveryTurnIds);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const hasSeenWelcome = useAISidebarStore((s) => s.hasSeenWelcome);
   const dismissWelcome = useAISidebarStore((s) => s.dismissWelcome);
@@ -125,8 +134,7 @@ export function AISidebar() {
     && setupStatus.state !== 'ready';
   const latestClaudeTurn = agentConversation[agentConversation.length - 1];
   const inlineRecoveryAvailable = isClaudeCode
-    && (latestClaudeTurn?.result?.failureKind === 'authentication'
-      || latestClaudeTurn?.result?.failureKind === 'api-key-authentication');
+    && hasUndismissedInlineRecovery(latestClaudeTurn, dismissedAuthRecoveryTurnIds);
   const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
   const showWelcome = isClaudeCode && setupStatus !== null
     && setupStatus.state === 'ready' && !hasSeenWelcome && !hasAnyRuntimeConversation;

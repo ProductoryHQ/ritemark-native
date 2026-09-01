@@ -53,7 +53,7 @@ export function OnboardingWizard() {
           installStates={installStates}
           onInstall={installDependency}
           onRecheck={recheckDependencies}
-          onLoginClaude={startLogin}
+          onLoginClaude={() => startLogin()}
           onLoginCodex={startCodexLogin}
           onApiKey={openApiKeySettings}
         />

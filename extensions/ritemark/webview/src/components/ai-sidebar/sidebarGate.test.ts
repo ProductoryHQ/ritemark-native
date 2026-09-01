@@ -3,7 +3,7 @@
  * renders the chat composer directly; there is no welcome-card state at all.
  */
 import assert from 'node:assert/strict'
-import { sidebarGate } from './sidebarGate'
+import { hasUndismissedInlineRecovery, sidebarGate } from './sidebarGate'
 
 const base = {
   ready: true,
@@ -26,6 +26,18 @@ assert.equal(sidebarGate({ ...base, needsSetup: true }), 'claude-setup')
 // onboarding because the user already has a concrete failed conversation.
 assert.equal(sidebarGate({ ...base, needsSetup: true, inlineRecoveryAvailable: true }), 'chat')
 assert.equal(sidebarGate({ ...base, onboardingNeeded: true, needsSetup: true, inlineRecoveryAvailable: true }), 'chat')
+
+const authTurn = { id: 'turn-auth', result: { failureKind: 'authentication' } }
+assert.equal(hasUndismissedInlineRecovery(authTurn, []), true)
+assert.equal(
+  hasUndismissedInlineRecovery(authTurn, ['turn-auth']),
+  false,
+  'acknowledging a recovered turn must let a later needs-auth state show setup again',
+)
+assert.equal(
+  hasUndismissedInlineRecovery({ id: 'turn-generic', result: { failureKind: 'runtime' } }, []),
+  false,
+)
 
 // First-run onboarding wins over everything else.
 assert.equal(sidebarGate({ ...base, onboardingNeeded: true, needsSetup: true }), 'onboarding')

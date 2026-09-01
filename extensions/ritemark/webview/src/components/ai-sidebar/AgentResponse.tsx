@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { Icon } from '../ui/Icon';
+import { Button } from '../ui/button';
 import { useAISidebarStore } from './store';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
@@ -35,6 +36,81 @@ interface AgentResponseProps {
   turn: AgentConversationTurn;
 }
 
+interface RecoveryNoticeProps {
+  title: string;
+  message: string;
+  tone?: 'warning' | 'progress' | 'success' | 'error';
+  actionLabel?: string;
+  actionIcon?: 'key' | 'sign-in' | 'arrow-counter-clockwise' | 'check';
+  statusLabel?: string;
+  actionDisabled?: boolean;
+  onAction?: () => void;
+}
+
+/**
+ * Recoverable runtime failures are conversation cards, not form validation.
+ * Keep the surface neutral and use amber only for the attention icon so the
+ * notice fits the Ritemark card system without visually shouting at the user.
+ */
+function RecoveryNotice({
+  title,
+  message,
+  tone = 'warning',
+  actionLabel,
+  actionIcon,
+  statusLabel,
+  actionDisabled = false,
+  onAction,
+}: RecoveryNoticeProps) {
+  const visual = {
+    warning: { icon: 'warning' as const, background: 'var(--r-warning-soft)', color: 'var(--r-warning)' },
+    progress: { icon: 'circle-notch' as const, background: 'var(--r-accent-soft)', color: 'var(--r-accent)' },
+    success: { icon: 'check-circle' as const, background: 'var(--r-success-soft)', color: 'var(--r-success)' },
+    error: { icon: 'warning-circle' as const, background: 'var(--r-error-soft)', color: 'var(--r-error)' },
+  }[tone];
+
+  return (
+    <div
+      role={tone === 'warning' ? 'group' : 'status'}
+      aria-label={title}
+      className="overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[var(--r-surface)] shadow-[0_1px_2px_rgba(30,27,75,0.04)]"
+    >
+      <div className="flex items-start gap-2.5 px-3 py-2.5">
+        <span
+          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+          style={{ background: visual.background, color: visual.color }}
+        >
+          <Icon
+            name={visual.icon}
+            size={14}
+            tone="inherit"
+            className={tone === 'progress' ? 'animate-spin' : undefined}
+          />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold leading-5 text-[var(--r-ink-strong)]">{title}</div>
+          <div className="mt-0.5 text-[11px] leading-[1.45] text-[var(--r-ink-muted)]">{message}</div>
+        </div>
+      </div>
+      {(statusLabel || (actionLabel && actionIcon && onAction)) && (
+        <div className={`flex flex-wrap items-center border-t border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-2 ${statusLabel ? 'pl-[46px]' : 'justify-end gap-2'}`}>
+          {statusLabel ? (
+            <div className="inline-flex h-8 items-center gap-1.5 text-xs font-medium text-[var(--r-accent)]">
+              <Icon name="circle-notch" size={12} tone="inherit" className="animate-spin" />
+              {statusLabel}
+            </div>
+          ) : (
+            <Button type="button" size="sm" onClick={onAction} disabled={actionDisabled}>
+              <Icon name={actionIcon!} size={12} tone="inherit" />
+              {actionLabel}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AgentResponse({ turn }: AgentResponseProps) {
   const { result, activities } = turn;
   const approvePlan = useAISidebarStore((s) => s.approvePlan);
@@ -42,7 +118,11 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   const requestNewThread = useAISidebarStore((s) => s.requestNewThread);
   const startLogin = useAISidebarStore((s) => s.startLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
-  const setupInProgress = useAISidebarStore((s) => s.setupInProgress);
+  const claudeLoginState = useAISidebarStore((s) => s.claudeLoginState);
+  const claudeLoginTurnId = useAISidebarStore((s) => s.claudeLoginTurnId);
+  const setupError = useAISidebarStore((s) => s.setupError);
+  const dismissedAuthRecoveryTurnIds = useAISidebarStore((s) => s.dismissedAuthRecoveryTurnIds);
+  const dismissAuthRecovery = useAISidebarStore((s) => s.dismissAuthRecovery);
   const [rejectInput, setRejectInput] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
@@ -50,34 +130,66 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
   if (result.error && (result.failureKind === 'authentication' || result.failureKind === 'api-key-authentication')) {
     const usesApiKey = result.failureKind === 'api-key-authentication';
+    const isActiveLoginTurn = !usesApiKey && claudeLoginTurnId === turn.id;
+
+    if (!usesApiKey && dismissedAuthRecoveryTurnIds.includes(turn.id)) {
+      return null;
+    }
+
+    if (isActiveLoginTurn && claudeLoginState === 'pending') {
+      return (
+        <div style={chatFontStyle}>
+          <RecoveryNotice
+            tone="progress"
+            title="Finish signing in in your browser"
+            message="Ritemark is waiting for Claude. This card will update automatically when sign-in is complete."
+            statusLabel="Waiting for sign-in…"
+          />
+        </div>
+      );
+    }
+
+    if (isActiveLoginTurn && claudeLoginState === 'success') {
+      return (
+        <div style={chatFontStyle}>
+          <RecoveryNotice
+            tone="success"
+            title="You’re signed in to Claude"
+            message="You can continue this conversation now. Resend your last message when you’re ready."
+            actionLabel="OK"
+            actionIcon="check"
+            onAction={() => dismissAuthRecovery(turn.id)}
+          />
+        </div>
+      );
+    }
+
+    if (isActiveLoginTurn && claudeLoginState === 'error') {
+      return (
+        <div style={chatFontStyle}>
+          <RecoveryNotice
+            tone="error"
+            title="Claude sign-in didn’t finish"
+            message={setupError || 'Ritemark could not confirm the sign-in. Please try again.'}
+            actionLabel="Try again"
+            actionIcon="arrow-counter-clockwise"
+            onAction={() => startLogin(turn.id)}
+          />
+        </div>
+      );
+    }
+
     return (
       <div style={chatFontStyle}>
-        <div className="rounded border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] p-3 space-y-2">
-          <div className="flex items-start gap-2 text-[var(--vscode-editorWarning-foreground)]">
-            <Icon name="warning" size={14} className="shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-medium">
-                {usesApiKey ? 'Claude API key needs attention' : 'Claude needs you to sign in again'}
-              </div>
-              <div className="text-[11px] opacity-80">
-                {usesApiKey
-                  ? 'Claude did not accept the saved key. Update it in AI Settings, then resend your message.'
-                  : 'Your session expired before Claude could answer. Sign in, then resend your message.'}
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2 ml-[22px]">
-            <button
-              type="button"
-              onClick={usesApiKey ? openApiKeySettings : startLogin}
-              disabled={!usesApiKey && setupInProgress}
-              className="flex items-center gap-1.5 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)] disabled:cursor-wait disabled:opacity-60"
-            >
-              <Icon name={usesApiKey ? 'key' : 'sign-in'} size={12} />
-              {usesApiKey ? 'Update API key' : setupInProgress ? 'Opening sign-in…' : 'Sign in to Claude'}
-            </button>
-          </div>
-        </div>
+        <RecoveryNotice
+          title={usesApiKey ? 'Claude API key needs attention' : 'Claude needs you to sign in again'}
+          message={usesApiKey
+            ? 'Claude did not accept the saved key. Update it in AI Settings, then resend your message.'
+            : 'Your session expired before Claude could answer. Sign in, then resend your message.'}
+          actionLabel={usesApiKey ? 'Update API key' : 'Sign in to Claude'}
+          actionIcon={usesApiKey ? 'key' : 'sign-in'}
+          onAction={usesApiKey ? openApiKeySettings : () => startLogin(turn.id)}
+        />
         <ActivityDetails activities={activities} metrics={result.metrics} />
       </div>
     );
@@ -87,26 +199,13 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   if (result.error && isContextOverflowError(result.error)) {
     return (
       <div style={chatFontStyle}>
-        <div className="rounded border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] p-3 space-y-2">
-          <div className="flex items-start gap-2 text-[var(--vscode-editorWarning-foreground)]">
-            <Icon name="warning" size={14} className="shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-medium">Conversation exceeded context window limit</div>
-              <div className="text-[11px] opacity-80">
-                Long conversations accumulate token usage. Starting a new chat gives the agent full context capacity.
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2 ml-[22px]">
-            <button
-              onClick={() => requestNewThread()}
-              className="flex items-center gap-1.5 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)]"
-            >
-              <Icon name="arrow-counter-clockwise" size={12} />
-              Start new chat
-            </button>
-          </div>
-        </div>
+        <RecoveryNotice
+          title="Conversation exceeded context window limit"
+          message="Long conversations accumulate token usage. Starting a new chat gives the agent full context capacity."
+          actionLabel="Start new chat"
+          actionIcon="arrow-counter-clockwise"
+          onAction={() => requestNewThread()}
+        />
         <ActivityDetails activities={activities} metrics={result.metrics} />
       </div>
     );
