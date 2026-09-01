@@ -93,6 +93,8 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] Extension compile, webview typecheck, focused error-presentation test, and Claude runtime adapter regression pass.
 - [x] In RunDev, inject the exact OAuth failure, verify the raw provider sentence is absent from the visible response, click **Sign in to Claude**, and capture/visually inspect the recovery card at narrow and normal sidebar widths. Verified 2026-09-01 at 300 px and 480 px; the CTA reached the shared browser-login route and the test account remained signed out.
 - [x] A subsequent `needs-auth` setup refresh keeps the failed turn and inline sign-in CTA visible instead of replacing chat with the full-sidebar Setup Wizard. Verified 2026-09-01 by sequential RunDev event injection and visual inspection.
+- [x] A chat CTA joining a login already started from Settings receives the same completion/cancel terminal callback; coordinator fan-out regression passes and no joined surface retains `setupInProgress`.
+- [x] The same generic provider authentication sentence under `anthropic-api-key` is classified as `api-key-authentication` and offers **Update API key**, never the Claude.ai OAuth action. Verified in RunDev 2026-09-01; the card was visually inspected and its CTA opened the existing Ritemark Settings editor without mutating a key.
 - [ ] Repeat the recovery path on the final packaged release candidate; cancel before completing a test-account login unless the release owner explicitly wants credential mutation.
 
 ## Transcribe Insights and speaker names (Sprint 113)

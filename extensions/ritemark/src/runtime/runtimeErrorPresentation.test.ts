@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  classifyClaudeAuthenticationError,
   isClaudeAuthenticationError,
   presentRuntimeError,
 } from './runtimeErrorPresentation';
@@ -15,6 +16,12 @@ assert.deepEqual(presentRuntimeError('claude-code', rawOAuthError), {
 assert.deepEqual(presentRuntimeError('claude-code', 'Please run /login to continue'), {
   message: 'Your Claude session has expired. Sign in again, then resend your message.',
   failureKind: 'authentication',
+});
+
+assert.equal(classifyClaudeAuthenticationError(rawOAuthError, true), 'api-key-authentication');
+assert.deepEqual(presentRuntimeError('claude-code', rawOAuthError, 'api-key-authentication'), {
+  message: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
+  failureKind: 'api-key-authentication',
 });
 
 assert.deepEqual(presentRuntimeError('claude-code', 'Workspace unavailable'), {

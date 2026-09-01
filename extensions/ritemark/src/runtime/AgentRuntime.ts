@@ -33,7 +33,7 @@ export interface RuntimeTurnResult {
   filesModified?: string[];
   metrics?: { durationMs: number; costUsd: number | null; model: string | null };
   error?: string;
-  /** Stable recovery category; provider-specific error text stays diagnostic-only. */
+  /** Stable, auth-method-aware recovery category; provider text stays diagnostic-only. */
   failureKind?: RuntimeFailureKind;
 }
 

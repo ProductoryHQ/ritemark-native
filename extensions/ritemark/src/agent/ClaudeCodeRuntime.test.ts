@@ -212,7 +212,31 @@ async function run() {
     console.log('✓ Test 8: OAuth failures carry the authentication recovery category');
   }
 
-  console.log('\nAll 8 ClaudeCodeRuntime tests passed!');
+  // The same provider sentence under API-key auth must recover through AI
+  // Settings, never through the Claude.ai OAuth flow.
+  {
+    let completed: { failureKind?: string } | undefined;
+    const session = makeSession('conv-api-key-error', {
+      ...mockSession,
+      sendMessage: async () => ({
+        text: '',
+        filesModified: [],
+        metrics: { durationMs: 0, costUsd: null, model: null },
+        error: 'Failed to authenticate: invalid authentication credentials',
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (session as any)._config = {
+      ...dummyConfig,
+      anthropicApiKey: 'sk-ant-test',
+      onComplete: (result: { failureKind?: string }) => { completed = result; },
+    };
+    await session.prompt({ prompt: 'Try Claude with a key' });
+    assert.equal(completed?.failureKind, 'api-key-authentication');
+    console.log('✓ Test 9: API-key failures use the AI Settings recovery category');
+  }
+
+  console.log('\nAll 9 ClaudeCodeRuntime tests passed!');
 }
 
 run().then(

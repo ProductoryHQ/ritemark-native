@@ -125,7 +125,8 @@ export function AISidebar() {
     && setupStatus.state !== 'ready';
   const latestClaudeTurn = agentConversation[agentConversation.length - 1];
   const inlineRecoveryAvailable = isClaudeCode
-    && latestClaudeTurn?.result?.failureKind === 'authentication';
+    && (latestClaudeTurn?.result?.failureKind === 'authentication'
+      || latestClaudeTurn?.result?.failureKind === 'api-key-authentication');
   const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
   const showWelcome = isClaudeCode && setupStatus !== null
     && setupStatus.state === 'ready' && !hasSeenWelcome && !hasAnyRuntimeConversation;

@@ -7,7 +7,7 @@
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
 export type AgentId = 'claude-code' | 'codex' | 'opencode';
-export type RuntimeFailureKind = 'authentication';
+export type RuntimeFailureKind = 'authentication' | 'api-key-authentication';
 export type ThinkingEffort = 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
 export type ExplicitThinkingEffort = Exclude<ThinkingEffort, 'auto'>;
 

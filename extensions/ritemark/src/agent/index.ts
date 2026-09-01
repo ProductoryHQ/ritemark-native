@@ -23,7 +23,7 @@ export {
 export { installClaude, isClaudeInstallInProgress, openClaudeLoginTerminal, openAnthropicKeySettings, logoutClaude, installGit, installNode, installCodexCli, startClaudeLoginSubprocess } from './installer';
 export type { ClaudeLoginSubprocessHandle, ClaudeLoginSubprocessOptions } from './installer';
 export { beginClaudeLogin, cancelClaudeLogin, isClaudeLoginActive } from './claudeLogin';
-export type { ClaudeLoginStartResult } from './claudeLogin';
+export type { ClaudeLoginOptions, ClaudeLoginStartResult } from './claudeLogin';
 export {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,

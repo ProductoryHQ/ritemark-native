@@ -6,15 +6,44 @@ import {
 import { emitClaudeStatusInvalidated } from './claudeStatusEvents';
 import { clearSetupCache, setClaudeLoginInProgress } from './setup';
 
-export type ClaudeLoginStartResult = 'started' | 'already-running';
+export interface ClaudeLoginOptions extends ClaudeLoginSubprocessOptions {
+  onCancel?: () => void;
+}
 
-let activeLogin: ClaudeLoginSubprocessHandle | null = null;
+export type ClaudeLoginStartResult = 'started' | 'already-running' | 'failed-to-start';
 
-function settle(reason: 'login-finished' | 'settings-updated'): void {
+interface ActiveClaudeLogin {
+  handle: ClaudeLoginSubprocessHandle | null;
+  subscribers: ClaudeLoginOptions[];
+}
+
+let activeLogin: ActiveClaudeLogin | null = null;
+
+function notifySubscribers(
+  subscribers: ClaudeLoginOptions[],
+  notify: (subscriber: ClaudeLoginOptions) => void,
+): void {
+  for (const subscriber of subscribers) {
+    try {
+      notify(subscriber);
+    } catch (error) {
+      console.error('[claude-login] Subscriber callback failed:', error);
+    }
+  }
+}
+
+function settle(
+  login: ActiveClaudeLogin,
+  reason: 'login-finished' | 'settings-updated',
+  notify: (subscriber: ClaudeLoginOptions) => void,
+): void {
+  if (activeLogin !== login) return;
+  const subscribers = [...login.subscribers];
   activeLogin = null;
   setClaudeLoginInProgress(false);
   clearSetupCache();
   emitClaudeStatusInvalidated(reason);
+  notifySubscribers(subscribers, notify);
 }
 
 /**
@@ -24,29 +53,37 @@ function settle(reason: 'login-finished' | 'settings-updated'): void {
  */
 export function beginClaudeLogin(
   binaryPath: string,
-  options: ClaudeLoginSubprocessOptions = {},
+  options: ClaudeLoginOptions = {},
 ): ClaudeLoginStartResult {
-  if (activeLogin) return 'already-running';
+  if (activeLogin) {
+    // The OAuth process is shared, but every surface that joined it still
+    // needs the terminal callback so its own busy/error state can settle.
+    activeLogin.subscribers.push(options);
+    return 'already-running';
+  }
 
   setClaudeLoginInProgress(true);
   clearSetupCache();
   emitClaudeStatusInvalidated('login-started');
 
-  activeLogin = startClaudeLoginSubprocess(binaryPath, {
-    ...options,
-    onComplete: () => {
-      settle('login-finished');
-      options.onComplete?.();
-    },
-    onError: (error) => {
-      settle('settings-updated');
-      options.onError?.(error);
-    },
-    onTimeout: () => {
-      settle('settings-updated');
-      options.onTimeout?.();
-    },
-  });
+  const login: ActiveClaudeLogin = { handle: null, subscribers: [options] };
+  activeLogin = login;
+  try {
+    login.handle = startClaudeLoginSubprocess(binaryPath, {
+      onUrl: (url) => {
+        notifySubscribers(login.subscribers, (subscriber) => subscriber.onUrl?.(url));
+      },
+      onComplete: () => settle(login, 'login-finished', (subscriber) => subscriber.onComplete?.()),
+      onError: (error) => settle(login, 'settings-updated', (subscriber) => subscriber.onError?.(error)),
+      onTimeout: () => settle(login, 'settings-updated', (subscriber) => subscriber.onTimeout?.()),
+      timeoutMs: options.timeoutMs,
+    });
+  } catch (error) {
+    settle(login, 'settings-updated', (subscriber) => subscriber.onError?.(
+      error instanceof Error ? error.message : String(error),
+    ));
+    return 'failed-to-start';
+  }
 
   return 'started';
 }
@@ -57,10 +94,11 @@ export function cancelClaudeLogin(): boolean {
   // Clear first: the subprocess kill intentionally settles without firing a
   // completion callback, and a synchronous exit must not see a stale handle.
   activeLogin = null;
-  login.kill();
+  login.handle?.kill();
   setClaudeLoginInProgress(false);
   clearSetupCache();
   emitClaudeStatusInvalidated('settings-updated');
+  notifySubscribers(login.subscribers, (subscriber) => subscriber.onCancel?.());
   return true;
 }
 

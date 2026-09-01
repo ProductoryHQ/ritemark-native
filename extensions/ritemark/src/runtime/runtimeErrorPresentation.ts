@@ -1,6 +1,6 @@
 import type { AgentId } from '../agent/types';
 
-export type RuntimeFailureKind = 'authentication';
+export type RuntimeFailureKind = 'authentication' | 'api-key-authentication';
 
 export interface RuntimeErrorPresentation {
   message: string;
@@ -21,6 +21,14 @@ export function isClaudeAuthenticationError(error: string | undefined): boolean 
   return CLAUDE_AUTH_ERROR_PATTERNS.some((pattern) => pattern.test(error));
 }
 
+export function classifyClaudeAuthenticationError(
+  error: string | undefined,
+  usesApiKey: boolean,
+): RuntimeFailureKind | undefined {
+  if (!isClaudeAuthenticationError(error)) return undefined;
+  return usesApiKey ? 'api-key-authentication' : 'authentication';
+}
+
 /**
  * Convert provider/runtime failures into stable user-facing categories.
  *
@@ -30,13 +38,25 @@ export function isClaudeAuthenticationError(error: string | undefined): boolean 
 export function presentRuntimeError(
   agentId: AgentId,
   error: string | undefined,
+  failureKind?: RuntimeFailureKind,
 ): RuntimeErrorPresentation | undefined {
   if (!error) return undefined;
 
-  if (agentId === 'claude-code' && isClaudeAuthenticationError(error)) {
+  const classifiedFailure = agentId === 'claude-code'
+    ? failureKind ?? classifyClaudeAuthenticationError(error, false)
+    : undefined;
+
+  if (classifiedFailure === 'authentication') {
     return {
       message: 'Your Claude session has expired. Sign in again, then resend your message.',
       failureKind: 'authentication',
+    };
+  }
+
+  if (classifiedFailure === 'api-key-authentication') {
+    return {
+      message: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
+      failureKind: 'api-key-authentication',
     };
   }
 

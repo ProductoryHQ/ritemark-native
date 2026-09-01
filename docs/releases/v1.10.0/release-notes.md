@@ -112,6 +112,10 @@ flow as Settings; Ritemark closes its stale Claude sessions before the new login
 is used, so an old background conversation cannot immediately reuse the invalid
 credential.
 
+If the conversation uses an Anthropic API key instead, the card directs you to
+**Update API key** in AI Settings. Ritemark keeps OAuth and API-key recovery
+separate, even when the provider returns the same generic authentication text.
+
 ## Transcribe Insights you can deliver
 
 Search common languages or enter any language or dialect before generating

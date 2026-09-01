@@ -41,34 +41,40 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   const rejectPlan = useAISidebarStore((s) => s.rejectPlan);
   const requestNewThread = useAISidebarStore((s) => s.requestNewThread);
   const startLogin = useAISidebarStore((s) => s.startLogin);
+  const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
   const setupInProgress = useAISidebarStore((s) => s.setupInProgress);
   const [rejectInput, setRejectInput] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
   if (!result) return null;
 
-  if (result.error && result.failureKind === 'authentication') {
+  if (result.error && (result.failureKind === 'authentication' || result.failureKind === 'api-key-authentication')) {
+    const usesApiKey = result.failureKind === 'api-key-authentication';
     return (
       <div style={chatFontStyle}>
         <div className="rounded border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] p-3 space-y-2">
           <div className="flex items-start gap-2 text-[var(--vscode-editorWarning-foreground)]">
             <Icon name="warning" size={14} className="shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <div className="font-medium">Claude needs you to sign in again</div>
+              <div className="font-medium">
+                {usesApiKey ? 'Claude API key needs attention' : 'Claude needs you to sign in again'}
+              </div>
               <div className="text-[11px] opacity-80">
-                Your session expired before Claude could answer. Sign in, then resend your message.
+                {usesApiKey
+                  ? 'Claude did not accept the saved key. Update it in AI Settings, then resend your message.'
+                  : 'Your session expired before Claude could answer. Sign in, then resend your message.'}
               </div>
             </div>
           </div>
           <div className="flex gap-2 ml-[22px]">
             <button
               type="button"
-              onClick={startLogin}
-              disabled={setupInProgress}
+              onClick={usesApiKey ? openApiKeySettings : startLogin}
+              disabled={!usesApiKey && setupInProgress}
               className="flex items-center gap-1.5 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)] disabled:cursor-wait disabled:opacity-60"
             >
-              <Icon name="sign-in" size={12} />
-              {setupInProgress ? 'Opening sign-in…' : 'Sign in to Claude'}
+              <Icon name={usesApiKey ? 'key' : 'sign-in'} size={12} />
+              {usesApiKey ? 'Update API key' : setupInProgress ? 'Opening sign-in…' : 'Sign in to Claude'}
             </button>
           </div>
         </div>

@@ -757,7 +757,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             },
             onComplete: (result) => {
               if (!isCurrentRuntimeTurn()) return;
-              const errorPresentation = presentRuntimeError(agentId as AgentId, result.error);
+              const errorPresentation = presentRuntimeError(agentId as AgentId, result.error, result.failureKind);
               const error = errorPresentation?.message;
               const failureKind = result.failureKind ?? errorPresentation?.failureKind;
               this._view?.webview.postMessage({
@@ -784,11 +784,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
               }
-              if (failureKind === 'authentication') {
-                // Claude OAuth is app-global. One failed refresh means every
-                // warm Claude process may hold the same stale token family;
-                // keeping siblings alive after re-login can immediately race
-                // and invalidate the fresh credential again.
+              if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
+                // Claude authentication is app-global. OAuth siblings may hold
+                // the same stale token family, while API-key siblings retain
+                // the same rejected credential. Neither may survive recovery.
                 this._disposeRuntimeSessionsForAgent('claude-code');
                 clearSetupCache();
                 emitClaudeStatusInvalidated('authentication-failed');
@@ -1649,6 +1648,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
         });
       },
+      onComplete: () => {
+        void (async () => {
+          const completedStatus = await getSetupStatus({ refresh: true });
+          const completedEnvironmentStatus = await getAgentEnvironmentStatus({ setupStatus: completedStatus });
+          this._view?.webview.postMessage({
+            type: 'agent-setup:complete',
+            status: completedStatus,
+            environmentStatus: completedEnvironmentStatus,
+          });
+        })();
+      },
       onError: (msg) => {
         this._view?.webview.postMessage({
           type: 'agent-setup:error',
@@ -1659,6 +1669,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         this._view?.webview.postMessage({
           type: 'agent-setup:error',
           error: 'Claude sign-in timed out after 5 minutes. Please try again.',
+        });
+      },
+      onCancel: () => {
+        this._view?.webview.postMessage({
+          type: 'agent-setup:error',
+          error: 'Claude sign-in was cancelled.',
         });
       },
     });
@@ -1674,6 +1690,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (startResult === 'failed-to-start') return;
+
     this._view?.webview.postMessage({
       type: 'agent-setup:progress',
       progress: {
@@ -1682,9 +1700,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       },
     });
 
-    const pendingStatus = await getSetupStatus({ refresh: true });
-    const pendingEnvironmentStatus = await getAgentEnvironmentStatus({ setupStatus: pendingStatus });
-    this._view?.webview.postMessage({ type: 'agent-setup:complete', status: pendingStatus, environmentStatus: pendingEnvironmentStatus });
   }
 
   private _sendChatFontSize() {

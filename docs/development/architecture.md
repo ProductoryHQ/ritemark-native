@@ -239,11 +239,13 @@ Per-runtime session mapping, and the shared thing each keeps:
 
 Provider error text is diagnostic data, not user-interface copy. The runtime
 boundary classifies known recoverable failures into stable `failureKind`
-values; `agent-result` carries that category alongside the user-facing error.
-The webview renders the recovery action from the category and never has to
-parse a vendor sentence. Claude authentication failures therefore appear as a
-plain-language card with **Sign in to Claude**, while the raw SDK error remains
-inside the collapsed activity trace. That active-turn recovery card takes
+values; Claude distinguishes OAuth from API-key authentication before the
+result leaves its runtime session. `agent-result` carries that category
+alongside the user-facing error. The webview renders the recovery action from
+the category and never has to parse a vendor sentence. OAuth failures therefore
+offer **Sign in to Claude**, while API-key failures offer **Update API key** via
+the existing AI Settings path; the raw SDK error remains inside the collapsed
+activity trace. That active-turn recovery card takes
 precedence over the full-sidebar setup/onboarding gate, so the ensuing
 `needs-auth` status refresh cannot hide the action the user was just shown;
 empty or newly started conversations continue to use the normal setup wizard.
@@ -255,8 +257,10 @@ model-discovery probe while authentication is unavailable. Starting or
 finishing sign-in also releases stale Claude sessions so a process holding the
 old token cannot survive the browser flow and race the new credential. Settings,
 commands, onboarding, and the chat recovery card use one app-global login
-coordinator; a second surface reports the already-open flow instead of spawning
-a competing login process. No credential or token crosses into the webview.
+coordinator; a second surface joins the already-open flow instead of spawning a
+competing login process. The coordinator fans completion, failure, timeout, and
+cancellation back to every joined surface so none can retain a stale busy state.
+No credential or token crosses into the webview.
 
 Sprint 99 fixed three concurrency defects that the single-conversation shape had hidden:
 `CodexRuntime` held `_threadApprovalKey`/`_browserToolsEnabledForThread` as scalars whose mismatch
