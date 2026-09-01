@@ -69,6 +69,51 @@ function testPollingRefreshCompletesInlineRecovery(): void {
   }
 }
 
+function testSetupOriginatedReadyLoginDoesNotStoreAFalseError(): void {
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = () => undefined;
+  try {
+    useAISidebarStore.getState().startLogin();
+    assert.equal(useAISidebarStore.getState().claudeLoginTurnId, null);
+
+    useAISidebarStore.getState().handleExtensionMessage({
+      type: 'agent-setup:complete',
+      status: readyStatus,
+    });
+
+    assert.equal(useAISidebarStore.getState().claudeLoginState, 'idle');
+    assert.equal(useAISidebarStore.getState().setupInProgress, false);
+    assert.equal(useAISidebarStore.getState().setupError, null);
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+function testSetupOriginatedPollingRefreshAlsoReturnsToIdle(): void {
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = () => undefined;
+  try {
+    useAISidebarStore.getState().startLogin();
+    useAISidebarStore.getState().handleExtensionMessage({
+      type: 'agent:config',
+      agenticEnabled: true,
+      selectedAgent: 'claude-code',
+      selectedModel: 'claude-sonnet-5',
+      agents: [],
+      models: [],
+      setupStatus: readyStatus,
+    });
+
+    assert.equal(useAISidebarStore.getState().claudeLoginState, 'idle');
+    assert.equal(useAISidebarStore.getState().claudeLoginTurnId, null);
+    assert.equal(useAISidebarStore.getState().setupError, null);
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
 function testFailedLoginStaysRecoverable(): void {
   const originalPostMessage = vscode.postMessage;
   vscode.postMessage = () => undefined;
@@ -148,6 +193,8 @@ function testSuccessAcknowledgementDismissesOnlyItsTurn(): void {
 function main(): void {
   testBrowserCallbackCompletesInlineRecovery();
   testPollingRefreshCompletesInlineRecovery();
+  testSetupOriginatedReadyLoginDoesNotStoreAFalseError();
+  testSetupOriginatedPollingRefreshAlsoReturnsToIdle();
   testFailedLoginStaysRecoverable();
   testLateReadyRefreshRecoversAnErroredLogin();
   testSuccessAcknowledgementDismissesOnlyItsTurn();

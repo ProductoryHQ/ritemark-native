@@ -19,6 +19,19 @@ export interface SidebarGateInput {
   showOpenCodeSetup: boolean;
 }
 
+/** A dismissed historical failure must no longer suppress the setup surface. */
+export function hasUndismissedInlineRecovery(
+  latestTurn: { id: string; result?: { failureKind?: string } } | undefined,
+  dismissedTurnIds: readonly string[],
+): boolean {
+  const failureKind = latestTurn?.result?.failureKind;
+  return Boolean(
+    latestTurn
+      && !dismissedTurnIds.includes(latestTurn.id)
+      && (failureKind === 'authentication' || failureKind === 'api-key-authentication'),
+  );
+}
+
 export function sidebarGate(i: SidebarGateInput): SidebarView {
   // A recoverable failure belongs beside the turn that failed. A setup-status
   // refresh must not flash that card and immediately replace it with a

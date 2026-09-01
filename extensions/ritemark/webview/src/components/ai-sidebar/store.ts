@@ -2353,8 +2353,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // paths as the same transition for the inline recovery card.
           const incomingSetupStatus = message.setupStatus ?? get().setupStatus;
           const loginCompleted = (get().claudeLoginState === 'pending' || get().claudeLoginState === 'error')
-            && get().claudeLoginTurnId !== null
             && incomingSetupStatus?.state === 'ready';
+          const inlineLoginCompleted = loginCompleted && get().claudeLoginTurnId !== null;
 
           set({
             agenticEnabled: message.agenticEnabled,
@@ -2373,7 +2373,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             ...(loginCompleted ? {
               setupInProgress: false,
               setupError: null,
-              claudeLoginState: 'success' as const,
+              claudeLoginState: inlineLoginCompleted ? 'success' as const : 'idle' as const,
+              ...(!inlineLoginCompleted ? { claudeLoginTurnId: null } : {}),
             } : {}),
             hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
             discoveredAgents: message.discoveredAgents || [],
@@ -2707,8 +2708,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'agent-setup:complete': {
           const loginState = get().claudeLoginState;
           const loginSucceeded = (loginState === 'pending' || loginState === 'error')
-            && get().claudeLoginTurnId !== null
             && message.status.state === 'ready';
+          const inlineLoginSucceeded = loginSucceeded && get().claudeLoginTurnId !== null;
           const loginFailed = loginState === 'pending' && !loginSucceeded;
           set({
             setupStatus: message.status,
@@ -2722,10 +2723,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                   ? message.status.error ?? 'Claude sign-in did not finish. Please try again.'
                   : null,
             claudeLoginState: loginSucceeded
-              ? 'success'
+              ? inlineLoginSucceeded ? 'success' : 'idle'
               : loginFailed
                 ? 'error'
                 : loginState,
+            ...(loginSucceeded && !inlineLoginSucceeded ? { claudeLoginTurnId: null } : {}),
           });
           break;
         }

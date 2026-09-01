@@ -10,7 +10,7 @@ import { useAISidebarStore, useActiveConversation } from './store';
 import { vscode } from '../../lib/vscode';
 import { OfflineBanner } from './OfflineBanner';
 import { OnboardingWizard } from './OnboardingWizard';
-import { sidebarGate } from './sidebarGate';
+import { hasUndismissedInlineRecovery, sidebarGate } from './sidebarGate';
 import { SetupWizard } from './SetupWizard';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
@@ -97,6 +97,7 @@ export function AISidebar() {
   const onboardingStatus = useAISidebarStore((s) => s.onboardingStatus);
   const onboardingDismissed = useAISidebarStore((s) => s.onboardingDismissed);
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
+  const dismissedAuthRecoveryTurnIds = useAISidebarStore((s) => s.dismissedAuthRecoveryTurnIds);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
   const hasSeenWelcome = useAISidebarStore((s) => s.hasSeenWelcome);
   const dismissWelcome = useAISidebarStore((s) => s.dismissWelcome);
@@ -133,8 +134,7 @@ export function AISidebar() {
     && setupStatus.state !== 'ready';
   const latestClaudeTurn = agentConversation[agentConversation.length - 1];
   const inlineRecoveryAvailable = isClaudeCode
-    && (latestClaudeTurn?.result?.failureKind === 'authentication'
-      || latestClaudeTurn?.result?.failureKind === 'api-key-authentication');
+    && hasUndismissedInlineRecovery(latestClaudeTurn, dismissedAuthRecoveryTurnIds);
   const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
   const showWelcome = isClaudeCode && setupStatus !== null
     && setupStatus.state === 'ready' && !hasSeenWelcome && !hasAnyRuntimeConversation;
