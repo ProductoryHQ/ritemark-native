@@ -2,6 +2,7 @@
 
 **Status:** prior RC invalidated; correction passes source and RunDev quota gates; replacement RC not built
 **Release:** v1.10.0  
+**Pull request:** [#237](https://github.com/ProductoryHQ/ritemark-native/pull/237)
 **Observed:** 2026-09-01 in the signed RC installed at `/Applications/Ritemark.app`  
 **Scope:** Bug fix / RC correction, not a new sprint
 
