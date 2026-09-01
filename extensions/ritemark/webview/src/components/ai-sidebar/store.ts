@@ -240,6 +240,10 @@ interface AISidebarState {
   isOnline: boolean;
   isCheckingConnectivity: boolean;
   ready: boolean;
+  bootstrapGeneration: number;
+  bootstrapError: string | null;
+  sidebarStatusRevisions: Record<'claude-code' | 'codex' | 'opencode' | 'discovery', number>;
+  runtimeHydration: Record<AgentId, { phase: 'checking' | 'ready' | 'error'; error: string | null }>;
 
   // ── Agent config: catalogs + availability (APP-GLOBAL) ──
   agenticEnabled: boolean;
@@ -807,6 +811,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     isOnline: true,
     isCheckingConnectivity: false,
     ready: false,
+    bootstrapGeneration: 0,
+    bootstrapError: null,
+    sidebarStatusRevisions: { 'claude-code': 0, codex: 0, opencode: 0, discovery: 0 },
+    runtimeHydration: {
+      'claude-code': { phase: 'checking', error: null },
+      codex: { phase: 'checking', error: null },
+      opencode: { phase: 'checking', error: null },
+    },
 
     agenticEnabled: false,
     agents: [],
@@ -1046,14 +1058,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     selectAgent: (agentId) => {
       patchConversation(get().activeConversationId, () => ({ selectedAgent: agentId }));
       vscode.postMessage({ type: 'ai-select-agent', agentId, conversationId: get().activeConversationId });
-      // When switching to Codex, force a fresh auth status check.
-      // The AI sidebar and Settings each maintain their own CodexAppServer instance,
-      // so logging out from Settings can leave the AI sidebar with a stale "ready"
-      // state. A fresh status round-trip ensures CodexSetupView appears whenever
-      // the user actually needs to sign in.
-      if (agentId === 'codex') {
-        vscode.postMessage({ type: 'codex:refreshStatus' });
-      }
     },
 
     selectModel: (modelId) => {
@@ -2248,7 +2252,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
 
         case 'ai-key-status':
-          set({ hasApiKey: message.hasKey, ready: true });
+          set({ hasApiKey: message.hasKey });
           break;
 
         case 'connectivity-status':
@@ -2287,7 +2291,61 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
         }
 
+        case 'agent:bootstrap-error':
+          if (message.generation < get().bootstrapGeneration) break;
+          set({
+            bootstrapGeneration: message.generation,
+            bootstrapError: message.error,
+            ready: false,
+          });
+          break;
+
+        case 'agent:status-checking':
+          if (message.generation !== get().bootstrapGeneration) break;
+          if (message.revision < get().sidebarStatusRevisions[message.runtimeId]) break;
+          set({
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              [message.runtimeId]: { phase: 'checking', error: null },
+            },
+            sidebarStatusRevisions: {
+              ...get().sidebarStatusRevisions,
+              [message.runtimeId]: message.revision,
+            },
+          });
+          break;
+
+        case 'agent:runtime-status-error':
+          if (message.generation !== get().bootstrapGeneration) break;
+          if (message.revision < get().sidebarStatusRevisions[message.runtimeId]) break;
+          set({
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              [message.runtimeId]: { phase: 'error', error: message.error },
+            },
+            sidebarStatusRevisions: {
+              ...get().sidebarStatusRevisions,
+              [message.runtimeId]: message.revision,
+            },
+          });
+          break;
+
+        case 'agent:discovery': {
+          if (message.generation !== get().bootstrapGeneration) break;
+          if (message.revision < get().sidebarStatusRevisions.discovery) break;
+          set({
+            discoveredAgents: message.agents,
+            discoveredCommands: message.commands,
+            sidebarStatusRevisions: { ...get().sidebarStatusRevisions, discovery: message.revision },
+          });
+          break;
+        }
+
+        case 'agent:bootstrap':
         case 'agent:config': {
+          const bootstrap = message.type === 'agent:bootstrap' ? message : null;
+          const legacyConfig = message.type === 'agent:config' ? message : null;
+          if (bootstrap && bootstrap.generation < get().bootstrapGeneration) break;
           // Set workspace context for per-project history scoping, then immediately
           // initialize the authoritative rollout mode before choosing legacy or
           // host storage. The host cutover state, not the flag alone, owns this.
@@ -2306,9 +2364,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             incomingAgent === 'codex' ? 'codex'
             : incomingAgent === 'opencode' ? 'opencode'
             : 'claude-code';
-          const incomingCodexStatus = message.codexStatus ?? get().codexStatus;
+          const incomingCodexStatus = legacyConfig?.codexStatus ?? get().codexStatus;
           const opencodeEnabled = message.opencodeEnabled ?? get().opencodeEnabled;
-          const acpProviders = message.acpProviders ?? get().acpProviders;
+          const acpProviders = legacyConfig?.acpProviders ?? get().acpProviders;
           const byokProviderModels = message.byokProviderModels ?? get().byokProviderModels;
 
           // Model-catalog reconciliation applies to EVERY open thread: if a thread's
@@ -2351,12 +2409,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // The host can report a completed browser login either through the
           // setup callback or through its status polling refresh. Treat both
           // paths as the same transition for the inline recovery card.
-          const incomingSetupStatus = message.setupStatus ?? get().setupStatus;
+          const incomingSetupStatus = legacyConfig?.setupStatus ?? get().setupStatus;
           const loginCompleted = (get().claudeLoginState === 'pending' || get().claudeLoginState === 'error')
             && incomingSetupStatus?.state === 'ready';
           const inlineLoginCompleted = loginCompleted && get().claudeLoginTurnId !== null;
 
           set({
+            ready: true,
+            ...(bootstrap ? {
+              bootstrapGeneration: bootstrap.generation,
+              bootstrapError: null,
+            } : {}),
             agenticEnabled: message.agenticEnabled,
             durableAgentConversationsEnabled: message.durableAgentConversations !== false,
             composerThinkingEffortEnabled: message.composerThinkingEffortEnabled !== false,
@@ -2369,7 +2432,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               ? get().dismissedCodexNoticeKey
               : null,
             setupStatus: incomingSetupStatus,
-            environmentStatus: message.environmentStatus ?? get().environmentStatus,
+            environmentStatus: legacyConfig?.environmentStatus ?? get().environmentStatus,
             ...(loginCompleted ? {
               setupInProgress: false,
               setupError: null,
@@ -2377,8 +2440,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               ...(!inlineLoginCompleted ? { claudeLoginTurnId: null } : {}),
             } : {}),
             hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
-            discoveredAgents: message.discoveredAgents || [],
-            discoveredCommands: message.discoveredCommands || [],
+            discoveredAgents: legacyConfig?.discoveredAgents ?? get().discoveredAgents,
+            discoveredCommands: legacyConfig?.discoveredCommands ?? get().discoveredCommands,
             claudeSdkVersion: message.claudeSdkVersion ?? get().claudeSdkVersion,
             // Sprint 76: OpenCode / ACP fields
             opencodeEnabled,
@@ -2392,6 +2455,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         }
 
         case 'acp-providers': {
+          if (message.generation !== undefined && message.generation !== get().bootstrapGeneration) break;
+          if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions.opencode) break;
           const conversations: Record<string, ConversationState> = {};
           for (const conversation of Object.values(get().conversations)) {
             conversations[conversation.id] = {
@@ -2407,6 +2472,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             opencodeEnabled: message.enabled,
             acpProviders: message.providers,
             conversations,
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              opencode: { phase: message.error ? 'error' : 'ready', error: message.error ?? null },
+            },
+            ...(message.revision !== undefined ? {
+              sidebarStatusRevisions: { ...get().sidebarStatusRevisions, opencode: message.revision },
+            } : {}),
           });
           break;
         }
@@ -2432,8 +2504,20 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         }
 
         case 'codex:status': {
+          if (message.generation !== undefined && message.generation !== get().bootstrapGeneration) break;
+          if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions.codex) break;
           const updates: Partial<AISidebarState> = {
             codexStatus: message.status,
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              codex: {
+                phase: message.status.state === 'checking' ? 'checking' : 'ready',
+                error: null,
+              },
+            },
+            ...(message.revision !== undefined ? {
+              sidebarStatusRevisions: { ...get().sidebarStatusRevisions, codex: message.revision },
+            } : {}),
           };
 
           if (!getCodexCompatibilityNoticeKey(message.status)) {
@@ -2706,6 +2790,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
 
         case 'agent-setup:complete': {
+          if (message.generation !== undefined && message.generation !== get().bootstrapGeneration) break;
+          if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions['claude-code']) break;
           const loginState = get().claudeLoginState;
           const loginSucceeded = (loginState === 'pending' || loginState === 'error')
             && message.status.state === 'ready';
@@ -2728,15 +2814,33 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 ? 'error'
                 : loginState,
             ...(loginSucceeded && !inlineLoginSucceeded ? { claudeLoginTurnId: null } : {}),
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              'claude-code': { phase: 'ready', error: null },
+            },
+            ...(message.revision !== undefined ? {
+              sidebarStatusRevisions: { ...get().sidebarStatusRevisions, 'claude-code': message.revision },
+            } : {}),
           });
           break;
         }
 
         case 'agent-setup:error':
+          if (message.generation !== undefined && message.generation !== get().bootstrapGeneration) break;
+          if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions['claude-code']) break;
           set({
             setupInProgress: false,
             setupError: message.error,
             claudeLoginState: get().claudeLoginState === 'pending' ? 'error' : get().claudeLoginState,
+            ...(message.generation !== undefined ? {
+              runtimeHydration: {
+                ...get().runtimeHydration,
+                'claude-code': { phase: 'error', error: message.error },
+              },
+            } : {}),
+            ...(message.revision !== undefined ? {
+              sidebarStatusRevisions: { ...get().sidebarStatusRevisions, 'claude-code': message.revision },
+            } : {}),
           });
           break;
 

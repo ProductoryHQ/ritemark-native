@@ -23,6 +23,7 @@ import {
 } from './workspaceFileLinks';
 import { DocumentSyncCoordinator } from './editorSync/DocumentSyncCoordinator';
 import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap } from './editorSync/protocol';
+import { versionedWebviewAssetUri } from './views/webviewAssetUri';
 
 // Properties type for front-matter
 export interface DocumentProperties {
@@ -521,9 +522,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // webview otherwise serves a cached copy across window reloads.
     const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.js');
     const scriptBaseUri = webviewPanel.webview.asWebviewUri(scriptPath).toString();
-    let scriptVersion = '';
-    try { scriptVersion = `?v=${Math.round(fs.statSync(scriptPath.fsPath).mtimeMs)}`; } catch { /* keep unversioned */ }
-    const scriptUri = `${scriptBaseUri}${scriptVersion}`;
+    const scriptUri = versionedWebviewAssetUri(scriptBaseUri, scriptPath.fsPath);
 
     // Debug logging for Windows path issues
     console.log('[Ritemark] Extension URI:', this.context.extensionUri.toString());

@@ -245,12 +245,17 @@ export function ChatInput() {
   const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
   const selectOpenCodeModel = useAISidebarStore((s) => s.selectOpenCodeModel);
   const openAgentSettings = useAISidebarStore((s) => s.openAgentSettings);
+  const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
 
   // Route by pendingRuntime so switching provider mid-session takes effect immediately
   const isClaudeCode = pendingRuntime.runtimeId === 'claude-code';
   const isCodex = pendingRuntime.runtimeId === 'codex';
   const isOpenCode = (pendingRuntime.runtimeId as string) === 'opencode';
   const isAgentMode = isClaudeCode || isCodex || isOpenCode;
+  const operationalStatus = runtimeHydration[pendingRuntime.runtimeId];
+  const isRuntimeChecking = operationalStatus?.phase === 'checking';
+  const isRuntimeError = operationalStatus?.phase === 'error';
+  const isRuntimeOperational = operationalStatus?.phase === 'ready';
   // Sprint 103 R8: two-axis composer policy (legacy 'plan' mode normalized).
   const composerPolicy = policyOf(pendingRuntime);
   const composerThinkingEffort = composerThinkingEffortEnabled
@@ -273,7 +278,11 @@ export function ChatInput() {
   const isLoading = isAgentMode ? agentRunning : isStreaming;
   // Sprint 74 R2 (#82): while an agent runs, the composer stays unlocked and
   // Enter queues the next prompt instead of sending it.
-  const placeholder = isLoading && isAgentMode
+  const placeholder = isRuntimeChecking
+    ? `Checking ${isClaudeCode ? 'Claude' : isCodex ? 'Codex' : 'OpenCode'}…`
+    : isRuntimeError
+      ? `${isClaudeCode ? 'Claude' : isCodex ? 'Codex' : 'OpenCode'} is unavailable — try again above`
+    : isLoading && isAgentMode
     ? 'Add a follow-up… (Enter queues it for when the agent finishes)'
     // Sprint 103 R8: the placeholder is the cheapest honest signal that the
     // next message runs plan-first.
@@ -363,7 +372,7 @@ export function ChatInput() {
       return;
     }
 
-    if (!isOnline || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
+    if (!isOnline || isLoading || !isRuntimeOperational || (isCodex && codexStatus.state !== 'ready')) return;
 
     // Build hidden context (agent instructions — sent to AI but not shown in chat).
     // Dismissal + new pin can both be active when switching agents A → B.
@@ -421,7 +430,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on
@@ -1515,9 +1524,9 @@ export function ChatInput() {
             ) : (
               <button
                 onClick={() => handleSend()}
-                disabled={!value.trim() || !isOnline}
+                disabled={!value.trim() || !isOnline || !isRuntimeOperational}
                 className="flex h-7 w-7 items-center justify-center rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-strong)] disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
-                title={sendTitle}
+                title={isRuntimeChecking ? 'Checking runtime status…' : isRuntimeError ? 'Runtime check failed — try again above' : sendTitle}
               >
                 <Icon name="paper-plane-right" size={14} />
               </button>

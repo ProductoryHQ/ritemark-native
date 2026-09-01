@@ -259,6 +259,42 @@ test('cache is used when no live and no remote', () => {
   assert.strictEqual(r.anthropic.models[0].id, 'cache-only');
 });
 
+test('empty remote/cache providers cannot erase the bundled selectable floor', () => {
+  const emptyRemote: ModelCatalog = {
+    schemaVersion: 1,
+    updatedAt: 'x',
+    providers: { anthropic: { models: [], defaults: {} } },
+  };
+  const emptyCache: ModelCatalog = {
+    schemaVersion: 1,
+    updatedAt: 'x',
+    providers: { anthropic: { models: [], defaults: {} } },
+  };
+  const r = resolveAll({}, emptyRemote, emptyCache, BUNDLED_CATALOG, APP);
+  assert.strictEqual(r.anthropic.source, 'bundled');
+  assert.ok(r.anthropic.models.length > 0);
+  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5');
+});
+
+test('a source containing only future-gated models falls back to this build bundled floor', () => {
+  const remote: ModelCatalog = {
+    schemaVersion: 1,
+    updatedAt: 'x',
+    providers: {
+      anthropic: {
+        models: [{
+          id: 'future-only', label: 'Future', description: '', tier: 'high',
+          deprecated: false, order: 0, minAppVersion: '99.0.0',
+        }],
+        defaults: { 'claude-code': 'future-only' },
+      },
+    },
+  };
+  const r = resolveAll({}, remote, null, BUNDLED_CATALOG, APP);
+  assert.strictEqual(r.anthropic.source, 'bundled');
+  assert.ok(r.anthropic.models.some((model) => model.id === 'claude-sonnet-5'));
+});
+
 test('minAppVersion filters entries above the running app version', () => {
   const bundled: ModelCatalog = {
     schemaVersion: 1,

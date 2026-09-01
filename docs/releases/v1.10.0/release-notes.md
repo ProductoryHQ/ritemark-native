@@ -98,6 +98,11 @@ Claude's runtime can expose `default` and an explicit model name as two request
 aliases for the same actual model. Ritemark now shows that model once, marks the
 provider default with a restrained `*`, and verifies the resolved runtime model
 without producing a false **Model mismatch** warning for equivalent aliases.
+Opening Agent Chat in a new window now displays that real selected model before
+any runtime or account check can finish. Slow Claude/Codex startup, a locked
+keychain, workspace discovery, or a stale cached sidebar bundle can no longer
+leave the composer at a permanent `Model` placeholder; those checks report and
+retry independently without removing the available model choices.
 In a compact AI sidebar, the selected model also gets priority in the composer
 footer: the closed permission control reduces to its icon and thinking effort
 uses a level-aware icon, while full labels remain available in opened controls,
