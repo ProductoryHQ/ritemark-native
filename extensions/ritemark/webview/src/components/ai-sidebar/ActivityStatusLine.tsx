@@ -43,6 +43,17 @@ export function ActivityStatusLine() {
   const presentation = presentActivityState(state, { activeSeconds, waitedSeconds, errorFirstLine, liveActivity });
   if (!presentation) return null;
 
+  // AgentResponse already renders recoverable Claude auth failures as an
+  // actionable card. Repeating the same failure below it as a red status line
+  // creates two competing truth points and exposes the raw runtime wording.
+  const terminalResult = last?.result;
+  const failureKind = terminalResult && 'failureKind' in terminalResult
+    ? terminalResult.failureKind
+    : undefined;
+  if (state === 'failed' && (failureKind === 'authentication' || failureKind === 'api-key-authentication')) {
+    return null;
+  }
+
   const title = state === 'done' && waitedSeconds && waitedSeconds > 1
     ? `+${Math.round(waitedSeconds)}s waiting for you`
     : undefined;

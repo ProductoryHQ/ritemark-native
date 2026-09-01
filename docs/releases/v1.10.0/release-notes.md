@@ -116,7 +116,9 @@ If the conversation uses an Anthropic API key instead, the card directs you to
 **Update API key** in AI Settings. Ritemark keeps OAuth and API-key recovery
 separate, even when the provider returns the same generic authentication text.
 The recovery card remains available after reloading the window or leaving and
-returning to the failed conversation.
+returning to the failed conversation. Its neutral Ritemark card treatment keeps
+warning colour on the attention icon, uses the standard primary action, and
+does not repeat the same failure as a second red status line.
 
 ## Transcribe Insights you can deliver
 
