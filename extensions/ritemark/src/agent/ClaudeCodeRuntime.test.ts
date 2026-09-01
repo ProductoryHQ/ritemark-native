@@ -188,7 +188,31 @@ async function run() {
     console.log('✓ Test 7: every advertised Claude effort reaches the SDK without inventing an applied value');
   }
 
-  console.log('\nAll 7 ClaudeCodeRuntime tests passed!');
+  // A provider OAuth failure becomes a stable recovery category while the raw
+  // text remains available to the host for diagnostics/presentation.
+  {
+    let completed: { error?: string; failureKind?: string } | undefined;
+    const session = makeSession('conv-auth-error', {
+      ...mockSession,
+      sendMessage: async () => ({
+        text: '',
+        filesModified: [],
+        metrics: { durationMs: 0, costUsd: null, model: null },
+        error: 'Failed to authenticate: OAuth session expired and could not be refreshed',
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (session as any)._config = {
+      ...dummyConfig,
+      onComplete: (result: { error?: string; failureKind?: string }) => { completed = result; },
+    };
+    await session.prompt({ prompt: 'Try Claude' });
+    assert.equal(completed?.failureKind, 'authentication');
+    assert.match(completed?.error ?? '', /OAuth session expired/);
+    console.log('✓ Test 8: OAuth failures carry the authentication recovery category');
+  }
+
+  console.log('\nAll 8 ClaudeCodeRuntime tests passed!');
 }
 
 run().then(

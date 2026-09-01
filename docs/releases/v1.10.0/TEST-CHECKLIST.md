@@ -85,6 +85,15 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] New conversation, conversation, and history buttons in the thread rail have a measured vertical gap of 4 px, including when the rail has no visible conversations; a pinned divider has 4 px clearance before and after its 1 px line.
 - [ ] Verify the one-row picker and absence of a false mismatch in the final packaged release candidate.
 
+## Claude sign-in recovery (RC bug fix)
+
+- [x] The exact provider error `Failed to authenticate: OAuth session expired and could not be refreshed` is classified as an authentication failure and replaced with plain-language transcript copy.
+- [x] The recovery card uses the existing `agent-setup:login` route and the same app-global Claude browser-login coordinator as Settings and command actions; a second surface cannot spawn a competing login subprocess.
+- [x] A proven auth failure and sign-in transition release every warm Ritemark Claude session; missing-auth and login-started transitions do not spawn a model-discovery Claude process.
+- [x] Extension compile, webview typecheck, focused error-presentation test, and Claude runtime adapter regression pass.
+- [x] In RunDev, inject the exact OAuth failure, verify the raw provider sentence is absent from the visible response, click **Sign in to Claude**, and capture/visually inspect the recovery card at narrow and normal sidebar widths. Verified 2026-09-01 at 300 px and 480 px; the CTA reached the shared browser-login route and the test account remained signed out.
+- [ ] Repeat the recovery path on the final packaged release candidate; cancel before completing a test-account login unless the release owner explicitly wants credential mutation.
+
 ## Transcribe Insights and speaker names (Sprint 113)
 
 - [x] Auto/known/custom language contract, catalog search, custom normalization, fallback, invalid-wire, data-only prompt language, quote-fidelity instruction, and legacy-English provenance tests pass.

@@ -36,8 +36,7 @@ import {
   setAnthropicKeyAvailable,
   installClaude,
   openAnthropicKeySettings,
-  startClaudeLoginSubprocess,
-  type ClaudeLoginSubprocessHandle,
+  beginClaudeLogin,
   installGit,
   installNode,
   installCodexCli,
@@ -77,6 +76,7 @@ import {
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import { RUNTIME_CAPABILITIES, capabilitiesFor } from '../runtime/capabilities';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
+import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
 import {
   isThinkingEffort,
   thinkingEffortLabel,
@@ -135,7 +135,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   private _disposeCodexStatusListener: (() => void) | null = null;
   private _claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
-  private _claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
   private _disposeClaudeStatusListener: (() => void) | null = null;
   private _browserContextPoll: ReturnType<typeof setInterval> | null = null;
   /** Sprint 78 (#73): cached annotation-mode screenshot keyed by URL to avoid
@@ -758,13 +757,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             },
             onComplete: (result) => {
               if (!isCurrentRuntimeTurn()) return;
+              const errorPresentation = presentRuntimeError(agentId as AgentId, result.error);
+              const error = errorPresentation?.message;
+              const failureKind = result.failureKind ?? errorPresentation?.failureKind;
               this._view?.webview.postMessage({
                 type: 'agent-result', conversationId,
                 agentId,
                 text: result.text ?? '',
                 filesModified: result.filesModified ?? [],
                 metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
-                error: result.error,
+                error,
+                failureKind,
               });
               this._refreshExplorerForAgentWrites(result.filesModified);
               if (!terminalCheckpointWritten) {
@@ -775,13 +778,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   runtimeId: agentId as AgentId,
                   turnId: conversationTurnId,
                   text: result.text ?? '',
-                  status: result.error ? 'failed' : 'completed',
-                  error: result.error,
+                  status: error ? 'failed' : 'completed',
+                  error,
                   appliedThinkingEffort,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
               }
-              if (result.error) this._disposeRuntimeSession(conversationId, agentId as AgentId);
+              if (failureKind === 'authentication') {
+                // Claude OAuth is app-global. One failed refresh means every
+                // warm Claude process may hold the same stale token family;
+                // keeping siblings alive after re-login can immediately race
+                // and invalidate the fresh credential again.
+                this._disposeRuntimeSessionsForAgent('claude-code');
+                clearSetupCache();
+                emitClaudeStatusInvalidated('authentication-failed');
+              } else if (error) {
+                this._disposeRuntimeSession(conversationId, agentId as AgentId);
+              }
             },
             onQuestion: (question) => {
               if (!isCurrentRuntimeTurn()) return;
@@ -1420,7 +1433,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _handleExternalClaudeStatusInvalidation(
-    reason: 'install-started' | 'install-finished' | 'login-started' | 'login-finished' | 'status-refresh' | 'settings-updated'
+    reason: 'install-started' | 'install-finished' | 'login-started' | 'login-finished' | 'authentication-failed' | 'status-refresh' | 'settings-updated'
   ): Promise<void> {
     if (reason === 'login-started') {
       setClaudeLoginInProgress(true);
@@ -1428,14 +1441,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     } else if (reason === 'login-finished') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
-    } else if (reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
+    } else if (reason === 'authentication-failed' || reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
     }
 
+    if (reason === 'login-started' || reason === 'login-finished' || reason === 'authentication-failed') {
+      this._disposeRuntimeSessionsForAgent('claude-code');
+    }
+
     // Auth/runtime context may have changed (account, binary, settings) and model
-    // availability can be account-specific — re-resolve the catalog before sending.
-    await modelCatalog.refresh();
+    // availability can be account-specific — re-resolve after a completed
+    // transition. Do not spawn a discovery probe while auth is missing or the
+    // browser login is still in flight; that creates another stale Claude process.
+    if (reason !== 'login-started' && reason !== 'authentication-failed') {
+      await modelCatalog.refresh();
+    }
     await this._sendAgentConfig();
     this._sendOnboardingStatus();
   }
@@ -1617,16 +1638,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    if (this._claudeLoginSubprocess) {
-      this._claudeLoginSubprocess.kill();
-      this._claudeLoginSubprocess = null;
-    }
-
-    setClaudeLoginInProgress(true);
-    this._startClaudeLoginPolling();
-    emitClaudeStatusInvalidated('login-started');
-
-    this._claudeLoginSubprocess = startClaudeLoginSubprocess(status.binaryPath, {
+    const startResult = beginClaudeLogin(status.binaryPath, {
       onUrl: (url) => {
         vscode.window.showInformationMessage(
           'Sign-in opened in your browser. Authorize to finish.',
@@ -1637,30 +1649,30 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
         });
       },
-      onComplete: () => {
-        this._claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('login-finished');
-      },
       onError: (msg) => {
-        this._claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('settings-updated');
         this._view?.webview.postMessage({
           type: 'agent-setup:error',
           error: `Claude sign-in failed: ${msg}`,
         });
       },
       onTimeout: () => {
-        this._claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('settings-updated');
         this._view?.webview.postMessage({
           type: 'agent-setup:error',
           error: 'Claude sign-in timed out after 5 minutes. Please try again.',
         });
       },
     });
+
+    if (startResult === 'already-running') {
+      this._view?.webview.postMessage({
+        type: 'agent-setup:progress',
+        progress: {
+          stage: 'login',
+          message: 'Claude sign-in is already open. Finish it in your browser.',
+        },
+      });
+      return;
+    }
 
     this._view?.webview.postMessage({
       type: 'agent-setup:progress',
@@ -1963,6 +1975,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       delete liveCapabilities[agentId];
       if (Object.keys(liveCapabilities).length === 0) {
         this._liveThinkingEffortCapabilities.delete(conversationId);
+      }
+    }
+  }
+
+  /** Release one app-global runtime kind across every attached conversation. */
+  private _disposeRuntimeSessionsForAgent(agentId: AgentId): void {
+    for (const conversationId of Array.from(this._runtimeSessions.keys())) {
+      this._disposeRuntimeSession(conversationId, agentId);
+      if (!this._runtimeSessions.has(conversationId)) {
+        this._runtimeSessionLastUsed.delete(conversationId);
       }
     }
   }

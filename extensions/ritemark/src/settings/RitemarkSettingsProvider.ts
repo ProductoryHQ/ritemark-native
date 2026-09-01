@@ -17,14 +17,13 @@ import {
   getAgentEnvironmentStatus,
   getSetupStatus,
   installClaude,
-  openClaudeLoginTerminal,
   logoutClaude,
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
   setAnthropicKeyAvailable,
   setClaudeLoginInProgress,
-  startClaudeLoginSubprocess,
-  type ClaudeLoginSubprocessHandle,
+  beginClaudeLogin,
+  cancelClaudeLogin as cancelActiveClaudeLogin,
   type SetupStatus,
 } from '../agent';
 import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
@@ -149,7 +148,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private disposeClaudeStatusListener: (() => void) | null = null;
   private disposeCodexStatusListener: (() => void) | null = null;
   private claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
-  private claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -176,7 +174,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     this.disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
       if (event.reason === 'login-started') {
         this.startClaudeLoginPolling();
-      } else if (event.reason === 'login-finished' || event.reason === 'install-finished' || event.reason === 'settings-updated') {
+      } else if (event.reason === 'login-finished' || event.reason === 'authentication-failed' || event.reason === 'install-finished' || event.reason === 'settings-updated') {
         this.stopClaudeLoginPolling();
       }
       const panel = RitemarkSettingsProvider.panel;
@@ -823,11 +821,21 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       return;
     }
 
-    setClaudeLoginInProgress(true);
-    emitClaudeStatusInvalidated('login-started');
-    this.startClaudeLoginPolling();
-    openClaudeLoginTerminal(status.binaryPath);
-    vscode.window.showInformationMessage('Finish Claude.ai sign-in in the terminal and browser. Ritemark will refresh automatically.');
+    const startResult = beginClaudeLogin(status.binaryPath, {
+      onUrl: (url) => {
+        vscode.window.showInformationMessage(
+          'Sign-in opened in your browser. Authorize to finish.',
+          'Copy backup link',
+        ).then((action) => {
+          if (action === 'Copy backup link') void vscode.env.clipboard.writeText(url);
+        });
+      },
+      onError: (message) => vscode.window.showErrorMessage(`Claude sign-in failed: ${message}`),
+      onTimeout: () => vscode.window.showWarningMessage('Claude sign-in timed out after 5 minutes. Please try again.'),
+    });
+    if (startResult === 'already-running') {
+      vscode.window.showInformationMessage('Claude sign-in is already open. Finish it in your browser.');
+    }
   }
 
   public async startCodexLoginFromCommand(): Promise<void> {
@@ -872,16 +880,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       return;
     }
 
-    if (this.claudeLoginSubprocess) {
-      this.claudeLoginSubprocess.kill();
-      this.claudeLoginSubprocess = null;
-    }
-
-    setClaudeLoginInProgress(true);
-    emitClaudeStatusInvalidated('login-started');
-    this.startClaudeLoginPolling();
-
-    this.claudeLoginSubprocess = startClaudeLoginSubprocess(status.binaryPath, {
+    const startResult = beginClaudeLogin(status.binaryPath, {
       onUrl: (url) => {
         vscode.window.showInformationMessage(
           'Sign-in opened in your browser. Authorize to finish.',
@@ -892,36 +891,24 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           }
         });
       },
-      onComplete: () => {
-        this.claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('login-finished');
-      },
       onError: (msg) => {
-        this.claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('settings-updated');
         vscode.window.showErrorMessage(`Claude sign-in failed: ${msg}`);
       },
       onTimeout: () => {
-        this.claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('settings-updated');
         vscode.window.showWarningMessage('Claude sign-in timed out after 5 minutes. Please try again.');
       },
     });
+
+    if (startResult === 'already-running') {
+      vscode.window.showInformationMessage('Claude sign-in is already open. Finish it in your browser.');
+    }
 
     await this.sendCurrentSettings(webview);
   }
 
   private cancelClaudeLogin(): void {
-    if (this.claudeLoginSubprocess) {
-      this.claudeLoginSubprocess.kill();
-      this.claudeLoginSubprocess = null;
-    }
-    setClaudeLoginInProgress(false);
-    emitClaudeStatusInvalidated('settings-updated');
-    vscode.window.showInformationMessage('Sign-in cancelled.');
+    const cancelled = cancelActiveClaudeLogin();
+    vscode.window.showInformationMessage(cancelled ? 'Sign-in cancelled.' : 'No Claude sign-in is currently open.');
   }
 
   private async enterAnthropicApiKey(webview: vscode.Webview): Promise<void> {

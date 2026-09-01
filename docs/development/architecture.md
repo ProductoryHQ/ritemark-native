@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-08-31 (v1.10.0 RC — Codex runtime completeness and editor reconciliation corrections)
+**Last updated:** 2026-09-01 (v1.10.0 RC — recoverable Claude authentication failures)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -234,6 +234,26 @@ Per-runtime session mapping, and the shared thing each keeps:
 | Claude Code | one `AgentSession` (`AgentRunner.ts`) | nothing — the SDK is per-session |
 | Codex | one app-server **thread** | ONE `codex-app-server` process, one listener registration; events route by `params.threadId` |
 | OpenCode / ACP | one ACP **session** | ONE subprocess (measured: 339 MB for 5 sessions vs 1291 MB for 5 processes) |
+
+### Recoverable runtime failures (v1.10.0 RC correction)
+
+Provider error text is diagnostic data, not user-interface copy. The runtime
+boundary classifies known recoverable failures into stable `failureKind`
+values; `agent-result` carries that category alongside the user-facing error.
+The webview renders the recovery action from the category and never has to
+parse a vendor sentence. Claude authentication failures therefore appear as a
+plain-language card with **Sign in to Claude**, while the raw SDK error remains
+inside the collapsed activity trace.
+
+Claude OAuth and its macOS Keychain credential are app-global even though
+conversation sessions are independent. A proven Claude authentication failure
+releases every warm Claude session, invalidates setup status, and does not run a
+model-discovery probe while authentication is unavailable. Starting or
+finishing sign-in also releases stale Claude sessions so a process holding the
+old token cannot survive the browser flow and race the new credential. Settings,
+commands, onboarding, and the chat recovery card use one app-global login
+coordinator; a second surface reports the already-open flow instead of spawning
+a competing login process. No credential or token crosses into the webview.
 
 Sprint 99 fixed three concurrency defects that the single-conversation shape had hidden:
 `CodexRuntime` held `_threadApprovalKey`/`_browserToolsEnabledForThread` as scalars whose mismatch

@@ -2638,6 +2638,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                   filesModified: message.filesModified || [],
                   metrics: message.metrics || { durationMs: 0, costUsd: null, model: null },
                   error: message.error,
+                  failureKind: message.failureKind,
                 },
               };
             },
