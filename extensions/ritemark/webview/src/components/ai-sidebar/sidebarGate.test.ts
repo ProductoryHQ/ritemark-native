@@ -7,6 +7,7 @@ import { sidebarGate } from './sidebarGate'
 
 const base = {
   ready: true,
+  inlineRecoveryAvailable: false,
   onboardingNeeded: false,
   needsSetup: false,
   showCodexSetup: false,
@@ -19,6 +20,12 @@ assert.equal(sidebarGate(base), 'chat')
 
 // needsSetup path (binary missing/broken, auth needed) is untouched.
 assert.equal(sidebarGate({ ...base, needsSetup: true }), 'claude-setup')
+
+// A failed turn with an inline sign-in CTA stays visible after the host
+// refreshes Claude setup state to needs-auth. It also wins over first-run
+// onboarding because the user already has a concrete failed conversation.
+assert.equal(sidebarGate({ ...base, needsSetup: true, inlineRecoveryAvailable: true }), 'chat')
+assert.equal(sidebarGate({ ...base, onboardingNeeded: true, needsSetup: true, inlineRecoveryAvailable: true }), 'chat')
 
 // First-run onboarding wins over everything else.
 assert.equal(sidebarGate({ ...base, onboardingNeeded: true, needsSetup: true }), 'onboarding')

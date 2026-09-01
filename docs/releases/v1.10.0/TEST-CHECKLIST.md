@@ -92,6 +92,7 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] A proven auth failure and sign-in transition release every warm Ritemark Claude session; missing-auth and login-started transitions do not spawn a model-discovery Claude process.
 - [x] Extension compile, webview typecheck, focused error-presentation test, and Claude runtime adapter regression pass.
 - [x] In RunDev, inject the exact OAuth failure, verify the raw provider sentence is absent from the visible response, click **Sign in to Claude**, and capture/visually inspect the recovery card at narrow and normal sidebar widths. Verified 2026-09-01 at 300 px and 480 px; the CTA reached the shared browser-login route and the test account remained signed out.
+- [x] A subsequent `needs-auth` setup refresh keeps the failed turn and inline sign-in CTA visible instead of replacing chat with the full-sidebar Setup Wizard. Verified 2026-09-01 by sequential RunDev event injection and visual inspection.
 - [ ] Repeat the recovery path on the final packaged release candidate; cancel before completing a test-account login unless the release owner explicitly wants credential mutation.
 
 ## Transcribe Insights and speaker names (Sprint 113)

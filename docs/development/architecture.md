@@ -243,7 +243,10 @@ values; `agent-result` carries that category alongside the user-facing error.
 The webview renders the recovery action from the category and never has to
 parse a vendor sentence. Claude authentication failures therefore appear as a
 plain-language card with **Sign in to Claude**, while the raw SDK error remains
-inside the collapsed activity trace.
+inside the collapsed activity trace. That active-turn recovery card takes
+precedence over the full-sidebar setup/onboarding gate, so the ensuing
+`needs-auth` status refresh cannot hide the action the user was just shown;
+empty or newly started conversations continue to use the normal setup wizard.
 
 Claude OAuth and its macOS Keychain credential are app-global even though
 conversation sessions are independent. A proven Claude authentication failure
