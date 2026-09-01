@@ -13,6 +13,7 @@ import {
   type ExplicitThinkingEffort,
   type ThinkingEffort,
 } from '../runtime/thinkingEffort';
+import type { RuntimeFailureKind } from '../runtime/runtimeErrorPresentation';
 
 export const CONVERSATION_SCHEMA_VERSION = 1 as const;
 export const CONVERSATION_INDEX_VERSION = 1 as const;
@@ -75,6 +76,9 @@ export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
   kind: 'assistant-message';
   content: string;
   terminalStatus: 'completed' | 'failed' | 'cancelled' | null;
+  /** Stable recovery metadata for a terminal runtime failure. */
+  error?: string;
+  failureKind?: RuntimeFailureKind;
   /** Provider-observed applied value; absent/null means the provider did not expose it. */
   appliedThinkingEffort?: ExplicitThinkingEffort | null;
 }
@@ -99,6 +103,8 @@ export interface BoundaryEventV1 extends ConversationEventBaseV1 {
   kind: 'boundary';
   boundaryKind: 'failed' | 'cancelled' | 'interrupted' | 'context-restored';
   message: string;
+  /** Stable recovery metadata for a failed boundary. */
+  failureKind?: RuntimeFailureKind;
 }
 
 export type DispatchReceiptStateV1 = 'not-sent' | 'ambiguous' | 'accepted';
@@ -399,6 +405,10 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
       terminalStatus: input.terminalStatus === null
         ? null
         : enumAt(input.terminalStatus, `${path}.terminalStatus`, ['completed', 'failed', 'cancelled'] as const),
+      ...(input.error === undefined ? {} : { error: stringAt(input.error, `${path}.error`) }),
+      ...(input.failureKind === undefined ? {} : {
+        failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
+      }),
       appliedThinkingEffort,
     };
   }
@@ -435,6 +445,9 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
     kind,
     boundaryKind: enumAt(input.boundaryKind, `${path}.boundaryKind`, ['failed', 'cancelled', 'interrupted', 'context-restored'] as const),
     message: stringAt(input.message, `${path}.message`),
+    ...(input.failureKind === undefined ? {} : {
+      failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
+    }),
   };
 }
 

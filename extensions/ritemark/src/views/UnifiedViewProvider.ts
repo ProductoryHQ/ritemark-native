@@ -780,6 +780,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   text: result.text ?? '',
                   status: error ? 'failed' : 'completed',
                   error,
+                  failureKind,
                   appliedThinkingEffort,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);

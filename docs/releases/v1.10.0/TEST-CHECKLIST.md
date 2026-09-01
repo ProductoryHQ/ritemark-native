@@ -95,6 +95,7 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] A subsequent `needs-auth` setup refresh keeps the failed turn and inline sign-in CTA visible instead of replacing chat with the full-sidebar Setup Wizard. Verified 2026-09-01 by sequential RunDev event injection and visual inspection.
 - [x] A chat CTA joining a login already started from Settings receives the same completion/cancel terminal callback; coordinator fan-out regression passes and no joined surface retains `setupInProgress`.
 - [x] The same generic provider authentication sentence under `anthropic-api-key` is classified as `api-key-authentication` and offers **Update API key**, never the Claude.ai OAuth action. Verified in RunDev 2026-09-01; the card was visually inspected and its CTA opened the existing Ritemark Settings editor without mutating a key.
+- [x] Friendly failure copy and its auth-method-aware recovery category are stored on the canonical terminal event; projection/controller regressions verify **Sign in to Claude** or **Update API key** survives window reload and conversation navigation. A stopped-profile canonical OAuth-failure fixture was restored in a fresh RunDev process and the resulting card was captured and visually inspected (2026-09-01).
 - [ ] Repeat the recovery path on the final packaged release candidate; cancel before completing a test-account login unless the release owner explicitly wants credential mutation.
 
 ## Transcribe Insights and speaker names (Sprint 113)

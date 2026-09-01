@@ -115,6 +115,8 @@ credential.
 If the conversation uses an Anthropic API key instead, the card directs you to
 **Update API key** in AI Settings. Ritemark keeps OAuth and API-key recovery
 separate, even when the provider returns the same generic authentication text.
+The recovery card remains available after reloading the window or leaving and
+returning to the failed conversation.
 
 ## Transcribe Insights you can deliver
 

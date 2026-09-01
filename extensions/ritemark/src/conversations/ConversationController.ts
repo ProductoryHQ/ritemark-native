@@ -18,6 +18,7 @@ import type {
 import type { ConversationRolloutMode } from './ConversationCutoverState';
 import { AGENTS, type AgentId } from '../agent/types';
 import type { RuntimeContinuationDescriptorV1 } from '../runtime/continuation';
+import type { RuntimeFailureKind } from '../runtime/runtimeErrorPresentation';
 import { LegacyConversationMigrator, type LegacyConversationCandidateV1 } from './LegacyConversationMigrator';
 import {
   fallbackTitleFromPrompt,
@@ -456,6 +457,7 @@ export class ConversationController {
     text: string;
     status: 'completed' | 'failed' | 'cancelled';
     error?: string;
+    failureKind?: RuntimeFailureKind;
     appliedThinkingEffort?: import('../runtime/thinkingEffort').ExplicitThinkingEffort | null;
     turnId?: string;
     generateTitle?: (request: FirstResponseTitleRequest) => Promise<string | null>;
@@ -492,6 +494,8 @@ export class ConversationController {
               runtimeId: input.runtimeId,
               content: input.text,
               terminalStatus: input.status,
+              ...(input.error ? { error: input.error } : {}),
+              ...(input.failureKind ? { failureKind: input.failureKind } : {}),
               appliedThinkingEffort: input.appliedThinkingEffort ?? null,
             }]
           : [{
@@ -503,6 +507,7 @@ export class ConversationController {
               runtimeId: input.runtimeId,
               boundaryKind: input.status === 'cancelled' ? 'cancelled' as const : 'failed' as const,
               message: input.error || (input.status === 'cancelled' ? 'The turn was cancelled.' : 'The turn failed.'),
+              ...(input.failureKind ? { failureKind: input.failureKind } : {}),
             }];
         const assistantEvent = appendEvents[0];
         const currentDescriptor = current.continuations?.[input.runtimeId];

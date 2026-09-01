@@ -21,6 +21,16 @@ export function projectionToConversation(
       ),
     );
     const terminalAssistant = assistants[assistants.length - 1];
+    const terminalBoundary = [...projection.events].reverse().find(
+      (event): event is Extract<typeof event, { kind: 'boundary' }> => (
+        event.kind === 'boundary'
+        && event.turnId === user.turnId
+        && (event.boundaryKind === 'failed' || event.boundaryKind === 'cancelled')
+      ),
+    );
+    const terminalEvent = terminalBoundary && (!terminalAssistant || terminalBoundary.sequence > terminalAssistant.sequence)
+      ? terminalBoundary
+      : terminalAssistant;
     const assistantContent = assistants.map((event) => event.content).filter(Boolean).join('\n\n');
     const runtime = runtimeAgent(user.runtimeId);
     const timestamp = Date.parse(user.occurredAt);
@@ -30,11 +40,18 @@ export function projectionToConversation(
         conversationId: projection.conversationId,
         userPrompt: user.text,
         activities: [],
-        ...(terminalAssistant ? { result: {
+        ...(terminalEvent ? { result: {
           text: assistantContent,
           filesModified: [],
           metrics: { durationMs: 0, costUsd: null, model: null },
-          ...(terminalAssistant.terminalStatus === 'failed' ? { error: 'The turn failed.' } : {}),
+          ...(terminalEvent.kind === 'boundary'
+            ? terminalEvent.boundaryKind === 'failed'
+              ? { error: terminalEvent.message }
+              : {}
+            : terminalEvent.terminalStatus === 'failed'
+              ? { error: terminalEvent.error ?? 'The turn failed.' }
+              : {}),
+          ...(terminalEvent.failureKind ? { failureKind: terminalEvent.failureKind } : {}),
         } } : {}),
         isRunning: projection.lifecycle.state === 'working' && projection.lifecycle.activeTurnId === user.turnId,
         isPlan: user.mode === 'plan',
@@ -50,7 +67,11 @@ export function projectionToConversation(
         requestedPlanMode: user.mode === 'plan',
         streamingText: assistantContent,
         activities: [],
-        ...(terminalAssistant?.terminalStatus ? { result: { status: terminalAssistant.terminalStatus } } : {}),
+        ...(terminalEvent ? { result: {
+          status: terminalEvent.kind === 'boundary'
+            ? terminalEvent.boundaryKind === 'cancelled' ? 'cancelled' : 'failed'
+            : terminalEvent.terminalStatus ?? 'completed',
+        } } : {}),
         isRunning: projection.lifecycle.state === 'working' && projection.lifecycle.activeTurnId === user.turnId,
         timestamp,
       });

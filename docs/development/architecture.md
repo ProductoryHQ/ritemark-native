@@ -241,7 +241,10 @@ Provider error text is diagnostic data, not user-interface copy. The runtime
 boundary classifies known recoverable failures into stable `failureKind`
 values; Claude distinguishes OAuth from API-key authentication before the
 result leaves its runtime session. `agent-result` carries that category
-alongside the user-facing error. The webview renders the recovery action from
+alongside the user-facing error for the live turn, and the same category plus
+friendly copy are checkpointed on the canonical terminal conversation event.
+Conversation projection restores both after reload or navigation, so recovery
+does not depend on transient webview state. The webview renders the action from
 the category and never has to parse a vendor sentence. OAuth failures therefore
 offer **Sign in to Claude**, while API-key failures offer **Update API key** via
 the existing AI Settings path; the raw SDK error remains inside the collapsed
