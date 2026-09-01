@@ -55,6 +55,13 @@ export function AISidebar() {
       if (Array.isArray(savedState.pinnedConversationIds)) {
         store.setPinnedConversationIds(savedState.pinnedConversationIds.filter((id): id is string => typeof id === 'string'));
       }
+      if (Array.isArray(savedState.dismissedAuthRecoveryTurnIds)) {
+        useAISidebarStore.setState({
+          dismissedAuthRecoveryTurnIds: savedState.dismissedAuthRecoveryTurnIds
+            .filter((id): id is string => typeof id === 'string')
+            .slice(-100),
+        });
+      }
       if (typeof savedState.currentConversationId === 'string' && /^[0-9a-f]{8}-/i.test(savedState.currentConversationId)) {
         sendConversationRequest({ type: 'conversation/get', requestId: `restore-${Date.now()}`, conversationId: savedState.currentConversationId });
       }
@@ -76,6 +83,7 @@ export function AISidebar() {
       vscode.setState({
         currentConversationId: state.activeConversationId,
         pinnedConversationIds: state.pinnedConversationIds,
+        dismissedAuthRecoveryTurnIds: state.dismissedAuthRecoveryTurnIds,
       });
       if (state.activeConversationId !== selectedConversationId) {
         selectedConversationId = state.activeConversationId;

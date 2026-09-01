@@ -91,6 +91,8 @@ import type {
 
 export type { ConversationState, PendingRuntimeSelection } from './conversationState';
 
+export type ClaudeLoginState = 'idle' | 'pending' | 'success' | 'error';
+
 let msgCounter = 0;
 function nextId(): string {
   return `msg-${++msgCounter}-${Date.now()}`;
@@ -327,6 +329,12 @@ interface AISidebarState {
   environmentStatus: AgentEnvironmentStatus | null;
   setupInProgress: boolean;
   setupError: string | null;
+  /** Chat-visible lifecycle for the shared browser sign-in flow. */
+  claudeLoginState: ClaudeLoginState;
+  /** Failed turn whose recovery card started the current browser sign-in. */
+  claudeLoginTurnId: string | null;
+  /** Acknowledged recovered turns stay out of the transcript after navigation/reload. */
+  dismissedAuthRecoveryTurnIds: string[];
   hasSeenWelcome: boolean;
   claudeSdkVersion: string | null;
 
@@ -389,7 +397,8 @@ interface AISidebarState {
   configureApiKey: () => void;
   clearChat: () => void;
   startInstall: () => void;
-  startLogin: () => void;
+  startLogin: (recoveryTurnId?: string) => void;
+  dismissAuthRecovery: (turnId: string) => void;
   openApiKeySettings: () => void;
   openGitDownload: () => void;
   openNodeDownload: () => void;
@@ -845,6 +854,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     environmentStatus: null,
     setupInProgress: false,
     setupError: null,
+    claudeLoginState: 'idle',
+    claudeLoginTurnId: null,
+    dismissedAuthRecoveryTurnIds: [],
     hasSeenWelcome: false,
     claudeSdkVersion: null,
 
@@ -1319,13 +1331,28 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     },
 
     startInstall: () => {
-      set({ setupInProgress: true, setupError: null });
+      set({ setupInProgress: true, setupError: null, claudeLoginState: 'idle', claudeLoginTurnId: null });
       vscode.postMessage({ type: 'agent-setup:install' });
     },
 
-    startLogin: () => {
-      set({ setupInProgress: true, setupError: null });
+    startLogin: (recoveryTurnId) => {
+      set({
+        setupInProgress: true,
+        setupError: null,
+        claudeLoginState: 'pending',
+        claudeLoginTurnId: recoveryTurnId ?? null,
+      });
       vscode.postMessage({ type: 'agent-setup:login' });
+    },
+
+    dismissAuthRecovery: (turnId) => {
+      set((state) => ({
+        claudeLoginState: 'idle',
+        claudeLoginTurnId: state.claudeLoginTurnId === turnId ? null : state.claudeLoginTurnId,
+        dismissedAuthRecoveryTurnIds: state.dismissedAuthRecoveryTurnIds.includes(turnId)
+          ? state.dismissedAuthRecoveryTurnIds
+          : [...state.dismissedAuthRecoveryTurnIds, turnId].slice(-100),
+      }));
     },
 
     openApiKeySettings: () => {
@@ -2321,6 +2348,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             };
           }
 
+          // The host can report a completed browser login either through the
+          // setup callback or through its status polling refresh. Treat both
+          // paths as the same transition for the inline recovery card.
+          const incomingSetupStatus = message.setupStatus ?? get().setupStatus;
+          const loginCompleted = (get().claudeLoginState === 'pending' || get().claudeLoginState === 'error')
+            && get().claudeLoginTurnId !== null
+            && incomingSetupStatus?.state === 'ready';
+
           set({
             agenticEnabled: message.agenticEnabled,
             durableAgentConversationsEnabled: message.durableAgentConversations !== false,
@@ -2333,8 +2368,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             dismissedCodexNoticeKey: getCodexCompatibilityNoticeKey(incomingCodexStatus)
               ? get().dismissedCodexNoticeKey
               : null,
-            setupStatus: message.setupStatus ?? get().setupStatus,
+            setupStatus: incomingSetupStatus,
             environmentStatus: message.environmentStatus ?? get().environmentStatus,
+            ...(loginCompleted ? {
+              setupInProgress: false,
+              setupError: null,
+              claudeLoginState: 'success' as const,
+            } : {}),
             hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
             discoveredAgents: message.discoveredAgents || [],
             discoveredCommands: message.discoveredCommands || [],
@@ -2659,20 +2699,43 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         }
 
         case 'agent-setup:progress':
-          // Progress is informational — setupInProgress stays true
+          if (message.progress.stage === 'login') {
+            set({ setupInProgress: true, setupError: null, claudeLoginState: 'pending' });
+          }
           break;
 
-        case 'agent-setup:complete':
+        case 'agent-setup:complete': {
+          const loginState = get().claudeLoginState;
+          const loginSucceeded = (loginState === 'pending' || loginState === 'error')
+            && get().claudeLoginTurnId !== null
+            && message.status.state === 'ready';
+          const loginFailed = loginState === 'pending' && !loginSucceeded;
           set({
             setupStatus: message.status,
             environmentStatus: message.environmentStatus ?? get().environmentStatus,
             setupInProgress: false,
-            setupError: null,
+            setupError: loginSucceeded
+              ? null
+              : loginState === 'error'
+                ? get().setupError
+                : loginFailed
+                  ? message.status.error ?? 'Claude sign-in did not finish. Please try again.'
+                  : null,
+            claudeLoginState: loginSucceeded
+              ? 'success'
+              : loginFailed
+                ? 'error'
+                : loginState,
           });
           break;
+        }
 
         case 'agent-setup:error':
-          set({ setupInProgress: false, setupError: message.error });
+          set({
+            setupInProgress: false,
+            setupError: message.error,
+            claudeLoginState: get().claudeLoginState === 'pending' ? 'error' : get().claudeLoginState,
+          });
           break;
 
         // ── Codex messages ──
