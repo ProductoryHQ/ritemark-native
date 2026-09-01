@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-01 (v1.10.0 RC — recoverable Claude authentication failures)
+**Last updated:** 2026-09-01 (v1.10.0 RC — atomic Agent Chat bootstrap)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -409,7 +409,7 @@ Sent as `approvalMode` + `planFirst` on `agent-execute`; the webview derives bot
 | **Manual (ask)** | SDK `default` + mutating tools gated via `canUseTool` | `approvalPolicy: untrusted` + `sandbox: read-only` | native `request_permission` prompt |
 | **Plan on** | SDK native `permissionMode: 'plan'` (enforced read-only) + `planModeInstructions`; `ExitPlanMode` → plan card; approve → `updatedPermissions setMode` to the autonomy mode, same turn continues | `collaborationMode: plan` on a **read-only sandbox** thread; approval sends the continuation turn on a write-sandbox thread | **not offered** — no enforceable plan contract (capability-gated) |
 
-Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`), delivered to the webview on `agent:config`; no component hardcodes runtime ids for capability checks.
+Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`), delivered to the webview on `agent:bootstrap`; no component hardcodes runtime ids for capability checks.
 
 Mechanics & constraints:
 - `allowedTools` in the Claude SDK means *auto-allowed without prompting* and auto-allowed tools NEVER reach `canUseTool` — mutating tools **and `ExitPlanMode`** must be excluded from it (audit F7; only `AskUserQuestion` is documented as always prompting).
@@ -674,6 +674,11 @@ resolving model lists + per-surface defaults for every runtime and view:
 Public API: `getModels(provider)`, `getModel(provider, id)`, `getDefault(provider, surface)`, `onUpdate(cb)`, `refresh()`.
 Gated by the `remote-model-catalog` flag (off → bundled/cache floor only). Default Claude model: `claude-sonnet-5`.
 
+An empty remote/cache provider or a provider whose rows are all gated to a newer
+app version is not a successful authority: resolution falls through to the
+bundled provider floor. Thus every enabled selector has at least one row even
+when a structurally valid higher-priority catalog is unusable.
+
 Live runtimes may expose several request aliases for one actual model. The catalog
 preserves the provider's `resolvedModel`, groups only exact equal resolved identities,
 and exposes one selectable representative plus retained aliases and provider-default
@@ -681,6 +686,33 @@ metadata. Persisted aliases reconcile at this boundary; the webview never dedupl
 by label. Claude sessions receive the request id and expected resolved identity
 separately, so init diagnostics compare like with like while genuine model drift still
 surfaces. A provider-default row uses one accessible trailing `*` in the picker.
+
+### Agent Chat bootstrap boundary (v1.10.0 RC correction)
+
+`UnifiedViewProvider` delivers model/agent selection through one typed,
+generation-scoped `agent:bootstrap` message before starting runtime hydration.
+The bootstrap is atomic and may depend only on synchronous local authorities:
+feature flags, VS Code configuration, the static agent registry, the synchronous
+model-catalog API, bundled BYOK model metadata, capability metadata, workspace
+identity, and the bundled Claude SDK version. SecretStorage, CLI/app-server
+status, process spawn, filesystem discovery, and network work are forbidden in
+this path.
+
+Claude, Codex, OpenCode credential checks, and `.claude` discovery hydrate as
+independent domains after bootstrap delivery. Every result carries the concrete
+webview generation and a domain revision; the host and webview both reject old
+view results and older same-view completions. One failed domain disables Send
+and exposes retry/status feedback but cannot clear either model catalog or hide
+the selected model. `ai-key-status` is credential data only and never marks the
+sidebar configured. The legacy `agent:config` receiver remains temporarily for
+older bundles. A host emits that compatibility shape only when it receives the
+old bundle's `ready` request, and derives it from the same pure bootstrap data;
+the removed monolithic runtime/credential probe is never revived.
+
+The Agent Chat HTML versions `media/webview.js` with the bundle mtime, matching
+the editor provider. A host update must never reuse an unversioned cached
+webview script from an earlier release, because that would silently split the
+two halves of the protocol across versions.
 
 `src/ai/modelConfig.ts` is **retained but narrowed** — only OpenAI/Gemini image arrays,
 `DEFAULT_MODELS` (image defaults), and the `ModelConfig` types remain. Deleted: `CLAUDE_MODELS`,
@@ -751,6 +783,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-01 | v1.10.0 RC bugfix | **Atomic Agent Chat bootstrap.** The model/agent selector now hydrates from synchronous local authorities before any SecretStorage, runtime, process, network, or filesystem-discovery probe. Per-domain generation/revision guards reject stale window and out-of-order results; operational failures remain recoverable without erasing or hiding the bundled model floor. |
 | 2026-08-24 | Sprint 113 | **Typed Transcribe Insights output boundary.** The sandboxed workbench sends a validated Auto/known/custom language selection through one protocol; autocomplete search remains local UI state and any explicitly committed normalized language or dialect can be used. The host records selected/resolved provenance, passes the language as quoted prompt data, preserves legacy English provenance, validates primary-path aliases and cross-platform filenames, and exclusively creates separate Insights-only Markdown snapshots. Full Unicode speaker labels remain intact through storage, prompts, and exports while webview layout alone truncates their display. |
 | 2026-08-24 | Sprint 113 R7 | **Focused Insights runtime policy.** An authenticated 48-minute run exposed 3m43s latency, ~82k coding-context input/cache tokens, and 15,836 output tokens for a ~3k-character memo. The existing Claude adapter now accepts explicit available-tool and setting-source policies; Insights supplies empty lists for both, keeps `allowedTools: []` as defense in depth, and requests low turn effort. AI chat sessions and other runtime defaults remain unchanged. |
 | 2026-08-24 | Sprint 112 | **Capability-driven Composer thinking effort.** One canonical Auto–Ultra contract crosses the durable conversation draft, accepted/queued turn snapshot, typed host bridge, and all three existing `AgentRuntime` adapters. Claude uses SDK effort plus warm flag updates; Codex keeps execute/plan values aligned and restores captured defaults; OpenCode remains lazy and exposes only live ACP `thought_level` choices. Requested/applied evidence stays metadata, model/UI capability is truthful, and the default-on experimental flag provides rollback without data loss. |

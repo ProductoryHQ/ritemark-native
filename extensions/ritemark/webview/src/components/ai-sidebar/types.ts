@@ -4,6 +4,8 @@
  * Mirrors the message protocol used between UnifiedViewProvider and the webview.
  */
 
+import type { AgentSidebarProtocolMessage } from '../../../../src/views/agentSidebarProtocol';
+
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
 export type AgentId = 'claude-code' | 'codex' | 'opencode';
@@ -35,7 +37,7 @@ export interface AgentInfo {
   label: string;
   description: string;
   experimental: boolean;
-  requiresApiKey: 'anthropic' | 'openai' | null;
+  requiresApiKey: 'anthropic' | 'openai' | 'byok' | null;
 }
 
 export interface ModelOption {
@@ -402,6 +404,7 @@ export interface ConversationScopedMessage {
 }
 
 export type ExtensionMessage =
+  | AgentSidebarProtocolMessage
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
   // Sprint 94 (#81): a comment assigned to an agent, relayed from the editor.
@@ -409,7 +412,7 @@ export type ExtensionMessage =
   | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; composerThinkingEffortEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103/112: per-runtime capability map. */ runtimeCapabilities?: Record<string, RuntimeCapabilityFlags> }
   | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
   | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)
-  | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
+  | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags; generation?: number; revision?: number; error?: string }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
   | { type: 'active-browser-changed'; context: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null }
@@ -425,8 +428,8 @@ export type ExtensionMessage =
   | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind } & ConversationScopedMessage)
   | ({ type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string } & ConversationScopedMessage)
   | { type: 'agent-setup:progress'; progress: InstallProgress }
-  | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus }
-  | { type: 'agent-setup:error'; error: string }
+  | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus; generation?: number; revision?: number }
+  | { type: 'agent-setup:error'; error: string; generation?: number; revision?: number }
   | { type: 'settings:chatFontSize'; fontSize: number }
   | { type: 'toggle-history-panel' }
   | { type: 'conversation/canonical-id'; clientConversationId: string; conversationId: string; bindingGeneration: number }
@@ -446,7 +449,7 @@ export type ExtensionMessage =
   | import('../../../../src/conversations/protocol').ConversationHostEvent
   | { type: 'files-dropped'; paths: string[] }
   // Codex messages
-  | { type: 'codex:status'; status: CodexSidebarStatus }
+  | { type: 'codex:status'; status: CodexSidebarStatus; generation?: number; revision?: number }
   | ({ type: 'codex-progress'; progress: AgentProgress } & ConversationScopedMessage)
   | ({ type: 'codex-rpc-progress'; method: string; message: string } & ConversationScopedMessage)
   | ({ type: 'codex-streaming'; delta: string } & ConversationScopedMessage)

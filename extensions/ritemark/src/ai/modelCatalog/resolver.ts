@@ -54,7 +54,11 @@ function resolveProvider(
   const remotePC = remote?.providers[provider] ?? null;
   const cachePC = cache?.providers[provider] ?? null;
   const bundledPC = bundled.providers[provider] ?? null;
-  const bestCatalog = remotePC ?? cachePC ?? bundledPC; // curated metadata + defaults
+  // A structurally valid but empty provider is not a usable catalog source. It
+  // must not erase the compiled offline floor and leave a picker with no rows.
+  const usableRemotePC = remotePC && remotePC.models.length > 0 ? remotePC : null;
+  const usableCachePC = cachePC && cachePC.models.length > 0 ? cachePC : null;
+  const bestCatalog = usableRemotePC ?? usableCachePC ?? bundledPC; // curated metadata + defaults
 
   const live = discovery[provider];
 
@@ -66,14 +70,14 @@ function resolveProvider(
     source = 'live';
     models = enrichLive(live, bestCatalog, bundledPC);
     defaults = bestCatalog?.defaults ?? {};
-  } else if (remotePC) {
+  } else if (usableRemotePC) {
     source = 'remote';
-    models = enrichCatalogCapabilities(remotePC.models, bundledPC);
-    defaults = remotePC.defaults;
-  } else if (cachePC) {
+    models = enrichCatalogCapabilities(usableRemotePC.models, bundledPC);
+    defaults = usableRemotePC.defaults;
+  } else if (usableCachePC) {
     source = 'cache';
-    models = enrichCatalogCapabilities(cachePC.models, bundledPC);
-    defaults = cachePC.defaults;
+    models = enrichCatalogCapabilities(usableCachePC.models, bundledPC);
+    defaults = usableCachePC.defaults;
   } else if (bundledPC) {
     source = 'bundled';
     models = bundledPC.models;
@@ -90,7 +94,18 @@ function resolveProvider(
   const filtered = enrichCatalogCapabilities(models, bundledPC)
     .filter((m) => allowedByAppVersion(m, appVersion));
   const canonical = source === 'live' ? canonicalizeModelAliases(filtered) : filtered;
-  const sorted = [...canonical].sort((a, b) => a.order - b.order);
+  let sorted = [...canonical].sort((a, b) => a.order - b.order);
+  // A higher-priority source can contain only future-gated rows. Preserve the
+  // selectable-provider invariant with models this exact build ships and knows.
+  if (sorted.length === 0 && bundledPC) {
+    sorted = bundledPC.models
+      .filter((model) => allowedByAppVersion(model, appVersion))
+      .sort((a, b) => a.order - b.order);
+    if (sorted.length > 0) {
+      source = 'bundled';
+      defaults = bundledPC.defaults;
+    }
+  }
   return { models: sorted, defaults, source };
 }
 

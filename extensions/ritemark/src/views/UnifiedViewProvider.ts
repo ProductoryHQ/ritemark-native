@@ -48,7 +48,6 @@ import {
   onClaudeStatusInvalidated,
   type AgentId,
   type SetupStatus,
-  type AgentEnvironmentStatus,
   type OnboardingStatus,
   traceClaude,
 } from '../agent';
@@ -104,6 +103,8 @@ import {
   SINGLE_RUNTIME_ATTACHMENT_LIMIT,
 } from '../conversations/runtimeAttachmentPolicy';
 import { buildNormalizedContextPack } from '../conversations/contextPack';
+import { buildAgentSidebarBootstrap, AgentSidebarBootstrapError } from './agentSidebarBootstrap';
+import { versionedWebviewAssetUri } from './webviewAssetUri';
 
 /**
  * Conversation id used when a webview message predates the Sprint 99 protocol.
@@ -115,6 +116,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
 
   private _view?: vscode.WebviewView;
+  /**
+   * Monotonic identity for the concrete webview instance. Async work may finish
+   * after a view was disposed and replaced; generation + exact-webview checks
+   * prevent those results from hydrating the replacement view.
+   */
+  private _viewGeneration = 0;
+  private _hydratedViewGeneration = 0;
+  private readonly _sidebarStatusRevisions: Record<AgentId | 'discovery', number> = {
+    'claude-code': 0,
+    codex: 0,
+    opencode: 0,
+    discovery: 0,
+  };
   /**
    * Live runtime sessions, keyed by conversation then runtime.
    *
@@ -204,6 +218,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ) {
     this._view = webviewView;
+    const viewGeneration = ++this._viewGeneration;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -251,17 +266,41 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       switch (message.type) {
-        case 'ready':
-          this._sendApiKeyStatus();
-          this._sendConnectivityStatus();
-          // Await agent config first — it boots Codex runtime and hydrates auth.
-          // Onboarding status needs that to correctly detect authenticated users.
-          await this._sendAgentConfig();
+        case 'ready': // Compatibility request from an older webview bundle.
+        case 'agent:bootstrap/request': {
+          const delivered = await this._sendAgentBootstrap(
+            webviewView.webview,
+            viewGeneration,
+            message.type === 'ready' ? 'agent:config' : 'agent:bootstrap',
+          );
+          if (!delivered || !this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
           this._sendChatFontSize();
           this._sendActiveFile();
           void this._sendActiveBrowserContext();
-          this._sendOnboardingStatus();
+          this._sendConnectivityStatus();
+
+          // Duplicate ready/bootstrap requests are idempotent. Runtime and
+          // credential probes start only after the atomic local bootstrap has
+          // been accepted for this concrete webview generation.
+          if (this._hydratedViewGeneration !== viewGeneration) {
+            this._hydratedViewGeneration = viewGeneration;
+            setTimeout(() => {
+              if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) return;
+              const claudeStatus = this._sendClaudeSidebarStatus();
+              const codexStatus = this._sendCodexSidebarStatus();
+              void this._sendAcpProviders();
+              void this._sendAgentDiscovery();
+              void this._sendApiKeyStatus();
+              // Reuse the two runtime results for onboarding. Starting a second
+              // Claude/Codex probe here doubles CLI work and reintroduces races.
+              void Promise.all([claudeStatus, codexStatus]).then(([setupStatus, resolvedCodexStatus]) => {
+                if (!setupStatus || !resolvedCodexStatus) return;
+                void this._sendOnboardingStatus({ setupStatus, codexStatus: resolvedCodexStatus });
+              });
+            }, 0);
+          }
           break;
+        }
 
         case 'openExternal': {
           // The shared webview bridge already uses this message for editor
@@ -321,8 +360,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             message.agentId,
             vscode.ConfigurationTarget.Global
           );
-          // Re-send config (triggers setup check for Claude Code)
-          this._sendAgentConfig();
+          // The selected label is local bootstrap state. Runtime readiness is
+          // hydrated independently and cannot delay model selection.
+          await this._sendCurrentAgentBootstrap();
+          void this._sendRuntimeStatus(message.agentId as AgentId);
           break;
 
         case 'conversation:selected':
@@ -1008,8 +1049,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'agent-setup:check':
           clearSetupCache();
+          // The invalidation listener is the single refresh owner. Calling the
+          // probe here as well would create two revisions and duplicate CLI /
+          // keychain work for one user action.
           emitClaudeStatusInvalidated('status-refresh');
-          this._sendAgentConfig();
+          break;
+
+        case 'agent:status/recheck':
+          if (message.runtimeId === 'claude-code' || message.runtimeId === 'codex' || message.runtimeId === 'opencode') {
+            void this._sendRuntimeStatus(message.runtimeId);
+          }
           break;
 
         // ── Onboarding wizard messages ──
@@ -1032,11 +1081,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'onboarding:recheck': {
           clearSetupCache();
-          const status = await this._getOnboardingStatus();
-          this._view?.webview.postMessage({ type: 'onboarding:status', status });
-          // Also refresh the agent config so per-agent views update too
+          // The invalidation handler performs one Claude probe and reuses that
+          // result when rebuilding onboarding status.
           emitClaudeStatusInvalidated('status-refresh');
-          this._sendAgentConfig();
           break;
         }
 
@@ -1059,8 +1106,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'codex:refreshStatus':
+          // The invalidation listener owns the refresh and latest-wins revision.
           emitCodexStatusInvalidated('status-refresh');
-          await this._sendCodexSidebarStatus();
           break;
 
         case 'codex:repair':
@@ -1134,6 +1181,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       if (this._browserContextPoll) {
         clearInterval(this._browserContextPoll);
         this._browserContextPoll = null;
+      }
+      if (this._isCurrentSidebarView(webviewView.webview, viewGeneration)) {
+        this._view = undefined;
+        this._hydratedViewGeneration = 0;
       }
     });
     this._refreshBrowserContextPolling();
@@ -1251,13 +1302,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _sendApiKeyStatus() {
+    const target = this._currentSidebarContext();
+    if (!target) return;
+    let hasKey = false;
     try {
       const apiKeyManager = getAPIKeyManager();
-      const hasKey = await apiKeyManager.hasAPIKey();
-      this._view?.webview.postMessage({ type: 'ai-key-status', hasKey });
+      hasKey = await apiKeyManager.hasAPIKey();
     } catch {
-      this._view?.webview.postMessage({ type: 'ai-key-status', hasKey: false });
+      // Key availability is one operational domain; false is its contained
+      // failure result and cannot affect bootstrap/catalog readiness.
     }
+    await this._postCurrentSidebarMessage(target, { type: 'ai-key-status', hasKey }, 'OpenAI key status');
   }
 
   private _sendConnectivityStatus() {
@@ -1267,23 +1322,43 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /**
    * Send onboarding status to webview.
    */
-  private async _sendOnboardingStatus(): Promise<void> {
-    const status = await this._getOnboardingStatus();
-    this._view?.webview.postMessage({ type: 'onboarding:status', status });
+  private async _sendOnboardingStatus(known?: {
+    setupStatus?: SetupStatus;
+    codexStatus?: CodexSidebarStatus;
+  }): Promise<void> {
+    const target = this._currentSidebarContext();
+    if (!target) return;
+    try {
+      const status = await this._getOnboardingStatus(known);
+      if (this._isCurrentSidebarView(target.webview, target.generation)) {
+        await target.webview.postMessage({ type: 'onboarding:status', status });
+      }
+    } catch (error) {
+      // Onboarding is an independent enhancement; it never owns bootstrap.
+      console.error('[Agent Chat onboarding] Status check failed:', error);
+    }
   }
 
   /**
    * Get unified onboarding status, including Codex CLI state.
    */
-  private async _getOnboardingStatus(): Promise<OnboardingStatus> {
-    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
-    const codexStatus = await rt.getCodexSidebarStatus();
-    const codexAuthenticated = codexStatus.state === 'ready';
-    const codexCliInstalled = codexStatus.state !== 'disabled' && codexStatus.state !== 'broken-install';
+  private async _getOnboardingStatus(known?: {
+    setupStatus?: SetupStatus;
+    codexStatus?: CodexSidebarStatus;
+  }): Promise<OnboardingStatus> {
+    const codexEnabled = isEnabled('codex-integration');
+    const codexStatus = known?.codexStatus ?? (codexEnabled
+      ? await (this._runtimeRegistry.get('codex') as CodexRuntime).getCodexSidebarStatus()
+      : null);
+    const codexAuthenticated = codexStatus?.state === 'ready';
+    const codexCliInstalled = Boolean(codexStatus
+      && codexStatus.state !== 'disabled'
+      && codexStatus.state !== 'broken-install');
     const keyManager = getAPIKeyManager();
     const hasOpenAiKey = keyManager ? await keyManager.hasAPIKey() : false;
 
     return getOnboardingStatus({
+      setupStatus: known?.setupStatus,
       hasOpenAiKey,
       codexCliInstalled,
       codexCliAuthenticated: codexAuthenticated,
@@ -1312,106 +1387,207 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'onboarding:status', status });
   }
 
-  /**
-   * Re-send agent config to the webview. Called when the model catalog resolves
-   * fresh model lists (live probe / remote fetch / 6h refresh) so the sidebar
-   * dropdown updates without a reload (Sprint 89 #109, spec R1/R4).
-   */
+  /** Re-send the atomic local catalog/selection after model-catalog updates. */
   public notifyModelCatalogUpdated(): void {
-    void this._sendAgentConfig();
+    void this._sendCurrentAgentBootstrap();
+  }
+
+  private _currentSidebarContext(): { webview: vscode.Webview; generation: number } | null {
+    if (!this._view) return null;
+    return { webview: this._view.webview, generation: this._viewGeneration };
+  }
+
+  private _isCurrentSidebarView(webview: vscode.Webview, generation: number): boolean {
+    return this._view?.webview === webview && this._viewGeneration === generation;
+  }
+
+  private async _postCurrentSidebarMessage(
+    target: { webview: vscode.Webview; generation: number },
+    message: unknown,
+    domain: string,
+  ): Promise<boolean> {
+    if (!this._isCurrentSidebarView(target.webview, target.generation)) return false;
+    try {
+      return await target.webview.postMessage(message);
+    } catch (error) {
+      // Disposing/replacing a webview while an async producer is finishing is a
+      // normal lifecycle race. It must not become an unhandled rejection.
+      console.error(`[Agent Chat ${domain}] Could not post to webview:`, error);
+      return false;
+    }
+  }
+
+  private _nextSidebarStatusRevision(domain: AgentId | 'discovery'): number {
+    this._sidebarStatusRevisions[domain] += 1;
+    return this._sidebarStatusRevisions[domain];
+  }
+
+  private _isLatestSidebarStatusRevision(domain: AgentId | 'discovery', revision: number): boolean {
+    return this._sidebarStatusRevisions[domain] === revision;
   }
 
   /**
-   * Send agent configuration to webview (selected agent, available agents, feature flag state)
+   * Send the selector's atomic bootstrap. Every dependency here is a synchronous
+   * local authority; runtime, credential, process, network, and discovery work
+   * is forbidden in this path so a model label can never wait on it.
    */
-  private async _sendAgentConfig() {
-    const agenticEnabled = isEnabled('agentic-assistant');
-    // Sprint 99 kill-switch. Parallel chats are almost entirely webview behaviour,
-    // so the flag has to cross the boundary or it cannot switch anything off.
-    const parallelChatsEnabled = isEnabled('parallelChats');
-    const durableAgentConversations = isEnabled('durableAgentConversations');
-    const composerThinkingEffortEnabled = isEnabled('composer-thinking-effort');
-    const codexEnabled = isEnabled('codex-integration');
-    const config = vscode.workspace.getConfiguration('ritemark.ai');
-    const selectedAgent = config.get<string>('selectedAgent', 'claude-code');
-    const selectedModel = config.get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code'));
+  private async _sendAgentBootstrap(
+    webview: vscode.Webview,
+    generation: number,
+    responseType: 'agent:bootstrap' | 'agent:config' = 'agent:bootstrap',
+  ): Promise<boolean> {
+    if (!this._isCurrentSidebarView(webview, generation)) return false;
 
-    let setupStatus: SetupStatus | undefined;
-    let environmentStatus: AgentEnvironmentStatus | undefined;
-    let hasSeenWelcome = false;
-    if (selectedAgent === 'claude-code') {
-      // Check SecretStorage for Anthropic API key before setup status check
-      if (this._secrets) {
-        const anthropicKey = await this._secrets.get('anthropic-api-key');
-        setAnthropicKeyAvailable(!!anthropicKey);
-      }
-      setupStatus = await getSetupStatus();
-      hasSeenWelcome = config.get<boolean>('hasSeenClaudeWelcome', false);
+    try {
+      const config = vscode.workspace.getConfiguration('ritemark.ai');
+      const codexEnabled = isEnabled('codex-integration');
+      const opencodeEnabled = isEnabled('opencode-integration');
+      const visibleAgents = Object.values(AGENTS).filter((agent) => {
+        if (agent.deprecated) return false;
+        if (agent.id === 'codex') return codexEnabled;
+        if (agent.id === 'opencode') return opencodeEnabled;
+        return true;
+      });
+      const message = buildAgentSidebarBootstrap({
+        generation,
+        agenticEnabled: isEnabled('agentic-assistant'),
+        parallelChatsEnabled: isEnabled('parallelChats'),
+        durableAgentConversations: isEnabled('durableAgentConversations'),
+        composerThinkingEffortEnabled: isEnabled('composer-thinking-effort'),
+        codexEnabled,
+        opencodeEnabled,
+        selectedAgent: config.get<string>('selectedAgent', 'claude-code'),
+        persistedClaudeModel: config.get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code')),
+        defaultClaudeModel: modelCatalog.getDefault('anthropic', 'claude-code'),
+        agents: visibleAgents,
+        claudeModels: modelCatalog.getModels('anthropic'),
+        codexModels: modelCatalog.getModels('codex'),
+        byokProviderModels: opencodeEnabled ? modelCatalog.getByokProviderModels() : undefined,
+        hasSeenWelcome: config.get<boolean>('hasSeenClaudeWelcome', false),
+        workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        claudeSdkVersion: CLAUDE_AGENT_SDK_VERSION,
+        runtimeCapabilities: RUNTIME_CAPABILITIES,
+      });
+      // A cache-versioned current bundle requests `agent:bootstrap`. If an old
+      // bundle still reaches the host and sends its legacy `ready` handshake,
+      // answer in the shape it understands — from the same pure atomic data,
+      // never by reviving the removed monolithic runtime probe.
+      const response = responseType === 'agent:config'
+        ? { ...message, type: 'agent:config' as const }
+        : message;
+      return this._postCurrentSidebarMessage({ webview, generation }, response, 'bootstrap');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error('[Agent Chat bootstrap] Could not build local bootstrap:', error);
+      await this._postCurrentSidebarMessage({ webview, generation }, {
+        type: 'agent:bootstrap-error',
+        generation,
+        error: error instanceof AgentSidebarBootstrapError
+          ? detail
+          : 'Agent Chat could not load its local configuration. Try again.',
+      }, 'bootstrap');
+      return false;
     }
-    environmentStatus = await getAgentEnvironmentStatus({ setupStatus });
+  }
 
-    // Discover dynamic agents and commands from .claude/ directory
-    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const discoveredAgents = workspacePath ? discoverAgents(workspacePath) : [];
-    const discoveredCommands = workspacePath ? discoverCommands(workspacePath) : [];
-    const codexStatus = await (this._runtimeRegistry.get('codex') as CodexRuntime).getCodexSidebarStatus();
+  private async _sendCurrentAgentBootstrap(): Promise<boolean> {
+    const target = this._currentSidebarContext();
+    return target ? this._sendAgentBootstrap(target.webview, target.generation) : false;
+  }
 
-    // Filter agents based on feature flags; exclude deprecated agents from the selector
-    const opencodeEnabled = isEnabled('opencode-integration');
-    const visibleAgents = Object.values(AGENTS).filter(a => {
-      if (a.deprecated) return false;
-      if (a.id === 'codex') return codexEnabled;
-      // Sprint 76 R7: gate OpenCode in the agent registry exposure to the webview.
-      if (a.id === 'opencode') return opencodeEnabled;
-      return true;
-    });
+  private async _sendRuntimeStatus(runtimeId: AgentId): Promise<void> {
+    switch (runtimeId) {
+      case 'claude-code': await this._sendClaudeSidebarStatus(); break;
+      case 'codex': await this._sendCodexSidebarStatus(); break;
+      case 'opencode': await this._sendAcpProviders(); break;
+    }
+  }
 
-    // Sprint 76 R3a/R6: which BYOK providers are configured (booleans only —
-    // never key values) + curated models, so the OpenCode model picker can
-    // filter. Empty/false when the flag is off.
-    const acpProviders: ByokProviderFlags = opencodeEnabled
-      ? byokProviderFlags(await this._readByokKeys())
-      : { google: false, openai: false, anthropic: false, openrouter: false };
+  private async _sendAgentDiscovery(): Promise<void> {
+    const target = this._currentSidebarContext();
+    if (!target) return;
+    const revision = this._nextSidebarStatusRevision('discovery');
+    try {
+      // Yield so bootstrap delivery is never in the same blocking stack.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      const workspacePath = this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const agents = workspacePath ? discoverAgents(workspacePath) : [];
+      const commands = workspacePath ? discoverCommands(workspacePath) : [];
+      if (!this._isCurrentSidebarView(target.webview, target.generation)
+        || !this._isLatestSidebarStatusRevision('discovery', revision)) return;
+      await this._postCurrentSidebarMessage(target, {
+        type: 'agent:discovery',
+        generation: target.generation,
+        revision,
+        agents,
+        commands,
+      }, 'discovery');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error('[Agent Chat discovery] Could not discover agents or commands:', error);
+      if (!this._isCurrentSidebarView(target.webview, target.generation)
+        || !this._isLatestSidebarStatusRevision('discovery', revision)) return;
+      await this._postCurrentSidebarMessage(target, {
+        type: 'agent:discovery',
+        generation: target.generation,
+        revision,
+        agents: [],
+        commands: [],
+        error: detail,
+      }, 'discovery');
+    }
+  }
 
-    const claudeModels = modelCatalog.getModels('anthropic');
-    // Reconcile a persisted-but-stale selection against the resolved list so the
-    // sidebar never shows or runs a model id that no longer exists (Sprint 89 #109).
-    const reconciledModel = modelCatalog.getModel('anthropic', selectedModel)?.id
-      ?? modelCatalog.getDefault('anthropic', 'claude-code');
+  private async _sendClaudeSidebarStatus(): Promise<SetupStatus | null> {
+    const target = this._currentSidebarContext();
+    if (!target) return null;
+    const revision = this._nextSidebarStatusRevision('claude-code');
+    const checkingDelivered = await this._postCurrentSidebarMessage(target, {
+      type: 'agent:status-checking',
+      runtimeId: 'claude-code',
+      generation: target.generation,
+      revision,
+    }, 'Claude status');
+    if (!checkingDelivered) return null;
 
-    this._view?.webview.postMessage({
-      type: 'agent:config',
-      agenticEnabled,
-      parallelChatsEnabled,
-      durableAgentConversations,
-      composerThinkingEffortEnabled,
-      codexEnabled,
-      selectedAgent,
-      selectedModel: reconciledModel,
-      agents: visibleAgents,
-      models: claudeModels,
-      codexModels: modelCatalog.getModels('codex'),
-      // Sprint 76 R6/R7: OpenCode availability + BYOK provider booleans + curated
-      // models. The webview model picker filters models by configured providers.
-      opencodeEnabled,
-      acpProviders,
-      byokProviderModels: opencodeEnabled ? modelCatalog.getByokProviderModels() : undefined,
-      codexStatus,
-      setupStatus,
-      environmentStatus,
-      hasSeenWelcome,
-      discoveredAgents,
-      discoveredCommands,
-      workspacePath: this._workspacePath,
-      claudeSdkVersion: CLAUDE_AGENT_SDK_VERSION,
-      // Sprint 103 R6: per-runtime capability map — the webview renders mode
-      // controls from this, never from hardcoded runtime ids.
-      runtimeCapabilities: RUNTIME_CAPABILITIES,
-    });
-
-    // Model lists come from the model-catalog resolver (live /v1/models → remote
-    // → cache → bundled). Discovery + refresh is owned by `src/ai/modelCatalog`
-    // (activated in extension.ts + refreshed on Claude status changes below).
+    try {
+      // Always leave the bootstrap call stack before a CLI/keychain probe.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      if (this._secrets) {
+        try {
+          const anthropicKey = await this._secrets.get('anthropic-api-key');
+          setAnthropicKeyAvailable(Boolean(anthropicKey));
+        } catch (error) {
+          // Keychain failure must not erase or block the local model catalog.
+          setAnthropicKeyAvailable(false);
+          console.error('[Agent Chat Claude status] Could not read Anthropic key:', error);
+        }
+      }
+      const status = await getSetupStatus();
+      const environmentStatus = await getAgentEnvironmentStatus({ setupStatus: status });
+      if (!this._isCurrentSidebarView(target.webview, target.generation)
+        || !this._isLatestSidebarStatusRevision('claude-code', revision)) return null;
+      const delivered = await this._postCurrentSidebarMessage(target, {
+        type: 'agent-setup:complete',
+        status,
+        environmentStatus,
+        generation: target.generation,
+        revision,
+      }, 'Claude status');
+      return delivered ? status : null;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error('[Agent Chat Claude status] Runtime check failed:', error);
+      if (!this._isCurrentSidebarView(target.webview, target.generation)
+        || !this._isLatestSidebarStatusRevision('claude-code', revision)) return null;
+      await this._postCurrentSidebarMessage(target, {
+        type: 'agent-setup:error',
+        error: `Claude could not be checked. ${detail}`,
+        generation: target.generation,
+        revision,
+      }, 'Claude status');
+      return null;
+    }
   }
 
   private async _handleExternalCodexStatusInvalidation(
@@ -1428,8 +1604,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       rt.stopLoginPolling();
       rt.dispose();
     }
-    await this._sendCodexSidebarStatus();
-    this._sendOnboardingStatus();
+    const codexStatus = await this._sendCodexSidebarStatus();
+    if (codexStatus) void this._sendOnboardingStatus({ codexStatus });
   }
 
   private async _handleExternalClaudeStatusInvalidation(
@@ -1454,11 +1630,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // availability can be account-specific — re-resolve after a completed
     // transition. Do not spawn a discovery probe while auth is missing or the
     // browser login is still in flight; that creates another stale Claude process.
+    // The existing in-memory catalog is a valid bootstrap authority. Do not
+    // make auth/status feedback wait on a remote catalog refresh; onUpdate will
+    // re-send a newer bootstrap when the independent refresh completes.
+    await this._sendCurrentAgentBootstrap();
+    const setupStatus = await this._sendClaudeSidebarStatus();
+    if (setupStatus) void this._sendOnboardingStatus({ setupStatus });
     if (reason !== 'login-started' && reason !== 'authentication-failed') {
-      await modelCatalog.refresh();
+      void modelCatalog.refresh().catch((error) => {
+        console.error('[Agent Chat catalog] Refresh after Claude status change failed:', error);
+      });
     }
-    await this._sendAgentConfig();
-    this._sendOnboardingStatus();
   }
 
   private _stopClaudeLoginPolling(): void {
@@ -1485,27 +1667,95 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           return;
         }
 
-        await this._sendAgentConfig();
+        await this._sendClaudeSidebarStatus();
 
         if (attempts >= 60) {
           setClaudeLoginInProgress(false);
           this._stopClaudeLoginPolling();
-          await this._sendAgentConfig();
+          await this._sendClaudeSidebarStatus();
         }
       })();
     }, 2000);
   }
 
   private _postCodexSidebarStatus(status: CodexSidebarStatus): void {
-    this._view?.webview.postMessage({
+    const target = this._currentSidebarContext();
+    if (!target) return;
+    const revision = this._nextSidebarStatusRevision('codex');
+    void target.webview.postMessage({
       type: 'codex:status',
       status,
+      generation: target.generation,
+      revision,
     });
   }
 
-  private async _sendCodexSidebarStatus(): Promise<void> {
+  private async _sendCodexSidebarStatus(): Promise<CodexSidebarStatus | null> {
+    const target = this._currentSidebarContext();
+    if (!target) return null;
+    const revision = this._nextSidebarStatusRevision('codex');
+    const checkingDelivered = await this._postCurrentSidebarMessage(target, {
+      type: 'agent:status-checking',
+      runtimeId: 'codex',
+      generation: target.generation,
+      revision,
+    }, 'Codex status');
+    if (!checkingDelivered) return null;
+
+    if (!isEnabled('codex-integration')) {
+      const status: CodexSidebarStatus = {
+        enabled: false,
+        state: 'disabled',
+        version: null,
+        authMethod: null,
+        email: null,
+        plan: null,
+        error: null,
+        diagnostics: [],
+        repairCommand: null,
+        binaryPath: null,
+        compatibility: null,
+      };
+      if (this._isCurrentSidebarView(target.webview, target.generation)
+        && this._isLatestSidebarStatusRevision('codex', revision)) {
+        const delivered = await this._postCurrentSidebarMessage(target, {
+          type: 'codex:status',
+          status,
+          generation: target.generation,
+          revision,
+        }, 'Codex status');
+        return delivered ? status : null;
+      }
+      return null;
+    }
+
     const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
-    this._postCodexSidebarStatus(await rt.getCodexSidebarStatus());
+    try {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      const status = await rt.getCodexSidebarStatus();
+      if (!this._isCurrentSidebarView(target.webview, target.generation)
+        || !this._isLatestSidebarStatusRevision('codex', revision)) return null;
+      const delivered = await this._postCurrentSidebarMessage(target, {
+        type: 'codex:status',
+        status,
+        generation: target.generation,
+        revision,
+      }, 'Codex status');
+      return delivered ? status : null;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error('[Agent Chat Codex status] Runtime check failed:', error);
+      if (!this._isCurrentSidebarView(target.webview, target.generation)
+        || !this._isLatestSidebarStatusRevision('codex', revision)) return null;
+      await this._postCurrentSidebarMessage(target, {
+        type: 'agent:runtime-status-error',
+        runtimeId: 'codex',
+        error: `Codex could not be checked. ${detail}`,
+        generation: target.generation,
+        revision,
+      }, 'Codex status');
+      return null;
+    }
   }
 
   private async _handleCodexLogin(): Promise<void> {
@@ -1579,15 +1829,46 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * picker filter + setup prompt). Only booleans — never key values.
    */
   private async _sendAcpProviders(): Promise<void> {
+    const target = this._currentSidebarContext();
+    if (!target) return;
+    const revision = this._nextSidebarStatusRevision('opencode');
+    const checkingDelivered = await this._postCurrentSidebarMessage(target, {
+      type: 'agent:status-checking',
+      runtimeId: 'opencode',
+      generation: target.generation,
+      revision,
+    }, 'OpenCode status');
+    if (!checkingDelivered) return;
+
     const enabled = isEnabled('opencode-integration');
-    const providers: ByokProviderFlags = enabled
-      ? byokProviderFlags(await this._readByokKeys())
-      : { google: false, openai: false, anthropic: false, openrouter: false };
-    this._view?.webview.postMessage({
-      type: 'acp-providers',
-      enabled,
-      providers,
-    });
+    try {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      const providers: ByokProviderFlags = enabled
+        ? byokProviderFlags(await this._readByokKeys())
+        : { google: false, openai: false, anthropic: false, openrouter: false };
+      if (!this._isCurrentSidebarView(target.webview, target.generation)
+        || !this._isLatestSidebarStatusRevision('opencode', revision)) return;
+      await this._postCurrentSidebarMessage(target, {
+        type: 'acp-providers',
+        enabled,
+        providers,
+        generation: target.generation,
+        revision,
+      }, 'OpenCode status');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error('[Agent Chat OpenCode status] Could not read provider keys:', error);
+      if (!this._isCurrentSidebarView(target.webview, target.generation)
+        || !this._isLatestSidebarStatusRevision('opencode', revision)) return;
+      await this._postCurrentSidebarMessage(target, {
+        type: 'acp-providers',
+        enabled,
+        providers: { google: false, openai: false, anthropic: false, openrouter: false },
+        generation: target.generation,
+        revision,
+        error: `OpenCode credentials could not be checked. ${detail}`,
+      }, 'OpenCode status');
+    }
   }
 
   /**
@@ -1634,7 +1915,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         error: status.error ?? 'Claude is not ready yet. Install or repair it first.',
       });
       this._view?.webview.postMessage({ type: 'agent-setup:complete', status, environmentStatus });
-      await this._sendAgentConfig();
+      await this._sendClaudeSidebarStatus();
       return;
     }
 
@@ -1909,9 +2190,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _getHtmlForWebview(webview: vscode.Webview): string {
     const nonce = this._getNonce();
 
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'media', 'webview.js')
-    );
+    // Match the editor provider's cache policy. Without a content version this
+    // sidebar can keep executing a previous release's webview bundle while the
+    // extension host has already updated its message contract.
+    const scriptPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'webview.js');
+    const scriptBaseUri = webview.asWebviewUri(scriptPath).toString();
+    const scriptUri = versionedWebviewAssetUri(scriptBaseUri, scriptPath.fsPath);
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
