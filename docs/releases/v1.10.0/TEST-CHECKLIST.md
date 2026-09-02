@@ -143,6 +143,15 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 
 ## Automated gates
 
+### Product Help menu (RC bug fix)
+
+- [x] Historical audit traces the regression to Help-specific hunks dropped during the VS Code 1.117 patch rebase and records the stable Ritemark product policy.
+- [x] The native and custom menubar paths share one Ritemark-only fail-closed allowlist; unknown future upstream Help contributions are rejected and separators are normalized.
+- [x] Focused Electron unit suite passes 4/4, VS Code `compile-client` reports zero errors, native TypeScript validation passes, and the full canonical patch stack applies in the fresh CI asset-parity simulation (2026-09-02).
+- [x] Fresh RunDev accessibility inspection exposes exactly **Support**, **View License**, and **Advanced → Toggle Developer Tools**; no VS Code-only Help item is present.
+- [ ] Capture and visually inspect the open native macOS Help menu. Computer Use exposes the exact menu through accessibility, but this machine's automated `screencapture` path drops accessibility-opened native menu overlays; do not treat the underlying RunDev-window screenshot as evidence.
+- [ ] Repeat the exact Help-menu check on the final packaged release candidate.
+
 - [x] Extension TypeScript compile and bundle.
 - [x] Webview TypeScript typecheck and production bundle.
 - [x] Focused continuation, context-pack, controller/store, three-adapter, projection, presentation, and runtime-switch tests.
