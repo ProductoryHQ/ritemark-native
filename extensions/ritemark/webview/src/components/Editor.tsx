@@ -36,7 +36,10 @@ import { CommentNode } from '../extensions/comment/CommentNode'
 import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
 import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
 import type { DocumentApplyTarget } from '../types/documentSync'
-import { shouldApplyIncomingEditorValue } from '../editorValueReconciliation'
+import {
+  shouldApplyIncomingEditorValue,
+  shouldPublishEditorChange,
+} from '../editorValueReconciliation'
 import {
   addTipTapTaskListTurndownRules,
   preprocessTaskListHTML,
@@ -132,6 +135,18 @@ export function preprocessTableHTML(html: string): string {
 }
 
 addTipTapTaskListTurndownRules(turndownService)
+
+/**
+ * Serialize every TipTap document through one canonical Markdown path.
+ *
+ * The editor's incoming-value reconciliation and outgoing change publication
+ * must compare the same representation. Otherwise a harmless TipTap plugin
+ * transaction after opening a file can look like a user edit (for example,
+ * when the source file has a trailing newline but Turndown does not).
+ */
+function serializeEditorHTML(html: string): string {
+  return turndownService.turndown(preprocessTableHTML(html))
+}
 
 // Keep Turndown's default escaping behavior to prevent content corruption
 // The unescape logic below handles loading escaped files correctly
@@ -419,18 +434,20 @@ export function Editor({
     ],
     content: initialContent,
     onCreate: ({ editor }) => {
+      // Establish the baseline from TipTap's parsed document, not the source
+      // bytes. Plugin transactions after creation are then true no-ops.
+      lastOnChangeValue.current = serializeEditorHTML(editor.getHTML())
       onEditorReady?.(editor)
     },
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML()
-      // Preprocess HTML to fix TipTap table formatting for GFM conversion
-      const cleanedHTML = preprocessTableHTML(html)
-      // Convert HTML back to markdown for storage
-      const markdown = turndownService.turndown(cleanedHTML)
+      const markdown = serializeEditorHTML(editor.getHTML())
 
       // Only call onChange if content actually changed
       // This prevents unnecessary re-renders that close bubble menus
-      if (markdown !== lastOnChangeValue.current) {
+      if (shouldPublishEditorChange({
+        nextMarkdown: markdown,
+        canonicalBaseline: lastOnChangeValue.current,
+      })) {
         lastOnChangeValue.current = markdown
         onChange(markdown)
       }
@@ -699,7 +716,7 @@ export function Editor({
     if (!editor) return
 
     // Convert current editor HTML back to markdown to compare with incoming value
-    const currentMarkdown = turndownService.turndown(editor.getHTML())
+    const currentMarkdown = serializeEditorHTML(editor.getHTML())
 
     // Initial mount is an explicit reconciliation reason. Do not infer it from
     // an empty Markdown projection: an empty heading created by `# ` also
@@ -708,7 +725,7 @@ export function Editor({
     if (initialMount) {
       isInitialMount.current = false
       lastExternalValue.current = value
-      lastOnChangeValue.current = value
+      lastOnChangeValue.current = currentMarkdown
     }
 
     // Check if imageMappings changed - need to re-apply them
@@ -754,8 +771,6 @@ export function Editor({
       const wasFocused = editor.isFocused
       const { anchor, head } = editor.state.selection
       const scrollTop = scrollContainer?.scrollTop
-      lastOnChangeValue.current = value
-
       try {
         const parsed = createNodeFromContent(processedContent, editor.schema, {
           slice: false,
@@ -798,6 +813,11 @@ export function Editor({
           .setMeta('addToHistory', false)
           .setMeta('preventUpdate', true))
       }
+
+      // Structural application and the fallback both suppress onUpdate. Keep
+      // the outgoing baseline aligned with the actual parsed TipTap document,
+      // so a later plugin-only update cannot be published as a user edit.
+      lastOnChangeValue.current = serializeEditorHTML(editor.getHTML())
 
       lastExternalValue.current = value
       requestAnimationFrame(() => {

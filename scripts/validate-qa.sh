@@ -11,6 +11,7 @@ echo "Running Codex QA validation..."
 node "$PROJECT_ROOT/scripts/validate-agent-runtime-manifest.mjs"
 node --test "$PROJECT_ROOT/scripts/copy-extension-for-target.test.mjs"
 node --test "$PROJECT_ROOT/scripts/validate-agent-runtime-manifest.test.mjs"
+"$PROJECT_ROOT/scripts/test-dev-extension-link.sh"
 "$PROJECT_ROOT/scripts/test-release-source-integrity.sh"
 "$PROJECT_ROOT/scripts/test-worktree-hygiene.sh"
 "$PROJECT_ROOT/.claude/hooks/pre-commit-validator.sh"
@@ -55,6 +56,14 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/editorSy
   (
     cd "$PROJECT_ROOT/extensions/ritemark"
     npm run test:editor-sync
+  )
+fi
+
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/webview/patches/|extensions/ritemark/webview/src/utils/securityBackports\.test\.ts|extensions/ritemark/(package|webview/package)(-lock)?\.json)$'; then
+  echo "Security backport inputs detected; running targeted security regression..."
+  (
+    cd "$PROJECT_ROOT/extensions/ritemark"
+    npm run test:security-backports
   )
 fi
 

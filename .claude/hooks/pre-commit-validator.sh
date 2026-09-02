@@ -51,16 +51,24 @@ if grep -q "@tailwind base" "extensions/ritemark/media/webview.js" 2>/dev/null; 
   ERRORS=$((ERRORS + 1))
 fi
 
-# Check 5: Webview bundle freshness (production source vs bundle)
-# Colocated tests are not Vite inputs. If any other webview source file is
-# staged, the generated bundle must also be staged.
-STAGED_WEBVIEW_SRC=$(git diff --cached --name-only -- "extensions/ritemark/webview/src" 2>/dev/null \
-  | grep -Ev '(\.test|\.spec)\.[cm]?[jt]sx?$' || true)
-if [[ -n "$STAGED_WEBVIEW_SRC" ]]; then
+# Check 5: Webview bundle freshness (production inputs vs bundle)
+# Colocated tests are not Vite inputs. If production source, dependency locks,
+# or dependency patches are staged, the generated bundle must also be staged.
+STAGED_WEBVIEW_INPUTS=$(
+  {
+    git diff --cached --name-only -- "extensions/ritemark/webview/src" 2>/dev/null \
+      | grep -Ev '(\.test|\.spec)\.[cm]?[jt]sx?$' || true
+    git diff --cached --name-only -- \
+      "extensions/ritemark/webview/package.json" \
+      "extensions/ritemark/webview/package-lock.json" \
+      "extensions/ritemark/webview/patches" 2>/dev/null || true
+  } | sort -u
+)
+if [[ -n "$STAGED_WEBVIEW_INPUTS" ]]; then
   STAGED_BUNDLE=$(git diff --cached --name-only -- "extensions/ritemark/media/webview.js" 2>/dev/null || true)
   if [[ -z "$STAGED_BUNDLE" ]]; then
-    echo "ERROR: Webview source files changed but webview.js not updated!"
-    echo "  Changed: $(echo "$STAGED_WEBVIEW_SRC" | wc -l | tr -d ' ') source file(s)"
+    echo "ERROR: Webview production inputs changed but webview.js not updated!"
+    echo "  Changed: $(echo "$STAGED_WEBVIEW_INPUTS" | wc -l | tr -d ' ') production input(s)"
     echo "  Fix: cd extensions/ritemark/webview && npm run build"
     ERRORS=$((ERRORS + 1))
   fi

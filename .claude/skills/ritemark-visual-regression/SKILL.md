@@ -58,6 +58,8 @@ For task lists, assert all of these:
 - unchecked and checked items render as checkboxes after reopening;
 - checked state survives;
 - a valid loose GFM fixture (`- [ ] A`, blank line, `- [x] B`) also reopens as checkboxes;
+- record the loose fixture's disk hash before opening it; opening alone must neither change the hash nor mark the tab dirty;
+- perform one real visible checkbox click and confirm that this user action, not an editor-internal transaction, creates the dirty state;
 - the first disk snapshot contains `- [ ]` and `- [x]`;
 - the second disk snapshot still contains the same markers;
 - an unrelated edit does not normalize task items into ordinary bullets.

@@ -6,6 +6,22 @@ export interface EditorValueReconciliationInput {
   imageMappingsChanged: boolean;
 }
 
+export interface EditorChangePublicationInput {
+  nextMarkdown: string;
+  canonicalBaseline: string;
+}
+
+/**
+ * Only user-visible semantic changes may leave the editor.
+ *
+ * Callers are responsible for deriving both values through the same
+ * serializer. This makes the decision independent of render timing and of
+ * source-byte details such as a trailing newline.
+ */
+export function shouldPublishEditorChange(input: EditorChangePublicationInput): boolean {
+  return input.nextMarkdown !== input.canonicalBaseline;
+}
+
 /**
  * Decide whether an incoming React value must replace the current TipTap doc.
  *
