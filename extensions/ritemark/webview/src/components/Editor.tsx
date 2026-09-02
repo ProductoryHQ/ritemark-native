@@ -37,6 +37,10 @@ import { commentMarkedExtension } from '../extensions/comment/commentMarkedExten
 import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
 import type { DocumentApplyTarget } from '../types/documentSync'
 import { shouldApplyIncomingEditorValue } from '../editorValueReconciliation'
+import {
+  addTipTapTaskListTurndownRules,
+  preprocessTaskListHTML,
+} from '../utils/taskListRoundTrip'
 
 // Initialize Turndown for HTML to Markdown conversion.
 // Base config + GFM plugins + pipe-escape rule live in utils/turndownService;
@@ -60,43 +64,6 @@ function ensureCommentMarkedPipeline(): void {
   if (commentMarkedRegistered) return
   commentMarkedRegistered = true
   editorMarked.use(commentMarkedExtension as Parameters<typeof editorMarked.use>[0])
-}
-
-/**
- * Preprocess HTML to convert GFM task lists to TipTap format
- *
- * marked generates: <ul><li><input type="checkbox" disabled> Task</li></ul>
- * TipTap expects: <ul data-type="taskList"><li data-type="taskItem" data-checked="false">Task</li></ul>
- */
-function preprocessTaskListHTML(html: string): string {
-  const temp = document.createElement('div')
-  temp.innerHTML = html
-
-  // Find all list items that contain a checkbox
-  temp.querySelectorAll('li').forEach(li => {
-    const checkbox = li.querySelector('input[type="checkbox"]')
-    if (checkbox) {
-      // Check if checkbox is at the start (first element child)
-      const firstElement = li.firstElementChild
-      if (firstElement === checkbox) {
-        // This is a task list item
-        const isChecked = checkbox.hasAttribute('checked')
-        li.setAttribute('data-type', 'taskItem')
-        li.setAttribute('data-checked', isChecked ? 'true' : 'false')
-
-        // Remove the checkbox - TipTap renders its own
-        checkbox.remove()
-
-        // Mark parent UL as task list
-        const parentUl = li.parentElement
-        if (parentUl && parentUl.tagName === 'UL') {
-          parentUl.setAttribute('data-type', 'taskList')
-        }
-      }
-    }
-  })
-
-  return temp.innerHTML
 }
 
 /**
@@ -164,54 +131,7 @@ export function preprocessTableHTML(html: string): string {
   return temp.innerHTML
 }
 
-// Custom rule to convert TipTap task list items to GFM syntax
-// TipTap outputs: <li data-type="taskItem" data-checked="true">Task</li>
-// GFM expects: - [x] Task
-//
-// BUG FIX: Handle nested task lists by preserving line breaks and indentation
-// Previously, nested items were flattened to a single line with escaped brackets
-turndownService.addRule('tiptapTaskItem', {
-  filter: function (node) {
-    return node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem'
-  },
-  replacement: function (content, node) {
-    const element = node as HTMLElement
-    const isChecked = element.getAttribute('data-checked') === 'true'
-    const checkbox = isChecked ? '[x]' : '[ ]'
-
-    // Split content into lines
-    const lines = content.split('\n').filter(line => line.trim())
-
-    // Check if we have nested task list items (lines starting with "- [")
-    // These are already converted by turndown processing child nodes first
-    const hasNestedTasks = lines.some((line, idx) => idx > 0 && line.match(/^- \[[ x]\]/))
-
-    if (hasNestedTasks && lines.length > 1) {
-      // First line is direct content, rest are nested items
-      const firstLine = lines[0].trim()
-      const nestedLines = lines.slice(1).map(line => '  ' + line).join('\n')
-      return `- ${checkbox} ${firstLine}\n${nestedLines}\n`
-    }
-
-    // No nested items - single line (clean up whitespace and newlines)
-    const cleanContent = content.replace(/^\s+|\s+$/g, '').replace(/\n+/g, ' ')
-    return `- ${checkbox} ${cleanContent}\n`
-  }
-})
-
-// Custom rule to handle TipTap task list UL (prevent default list handling)
-turndownService.addRule('tiptapTaskList', {
-  filter: function (node) {
-    return node.nodeName === 'UL' && node.getAttribute('data-type') === 'taskList'
-  },
-  replacement: function (content, node) {
-    // Content already formatted by taskItem rule
-    // For nested lists, don't add extra newlines - let parent control formatting
-    const parent = (node as HTMLElement).parentElement
-    const isNested = parent && parent.getAttribute('data-type') === 'taskItem'
-    return isNested ? content : '\n' + content + '\n'
-  }
-})
+addTipTapTaskListTurndownRules(turndownService)
 
 // Keep Turndown's default escaping behavior to prevent content corruption
 // The unescape logic below handles loading escaped files correctly

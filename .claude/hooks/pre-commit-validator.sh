@@ -51,9 +51,11 @@ if grep -q "@tailwind base" "extensions/ritemark/media/webview.js" 2>/dev/null; 
   ERRORS=$((ERRORS + 1))
 fi
 
-# Check 5: Webview bundle freshness (source vs bundle)
-# If webview source files are staged, bundle must also be staged
-STAGED_WEBVIEW_SRC=$(git diff --cached --name-only -- "extensions/ritemark/webview/src" 2>/dev/null || true)
+# Check 5: Webview bundle freshness (production source vs bundle)
+# Colocated tests are not Vite inputs. If any other webview source file is
+# staged, the generated bundle must also be staged.
+STAGED_WEBVIEW_SRC=$(git diff --cached --name-only -- "extensions/ritemark/webview/src" 2>/dev/null \
+  | grep -Ev '(\.test|\.spec)\.[cm]?[jt]sx?$' || true)
 if [[ -n "$STAGED_WEBVIEW_SRC" ]]; then
   STAGED_BUNDLE=$(git diff --cached --name-only -- "extensions/ritemark/media/webview.js" 2>/dev/null || true)
   if [[ -z "$STAGED_BUNDLE" ]]; then
