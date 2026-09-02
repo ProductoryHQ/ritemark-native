@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:debug": "RITEMARK_WEBVIEW_SOURCEMAP=true vite build",
+    "postinstall": "patch-package",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
@@ -72,6 +73,7 @@
     "zustand": "^5.0.2"
   },
   "overrides": {
+    "@xmldom/xmldom": "0.8.15",
     "dompurify": "3.4.14",
     "linkify-it": "6.1.0",
     "markdown-it": "15.0.0"
@@ -82,6 +84,7 @@
     "@types/turndown": "^5.0.4",
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.16",
+    "patch-package": "^8.0.1",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
     "typescript": "^5.2.0",

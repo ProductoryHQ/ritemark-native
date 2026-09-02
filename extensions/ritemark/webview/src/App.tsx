@@ -490,6 +490,9 @@ function App() {
   }, [documentSync, postDocumentEdit])
 
   const handleContentChange = (newContent: string) => {
+    // Defense in depth: an editor update identical to the accepted host value
+    // is not a document edit and must never make the tab dirty.
+    if (newContent === contentRef.current) return
     contentRef.current = newContent
     setContent(newContent)
     const currentProperties = propertiesRef.current

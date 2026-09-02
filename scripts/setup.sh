@@ -22,9 +22,10 @@ cd "$ROOT_DIR/extensions/ritemark"
 npm install
 npm run compile
 
-# Copy extension to VS Code
-echo "[4/4] Copying extension to VS Code..."
-cp -r "$ROOT_DIR/extensions/ritemark" "$ROOT_DIR/vscode/extensions/"
+# Link the one canonical extension source into this worktree's VS Code tree.
+# A physical directory is never overwritten because it may contain unique work.
+echo "[4/4] Linking RiteMark extension into VS Code..."
+"$ROOT_DIR/scripts/ensure-dev-extension-link.sh" --root "$ROOT_DIR"
 
 echo ""
 echo "Setup complete!"

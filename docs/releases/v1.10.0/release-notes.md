@@ -172,7 +172,10 @@ Task lists now keep their checkbox structure and checked state through the full
 edit, save, close, and reopen cycle. This also covers valid Markdown that uses
 blank lines between task items, nested checklists, and adjacent ordinary bullet
 items; reopening such a document no longer lets the next save erase its
-`[x]` / `[ ]` markers.
+`[x]` / `[ ]` markers. Merely opening a task list also stays clean: Ritemark
+compares editor updates against the same canonical Markdown representation it
+uses for saving, so an internal editor transaction cannot impersonate a user
+edit.
 
 ## Help that belongs to Ritemark
 
@@ -181,6 +184,12 @@ The desktop **Help** menu is focused again: **Support**, **View License**, and a
 where the operating system normally provides it. VS Code-specific playgrounds,
 walkthroughs, `Ask @vscode`, and process tooling no longer appear in Ritemark's
 product menu; power-user commands remain available from the Command Menu.
+
+The release candidate also refreshes the compatible URI and XML parser
+dependencies and carries the vendor-recommended protection for the current
+editor generation. A separately tracked TipTap 3 upgrade will replace that
+temporary compatibility backport after the release without adding a late
+editor-wide migration risk to 1.10.0.
 
 > Native continuation is intentionally version- and configuration-specific. “Previous messages were included” means transcript fallback, not complete private model memory.
 

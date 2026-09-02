@@ -1,6 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { shouldApplyIncomingEditorValue } from './editorValueReconciliation';
+import {
+  shouldApplyIncomingEditorValue,
+  shouldPublishEditorChange,
+} from './editorValueReconciliation';
+
+test('canonical no-op editor transactions are never published', () => {
+  assert.equal(shouldPublishEditorChange({
+    nextMarkdown: '- [ ] Alpha\n- [x] Beta',
+    canonicalBaseline: '- [ ] Alpha\n- [x] Beta',
+  }), false);
+});
+
+test('a real task-state change is published', () => {
+  assert.equal(shouldPublishEditorChange({
+    nextMarkdown: '- [x] Alpha\n- [x] Beta',
+    canonicalBaseline: '- [ ] Alpha\n- [x] Beta',
+  }), true);
+});
 
 test("an empty heading projection is not replaced by the editor's own empty value", () => {
   assert.equal(shouldApplyIncomingEditorValue({
