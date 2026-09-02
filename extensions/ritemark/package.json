@@ -813,6 +813,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/turndown": "^5.0.5",
     "@types/vscode": "^1.94.0",
+    "@xmldom/xmldom": "^0.8.15",
     "esbuild": "^0.28.1",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { DOMParser } from '@xmldom/xmldom'
-import { Marked } from 'marked'
+import { marked } from 'marked'
 import { createTurndownService } from './turndownService'
 import {
   addTipTapTaskListTurndownRules,
@@ -38,8 +38,7 @@ function directChildren(element: Element, tagName: string): Element[] {
 }
 
 function markedFixture(markdown: string): Element {
-  const marked = new Marked({ breaks: true, gfm: true })
-  return parseFixture(marked.parse(markdown) as string)
+  return parseFixture(marked(markdown, { breaks: true, gfm: true }))
 }
 
 {
