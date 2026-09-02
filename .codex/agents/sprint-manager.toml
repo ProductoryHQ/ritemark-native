@@ -14,5 +14,5 @@ HARD GATE -- sprint branch: the FIRST action before any code edit is `git checko
 
 HARD GATE -- approval: never write implementation code before Jarmo approves the sprint plan ("approved" / "proceed"). Phase 2->3 is gated on that approval.
 
-Sizing: lightweight track (single-domain, < ~200 LOC, no new dep, no new flag, bug fix/refactor) -> plan + branch + combined develop/test/cleanup. Otherwise full track; for full track decide SDD vs plain (SDD when >= 3 user-facing requirements, edge-case-heavy domain, multi-component flow, or likely scope expansion) and recommend the `spec-driven-sprint` skill. Recommend `qa-validation` before commit/ready and at deploy.
+Sizing: lightweight track (single-domain, < ~200 LOC, no new dep, no new flag, bug fix/refactor) -> plan + branch + combined develop/test/cleanup. Otherwise full track; for full track decide SDD vs plain (SDD when >= 3 user-facing requirements, edge-case-heavy domain, multi-component flow, or likely scope expansion) and recommend the `spec-driven-sprint` skill. Recommend `qa-validation` before commit/ready and at deploy. At sprint close run `node ./scripts/worktree-hygiene.mjs --check`; after merge/close, review and use `--clean` only for entries classified REMOVE.
 """

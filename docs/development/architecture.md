@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-01 (v1.10.0 RC — storage-isolated Agent Chat bootstrap)
+**Last updated:** 2026-09-02 (clean-build and worktree-hygiene architecture)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -493,7 +493,7 @@ create-dmg              Sparkle-compatible .dmg
 update-feed.json        Sparkle update feed → jarmo-productory/ritemark-public
 ```
 
-Build prerequisites (not enforceable at commit time): Node v20.x arm64 for prod, Node v22.21.1 arm64 for dev, `arch -arm64` shell wrapper. Full commands and gotchas in `.claude/skills/vscode-development/SKILL.md`.
+Build prerequisites (not enforceable at commit time): arm64 Node at the exact `vscode/.nvmrc` pin for production, the repo-root `.nvmrc` pin for development, and the `arch -arm64` shell wrapper. Full commands and gotchas in `.claude/skills/vscode-development/SKILL.md`.
 
 **RESOLVED ([#105](https://github.com/ProductoryHQ/ritemark-native/issues/105), Sprint 92):** The host was ~130 loose `.js` files plus the full `node_modules` tree (~180 packages) — root cause of Windows EMFILE, the 0-byte tsc trap (v1.7.1), and DMG bloat. Now esbuild-bundled into **two files** (`out/extension.js` + the standalone `out/browser/browserMcpAdapter.js` subprocess). Pure-JS deps are inlined; `node_modules` is retained ONLY for what esbuild can't/shouldn't bundle: the two ESM agent SDKs loaded via `new Function('return import(...)')` (`@anthropic-ai/claude-agent-sdk`, `@agentclientprotocol/sdk`), `pdfkit` (runtime font-data loader), and `fsevents` (native, macOS-only). Type-checking preserved via `tsc --noEmit`. **Future extension code must follow the bundle-safe rules** (no `__dirname`-depth path math; native/dynamic deps → esbuild `external`; separate-process code → its own entry point) — see `.claude/skills/vscode-development/SKILL.md`. #107 (webview bundle size) and #108 (build-integrity gate) are now unblocked but not built here.
 
@@ -769,7 +769,8 @@ Post-Sprint 79 items tracked as GitHub Issues:
 The decisions that define the system. Changing any of these is an architecture-level change requiring Jarmo's approval and an architecture.md update.
 
 - **VS Code as submodule, not fork** — customise via patches; keep upstream sync cheap. The brittleness of patch files is the accepted price.
-- **Extension symlinked, not copied** — single source of truth in `extensions/ritemark/`; symlinked into `vscode/extensions/ritemark` at build time. Never edit the submodule copy.
+- **Release builds are clean-room builds** — an RC starts in a new detached exact-`origin/main` worktree with a physical pristine VS Code submodule at the recorded gitlink. Dependencies come from lockfiles, patches come from Git, output starts empty, and the app carries verified provenance. A development worktree is never promoted into an RC. Full contract: `docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`.
+- **Extension source has one authority** — `extensions/ritemark/` is canonical. Development and local macOS builds symlink it into the same worktree's `vscode/extensions/ritemark`; CI and Windows packaging may create a same-worktree physical copy for platform/tooling constraints. A copy is derived build state, never an editable source or a cross-worktree dependency.
 - **Webview is sandboxed** — no filesystem/Node access; everything through `bridge.ts`. Never give the webview direct FS access to "simplify" things. ARCH-9 hardens this boundary; it must not dissolve it.
 - **Model catalog is the single authority** — model lists + defaults resolve through `src/ai/modelCatalog/` (live provider probes → remote `ritemark-public` catalog → cache → bundled baseline), evolved from the static `modelConfig.ts` registry in Sprint 89 (GH #109). Never hardcode model ids in runtimes, views, or the webview; add models by editing the published catalog (no app release). The single-authority spirit is preserved; the mechanism is now dynamic + remotely updatable.
 - **Flows are JSON + pluggable executors** — new automation capability = new node executor, not a new engine.

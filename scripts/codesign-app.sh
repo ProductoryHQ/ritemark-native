@@ -46,6 +46,14 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 APP_PATH="$PROJECT_ROOT/VSCode-$TARGET/Ritemark.app"
 ENTITLEMENTS_PATH="$PROJECT_ROOT/branding/entitlements.plist"
 
+# Never sign an app whose source/dependency identity cannot be traced back to
+# the exact main commit and committed build recipe that produced it.
+if ! node "$PROJECT_ROOT/scripts/build-provenance.mjs" \
+    --verify --repo "$PROJECT_ROOT" --target "$TARGET" --app "$APP_PATH"; then
+    echo -e "${RED}ERROR: Build provenance verification failed; refusing to sign.${NC}"
+    exit 1
+fi
+
 # Counters (using temp files to persist across subshells)
 SIGNED_FILE=$(mktemp)
 FAILED_FILE=$(mktemp)

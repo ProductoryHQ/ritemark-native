@@ -31,7 +31,11 @@ This document is updated at the end of every sprint that changes extension struc
 
 Runtime invariants (extension symlink, webview bundle freshness + size + `ai-sidebar` sentinel, postcss config, no raw `@tailwind`, extension TS compiles, VS Code patches applied, Settings page integrity) are enforced by `.claude/hooks/pre-commit-validator.sh` — the single source of truth. To inspect or modify checks, read or edit the hook directly. A failing check blocks the commit.
 
-Build-environment prerequisites that the hook can't enforce at commit time (Node v20.x arm64 for prod, Node v22.21.1 arm64 for dev mode, `arch -arm64` shell wrapper) live in `.claude/skills/vscode-development/SKILL.md`.
+**Clean-room release invariant (2026-09-02):** a shell RC is built only in a new worktree created by `./scripts/create-release-worktree.sh`: detached at the exact `origin/main` commit, physical pristine VS Code submodule at the recorded gitlink, physical dependency roots installed from lockfiles, and empty target output. `build-prod.sh`, signing, and DMG packaging hard-block unsafe source or missing/mismatched embedded provenance. Development worktrees and locally patched/shared VS Code trees are never promoted into RCs. Full contract: `docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`.
+
+**Worktree hygiene invariant:** run `node ./scripts/worktree-hygiene.mjs --check` after PR merge/close, at sprint close, before every RC, and weekly. Review before `--clean`; never override `BLOCKED`, and never manually recurse-delete a worktree. The scheduled `worktree-janitor` agent performs this bounded cleanup weekly.
+
+Build-environment prerequisites that the hook can't enforce at commit time (arm64 Node at the exact version in `vscode/.nvmrc`, plus the `arch -arm64` shell wrapper) live in `.claude/skills/vscode-development/SKILL.md`.
 
 **Bundle-safe extension code (Sprint 92, #105):** the extension host is one esbuild bundle (`out/extension.js` + the standalone `out/browser/browserMcpAdapter.js`), not loose files. New host code must not do `__dirname`-depth path math, must add native/runtime-asset/dynamic-path deps to the esbuild `external` list, and must give separately-spawned processes their own entry point. Full rule: `.claude/skills/vscode-development/SKILL.md` ## Extension host build.
 
@@ -84,10 +88,19 @@ patches/
 vscode
 branding/product.json
 extensions/ritemark/binaries/agents/
+.github/workflows/build-
 scripts/build-prod.sh
+scripts/build-prod-windows.sh
+scripts/build-provenance.mjs
 scripts/codesign-app.sh
 scripts/create-dmg.sh
+scripts/create-release-worktree.sh
 scripts/apply-patches.sh
+scripts/release-preflight.sh
+scripts/verify-release-source.sh
+scripts/worktree-hygiene.mjs
+scripts/vscode-derived-state.mjs
+scripts/validate-build-output.sh
 scripts/update-vscode.sh
 scripts/create-patch.sh
 installer/windows/ritemark.iss
@@ -109,6 +122,7 @@ This list is the single source of truth — `scripts/release-extension-preflight
 | Sprint Workflow | `sprint-manager` | sprint, phase, plan, implement, feature |
 | Quality Gates | `qa-validator` | commit, push, done, merge, PR |
 | Releases & Distribution | `release-manager` | release, publish, ship, deploy, dmg, notarization, github release |
+| Worktree/Disk Hygiene | `worktree-janitor` | worktree cleanup, disk hygiene, stale worktrees |
 | Webview/Editor | `webview-expert` | webview, tiptap, react, vite, bundle, editor blank, editor not loading |
 | Marketing & Content | `product-marketer` | changelog, release notes, blog post, landing page, marketing |
 | UX/UI Design | `ux-expert` | dialog, modal, button, UI, UX, component, design, user experience |
@@ -134,6 +148,8 @@ Skills (knowledge injection, not agents):
 DO IT YOURSELF, do NOT delegate to `vscode-expert` (the agent has output-buffering issues that hang background mode). For exact commands, gotchas, and the arm64 wrapper, see `.claude/skills/vscode-development/SKILL.md` ## Production Build.
 
 Hard rule: **NEVER** pipe build output through `| tail` / `| head` (causes background-mode hang). For release-step commands (sign, DMG, notarize), see the `release` skill.
+
+Hard source rule: **NEVER** run a production build from a development/old RC worktree or a local patched/symlinked VS Code tree. Create a new exact-main release worktree with `./scripts/create-release-worktree.sh`; `build-prod.sh` materializes frozen dependencies and canonical patches itself. A failed source gate means discard/recreate the release worktree, not repair it in place.
 
 * * *
 

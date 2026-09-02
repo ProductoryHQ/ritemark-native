@@ -52,6 +52,11 @@ echo "RiteMark Windows Build Script"
 echo "========================================${NC}"
 echo ""
 
+# The local Windows production path follows the same clean-source contract as
+# macOS. CI performs this check immediately after checkout as well.
+"$ROOT_DIR/scripts/verify-release-source.sh" \
+    --repo "$ROOT_DIR" --target win32-x64 --phase pristine
+
 # Step 1: Check prerequisites
 echo -e "${YELLOW}Step 1: Checking prerequisites...${NC}"
 
@@ -94,8 +99,10 @@ echo ""
 echo -e "${YELLOW}Step 2: Applying patches...${NC}"
 cd "$ROOT_DIR"
 if [ -f "./scripts/apply-patches.sh" ]; then
-    ./scripts/apply-patches.sh || true  # Continue even if some patches fail
+    ./scripts/apply-patches.sh
 fi
+"$ROOT_DIR/scripts/verify-release-source.sh" \
+    --repo "$ROOT_DIR" --target win32-x64 --phase patched
 echo ""
 
 # Step 3: Copy extension (not symlink) for Windows build
@@ -126,7 +133,7 @@ echo ""
 # Step 4: Compile extension
 echo -e "${YELLOW}Step 4: Compiling RiteMark extension...${NC}"
 cd "$VSCODE_DIR/extensions/ritemark"
-npm install
+npm ci --legacy-peer-deps
 npm run compile
 echo -e "${GREEN}  Extension compiled${NC}"
 echo ""
@@ -155,9 +162,9 @@ fi
 echo ""
 
 # Step 6: Install VS Code dependencies
-echo -e "${YELLOW}Step 6: Installing VS Code dependencies...${NC}"
+echo -e "${YELLOW}Step 6: Installing frozen VS Code dependencies...${NC}"
 cd "$VSCODE_DIR"
-yarn install
+npm ci
 echo ""
 
 # Step 7: Build VS Code for Windows x64
@@ -204,6 +211,13 @@ else
     echo -e "${RED}  Error: Build directory not found${NC}"
     exit 1
 fi
+
+# Bind the finished app to the exact source, VS Code submodule, patch stack,
+# lockfiles, runtime manifest, and branding inputs used for this build.
+node "$ROOT_DIR/scripts/build-provenance.mjs" \
+    --write --repo "$ROOT_DIR" --target win32-x64 --app "$BUILD_OUTPUT"
+node "$ROOT_DIR/scripts/build-provenance.mjs" \
+    --verify --repo "$ROOT_DIR" --target win32-x64 --app "$BUILD_OUTPUT"
 
 # Check for RiteMark.exe or Code - OSS.exe
 if [ -f "$BUILD_OUTPUT/RiteMark.exe" ]; then

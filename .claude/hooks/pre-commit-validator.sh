@@ -159,6 +159,20 @@ if git diff --cached --name-only | grep -qx "$MANIFEST"; then
   fi
 fi
 
+# Check 12: build/worktree governance changes must prove both acceptance and
+# rejection paths in real disposable Git repositories before commit.
+STAGED_BUILD_GUARDS=$(git diff --cached --name-only | grep -E '^((scripts/(verify-release-source|create-release-worktree|test-release-source-integrity|test-worktree-hygiene)\.sh|scripts/(build-provenance|worktree-hygiene|vscode-derived-state)\.mjs|scripts/(build-prod|build-prod-windows|release-preflight|validate-build-output)\.sh)|\.github/workflows/build-)' || true)
+if [[ -n "$STAGED_BUILD_GUARDS" ]]; then
+  if ! ./scripts/test-release-source-integrity.sh; then
+    echo "ERROR: Release source/provenance guard tests failed"
+    ERRORS=$((ERRORS + 1))
+  fi
+  if ! ./scripts/test-worktree-hygiene.sh; then
+    echo "ERROR: Worktree hygiene tests failed"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
 # Summary
 if [[ $ERRORS -gt 0 ]]; then
   echo ""
