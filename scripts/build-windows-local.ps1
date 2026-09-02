@@ -98,6 +98,15 @@ if ($SkipVSCodeClone -and (Test-Path $VSCodeDir)) {
 # ------------------------------------------------------------------
 Write-Step 3 "Copying Ritemark extension"
 
+Push-Location $RootDir
+& bash ./scripts/fetch-agent-runtimes.sh --platform win32 --arch x64
+$fetchExitCode = $LASTEXITCODE
+Pop-Location
+if ($fetchExitCode -ne 0) {
+    Write-Host "ERROR: Fetching win32-x64 agent runtimes failed" -ForegroundColor Red
+    exit 1
+}
+
 $extDest = Join-Path $VSCodeDir "extensions\ritemark"
 & node (Join-Path $RootDir "scripts\copy-extension-for-target.mjs") `
     --source $ExtDir `

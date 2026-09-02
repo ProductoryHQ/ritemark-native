@@ -122,6 +122,10 @@ test('release callers use the immutable target copier', () => {
 	];
 	for (const [relative, target] of callers) {
 		const contents = fs.readFileSync(path.join(projectRoot, relative), 'utf8');
+		const fetchIndex = contents.indexOf('fetch-agent-runtimes.sh');
+		const copyIndex = contents.indexOf('copy-extension-for-target.mjs');
+		assert.notEqual(fetchIndex, -1, `${relative} must fetch the target runtime`);
+		assert.ok(fetchIndex < copyIndex, `${relative} must fetch the target runtime before copying`);
 		assert.match(contents, /copy-extension-for-target\.mjs/);
 		assert.match(contents, new RegExp(`--target ${target}`));
 		assert.doesNotMatch(contents, /rm -rf extensions\/ritemark\/binaries\/darwin-arm64/);
