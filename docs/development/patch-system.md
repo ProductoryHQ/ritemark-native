@@ -32,7 +32,8 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 # Apply all patches
 ./scripts/apply-patches.sh
 
-# Check status without applying
+# Validate the complete ordered stack against pristine VS Code HEAD without
+# changing the worktree
 ./scripts/apply-patches.sh --dry-run
 
 # Create a new patch

@@ -82,20 +82,13 @@ jobs:
         shell: bash
         working-directory: r
         run: |
-          rm -rf vscode/extensions/ritemark 2>/dev/null || true
-          # Strip macOS dictation dylib tree before cp -R. binaries/darwin-arm64/
-          # contains whisper.cpp/libggml dylibs with macOS symlinks (e.g.
-          # libggml-base.0.dylib -> libggml-base.1.dylib). Git Bash on the
-          # Windows runner cannot replicate macOS symlinks, so cp -R fails
-          # mid-copy with "cannot create symbolic link". This tree is darwin-only
-          # (macOS dictation), it has no role in the Windows build, so dropping
-          # it before the copy is the right move. Do NOT remove this line
-          # without first solving the Git-Bash-symlink problem on Windows
-          # runners. See Commit A (956665b) for the regression that re-broke
-          # this and Commit C for the restore.
-          rm -rf extensions/ritemark/binaries/darwin-arm64 2>/dev/null || true
-          cp -R extensions/ritemark vscode/extensions/ritemark
-          echo "Extension copied to vscode/extensions/ritemark"
+          # Build a target-only physical copy without mutating tracked source.
+          # The copier filters macOS dylib symlinks before traversal, so it is
+          # safe under Git Bash without Windows symlink privileges.
+          node ./scripts/copy-extension-for-target.mjs \
+            --source extensions/ritemark \
+            --destination vscode/extensions/ritemark \
+            --target win32-x64
 
       - name: Patch bundled node-gyp for VS2026 detection
         # DRIFT-PREVENTION: .github/workflows/windows-canary.yml runs a copy of

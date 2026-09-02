@@ -70,6 +70,18 @@ cd "$VSCODE_DIR"
 APPLIED=0
 FAILED=0
 SKIPPED=0
+DRY_RUN_INDEX=""
+
+if [ "$DRY_RUN" = true ]; then
+    # Validate the canonical stack sequentially against HEAD without touching
+    # the worktree. Checking every patch independently is incorrect when a
+    # later patch intentionally builds on an earlier patch's hunk. A temporary
+    # index also avoids Windows CRLF conversion affecting patch validation.
+    DRY_RUN_INDEX="$(mktemp -t ritemark-patch-index.XXXXXX)"
+    rm -f "$DRY_RUN_INDEX"
+    GIT_INDEX_FILE="$DRY_RUN_INDEX" git read-tree HEAD
+    trap 'rm -f "$DRY_RUN_INDEX"' EXIT
+fi
 
 patch_paths() {
     awk '
@@ -125,15 +137,9 @@ for patch_index in "${!PATCHES[@]}"; do
 
     if [ "$DRY_RUN" = true ]; then
         echo -n "Checking $PATCH_NAME... "
-        if git apply --check "$patch" 2>/dev/null; then
+        if GIT_INDEX_FILE="$DRY_RUN_INDEX" git apply --cached "$patch" 2>/dev/null; then
             echo -e "${GREEN}OK (can apply)${NC}"
             APPLIED=$((APPLIED + 1))
-        elif git apply --check --reverse "$patch" 2>/dev/null; then
-            echo -e "${YELLOW}Already applied${NC}"
-            SKIPPED=$((SKIPPED + 1))
-        elif reverse_later_patches_then_check_current "$patch_index" "$patch"; then
-            echo -e "${YELLOW}Already applied (overlapped by later patch)${NC}"
-            SKIPPED=$((SKIPPED + 1))
         else
             echo -e "${RED}CONFLICT${NC}"
             FAILED=$((FAILED + 1))
@@ -194,6 +200,11 @@ echo "========================================"
 
 if [ $FAILED -gt 0 ]; then
     exit 1
+fi
+
+if [ -n "$DRY_RUN_INDEX" ]; then
+    rm -f "$DRY_RUN_INDEX"
+    trap - EXIT
 fi
 
 # Copy branding assets (only when applying, not reversing or dry-run)
