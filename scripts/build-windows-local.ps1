@@ -98,23 +98,23 @@ if ($SkipVSCodeClone -and (Test-Path $VSCodeDir)) {
 # ------------------------------------------------------------------
 Write-Step 3 "Copying Ritemark extension"
 
+Push-Location $RootDir
+& bash ./scripts/fetch-agent-runtimes.sh --platform win32 --arch x64
+$fetchExitCode = $LASTEXITCODE
+Pop-Location
+if ($fetchExitCode -ne 0) {
+    Write-Host "ERROR: Fetching win32-x64 agent runtimes failed" -ForegroundColor Red
+    exit 1
+}
+
 $extDest = Join-Path $VSCodeDir "extensions\ritemark"
-if (Test-Path $extDest) {
-    Remove-Item -Recurse -Force $extDest
-}
-
-# Remove macOS-only binaries before copying
-$darwinBin = Join-Path $ExtDir "binaries\darwin-arm64"
-$hadDarwinBin = Test-Path $darwinBin
-if ($hadDarwinBin) {
-    Rename-Item $darwinBin "$darwinBin.bak"
-}
-
-Copy-Item -Recurse $ExtDir $extDest
-Write-Host "  Extension copied to vscode\extensions\ritemark"
-
-if ($hadDarwinBin) {
-    Rename-Item "$darwinBin.bak" $darwinBin
+& node (Join-Path $RootDir "scripts\copy-extension-for-target.mjs") `
+    --source $ExtDir `
+    --destination $extDest `
+    --target win32-x64
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Target-specific extension copy failed" -ForegroundColor Red
+    exit 1
 }
 
 # ------------------------------------------------------------------

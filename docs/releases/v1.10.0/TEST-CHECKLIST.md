@@ -2,11 +2,12 @@
 
 This checklist accumulates release evidence across Sprints 109–115 and focused release-candidate bug fixes.
 
-## Current candidate record — 2026-08-31
+## Current candidate record — 2026-09-02
 
 - Invalidated candidate: `dist/Ritemark-1.10.0-darwin-arm64.dmg` from merged `main` commit `3f01ef5` passed static packaging/signature checks but omitted Codex 0.149.0's required `codex-code-mode-host` sibling. A real Codex file-tool turn failed with `No such file or directory`, so this DMG is not a Gate 1 candidate and must not be notarized or published.
-- Correction under review: `codex/fix-codex-code-mode-host-packaging`. Manifest schema 2 requires the Codex app-server and code-mode-host matrices for every release target; all twelve exact archives pass local checksum, extraction-path, and architecture verification, and both arm64 Codex components start.
-- Replacement signed/unnotarized Gate 1 DMG: **not yet produced**. It must be built from the merged correction on clean synchronized `main`, pass static packaging/signature/mount checks, and complete a real packaged Codex file create/edit/read canary before human testing. Any rebuild resets Gate 1 evidence and the 60-minute clock.
+- Retired Gate 1 evidence: the arm64 DMG from exact merged `main` commit `0140ab9948703ad8067d89d7c41dc3742d531ef2` passed QA/preflight, mounted content/signature/architecture/runtime checks, visual inspection, and Jarmo's installed-app test. After more than four hours with no new bug, Apple accepted submission `8434142f-25a0-48ce-8848-a8606c3fc319`; stapling and all six final notarization checks passed. Final notarized SHA-256: `0bb1e49df477b95762521894844d4003afe03cb55877b597184638e81a5684b3`.
+- Gate 2 pipeline block: Windows run `33642850280` passed exact-source checkout and dependencies, then correctly rejected a source-mutating platform cleanup plus an order-sensitive reverse check of overlapping patches. The repository was restored to public and obsolete x64 run `33642854001` was cancelled.
+- Replacement Gate 1 DMG: **not yet produced**. The immutable target-copy/source-gate correction changes canonical source, so the otherwise-valid notarized `0140ab9` artifact is not eligible for multi-platform publication. A fresh exact-`main` arm64 candidate must repeat build, signing, mounted checks, Jarmo approval, hardening, and notarization.
 - Production dependency security: **pass** — extension and webview `npm audit --omit=dev` each report zero findings; SheetJS is pinned to the official `0.20.3` tarball and targeted spreadsheet/Markdown/Mermaid checks pass.
 
 ## Trusted Windows installation (Sprint 114)

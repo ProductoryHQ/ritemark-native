@@ -55,7 +55,7 @@ mkdir -p \
 cp "$SCRIPT_DIR/verify-release-source.sh" "$SUPER/scripts/verify-release-source.sh"
 cp "$SCRIPT_DIR/create-release-worktree.sh" "$SUPER/scripts/create-release-worktree.sh"
 cp "$SCRIPT_DIR/vscode-derived-state.mjs" "$SUPER/scripts/vscode-derived-state.mjs"
-printf '#!/usr/bin/env bash\necho "Already applied"\n' >"$SUPER/scripts/apply-patches.sh"
+cp "$SCRIPT_DIR/apply-patches.sh" "$SUPER/scripts/apply-patches.sh"
 chmod +x \
   "$SUPER/scripts/verify-release-source.sh" \
   "$SUPER/scripts/create-release-worktree.sh" \
@@ -67,7 +67,20 @@ printf '{"runtimes":[]}\n' >"$SUPER/extensions/ritemark/binaries/agents/manifest
 printf '{"ritemarkVersion":"0.0.0-test"}\n' >"$SUPER/branding.json"
 mkdir -p "$SUPER/branding"
 mv "$SUPER/branding.json" "$SUPER/branding/product.json"
-printf 'canonical patch bytes\n' >"$SUPER/patches/vscode/001-test.patch"
+printf '%s\n' \
+  'diff --git a/package-lock.json b/package-lock.json' \
+  '--- a/package-lock.json' \
+  '+++ b/package-lock.json' \
+  '@@ -1 +1 @@' \
+  '-{}' \
+  '+{"step":1}' >"$SUPER/patches/vscode/001-test.patch"
+printf '%s\n' \
+  'diff --git a/package-lock.json b/package-lock.json' \
+  '--- a/package-lock.json' \
+  '+++ b/package-lock.json' \
+  '@@ -1 +1 @@' \
+  '-{"step":1}' \
+  '+{"step":2}' >"$SUPER/patches/vscode/002-test.patch"
 printf 'VSCode-*\n' >"$SUPER/.gitignore"
 git -C "$SUPER" -c protocol.file.allow=always submodule add "$VSCODE_REMOTE" vscode >/dev/null
 git -C "$SUPER" add .
@@ -77,12 +90,23 @@ git -C "$SUPER_REMOTE" symbolic-ref HEAD refs/heads/main
 git -C "$SUPER" remote add origin "$SUPER_REMOTE"
 git -C "$SUPER" push -u origin main >/dev/null
 
+if git -C "$SUPER/vscode" apply --check "$SUPER/patches/vscode/002-test.patch" 2>/dev/null; then
+  echo "FAIL: dependent test patch unexpectedly applies to pristine HEAD" >&2
+  exit 1
+fi
+"$SUPER/scripts/apply-patches.sh" --dry-run >/dev/null
+echo "PASS: dry-run validates dependent patches sequentially without changing the worktree"
+
 "$SCRIPT_DIR/verify-release-source.sh" --repo "$SUPER" --expected-ref origin/main >/dev/null
 echo "PASS: accepted clean exact main source"
 
 printf 'derived patch state\n' >>"$SUPER/vscode/package-lock.json"
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --verify --repo "$SUPER" >/dev/null
+printf 'unexpected patch mutation\n' >>"$SUPER/patches/vscode/001-test.patch"
+expect_failure "differs from its recorded canonical derived state" \
+  node "$SCRIPT_DIR/vscode-derived-state.mjs" --verify --repo "$SUPER"
+git -C "$SUPER" restore patches/vscode/001-test.patch
 printf 'manual unrecorded edit\n' >>"$SUPER/vscode/package-lock.json"
 expect_failure "differs from its recorded canonical derived state" \
   node "$SCRIPT_DIR/vscode-derived-state.mjs" --verify --repo "$SUPER"
@@ -97,7 +121,7 @@ node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 "$SCRIPT_DIR/verify-release-source.sh" \
   --repo "$SUPER" --expected-ref origin/main --phase patched >/dev/null
 printf 'unrecorded unrelated edit\n' >"$SUPER/vscode/manual-edit.txt"
-expect_failure "patched vscode differs from the state recorded" \
+expect_failure "canonical patch set or patched vscode differs from the state recorded" \
   "$SCRIPT_DIR/verify-release-source.sh" \
     --repo "$SUPER" --expected-ref origin/main --phase patched
 rm "$SUPER/vscode/manual-edit.txt" "$SUPER/vscode/extensions/ritemark"

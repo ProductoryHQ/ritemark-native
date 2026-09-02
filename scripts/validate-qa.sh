@@ -9,6 +9,7 @@ cd "$PROJECT_ROOT"
 
 echo "Running Codex QA validation..."
 node "$PROJECT_ROOT/scripts/validate-agent-runtime-manifest.mjs"
+node --test "$PROJECT_ROOT/scripts/copy-extension-for-target.test.mjs"
 node --test "$PROJECT_ROOT/scripts/validate-agent-runtime-manifest.test.mjs"
 "$PROJECT_ROOT/scripts/test-release-source-integrity.sh"
 "$PROJECT_ROOT/scripts/test-worktree-hygiene.sh"

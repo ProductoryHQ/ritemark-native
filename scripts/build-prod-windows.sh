@@ -115,9 +115,12 @@ if [ -L "extensions/ritemark" ] || [ -d "extensions/ritemark" ]; then
     echo "  Removed existing extension"
 fi
 
-# Copy extension source
-cp -r "$EXTENSION_DIR" "extensions/ritemark"
-echo "  Copied extension from $EXTENSION_DIR"
+# Copy a target-only extension without mutating or importing foreign native
+# payloads from the canonical source tree.
+node "$ROOT_DIR/scripts/copy-extension-for-target.mjs" \
+    --source "$EXTENSION_DIR" \
+    --destination "$VSCODE_DIR/extensions/ritemark" \
+    --target win32-x64
 
 # Floor the BUNDLED extension's version to X.Y.Z-0 so over-the-air X.Y.Z-ext.N
 # patches win VS Code's extension scanner (GH #142). gulp bundles this copy into

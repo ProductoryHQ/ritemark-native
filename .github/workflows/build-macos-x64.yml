@@ -55,9 +55,10 @@ jobs:
       - name: Copy extension (replace symlink)
         working-directory: r
         run: |
-          rm -rf vscode/extensions/ritemark 2>/dev/null || true
-          cp -R extensions/ritemark vscode/extensions/ritemark
-          echo "Extension copied to vscode/extensions/ritemark"
+          node ./scripts/copy-extension-for-target.mjs \
+            --source extensions/ritemark \
+            --destination vscode/extensions/ritemark \
+            --target darwin-x64
 
       # =========================================================================
       # Step 4: Install dependencies

@@ -225,24 +225,16 @@ if [[ "$PHASE" == "patched" ]]; then
     fi
   fi
 
-  PATCH_CHECK_LOG="$(mktemp -t ritemark-patch-check.XXXXXX)"
-  if "$PROJECT_ROOT/scripts/apply-patches.sh" --dry-run >"$PATCH_CHECK_LOG" 2>&1; then
-    if grep -q "Already applied" "$PATCH_CHECK_LOG"; then
-      pass "canonical patch stack is applied"
-    else
-      fail "patch check passed without confirming an applied canonical patch"
-    fi
-  else
-    fail "canonical patch stack verification failed"
-    tail -20 "$PATCH_CHECK_LOG" | sed 's/^/        /' >&2
-  fi
-  rm -f "$PATCH_CHECK_LOG"
-
+  # apply-patches.sh writes this marker only after the complete canonical stack
+  # succeeds. It binds the source commit, patch-set hash, and final VS Code diff,
+  # so verification is deterministic even when later patches overlap earlier
+  # hunks. Forward applicability is tested separately against pristine VS Code
+  # by release-preflight.sh.
   if node "$PROJECT_ROOT/scripts/vscode-derived-state.mjs" \
       --verify --repo "$PROJECT_ROOT" >/dev/null; then
-    pass "patched vscode exactly matches its recorded derived-state fingerprint"
+    pass "canonical patch set and patched vscode match the recorded derived-state fingerprint"
   else
-    fail "patched vscode differs from the state recorded by apply-patches.sh"
+    fail "canonical patch set or patched vscode differs from the state recorded by apply-patches.sh"
   fi
 fi
 

@@ -65,7 +65,7 @@ We customize VS Code via patch files, not direct edits to the submodule. See [Pa
 | Command | Purpose |
 |---------|---------|
 | `./scripts/apply-patches.sh` | Apply all patches |
-| `./scripts/apply-patches.sh --dry-run` | Check patch status |
+| `./scripts/apply-patches.sh --dry-run` | Validate the ordered patch stack against pristine VS Code `HEAD` |
 | `./scripts/create-patch.sh "name"` | Create new patch |
 | `./scripts/apply-patches.sh --reverse` | Remove patches |
 
