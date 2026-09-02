@@ -41,6 +41,7 @@ After each run, the Codex harness faithfully reflects the Claude canon:
 - `AGENTS.md` carries the same repo guidance and lifecycle canon as `CLAUDE.md`.
 - Every Claude role agent has a Codex counterpart at `.codex/agents/*.toml`.
 - Every Claude skill has a Codex skill (`.agents/skills/*`) covering the same responsibility.
+- Clean-room release and worktree-hygiene rules remain materially identical on both harness sides; `worktree-janitor` maps to `.codex/agents/worktree-janitor.toml`.
 
 The lifecycle canon you enforce everywhere is **Release → Sprints → GitHub Issues**.
 

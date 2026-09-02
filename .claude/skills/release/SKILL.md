@@ -50,27 +50,43 @@ Sequence: **build DMG → Jarmo tests un-notarized → ≥60 min hardening (no n
 ### Step 0 — Pre-flight
 
 ```bash
+node ./scripts/worktree-hygiene.mjs --check
+./scripts/create-release-worktree.sh
+# cd to the new path printed by the command
 ./scripts/release-preflight.sh
 ```
 
-Must pass (clean git, on main, synced with origin, Node v20.x arm64, signing cert present, no 0-byte source files, node_modules present, webview.js + extension.js built). If FAIL → fix, do not proceed.
+Review the hygiene report before `--clean`. The release worktree must be new,
+detached at the exact `origin/main` commit, and contain a physical pristine VS
+Code submodule. Preflight hard-blocks local patches, shared dependencies, old
+output, and any source drift. If the release source gate fails, discard the RC
+worktree and recreate it; do not repair it in place.
 
 ### Step 1 — Version bump (no tag yet)
 
-1. Edit `branding/product.json` — bump `version`.
-2. Edit `extensions/ritemark/package.json` — bump `version`.
-3. Commit: `git commit -m "chore: bump version to X.Y.Z"`
-4. Push: `git push origin main`
+1. Make the version changes on a dedicated release-prep branch.
+2. Edit `branding/product.json` — bump `version`.
+3. Edit `extensions/ritemark/package.json` — bump `version`.
+4. Commit, push, and merge through the normal protected-main workflow.
+5. Fetch `origin/main`; the previous preflight worktree is now invalid.
 
 **Do NOT create the tag yet** — tag push triggers CI; we wait until Gate 1 passes.
 
 ### Step 2 — Build macOS arm64 (local)
 
 ```bash
-arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" && ./scripts/build-prod.sh 2>&1'
+node ./scripts/worktree-hygiene.mjs --check
+./scripts/create-release-worktree.sh
+# cd to the new path, then:
+./scripts/release-preflight.sh
+arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use "$(cat vscode/.nvmrc)" && ./scripts/build-prod.sh 2>&1'
 ```
 
-Run as background task with `timeout: 600000` (10 min cap). Never pipe through `tail`/`head` — buffering hangs background mode.
+This second fresh worktree is mandatory because the version commit changed
+`origin/main`. `build-prod.sh` uses `npm ci`, applies canonical patches itself,
+requires empty output, and embeds `ritemark-build-provenance.json`. Run as a
+background task with `timeout: 600000` (10 min cap). Never pipe through
+`tail`/`head` — buffering hangs background mode.
 
 Generate test checklist in `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.
 
@@ -123,6 +139,10 @@ Dispatch both builds against the release ref (e.g. `main`, or the release branch
 gh workflow run build-macos-x64.yml --ref <ref>
 gh workflow run build-windows.yml  --ref <ref>
 ```
+
+`<ref>` must resolve to the exact already-approved `origin/main` source commit.
+Both workflows independently initialize the recorded VS Code gitlink, use
+frozen installs, run the clean-source gate, and embed provenance.
 
 After the Windows build completes (Step 6), toggle back:
 
@@ -208,7 +228,7 @@ GitHub does NOT allow larger runners (windows-8core) on public repos. Before dis
 
 ### Node version + architecture
 
-Production builds require **Node v20.x arm64** (`nvm use 20`). Default shell has x64 Node v23 — this fails with missing `@rollup/rollup-darwin-arm64` and similar arm64 native binaries. Always wrap with the `arch -arm64 /bin/zsh` invocation.
+Production builds require **arm64 Node at the version pinned by `vscode/.nvmrc`**. A machine default or Rosetta/x64 Node is not a release input. Always use the `arch -arm64 /bin/zsh` invocation and `nvm use "$(cat vscode/.nvmrc)"`.
 
 ### x64 from CI, never cross-compiled
 
@@ -229,6 +249,21 @@ For changes confined to extension code:
 ```bash
 cp -R extensions/ritemark/out/* "VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extensions/ritemark/out/"
 ```
+
+This is development-only. A hot-copied app has invalid provenance and must
+never be signed, packaged, or described as an RC.
+
+### Clean build and worktree contract
+
+The authoritative contract is
+`docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`.
+
+- Audit after merge/close, at sprint close, before RC creation, and weekly:
+  `node ./scripts/worktree-hygiene.mjs --check`.
+- Use `--clean` only after reviewing classifications. Never override `BLOCKED`.
+- Every RC begins with `./scripts/create-release-worktree.sh`.
+- `codesign-app.sh` and `create-dmg.sh` refuse missing or mismatched provenance.
+- Any source change or rebuild creates a new candidate and resets the relevant gate.
 
 ## Past incidents (institutional memory)
 

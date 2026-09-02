@@ -29,10 +29,10 @@ It validates symlink, webview bundle, postcss config, CSS processing, bundle fre
 
 | Symptom | Fix |
 | --- | --- |
-| `node -p "process.arch"` shows `x64` (running under Rosetta) | `arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20'` |
+| `node -p "process.arch"` shows `x64` (running under Rosetta) | use an arm64 shell and `nvm use "$(cat vscode/.nvmrc)"` |
 | `ls -la vscode/extensions/ritemark` shows directory (not symlink) | `rm -rf vscode/extensions/ritemark && ln -s ../../extensions/ritemark vscode/extensions/ritemark` |
-| `node -v` shows v22+ (wrong for prod build) | `nvm use 20` (prod) or `nvm use 22.21.1` (dev mode — see vscode-development skill ## Node Versions) |
-| `file vscode/.build/electron/*.app/Contents/MacOS/Electron` shows x86_64 | `rm -rf vscode/.build/electron && arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && node build/lib/electron.js'` |
+| Node version differs from `vscode/.nvmrc` | `nvm use "$(cat vscode/.nvmrc)"` for production; repo-root `.nvmrc` remains the dev-shell pin |
+| `file vscode/.build/electron/*.app/Contents/MacOS/Electron` shows x86_64 | rebuild it under an arm64 shell with `nvm use "$(cat vscode/.nvmrc)"` |
 | `xattr -l vscode/.build/electron/*.app \| grep quarantine` returns a match | `xattr -cr vscode/.build/electron/Ritemark.app` (quarantine forces Rosetta even on arm64) |
 
 ## Scope Boundaries
@@ -63,6 +63,7 @@ It validates symlink, webview bundle, postcss config, CSS processing, bundle fre
 - Recommend correct Node/toolchain versions
 - Guide through clean rebuild procedures
 - Identify dependency issues
+- For production, require `create-release-worktree.sh`; never promote a development or old RC tree
 
 ### Extension Development
 - Help with extension architecture
@@ -194,7 +195,7 @@ Format example:
 Enforced by `.claude/hooks/pre-commit-validator.sh`. Manual reference of what must hold:
 - Symlink: `vscode/extensions/ritemark` → `../../extensions/ritemark`
 - Build target: `darwin-arm64`
-- Node architecture: arm64 for prod builds; v20.x (prod) or v22.21.1 (dev — see vscode-development skill)
+- Node architecture: arm64; production uses the exact `vscode/.nvmrc` pin, while the repo-root `.nvmrc` remains the development-shell pin
 - Webview bundle: `extensions/ritemark/media/webview.js` ~900 KB, contains `ai-sidebar` sentinel
 - Patches applied: `./scripts/apply-patches.sh --dry-run` reports all "Already applied"
 
@@ -204,10 +205,14 @@ Enforced by `.claude/hooks/pre-commit-validator.sh`. Manual reference of what mu
 cd vscode && ./scripts/code.sh
 
 # Production build (RECOMMENDED - automated)
+node ./scripts/worktree-hygiene.mjs --check
+./scripts/create-release-worktree.sh
+# cd to the printed exact-main worktree
+./scripts/release-preflight.sh
 ./scripts/build-prod.sh
 
-# Production build (manual - ~25 min)
-cd vscode && npm run gulp vscode-darwin-arm64
+# The underlying gulp command is intentionally not a public release path.
+# build-prod.sh owns dependency, patch, provenance, and output validation.
 
 # Run production app
 open "VSCode-darwin-arm64/Ritemark Native.app"
@@ -266,7 +271,7 @@ Or use the automated script that does everything:
 
 | Issue | Symptom | Fix |
 |-------|---------|-----|
-| Wrong Node version | Build fails with module errors | `nvm use 20` |
+| Wrong Node version | Build fails with module errors | production: `nvm use "$(cat vscode/.nvmrc)"`; development: `nvm use` from repo root |
 | x64 Node (Rosetta) | Native modules fail | Reinstall Node for arm64 |
 | Extension not in prod | Blank editor in .app | Run `./scripts/build-prod.sh` (copies extension) |
 | 0-byte files | Missing icons, JS errors | `git checkout HEAD -- <file>` |

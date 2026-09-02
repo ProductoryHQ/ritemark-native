@@ -51,11 +51,11 @@ Missing DLC tracker state is a process blocker even when build checks pass.
 
 This script is the canonical repo QA gate before commit/push/merge/release/ready handoff. It validates:
 
-1. **Symlink integrity** — `vscode/extensions/ritemark` → `../../extensions/ritemark`
-2. **Webview bundle size** — `extensions/ritemark/media/webview.js` > 500 KB
-3. **Webview config files** — `postcss.config.js`, `tailwind.config.ts` non-empty
-4. **CSS processing** — webview.js does NOT contain raw `@tailwind` directives
-5. **TypeScript compilation** — `extensions/ritemark` compiles cleanly
+1. **Release source/provenance guards** — accept exact clean input and reject unsafe source/build state
+2. **Worktree hygiene** — real linked worktrees are classified correctly and only a proven-safe tree is removed
+3. **Symlink integrity** — `vscode/extensions/ritemark` → `../../extensions/ritemark`
+4. **Webview bundle size** — `extensions/ritemark/media/webview.js` > 500 KB
+5. **Webview config/CSS/TypeScript checks**
 
 It also enforces bundle freshness (source change without bundle rebuild = block) and the `ai-sidebar` sentinel (the routing key for the AI sidebar / Agent Library).
 
@@ -234,6 +234,12 @@ Recommendation: Run qa-validator after fixing issues.
 ```
 
 ## Production Build Validation
+
+Before app checks, require a new worktree from
+`./scripts/create-release-worktree.sh`, passing pristine
+`verify-release-source.sh`, and matching embedded build provenance. A normal
+development worktree, an old RC directory, shared dependencies, or a locally
+patched VS Code tree is a hard block even if the app launches.
 
 For production releases, also check:
 

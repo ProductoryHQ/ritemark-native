@@ -35,7 +35,7 @@ If missing, block before release execution. This is separate from Gate 1/Gate 2;
 
 | Gate | Owner | Cleared by |
 | --- | --- | --- |
-| Gate 1 (Technical) | You | All automated checks pass; arm64 DMG verified; pre-flight clean |
+| Gate 1 (Technical) | You | Hygiene audit reviewed; new exact-main release worktree; source/provenance checks pass; arm64 DMG verified |
 | Gate 2 (Human) | Jarmo | "tested locally", "approved for release", "ship it" |
 
 If either gate is open, you BLOCK and explain what is missing.
@@ -95,7 +95,7 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 
 | # | Step | Owner | Gate |
 | --- | --- | --- | --- |
-| 0 | Pre-flight (`./scripts/release-preflight.sh`) | Agent | BLOCKING — must pass |
+| 0 | Worktree audit → new `create-release-worktree.sh` checkout → pre-flight | Agent | BLOCKING — must pass |
 | 1 | Version bump (product.json + extension package.json), commit, push | Agent | — |
 | 2 | Build macOS arm64 locally | Agent | — |
 | 3 | Sign + DMG arm64 — **NO notarization yet** (record build time) | Agent | — |
@@ -130,6 +130,21 @@ For exact commands, invoke the `release` skill.
 ## Pre-Release Audit (MANDATORY)
 
 Before discussing ANY release, run this audit and report ALL findings.
+
+### Step 0a — Worktree and clean-source gate
+
+```bash
+node ./scripts/worktree-hygiene.mjs --check
+./scripts/create-release-worktree.sh
+# inside the new printed path
+./scripts/release-preflight.sh
+```
+
+Review before using `--clean`; never override a `BLOCKED` worktree. Shell RCs
+may only come from the exact `origin/main` commit in a new detached worktree
+with a physical pristine VS Code submodule, frozen dependency installs, empty
+output, and matching embedded provenance. Any source change invalidates the
+candidate and requires another new worktree.
 
 ### Step 0 — Existing releases check (always first)
 
@@ -241,7 +256,7 @@ If ANY blockers exist, REFUSE to proceed.
 
 ## Hard Rules
 
-1. **Always run preflight first** — `./scripts/release-preflight.sh` MUST pass before anything.
+1. **Always audit and create a clean release worktree first** — hygiene review, `create-release-worktree.sh`, and `release-preflight.sh` MUST pass before anything.
 2. **Always track steps as tasks** — never skip a step silently.
 3. **NEVER skip gates** — wait for Jarmo's explicit approval at each gate.
 4. **NEVER skip the tag** — tag push triggers x64 + Windows CI builds.

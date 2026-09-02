@@ -155,6 +155,12 @@ for patch_index in "${!PATCHES[@]}"; do
         if git apply --check --reverse "$patch" 2>/dev/null; then
             echo -e "${YELLOW}Already applied (skipping)${NC}"
             SKIPPED=$((SKIPPED + 1))
+        elif reverse_later_patches_then_check_current "$patch_index" "$patch"; then
+            # Patches that create new files are not always reversible directly
+            # in a dirty submodule because those files are intentionally not in
+            # the Git index. Verify their exact content in an isolated tree.
+            echo -e "${YELLOW}Already applied (content verified)${NC}"
+            SKIPPED=$((SKIPPED + 1))
         elif git apply "$patch" 2>/dev/null; then
             echo -e "${GREEN}Done${NC}"
             APPLIED=$((APPLIED + 1))
@@ -308,4 +314,11 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
     fi
 
     echo "========================================"
+
+    # Record the exact derived VS Code diff in the per-worktree Git metadata.
+    # Hygiene may later remove a merged worktree only while this fingerprint
+    # still matches; any manual VS Code edit invalidates the marker.
+    node "$ROOT_DIR/scripts/vscode-derived-state.mjs" --write --repo "$ROOT_DIR"
+elif [ "$DRY_RUN" = false ] && [ "$REVERSE" = true ]; then
+    node "$ROOT_DIR/scripts/vscode-derived-state.mjs" --clear --repo "$ROOT_DIR"
 fi

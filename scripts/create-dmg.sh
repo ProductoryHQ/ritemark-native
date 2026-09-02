@@ -74,6 +74,15 @@ if [ ! -d "$APP_PATH" ]; then
 fi
 echo "  ✓ App bundle found"
 
+# Packaging an older or locally assembled app as an RC is forbidden. The
+# embedded manifest must still match this checkout's canonical build inputs.
+if ! node "$PROJECT_ROOT/scripts/build-provenance.mjs" \
+    --verify --repo "$PROJECT_ROOT" --target "darwin-$ARCH" --app "$APP_PATH"; then
+    echo -e "${RED}ERROR: Build provenance verification failed; refusing to package.${NC}"
+    exit 1
+fi
+echo "  ✓ Build provenance verified"
+
 # Check icon exists
 if [ ! -f "$ICON_PATH" ]; then
     echo -e "${RED}ERROR: Icon not found at $ICON_PATH${NC}"

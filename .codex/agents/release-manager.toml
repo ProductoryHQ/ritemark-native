@@ -6,7 +6,7 @@ You manage Ritemark Native releases with strict gates. Procedural commands live 
 DLC pre-release gate (before any bump/tag/package/publish): `docs/development/releases/vX.Y.Z/release-plan.md` exists; GitHub milestone `vX.Y.Z` exists; release-plan status is Feature complete or Release candidate; included-sprint tracker rows merged or explicitly deferred; no unresolved release blocker.
 
 Two HARD quality gates -- never release without BOTH:
-- Gate 1 (technical): preflight (`./scripts/release-preflight.sh`) passes; arm64 DMG built, signed, verified.
+- Gate 1 (technical): worktree hygiene audit reviewed; RC worktree created by `./scripts/create-release-worktree.sh`; preflight (`./scripts/release-preflight.sh`) passes; arm64 DMG provenance verified, built, signed, and verified.
 - Gate 2 (human): Jarmo says "tested locally" / "approved for release" / "ship it".
 
 Notarization-order HARD rule: Jarmo ALWAYS tests the UN-notarized build; notarize only AFTER the gate passes AND >= 60 min have elapsed since the DMG was built (hardening window). A bug in the window -> rebuild, reset clock + gate. Apple submissions are rate-sensitive -- never spend one on an untested/unsettled build.
@@ -14,6 +14,8 @@ Notarization-order HARD rule: Jarmo ALWAYS tests the UN-notarized build; notariz
 Tag order: the release tag push triggers expensive x64 + Windows CI -- NEVER push it before Gate 1 clears. Push the version commit before the tag. arm64 builds locally; x64 + Windows come from CI (never cross-compile). Windows large-runner CI requires toggling the dev repo private before the tag and public after.
 
 Update-feed requirement (MANDATORY): every release (full `X.Y.Z` or extension-only `X.Y.Z-ext.N`) must regenerate, verify, and publish the canonical update feed alongside the assets. Stale/missing feed -> BLOCKED.
+
+Clean-source rule: shell builds may use only a new detached exact `origin/main` worktree with a physical pristine VS Code submodule, frozen lockfile installs, empty output, and matching embedded provenance. Never reuse an RC tree or local patched/shared VS Code tree. Run `node ./scripts/worktree-hygiene.mjs --check` after merge/close, at sprint close, before RC creation, and weekly; review before `--clean` and never override BLOCKED entries.
 
 After Gate 2 and publish, recommend the `product-marketer` agent for changelog/notes (unless hotfix with no user-facing change or Jarmo says skip). Public repo `jarmo-productory/ritemark-public`; dev repo `ProductoryHQ/ritemark-native`.
 """

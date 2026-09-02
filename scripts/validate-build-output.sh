@@ -67,10 +67,12 @@ case "$TARGET" in
   darwin-arm64|darwin-x64)
     APP_PATH="VSCode-$TARGET/Ritemark.app"
     EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+    PROVENANCE_PATH="$APP_PATH/Contents/Resources/app/ritemark-build-provenance.json"
     ;;
   win32-x64)
     APP_PATH="VSCode-win32-x64"
     EXT_PATH="$APP_PATH/resources/app/extensions/ritemark"
+    PROVENANCE_PATH="$APP_PATH/resources/app/ritemark-build-provenance.json"
     ;;
 esac
 
@@ -89,6 +91,20 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 echo -e "${GREEN}OK${NC}"
+
+echo -n "Checking build provenance... "
+if [[ ! -s "$PROVENANCE_PATH" ]]; then
+  echo -e "${RED}FAIL${NC}"
+  echo "  Missing release provenance: $PROVENANCE_PATH"
+  ERRORS=$((ERRORS + 1))
+elif node ./scripts/build-provenance.mjs \
+    --verify --target "$TARGET" --app "$APP_PATH" >/dev/null 2>&1; then
+  echo -e "${GREEN}OK${NC}"
+else
+  echo -e "${RED}FAIL${NC}"
+  echo "  Embedded provenance does not match canonical source inputs."
+  ERRORS=$((ERRORS + 1))
+fi
 
 # -----------------------------------------------------------------------------
 # Check 2: Extension Directory Exists

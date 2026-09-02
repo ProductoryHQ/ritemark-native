@@ -36,18 +36,22 @@ Run or require these before version bumps, tags, DMG distribution, GitHub releas
 
 ```bash
 gh release list --repo jarmo-productory/ritemark-public --limit 10
+node ./scripts/worktree-hygiene.mjs --check
+./scripts/create-release-worktree.sh
 ./scripts/release-preflight.sh
 ```
 
 Report latest existing release, next valid version, preflight status, blockers, and warnings. Never suggest or reuse a version that already exists.
 
+`create-release-worktree.sh` is mandatory for shell releases. It creates a new detached checkout of the exact `origin/main` commit with a physical VS Code submodule. Any later source commit invalidates that worktree; remove it and create another. Never use an older RC tree, a symlinked VS Code tree, shared `node_modules`, or a pre-existing `VSCode-<target>` output.
+
 ## Full Release Workflow
 
 Use this for VS Code core changes, `patches/vscode`, branding, app bundle changes, or any app installer/DMG distribution.
 
-1. Preflight: `./scripts/release-preflight.sh` must pass.
+1. Audit worktrees, create a new release worktree from the exact `origin/main` commit, then run `./scripts/release-preflight.sh`; all must pass.
 2. Version bump commit: update `branding/product.json` and `extensions/ritemark/package.json`, commit, push. Do not tag yet.
-3. Build local arm64 only: `./scripts/build-prod.sh`.
+3. After the version commit is on `origin/main`, discard any earlier preflight worktree, create a new release worktree, rerun preflight, and build local arm64 with `./scripts/build-prod.sh`.
 4. Sign and package arm64, but do not notarize yet:
 
 ```bash
@@ -79,6 +83,13 @@ Use this for VS Code core changes, `patches/vscode`, branding, app bundle change
 - Notarize the DMG, not the `.app`.
 - If `create-dmg` fails with `/Volumes/... Operation not permitted`, block and report it. Do not silently use `--sandbox-safe`, a plain `hdiutil` fallback, or a non-standard DMG layout.
 - Do not call an unsigned, sandbox-safe, locally hacked, or not-yet-approved DMG “ready”. During Gate 1/Gate 2, describe the expected state precisely as “signed, unnotarized test candidate”.
+- `codesign-app.sh` and `create-dmg.sh` must verify the embedded `ritemark-build-provenance.json`. Missing or mismatched provenance is a hard block.
+
+## Worktree Hygiene
+
+- Run `node ./scripts/worktree-hygiene.mjs --check` after merge/close, at sprint close, before each RC, and weekly.
+- Review before using `--clean`. Only `REMOVE` entries are eligible; never bypass a `BLOCKED` classification with manual recursive deletion.
+- Release artifacts belong in the release system. Locally retain only the currently tested candidate; remove an invalidated or shipped release worktree after the gate evidence is stored.
 
 ## DMG Hard Checks
 

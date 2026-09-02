@@ -43,6 +43,8 @@ Run these from repo root:
 
 ## What `validate-qa.sh` Covers
 
+- release-source acceptance/rejection and build-provenance tests
+- real Git worktree classification and safe-removal tests
 - `vscode/extensions/ritemark` symlink integrity
 - webview bundle size and CSS-processing sanity
 - required webview config files
@@ -53,3 +55,4 @@ Run these from repo root:
 
 - Do not describe work as ready to commit or release if validation failed.
 - If checks were skipped, state that explicitly and explain the risk.
+- For shell releases, QA also requires a new clean release worktree and a passing `verify-release-source.sh`; a normal development checkout is not release evidence.

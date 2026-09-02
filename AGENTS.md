@@ -51,6 +51,7 @@ These are different object types: a Claude role agent maps to a `.codex/agents/*
 ### Default Workflow
 
 - Prefer existing project scripts in `scripts/` over ad hoc shell sequences.
+- Run `node ./scripts/worktree-hygiene.mjs --check` after PR merge/close, at sprint close, before every RC, and weekly. Use `--clean` only after reviewing the report; the script must preserve dirty, unreadable, unpushed, upstream-less, active, current, primary, and locked worktrees.
 - Before commit, push, merge, release, or "ready" handoff, use the `qa-validation` skill and run `./scripts/validate-qa.sh`.
 - For release work, also use the `release-process` skill and run `./scripts/release-preflight.sh` before version bumps, tags, or build/distribution steps.
 - Keep release-bound sprint documentation under `docs/development/releases/vX.Y.Z/sprint-NN-name/` aligned with implementation. Use `docs/development/sprints/` only for historical/non-release-bound legacy sprint docs.
@@ -66,6 +67,7 @@ These are different object types: a Claude role agent maps to a `.codex/agents/*
 - A sprint may require an audit or research pass before implementation starts. Do that first when the scope is unclear, cross-cutting, or recovery/debugging heavy.
 - Treat each sprint as one feature branch. Do not mix multiple sprint implementations on the same branch.
 - If no sprint exists yet, stop at release/sprint setup, audit, and planning. Do not proceed into implementation changes in the same step as if the sprint already existed.
+- A shell-release candidate must be built in a new worktree created by `./scripts/create-release-worktree.sh`. `build-prod.sh`, signing, and packaging must refuse a source that is not the exact `origin/main` commit, uses a symlinked/pre-patched VS Code tree, shares top-level dependency directories, reuses build output, or lacks matching embedded provenance. Full contract: `docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`.
 
 ### Skill Routing
 

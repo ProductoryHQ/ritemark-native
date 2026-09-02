@@ -47,7 +47,7 @@ These are non-negotiable. Any proposal that violates one needs Jarmo's explicit 
 
 **VS Code as submodule, not fork.** All VS Code customizations go through patch files in `patches/vscode/`. Never edit the `vscode/` submodule tree directly. The cost of patches (brittleness on upstream bumps) is the accepted price of cheap upstream sync.
 
-**Extension symlinked, not copied.** Edit only in `extensions/ritemark/src/`. The symlink into `vscode/extensions/ritemark` is applied at build time. Never edit the submodule copy.
+**Extension source has one authority.** Edit only in `extensions/ritemark/`. Development and local macOS builds use a same-worktree symlink at `vscode/extensions/ritemark`; CI and Windows packaging may create a same-worktree physical copy for platform/tooling constraints. That copy is derived build state, never editable source and never borrowed from another worktree.
 
 **Webview is sandboxed.** The webview has no filesystem or Node access. Everything crosses `bridge.ts` via postMessage. Never give the webview direct FS access to "simplify" things. Hardening the boundary (typed protocol) is acceptable; dissolving it is not.
 
